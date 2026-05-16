@@ -30,13 +30,14 @@ interface MusicGraphProps {
   onLegendInteraction?: () => void;
   onExtendNode?: (node: Node) => void;
   onRemoveNode?: (node: Node) => void;
+  isGuest?: boolean;
 }
 
 const MusicGraph: React.FC<MusicGraphProps> = ({
   data, libraryArtists, seedArtists, onNodeClick, selectedNode, isSmallScreen,
   activeFilters, focusOn, searchQuery, toggleFilter,
   legendConfig, legendOrder, graphSettings = { linkDistance: 3, nodeSize: 3 },
-  legendRef, onInteraction, onLegendInteraction, onExtendNode, onRemoveNode
+  legendRef, onInteraction, onLegendInteraction, onExtendNode, onRemoveNode, isGuest
 }) => {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const simulationRef = useRef<d3.Simulation<Node, Link> | null>(null);
@@ -622,7 +623,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         <svg ref={svgRef} className="w-full h-full touch-none" />
         
         <AnimatePresence mode="wait">
-            {selectedNode && selectedNodePos && !selectedNode.isLoading && (
+            {selectedNode && selectedNodePos && !selectedNode.isLoading && !isGuest && (
                 <motion.div
                     key={`node-actions-${selectedNode.id}`}
                     initial={{ opacity: 0, scale: 0.8 }}

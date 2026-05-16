@@ -60,11 +60,12 @@ interface NodeDetailsCardProps {
   onToggleStack: (node: Node, link?: string) => void;
   onToggleMagazineView?: () => void;
   isGuest?: boolean;
+  onAuthRequest?: () => void;
 }
 
 const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     node, details, isLoading, isGlobalLoading, graphData, libraryArtists, seedArtists, onAddArtist, isSmallScreen, onRefresh, onClose, onNodeClick, onNavigate,
-    chatHistory, onSendMessage, isChatLoading, isFullScreenMode = false, isHero = false, isInStack, onToggleStack, onToggleMagazineView, isGuest = false
+    chatHistory, onSendMessage, isChatLoading, isFullScreenMode = false, isHero = false, isInStack, onToggleStack, onToggleMagazineView, isGuest = false, onAuthRequest
 }) => {
     const [chatInput, setChatInput] = useState('');
     const [isListening, setIsListening] = useState(false);
@@ -486,7 +487,23 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 </h4>
                                 
                                 <div className="space-y-4 bg-zinc-950/20 border border-zinc-800/50 p-4">
-                                    <div className="max-h-60 overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-zinc-800 pr-1">
+                                    {isGuest ? (
+                                        <div className="flex flex-col items-center justify-center text-center p-6 bg-zinc-900/50 rounded-xl border border-zinc-800/80">
+                                            <span className="material-symbols-outlined !text-4xl text-primary/50 mb-3">lock</span>
+                                            <h5 className="text-sm font-semibold text-zinc-200 mb-2">AI Assistant Locked</h5>
+                                            <p className="text-xs text-zinc-400 leading-relaxed mb-4">
+                                                Sign in and save this project to your dashboard to use the AI assistant and edit this zcene!
+                                            </p>
+                                            <button 
+                                                onClick={() => onAuthRequest?.()}
+                                                className="bg-primary text-brand-black px-6 py-2 rounded-xl text-sm font-bold shadow-lg hover:scale-[1.02] active:scale-95 transition-all"
+                                            >
+                                                Sign in to Save
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div className="max-h-60 overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-zinc-800 pr-1">
                                         {chatHistory.length === 0 ? (
                                             <p className="text-sm text-zinc-500 text-center py-4 italic">
                                                 Inquire about history or relative scene positioning.
@@ -555,6 +572,8 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                             </button>
                                         </div>
                                     </div>
+                                    </>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -596,6 +615,7 @@ interface DetailsPanelProps {
   stack: StackItem[];
   onToggleStack: (node: Node, link?: string) => void;
   isGuest?: boolean;
+  onAuthRequest?: () => void;
 }
 
 export const DetailsPanel: React.FC<DetailsPanelProps> = ({
@@ -603,7 +623,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
   error, systemError, graphData, libraryArtists, seedArtists, onAddArtist, isCollapsed, onToggleCollapse,
   isSmallScreen, onNodeClick, onNavigate, isGlobalLoading, onCancelGlobalLoading, unreadCount, isActive, collapseBtnRef,
   isMagazineViewOpen, onMagazineViewToggle, chatHistories, onUpdateChatHistories, stack, onToggleStack,
-  isGuest = false
+  isGuest = false, onAuthRequest
 }) => {
     const [viewedIndex, setViewedIndex] = useState(0);
     const [isChatLoading, setIsChatLoading] = useState(false);
@@ -990,6 +1010,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 onToggleStack={onToggleStack}
                                                 onToggleMagazineView={() => onMagazineViewToggle(!isMagazineViewOpen)}
                                                 isGuest={isGuest}
+                                                onAuthRequest={onAuthRequest}
                                             />
                                         </div>
                                     );
