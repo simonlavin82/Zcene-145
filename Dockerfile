@@ -21,4 +21,5 @@ EXPOSE 8080
 
 # Configure environment fallback variable and launch via node production handler
 ENV PORT=8080
-CMD ["npm", "run", "preview"]
+# Inject the runtime GEMINI_API_KEY into the built index.html before starting the server
+CMD ["sh", "-c", "sed -i \"s|<head>|<head><script>window.GEMINI_API_KEY='$GEMINI_API_KEY'</script>|g\" dist/index.html && npm run preview"]

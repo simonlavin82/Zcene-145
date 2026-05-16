@@ -578,7 +578,40 @@ const App: React.FC = () => {
   }, [user, handleLogin]);
 
   const handleShareZcene = useCallback(async () => {
-    if (!user || !graphData || isSharing) return null;
+    // 1. Robust Check for existing Share ID (Path or Params)
+    const hash = window.location.hash;
+    const params = new URLSearchParams(hash.includes('?') ? hash.split('?')[1] : '');
+    
+    // Check #/z/ID pattern (used for both projects and shares)
+    let existingShareId = null;
+    if (hash.includes('#/z/')) {
+      existingShareId = hash.split('#/z/')[1].split('?')[0];
+    }
+    
+    // Fallback to query params
+    if (!existingShareId) {
+      existingShareId = params.get('shareId') || params.get('id');
+    }
+    
+    // If we are viewing a shared link (even as a guest), we can just reshare the existing ID
+    if (existingShareId && isGuest) {
+      console.log(`[Sharing] Resharing existing guest ID: ${existingShareId}`);
+      return existingShareId;
+    }
+
+    if (isSharing) return null;
+
+    // 2. Auth gating for NEW share generation
+    if (!user) {
+      setPendingAuthAction({ type: 'share', payload: null });
+      handleLogin();
+      return null;
+    }
+
+    if (!graphData) {
+      showToast('No graph data to share!');
+      return null;
+    }
 
     if (!user.emailVerified) {
       setError("Your email must be verified to share Zcenes. Please check your inbox or sign in with a verified account.");
@@ -608,12 +641,18 @@ const App: React.FC = () => {
 
       return docRef.id;
     } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, path);
+      // Gracefully handle Firestore errors (like Quota Exhausted)
+      const errMessage = err instanceof Error ? err.message : String(err);
+      if (errMessage.includes('resource-exhausted') || errMessage.includes('quota')) {
+        showToast("Database quota reached. Please try again tomorrow.");
+      } else {
+        handleFirestoreError(err, OperationType.WRITE, path);
+      }
       return null;
     } finally {
       setIsSharing(false);
     }
-  }, [user, graphData, seedArtists, activeNodes, detailsCache, isSharing, showToast]);
+  }, [user, graphData, seedArtists, activeNodes, detailsCache, isSharing, showToast, handleLogin, isGuest]);
 
   const handleTriggerShareModal = useCallback(async () => {
     const shareId = await handleShareZcene();
