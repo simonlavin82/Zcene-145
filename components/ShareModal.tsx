@@ -1,0 +1,94 @@
+import React from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+
+interface ShareModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  shareUrl: string;
+}
+
+export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, shareUrl }) => {
+  const [copied, setCopied] = React.useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy", err);
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+          />
+
+          {/* Modal */}
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            className="relative bg-background-dark border border-zinc-600 rounded-none max-w-md w-full overflow-hidden shadow-2xl"
+          >
+            <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary !text-[18px]">share</span>
+                <h3 className="font-medium text-white text-base">Share Zcene</h3>
+              </div>
+              <button 
+                onClick={onClose}
+                className="text-zinc-500 hover:text-white transition-colors p-1"
+              >
+                <span className="material-symbols-outlined !text-[18px]">close</span>
+              </button>
+            </header>
+
+            <div className="p-4 space-y-4">
+              <p className="text-sm text-zinc-400 leading-relaxed">
+                Anyone with the link can view this music discovery journey.
+              </p>
+
+              <div className="relative flex items-center gap-3 bg-zinc-950 border border-zinc-800 rounded-xl p-3 overflow-hidden group">
+                <span className="material-symbols-outlined text-zinc-500 !text-[18px]">link</span>
+                <input 
+                  readOnly 
+                  value={shareUrl}
+                  className="flex-1 bg-transparent text-zinc-300 text-sm outline-none font-mono truncate"
+                />
+                <button 
+                  onClick={handleCopy}
+                  className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+                    copied 
+                    ? 'bg-green-500/10 text-green-500' 
+                    : 'bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700'
+                  }`}
+                >
+                  {copied ? 'Copied!' : 'Copy'}
+                </button>
+              </div>
+            </div>
+
+            <footer className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end">
+              <button 
+                onClick={onClose}
+                className="px-6 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm hover:opacity-90 transition-opacity"
+              >
+                Done
+              </button>
+            </footer>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+};

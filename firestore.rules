@@ -1,0 +1,164 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Phase 3: Primitive Definition
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isEmailVerified() {
+      return request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'Simon.Lavin1@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // --- Validation Blueprints ---
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['email']) &&
+             data.keys().size() <= 12 &&
+             data.email is string && data.email.size() <= 256 &&
+             (!('displayName' in data) || (data.displayName == null || (data.displayName is string && data.displayName.size() <= 200))) &&
+             (!('photoURL' in data) || (data.photoURL == null || (data.photoURL is string && data.photoURL.size() <= 1000))) &&
+             (!('createdAt' in data) || (data.createdAt is timestamp)) &&
+             (!('updatedAt' in data) || (data.updatedAt is timestamp)) &&
+             (!('libraryArtists' in data) || (data.libraryArtists is string)) &&
+             (!('onboardingProgress' in data) || data.onboardingProgress is map) &&
+             (!('pageAuth' in data) || data.pageAuth is map);
+    }
+
+    function isValidProject(data) {
+      return data.keys().hasAll(['name', 'seedArtists']) &&
+             data.keys().size() <= 20 &&
+             data.name is string && data.name.size() <= 512 &&
+             data.seedArtists is string && data.seedArtists.size() <= 10000 &&
+             (!('graphData' in data) || (data.graphData == null || (data.graphData is string && data.graphData.size() <= 2097152))) &&
+             (!('activeNodes' in data) || (data.activeNodes is list)) &&
+             (!('detailsCache' in data) || (data.detailsCache == null || data.detailsCache is string)) &&
+             (!('chatHistories' in data) || (data.chatHistories == null || data.chatHistories is string)) &&
+             (!('discoveryFilters' in data) || (data.discoveryFilters is string)) &&
+             (!('lastViewedStackCount' in data) || (data.lastViewedStackCount is int)) &&
+             (!('isMagazineViewOpen' in data) || (data.isMagazineViewOpen is bool)) &&
+             (!('authorId' in data) || (data.authorId is string)) &&
+             (!('createdAt' in data) || (data.createdAt is timestamp)) &&
+             (!('updatedAt' in data) || (data.updatedAt is timestamp));
+    }
+
+    function isValidStackItem(data) {
+      return data.keys().hasAll(['id', 'type', 'dateSaved']) &&
+             data.id is string &&
+             data.type is string &&
+             (data.dateSaved is int || data.dateSaved is timestamp);
+    }
+
+    function isValidSession(data) {
+      return data.spiderwebData is string &&
+             data.activeDeepCuts is list;
+    }
+
+    function isValidSharedZcene(data) {
+      return data.keys().hasAll(['graphData', 'seedArtists', 'activeNodes']) &&
+             data.graphData is string &&
+             data.seedArtists is string &&
+             data.activeNodes is list;
+    }
+
+    // --- Core Rules ---
+
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      
+      allow create: if isOwner(userId) && 
+                      isValidUser(incoming());
+      
+      allow update: if isOwner(userId) && 
+                      isValidUser(incoming());
+      
+      allow delete: if isOwner(userId) || isAdmin();
+
+      match /projects/{projectId} {
+        allow get: if isOwner(userId);
+        allow list: if isOwner(userId);
+        
+        allow create: if isOwner(userId) && 
+                        isValidProject(incoming());
+        
+        allow update: if isOwner(userId) && 
+                        isValidProject(incoming());
+        
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      match /stack/{itemId} {
+        allow get: if isOwner(userId);
+        allow list: if isOwner(userId);
+        
+        allow create: if isOwner(userId) && 
+                        isValidStackItem(incoming());
+        
+        allow update: if isOwner(userId) && 
+                        isValidStackItem(incoming());
+        
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      match /userSession/{sessionId} {
+        allow get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidSession(incoming());
+        allow update: if isOwner(userId) && isValidSession(incoming());
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+    }
+
+    match /sharedZcenes/{shareId} {
+      allow get: if true;
+      allow list: if isSignedIn() && (resource.data.authorId == request.auth.uid || isAdmin());
+      
+      allow create: if isSignedIn() && 
+                      isValidSharedZcene(incoming()) &&
+                      incoming().authorId == request.auth.uid;
+      
+      allow delete: if isAdmin() || (isSignedIn() && existing().authorId == request.auth.uid);
+    }
+
+    // Support for potential legacies or flat projects
+    match /projects/{projectId} {
+      allow get: if isValidId(projectId) && (
+        (isSignedIn() && resource.data.authorId == request.auth.uid) ||
+        (resource.data.isPublic == true)
+      );
+      allow delete: if isAdmin() || (isSignedIn() && existing().authorId == request.auth.uid);
+    }
+    
+    // Explicit health check path
+    match /test/connection {
+      allow get: if true;
+    }
+  }
+}

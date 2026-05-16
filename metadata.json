@@ -1,0 +1,7 @@
+{
+  "name": "Remix: 144 Zcene - Own Music Discovery",
+  "description": "The brick wall",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

@@ -1,0 +1,92 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Phase 3: Primitive Definition
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // User Validation Blueprint
+    function isValidUser(data) {
+      return data.keys().hasAll(['email']) &&
+             data.keys().size() <= 5 &&
+             data.email is string &&
+             data.email.size() <= 256 &&
+             // Authentication Integrity
+             data.email == request.auth.token.email &&
+             request.auth.token.email_verified == true &&
+             (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 100)) &&
+             (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 500)) &&
+             (!('createdAt' in data) || (data.createdAt is string));
+    }
+
+    // Stack Item Validation Blueprint
+    function isValidStackItem(data) {
+      return data.keys().hasAll(['id', 'type', 'dateSaved']) &&
+             data.keys().size() <= 5 &&
+             data.id is string && data.id.size() <= 256 &&
+             data.type is string && (data.type == 'artist' || data.type == 'label' || data.type == 'genre') &&
+             data.dateSaved is int &&
+             (!('link' in data) || (data.link is string && data.link.size() <= 1000));
+    }
+
+    // Phase 4: Drafting the "Fortress" Rules
+    match /users/{userId} {
+      // 3. Path Variable Hardening
+      allow get: if isOwner(userId) && isValidId(userId);
+      
+      allow create: if isOwner(userId) && 
+                      isValidId(userId) && 
+                      isValidUser(incoming());
+      
+      allow update: if isOwner(userId) && 
+                      isValidId(userId) && 
+                      isValidUser(incoming()) && (
+                        // Action: Update Profile info
+                        incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL'])
+                      );
+      
+      // No blanket reads allowed. Each list must be secure.
+      // Profiles aren't listed in this app.
+
+      match /stack/{itemId} {
+        allow get: if isOwner(userId) && isValidId(itemId);
+        allow list: if isOwner(userId); // Explicitly restricted to owner
+        
+        allow create: if isOwner(userId) && 
+                        isValidId(itemId) && 
+                        isValidStackItem(incoming());
+        
+        allow update: if isOwner(userId) && 
+                        isValidId(itemId) && 
+                        isValidStackItem(incoming()) && (
+                          // Action: Update Link/Metadata
+                          incoming().diff(existing()).affectedKeys().hasOnly(['link'])
+                        );
+        
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}

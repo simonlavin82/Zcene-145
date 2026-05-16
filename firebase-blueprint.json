@@ -1,0 +1,97 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and preferences",
+      "type": "object",
+      "properties": {
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "libraryArtists": { "type": "string" },
+        "onboardingProgress": { "type": "object" },
+        "pageAuth": { "type": "object" }
+      },
+      "required": ["email"]
+    },
+    "Stack": {
+      "title": "Stack",
+      "description": "User's saved artists and labels",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string" },
+        "dateSaved": { "type": "integer" },
+        "link": { "type": "string" }
+      },
+      "required": ["id", "type", "dateSaved"]
+    },
+    "UserSession": {
+      "title": "User Session",
+      "description": "User's current active session state",
+      "type": "object",
+      "properties": {
+        "spiderwebData": { "type": "string" },
+        "activeDeepCuts": { "type": "array" },
+        "updatedAt": { "type": "object" }
+      },
+      "required": ["spiderwebData", "activeDeepCuts"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "A saved music discovery project",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "seedArtists": { "type": "string" },
+        "graphData": { "type": "string" },
+        "activeNodes": { "type": "array" },
+        "detailsCache": { "type": "string" },
+        "chatHistories": { "type": "string" },
+        "discoveryFilters": { "type": "string" },
+        "lastViewedStackCount": { "type": "integer" },
+        "isMagazineViewOpen": { "type": "boolean" },
+        "createdAt": { "type": "object" },
+        "updatedAt": { "type": "object" }
+      },
+      "required": ["name", "seedArtists"]
+    },
+    "SharedZcene": {
+      "title": "Shared Zcene",
+      "description": "A shareable snapshot of a Zcene",
+      "type": "object",
+      "properties": {
+        "graphData": { "type": "string" },
+        "seedArtists": { "type": "string" },
+        "activeNodes": { "type": "array" },
+        "detailsCache": { "type": "string" },
+        "authorId": { "type": "string" },
+        "createdAt": { "type": "object" }
+      },
+      "required": ["graphData", "seedArtists", "activeNodes"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile documents"
+    },
+    "/users/{userId}/stack/{itemId}": {
+      "schema": "Stack",
+      "description": "User's individual stack items"
+    },
+    "/users/{userId}/userSession/current": {
+      "schema": "UserSession",
+      "description": "User's current active session document"
+    },
+    "/users/{userId}/projects/{projectId}": {
+      "schema": "Project",
+      "description": "User's saved projects"
+    },
+    "/sharedZcenes/{shareId}": {
+      "schema": "SharedZcene",
+      "description": "Publicly shareable Zcenes"
+    }
+  }
+}
