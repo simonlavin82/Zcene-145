@@ -75,10 +75,8 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     onInteractionRef.current = onInteraction;
     selectedNodeRef.current = selectedNode;
     
-    // If a node is selected, give the simulation a small kick to ensure the "Add" button position updates
-    if (selectedNode && simulationRef.current) {
-        simulationRef.current.alpha(0.1).restart();
-    }
+    // No longer kicking the simulation on selection to maintain absolute stability.
+    // The selectedNodePos useEffect handles the button positioning even when simulation is idle.
   }, [onNodeClick, onInteraction, selectedNode]);
 
   const distMult = Math.pow(1.8, graphSettings.linkDistance - 3);
@@ -181,9 +179,6 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   const visibleNodesRef = useRef(visibleNodes);
   useEffect(() => {
     visibleNodesRef.current = visibleNodes;
-    if (selectedNode && simulationRef.current) {
-        simulationRef.current.alpha(0.1).restart();
-    }
   }, [visibleNodes, selectedNode]);
 
   const selectionHighlightIds = useMemo(() => {
@@ -283,7 +278,9 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             .force("link", d3.forceLink<Node, Link>().id((d: any) => String(d.id)).strength(0.3))
             .force("charge", d3.forceManyBody().strength(-600))
             .force("collide", d3.forceCollide().radius(55 * sizeMult))
-            .velocityDecay(0.55) 
+            .velocityDecay(0.7) 
+            .alphaMin(0.01)
+            .alphaDecay(0.1)
             .on("tick", () => {
                 if (!svgRef.current) return;
                 const currentContainer = d3.select(svgRef.current).select(".main-container");
@@ -481,7 +478,8 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                         .on("drag", (event, d) => { d.fx = event.x; d.fy = event.y; })
                         .on("end", (event, d) => {
                             if (!event.active) simulation.alphaTarget(0);
-                            d.fx = null; d.fy = null;
+                            d.fx = event.x;
+                            d.fy = event.y;
                         })
                     );
                 g.append("path");
@@ -552,7 +550,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         .attr("stroke-dasharray", "3,3");
 
     // Use a lower alpha for restarts to prevent "explosive" movement on interaction
-    simulation.alpha(0.3).alphaTarget(0).restart();
+    simulation.alpha(0.15).alphaTarget(0).restart();
   }, [dimensions, visibleNodes, visibleLinks, focusOn, distMult, sizeMult, seedArtists]);
 
   // Ensure selectedNodePos is updated when selection changes, even if simulation is idle

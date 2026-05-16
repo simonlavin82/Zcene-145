@@ -1,0 +1,7 @@
+kind: "AppHosting"
+schemaVersion: "v1"
+
+# Environment variables
+env:
+  - name: PROJECT_ID
+    value: "gen-lang-client-0482359498"

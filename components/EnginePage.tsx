@@ -87,17 +87,21 @@ the entire dataset, the app evolves existing visual structures.
 
 const PHYSICS_ENGINE_DOCUMENTATION = `
 The spiderweb is powered by a D3.js force-directed simulation (d3-force) 
-tuned for "Organic discovery and Liquid clustering" (MusicGraph.tsx).
+tuned for "Organic discovery and Stable clustering" (MusicGraph.tsx).
 
 STABILITY & MOMENTUM CONSTANTS:
-- Velocity Decay: 0.55. Provides balanced friction and natural momentum, 
-  allowing nodes to swing into organic clusters with controlled settling.
+- Velocity Decay: 0.7. Provides high friction for rapid settling and 
+  stability, minimizing jitter during user interaction.
 - Charge (ManyBody): -500 (Organic Mode) to -1200 (Cluster Mode). 
   Variable repulsion allows the "gravity" of connections to define the layout.
 - Collision: radius(80 * sizeMult in Organic). Prevents overlaps while 
   maintaining dense, semantic grouping without forcing grid symmetry.
-- Alpha Targets: 0.3 (Initialization) / 0.2 (Interactive Drag). Ensures 
-  smooth transitions without chaotic "explosions" during state changes.
+- Alpha Targets: 0.15 (Initialization) / 0.2 (Interactive Drag). Reduced 
+  initial momentum ensures the graph remains approachable and clickable.
+- Alpha Cooling: alphaDecay(0.1) and alphaMin(0.01). Forces the simulation 
+  to reach a complete halt rapidly to prevent perpetual "liquid" jitter.
+- Sticky Nodes: Nodes are pinned (fx/fy) permanently upon drag release to 
+  allow for manual structural curation.
 
 RELATIONAL SCALING (Formulas):
 Users can adjust layout density via the Preferences panel.
