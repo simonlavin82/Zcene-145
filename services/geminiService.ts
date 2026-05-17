@@ -309,11 +309,12 @@ export const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed infor
 // --- SERVICE FUNCTIONS ---
 
 export const generateGraphData = async (artists: string, baseGraph?: GraphData, filters?: DiscoveryFilters): Promise<GraphData> => {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
-  if (!apiKey) {
-      console.error("Gemini API Key is missing. Ensure GEMINI_API_KEY or API_KEY is set in your environment.");
-  }
-  const ai = new GoogleGenAI({ apiKey: apiKey || '' });
+  const proxyKey = 'backend-proxy-key'; // Actual key is securely injected by the proxy
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin + '/api/gemini' : 'http://localhost:8080/api/gemini';
+  const ai = new GoogleGenAI({ 
+      apiKey: proxyKey,
+      httpOptions: { baseUrl }
+  });
   
   const attemptRequest = async (retriesLeft: number): Promise<GraphData> => {
     // Reverting to Pro for complex graph generation to ensure full, valid JSON responses
@@ -560,8 +561,12 @@ export const generateGraphData = async (artists: string, baseGraph?: GraphData, 
 };
 
 export const extendGraphFromNode = async (node: Node, baseGraph: GraphData): Promise<GraphData> => {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
-  const ai = new GoogleGenAI({ apiKey: apiKey || '' });
+  const proxyKey = 'backend-proxy-key';
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin + '/api/gemini' : 'http://localhost:8080/api/gemini';
+  const ai = new GoogleGenAI({ 
+      apiKey: proxyKey,
+      httpOptions: { baseUrl }
+  });
   
   const existingNodeIds = baseGraph.nodes.map(n => `"${n.id}" (${n.type})`).join(', ');
   const systemInstruction = EXTEND_GRAPH_PROMPT_TEMPLATE
@@ -591,11 +596,12 @@ export const extendGraphFromNode = async (node: Node, baseGraph: GraphData): Pro
 };
 
 export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArtists: string, originHint?: string | null): Promise<NodeDetails> => {
-    const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
-    if (!apiKey) {
-        console.error("Gemini API Key is missing for fetchNodeDetails.");
-    }
-    const ai = new GoogleGenAI({ apiKey: apiKey || '' });
+    const proxyKey = 'backend-proxy-key';
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin + '/api/gemini' : 'http://localhost:8080/api/gemini';
+    const ai = new GoogleGenAI({ 
+        apiKey: proxyKey,
+        httpOptions: { baseUrl }
+    });
     
     const contextNodes = graphData.links
         .filter(l => (typeof l.source === 'string' ? l.source : l.source.id) === node.id || (typeof l.target === 'string' ? l.target : l.target.id) === node.id)
@@ -699,11 +705,12 @@ export const streamNodeChat = async (
   graphData: GraphData,
   onChunk: (text: string) => void
 ) => {
-    const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
-    if (!apiKey) {
-        console.error("Gemini API Key is missing for streamNodeChat.");
-    }
-    const ai = new GoogleGenAI({ apiKey: apiKey || '' });
+    const proxyKey = 'backend-proxy-key';
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin + '/api/gemini' : 'http://localhost:8080/api/gemini';
+    const ai = new GoogleGenAI({ 
+        apiKey: proxyKey,
+        httpOptions: { baseUrl }
+    });
     
     const contextNodes = graphData.nodes.map(n => `"${n.id}" (${n.type})`).slice(0, 30).join(', ');
     

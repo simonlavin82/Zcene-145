@@ -12,7 +12,21 @@ export default defineConfig(({ mode }) => {
       allowedHosts: [
         'www.zcene.online',
         'remix-145-zcene-live-800155534113.us-west1.run.app'
-      ]
+      ],
+      proxy: {
+        '/api/gemini': {
+          target: 'https://generativelanguage.googleapis.com',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api\/gemini/, ''),
+          configure: (proxy) => {
+            proxy.on('proxyReq', (proxyReq) => {
+              if (env.GEMINI_API_KEY) {
+                proxyReq.setHeader('x-goog-api-key', env.GEMINI_API_KEY);
+              }
+            });
+          }
+        }
+      }
     },
     plugins: [react(), tailwindcss()],
     define: {
