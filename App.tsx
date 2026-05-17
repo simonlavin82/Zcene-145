@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { AlertCircle, X, CheckCircle2, Key } from 'lucide-react';
 import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project } from './types';
 import { generateGraphData, fetchNodeDetails, extendGraphFromNode } from './services/geminiService';
+import { normalizeCacheKey, readArtistCache, writeArtistCache, updateCacheDetailsCache, incrementCacheHit } from './services/artistCacheService';
 import { auth, signInWithGoogle, logout, onAuthStateChanged, User, db, handleFirestoreError, OperationType } from './services/firebase';
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, getDocFromServer, serverTimestamp, addDoc, getDoc, getDocs, orderBy, where, writeBatch, getDocFromCache, updateDoc } from 'firebase/firestore';
 const StyleGuidePage = React.lazy(() => import('./components/DesignSystem').then(m => ({ default: m.StyleGuidePage })));
@@ -455,6 +456,7 @@ const App: React.FC = () => {
   const [activeShareUrl, setActiveShareUrl] = useState<string | null>(null);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
+  const [currentCacheKey, setCurrentCacheKey] = useState<string | null>(null);
   const [isStackDialogOpen, setIsStackDialogOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const isAdmin = useMemo(() => {
@@ -550,6 +552,14 @@ const App: React.FC = () => {
 
     console.log(`[Dashboard] Creating Project: ${newId}`);
 
+    // EXPLICITLY RESET CANVAS STATE IMMEDIATELY (Fixing state leak from previous guest projects)
+    setGraphData({ nodes: [], links: [] });
+    setSeedArtists('');
+    setActiveNodes([]);
+    setDetailsCache(new Map());
+    setChatHistories(new Map());
+    setCurrentCacheKey(null);
+
     // Update route immediately
     window.location.hash = `#/z/${newId}`;
     setIsCreatingProject(true);
@@ -621,14 +631,34 @@ const App: React.FC = () => {
     setIsSharing(true);
     const path = 'sharedZcenes';
     try {
-      const docRef = await addDoc(collection(db, path), {
-        graphData: JSON.stringify(graphData),
+      // Build lightweight canvas layout — artist positions only
+      const canvasLayout = graphData!.nodes
+        .filter(n => n.type === 'artist')
+        .map(n => ({ nodeId: n.id, x: n.x, y: n.y, fx: n.fx ?? null, fy: n.fy ?? null }));
+
+      const sharePayload: Record<string, any> = {
         seedArtists,
         activeNodes: activeNodes.map(n => n.id),
-        detailsCache: JSON.stringify(Array.from(detailsCache.entries())),
         authorId: user.uid,
-        createdAt: serverTimestamp()
-      });
+        createdAt: serverTimestamp(),
+      };
+
+      if (currentCacheKey) {
+        // New format: store cacheKey + canvasLayout for fast hydration from artists cache.
+        // Also include the full graphData as an inline fallback — guests can render the canvas
+        // immediately even if the artists cache document is unavailable.
+        sharePayload.cacheKey = currentCacheKey;
+        sharePayload.canvasLayout = JSON.stringify(canvasLayout);
+        sharePayload.graphData = JSON.stringify(graphData);
+        sharePayload.detailsCache = JSON.stringify(Array.from(detailsCache.entries()));
+      } else {
+        // Fallback: no cache key, write full blobs directly
+        sharePayload.graphData = JSON.stringify(graphData);
+        sharePayload.detailsCache = JSON.stringify(Array.from(detailsCache.entries()));
+      }
+
+
+      const docRef = await addDoc(collection(db, path), sharePayload);
 
       const shareUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}#/app?id=${docRef.id}`;
       try {
@@ -652,7 +682,8 @@ const App: React.FC = () => {
     } finally {
       setIsSharing(false);
     }
-  }, [user, graphData, seedArtists, activeNodes, detailsCache, isSharing, showToast, handleLogin, isGuest]);
+  }, [user, graphData, seedArtists, activeNodes, detailsCache, isSharing, currentCacheKey, showToast, handleLogin, isGuest]);
+
 
   const handleTriggerShareModal = useCallback(async () => {
     const shareId = await handleShareZcene();
@@ -860,23 +891,38 @@ const App: React.FC = () => {
     const newDocRef = doc(collection(db, 'users', user.uid, 'projects'));
     const newId = newDocRef.id;
 
+    // Phase 05: Build lightweight canvas layout — artist nodes only (x/y/fx/fy).
+    // Heavy graphData and detailsCache live in the global 'artists' cache, referenced by cacheKey.
+    const canvasLayout = graphData.nodes
+      .filter(n => n.type === 'artist')
+      .map(n => ({ nodeId: n.id, x: n.x, y: n.y, fx: n.fx ?? null, fy: n.fy ?? null }));
+
     const path = `users/${user.uid}/projects/${newId}`;
     try {
-      await setDoc(newDocRef, {
+      const docPayload: Record<string, any> = {
         name: projectName || (seedArtists ? seedArtists.split('::')[0] : 'Saved Zcene'),
         seedArtists,
-        graphData: JSON.stringify(graphData),
         activeNodes: activeNodes.map(n => n.id),
-        detailsCache: JSON.stringify(Array.from(detailsCache.entries())),
         chatHistories: JSON.stringify(Array.from(chatHistories.entries())),
         discoveryFilters: JSON.stringify(discoveryFilters),
         lastViewedStackCount,
         isMagazineViewOpen: false,
         authorId: user.uid,
         createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      });
+        updatedAt: serverTimestamp(),
+      };
 
+      if (currentCacheKey) {
+        // New lightweight path: reference global cache
+        docPayload.cacheKey = currentCacheKey;
+        docPayload.canvasLayout = JSON.stringify(canvasLayout);
+      } else {
+        // Fallback: write full blobs if there's no cache key (shouldn't normally happen)
+        docPayload.graphData = JSON.stringify(graphData);
+        docPayload.detailsCache = JSON.stringify(Array.from(detailsCache.entries()));
+      }
+
+      await setDoc(newDocRef, docPayload);
       showToast('Zcene saved to your dashboard!');
       window.location.hash = `#/z/${newId}`;
     } catch (err) {
@@ -884,7 +930,8 @@ const App: React.FC = () => {
     } finally {
       setIsCreatingProject(false);
     }
-  }, [user, graphData, seedArtists, projectName, activeNodes, detailsCache, chatHistories, discoveryFilters, lastViewedStackCount, handleLogin, showToast]);
+  }, [user, graphData, seedArtists, projectName, activeNodes, detailsCache, chatHistories, discoveryFilters, lastViewedStackCount, currentCacheKey, handleLogin, showToast]);
+
 
   const handleDeleteAccount = async () => {
     if (!user) return;
@@ -1004,11 +1051,83 @@ const App: React.FC = () => {
       pruned = filterGraphByDiscoveryFilters(pruned, discoveryFilters, artists);
     }
 
+
     setIsLoading(true); setError(null); setSeedArtists(artists);
 
     if (discoveryFilters.foundedAfter) {
       showToast(`Discovery Mode: Filtering artists founded after ${discoveryFilters.foundedAfter}...`);
     }
+
+    // --- PHASE 02: GLOBAL CACHE CHECK ---
+    // Before invoking Gemini, check if this exact artist+filter combo is already cached globally.
+    const cacheKey = normalizeCacheKey(artists, discoveryFilters);
+
+    try {
+      const cached = await readArtistCache(cacheKey);
+      if (cached && !controller.signal.aborted) {
+        console.log(`[Music Discovery] Cache HIT \u2014 skipping Gemini for: ${cacheKey}`);
+        incrementCacheHit(cacheKey); // fire-and-forget analytics
+
+        const g: GraphData = JSON.parse(cached.graphData);
+        // Normalise link source/target (D3 compatibility)
+        g.links = g.links.map((l: any) => ({
+          ...l,
+          source: typeof l.source === 'object' ? l.source.id : l.source,
+          target: typeof l.target === 'object' ? l.target.id : l.target,
+        }));
+        g.nodes.forEach((n: any) => { n.fx = null; n.fy = null; });
+
+        // Ensure all requested seed artists are present in the graph
+        const returnedIds = new Set(g.nodes.map((n: Node) => n.id.toLowerCase()));
+        let maxG = g.nodes.reduce((m: number, n: Node) => Math.max(m, n.group || 0), 0);
+        artistList.forEach(name => {
+          if (!returnedIds.has(name.toLowerCase())) {
+            maxG++;
+            g.nodes.push({ id: name, type: 'artist', group: maxG });
+          }
+        });
+
+        let final = pruned ? mergeGraphData(pruned, g) : g;
+        final = filterGraphByDiscoveryFilters(final, discoveryFilters, artists);
+        setGraphData(final);
+        setCurrentCacheKey(cacheKey);
+
+        // Restore enriched Deep Cut metadata from the cache
+        if (cached.detailsCache) {
+          try {
+            setDetailsCache(new Map(JSON.parse(cached.detailsCache)));
+          } catch (e) {
+            console.warn('[ArtistCache] Could not parse cached detailsCache:', e);
+          }
+        }
+
+        // Seed active nodes from the final graph
+        setActiveNodes(prev => {
+          const currentActive = [...prev];
+          const seedMapped = artistList.map(name => {
+            const match = final.nodes.find(fn => fn.id.toLowerCase() === name.toLowerCase());
+            return (match || { id: name, type: 'artist' as any, group: 0 }) as Node;
+          });
+          const seedIds = new Set(seedMapped.map(s => s.id.toLowerCase()));
+          const finalActive = [...seedMapped];
+          currentActive.forEach(p => {
+            if (!seedIds.has(p.id.toLowerCase())) {
+              const match = final.nodes.find(fn => fn.id.toLowerCase() === p.id.toLowerCase());
+              finalActive.push(match || p);
+              seedIds.add(p.id.toLowerCase());
+            }
+          });
+          return finalActive;
+        });
+
+        showToast('\u26a1 Loaded from cache');
+        setIsLoading(false);
+        return; // Phase 02 & 03 skipped — go straight to Phase 04 (D3 physics)
+      }
+    } catch (cacheErr) {
+      console.warn('[Music Discovery] Cache read error, falling back to Gemini:', cacheErr);
+    }
+    // --- END CACHE CHECK ---
 
     try {
       const graphPromise = generateGraphData(artists, pruned, discoveryFilters);
@@ -1031,6 +1150,15 @@ const App: React.FC = () => {
       let final = pruned ? mergeGraphData(pruned, newData) : newData;
       final = filterGraphByDiscoveryFilters(final, discoveryFilters, artists);
       setGraphData(final);
+      setCurrentCacheKey(cacheKey);
+
+      // Phase 02 complete — write to global cache so the NEXT generation is instant.
+      // Awaited here so any rule/write failure surfaces in the console immediately.
+      console.log(`[Music Discovery] Cache MISS — writing to artists/${cacheKey}`);
+      writeArtistCache(cacheKey, final, new Map(), artists, discoveryFilters)
+        .then(() => console.log(`[Music Discovery] Cache write confirmed: artists/${cacheKey}`))
+        .catch(e => console.error(`[Music Discovery] Cache write FAILED for artists/${cacheKey}:`, e));
+
 
       // Update active nodes metadata from the final graph, ensuring all seeds are present
       setActiveNodes(prev => {
@@ -1069,6 +1197,7 @@ const App: React.FC = () => {
   }, [user, discoveryFilters, showToast, humanizeError, handleLogin]);
 
 
+
   useEffect(() => {
     // Health Check
     const runHealthCheck = async () => {
@@ -1087,7 +1216,24 @@ const App: React.FC = () => {
     };
     runHealthCheck();
 
+    let previousUserId: string | undefined = undefined;
+
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      const currentId = currentUser ? currentUser.uid : null;
+      
+      // Explicitly reset all canvas layout and ephemeral states when auth context changes
+      // We check undefined to skip the initial silent mount if they were already logged out
+      if (previousUserId !== undefined && previousUserId !== currentId) {
+        console.log(`[Auth] User context changed (${previousUserId} -> ${currentId}). Wiping canvas state to prevent leaks.`);
+        setGraphData({ nodes: [], links: [] });
+        setSeedArtists('');
+        setActiveNodes([]);
+        setDetailsCache(new Map());
+        setChatHistories(new Map());
+        setCurrentProjectId(null);
+      }
+      previousUserId = currentId;
+
       setUser(currentUser);
       setIsAuthInitialized(true);
 
@@ -1248,6 +1394,7 @@ const App: React.FC = () => {
         setActiveNodes([]);
         setDetailsCache(new Map());
         setChatHistories(new Map());
+        setCurrentCacheKey(null);
         setCurrentProjectOwnerId(null);
       }
       return;
@@ -1256,18 +1403,134 @@ const App: React.FC = () => {
     let isMounted = true;
     const unsubscribeList: (() => void)[] = [];
 
-    const handleSnap = (snap: any) => {
+    const isGraphEqual = (g1: any, g2: any) => {
+      if (!g1 || !g2) return g1 === g2;
+      try {
+        const strip = (g: any) => ({
+          nodes: g.nodes.map((n: any) => ({ id: n.id, type: n.type, label: n.label, group: n.group })),
+          links: g.links.map((l: any) => ({ 
+            source: typeof l.source === 'object' ? l.source.id : l.source, 
+            target: typeof l.target === 'object' ? l.target.id : l.target 
+          }))
+        });
+        return JSON.stringify(strip(g1)) === JSON.stringify(strip(g2));
+      } catch (e) {
+        return false;
+      }
+    };
+
+    const handleSnap = async (snap: any): Promise<boolean> => {
       if (!isMounted || !snap.exists()) return false;
 
       const data = snap.data();
       setCurrentProjectOwnerId(data.authorId || null);
-
       if (data.name !== undefined) setProjectName(data.name);
 
-      if (data.graphData) {
+      // Always restore non-graph metadata (available in both new and legacy formats)
+      if (data.seedArtists) setSeedArtists((prev: any) => prev === data.seedArtists ? prev : data.seedArtists);
+      if (data.discoveryFilters) {
+        const parsedFilters = typeof data.discoveryFilters === 'string' && data.discoveryFilters.startsWith('{') ? JSON.parse(data.discoveryFilters) : null;
+        if (parsedFilters) setDiscoveryFilters((prev: any) => JSON.stringify(prev) === JSON.stringify(parsedFilters) ? prev : parsedFilters);
+      }
+      if (data.lastViewedStackCount !== undefined) setLastViewedStackCount((prev: any) => prev === data.lastViewedStackCount ? prev : data.lastViewedStackCount);
+      if (data.chatHistories) {
         try {
+          const newChatsMap = new Map<string, ChatMessage[]>(JSON.parse(data.chatHistories));
+          setChatHistories((prev) => {
+            if (prev.size !== newChatsMap.size) return newChatsMap;
+            return JSON.stringify(Array.from(prev.entries())) === data.chatHistories ? prev : newChatsMap;
+          });
+        } catch (e) { console.error("Chat histories parse fail", e); }
+      }
+      if (data.isMagazineViewOpen !== undefined) {
+        setIsMagazineViewOpen((prev: any) => prev === data.isMagazineViewOpen ? prev : data.isMagazineViewOpen);
+      }
+
+      try {
+        if (data.cacheKey) {
+          // --- NEW FORMAT: hydrate graph + metadata from global artists cache ---
+          console.log(`[ProjectLoader] New format detected. Hydrating from cache: ${data.cacheKey}`);
+          const cacheEntry = await readArtistCache(data.cacheKey);
+          if (!isMounted) return false;
+
+          if (cacheEntry) {
+            const g: GraphData = JSON.parse(cacheEntry.graphData);
+            // D3 compatibility normalisation
+            g.links = g.links.map((l: any) => ({
+              ...l,
+              source: typeof l.source === 'object' ? l.source.id : l.source,
+              target: typeof l.target === 'object' ? l.target.id : l.target,
+            }));
+            // Start with no pinned positions so D3 can settle them
+            g.nodes.forEach((n: any) => { n.fx = null; n.fy = null; });
+
+            // Re-apply saved artist canvas positions on top of the cached graph
+            if (data.canvasLayout) {
+              try {
+                const positions: Array<{ nodeId: string; x?: number; y?: number; fx?: number | null; fy?: number | null }> = JSON.parse(data.canvasLayout);
+                positions.forEach(ref => {
+                  const node = g.nodes.find((n: any) => n.id === ref.nodeId);
+                  if (node) {
+                    node.x = ref.x;
+                    node.y = ref.y;
+                    node.fx = ref.fx ?? null;
+                    node.fy = ref.fy ?? null;
+                  }
+                });
+              } catch (e) { console.warn('[ProjectLoader] canvasLayout parse failed:', e); }
+            }
+
+            setGraphData((prev: any) => isGraphEqual(prev, g) ? prev : g);
+            setCurrentCacheKey(data.cacheKey);
+
+            // Restore Deep Cut metadata from the cache entry
+            if (cacheEntry.detailsCache) {
+              try {
+                const newCacheMap = new Map<string, NodeDetails>(JSON.parse(cacheEntry.detailsCache));
+                setDetailsCache((prev) => {
+                  if (prev.size !== newCacheMap.size) return newCacheMap;
+                  return JSON.stringify(Array.from(prev.entries())) === cacheEntry.detailsCache ? prev : newCacheMap;
+                });
+              } catch (e) { console.error("Details cache parse fail", e); }
+            }
+
+            // Set active nodes from saved list (resolved against the cached graph)
+            if (data.activeNodes && Array.isArray(data.activeNodes)) {
+              const activeIds = new Set(data.activeNodes.map((item: any) => typeof item === 'string' ? item : item.id));
+              const nextActive = g.nodes.filter((n: any) => activeIds.has(n.id));
+              setActiveNodes((prev: any) => {
+                if (prev.length !== nextActive.length) return nextActive;
+                return JSON.stringify(prev.map((n: any) => n.id)) === JSON.stringify(nextActive.map((n: any) => n.id)) ? prev : nextActive;
+              });
+            }
+          } else {
+            // Cache miss — fall back to inline graphData if present (share doc may have it as backup)
+            console.warn(`[ProjectLoader] Cache miss for key: ${data.cacheKey} — trying inline graphData fallback.`);
+            if (data.graphData && data.graphData.length > 20) {
+              const g = JSON.parse(data.graphData);
+              g.links = g.links.map((l: any) => ({
+                ...l,
+                source: typeof l.source === 'object' ? l.source.id : l.source,
+                target: typeof l.target === 'object' ? l.target.id : l.target,
+              }));
+              g.nodes.forEach((n: any) => { n.fx = null; n.fy = null; });
+              if (g.nodes.length > 0) {
+                setGraphData((prev: any) => isGraphEqual(prev, g) ? prev : g);
+                if (data.activeNodes && Array.isArray(data.activeNodes)) {
+                  const activeIds = new Set(data.activeNodes.map((item: any) => typeof item === 'string' ? item : item.id));
+                  const nextActive = g.nodes.filter((n: any) => activeIds.has(n.id));
+                  setActiveNodes((prev: any) => {
+                    if (prev.length !== nextActive.length) return nextActive;
+                    return JSON.stringify(prev.map((n: any) => n.id)) === JSON.stringify(nextActive.map((n: any) => n.id)) ? prev : nextActive;
+                  });
+                }
+              }
+            }
+          }
+        } else if (data.graphData) {
+          // --- LEGACY FORMAT: full graph blob stored inline ---
+          console.log(`[ProjectLoader] Legacy format detected — loading full graphData blob.`);
           const g = JSON.parse(data.graphData);
-          // Map structure cleanup for D3 compatibility
           g.links = g.links.map((l: any) => ({
             ...l,
             source: typeof l.source === 'object' ? l.source.id : l.source,
@@ -1275,14 +1538,7 @@ const App: React.FC = () => {
           }));
           g.nodes.forEach((n: any) => { n.fx = null; n.fy = null; });
 
-          setGraphData((prev: any) => JSON.stringify(prev) === JSON.stringify(g) ? prev : g);
-          if (data.seedArtists) setSeedArtists((prev: any) => prev === data.seedArtists ? prev : data.seedArtists);
-
-          if (data.discoveryFilters) {
-            const parsedFilters = typeof data.discoveryFilters === 'string' && data.discoveryFilters.startsWith('{') ? JSON.parse(data.discoveryFilters) : null;
-            if (parsedFilters) setDiscoveryFilters((prev: any) => JSON.stringify(prev) === JSON.stringify(parsedFilters) ? prev : parsedFilters);
-          }
-          if (data.lastViewedStackCount !== undefined) setLastViewedStackCount((prev: any) => prev === data.lastViewedStackCount ? prev : data.lastViewedStackCount);
+          setGraphData((prev: any) => isGraphEqual(prev, g) ? prev : g);
 
           if (data.detailsCache) {
             try {
@@ -1293,15 +1549,6 @@ const App: React.FC = () => {
               });
             } catch (e) { console.error("Details cache parse fail", e); }
           }
-          if (data.chatHistories) {
-            try {
-              const newChatsMap = new Map<string, ChatMessage[]>(JSON.parse(data.chatHistories));
-              setChatHistories((prev) => {
-                if (prev.size !== newChatsMap.size) return newChatsMap;
-                return JSON.stringify(Array.from(prev.entries())) === data.chatHistories ? prev : newChatsMap;
-              });
-            } catch (e) { console.error("Chat histories parse fail", e); }
-          }
 
           if (data.activeNodes && Array.isArray(data.activeNodes)) {
             const activeIds = new Set(data.activeNodes.map((item: any) => typeof item === 'string' ? item : item.id));
@@ -1311,16 +1558,14 @@ const App: React.FC = () => {
               return JSON.stringify(prev.map((n: any) => n.id)) === JSON.stringify(nextActive.map((n: any) => n.id)) ? prev : nextActive;
             });
           }
-
-          if (data.isMagazineViewOpen !== undefined) {
-            setIsMagazineViewOpen(prev => prev === data.isMagazineViewOpen ? prev : data.isMagazineViewOpen);
-          }
-        } catch (err) {
-          console.error("Failed to parse project data:", err);
         }
+      } catch (err) {
+        console.error("Failed to parse project data:", err);
       }
+
       return true; // Found
     };
+
 
     const loadProject = async () => {
       try {
@@ -1331,7 +1576,7 @@ const App: React.FC = () => {
         try {
           const shareSnap = await getDoc(shareRef);
           if (!isMounted) return;
-          if (handleSnap(shareSnap)) {
+          if (await handleSnap(shareSnap)) {
             console.log(`[ProjectLoader] Found in sharedZcenes`);
             return;
           }
@@ -1344,9 +1589,9 @@ const App: React.FC = () => {
         try {
           const flatSnap = await getDoc(flatProjectRef);
           if (!isMounted) return;
-          if (handleSnap(flatSnap)) {
+          if (await handleSnap(flatSnap)) {
             console.log(`[ProjectLoader] Found in top-level projects, setting up real-time sync`);
-            const unsub = onSnapshot(flatProjectRef, handleSnap, (err) => {
+            const unsub = onSnapshot(flatProjectRef, (snap) => { handleSnap(snap); }, (err) => {
               if (isMounted && err.code !== 'permission-denied') handleFirestoreError(err, OperationType.GET, `projects/${currentProjectId}`);
             });
             unsubscribeList.push(unsub);
@@ -1362,9 +1607,9 @@ const App: React.FC = () => {
           try {
             const userSnap = await getDoc(userProjectRef);
             if (!isMounted) return;
-            if (handleSnap(userSnap)) {
+            if (await handleSnap(userSnap)) {
               console.log(`[ProjectLoader] Found in user projects, setting up real-time sync`);
-              const unsub = onSnapshot(userProjectRef, handleSnap, (err) => {
+              const unsub = onSnapshot(userProjectRef, (snap) => { handleSnap(snap); }, (err) => {
                 if (isMounted && err.code !== 'permission-denied') handleFirestoreError(err, OperationType.GET, `users/${user.uid}/projects/${currentProjectId}`);
               });
               unsubscribeList.push(unsub);
@@ -1382,6 +1627,7 @@ const App: React.FC = () => {
         }
       }
     };
+
 
     loadProject();
 
@@ -1403,18 +1649,34 @@ const App: React.FC = () => {
         isHydratingSessionRef.current = true;
 
         console.log(`[Database Reporter] Attempting PROJECT SAVE | Path: ${projectPath}`);
-        await setDoc(doc(db, projectPath), {
-          graphData: JSON.stringify(graphData),
+        
+        // Phase 05: Build lightweight canvas layout — artist nodes only (x/y/fx/fy)
+        const canvasLayout = graphData.nodes
+          .filter(n => n.type === 'artist')
+          .map(n => ({ nodeId: n.id, x: n.x, y: n.y, fx: n.fx ?? null, fy: n.fy ?? null }));
+
+        const docPayload: Record<string, any> = {
           seedArtists,
           discoveryFilters: JSON.stringify(discoveryFilters),
           lastViewedStackCount,
           activeNodes: activeNodes.map(n => n.id),
           isMagazineViewOpen: isMagazineViewOpen && activeNodes.length > 0,
-          detailsCache: JSON.stringify(Array.from(detailsCache.entries())),
           chatHistories: JSON.stringify(Array.from(chatHistories.entries())),
           authorId: user.uid,
           updatedAt: serverTimestamp(),
-        }, { merge: true });
+        };
+
+        if (currentCacheKey) {
+          // Lightweight cache reference
+          docPayload.cacheKey = currentCacheKey;
+          docPayload.canvasLayout = JSON.stringify(canvasLayout);
+        } else {
+          // Fallback to full blobs if no cacheKey
+          docPayload.graphData = JSON.stringify(graphData);
+          docPayload.detailsCache = JSON.stringify(Array.from(detailsCache.entries()));
+        }
+
+        await setDoc(doc(db, projectPath), docPayload, { merge: true });
 
         console.log(`[Database Reporter] SUCCESS: Project synced.`);
         setTimeout(() => { isHydratingSessionRef.current = false; }, 1000);
@@ -1425,7 +1687,7 @@ const App: React.FC = () => {
     }, 3000);
 
     return () => clearTimeout(timer);
-  }, [user, isFirebaseReady, isAuthInitialized, currentProjectId, graphData, seedArtists, discoveryFilters, activeNodes, isMagazineViewOpen, detailsCache, chatHistories, lastViewedStackCount]);
+  }, [user, isFirebaseReady, isAuthInitialized, currentProjectId, graphData, seedArtists, discoveryFilters, activeNodes, isMagazineViewOpen, detailsCache, chatHistories, lastViewedStackCount, currentCacheKey]);
 
   const lastProcessedHashRef = useRef<string>('');
   const lastProcessedSelectedRef = useRef<string | null>(null);
@@ -1472,6 +1734,14 @@ const App: React.FC = () => {
           const projectId = projectIdFromQuery || shareIdFromQuery || hash.split('#/z/')[1]?.split('?')[0];
           if (projectId) {
             if (currentViewRef.current !== View.Graph || currentProjectIdRef.current !== projectId) {
+              if (currentProjectIdRef.current !== projectId) {
+                setGraphData({ nodes: [], links: [] });
+                setSeedArtists('');
+                setActiveNodes([]);
+                setDetailsCache(new Map());
+                setChatHistories(new Map());
+                setCurrentCacheKey(null);
+              }
               setCurrentProjectId(projectId);
               setCurrentView(View.Graph);
             }
@@ -1756,10 +2026,19 @@ const App: React.FC = () => {
 
               const details = await Promise.race([nodeDetailsPromise, timeoutPromise]) as NodeDetails;
 
-              setDetailsCache(prev => new Map(prev).set(node.id, details));
+              setDetailsCache(prev => {
+                const updated = new Map(prev).set(node.id, details);
+                // Phase 03 write-back: incrementally update global cache so future users
+                // get pre-populated Deep Cuts on a cache hit (fire-and-forget)
+                if (currentCacheKey) {
+                  updateCacheDetailsCache(currentCacheKey, updated);
+                }
+                return updated;
+              });
               success = true;
               lastProgressTimestampRef.current = Date.now();
               await wait(1000);
+
             } catch (err: any) {
               const isRate = err?.message?.includes('429') || err?.message?.includes('RESOURCE_EXHAUSTED');
               const isTimeout = err?.message?.includes('timed out');

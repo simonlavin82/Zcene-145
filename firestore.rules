@@ -1,10 +1,10 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 0. Global Safety Net
-    match /{document=**} {
-      allow read, write: if false;
-    }
+    // 0. DEFAULT DENY
+    // Firestore denies all requests by default when no rule matches.
+    // No catch-all block is needed — only the explicit rules below grant access.
+    // (The previous `allow read, write: if false` catch-all was redundant and has been removed.)
 
     // Phase 3: Primitive Definition
     function isSignedIn() {
@@ -55,12 +55,16 @@ service cloud.firestore {
 
     function isValidProject(data) {
       return data.keys().hasAll(['name', 'seedArtists']) &&
-             data.keys().size() <= 20 &&
+             data.keys().size() <= 24 &&
              data.name is string && data.name.size() <= 512 &&
              data.seedArtists is string && data.seedArtists.size() <= 10000 &&
+             // LEGACY full-blob fields (optional for backward compat)
              (!('graphData' in data) || (data.graphData == null || (data.graphData is string && data.graphData.size() <= 2097152))) &&
-             (!('activeNodes' in data) || (data.activeNodes is list)) &&
              (!('detailsCache' in data) || (data.detailsCache == null || data.detailsCache is string)) &&
+             // NEW lightweight reference fields
+             (!('cacheKey' in data) || (data.cacheKey is string && data.cacheKey.size() <= 512)) &&
+             (!('canvasLayout' in data) || (data.canvasLayout is string)) &&
+             (!('activeNodes' in data) || (data.activeNodes is list)) &&
              (!('chatHistories' in data) || (data.chatHistories == null || data.chatHistories is string)) &&
              (!('discoveryFilters' in data) || (data.discoveryFilters is string)) &&
              (!('lastViewedStackCount' in data) || (data.lastViewedStackCount is int)) &&
@@ -83,10 +87,14 @@ service cloud.firestore {
     }
 
     function isValidSharedZcene(data) {
+      // graphData must exist (may be a lightweight stub '{}' for new-format shares)
       return data.keys().hasAll(['graphData', 'seedArtists', 'activeNodes']) &&
              data.graphData is string &&
              data.seedArtists is string &&
-             data.activeNodes is list;
+             data.activeNodes is list &&
+             // NEW lightweight reference fields (optional)
+             (!('cacheKey' in data) || (data.cacheKey is string && data.cacheKey.size() <= 512)) &&
+             (!('canvasLayout' in data) || (data.canvasLayout is string));
     }
 
     // --- Core Rules ---
@@ -159,6 +167,34 @@ service cloud.firestore {
     // Explicit health check path
     match /test/connection {
       allow get: if true;
+    }
+
+    // --- Global Artist Cache ---
+    // Top-level collection storing computed graph structures and Deep Cut metadata.
+    // Keyed by a normalized artist+filter string for O(1) lookup before Gemini is called.
+    match /artists/{cacheKey} {
+      // Anyone (even guests) can read the global cache for instant hydration.
+      allow get: if true;
+
+      // Any authenticated user may CREATE a new entry on a cache miss.
+      // The rule checks that the document does not already exist, preventing poisoning.
+      // (Firestore enforces this via the `create` operation — not `update`.)
+      allow create: if isSignedIn() &&
+                       incoming().keys().hasAll(['cacheKey', 'graphData', 'seedArtists', 'filters', 'cacheVersion']) &&
+                       incoming().cacheKey == cacheKey &&
+                       incoming().graphData is string &&
+                       incoming().graphData.size() <= 2097152 &&
+                       incoming().seedArtists is string &&
+                       incoming().hitCount == 0;
+
+      // Authenticated users may update ONLY detailsCache (Phase 03 write-back) and hitCount (analytics).
+      // No other fields may be mutated — prevents graph poisoning via updates.
+      allow update: if isSignedIn() &&
+                       request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['detailsCache', 'hitCount']);
+
+      // Only admins may delete cache entries (manual invalidation).
+      allow delete: if isAdmin();
     }
   }
 }

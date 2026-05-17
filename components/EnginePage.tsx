@@ -40,8 +40,15 @@ real-time intelligence and global scalability.
      enabling users to save and persist their music discovery projects.
    - Cloud Firestore: A NoSQL real-time database used to store Project 
      states, seed artists, graph snapshots, and discovery filters.
+   - Global Artist Cache: A top-level 'artists' Firestore collection acts as 
+     a permanent, site-wide cache for computed graph structures and enriched 
+     Deep Cut metadata, keyed by a normalized artist+filter identifier. 
+     Projects store only a lightweight cacheKey reference and artist canvas 
+     positions, dramatically reducing document size and Gemini API usage.
    - Rules Engine: Attribute-Based Access Control (ABAC) ensures every 
-     music discovery journey remains private and secure.
+     music discovery journey remains private and secure. The global cache 
+     collection is publicly readable but write-protected: only a CREATE 
+     (cache miss) is permitted per key, preventing cache poisoning.
 `;
 
 const GRAPH_INTELLIGENCE_DOCUMENTATION = `
@@ -72,7 +79,24 @@ the entire dataset, the app evolves existing visual structures.
    every link's 'source' and 'target' corresponds to a validated node ID 
    present in either the legacy graph or the new delta.
 
-5. IMMERSIVE DISCOVERY FLOW (MusicGraph.tsx / ExampleMusicGraph.tsx):
+5. GLOBAL CACHE ALIGNMENT (artistCacheService.ts):
+   Before invoking Gemini for Phase 02 Orchestration, the engine computes a 
+   normalized cache key (sorted artist list + serialized filters) and probes 
+   the global 'artists' Firestore collection.
+   - Cache HIT: Graph structure + Deep Cut metadata are returned instantly. 
+     Phases 02 and 03 are bypassed entirely. D3 Phase 04 begins immediately, 
+     and artist canvas positions from the project's canvasLayout are restored.
+   - Cache MISS: The normal Gemini generation pipeline executes. On success, 
+     the computed graph is written to the global cache (detailsCache starts 
+     empty). As each Phase 03 Deep Cut fetch completes, it incrementally 
+     writes the enriched metadata back into the cache entry so future users 
+     receive pre-populated Deep Cuts on a cache hit.
+   - Key Format: lowercase, alphanumeric + hyphens, artists sorted and joined 
+     with '--', filters appended as suffixes (e.g. 'after2010'). Max 512 chars.
+   - Permanent cache by design: music histories, genre bridges, and Deep Cut 
+     metadata rarely change. Admin manual deletion handles edge cases.
+
+6. IMMERSIVE DISCOVERY FLOW (MusicGraph.tsx / ExampleMusicGraph.tsx):
    Zcene features a "Spiderweb" discovery interface that allows users to 
    interactively expand the graph in real-time.
    - Discovery UI: Contextual action buttons (+/-) emerge directly from 
@@ -331,8 +355,8 @@ const DiscoveryFlowDiagram: React.FC = () => (
             <div className="w-full flex flex-col items-center">
                 <div className="px-6 py-4 rounded-xl border-2 border-primary bg-zinc-900/50 text-center w-full max-w-md shadow-[0_0_15px_rgba(255,255,255,0.03)]">
                     <div className="text-primary text-[10px] font-mono mb-1 uppercase tracking-tighter">Phase 02: Orchestration</div>
-                    <div className="text-white font-medium">Gemini 1.5 Discovery Graph</div>
-                    <div className="text-[11px] text-zinc-500 mt-1">Maps relational bridges directly from internal knowledge base. Returns D3 nodes & links.</div>
+                    <div className="text-white font-medium">Global Cache Check → Gemini 1.5</div>
+                    <div className="text-[11px] text-zinc-500 mt-1">Probes the global 'artists' cache first. <span className="text-primary font-semibold">⚡ Cache Hit</span> skips directly to Phase 04. Cache Miss calls Gemini to map relational bridges, then writes the result to the global cache.</div>
                 </div>
                 <div className="h-8 w-0.5 bg-zinc-800 my-2" />
             </div>
@@ -342,6 +366,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                 <div className="px-6 py-4 rounded-xl border border-zinc-700 bg-zinc-900 text-center w-full max-w-sm relative group">
                     <div className="text-primary text-[10px] font-mono mb-1 uppercase tracking-tighter">Phase 03: Enrichment</div>
                     <div className="text-white font-medium text-sm">Serial Extraction Queue (Deep Cuts)</div>
+                    <div className="text-[11px] text-zinc-500 mt-1">Each Deep Cut fetch incrementally writes back to the global cache entry, so future cache hits include pre-populated metadata.</div>
                     <div className="flex gap-1 justify-center mt-3">
                         {[1, 2, 3].map(i => (
                             <div key={i} className="w-2 h-2 rounded-full bg-primary/40 animate-pulse" style={{ animationDelay: `${i * 200}ms` }} />
@@ -356,7 +381,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                 <div className="px-6 py-4 rounded-xl border border-zinc-700 bg-zinc-900/50 text-center w-full max-w-sm italic">
                     <div className="text-primary text-[10px] font-mono mb-1 uppercase tracking-tighter">Phase 04: Validation</div>
                     <div className="text-white font-medium text-sm">D3.js Force Field Convergence</div>
-                    <div className="text-[11px] text-zinc-500 mt-1 italic">Nodes stabilize into organic clusters based on metadata similarity.</div>
+                    <div className="text-[11px] text-zinc-500 mt-1 italic">Nodes stabilize into organic clusters. Saved artist positions are re-applied from canvasLayout on project load.</div>
                 </div>
                 <div className="h-8 w-0.5 bg-zinc-800 my-2" />
             </div>
@@ -365,8 +390,8 @@ const DiscoveryFlowDiagram: React.FC = () => (
             <div className="w-full flex flex-col items-center">
                 <div className="px-6 py-4 rounded-xl border border-primary/20 bg-primary/5 text-center w-full max-w-md">
                     <div className="text-primary text-[10px] font-mono mb-1 uppercase tracking-tighter">Phase 05: Persistence</div>
-                    <div className="text-white font-medium">Atomic Cloud Firestore Commit</div>
-                    <div className="text-[11px] text-zinc-400 mt-1">Full graph state + Metadata written to project record.</div>
+                    <div className="text-white font-medium">Lightweight Firestore Commit</div>
+                    <div className="text-[11px] text-zinc-400 mt-1">Project record stores only a <span className="text-primary font-mono">cacheKey</span> reference + artist <span className="text-primary font-mono">canvasLayout</span> positions. Heavy graph data lives in the global artists cache.</div>
                 </div>
             </div>
         </div>

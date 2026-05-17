@@ -82,14 +82,40 @@ export interface StackItem {
   link?: string;
 }
 
+/** A lean position reference stored inside a user project's canvasLayout (artist nodes only). */
+export interface CanvasNodeRef {
+  nodeId: string;
+  x?: number;
+  y?: number;
+  fx?: number | null;
+  fy?: number | null;
+}
+
+/** Top-level Firestore 'artists' collection document — global cache entry. */
+export interface ArtistCacheEntry {
+  cacheKey: string;
+  graphData: string;     // JSON-stringified GraphData
+  detailsCache: string;  // JSON-stringified Map<string, NodeDetails> entries
+  seedArtists: string;
+  filters: string;       // JSON-stringified DiscoveryFilters
+  cacheVersion: number;  // Schema version (currently 1)
+  cachedAt: any;         // serverTimestamp()
+  hitCount: number;
+}
+
 export interface Project {
   id: string;
   name: string;
   seedArtists: string;
-  graphData: string | null;
+  // --- NEW: lightweight reference fields ---
+  cacheKey?: string;       // points to artists/{cacheKey} global cache doc
+  canvasLayout?: string;   // JSON CanvasNodeRef[] — artist positions only
+  // --- LEGACY: kept for backward-compatible reads of old project docs ---
+  graphData?: string | null;
+  detailsCache?: string;   // JSON Map
+  // --- Always present ---
   activeNodes: string[];
-  detailsCache?: string; // JSON Map
-  chatHistories?: string; // JSON Map
+  chatHistories?: string;  // JSON Map
   discoveryFilters?: string; // JSON
   lastViewedStackCount?: number;
   isMagazineViewOpen?: boolean;
