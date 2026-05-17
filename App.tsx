@@ -1719,6 +1719,15 @@ const App: React.FC = () => {
     return () => clearInterval(checkStuck);
   }, []);
 
+  // Reset the deep cut queue when navigating to a different project.
+  // Without this, isFetchingDetailsRef stays `true` from the old guest/shared
+  // queue, so any newly-clicked node hangs in loadingNodeIds forever.
+  useEffect(() => {
+    isFetchingDetailsRef.current = false;
+    fetchingNodeIdsRef.current.clear();
+    setLoadingNodeIds(new Set());
+  }, [currentProjectId]);
+
   useEffect(() => {
     const fetch = async () => {
       const nodes = activeNodes.filter(n => !detailsCache.has(n.id) && !fetchingNodeIdsRef.current.has(n.id));
