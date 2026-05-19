@@ -108,6 +108,24 @@
   }
 }
 
+@keyframes pulse-orange {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.4);
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.7;
+    box-shadow: 0 0 0 4px rgba(249, 115, 22, 0);
+  }
+}
+
+.animate-pulse-orange {
+  animation: pulse-orange 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+
 /* Prevent sticky hover states on touch devices */
 @media (hover: none) {
   .hover\:bg-zinc-800:hover, 

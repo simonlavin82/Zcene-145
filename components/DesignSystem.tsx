@@ -4,7 +4,7 @@ import * as d3 from 'd3';
 import { ZceneLogo, InstagramIcon, ZceneAbbreviatedLogo, FaviconLogo, LegendSymbol, SortControls, Spinner, HelpIcon, MicIcon, VisibilityIcon, VisibilityOffIcon, LoadingSpinner, DETAIL_THINKING_STEPS, GRAPH_THINKING_STEPS } from './Icons';
 import ViewToggle from './ViewToggle';
 
-const ColorSwatch: React.FC<{ name: string; hex: string; className?: string; style?: React.CSSProperties }> = ({ name, hex, className = "", style }) => {
+const ColorSwatch: React.FC<{ name: string; hex: string; className?: string; style?: React.CSSProperties; description?: string }> = ({ name, hex, className = "", style, description }) => {
     return (
         <div className="group cursor-pointer">
             <div 
@@ -14,6 +14,7 @@ const ColorSwatch: React.FC<{ name: string; hex: string; className?: string; sty
             <div className="text-left mt-2">
                 <p className={`font-medium text-zinc-200 transition-colors group-hover:text-primary`}>{name}</p>
                 <p className="text-sm text-zinc-400 font-mono">{hex}</p>
+                {description && <p className="text-[11px] text-zinc-500 mt-1 leading-normal">{description}</p>}
             </div>
         </div>
     );
@@ -607,11 +608,12 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
 
                             <div>
                                 <h3 className="text-xl font-medium text-zinc-200 mb-6">States & Accents</h3>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                                <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
                                     <ColorSwatch name="Error" hex="#ef4444" className="bg-red-500" />
                                     <ColorSwatch name="Library Tag" hex="#0ea5e9" className="bg-sky-500" />
                                     <ColorSwatch name="AI Tag" hex="#a855f7" className="bg-purple-500" />
                                     <ColorSwatch name="Manual Add" hex="#10b981" className="bg-emerald-500" />
+                                    <ColorSwatch name="Warning / Unsaved State Orange" hex="#f97316" className="bg-[#f97316]" style={{ backgroundColor: '#f97316' }} description="Indicates guest status, unsaved shared view workspaces, or critical session warnings." />
                                 </div>
                             </div>
 

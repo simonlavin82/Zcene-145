@@ -467,6 +467,28 @@ const App: React.FC = () => {
   const authRedirectPathRef = useRef<string | null>(null);
   const isHydratingSessionRef = useRef(false);
 
+  const currentProjectOwnerIdRef = useRef<string | null>(null);
+  const projectNameRef = useRef<string>('');
+  const graphDataRef = useRef<GraphData | null>(null);
+  const seedArtistsRef = useRef<string>('');
+  const activeNodesRef = useRef<Node[]>([]);
+  const detailsCacheRef = useRef<Map<string, NodeDetails>>(new Map());
+  const chatHistoriesRef = useRef<Map<string, ChatMessage[]>>(new Map());
+  const discoveryFiltersRef = useRef<DiscoveryFilters>({});
+  const lastViewedStackCountRef = useRef<number>(0);
+  const currentCacheKeyRef = useRef<string | null>(null);
+
+  useEffect(() => { currentProjectOwnerIdRef.current = currentProjectOwnerId; }, [currentProjectOwnerId]);
+  useEffect(() => { projectNameRef.current = projectName; }, [projectName]);
+  useEffect(() => { graphDataRef.current = graphData; }, [graphData]);
+  useEffect(() => { seedArtistsRef.current = seedArtists; }, [seedArtists]);
+  useEffect(() => { activeNodesRef.current = activeNodes; }, [activeNodes]);
+  useEffect(() => { detailsCacheRef.current = detailsCache; }, [detailsCache]);
+  useEffect(() => { chatHistoriesRef.current = chatHistories; }, [chatHistories]);
+  useEffect(() => { discoveryFiltersRef.current = discoveryFilters; }, [discoveryFilters]);
+  useEffect(() => { lastViewedStackCountRef.current = lastViewedStackCount; }, [lastViewedStackCount]);
+  useEffect(() => { currentCacheKeyRef.current = currentCacheKey; }, [currentCacheKey]);
+
   const isGuest = useMemo(() => {
     if (!currentProjectId) return false;
     if (!user) return true;
@@ -1224,13 +1246,80 @@ const App: React.FC = () => {
       // Explicitly reset all canvas layout and ephemeral states when auth context changes
       // We check undefined to skip the initial silent mount if they were already logged out
       if (previousUserId !== undefined && previousUserId !== currentId) {
-        console.log(`[Auth] User context changed (${previousUserId} -> ${currentId}). Wiping canvas state to prevent leaks.`);
-        setGraphData({ nodes: [], links: [] });
-        setSeedArtists('');
-        setActiveNodes([]);
-        setDetailsCache(new Map());
-        setChatHistories(new Map());
-        setCurrentProjectId(null);
+        const isGuestLogin = previousUserId === null && currentProjectIdRef.current !== null && currentProjectOwnerIdRef.current !== currentId;
+        if (isGuestLogin) {
+          console.log(`[Auth] User logged in while viewing shared/guest project: ${currentProjectIdRef.current}. Saving a copy to user: ${currentId}`);
+          
+          // Capture current states
+          const currentStates = {
+            graphData: graphDataRef.current,
+            seedArtists: seedArtistsRef.current,
+            projectName: projectNameRef.current,
+            activeNodes: activeNodesRef.current,
+            detailsCache: detailsCacheRef.current,
+            chatHistories: chatHistoriesRef.current,
+            discoveryFilters: discoveryFiltersRef.current,
+            lastViewedStackCount: lastViewedStackCountRef.current,
+            currentCacheKey: currentCacheKeyRef.current,
+          };
+          
+          if (currentId) {
+            setIsCreatingProject(true);
+            (async () => {
+              try {
+                const newDocRef = doc(collection(db, 'users', currentId, 'projects'));
+                const newId = newDocRef.id;
+
+                const canvasLayout = currentStates.graphData?.nodes
+                  ? currentStates.graphData.nodes
+                      .filter((n: any) => n.type === 'artist')
+                      .map((n: any) => ({ nodeId: n.id, x: n.x, y: n.y, fx: n.fx ?? null, fy: n.fy ?? null }))
+                  : [];
+
+                const docPayload: Record<string, any> = {
+                  name: currentStates.projectName || (currentStates.seedArtists ? currentStates.seedArtists.split('::')[0] : 'Saved Zcene'),
+                  seedArtists: currentStates.seedArtists || '',
+                  activeNodes: currentStates.activeNodes ? currentStates.activeNodes.map((n: any) => n.id) : [],
+                  chatHistories: JSON.stringify(Array.from(currentStates.chatHistories?.entries() || [])),
+                  discoveryFilters: JSON.stringify(currentStates.discoveryFilters || {}),
+                  lastViewedStackCount: currentStates.lastViewedStackCount || 0,
+                  isMagazineViewOpen: false,
+                  authorId: currentId,
+                  createdAt: serverTimestamp(),
+                  updatedAt: serverTimestamp(),
+                };
+
+                if (currentStates.currentCacheKey) {
+                  docPayload.cacheKey = currentStates.currentCacheKey;
+                  docPayload.canvasLayout = JSON.stringify(canvasLayout);
+                } else {
+                  docPayload.graphData = JSON.stringify(currentStates.graphData || { nodes: [], links: [] });
+                  docPayload.detailsCache = JSON.stringify(Array.from(currentStates.detailsCache?.entries() || []));
+                }
+
+                await setDoc(newDocRef, docPayload);
+                console.log(`[Auth] Auto-saved guest/shared project copy to user dashboard as project: ${newId}`);
+                
+                setCurrentProjectId(newId);
+                window.location.hash = `#/z/${newId}`;
+                showToast('Zcene saved to your dashboard!');
+              } catch (err) {
+                console.error('[Auth] Failed to auto-save/fork project:', err);
+                showToast('Failed to save project copy');
+              } finally {
+                setIsCreatingProject(false);
+              }
+            })();
+          }
+        } else {
+          console.log(`[Auth] User context changed (${previousUserId} -> ${currentId}). Wiping canvas state to prevent leaks.`);
+          setGraphData({ nodes: [], links: [] });
+          setSeedArtists('');
+          setActiveNodes([]);
+          setDetailsCache(new Map());
+          setChatHistories(new Map());
+          setCurrentProjectId(null);
+        }
       }
       previousUserId = currentId;
 

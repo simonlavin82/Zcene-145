@@ -60,12 +60,13 @@ interface NodeDetailsCardProps {
   onToggleStack: (node: Node, link?: string) => void;
   onToggleMagazineView?: () => void;
   isGuest?: boolean;
+  user?: any;
   onAuthRequest?: () => void;
 }
 
 const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     node, details, isLoading, isGlobalLoading, graphData, libraryArtists, seedArtists, onAddArtist, isSmallScreen, onRefresh, onClose, onNodeClick, onNavigate,
-    chatHistory, onSendMessage, isChatLoading, isFullScreenMode = false, isHero = false, isInStack, onToggleStack, onToggleMagazineView, isGuest = false, onAuthRequest
+    chatHistory, onSendMessage, isChatLoading, isFullScreenMode = false, isHero = false, isInStack, onToggleStack, onToggleMagazineView, isGuest = false, onAuthRequest, user
 }) => {
     const [chatInput, setChatInput] = useState('');
     const [isListening, setIsListening] = useState(false);
@@ -486,23 +487,41 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     Deep Connections
                                 </h4>
                                 
-                                <div className="space-y-4 bg-zinc-950/20 border border-zinc-800/50 p-4">
-                                    {isGuest ? (
-                                        <div className="flex flex-col items-center justify-center text-center p-6 bg-zinc-900/50 rounded-xl border border-zinc-800/80">
-                                            <span className="material-symbols-outlined !text-4xl text-primary/50 mb-3">lock</span>
-                                            <h5 className="text-sm font-semibold text-zinc-200 mb-2">AI Assistant Locked</h5>
-                                            <p className="text-xs text-zinc-400 leading-relaxed mb-4">
-                                                Sign in and save this project to your dashboard to use the AI assistant and edit this zcene!
-                                            </p>
+                                {isGuest ? (
+                                    <div className="flex flex-col items-center justify-center text-center p-6 bg-zinc-900/50 rounded-none border border-zinc-800/80">
+                                        <span className="material-symbols-outlined !text-4xl text-primary/50 mb-3">lock</span>
+                                        <h5 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-200 mb-2">DEEPER CONNECTION</h5>
+                                        <p className="text-xs text-zinc-400 leading-relaxed mb-4">
+                                            Unlock our advanced AI assistant features to map deeper relationships across your music canvas.
+                                        </p>
+                                        {user ? (
                                             <button 
                                                 onClick={() => onAuthRequest?.()}
-                                                className="bg-primary text-brand-black px-6 py-2 rounded-xl text-sm font-bold shadow-lg hover:scale-[1.02] active:scale-95 transition-all"
+                                                className="bg-primary text-brand-black px-6 py-2 rounded-xl text-sm font-semibold tracking-tight hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
                                             >
-                                                Sign in to Save
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+                                                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                                                    <line x1="12" y1="11" x2="12" y2="17" />
+                                                    <line x1="9" y1="14" x2="15" y2="14" />
+                                                </svg>
+                                                Save to my Zcenes
                                             </button>
-                                        </div>
-                                    ) : (
-                                        <>
+                                        ) : (
+                                            <button 
+                                                onClick={() => onAuthRequest?.()}
+                                                className="bg-primary text-brand-black px-6 py-2 rounded-xl text-sm font-semibold tracking-tight hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
+                                            >
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+                                                    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                                                    <polyline points="10 17 15 12 10 7" />
+                                                    <line x1="15" y1="12" x2="3" y2="12" />
+                                                </svg>
+                                                Sign in to save
+                                            </button>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4 bg-zinc-950/20 border border-zinc-800/50 p-4">
                                             <div className="max-h-60 overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-zinc-800 pr-1">
                                         {chatHistory.length === 0 ? (
                                             <p className="text-sm text-zinc-500 text-center py-4 italic">
@@ -572,9 +591,8 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                             </button>
                                         </div>
                                     </div>
-                                    </>
-                                    )}
-                                </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
@@ -615,6 +633,7 @@ interface DetailsPanelProps {
   stack: StackItem[];
   onToggleStack: (node: Node, link?: string) => void;
   isGuest?: boolean;
+  user?: any;
   onAuthRequest?: () => void;
 }
 
@@ -623,7 +642,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
   error, systemError, graphData, libraryArtists, seedArtists, onAddArtist, isCollapsed, onToggleCollapse,
   isSmallScreen, onNodeClick, onNavigate, isGlobalLoading, onCancelGlobalLoading, unreadCount, isActive, collapseBtnRef,
   isMagazineViewOpen, onMagazineViewToggle, chatHistories, onUpdateChatHistories, stack, onToggleStack,
-  isGuest = false, onAuthRequest
+  isGuest = false, onAuthRequest, user
 }) => {
     const [viewedIndex, setViewedIndex] = useState(0);
     const [isChatLoading, setIsChatLoading] = useState(false);
@@ -1010,6 +1029,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 onToggleStack={onToggleStack}
                                                 onToggleMagazineView={() => onMagazineViewToggle(!isMagazineViewOpen)}
                                                 isGuest={isGuest}
+                                                user={user}
                                                 onAuthRequest={onAuthRequest}
                                             />
                                         </div>

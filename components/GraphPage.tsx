@@ -1194,9 +1194,9 @@ const GraphPage: React.FC<GraphPageProps> = ({
                   </span>
               </button>
             ) : (
-              <div className="flex flex-col gap-4 p-5 rounded-2xl bg-zinc-800/30 border border-zinc-800 backdrop-blur-sm shadow-xl">
+              <div className="flex flex-col gap-4 p-5 bg-zinc-900/50 border border-zinc-800/80 backdrop-blur-sm shadow-none rounded-none">
                 <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${user ? 'bg-blue-500' : 'bg-amber-500'} animate-pulse`} />
+                  <div className="w-2 h-2 rounded-full bg-[#f97316] animate-pulse-orange" />
                   <p className="text-[10px] text-zinc-400 uppercase tracking-[0.2em] font-bold">
                     {user ? 'Shared Access' : 'Guest Mode'}
                   </p>
@@ -1214,18 +1214,27 @@ const GraphPage: React.FC<GraphPageProps> = ({
                   {user ? (
                     <button 
                       onClick={onSaveToDashboard}
-                      className="w-full py-3 px-4 rounded-xl bg-primary text-brand-black font-bold text-sm hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
+                      className="w-full py-2 px-6 rounded-xl bg-primary text-brand-black font-semibold text-sm hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20 tracking-tight"
                     >
-                      <span className="material-symbols-outlined !text-[18px]">save</span>
-                      Save to My Zcenes
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                        <line x1="12" y1="11" x2="12" y2="17" />
+                        <line x1="9" y1="14" x2="15" y2="14" />
+                      </svg>
+                      Save to my Zcenes
                     </button>
                   ) : (
                     <>
                       <button 
                         onClick={onLogin}
-                        className="w-full py-3 px-4 rounded-xl bg-primary text-brand-black font-bold text-sm hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
+                        className="w-full py-2 px-6 rounded-xl bg-primary text-brand-black font-semibold text-sm hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20 tracking-tight"
                       >
-                        Sign in to Save
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+                          <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                          <polyline points="10 17 15 12 10 7" />
+                          <line x1="15" y1="12" x2="3" y2="12" />
+                        </svg>
+                        Sign in to save
                       </button>
                       <p className="text-[10px] text-zinc-600 text-center px-2 leading-relaxed">
                         Create an account and we will save this to your Zcene project dashboard, where you can access and edit it anytime.
@@ -1429,6 +1438,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                         stack={stack} 
                                         onToggleStack={onToggleStack} 
                                         isGuest={isGuest}
+                                        user={user}
                                         onAuthRequest={() => { user ? onSaveToDashboard?.() : onLogin(); }}
                                     />
                                 </div>
@@ -1528,6 +1538,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                        stack={stack} 
                        onToggleStack={onToggleStack} 
                        isGuest={isGuest}
+                       user={user}
                        onAuthRequest={() => { user ? onSaveToDashboard?.() : onLogin(); }}
                      />
                 </aside>
