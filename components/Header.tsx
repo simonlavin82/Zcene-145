@@ -186,17 +186,17 @@ const Header: React.FC<HeaderProps> = ({
                             <div className="p-1">
                               <button
                                 onClick={() => { setIsProfileOpen(false); onLogout(); }}
-                                className="w-full text-left px-3 py-2 text-xs font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all rounded-lg flex items-center gap-2"
+                                className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2"
                               >
-                                <span className="material-symbols-outlined !text-[16px]">logout</span>
+                                <span className="material-symbols-outlined !text-[16px] text-zinc-500">logout</span>
                                 Sign Out
                               </button>
-                              <div className="h-px bg-white/5 my-1" />
+                              <div className="border-t border-zinc-800/80 my-1.5" />
                               <button
                                 onClick={() => { setIsProfileOpen(false); setIsDeleteAccountModalOpen(true); }}
-                                className="w-full text-left px-3 py-2 text-xs font-medium text-red-500 hover:bg-red-500/20 hover:text-red-400 transition-all rounded-lg flex items-center gap-2"
+                                className="w-full text-left px-3 py-2 text-xs font-medium text-[#ef4444] hover:bg-[#ef4444]/10 transition-all rounded-lg flex items-center gap-2"
                               >
-                                <span className="material-symbols-outlined !text-[16px]">delete_forever</span>
+                                <span className="material-symbols-outlined !text-[16px] text-[#ef4444]">delete_forever</span>
                                 Delete Account
                               </button>
                             </div>
