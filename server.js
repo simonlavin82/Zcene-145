@@ -34,6 +34,15 @@ app.use(
   })
 );
 
+// Proxy Firebase Authentication handlers to bypass cross-origin/unauthorized domain restrictions
+app.use(
+  '/__/auth',
+  createProxyMiddleware({
+    target: 'https://gen-lang-client-0482359498.firebaseapp.com',
+    changeOrigin: true,
+  })
+);
+
 // Serve the static files from the React/Vite build output
 app.use(express.static(path.join(__dirname, 'dist')));
 
