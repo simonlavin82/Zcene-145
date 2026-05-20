@@ -1106,13 +1106,13 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
                                 <div className="p-6 bg-zinc-950 border border-zinc-800 rounded-xl space-y-4">
                                     <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Tactile Specifications</h4>
                                     <p className="text-sm text-zinc-400 leading-relaxed">
-                                        Interactive selector controls use a <strong>6px border-radius</strong> (<code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded">rounded-[6px]</code>) segmented pill container — deliberately separating them from our strict <strong>0px brutalist</strong> layout containers. The active option is highlighted by a proportional <strong>sliding background badge</strong> that physically encompasses the full icon + label.
+                                        Interactive selector controls use a <strong>6px border-radius</strong> (<code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded">rounded-[6px]</code>) segmented pill container — deliberately separating them from our strict <strong>0px brutalist</strong> layout containers. The active icon is highlighted by a <strong>tight square sliding badge</strong> that neatly wraps exactly one icon.
                                     </p>
                                     <ul className="text-xs text-zinc-500 space-y-2 list-disc list-inside">
-                                        <li><strong>Segmented pill:</strong> Both options sit inside a single cohesive container; the sliding badge moves between them.</li>
-                                        <li><strong>Icon + label:</strong> Each option renders its Material Symbol icon alongside a text label for maximum legibility.</li>
-                                        <li><strong>Spring animation:</strong> Badge glides via <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded">stiffness: 480 / damping: 38</code> spring — responsive and not floaty.</li>
-                                        <li><strong>Main Graph Alignment:</strong> Matches the Organic/Cluster selector used live inside the graph canvas.</li>
+                                        <li><strong>Icon-only minimalism:</strong> No text labels — identity is communicated purely through the Material Symbol icons (Hub = Organic, Bubble Chart = Cluster).</li>
+                                        <li><strong>Square active badge:</strong> A fixed <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded">w-8 h-8</code> <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded">bg-zinc-800</code> block slides between positions, wrapping exactly the active icon.</li>
+                                        <li><strong>Spring animation:</strong> Badge translates via <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded">stiffness: 480 / damping: 38</code> — snappy and responsive, not floaty.</li>
+                                        <li><strong>Main Graph Alignment:</strong> This same component is used live inside the graph canvas for Organic/Cluster mode switching.</li>
                                     </ul>
                                 </div>
                             </div>
