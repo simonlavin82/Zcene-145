@@ -449,6 +449,7 @@ const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isDeleteAccountModalOpen, setIsDeleteAccountModalOpen] = useState(false);
+  const [isExitBlockerModalOpen, setIsExitBlockerModalOpen] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [isAuthInitialized, setIsAuthInitialized] = useState(false);
   const [isFirebaseReady, setIsFirebaseReady] = useState(false);
@@ -745,6 +746,20 @@ const App: React.FC = () => {
       handleFirestoreError(err, OperationType.WRITE, path);
     }
   }, [user, currentProjectId]);
+
+  const handleRenameProject = useCallback(async (projectId: string, name: string) => {
+    if (!user) return;
+    const path = `users/${user.uid}/projects/${projectId}`;
+    try {
+      await setDoc(doc(db, 'users', user.uid, 'projects', projectId), {
+        name,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+      showToast("Zcene renamed");
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, path);
+    }
+  }, [user, showToast]);
 
   const displayProjectName = useMemo(() => {
     if (projectName) return projectName;
@@ -2219,6 +2234,7 @@ const App: React.FC = () => {
             onCreateProject={handleCreateProject}
             isCreatingProject={isCreatingProject}
             onDeleteProject={handleDeleteProject}
+            onRenameProject={handleRenameProject}
             onLogoClick={() => handleViewChange(View.Home)}
             onLogout={handleLogout}
             onDeleteAccount={handleDeleteAccount}
@@ -2259,7 +2275,13 @@ const App: React.FC = () => {
               onNodeClick={handleNodeClick} selectedNode={selectedNode} activeNodes={activeNodes}
               detailsCache={detailsCache} loadingNodeIds={loadingNodeIds} onCloseNode={handleCloseNode}
               onRefreshNode={handleRefreshNode} detailsError={detailsError} systemError={error}
-              onLogoClick={() => window.location.hash = '#/dashboard'}
+              onLogoClick={() => {
+                if (isGuest) {
+                  setIsExitBlockerModalOpen(true);
+                } else {
+                  window.location.hash = '#/dashboard';
+                }
+              }}
               onNavigate={handleMenuNavigate} onClearLibrary={handleClearLib} onClearZcene={handleClearZcene}
               isActive={currentView === View.Graph} chatHistories={chatHistories} onUpdateChatHistories={setChatHistories}
               onShowToast={showToast} onRefreshUI={handleRefreshUI} stack={stack} onToggleStack={handleToggleStack}
@@ -2423,6 +2445,47 @@ const App: React.FC = () => {
         onClose={() => setIsShareModalOpen(false)}
         shareUrl={activeShareUrl || ''}
       />
+
+      <AnimatePresence>
+        {isExitBlockerModalOpen && (
+          <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/60">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="w-full max-w-sm rounded-none bg-zinc-900 border border-zinc-800 p-8 shadow-2xl relative overflow-hidden"
+            >
+              <div className="w-16 h-16 rounded-none bg-red-500/10 flex items-center justify-center text-red-500 mb-6">
+                <span className="material-symbols-outlined !text-[32px]">warning</span>
+              </div>
+
+              <h3 className="text-xl font-bold text-white mb-3">Exit Preview?</h3>
+              <p className="text-zinc-400 text-sm mb-6 leading-relaxed">
+                Your preview session will be lost unless saved. Sign in or save this Zcene to your account to preserve your changes.
+              </p>
+
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={() => {
+                    setIsExitBlockerModalOpen(false);
+                    window.location.hash = '';
+                    handleViewChange(View.Home);
+                  }}
+                  className="w-full py-4 rounded-none bg-red-600 hover:bg-red-500 text-white font-bold transition-all active:scale-[0.98]"
+                >
+                  Exit without Saving
+                </button>
+                <button
+                  onClick={() => setIsExitBlockerModalOpen(false)}
+                  className="w-full py-4 rounded-none border border-zinc-800 text-zinc-400 font-bold hover:bg-zinc-800 hover:text-white transition-all"
+                >
+                  Cancel
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

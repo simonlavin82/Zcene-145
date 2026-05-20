@@ -721,7 +721,32 @@ const GraphPage: React.FC<GraphPageProps> = ({
       return () => observer.disconnect();
   }, [isSmallScreen]);
 
-  const onboardingProgress = useMemo(() => profile?.onboardingProgress || {}, [profile?.onboardingProgress]);
+  // Local state for guest onboarding
+  const [localOnboarding, setLocalOnboarding] = useState<{ [key: string]: boolean }>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('zcene_onboarding_progress');
+        return stored ? JSON.parse(stored) : {};
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return {};
+  });
+
+  const isShareIdActive = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    const hash = window.location.hash;
+    const params = new URLSearchParams(hash.split('?')[1] || '');
+    return hash.includes('#/z/') || params.has('shareId') || params.has('id');
+  }, []);
+
+  const onboardingProgress = useMemo(() => {
+    if (user) {
+      return profile?.onboardingProgress || {};
+    }
+    return localOnboarding;
+  }, [user, profile?.onboardingProgress, localOnboarding]);
 
   const [visibleTooltips, setVisibleTooltips] = useState<{ [key: string]: boolean }>({
     step1: false,
@@ -733,9 +758,43 @@ const GraphPage: React.FC<GraphPageProps> = ({
 
   const updateOnboarding = (step: string) => {
     const next = { ...onboardingProgress, [step]: true };
-    onUpdateProfile({ onboardingProgress: next });
+    if (user) {
+      onUpdateProfile({ onboardingProgress: next });
+    } else {
+      setLocalOnboarding(next);
+      try {
+        localStorage.setItem('zcene_onboarding_progress', JSON.stringify(next));
+      } catch (e) {
+        console.error(e);
+      }
+    }
     setVisibleTooltips(prev => ({ ...prev, [step]: false }));
   };
+
+  const handleRestartWalkthrough = useCallback(() => {
+    if (user) {
+      onUpdateProfile({ onboardingProgress: {} });
+    } else {
+      setLocalOnboarding({});
+      try {
+        localStorage.removeItem('zcene_onboarding_progress');
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    // Clear read/visited node IDs
+    setReadNodeIds(new Set());
+    // Clear selection
+    onNodeClick(null);
+    // Reset tabs and collapse panels
+    setActiveTab('artists');
+    onUpdateIsMagazineViewOpen(false);
+    setIsDetailsPanelCollapsed(true);
+    setIsLeftPanelCollapsed(false);
+    
+    // Show a toast to notify user
+    onShowToast("Walkthrough restarted!");
+  }, [user, onUpdateProfile, onNodeClick, onUpdateIsMagazineViewOpen, onShowToast]);
 
   useEffect(() => {
     if (!isActive) {
@@ -746,17 +805,32 @@ const GraphPage: React.FC<GraphPageProps> = ({
     const isArtistsVisible = isSmallScreen ? activeTab === 'artists' : true;
     const hasData = data.nodes.length > 0;
     const newVisibleTooltips = { step1: false, step2: false, step3: false, step4: false, step5: false };
-    if (!onboardingProgress.step1) {
-        if (isArtistsVisible) newVisibleTooltips.step1 = true;
-    } else if (selectedSeedArtists.length > 0 && !onboardingProgress.step2 && !isLoading && !hasData) {
-        if (isArtistsVisible) newVisibleTooltips.step2 = true;
-    } else if (hasData && !isLoading) {
-        if (!onboardingProgress.step3 && isGraphVisible) newVisibleTooltips.step3 = true;
-        else if (!onboardingProgress.step4 && isGraphVisible) newVisibleTooltips.step4 = true;
-        else if (!onboardingProgress.step5 && selectedNode) newVisibleTooltips.step5 = true;
+    
+    if (isShareIdActive) {
+        // Guest/Share onboarding: restrict to step3, step4, step5 (as a 3-step tour)
+        if (hasData && !isLoading) {
+            if (!onboardingProgress.step3 && isGraphVisible) {
+                newVisibleTooltips.step3 = true;
+            } else if (!onboardingProgress.step4 && isGraphVisible) {
+                newVisibleTooltips.step4 = true;
+            } else if (!onboardingProgress.step5 && selectedNode) {
+                newVisibleTooltips.step5 = true;
+            }
+        }
+    } else {
+        // Regular onboarding
+        if (!onboardingProgress.step1) {
+            if (isArtistsVisible) newVisibleTooltips.step1 = true;
+        } else if (selectedSeedArtists.length > 0 && !onboardingProgress.step2 && !isLoading && !hasData) {
+            if (isArtistsVisible) newVisibleTooltips.step2 = true;
+        } else if (hasData && !isLoading) {
+            if (!onboardingProgress.step3 && isGraphVisible) newVisibleTooltips.step3 = true;
+            else if (!onboardingProgress.step4 && isGraphVisible) newVisibleTooltips.step4 = true;
+            else if (!onboardingProgress.step5 && selectedNode) newVisibleTooltips.step5 = true;
+        }
     }
     setVisibleTooltips(newVisibleTooltips);
-  }, [isActive, data.nodes.length, onboardingProgress, isSmallScreen, activeTab, isLoading, selectedNode, selectedSeedArtists.length]);
+  }, [isActive, data.nodes.length, onboardingProgress, isSmallScreen, activeTab, isLoading, selectedNode, selectedSeedArtists.length, isShareIdActive]);
 
   const handleSpeechToText = (target: 'artists' | 'graph') => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -815,10 +889,9 @@ const GraphPage: React.FC<GraphPageProps> = ({
   }, [isDetailsPanelCollapsed]);
 
   const handleNodeClickInternal = useCallback((node: Node | null) => {
-    if (isGuest) return;
     onNodeClick(node);
     if (node) analyticsService.track('Node Clicked', { node_id: node?.id, node_type: node?.type });
-  }, [onNodeClick, isGuest]);
+  }, [onNodeClick]);
 
   const isDetailsVisible = useMemo(() => isSmallScreen ? activeTab === 'details' : !isDetailsPanelCollapsed, [isSmallScreen, activeTab, isDetailsPanelCollapsed]);
 
@@ -1353,6 +1426,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
             setIsMenuOpen={setIsMenuOpen}
             isAdmin={isAdmin}
             isGuest={isGuest}
+            onRestartWalkthrough={handleRestartWalkthrough}
         />
 
         {isSmallScreen ? (
@@ -1407,7 +1481,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                     <div className="flex-grow relative min-h-0 bg-zinc-900" ref={mobileGraphAreaRef}>{isLoading && (<div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-md z-[90] flex flex-col items-center justify-center gap-4 pointer-events-auto"><LoadingSpinner /><button onClick={(e) => { e.stopPropagation(); onCancelGeneration(); }} className="rounded-xl border border-zinc-600 px-6 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800 pointer-events-auto">Cancel</button></div>)}{isFirstGeneration && !isLoading && (<div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none"><ZceneEmptyState onNavigate={onNavigate} /></div>)}{data.nodes.length > 0 && (<MusicGraph data={data} libraryArtists={memoizedLibraryArtists} seedArtists={memoizedSeedArtists} onNodeClick={handleNodeClickInternal} selectedNode={selectedNode} isSmallScreen={isSmallScreen} activeFilters={activeFilters} focusOn={focusOn} searchQuery={searchQuery} setSearchQuery={setSearchQuery} toggleFilter={toggleFilterInternal} focusConfig={focusConfig} legendConfig={legendConfig} legendOrder={legendOrder} graphSettings={graphSettings} legendRef={desktopLegendAreaRef} onInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onLegendInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onExtendNode={onExtendNode} onRemoveNode={onRemoveNode} isGuest={isGuest} />)}</div>
                                 </div>
                             </div>
-                            <div className={`w-full flex-shrink-0 h-full flex flex-col min-h-0 overflow-hidden relative ${isMagazineViewOpen ? 'fixed inset-0 z-[1000]' : ''}`}>
+                            <div className={`w-full flex-shrink-0 h-full flex flex-col min-h-0 overflow-hidden relative ${isMagazineViewOpen ? 'fixed inset-0 z-[1000] pt-0 md:pt-4' : ''}`}>
                                 <div className="h-full flex flex-col overflow-hidden bg-zinc-900" style={{ overscrollBehaviorY: 'contain' }}>
                                     <DetailsPanel 
                                         selectedNode={selectedNode} 

@@ -30,6 +30,7 @@ interface HeaderProps {
   isMenuOpen: boolean;
   setIsMenuOpen: (open: boolean) => void;
   isGuest?: boolean;
+  onRestartWalkthrough?: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -56,12 +57,13 @@ const Header: React.FC<HeaderProps> = ({
   setIsDeleteAccountModalOpen,
   isMenuOpen,
   setIsMenuOpen,
-  isGuest = false
+  isGuest = false,
+  onRestartWalkthrough
 }) => {
   const isDashboard = view === 'dashboard';
 
   return (
-    <header className={`relative z-[100] h-16 flex-shrink-0 flex items-center pointer-events-none transition-all duration-300 ${isMagazineViewOpen ? 'h-0 opacity-0 overflow-hidden' : (isSmallScreen ? 'px-4' : 'px-6 lg:px-8')} ${isMagazineViewOpen ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100'}`}>
+    <header className={`relative z-[100] flex-shrink-0 flex items-center pointer-events-none transition-all duration-300 ${isMagazineViewOpen ? 'hidden md:block h-0 opacity-0 overflow-hidden' : (isSmallScreen ? 'h-16 px-4' : 'h-16 px-6 lg:px-8')} ${isMagazineViewOpen ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100'}`}>
         <div className="flex items-center w-full h-full">
             <div className="flex items-center flex-grow transition-all gap-2">
                 <button 
@@ -141,11 +143,10 @@ const Header: React.FC<HeaderProps> = ({
                     onClose={() => setIsMenuOpen(false)}
                     onNavigate={onNavigate}
                     isAdmin={isAdmin}
+                    onRestartWalkthrough={onRestartWalkthrough}
                 />
             </div>
 
-
-            <div className="h-4 w-px bg-zinc-700 mx-1"></div>
 
             {user && (
                 <div className="flex items-center gap-3 ml-1 relative">

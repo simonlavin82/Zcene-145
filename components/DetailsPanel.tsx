@@ -72,7 +72,6 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     const [isListening, setIsListening] = useState(false);
     const [imageError, setImageError] = useState(false);
     const [imgLoaded, setImgLoaded] = useState(false);
-    const [isNodeCopied, setIsNodeCopied] = useState(false);
     const [isIdCopied, setIsIdCopied] = useState(false);
     const [showTourDetails, setShowTourDetails] = useState(false);
     const chatEndRef = useRef<HTMLDivElement>(null);
@@ -112,39 +111,6 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             handleSend();
-        }
-    };
-
-    const handleShareCard = async () => {
-        const baseUrl = window.location.origin + window.location.pathname;
-        const seedsParam = encodeURIComponent(node.id);
-        const selectedParam = encodeURIComponent(node.id);
-        const deepLink = `${baseUrl}${baseUrl.endsWith('/') ? '' : '/'}#/app?seeds=${seedsParam}&selected=${selectedParam}`;
-        
-        analyticsService.track('Share Initiated', { type: 'node_card_focused', node_id: node.id });
-
-        if (navigator.share) {
-            try {
-                await navigator.share({
-                    title: `${node.id} on Zcene`,
-                    text: `Explore ${node.id} and its musical connections on Zcene.`,
-                    url: deepLink,
-                });
-            } catch (err: any) {
-                if (err.name !== 'AbortError') {
-                    await navigator.clipboard.writeText(deepLink);
-                    setIsNodeCopied(true);
-                    setTimeout(() => setIsNodeCopied(false), 2000);
-                }
-            }
-        } else {
-            try {
-                await navigator.clipboard.writeText(deepLink);
-                setIsNodeCopied(true);
-                setTimeout(() => setIsNodeCopied(false), 2000);
-            } catch (err) {
-                console.error("Clipboard copy failed", err);
-            }
         }
     };
 
@@ -233,14 +199,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                         </span>
                                     </button>
                                 )}
-                                <button 
-                                    onClick={handleShareCard} 
-                                    className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-700 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none relative" 
-                                    title="Share Card"
-                                >
-                                    <span className="material-symbols-outlined !text-[18px]">{isNodeCopied ? 'check' : 'share'}</span>
-                                    {isNodeCopied && <span className="absolute -top-10 left-1/2 -translate-x-1/2 bg-primary text-brand-black text-[10px] font-semibold px-2 py-1 whitespace-nowrap shadow-xl">Copied</span>}
-                                </button>
+
                                 <button onClick={onRefresh} className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-700 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none" title="Refresh Details">
                                         <span className="material-symbols-outlined !text-[18px]">refresh</span>
                                 </button>
