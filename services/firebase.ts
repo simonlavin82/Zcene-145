@@ -3,17 +3,7 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChang
 import { getFirestore } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
-const isBrowser = typeof window !== 'undefined';
-const isLocalhost = isBrowser && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-
-const dynamicAuthDomain = isBrowser && !isLocalhost 
-  ? window.location.hostname 
-  : firebaseConfig.authDomain;
-
-const app = initializeApp({
-  ...firebaseConfig,
-  authDomain: dynamicAuthDomain
-});
+const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 
