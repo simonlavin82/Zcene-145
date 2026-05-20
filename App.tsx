@@ -969,6 +969,18 @@ const App: React.FC = () => {
     }
   }, [user, graphData, seedArtists, projectName, activeNodes, detailsCache, chatHistories, discoveryFilters, lastViewedStackCount, currentCacheKey, handleLogin, showToast]);
 
+  const handleDashboardRestartWalkthrough = useCallback(async () => {
+    if (user) {
+      await handleUpdateProfile({ onboardingProgress: {} });
+    } else {
+      try {
+        localStorage.removeItem('zcene_onboarding_progress');
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    showToast("Walkthrough restarted!");
+  }, [user, handleUpdateProfile, showToast]);
 
   const handleDeleteAccount = async () => {
     if (!user) return;
@@ -1800,21 +1812,21 @@ const App: React.FC = () => {
   useEffect(() => {
     const processDeepLink = async () => {
       const hash = window.location.hash || '#/';
+      const searchParams = new URLSearchParams(window.location.search || hash.split('?')[1] || '');
+      const projectIdFromQuery = searchParams.get('id') || searchParams.get('projectId');
+      const shareIdFromQuery = searchParams.get('shareId');
+
       const isAppPath = hash.startsWith('#/app');
       const isDashboardPath = hash.startsWith('#/dashboard');
-      const isProjectPath = hash.startsWith('#/z/');
+      const isProjectPath = hash.startsWith('#/z/') || hash.startsWith('#/project/') || window.location.pathname.startsWith('/project/');
 
       // --- ROUTING LOGIC ---
-      if (isAppPath || isDashboardPath || isProjectPath || hash.startsWith('#/help') || hash.startsWith('#/design') || hash.startsWith('#/engine')) {
+      if (isAppPath || isDashboardPath || isProjectPath || hash.startsWith('#/help') || hash.startsWith('#/design') || hash.startsWith('#/engine') || shareIdFromQuery || projectIdFromQuery) {
         // Optimization: Pre-capture hash for redirection if auth is not ready
         if (!isAuthInitialized) {
           authRedirectPathRef.current = hash;
           return;
         }
-
-        const params = new URLSearchParams(hash.split('?')[1] || '');
-        const projectIdFromQuery = params.get('id') || params.get('projectId');
-        const shareIdFromQuery = params.get('shareId');
 
         // Allow access to app if we have a deep link ID, even if not logged in
         if (!user && !projectIdFromQuery && !shareIdFromQuery) {
@@ -1900,9 +1912,9 @@ const App: React.FC = () => {
 
       lastProcessedHashRef.current = hash;
       lastProcessedSessionKeyRef.current = sessionKey;
-      if (!hash.includes('?')) return;
+      if (!hash.includes('?') && !window.location.search) return;
 
-      const params = new URLSearchParams(hash.split('?')[1] || '');
+      const params = new URLSearchParams(window.location.search || hash.split('?')[1] || '');
       const seeds = params.get('seeds'), origin = params.get('origin'), selected = params.get('selected');
       const shareId = params.get('shareId') || params.get('id');
 
@@ -2248,6 +2260,7 @@ const App: React.FC = () => {
             isMenuOpen={isMenuOpen}
             setIsMenuOpen={setIsMenuOpen}
             onNavigate={handleMenuNavigate}
+            onRestartWalkthrough={handleDashboardRestartWalkthrough}
           />
         </div>
         <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Graph ? 'z-10' : 'z-0 opacity-0 pointer-events-none'}`}>

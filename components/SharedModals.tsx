@@ -150,20 +150,26 @@ export const HeaderMenu: React.FC<{
                         {item.isExternal && <span className="material-symbols-outlined !text-[12px] ml-auto opacity-40">open_in_new</span>}
                     </button>
                 ))}
-                {onRestartWalkthrough && (
-                    <div className="border-t border-zinc-800/80 my-1.5 pt-1.5">
-                        <button
-                            onClick={() => {
+                <div className="border-t border-zinc-800/80 my-1.5 pt-1.5">
+                    <button
+                        onClick={() => {
+                            if (onRestartWalkthrough) {
                                 onRestartWalkthrough();
-                                onClose();
-                            }}
-                            className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-zinc-300 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors group"
-                        >
-                            <span className="material-symbols-outlined !text-[18px] text-zinc-500 group-hover:text-primary">restart_alt</span>
-                            Restart Walkthrough
-                        </button>
-                    </div>
-                )}
+                            } else {
+                                try {
+                                    localStorage.removeItem('zcene_onboarding_progress');
+                                } catch (e) {
+                                    console.error(e);
+                                }
+                            }
+                            onClose();
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-zinc-300 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors group"
+                    >
+                        <span className="material-symbols-outlined !text-[18px] text-zinc-500 group-hover:text-primary">restart_alt</span>
+                        Restart Walkthrough
+                    </button>
+                </div>
             </motion.div>
         </>
     );

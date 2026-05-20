@@ -27,6 +27,7 @@ interface DashboardProps {
   isAdmin?: boolean;
   isMenuOpen: boolean;
   setIsMenuOpen: (open: boolean) => void;
+  onRestartWalkthrough?: () => void;
 }
 
 const Dashboard: React.FC<DashboardProps> = ({
@@ -51,7 +52,8 @@ const Dashboard: React.FC<DashboardProps> = ({
   onNavigate,
   isAdmin,
   isMenuOpen,
-  setIsMenuOpen
+  setIsMenuOpen,
+  onRestartWalkthrough
 }) => {
   const [projectToDelete, setProjectToDelete] = React.useState<string | null>(null);
   const [view, setView] = React.useState<'grid' | 'list'>('grid');
@@ -137,6 +139,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         setIsDeleteAccountModalOpen={setIsDeleteAccountModalOpen}
         isMenuOpen={isMenuOpen}
         setIsMenuOpen={setIsMenuOpen}
+        onRestartWalkthrough={onRestartWalkthrough}
       />
 
       

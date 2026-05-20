@@ -614,11 +614,9 @@ const GraphPage: React.FC<GraphPageProps> = ({
   const [activeTab, setActiveTab] = useState<MobileTab>(() => {
     if (typeof window !== 'undefined') {
         const hashParts = window.location.hash.split('?');
-        if (hashParts.length > 1) {
-            const params = new URLSearchParams(hashParts[1]);
-            if (params.has('selected')) return 'details';
-            if (params.has('seeds')) return 'spiderweb';
-        }
+        const params = new URLSearchParams(window.location.search || hashParts[1] || '');
+        if (params.has('shareId') || params.has('id') || params.has('seeds')) return 'spiderweb';
+        if (params.has('selected')) return 'details';
     }
     return 'artists';
   });
@@ -868,6 +866,13 @@ const GraphPage: React.FC<GraphPageProps> = ({
         mediaQuery.removeEventListener('change', updateScreenSize);
         window.removeEventListener('resize', updateScreenSize);
     };
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search || window.location.hash.split('?')[1] || '');
+    if (params.has('shareId') || params.has('id')) {
+      setActiveTab('spiderweb');
+    }
   }, []);
   
   useEffect(() => {
