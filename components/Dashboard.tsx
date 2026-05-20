@@ -153,17 +153,17 @@ const Dashboard: React.FC<DashboardProps> = ({
               <div className="flex items-center bg-zinc-950 rounded-none p-0.5 border border-zinc-800 h-[38px]">
                 <button
                   onClick={() => setView('grid')}
-                  className={`h-full w-[34px] rounded-none font-semibold transition-all flex items-center justify-center text-xs ${view === 'grid' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  className={`h-full w-[38px] rounded-none transition-all flex items-center justify-center ${view === 'grid' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
                   title="Grid View"
                 >
-                  <span className="material-symbols-outlined !text-[14px]">grid_view</span>
+                  <span className="material-symbols-outlined !text-[20px]">grid_view</span>
                 </button>
                 <button
                   onClick={() => setView('list')}
-                  className={`h-full w-[34px] rounded-none font-semibold transition-all flex items-center justify-center text-xs ${view === 'list' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  className={`h-full w-[38px] rounded-none transition-all flex items-center justify-center ${view === 'list' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
                   title="List View"
                 >
-                  <span className="material-symbols-outlined !text-[14px]">list</span>
+                  <span className="material-symbols-outlined !text-[20px]">list</span>
                 </button>
               </div>
 
