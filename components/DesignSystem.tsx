@@ -152,6 +152,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
         { id: 'iconography', title: 'Iconography' },
         { id: 'spiderweb-legends', title: 'Spiderweb Legends' },
         { id: 'buttons', title: 'Buttons' },
+        { id: 'toggles', title: 'Toggles' },
         { id: 'links', title: 'Links' },
         { id: 'badges-tags', title: 'Badges & Tags' },
         { id: 'lists', title: 'Lists' },
@@ -279,11 +280,11 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
             </div>
 
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex gap-12 flex-grow">
-                <aside className="w-56 flex-shrink-0 sticky top-28 self-start h-[calc(100vh-8rem)] hidden lg:block overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800">
+                <aside className="w-56 flex-shrink-0 sticky top-28 self-start h-[calc(100vh-8rem)] hidden lg:block overflow-y-auto overflow-x-hidden pl-4 scrollbar-thin scrollbar-thumb-zinc-800">
                     <nav className="space-y-1">
                         <h3 className="font-medium text-white text-lg mb-4">Jump to section</h3>
                         {sections.map(section => (
-                            <a key={section.id} href={`#${section.id}`} onClick={(e) => handleNavClick(e, section.id)} className="block text-zinc-400 hover:text-primary hover:bg-zinc-800/50 py-1.5 px-2 -mx-2 rounded-xl transition-colors text-sm">{section.title}</a>
+                            <a key={section.id} href={`#${section.id}`} onClick={(e) => handleNavClick(e, section.id)} className="block text-zinc-400 hover:text-primary hover:bg-zinc-800/50 py-1.5 px-2 rounded-xl transition-colors text-sm">{section.title}</a>
                         ))}
                     </nav>
                 </aside>
@@ -1032,38 +1033,6 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
                                 </div>
                             </div>
 
-                            {/* View Toggle Control */}
-                            <div className="space-y-8 mt-12">
-                                <div className="flex items-baseline justify-between">
-                                    <h3 className="text-xl font-medium text-zinc-200">View Toggle Control</h3>
-                                    <div className="flex gap-4">
-                                        <code className="text-[10px] text-zinc-500 font-mono bg-zinc-950 px-2 py-1 rounded-xl">2-way</code>
-                                        <code className="text-[10px] text-zinc-500 font-mono bg-zinc-950 px-2 py-1 rounded-xl">Material Symbols</code>
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                    <div className="p-8 bg-zinc-900/40 border border-zinc-800 rounded-xl space-y-8 flex flex-col items-center justify-center min-h-[200px]">
-                                        <ViewToggle value={demoFocusMode} onChange={setDemoFocusMode} />
-                                        <div className="text-center">
-                                            <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest mb-1">Current State</p>
-                                            <p className="text-sm font-medium text-primary capitalize">{demoFocusMode} View</p>
-                                        </div>
-                                    </div>
-                                    <div className="p-6 bg-zinc-950 border border-zinc-800 rounded-xl space-y-4">
-                                        <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Design Intent</h4>
-                                        <p className="text-sm text-zinc-400 leading-relaxed">
-                                            The View Toggle replaces standard dropdowns for high-frequency layout switching. It uses distinct icons (Hub for Organic, Bubble Chart for Cluster) to provide immediate visual feedback.
-                                        </p>
-                                        <ul className="text-xs text-zinc-500 space-y-2 list-disc list-inside">
-                                            <li><strong>Tactile Feedback:</strong> Subtle shadow-inner and ring-1 on the sliding pill.</li>
-                                            <li><strong>Motion:</strong> A spring-based sliding transition for smooth state changes.</li>
-                                            <li><strong>Visual Feedback:</strong> The active icon changes to the primary brand color.</li>
-                                            <li><strong>Accessibility:</strong> Full ARIA labels and title attributes for screen readers.</li>
-                                        </ul>
-                                    </div>
-                                </div>
-                            </div>
-
                             {/* Dialog Action Buttons */}
                             <div className="space-y-8">
                                 <div className="flex items-baseline justify-between">
@@ -1109,6 +1078,41 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
                                         <p className="text-sm text-zinc-500 font-semibold">Padding</p>
                                         <p className="text-xs text-zinc-400 leading-relaxed">A bottom padding of <strong>48px (pb-12)</strong> is applied to the scrollable container to ensure the button can be scrolled completely clear of the advertisement area on mobile devices.</p>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* 7.5. TOGGLES */}
+                    <section id="toggles">
+                        <div className="flex items-baseline justify-between border-b-2 border-primary/50 pb-2 mb-8">
+                            <h2 className="text-3xl font-medium text-white tracking-tight">Toggles</h2>
+                            <code className="text-[10px] text-zinc-500 font-mono bg-zinc-950 px-2 py-1 rounded-xl">rounded-[6px]</code>
+                        </div>
+                        
+                        <div className="space-y-12">
+                            <p className="text-base text-zinc-300 leading-relaxed max-w-3xl">
+                                Custom toggle components are utilized across the application to facilitate smooth visual transitions and switches between various modes (such as switching views or active filters).
+                            </p>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div className="p-8 bg-zinc-900/40 border border-zinc-800 rounded-xl space-y-8 flex flex-col items-center justify-center min-h-[200px]">
+                                    <ViewToggle value={demoFocusMode} onChange={setDemoFocusMode} />
+                                    <div className="text-center">
+                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest mb-1">Interactive Demo</p>
+                                        <p className="text-sm font-medium text-primary capitalize">{demoFocusMode} View</p>
+                                    </div>
+                                </div>
+                                <div className="p-6 bg-zinc-950 border border-zinc-800 rounded-xl space-y-4">
+                                    <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Tactile Specifications</h4>
+                                    <p className="text-sm text-zinc-400 leading-relaxed">
+                                        To ensure a modern, soft tactile response alongside our brutalist hard edges, interactive selector controls use a distinct **6px border-radius (`rounded-[6px]`)** pill structure.
+                                    </p>
+                                    <ul className="text-xs text-zinc-500 space-y-2 list-disc list-inside">
+                                        <li><strong>Soft tactile response:</strong> A customized 6px border-radius provides premium, reactive tactile feedback.</li>
+                                        <li><strong>Main Graph Alignment:</strong> Matches the design pattern implemented inside our main graph window for view mode selections.</li>
+                                        <li><strong>Sliding pill motion:</strong> Motion is driven by a smooth spring transition indicating the active option cleanly.</li>
+                                    </ul>
                                 </div>
                             </div>
                         </div>

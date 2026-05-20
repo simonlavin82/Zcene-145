@@ -150,20 +150,20 @@ const Dashboard: React.FC<DashboardProps> = ({
             
             <div className="flex items-center gap-3">
               {/* Grid/List View Toggle */}
-              <div className="flex items-center bg-zinc-950 rounded-xl p-0.5 border border-zinc-800 h-[38px]">
+              <div className="flex items-center bg-zinc-950 rounded-none p-0.5 border border-zinc-800 h-[38px]">
                 <button
                   onClick={() => setView('grid')}
-                  className={`h-full px-3.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 text-xs ${view === 'grid' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  className={`h-full w-[34px] rounded-none font-semibold transition-all flex items-center justify-center text-xs ${view === 'grid' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  title="Grid View"
                 >
                   <span className="material-symbols-outlined !text-[14px]">grid_view</span>
-                  Grid
                 </button>
                 <button
                   onClick={() => setView('list')}
-                  className={`h-full px-3.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 text-xs ${view === 'list' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  className={`h-full w-[34px] rounded-none font-semibold transition-all flex items-center justify-center text-xs ${view === 'list' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  title="List View"
                 >
                   <span className="material-symbols-outlined !text-[14px]">list</span>
-                  List
                 </button>
               </div>
 
@@ -174,7 +174,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                   className="h-[38px] px-4 bg-zinc-950 border border-zinc-800 hover:bg-zinc-900 hover:border-zinc-700 rounded-xl font-semibold text-zinc-300 transition-all flex items-center gap-2 cursor-pointer text-xs"
                 >
                   <span className="material-symbols-outlined !text-[14px]">sort</span>
-                  <span>Sort: {sortBy === 'recent' ? 'Most Recent' : 'Title'}</span>
+                  <span>{sortBy === 'recent' ? 'Most Recent' : 'Title'}</span>
                   <span className="material-symbols-outlined !text-[14px] transition-transform duration-200" style={{ transform: isSortOpen ? 'rotate(180deg)' : 'none' }}>keyboard_arrow_down</span>
                 </button>
                 
@@ -218,7 +218,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 ) : (
                   <>
                     <span className="material-symbols-outlined !text-lg font-bold">add</span>
-                    New Zcene
+                    Create
                   </>
                 )}
               </button>
