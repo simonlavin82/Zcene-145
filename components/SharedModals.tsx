@@ -130,7 +130,7 @@ export const HeaderMenu: React.FC<{
                 initial={{ opacity: 0, scale: 0.95, y: -10 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                className="absolute right-0 top-full mt-2 w-48 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl z-[110] overflow-hidden p-1.5"
+                className="absolute right-0 top-full mt-2 w-56 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl z-[110] overflow-hidden p-1.5"
             >
                 {menuItems.map((item) => (
                     <button

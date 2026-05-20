@@ -2367,7 +2367,7 @@ const App: React.FC = () => {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="w-full max-w-sm rounded-[32px] bg-zinc-900 border border-zinc-800 p-8 shadow-2xl relative overflow-hidden"
+              className="w-full max-w-sm rounded-none bg-zinc-900 border border-zinc-800 p-8 shadow-2xl relative overflow-hidden"
             >
               {isDeletingAccount && (
                 <div className="absolute top-0 left-0 w-full h-1 bg-zinc-800 overflow-hidden">
@@ -2375,7 +2375,7 @@ const App: React.FC = () => {
                 </div>
               )}
 
-              <div className="w-16 h-16 rounded-2xl bg-red-500/10 flex items-center justify-center text-red-500 mb-6">
+              <div className="w-16 h-16 rounded-none bg-red-500/10 flex items-center justify-center text-red-500 mb-6">
                 <span className="material-symbols-outlined !text-[32px]">warning</span>
               </div>
 
@@ -2385,7 +2385,7 @@ const App: React.FC = () => {
               </p>
 
               {error && (
-                <div className="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-medium leading-relaxed">
+                <div className="mb-6 p-4 rounded-none bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-medium leading-relaxed">
                   {error}
                 </div>
               )}
@@ -2394,7 +2394,7 @@ const App: React.FC = () => {
                 <button
                   disabled={isDeletingAccount}
                   onClick={handleDeleteAccount}
-                  className="w-full py-4 rounded-2xl bg-red-600 hover:bg-red-500 text-white font-bold transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2 shadow-lg shadow-red-900/20"
+                  className="w-full py-4 rounded-none bg-[#ef4444] hover:bg-[#ef4444]/90 text-white font-bold transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2 shadow-lg shadow-red-900/20"
                 >
                   {isDeletingAccount ? (
                     <>
@@ -2408,7 +2408,7 @@ const App: React.FC = () => {
                 <button
                   disabled={isDeletingAccount}
                   onClick={() => setIsDeleteAccountModalOpen(false)}
-                  className="w-full py-4 rounded-2xl border border-zinc-800 text-zinc-400 font-bold hover:bg-zinc-800 hover:text-white transition-all disabled:opacity-50"
+                  className="w-full py-4 rounded-none border border-zinc-800 text-zinc-400 font-bold hover:bg-zinc-800 hover:text-white transition-all disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -2484,7 +2484,7 @@ const App: React.FC = () => {
                     window.location.hash = '';
                     handleViewChange(View.Home);
                   }}
-                  className="w-full py-4 rounded-none bg-red-600 hover:bg-red-500 text-white font-bold transition-all active:scale-[0.98]"
+                  className="w-full py-4 rounded-none bg-[#ef4444] hover:bg-[#ef4444]/90 text-white font-bold transition-all active:scale-[0.98]"
                 >
                   Exit without Saving
                 </button>
