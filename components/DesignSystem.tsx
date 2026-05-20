@@ -1106,12 +1106,13 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
                                 <div className="p-6 bg-zinc-950 border border-zinc-800 rounded-xl space-y-4">
                                     <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Tactile Specifications</h4>
                                     <p className="text-sm text-zinc-400 leading-relaxed">
-                                        To ensure a modern, soft tactile response alongside our brutalist hard edges, interactive selector controls use a distinct **6px border-radius (`rounded-[6px]`)** pill structure.
+                                        To ensure a modern, soft tactile response alongside our brutalist hard edges, interactive selector controls use a distinct <strong>6px border-radius</strong> (<code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded">rounded-[6px]</code>) pill structure — deliberately separating them from our strict <strong>0px brutalist</strong> layout containers.
                                     </p>
                                     <ul className="text-xs text-zinc-500 space-y-2 list-disc list-inside">
-                                        <li><strong>Soft tactile response:</strong> A customized 6px border-radius provides premium, reactive tactile feedback.</li>
-                                        <li><strong>Main Graph Alignment:</strong> Matches the design pattern implemented inside our main graph window for view mode selections.</li>
-                                        <li><strong>Sliding pill motion:</strong> Motion is driven by a smooth spring transition indicating the active option cleanly.</li>
+                                        <li><strong>Soft tactile response:</strong> A customized 6px border-radius provides premium, reactive tactile feedback distinct from hard-edge containers.</li>
+                                        <li><strong>Main Graph Alignment:</strong> Matches the Organic/Cluster selector pill found inside our main graph window.</li>
+                                        <li><strong>Sliding pill motion:</strong> A smooth spring transition glides between options, indicating active state cleanly.</li>
+                                        <li><strong>Icon-based identity:</strong> Hub icon = Organic view; Bubble Chart icon = Cluster view — no text labels required.</li>
                                     </ul>
                                 </div>
                             </div>
