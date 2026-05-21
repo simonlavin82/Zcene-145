@@ -150,17 +150,17 @@ const Dashboard: React.FC<DashboardProps> = ({
             
             <div className="flex items-center gap-3">
               {/* Grid/List View Toggle */}
-              <div className="flex items-center bg-zinc-950 rounded-none p-0.5 border border-zinc-800 h-[38px]">
+              <div className="flex items-center bg-zinc-950 rounded-[6px] p-0.5 border border-zinc-800 h-[38px]">
                 <button
                   onClick={() => setView('grid')}
-                  className={`h-full w-[38px] rounded-none transition-all flex items-center justify-center ${view === 'grid' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  className={`h-full w-[38px] rounded-[6px] transition-all flex items-center justify-center ${view === 'grid' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
                   title="Grid View"
                 >
                   <span className="material-symbols-outlined !text-[20px]">grid_view</span>
                 </button>
                 <button
                   onClick={() => setView('list')}
-                  className={`h-full w-[38px] rounded-none transition-all flex items-center justify-center ${view === 'list' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  className={`h-full w-[38px] rounded-[6px] transition-all flex items-center justify-center ${view === 'list' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
                   title="List View"
                 >
                   <span className="material-symbols-outlined !text-[20px]">list</span>
