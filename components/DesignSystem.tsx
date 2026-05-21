@@ -1106,11 +1106,12 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
                                 <div className="p-6 bg-zinc-950 border border-zinc-800 rounded-xl space-y-4">
                                     <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Tactile Specifications</h4>
                                     <p className="text-sm text-zinc-400 leading-relaxed">
-                                        Interactive selector controls use a <strong>6px border-radius</strong> (<code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded">rounded-[6px]</code>) segmented pill container — deliberately separating them from our strict <strong>0px brutalist</strong> layout containers. The active icon is highlighted by a <strong>tight square sliding badge</strong> that neatly wraps exactly one icon.
+                                        Interactive selector controls use a unified <strong>6px border-radius</strong> (<code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded">rounded-[6px]</code>) segmented pill container and button frames — deliberately separating them from our strict <strong>0px brutalist</strong> layout containers. The active icon is highlighted by a <strong>tight square sliding badge</strong> that neatly wraps exactly one icon.
                                     </p>
                                     <ul className="text-xs text-zinc-500 space-y-2 list-disc list-inside">
                                         <li><strong>Icon-only minimalism:</strong> No text labels — identity is communicated purely through the Material Symbol icons (Hub = Organic, Bubble Chart = Cluster).</li>
-                                        <li><strong>Square active badge:</strong> A fixed <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded">w-8 h-8</code> <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded">bg-zinc-800</code> block slides between positions, wrapping exactly the active icon.</li>
+                                        <li><strong>Proportional sliding active badge:</strong> A fixed <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded">w-8 h-8</code> <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded">bg-zinc-800</code> active block with a soft <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded">rounded-[4px]</code> radius slides proportionally between positions.</li>
+                                        <li><strong>Outer & Button Radius:</strong> Both the main outer toggle container and button frames use a matching <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded">rounded-[6px]</code> border radius to form a unified set.</li>
                                         <li><strong>Spring animation:</strong> Badge translates via <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded">stiffness: 480 / damping: 38</code> — snappy and responsive, not floaty.</li>
                                         <li><strong>Main Graph Alignment:</strong> This same component is used live inside the graph canvas for Organic/Cluster mode switching.</li>
                                     </ul>
@@ -1880,7 +1881,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
                                 Zcene uses a hybrid border radius system to capture a 90s aesthetic while maintaining a premium interactive experience.
                             </p>
                             
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                                 <div className="p-6 bg-zinc-900 border border-zinc-700/50 rounded-none flex flex-col gap-4">
                                     <div className="h-16 w-16 bg-primary rounded-none flex items-center justify-center text-brand-black font-semibold">0px</div>
                                     <div>
@@ -1891,6 +1892,19 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
                                             <li>Structural dividers and panels</li>
                                             <li>Decorative icon boxes</li>
                                             <li>Data grid headers</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                <div className="p-6 bg-zinc-900 border border-zinc-700/50 rounded-none flex flex-col gap-4">
+                                    <div className="h-16 w-16 bg-primary rounded-[6px] flex items-center justify-center text-brand-black font-semibold">6px</div>
+                                    <div>
+                                        <h4 className="text-sm font-semibold text-white uppercase tracking-widest">Tactile (rounded-[6px])</h4>
+                                        <p className="text-xs text-zinc-500 mt-1">Used for unified <strong>Interaction Sets</strong> (segmented view switcher containers, toggle components, and button frames) for a premium, cohesive tactile signature.</p>
+                                        <ul className="text-[10px] text-zinc-600 mt-2 space-y-1 list-disc pl-3 uppercase tracking-wider font-semibold">
+                                            <li>Dashboard view switchers</li>
+                                            <li>ViewToggle segmented wrappers</li>
+                                            <li>Segment switcher button frames</li>
+                                            <li>Tactile selection controls</li>
                                         </ul>
                                     </div>
                                 </div>
