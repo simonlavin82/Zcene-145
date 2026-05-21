@@ -543,13 +543,13 @@ const ExampleMusicGraph: React.FC = () => {
                             <div className="relative">
                                 <div className="flex items-center bg-zinc-900/60 border border-zinc-700 rounded-xl p-0.5 backdrop-blur-sm relative">
                                     <motion.div 
-                                        className="absolute top-0.5 left-0.5 h-8 w-8 bg-zinc-800 rounded-[10px] shadow-inner ring-1 ring-zinc-700"
+                                        className="absolute top-0.5 left-0.5 h-8 w-8 bg-zinc-800 rounded-[6px] shadow-inner ring-1 ring-zinc-700"
                                         initial={false}
                                         animate={{ x: focusOn === 'organic' ? 0 : 32 }}
                                         transition={{ type: "spring", stiffness: 500, damping: 35 }}
                                     />
                                     <button 
-                                        className={`flex items-center justify-center w-8 h-8 rounded-[10px] transition-colors relative z-10 active:scale-95 ${focusOn === 'organic' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                        className={`flex items-center justify-center w-8 h-8 rounded-lg transition-colors relative z-10 active:scale-95 ${focusOn === 'organic' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
                                         onClick={() => setFocusOn('organic')}
                                         title="Organic View"
                                         aria-label="Organic View"
@@ -557,7 +557,7 @@ const ExampleMusicGraph: React.FC = () => {
                                         <span className="material-symbols-outlined !text-[18px]">hub</span>
                                     </button>
                                     <button 
-                                        className={`flex items-center justify-center w-8 h-8 rounded-[10px] transition-colors relative z-10 active:scale-95 ${focusOn === 'cluster' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                        className={`flex items-center justify-center w-8 h-8 rounded-lg transition-colors relative z-10 active:scale-95 ${focusOn === 'cluster' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
                                         onClick={() => setFocusOn('cluster')}
                                         title="Cluster View"
                                         aria-label="Cluster View"

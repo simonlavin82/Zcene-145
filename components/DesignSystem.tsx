@@ -725,7 +725,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
                                 <p className="text-base text-zinc-400 mb-8 leading-relaxed max-w-3xl">
                                     The legend provides visual decoding of node types and acts as a behavioral filter for the spiderweb. It is <strong>fully responsive</strong>, automatically switching to a compact mobile panel if the viewport or container becomes too narrow for the horizontal bar.
                                 </p>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-none border border-zinc-800">
                                      <div className="flex items-center gap-3 group cursor-pointer">
                                          <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center text-primary group-hover:bg-zinc-700 transition-colors">
                                              <LegendSymbol symbol={d3.symbolCircle} size={260} />
@@ -763,7 +763,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
                                          <span className="text-sm font-medium">Founded</span>
                                      </div>
                                 </div>
-                                <div className="mt-6 p-6 border border-zinc-800 bg-zinc-900/20 rounded-xl">
+                                <div className="mt-6 p-6 border border-zinc-800 bg-zinc-900/20 rounded-none">
                                     <h4 className="text-xs font-semibold text-primary uppercase tracking-widest mb-4">Responsive Behavior</h4>
                                     <ul className="space-y-3 text-sm text-zinc-400">
                                         <li className="flex items-start gap-2">
@@ -789,7 +789,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
                         
                         <div className="space-y-24">
                             {/* Button Size Scale */}
-                            <div className="p-8 bg-zinc-900/50 rounded-xl border border-zinc-800">
+                            <div className="p-8 bg-zinc-900/50 rounded-none border border-zinc-800">
                                 <h3 className="text-xl font-medium text-primary mb-4">Button Size Scale</h3>
                                 <p className="text-base text-zinc-300 leading-relaxed max-w-3xl mb-8">
                                     Zcene uses a responsive size scale to ensure buttons are both aesthetically refined on desktop and accessible on touch devices. We adhere to a **44px minimum touch target** for primary mobile actions. All interactive buttons use a **rounded-xl (12px)** radius for a modern, accessible feel.
@@ -797,40 +797,40 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
                                 
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                                     <div className="space-y-4">
-                                        <div className="h-16 flex items-center justify-center bg-zinc-950 rounded-xl border border-zinc-800">
-                                            <button className="bg-zinc-800 text-zinc-200 px-3 py-1 text-xs rounded-lg font-medium border border-zinc-700">Small Utility</button>
+                                        <div className="h-16 flex items-center justify-center bg-zinc-950 rounded-none border border-zinc-800">
+                                            <button className="bg-zinc-800 text-zinc-200 px-3 py-1 text-xs rounded-xl font-medium border border-zinc-700">Small Utility</button>
                                         </div>
                                         <div>
                                             <h4 className="text-sm font-semibold text-zinc-200 uppercase tracking-widest">Small (Utility)</h4>
-                                            <p className="text-xs text-zinc-500 mt-1 font-mono">px-3 py-1 text-xs (28px height)</p>
+                                            <p className="text-xs text-zinc-500 mt-1 font-mono"><code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">px-3</code> <code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">py-1</code> <code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">text-xs</code> (28px height) | Radius: 12px (<code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">rounded-xl</code>)</p>
                                             <p className="text-xs text-zinc-400 mt-2">Used for tight UI areas, metadata actions, or secondary panel controls.</p>
                                         </div>
                                     </div>
 
                                     <div className="space-y-4">
-                                        <div className="h-16 flex items-center justify-center bg-zinc-950 rounded-xl border border-zinc-800">
+                                        <div className="h-16 flex items-center justify-center bg-zinc-950 rounded-none border border-zinc-800">
                                             <button className="bg-primary text-brand-black px-6 py-2 text-sm rounded-xl font-medium shadow-lg">Standard CTA</button>
                                         </div>
                                         <div>
                                             <h4 className="text-sm font-semibold text-zinc-200 uppercase tracking-widest">Medium (Standard)</h4>
-                                            <p className="text-xs text-zinc-500 mt-1 font-mono">px-6 py-2 text-sm (38px height)</p>
+                                            <p className="text-xs text-zinc-500 mt-1 font-mono"><code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">px-6</code> <code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">py-2</code> <code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">text-sm</code> (38px height) | Radius: 12px (<code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">rounded-xl</code>)</p>
                                             <p className="text-xs text-zinc-400 mt-2">The default size for most system actions and sidebar controls.</p>
                                         </div>
                                     </div>
 
                                     <div className="space-y-4">
-                                        <div className="h-16 flex items-center justify-center bg-zinc-950 rounded-xl border border-zinc-800">
-                                            <button className="bg-primary text-brand-black px-8 py-4 text-base sm:text-lg rounded-2xl font-medium shadow-xl">Hero Action</button>
+                                        <div className="h-16 flex items-center justify-center bg-zinc-950 rounded-none border border-zinc-800">
+                                            <button className="bg-primary text-brand-black px-8 py-4 text-base sm:text-lg rounded-xl font-medium shadow-xl">Hero Action</button>
                                         </div>
                                         <div>
                                             <h4 className="text-sm font-semibold text-zinc-200 uppercase tracking-widest">Large (Hero/Mobile)</h4>
-                                            <p className="text-xs text-zinc-500 mt-1 font-mono">px-8 py-4 text-lg (56px height)</p>
+                                            <p className="text-xs text-zinc-500 mt-1 font-mono"><code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">px-8</code> <code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">py-4</code> <code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">text-lg</code> (56px height) | Radius: 12px (<code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">rounded-xl</code>)</p>
                                             <p className="text-xs text-zinc-400 mt-2">Used for Landing Page Hero sections and primary mobile-first touch targets.</p>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="mt-8 p-4 bg-primary/5 border border-primary/20 rounded-xl">
+                                <div className="mt-8 p-4 bg-primary/5 border border-primary/20 rounded-none">
                                     <div className="flex items-center gap-2 text-primary mb-1">
                                         <span className="material-symbols-outlined !text-[18px]">info</span>
                                         <span className="text-xs font-semibold uppercase tracking-wider">Accessibility Note</span>
@@ -843,36 +843,38 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
 
                             {/* Primary CTAs */}
                             <div>
-                                <div className="flex items-baseline justify-between mb-6">
+                                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
                                     <h3 className="text-xl font-medium text-zinc-200">Primary System CTAs</h3>
-                                    <div className="flex gap-4">
-                                        <code className="text-[10px] text-zinc-500 font-mono bg-zinc-950 px-2 py-1 rounded-xl">px-6 py-2</code>
-                                        <code className="text-[10px] text-zinc-500 font-mono bg-zinc-950 px-2 py-1 rounded-xl">text-sm</code>
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Radius: 12px / rounded-xl</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Height: 38px</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Padding: px-6 py-2</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Font: 14px / text-sm</span>
                                     </div>
                                 </div>
                                 <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
                                     High-impact buttons used for definitive system actions like generating or updating a graph. On Tablet/Mobile, the placement follows a dynamic inline strategy to ensure absolute visibility.
                                 </p>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-none border border-zinc-800">
                                      <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Default Status</p>
-                                        <button className="w-full bg-primary text-brand-black px-6 py-2 rounded-md font-medium shadow-lg text-sm flex items-center justify-center gap-2">
+                                        <button className="w-full bg-primary text-brand-black px-6 py-2 rounded-xl font-medium shadow-lg text-sm flex items-center justify-center gap-2">
                                             <span>Create Zcene</span>
-                                            <span className="h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-semibold border border-primary/50 bg-brand-black text-primary">0</span>
+                                            <span className="h-5 w-5 rounded-[6px] flex items-center justify-center text-[9px] font-semibold border border-primary/50 bg-brand-black text-primary">0</span>
                                         </button>
                                     </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover / Pulse Status</p>
-                                        <button className="w-full bg-primary/90 text-brand-black px-6 py-2 rounded-md font-medium shadow-lg text-sm flex items-center justify-center gap-2 ring-4 ring-primary/20">
+                                        <button className="w-full bg-primary/90 text-brand-black px-6 py-2 rounded-xl font-medium shadow-lg text-sm flex items-center justify-center gap-2 ring-4 ring-primary/20">
                                             <span>Create Zcene</span>
-                                            <span className="h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-semibold border border-primary/50 bg-brand-black text-primary animate-pulse">2</span>
+                                            <span className="h-5 w-5 rounded-[6px] flex items-center justify-center text-[9px] font-semibold border border-primary/50 bg-brand-black text-primary animate-pulse">2</span>
                                         </button>
                                     </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Disabled Status</p>
-                                        <button disabled className="w-full bg-primary text-brand-black px-6 py-2 rounded-md font-medium opacity-50 cursor-not-allowed text-sm flex items-center justify-center gap-2">
+                                        <button disabled className="w-full bg-primary text-brand-black px-6 py-2 rounded-xl font-medium opacity-50 cursor-not-allowed text-sm flex items-center justify-center gap-2">
                                             <span>Create Zcene</span>
-                                            <span className="h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-semibold border border-zinc-700 bg-zinc-800 text-zinc-500">0</span>
+                                            <span className="h-5 w-5 rounded-[6px] flex items-center justify-center text-[9px] font-semibold border border-zinc-700 bg-zinc-800 text-zinc-500">0</span>
                                         </button>
                                     </div>
                                 </div>
@@ -880,11 +882,13 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
 
                             {/* Support Outline */}
                             <div>
-                                <div className="flex items-baseline justify-between mb-6">
+                                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
                                     <h3 className="text-xl font-medium text-zinc-200">Brand Support Action</h3>
-                                    <div className="flex gap-4">
-                                        <code className="text-[10px] text-zinc-500 font-mono bg-zinc-950 px-2 py-1 rounded">px-4 py-1.5</code>
-                                        <code className="text-[10px] text-zinc-500 font-mono bg-zinc-950 px-2 py-1 rounded">text-sm</code>
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Radius: 12px / rounded-xl</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Height: 38px</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Padding: px-4 py-2</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Font: 14px / text-sm</span>
                                     </div>
                                 </div>
                                 <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
@@ -893,13 +897,13 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Default Status</p>
-                                        <button className="rounded-md border border-primary bg-transparent px-4 py-2 font-medium text-primary text-sm">
+                                        <button className="rounded-xl border border-primary bg-transparent px-4 py-2 font-medium text-primary text-sm">
                                             Support
                                         </button>
                                     </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover Status</p>
-                                        <button className="rounded-md border border-primary bg-primary/20 px-4 py-2 font-medium text-primary text-sm">
+                                        <button className="rounded-xl border border-primary bg-primary/20 px-4 py-2 font-medium text-primary text-sm">
                                             Support
                                         </button>
                                     </div>
@@ -908,12 +912,13 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
 
                             {/* Editorial Cards */}
                             <div>
-                                <div className="flex items-baseline justify-between mb-6">
+                                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
                                     <h3 className="text-xl font-medium text-zinc-200">Editorial Action Cards</h3>
-                                    <div className="flex gap-4">
-                                        <code className="text-[10px] text-zinc-500 font-mono bg-zinc-950 px-2 py-1 rounded-md">px-4 py-2</code>
-                                        <code className="text-[10px] text-zinc-500 font-mono bg-zinc-950 px-2 py-1 rounded-md">text-sm</code>
-                                        <code className="text-[10px] text-zinc-500 font-mono bg-zinc-950 px-2 py-1 rounded-md">icon: 18px</code>
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Radius: 12px / rounded-xl</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Height: 38px</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Padding: px-4 py-2</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Font: 14px / text-sm (icon: 18px)</span>
                                     </div>
                                 </div>
                                 <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
@@ -922,14 +927,14 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
                                      <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Default Status</p>
-                                        <div className="flex items-center justify-center px-4 py-2 bg-primary text-brand-black shadow-[4px_4px_0px_#000] rounded-md font-semibold uppercase tracking-tighter text-sm gap-3">
+                                        <div className="flex items-center justify-center px-4 py-2 bg-primary text-brand-black shadow-[4px_4px_0px_#000] rounded-xl font-semibold uppercase tracking-tighter text-sm gap-3">
                                             <span className="material-symbols-outlined !text-[18px]">shopping_bag</span>
                                             <span>Shop on Bandcamp</span>
                                         </div>
                                     </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Active / Press Status</p>
-                                        <div className="flex items-center justify-center px-4 py-2 bg-white text-brand-black shadow-[2px_2px_0px_#000] translate-x-[2px] translate-y-[2px] rounded-md font-semibold uppercase tracking-tighter text-sm gap-3">
+                                        <div className="flex items-center justify-center px-4 py-2 bg-white text-brand-black shadow-[2px_2px_0px_#000] translate-x-[2px] translate-y-[2px] rounded-xl font-semibold uppercase tracking-tighter text-sm gap-3">
                                             <span className="material-symbols-outlined !text-[18px]">shopping_bag</span>
                                             <span>Shop on Bandcamp</span>
                                         </div>
@@ -939,11 +944,13 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
 
                             {/* Utility Bordered Buttons */}
                             <div>
-                                <div className="flex items-baseline justify-between mb-6">
+                                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
                                     <h3 className="text-xl font-medium text-zinc-200">Utility Bordered Buttons</h3>
-                                    <div className="flex gap-4">
-                                        <code className="text-[10px] text-zinc-500 font-mono bg-zinc-950 px-2 py-1 rounded">px-4 py-1.5</code>
-                                        <code className="text-[10px] text-zinc-500 font-mono bg-zinc-950 px-2 py-1 rounded">text-sm</code>
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Radius: 12px / rounded-xl</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Height: 34px</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Padding: px-4 py-1.5</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Font: 14px / text-sm</span>
                                     </div>
                                 </div>
                                 <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
@@ -967,12 +974,13 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
 
                             {/* Scene Tags (Interactive) */}
                             <div>
-                                <div className="flex items-baseline justify-between mb-6">
+                                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
                                     <h3 className="text-xl font-medium text-zinc-200">Scene Tags (Interactive)</h3>
-                                    <div className="flex gap-4">
-                                        <code className="text-[10px] text-zinc-500 font-mono bg-zinc-950 px-2 py-1 rounded">px-3 py-1.5</code>
-                                        <code className="text-[10px] text-zinc-500 font-mono bg-zinc-950 px-2 py-1 rounded">text-sm</code>
-                                        <code className="text-[10px] text-zinc-500 font-mono bg-zinc-950 px-2 py-1 rounded">icon: 14px</code>
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Radius: 12px / rounded-xl</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Height: 34px</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Padding: px-3 py-1.5</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Font: 14px / text-sm (icon: 14px)</span>
                                     </div>
                                 </div>
                                 <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
@@ -1004,11 +1012,13 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
 
                             {/* Icon Buttons */}
                             <div className="space-y-8">
-                                <div className="flex items-baseline justify-between">
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-800 pb-4">
                                     <h3 className="text-xl font-medium text-zinc-200">Icon Buttons (States)</h3>
-                                    <div className="flex gap-4">
-                                        <code className="text-[10px] text-zinc-500 font-mono bg-zinc-950 px-2 py-1 rounded-xl">w-8 h-8</code>
-                                        <code className="text-[10px] text-zinc-500 font-mono bg-zinc-950 px-2 py-1 rounded-xl">icon: 18px</code>
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Radius: 12px / rounded-xl</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Height: 32px / h-8</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Padding: w-8 h-8</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Font: 18px (icon)</span>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
@@ -1035,11 +1045,13 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
 
                             {/* Dialog Action Buttons */}
                             <div className="space-y-8">
-                                <div className="flex items-baseline justify-between">
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-800 pb-4">
                                     <h3 className="text-xl font-medium text-zinc-200">Dialog Action Buttons</h3>
-                                    <div className="flex gap-4">
-                                        <code className="text-[10px] text-zinc-500 font-mono bg-zinc-950 px-2 py-1 rounded-xl">w-full</code>
-                                        <code className="text-[10px] text-zinc-500 font-mono bg-zinc-950 px-2 py-1 rounded-xl">gap-2</code>
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Radius: 12px / rounded-xl</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Height: 40px</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Padding: w-full py-2.5</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Font: 14px / text-sm</span>
                                     </div>
                                 </div>
                                 <p className="text-sm text-zinc-400 max-w-2xl leading-relaxed">
@@ -1087,7 +1099,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
                     <section id="toggles">
                         <div className="flex items-baseline justify-between border-b-2 border-primary/50 pb-2 mb-8">
                             <h2 className="text-3xl font-medium text-white tracking-tight">Toggles</h2>
-                            <code className="text-[10px] text-zinc-500 font-mono bg-zinc-950 px-2 py-1 rounded-xl">rounded-[8px]</code>
+                            <code className="text-[10px] text-zinc-500 font-mono bg-zinc-950 px-2 py-1 rounded-xl">rounded-xl</code>
                         </div>
                         
                         <div className="space-y-12">
@@ -1096,23 +1108,34 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
                             </p>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <div className="p-8 bg-zinc-900/40 border border-zinc-800 rounded-xl space-y-8 flex flex-col items-center justify-center min-h-[200px]">
-                                    <ViewToggle value={demoFocusMode} onChange={setDemoFocusMode} />
-                                    <div className="text-center">
-                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest mb-1">Interactive Demo</p>
-                                        <p className="text-sm font-medium text-primary capitalize">{demoFocusMode} View</p>
+                                <div className="p-8 bg-zinc-900/40 border border-zinc-800 rounded-xl space-y-6 flex flex-col min-h-[200px]">
+                                    <div className="flex items-center justify-between w-full border-b border-zinc-800/80 pb-3">
+                                        <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Interactive Toggle Preview</span>
+                                        <div className="flex flex-wrap gap-1.5">
+                                            <span className="text-[9px] font-mono text-zinc-400 bg-zinc-950 px-1.5 py-0.5 border border-zinc-800 rounded-full">Radius: Outer rounded-xl (12px) / Inner rounded-[6px]</span>
+                                            <span className="text-[9px] font-mono text-zinc-400 bg-zinc-950 px-1.5 py-0.5 border border-zinc-800 rounded-full">Height: 36px</span>
+                                            <span className="text-[9px] font-mono text-zinc-400 bg-zinc-950 px-1.5 py-0.5 border border-zinc-800 rounded-full">Padding: p-0.5</span>
+                                            <span className="text-[9px] font-mono text-zinc-400 bg-zinc-950 px-1.5 py-0.5 border border-zinc-800 rounded-full">Font: 18px (icon)</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex-1 flex flex-col items-center justify-center gap-6">
+                                        <ViewToggle value={demoFocusMode} onChange={(v) => setDemoFocusMode(v as 'organic' | 'cluster')} />
+                                        <div className="text-center">
+                                            <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest mb-1">Interactive Demo</p>
+                                            <p className="text-sm font-medium text-primary capitalize">{demoFocusMode} View</p>
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="p-6 bg-zinc-950 border border-zinc-800 rounded-xl space-y-4">
                                     <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Tactile Specifications</h4>
                                     <p className="text-sm text-zinc-400 leading-relaxed">
-                                        Interactive selector controls use a custom <strong>8px border-radius</strong> (<code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded">rounded-[8px]</code>) outer container and <strong>6px button frames</strong> (<code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded">rounded-[6px]</code>) — deliberately separating them from our strict <strong>0px brutalist</strong> layout containers. The active icon is highlighted by a <strong>tight square sliding badge</strong> that neatly wraps exactly one icon.
+                                        Interactive selector controls use a custom <strong>12px border-radius</strong> (<code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-xl">rounded-xl</code>) outer container and <strong>8px button frames</strong> (<code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-lg">rounded-lg</code>) — deliberately separating them from our strict <strong>0px brutalist</strong> layout containers. The active icon is highlighted by a <strong>tight square sliding badge</strong> that neatly wraps exactly one icon.
                                     </p>
                                     <ul className="text-xs text-zinc-500 space-y-2 list-disc list-inside">
                                         <li><strong>Icon-only minimalism:</strong> No text labels — identity is communicated purely through the Material Symbol icons (Hub = Organic, Bubble Chart = Cluster).</li>
-                                        <li><strong>Proportional sliding active badge:</strong> A fixed <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded">w-8 h-8</code> <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded">bg-zinc-800</code> active block with a soft <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded">rounded-[4px]</code> radius slides proportionally between positions.</li>
-                                        <li><strong>Outer & Button Radius:</strong> The main outer toggle container uses a soft <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded">rounded-[8px]</code> border radius, and the button frames use a matching concentric <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded">rounded-[6px]</code> to form a unified set.</li>
-                                        <li><strong>Spring animation:</strong> Badge translates via <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded">stiffness: 480 / damping: 38</code> — snappy and responsive, not floaty.</li>
+                                        <li><strong>Proportional sliding active badge:</strong> A fixed <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-xl">w-8 h-8</code> <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-xl">bg-zinc-800</code> active block with a soft <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-[6px]">rounded-[6px]</code> radius slides proportionally between positions.</li>
+                                        <li><strong>Outer & Button Radius:</strong> The main outer toggle container uses a soft <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-xl">rounded-xl</code> border radius, and the button frames use a matching concentric <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-lg">rounded-lg</code> to form a unified set.</li>
+                                        <li><strong>Spring animation:</strong> Badge translates via <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-xl">stiffness: 480 / damping: 38</code> — snappy and responsive, not floaty.</li>
                                         <li><strong>Main Graph Alignment:</strong> This same component is used live inside the graph canvas for Organic/Cluster mode switching.</li>
                                     </ul>
                                 </div>
@@ -1195,39 +1218,44 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Inputs & Dropdowns</h2>
                         <div className="space-y-24">
                             {/* Input Size Scale */}
-                            <div className="p-8 bg-zinc-900/50 rounded-xl border border-zinc-800">
-                                <h3 className="text-xl font-medium text-primary mb-4">Input Size Scale</h3>
-                                <p className="text-base text-zinc-300 leading-relaxed max-w-3xl mb-8">
-                                    Zcene uses responsive input sizing to ensure data entry is precise on desktop and accessible on mobile. We use <strong>text-base (16px)</strong> on mobile to prevent iOS auto-zoom and provide a larger touch target. All input fields and dropdowns utilize a **rounded-xl (12px)** border radius to maintain visual consistency with the button system.
-                                </p>
+                            <div className="p-8 bg-zinc-900/50 rounded-none border border-zinc-800">
+                                <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4 border-b border-zinc-800 pb-4">
+                                    <h3 className="text-xl font-medium text-primary">Input Size Scale</h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Radius: 12px / rounded-xl</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Height: 38px (Desktop) / 52px (Mobile)</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Padding: px-4</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Font: 14px / text-sm (Desktop) / 16px / text-base (Mobile)</span>
+                                    </div>
+                                </div>
                                 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                                     <div className="space-y-4">
-                                        <div className="p-6 bg-zinc-950 rounded-xl border border-zinc-800 flex items-center justify-center">
+                                        <div className="p-6 bg-zinc-950 rounded-none border border-zinc-800 flex items-center justify-center">
                                             <input 
                                                 type="text" 
                                                 placeholder="Desktop Input" 
                                                 className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900/60 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none" 
-                                            />
+                                            /> 
                                         </div>
                                         <div>
                                             <h4 className="text-sm font-semibold text-zinc-200 uppercase tracking-widest">Desktop (Standard)</h4>
-                                            <p className="text-xs text-zinc-500 mt-1 font-mono">py-2 text-sm (38px height)</p>
+                                            <p className="text-xs text-zinc-500 mt-1 font-mono"><code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">py-2</code> <code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">text-sm</code> (38px height) | Radius: 12px (<code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">rounded-xl</code>)</p>
                                             <p className="text-xs text-zinc-400 mt-2">The default size for all desktop viewports (lg+).</p>
                                         </div>
                                     </div>
 
                                     <div className="space-y-4">
-                                        <div className="p-6 bg-zinc-950 rounded-xl border border-zinc-800 flex items-center justify-center">
+                                        <div className="p-6 bg-zinc-950 rounded-none border border-zinc-800 flex items-center justify-center">
                                             <input 
                                                 type="text" 
                                                 placeholder="Mobile Input" 
                                                 className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900/60 py-3.5 px-4 text-base text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none" 
-                                            />
+                                            /> 
                                         </div>
                                         <div>
                                             <h4 className="text-sm font-semibold text-zinc-200 uppercase tracking-widest">Mobile (Large)</h4>
-                                            <p className="text-xs text-zinc-500 mt-1 font-mono">py-3.5 text-base (52px height)</p>
+                                            <p className="text-xs text-zinc-500 mt-1 font-mono"><code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">py-3.5</code> <code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">text-base</code> (52px height) | Radius: 12px (<code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">rounded-xl</code>)</p>
                                             <p className="text-xs text-zinc-400 mt-2">Used on mobile viewports (&lt;lg) to maximize touch accuracy and prevent browser zoom.</p>
                                         </div>
                                     </div>
@@ -1236,8 +1264,16 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
 
                             {/* Dropdowns */}
                             <div>
-                                <h3 className="text-xl font-medium text-zinc-200 mb-6">Dropdowns & Selects</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-12 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
+                                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
+                                    <h3 className="text-xl font-medium text-zinc-200">Dropdowns & Selects</h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Radius: 12px / rounded-xl</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Height: 44px / h-[44px]</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Padding: px-4</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Font: 14px / text-sm</span>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-12 bg-zinc-900/30 p-8 rounded-none border border-zinc-800">
                                     <div className="space-y-4">
                                         <p className="text-xs text-zinc-500 uppercase tracking-widest">Standard Select</p>
                                         <div className="relative">
@@ -1256,11 +1292,90 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
                                         </p>
                                     </div>
                                 </div>
+
+                                {/* Dropdown Blueprint Section */}
+                                <div className="mt-8 p-6 bg-zinc-950 border border-dashed border-zinc-800 rounded-xl space-y-6">
+                                    <h4 className="text-xs font-semibold text-primary uppercase tracking-widest flex items-center gap-2">
+                                        <span className="material-symbols-outlined !text-[14px]">architecture</span>
+                                        Dropdown Blueprint & Detailed Specification
+                                    </h4>
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                                        {/* Visual Blueprint Diagram */}
+                                        <div className="p-6 bg-zinc-900/50 rounded-lg border border-zinc-800 flex flex-col items-center justify-center relative min-h-[160px] overflow-hidden">
+                                            <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:14px_24px] pointer-events-none" />
+                                            
+                                            {/* Blueprint Container */}
+                                            <div className="relative w-full max-w-[240px] h-[44px] bg-zinc-950 border border-zinc-800 rounded-xl flex items-center justify-between px-4 z-10 shadow-lg">
+                                                {/* Left padding indicator line */}
+                                                <div className="absolute left-0 top-0 bottom-0 w-4 bg-primary/10 border-r border-dashed border-primary/30 flex items-center justify-center">
+                                                    <span className="text-[7px] text-primary font-mono select-none">px-4</span>
+                                                </div>
+                                                
+                                                <span className="text-xs font-semibold text-zinc-300 ml-4 select-none">Most Recent</span>
+                                                
+                                                {/* Right-aligned icon with padding indicator */}
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="material-symbols-outlined text-zinc-400 !text-[20px] bg-zinc-800/80 p-0.5 rounded border border-zinc-700/50">arrow_drop_down</span>
+                                                    {/* Right padding indicator line */}
+                                                    <div className="absolute right-0 top-0 bottom-0 w-4 bg-primary/10 border-l border-dashed border-primary/30 flex items-center justify-center">
+                                                        <span className="text-[7px] text-primary font-mono select-none">px-4</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="mt-4 text-[10px] text-zinc-500 font-mono flex gap-4 z-10">
+                                                <span>Height: 44px</span>
+                                                <span>Radius: 12px (rounded-xl)</span>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Specification Labels */}
+                                        <div className="space-y-4 z-10 text-xs">
+                                            <div className="border-l-2 border-primary pl-3 py-0.5">
+                                                <p className="font-semibold text-zinc-200 uppercase tracking-wider text-[10px]">Outer Structure</p>
+                                                <p className="text-zinc-400 mt-1 font-mono">
+                                                    Height: <code className="text-primary bg-zinc-900 px-1 py-0.5 rounded text-[10px]">h-[44px]</code> (44px)
+                                                </p>
+                                                <p className="text-zinc-400 mt-0.5 font-mono">
+                                                    Corner Radius: <code className="text-primary bg-zinc-900 px-1 py-0.5 rounded text-[10px]">rounded-xl</code> (12px)
+                                                </p>
+                                                <p className="text-zinc-400 mt-0.5 font-mono">
+                                                    Border: <code className="text-primary bg-zinc-900 px-1 py-0.5 rounded text-[10px]">border-zinc-800</code>
+                                                </p>
+                                            </div>
+                                            <div className="border-l-2 border-primary pl-3 py-0.5">
+                                                <p className="font-semibold text-zinc-200 uppercase tracking-wider text-[10px]">Internal Structure</p>
+                                                <p className="text-zinc-400 mt-1 font-mono">
+                                                    Horizontal Padding: <code className="text-primary bg-zinc-900 px-1 py-0.5 rounded text-[10px]">px-4</code> for alignment buffer
+                                                </p>
+                                            </div>
+                                            <div className="border-l-2 border-primary pl-3 py-0.5">
+                                                <p className="font-semibold text-zinc-200 uppercase tracking-wider text-[10px]">Icon Spec & Alignment</p>
+                                                <p className="text-zinc-400 mt-1 font-mono">
+                                                    Icon: Material-symbols <code className="text-primary bg-zinc-900 px-1 py-0.5 rounded text-[10px]">'arrow_drop_down'</code>
+                                                </p>
+                                                <p className="text-zinc-400 mt-0.5 font-mono">
+                                                    Sizing: exactly <code className="text-primary bg-zinc-900 px-1 py-0.5 rounded text-[10px]">20px</code>
+                                                </p>
+                                                <p className="text-zinc-400 mt-0.5 font-mono">
+                                                    Position: positioned right-aligned (absolute or flex layout)
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
                             {/* Input States */}
                             <div>
-                                <h3 className="text-xl font-medium text-zinc-200 mb-6">Input States</h3>
+                                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
+                                    <h3 className="text-xl font-medium text-zinc-200">Input States</h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Radius: 12px / rounded-xl</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Height: 38px / py-2</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Padding: px-4 py-2</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Font: 14px / text-sm</span>
+                                    </div>
+                                </div>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Focus State</p>
@@ -1405,25 +1520,25 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Contextual Indicators</h2>
                         <div className="space-y-12">
                             <p className="text-base text-zinc-400 leading-relaxed max-w-3xl">
-                                Standardized counters used in headers and utility bars to track unread content or list sizes. These follow an Action/Passive color logic and utilize a **rounded-md (6px)** "slight" radius to distinguish them from primary interactive elements.
+                                Standardized counters used in headers and utility bars to track unread content or list sizes. These follow an Action/Passive color logic and utilize a **rounded-lg (8px)** "slight" radius to distinguish them from primary interactive elements.
                             </p>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                                  <div className="p-6 bg-zinc-900 border border-zinc-700/50 rounded-xl flex flex-col items-center gap-4">
-                                    <span className="h-8 w-8 rounded-md flex items-center justify-center text-sm font-semibold border-2 bg-brand-black text-primary border-primary/50 shadow-[0_0_12px_rgba(246,228,104,0.3)]">12</span>
+                                    <span className="h-8 w-8 rounded-lg flex items-center justify-center text-sm font-semibold border-2 bg-brand-black text-primary border-primary/50 shadow-[0_0_12px_rgba(246,228,104,0.3)]">12</span>
                                     <div className="text-center">
                                         <p className="text-sm font-medium text-white">Large (32px)</p>
                                         <p className="text-xs text-zinc-500 mt-1">Action State</p>
                                     </div>
                                  </div>
                                  <div className="p-6 bg-zinc-900 border border-zinc-700/50 rounded-xl flex flex-col items-center gap-4">
-                                    <span className="h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-semibold border bg-brand-black text-primary border-primary/50">8</span>
+                                    <span className="h-5 w-5 rounded-lg flex items-center justify-center text-[9px] font-semibold border bg-brand-black text-primary border-primary/50">8</span>
                                     <div className="text-center">
                                         <p className="text-sm font-medium text-white">Medium (20px)</p>
                                         <p className="text-xs text-zinc-500 mt-1">Action State</p>
                                     </div>
                                  </div>
                                  <div className="p-6 bg-zinc-900 border border-zinc-700/50 rounded-xl flex flex-col items-center gap-4">
-                                    <span className="h-4.5 w-4.5 rounded-md flex items-center justify-center text-[8px] font-semibold border bg-zinc-800 text-zinc-500 border-zinc-700">3</span>
+                                    <span className="h-4.5 w-4.5 rounded-lg flex items-center justify-center text-[8px] font-semibold border bg-zinc-800 text-zinc-500 border-zinc-700">3</span>
                                     <div className="text-center">
                                         <p className="text-sm font-medium text-white">Small (18px)</p>
                                         <p className="text-xs text-zinc-500 mt-1">Passive State</p>
@@ -1566,7 +1681,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
                                     <div className="space-y-4">
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Backdrop</h4>
-                                            <code className="text-xs bg-zinc-950 text-primary px-2 py-1 rounded-md border border-zinc-800 block w-fit">fixed inset-0 bg-black/60 z-[100]</code>
+                                            <code className="text-xs bg-zinc-950 text-primary px-2 py-1 rounded-xl border border-zinc-800 block w-fit">fixed inset-0 bg-black/60 z-[100]</code>
                                         </div>
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Container</h4>
@@ -1695,7 +1810,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
                                     Zcene implements an error translation layer in <code>App.tsx</code> to ensure technical jargon (like 429 Rate Limits) is converted into our brand's "Expert Curator" tone.
                                 </p>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div className="bg-zinc-950 p-4 rounded-md border border-zinc-800">
+                                    <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-800">
                                         <p className="text-[10px] font-semibold text-zinc-600 uppercase tracking-widest mb-1">Raw API Error</p>
                                         <code className="text-xs text-zinc-500">RESOURCE_EXHAUSTED (429)</code>
                                         <div className="mt-3 pt-3 border-t border-zinc-800">
@@ -1703,7 +1818,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
                                             <p className="text-sm text-zinc-300">"The AI needs a short break. Please wait a minute and try again."</p>
                                         </div>
                                     </div>
-                                    <div className="bg-zinc-950 p-4 rounded-md border border-zinc-800">
+                                    <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-800">
                                         <p className="text-[10px] font-semibold text-zinc-600 uppercase tracking-widest mb-1">Raw API Error</p>
                                         <code className="text-xs text-zinc-500">Proxying failed / NetworkError</code>
                                         <div className="mt-3 pt-3 border-t border-zinc-800">
@@ -1770,15 +1885,15 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div className="bg-zinc-950 p-4 rounded-md border border-zinc-800">
+                                    <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-800">
                                         <p className="text-[10px] font-semibold text-zinc-600 uppercase tracking-widest mb-1">Trigger</p>
                                         <p className="text-sm text-zinc-300">open_in_full icon in Deep Cut header.</p>
                                     </div>
-                                    <div className="bg-zinc-950 p-4 rounded-md border border-zinc-800">
+                                    <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-800">
                                         <p className="text-[10px] font-semibold text-zinc-600 uppercase tracking-widest mb-1">State</p>
                                         <p className="text-sm text-zinc-300">Triggers fixed-position overlay at z-[1000].</p>
                                     </div>
-                                    <div className="bg-zinc-950 p-4 rounded-md border border-zinc-800">
+                                    <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-800">
                                         <p className="text-[10px] font-semibold text-zinc-600 uppercase tracking-widest mb-1">Logic</p>
                                         <p className="text-sm text-zinc-300">Auto-marks all visible nodes as "Read".</p>
                                     </div>
@@ -1798,19 +1913,19 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
                             <div className="space-y-6">
                                 <h3 className="text-xl font-medium text-white">Graph Interaction Logic</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                    <div className="p-6 bg-zinc-900/50 border border-zinc-800 rounded-md space-y-3">
+                                    <div className="p-6 bg-zinc-900/50 border border-zinc-800 rounded-xl space-y-3">
                                         <h4 className="text-base font-semibold text-zinc-500 uppercase tracking-widest">Hover (Nodes)</h4>
                                         <p className="text-sm text-zinc-400 leading-relaxed">
                                             <strong>Scale factor:</strong> 1.1x. Opacity of unrelated nodes drops to 0.2. Immediate connection links increase in stroke width to 3px.
                                         </p>
                                     </div>
-                                    <div className="p-6 bg-zinc-900/50 border border-zinc-800 rounded-md space-y-3">
+                                    <div className="p-6 bg-zinc-900/50 border border-zinc-800 rounded-xl space-y-3">
                                         <h4 className="text-base font-semibold text-zinc-500 uppercase tracking-widest">Drag (Nodes)</h4>
                                         <p className="text-sm text-zinc-400 leading-relaxed">
                                             <strong>Forces:</strong> alphaTarget(0.3). Position is fixed (fx, fy) during interaction and released on end unless pinned.
                                         </p>
                                     </div>
-                                    <div className="p-6 bg-zinc-900/50 border border-zinc-800 rounded-md space-y-3">
+                                    <div className="p-6 bg-zinc-900/50 border border-zinc-800 rounded-xl space-y-3">
                                         <h4 className="text-base font-semibold text-zinc-500 uppercase tracking-widest">Zoom & Pan</h4>
                                         <p className="text-sm text-zinc-400 leading-relaxed">
                                             <strong>D3 Zoom Behavior:</strong> Extent [0.1, 4]. Smooth transitions (750ms) for center/auto-fit action.
@@ -1827,7 +1942,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     <div className="space-y-4">
                                         <div className="flex items-center gap-3">
-                                            <div className="h-2 w-2 rounded-md bg-primary shadow-[0_0_8px_rgba(246,228,104,0.6)]"></div>
+                                            <div className="h-2 w-2 rounded-full bg-primary shadow-[0_0_8px_rgba(246,228,104,0.6)]"></div>
                                             <h4 className="text-base font-medium text-zinc-200">Global Layer</h4>
                                         </div>
                                         <div className="bg-zinc-950 p-5 rounded-xl border border-zinc-800 space-y-4">
@@ -1849,7 +1964,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
 
                                     <div className="space-y-4">
                                         <div className="flex items-center gap-3">
-                                            <div className="h-2 w-2 rounded-md bg-primary shadow-[0_0_8px_rgba(246,228,104,0.6)]"></div>
+                                            <div className="h-2 w-2 rounded-full bg-primary shadow-[0_0_8px_rgba(246,228,104,0.6)]"></div>
                                             <h4 className="text-base font-medium text-zinc-200">Carousel Layer</h4>
                                         </div>
                                         <div className="bg-zinc-950 p-5 rounded-xl border border-zinc-800 space-y-4">
@@ -1896,14 +2011,14 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
                                     </div>
                                 </div>
                                 <div className="p-6 bg-zinc-900 border border-zinc-700/50 rounded-none flex flex-col gap-4">
-                                    <div className="h-16 w-16 bg-primary rounded-[6px] flex items-center justify-center text-brand-black font-semibold">6px / 8px</div>
+                                    <div className="h-16 w-16 bg-primary rounded-lg flex items-center justify-center text-brand-black font-semibold">6px / 8px</div>
                                     <div>
-                                        <h4 className="text-sm font-semibold text-white uppercase tracking-widest">Tactile (6px / 8px)</h4>
-                                        <p className="text-xs text-zinc-500 mt-1">Used for custom <strong>Interaction Sets</strong> (toggles and segmented buttons) to establish concentric geometry and softer touch indicators.</p>
+                                        <h4 className="text-sm font-semibold text-white uppercase tracking-widest">Concentric Inner (6px / 8px)</h4>
+                                        <p className="text-xs text-zinc-500 mt-1">Used for custom <strong>Interaction Sets</strong> (inner button frames and sliding indicators) to establish concentric geometry and softer touch indicators.</p>
                                         <ul className="text-[10px] text-zinc-600 mt-2 space-y-1 list-disc pl-3 uppercase tracking-wider font-semibold">
-                                            <li>ViewToggle outer container (8px)</li>
-                                            <li>ViewToggle inner button frames (6px)</li>
-                                            <li>Concentric nested active badge (4px)</li>
+                                            <li>ViewToggle outer container (12px / rounded-xl)</li>
+                                            <li>ViewToggle inner button frames (8px / rounded-lg)</li>
+                                            <li>Concentric nested active badge (6px / rounded-[6px])</li>
                                             <li>Tactile selection controls</li>
                                         </ul>
                                     </div>
@@ -1912,7 +2027,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
                                     <div className="h-16 w-16 bg-primary rounded-xl flex items-center justify-center text-brand-black font-semibold">12px</div>
                                     <div>
                                         <h4 className="text-sm font-semibold text-white uppercase tracking-widest">Standard (rounded-xl)</h4>
-                                        <p className="text-xs text-zinc-500 mt-1">Used exclusively for <strong>Clickable UI</strong> (buttons, inputs, sliders) and dashboard toggles. This ensures a premium, tactile feel for interactive elements.</p>
+                                        <p className="text-xs text-zinc-500 mt-1">Used exclusively for <strong>Clickable UI</strong> (buttons, inputs, sliders) and dashboard controls. This ensures a premium, soft-curved feel for interactive elements.</p>
                                         <ul className="text-[10px] text-zinc-600 mt-2 space-y-1 list-disc pl-3 uppercase tracking-wider font-semibold">
                                             <li>Dashboard view switcher containers</li>
                                             <li>Buttons and clickable icons</li>
