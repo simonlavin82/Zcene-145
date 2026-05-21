@@ -17,7 +17,7 @@ interface ViewToggleProps {
  */
 const ViewToggle: React.FC<ViewToggleProps> = ({ value, onChange, className = "" }) => {
   return (
-    <div className={`flex items-center bg-zinc-950 border border-zinc-700/80 rounded-[6px] p-0.5 relative ${className}`}>
+    <div className={`flex items-center bg-zinc-950 border border-zinc-700/80 rounded-[8px] p-0.5 relative ${className}`}>
       {/* Square Sliding Active Badge */}
       <motion.div
         className="absolute top-0.5 left-0.5 w-8 h-8 bg-zinc-800 rounded-[4px] shadow-inner ring-1 ring-zinc-600/50"

@@ -1087,7 +1087,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
                     <section id="toggles">
                         <div className="flex items-baseline justify-between border-b-2 border-primary/50 pb-2 mb-8">
                             <h2 className="text-3xl font-medium text-white tracking-tight">Toggles</h2>
-                            <code className="text-[10px] text-zinc-500 font-mono bg-zinc-950 px-2 py-1 rounded-xl">rounded-[6px]</code>
+                            <code className="text-[10px] text-zinc-500 font-mono bg-zinc-950 px-2 py-1 rounded-xl">rounded-[8px]</code>
                         </div>
                         
                         <div className="space-y-12">
@@ -1106,12 +1106,12 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
                                 <div className="p-6 bg-zinc-950 border border-zinc-800 rounded-xl space-y-4">
                                     <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Tactile Specifications</h4>
                                     <p className="text-sm text-zinc-400 leading-relaxed">
-                                        Interactive selector controls use a unified <strong>6px border-radius</strong> (<code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded">rounded-[6px]</code>) segmented pill container and button frames — deliberately separating them from our strict <strong>0px brutalist</strong> layout containers. The active icon is highlighted by a <strong>tight square sliding badge</strong> that neatly wraps exactly one icon.
+                                        Interactive selector controls use a custom <strong>8px border-radius</strong> (<code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded">rounded-[8px]</code>) outer container and <strong>6px button frames</strong> (<code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded">rounded-[6px]</code>) — deliberately separating them from our strict <strong>0px brutalist</strong> layout containers. The active icon is highlighted by a <strong>tight square sliding badge</strong> that neatly wraps exactly one icon.
                                     </p>
                                     <ul className="text-xs text-zinc-500 space-y-2 list-disc list-inside">
                                         <li><strong>Icon-only minimalism:</strong> No text labels — identity is communicated purely through the Material Symbol icons (Hub = Organic, Bubble Chart = Cluster).</li>
                                         <li><strong>Proportional sliding active badge:</strong> A fixed <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded">w-8 h-8</code> <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded">bg-zinc-800</code> active block with a soft <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded">rounded-[4px]</code> radius slides proportionally between positions.</li>
-                                        <li><strong>Outer & Button Radius:</strong> Both the main outer toggle container and button frames use a matching <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded">rounded-[6px]</code> border radius to form a unified set.</li>
+                                        <li><strong>Outer & Button Radius:</strong> The main outer toggle container uses a soft <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded">rounded-[8px]</code> border radius, and the button frames use a matching concentric <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded">rounded-[6px]</code> to form a unified set.</li>
                                         <li><strong>Spring animation:</strong> Badge translates via <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded">stiffness: 480 / damping: 38</code> — snappy and responsive, not floaty.</li>
                                         <li><strong>Main Graph Alignment:</strong> This same component is used live inside the graph canvas for Organic/Cluster mode switching.</li>
                                     </ul>
@@ -1896,14 +1896,14 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
                                     </div>
                                 </div>
                                 <div className="p-6 bg-zinc-900 border border-zinc-700/50 rounded-none flex flex-col gap-4">
-                                    <div className="h-16 w-16 bg-primary rounded-[6px] flex items-center justify-center text-brand-black font-semibold">6px</div>
+                                    <div className="h-16 w-16 bg-primary rounded-[6px] flex items-center justify-center text-brand-black font-semibold">6px / 8px</div>
                                     <div>
-                                        <h4 className="text-sm font-semibold text-white uppercase tracking-widest">Tactile (rounded-[6px])</h4>
-                                        <p className="text-xs text-zinc-500 mt-1">Used for unified <strong>Interaction Sets</strong> (segmented view switcher containers, toggle components, and button frames) for a premium, cohesive tactile signature.</p>
+                                        <h4 className="text-sm font-semibold text-white uppercase tracking-widest">Tactile (6px / 8px)</h4>
+                                        <p className="text-xs text-zinc-500 mt-1">Used for custom <strong>Interaction Sets</strong> (toggles and segmented buttons) to establish concentric geometry and softer touch indicators.</p>
                                         <ul className="text-[10px] text-zinc-600 mt-2 space-y-1 list-disc pl-3 uppercase tracking-wider font-semibold">
-                                            <li>Dashboard view switchers</li>
-                                            <li>ViewToggle segmented wrappers</li>
-                                            <li>Segment switcher button frames</li>
+                                            <li>ViewToggle outer container (8px)</li>
+                                            <li>ViewToggle inner button frames (6px)</li>
+                                            <li>Concentric nested active badge (4px)</li>
                                             <li>Tactile selection controls</li>
                                         </ul>
                                     </div>
@@ -1912,8 +1912,9 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
                                     <div className="h-16 w-16 bg-primary rounded-xl flex items-center justify-center text-brand-black font-semibold">12px</div>
                                     <div>
                                         <h4 className="text-sm font-semibold text-white uppercase tracking-widest">Standard (rounded-xl)</h4>
-                                        <p className="text-xs text-zinc-500 mt-1">Used exclusively for <strong>Clickable UI</strong> (buttons, inputs, sliders). This ensures a premium, tactile feel for interactive elements.</p>
+                                        <p className="text-xs text-zinc-500 mt-1">Used exclusively for <strong>Clickable UI</strong> (buttons, inputs, sliders) and dashboard toggles. This ensures a premium, tactile feel for interactive elements.</p>
                                         <ul className="text-[10px] text-zinc-600 mt-2 space-y-1 list-disc pl-3 uppercase tracking-wider font-semibold">
+                                            <li>Dashboard view switcher containers</li>
                                             <li>Buttons and clickable icons</li>
                                             <li>Form inputs and textareas</li>
                                             <li>Interactive list items</li>

@@ -150,17 +150,17 @@ const Dashboard: React.FC<DashboardProps> = ({
             
             <div className="flex items-center gap-3">
               {/* Grid/List View Toggle */}
-              <div className="flex items-center bg-zinc-950 rounded-[6px] p-0.5 border border-zinc-800 h-[38px]">
+              <div className="flex items-center bg-zinc-950 rounded-xl p-0.5 border border-zinc-800 h-[44px]">
                 <button
                   onClick={() => setView('grid')}
-                  className={`h-full w-[38px] rounded-[6px] transition-all flex items-center justify-center ${view === 'grid' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  className={`h-full w-[40px] rounded-[10px] transition-all flex items-center justify-center ${view === 'grid' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
                   title="Grid View"
                 >
                   <span className="material-symbols-outlined !text-[20px]">grid_view</span>
                 </button>
                 <button
                   onClick={() => setView('list')}
-                  className={`h-full w-[38px] rounded-[6px] transition-all flex items-center justify-center ${view === 'list' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  className={`h-full w-[40px] rounded-[10px] transition-all flex items-center justify-center ${view === 'list' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
                   title="List View"
                 >
                   <span className="material-symbols-outlined !text-[20px]">list</span>
@@ -171,7 +171,7 @@ const Dashboard: React.FC<DashboardProps> = ({
               <div className="relative" ref={sortDropdownRef}>
                 <button
                   onClick={() => setIsSortOpen(!isSortOpen)}
-                  className="h-[38px] px-4 bg-zinc-950 border border-zinc-800 hover:bg-zinc-900 hover:border-zinc-700 rounded-xl font-semibold text-zinc-300 transition-all flex items-center gap-2 cursor-pointer text-xs"
+                  className="h-[44px] px-4 bg-zinc-950 border border-zinc-800 hover:bg-zinc-900 hover:border-zinc-700 rounded-xl font-semibold text-zinc-300 transition-all flex items-center gap-2 cursor-pointer text-xs"
                 >
                   <span className="material-symbols-outlined !text-[14px]">sort</span>
                   <span>{sortBy === 'recent' ? 'Most Recent' : 'Title'}</span>
@@ -208,7 +208,7 @@ const Dashboard: React.FC<DashboardProps> = ({
               <button 
                 onClick={onCreateProject}
                 disabled={isCreatingProject}
-                className="h-[38px] px-5 bg-primary text-brand-black rounded-xl font-medium hover:opacity-90 active:scale-95 transition-all text-sm tracking-normal normal-case disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg"
+                className="h-[44px] px-5 bg-primary text-brand-black rounded-xl font-medium hover:opacity-90 active:scale-95 transition-all text-sm tracking-normal normal-case disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg"
               >
                 {isCreatingProject ? (
                   <>
