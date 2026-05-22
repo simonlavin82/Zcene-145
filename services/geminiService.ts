@@ -1,6 +1,9 @@
 
 import { GoogleGenAI, Type, GenerateContentResponse, ThinkingLevel } from "@google/genai";
 import { GraphData, Node, NodeDetails, Link, ChatMessage, DiscoveryFilters } from "../types";
+import { db } from './firebase';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { normalizeArtistId, extractArtistSubGraph, readArtistCacheMany } from './artistCacheService';
 
 // --- EXPORTED CONSTANTS FOR SOURCE PAGE VISIBILITY ---
 
@@ -184,10 +187,6 @@ export const NODE_DETAILS_SCHEMA = {
         required: ["site", "url"]
       }
     },
-    tourInfo: {
-      type: Type.STRING,
-      description: "Current tour status."
-    },
     discography: {
       type: Type.ARRAY,
       items: {
@@ -221,6 +220,27 @@ export const GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = `I have an existing m
         ABSOLUTELY CRITICAL FINAL CHECK: Before you output the JSON, verify that for EVERY SINGLE OBJECT in the 'links' array, the value of its 'source' property and the value of its 'target' property perfectly match an 'id' from an object in EITHER the provided existing nodes list OR your new 'nodes' array. THERE MUST BE NO ORPHANED LINKS. If you create a link with a 'source' or 'target' ID (e.g., "Arista Records"), you MUST ALSO define a node with that exact same 'id' (e.g., { "id": "Arista Records", "type": "label", ... }). Do not invent connections to nodes you haven't defined. This is a strict, mandatory requirement.
         
         IMPORTANT: Ensure that any double quotes within string values are properly escaped (e.g., "Artist \\"Name\\""). The final output must be perfectly valid JSON. Your entire response MUST be ONLY the raw JSON object, without any surrounding text, explanations, or markdown code fences.`;
+
+export const GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = `Given the following list of seed artists: {{artists}}.
+We already have cached, independent music graphs for these seed artists.
+Your primary task is to act as the "connective tissue" and stitch these independent graphs together into a unified, cohesive, and sprawling interconnected spiderweb graph.
+
+The existing, cached nodes and connections are provided below as context:
+{{cachedSubgraphsContext}}
+
+Follow these rules precisely:
+1.  CONNECTIVE STITCHING: Discover or generate the overlap bridges between the independent seed artist graphs. These bridges can be:
+    - Direct musical links/connections between the seed artists or their related bands.
+    - Shared metadata nodes (e.g. sharing a record label like "Victory Records", a genre like "Alternative Rock", or country of origin/founded year).
+    - UP TO 6 NEW "bridging" artists/bands that musically bridge the gap or are related to multiple seeds, helping connect the separate subgraphs.
+2.  REUSE EXISTING IDENTITIES: For all existing nodes from the cached subgraphs (e.g. genres, labels, countries, founded years, and artists), you MUST reuse their exact 'id' and 'type' without modifying them. Do not duplicate or rename existing metadata or artist nodes.
+3.  NO DISJOINT GRAPHS: Ensure that there is a path connecting the subgraphs so that the resulting graph is fully unified rather than multiple disconnected clusters.
+4.  NEW BRIDGING BANDS: If you add new bridging bands, you must also identify and create their respective genre, label, country, and founded year nodes (YYYY) and link them to build a rich graph.
+5.  JSON SCHEMA: The output must be a single, valid JSON object with 'nodes' and 'links' arrays matching the schema.
+
+ABSOLUTELY CRITICAL: Ensure NO ORPHANED LINKS. Every source/target in the 'links' array must map to a node in the 'nodes' array.
+
+Your entire response MUST be ONLY the raw JSON object, without any surrounding text or markdown code fences.`;
 
 export const GENERATE_GRAPH_PROMPT_TEMPLATE = `Given the following list of seed artists: {{artists}}. Generate a music family tree connecting them. The output must be a single, valid JSON object with two keys: 'nodes' and 'links'.
 'nodes' should be an array of objects, each with 'id', 'type', and 'group'. The 'type' can be 'artist', 'genre', 'label', 'country', or 'founded'.
@@ -272,8 +292,7 @@ export const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed infor
        - Formatting: Use bolding for key terms and bullet points where appropriate to create white space.
        - Semantic Splitting: Group related content together by meaning.
     2. The canonical Wikipedia FilePath or high-quality official photo.
-    3. Real-time tour information for {{currentDate}}.
-    4. Confirmed top 3 studio albums.
+    3. Confirmed top 3 studio albums.
     
     Your task is to generate a JSON object. You MUST follow this structure precisely:
     {
@@ -291,7 +310,6 @@ export const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed infor
         {"site": "Official Website", "url": "..."},
         {"site": "Bandcamp", "url": "..."}
       ],
-      "tourInfo": "Current tour status or null",
       "discography": [{"albumName": "Name", "releaseYear": "YYYY"}],
       "recommendationReason": "Curator insight about their role in this scene."
     }
@@ -308,16 +326,41 @@ export const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed infor
 
 // --- SERVICE FUNCTIONS ---
 
-export const generateGraphData = async (artists: string, baseGraph?: GraphData, filters?: DiscoveryFilters): Promise<GraphData> => {
+export const generateGraphData = async (artists: string, baseGraph?: GraphData, filters?: DiscoveryFilters, activeUserId?: string | null): Promise<GraphData> => {
   const proxyKey = 'backend-proxy-key'; // Actual key is securely injected by the proxy
   const baseUrl = typeof window !== 'undefined' ? window.location.origin + '/api/gemini' : 'http://localhost:8080/api/gemini';
-  const ai = new GoogleGenAI({ 
-      apiKey: proxyKey,
-      httpOptions: { baseUrl }
-  });
-  
+
+  const artistList = artists.split('::').map(a => a.trim()).filter(Boolean);
+  let cachedSubgraphsContext = "";
+  if (artistList.length > 1) {
+    try {
+      const cacheResult = await readArtistCacheMany(artistList, activeUserId);
+      if (cacheResult.cached.size > 0) {
+        const contextData: Array<{ artist: string; nodes: Node[]; links: Link[] }> = [];
+        cacheResult.cached.forEach((entry, name) => {
+          if (entry.graphData) {
+            try {
+              const parsed = JSON.parse(entry.graphData);
+              contextData.push({
+                artist: name,
+                nodes: parsed.nodes || [],
+                links: parsed.links || []
+              });
+            } catch (e) {
+              console.warn(`[generateGraphData] Failed to parse cached graphData context for ${name}:`, e);
+            }
+          }
+        });
+        if (contextData.length > 0) {
+          cachedSubgraphsContext = JSON.stringify(contextData, null, 2);
+        }
+      }
+    } catch (cacheErr) {
+      console.warn("[generateGraphData] Failed to read cached subgraphs for prompt context:", cacheErr);
+    }
+  }
+
   const attemptRequest = async (retriesLeft: number): Promise<GraphData> => {
-    // Reverting to Pro for complex graph generation to ensure full, valid JSON responses
     const currentModel = "gemini-3.1-pro-preview";
     
     try {
@@ -325,6 +368,7 @@ export const generateGraphData = async (artists: string, baseGraph?: GraphData, 
       let systemInstruction: string;
 
       const isEnhancement = baseGraph && baseGraph.nodes.length > 0;
+      const isMultiSeed = artistList.length > 1 && cachedSubgraphsContext.length > 0;
       
       // Reinforce schema with dynamic descriptions if filters exist
       const dynamicSchema = JSON.parse(JSON.stringify(GRAPH_RESPONSE_SCHEMA));
@@ -332,7 +376,11 @@ export const generateGraphData = async (artists: string, baseGraph?: GraphData, 
           dynamicSchema.properties.nodes.description += ` MANDATORY: All NEW artists MUST have been founded AFTER ${filters.foundedAfter}.`;
       }
 
-      if (isEnhancement) {
+      if (isMultiSeed) {
+          systemInstruction = GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE
+              .replace('{{cachedSubgraphsContext}}', cachedSubgraphsContext);
+          userPrompt = `Stitch together the music graphs for these seed artists: ${artists}. Use the provided cached graphs as context.`;
+      } else if (isEnhancement) {
           const existingNodeIds = baseGraph.nodes.map(n => `"${n.id}" (${n.type})`).join(', ');
           systemInstruction = GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE
               .replace('{{existingNodeIds}}', existingNodeIds);
@@ -376,45 +424,78 @@ export const generateGraphData = async (artists: string, baseGraph?: GraphData, 
           userPrompt += `\n\nREMINDER: All new artists MUST be founded AFTER ${filters.foundedAfter || 'N/A'}. No exceptions.`;
       }
 
-      const response = await ai.models.generateContent({
-        model: currentModel,
-        contents: userPrompt,
-        config: {
-          systemInstruction: systemInstruction.replace(/{{artists}}/g, artists),
-          // Removal of googleSearch here drastically reduces latency for bulk graph generation
-          topK: 40,
-          topP: 0.95,
-          temperature: 0.2,
-          maxOutputTokens: 12000, 
-          responseMimeType: "application/json",
-          responseSchema: dynamicSchema,
+      // Format standard REST request body
+      const requestBody = {
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                text: userPrompt
+              }
+            ]
+          }
+        ],
+        systemInstruction: {
+          parts: [
+            {
+              text: systemInstruction.replace(/{{artists}}/g, artists)
+            }
+          ]
         },
+        generationConfig: {
+          temperature: 0.2,
+          topP: 0.95,
+          topK: 40,
+          maxOutputTokens: 12000,
+          responseMimeType: "application/json",
+          responseSchema: dynamicSchema
+        }
+      };
+
+      const url = `${baseUrl}/v1beta/models/${currentModel}:generateContent`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': proxyKey
+        },
+        body: JSON.stringify(requestBody)
       });
 
-      const jsonText = response.text?.trim();
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error(`[generateGraphData] Outbound fetch failed with status ${response.status}: ${errText}`);
+        throw new Error(`Outbound fetch failed with status ${response.status}: ${errText}`);
+      }
+
+      const resJson = await response.json();
+      const jsonText = resJson.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
       if (!jsonText) {
-          console.error(`AI (${currentModel}) returned empty response text:`, response);
+          console.error(`AI (${currentModel}) returned empty response text:`, resJson);
           if (retriesLeft > 0) return await attemptRequest(retriesLeft - 1);
           throw new Error("The AI returned an empty response. Please try again.");
       }
       
       console.log(`AI (${currentModel}) response length: ${jsonText.length}`);
-      const finishReason = response.candidates?.[0]?.finishReason;
+      const finishReason = resJson.candidates?.[0]?.finishReason;
       if (finishReason && finishReason !== 'STOP') {
           console.warn(`AI (${currentModel}) finished with reason: ${finishReason}. Response might be truncated.`);
       }
       
+      let cleanedJsonText = jsonText.trim();
+      if (cleanedJsonText.startsWith('```')) {
+          cleanedJsonText = cleanedJsonText.replace(/^```(?:json)?\n?/i, '').replace(/```$/, '').trim();
+      }
+
       let data: GraphData;
       try {
-          data = JSON.parse(jsonText) as GraphData;
+          data = JSON.parse(cleanedJsonText) as GraphData;
       } catch (parseError) {
-          console.error(`Failed to parse AI JSON response from ${currentModel}. Length: ${jsonText.length}. Text preview: ${jsonText.substring(0, 200)}...`, parseError);
+          console.error(`Failed to parse AI JSON response from ${currentModel}. Length: ${cleanedJsonText.length}. Text preview: ${cleanedJsonText.substring(0, 200)}...`, parseError);
           
-          // Robust extraction and repair
-          let cleaned = jsonText.replace(/```json\s?|```/g, '').trim();
-          
-          // Try to repair the JSON if it looks truncated
-          const repaired = repairJson(cleaned);
+          const repaired = repairJson(cleanedJsonText);
           console.log(`Attempting to parse repaired JSON (length: ${repaired.length})`);
           
           try {
@@ -434,14 +515,16 @@ export const generateGraphData = async (artists: string, baseGraph?: GraphData, 
       const seedArtistIds = new Set(artists.split('::').map(a => a.trim().toLowerCase()));
       const nodesToRemove = new Set<string>();
 
+      // Ensure that data.nodes and data.links are explicitly validated and assigned as arrays
+      const rawNodes = Array.isArray(data?.nodes) ? data.nodes : [];
+      const rawLinks = Array.isArray(data?.links) ? data.links : [];
+
       if (filters?.foundedAfter) {
           const threshold = Number(filters.foundedAfter);
-          
-          // Map artists to their founded years from the AI response
           const artistToYear = new Map<string, number>();
-          const nodeMap = new Map(data.nodes.map(n => [n.id, n]));
+          const nodeMap = new Map(rawNodes.map(n => [n.id, n]));
 
-          data.links.forEach(link => {
+          rawLinks.forEach(link => {
               const sourceId = typeof link.source === 'string' ? link.source : (link.source as Node).id;
               const targetId = typeof link.target === 'string' ? link.target : (link.target as Node).id;
               
@@ -457,8 +540,7 @@ export const generateGraphData = async (artists: string, baseGraph?: GraphData, 
               }
           });
 
-          // Mark artists for removal if they violate the year filter
-          data.nodes.forEach(node => {
+          rawNodes.forEach(node => {
               if (node.type === 'artist' && !seedArtistIds.has(node.id.toLowerCase())) {
                   const year = artistToYear.get(node.id.toLowerCase());
                   if (year && year <= threshold) {
@@ -468,20 +550,17 @@ export const generateGraphData = async (artists: string, baseGraph?: GraphData, 
           });
       }
 
-      // Filter nodes and links
-      let filteredNodes = data.nodes.filter(n => !nodesToRemove.has(n.id));
-      let filteredLinks = data.links.filter(l => {
+      let filteredNodes = rawNodes.filter(n => !nodesToRemove.has(n.id));
+      let filteredLinks = rawLinks.filter(l => {
           const s = typeof l.source === 'string' ? l.source : (l.source as Node).id;
           const t = typeof l.target === 'string' ? l.target : (l.target as Node).id;
           return !nodesToRemove.has(s) && !nodesToRemove.has(t);
       });
 
-      // Cleanup orphaned utility nodes (genre, label, country, founded)
       const artistIdsInFilteredNodes = new Set(filteredNodes.filter(n => n.type === 'artist').map(n => n.id));
       
       filteredNodes = filteredNodes.filter(n => {
           if (n.type === 'artist') return true;
-          // Check if this utility node is connected to at least one remaining artist
           return filteredLinks.some(l => {
               const s = typeof l.source === 'string' ? l.source : (l.source as Node).id;
               const t = typeof l.target === 'string' ? l.target : (l.target as Node).id;
@@ -497,7 +576,6 @@ export const generateGraphData = async (artists: string, baseGraph?: GraphData, 
           return finalNodeIds.has(s) && finalNodeIds.has(t);
       });
 
-      // Deduplicate nodes by ID
       const deduplicatedNodesMap = new Map<string, Node>();
       filteredNodes.forEach(node => {
           const normalizedId = node.id.trim().toLowerCase();
@@ -525,19 +603,58 @@ export const generateGraphData = async (artists: string, baseGraph?: GraphData, 
           const sourceId = sourceIdRaw.trim().toLowerCase();
           const targetId = targetIdRaw.trim().toLowerCase();
           
-          // Prevent self-loops which can crash or destabilize force simulations
           if (sourceId === targetId) return false;
-          
           if (!validationNodeMap.has(sourceId) || !validationNodeMap.has(targetId)) return false;
           link.source = validationNodeMap.get(sourceId)!.id;
           link.target = validationNodeMap.get(targetId)!.id;
           return true;
       });
 
-      return {
-          nodes: deduplicatedNodes,
-          links: validLinks
+      // Explicitly assign generated arrays to the returned graph metadata object
+      const finalGraph: GraphData = {
+          nodes: Array.isArray(deduplicatedNodes) ? deduplicatedNodes : [],
+          links: Array.isArray(validLinks) ? validLinks : []
       };
+
+      // --- Direct Firestore Write Loop for each artist node in the returned graph ---
+      if (activeUserId) {
+        const artistNodes = finalGraph.nodes.filter(n => n.type === 'artist');
+        await Promise.all(
+          artistNodes.map(async (artistNode) => {
+            let artistId: string;
+            const artistName = String(artistNode.id || '');
+            try {
+              artistId = normalizeArtistId(artistName);
+            } catch (e) {
+              artistId = artistName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+            }
+            if (!artistId) {
+              artistId = artistName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+            }
+
+            const { nodes, links } = extractArtistSubGraph(artistNode.id, finalGraph);
+            if (nodes.length === 0) return;
+            
+            try {
+              await setDoc(doc(db, 'artists', artistId), {
+                cacheKey: artistId,
+                artistId,
+                seedArtists: artistNode.id,
+                graphData: JSON.stringify({ nodes, links }),
+                filters: filters || {},
+                cacheVersion: 2,
+                cachedAt: serverTimestamp(),
+                hitCount: 0,
+              }, { merge: true });
+              console.log(`[generateGraphData] Standalone artist cache write confirmed: ${artistId}`);
+            } catch (error: any) {
+              console.warn("Global write bypassed due to rule restrictions:", error.message);
+            }
+          })
+        );
+      }
+
+      return finalGraph;
     } catch (error: any) {
       const errorMsg = error.message || '';
       const isTransient = errorMsg.includes('Proxying failed') || 
@@ -563,10 +680,6 @@ export const generateGraphData = async (artists: string, baseGraph?: GraphData, 
 export const extendGraphFromNode = async (node: Node, baseGraph: GraphData): Promise<GraphData> => {
   const proxyKey = 'backend-proxy-key';
   const baseUrl = typeof window !== 'undefined' ? window.location.origin + '/api/gemini' : 'http://localhost:8080/api/gemini';
-  const ai = new GoogleGenAI({ 
-      apiKey: proxyKey,
-      httpOptions: { baseUrl }
-  });
   
   const existingNodeIds = baseGraph.nodes.map(n => `"${n.id}" (${n.type})`).join(', ');
   const systemInstruction = EXTEND_GRAPH_PROMPT_TEMPLATE
@@ -574,23 +687,60 @@ export const extendGraphFromNode = async (node: Node, baseGraph: GraphData): Pro
     .replace('{{existingNodeIds}}', existingNodeIds)
     .replace('{{groupId}}', node.group.toString());
 
-  const response = await ai.models.generateContent({
-    model: "gemini-3.1-pro-preview",
-    contents: `Extend the music graph from artist: ${node.id}`,
-    config: {
-      systemInstruction,
+  const requestBody = {
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            text: `Extend the music graph from artist: ${node.id}`
+          }
+        ]
+      }
+    ],
+    systemInstruction: {
+      parts: [
+        {
+          text: systemInstruction
+        }
+      ]
+    },
+    generationConfig: {
       responseMimeType: "application/json",
       responseSchema: GRAPH_RESPONSE_SCHEMA,
+    }
+  };
+
+  const url = `${baseUrl}/v1beta/models/gemini-3.1-pro-preview:generateContent`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': proxyKey
     },
+    body: JSON.stringify(requestBody)
   });
 
-  const jsonText = response.text?.trim();
+  if (!response.ok) {
+    const errText = await response.text();
+    console.error(`[extendGraphFromNode] Outbound fetch failed with status ${response.status}: ${errText}`);
+    throw new Error(`Outbound fetch failed with status ${response.status}: ${errText}`);
+  }
+
+  const resJson = await response.json();
+  const jsonText = resJson.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
   if (!jsonText) throw new Error("Empty response from AI.");
   
+  let cleanedJsonText = jsonText.trim();
+  if (cleanedJsonText.startsWith('```')) {
+    cleanedJsonText = cleanedJsonText.replace(/^```(?:json)?\n?/i, '').replace(/```$/, '').trim();
+  }
+
   try {
-    return JSON.parse(jsonText) as GraphData;
+    return JSON.parse(cleanedJsonText) as GraphData;
   } catch (e) {
-    const repaired = repairJson(jsonText);
+    const repaired = repairJson(cleanedJsonText);
     return JSON.parse(repaired) as GraphData;
   }
 };
@@ -598,10 +748,6 @@ export const extendGraphFromNode = async (node: Node, baseGraph: GraphData): Pro
 export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArtists: string, originHint?: string | null): Promise<NodeDetails> => {
     const proxyKey = 'backend-proxy-key';
     const baseUrl = typeof window !== 'undefined' ? window.location.origin + '/api/gemini' : 'http://localhost:8080/api/gemini';
-    const ai = new GoogleGenAI({ 
-        apiKey: proxyKey,
-        httpOptions: { baseUrl }
-    });
     
     const contextNodes = graphData.links
         .filter(l => (typeof l.source === 'string' ? l.source : l.source.id) === node.id || (typeof l.target === 'string' ? l.target : l.target.id) === node.id)
@@ -629,33 +775,65 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
         prompt = prompt.replace(/{{#if originHint}}[\s\S]*?{{\/if}}/g, '');
     }
     
-    const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: prompt,
-        config: {
-            tools: [{ googleSearch: {} }],
-            responseMimeType: "application/json",
-            responseSchema: NODE_DETAILS_SCHEMA,
-            maxOutputTokens: 4000,
-        },
+    const requestBody = {
+      contents: [
+        {
+          role: "user",
+          parts: [
+            {
+              text: prompt
+            }
+          ]
+        }
+      ],
+      tools: [
+        {
+          googleSearch: {}
+        }
+      ],
+      generationConfig: {
+        responseMimeType: "application/json",
+        responseSchema: NODE_DETAILS_SCHEMA,
+        maxOutputTokens: 4000,
+      }
+    };
+
+    const url = `${baseUrl}/v1beta/models/gemini-3-flash-preview:generateContent`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': proxyKey
+      },
+      body: JSON.stringify(requestBody)
     });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error(`[fetchNodeDetails] Outbound fetch failed with status ${response.status}: ${errText}`);
+      throw new Error(`Outbound fetch failed with status ${response.status}: ${errText}`);
+    }
+
+    const resJson = await response.json();
+    const jsonText = resJson.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
     
-    const jsonText = response.text?.trim();
     if (!jsonText) {
-        console.error("AI returned empty details response:", response);
+        console.error("AI returned empty details response:", resJson);
         throw new Error("Empty response from AI details service.");
+    }
+
+    let cleanedJsonText = jsonText.trim();
+    if (cleanedJsonText.startsWith('```')) {
+        cleanedJsonText = cleanedJsonText.replace(/^```(?:json)?\n?/i, '').replace(/```$/, '').trim();
     }
 
     let details: NodeDetails;
     try {
-        console.log(`[Deep Cut Parse] Attempting to parse raw JSON:`, jsonText.substring(0, 50) + "...");
-        details = JSON.parse(jsonText) as NodeDetails;
+        console.log(`[Deep Cut Parse] Attempting to parse raw JSON:`, cleanedJsonText.substring(0, 50) + "...");
+        details = JSON.parse(cleanedJsonText) as NodeDetails;
     } catch (parseError) {
         console.warn("[Deep Cut Parse] Raw JSON parse failed. Attempting repair...");
-        let cleaned = jsonText.replace(/```json\s?|```/g, '').trim();
-        
-        // Try to repair
-        const repaired = repairJson(cleaned);
+        const repaired = repairJson(cleanedJsonText);
         console.log(`[Deep Cut Parse] Repaired JSON:`, repaired.substring(0, 50) + "...");
         
         try {
@@ -677,11 +855,9 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
         recommendationReason: details.recommendationReason || "No insight provided.",
     };
 
-    // Ensure details object nested fields exist
     if (!hydratedDetails.details) hydratedDetails.details = {};
 
-    // Extract grounding URLs as required by the developer guidelines
-    const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+    const groundingChunks = resJson.candidates?.[0]?.groundingMetadata?.groundingChunks;
     if (groundingChunks && Array.isArray(groundingChunks)) {
         const uniqueLinks = new Map<string, { title: string; url: string }>();
         groundingChunks.forEach((chunk: any) => {
@@ -753,4 +929,57 @@ export const streamNodeChat = async (
         }
     }
     return fullText;
+};
+
+/**
+ * Executes a fast, isolated micro-request with Google Web Grounding to fetch live tour data.
+ * This runs completely bypasses Firestore and does not pollute the permanent artist cache.
+ */
+export const fetchLiveTourData = async (artistName: string): Promise<string> => {
+    const proxyKey = 'backend-proxy-key';
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin + '/api/gemini' : 'http://localhost:8080/api/gemini';
+
+    const prompt = `Search the web for the latest real-time tour, concert, and festival schedules for the music artist "${artistName}". 
+    Provide a very concise, scannable summary (max 3 sentences) of their upcoming live events. 
+    If they are not touring, explicitly state that there are no upcoming events found.`;
+
+    const requestBody = {
+      contents: [
+        {
+          role: "user",
+          parts: [
+            {
+              text: prompt
+            }
+          ]
+        }
+      ],
+      tools: [
+        {
+          googleSearch: {}
+        }
+      ],
+      generationConfig: {
+        maxOutputTokens: 200,
+      }
+    };
+
+    const url = `${baseUrl}/v1beta/models/gemini-3-flash-preview:generateContent`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': proxyKey
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error(`[fetchLiveTourData] Outbound fetch failed with status ${response.status}: ${errText}`);
+      throw new Error(`Outbound fetch failed with status ${response.status}: ${errText}`);
+    }
+
+    const resJson = await response.json();
+    return resJson.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "No tour information available.";
 };

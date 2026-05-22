@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import Markdown from 'react-markdown';
 import { Node, NodeDetails, GraphData, View, ChatMessage, StackItem } from '../types';
-import { streamNodeChat } from '../services/geminiService';
+import { streamNodeChat, fetchLiveTourData } from '../services/geminiService';
+import { normalizeArtistId } from '../services/artistCacheService';
 import { analyticsService } from '../services/analyticsService';
 import { Spinner, HelpIcon, MicIcon, LoadingSpinner, DETAIL_THINKING_STEPS } from './Icons';
 
@@ -73,12 +74,27 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     const [imageError, setImageError] = useState(false);
     const [imgLoaded, setImgLoaded] = useState(false);
     const [isIdCopied, setIsIdCopied] = useState(false);
-    const [showTourDetails, setShowTourDetails] = useState(false);
+    
+    const [liveTourData, setLiveTourData] = useState<string | null>(null);
+    const [isFetchingTour, setIsFetchingTour] = useState(false);
+
+    const handleFetchTourData = async () => {
+        setIsFetchingTour(true);
+        try {
+            const data = await fetchLiveTourData(node.id);
+            setLiveTourData(data);
+        } catch (err) {
+            setLiveTourData("Failed to fetch live tour data. Please try again.");
+        } finally {
+            setIsFetchingTour(false);
+        }
+    };
+
     const chatEndRef = useRef<HTMLDivElement>(null);
     const prevHistoryLength = useRef(chatHistory.length);
 
-    const libraryArtistSet = useMemo(() => new Set(libraryArtists.map(a => a.toLowerCase())), [libraryArtists]);
-    const seedArtistSet = useMemo(() => new Set(seedArtists.map(a => a.toLowerCase())), [seedArtists]);
+    const libraryArtistSet = useMemo(() => new Set(libraryArtists.map(a => normalizeArtistId(a))), [libraryArtists]);
+    const seedArtistSet = useMemo(() => new Set(seedArtists.map(a => normalizeArtistId(a))), [seedArtists]);
 
     const isArtistNode = node.type === 'artist';
     const isLabelNode = node.type === 'label';
@@ -148,13 +164,6 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         return { purchase, info };
     }, [details?.links]);
 
-    const hasValidTourInfo = useMemo(() => {
-        if (!details?.tourInfo) return false;
-        const val = details.tourInfo.toLowerCase().trim();
-        const invalidMarkers = ['null', 'no tour', 'not on tour', 'hiatus', 'no active', 'unknown'];
-        return !invalidMarkers.some(marker => val.includes(marker));
-    }, [details?.tourInfo]);
-
     const headerSizeClass = isFullScreenMode 
         ? (isHero ? 'text-[clamp(2rem,5vw,4.5rem)] font-bold tracking-tighter' : 'text-[clamp(1.125rem,2vw,1.75rem)] font-bold tracking-tight')
         : 'text-xl font-medium';
@@ -200,9 +209,6 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     </button>
                                 )}
 
-                                <button onClick={onRefresh} className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-700 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none" title="Refresh Details">
-                                        <span className="material-symbols-outlined !text-[18px]">refresh</span>
-                                </button>
                                 <button onClick={onClose} className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-700 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none" title="Close Card">
                                         <span className="material-symbols-outlined !text-[18px]">close</span>
                                 </button>
@@ -299,28 +305,43 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                         <p className="text-base font-medium text-zinc-200">{details.details.founded}</p>
                                     </div>
                                 )}
-                                <div>
-                                    <h4 className="font-bold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">
-                                        Status
-                                    </h4>
-                                    {hasValidTourInfo ? (
-                                        <div className="flex flex-col gap-1">
-                                            <button 
-                                                onClick={() => setShowTourDetails(!showTourDetails)}
-                                                className="text-base text-primary font-semibold underline underline-offset-8 decoration-primary/30 hover:decoration-primary transition-all text-left w-fit rounded-xl"
-                                            >
-                                                Active events
-                                            </button>
-                                            {showTourDetails && (
-                                                <p className="text-sm text-zinc-400 leading-relaxed animate-in fade-in slide-in-from-top-1 duration-300 mt-2">
-                                                    {details.tourInfo}
-                                                </p>
-                                            )}
+                                {(() => {
+                                    // 1. Add Safe Fallback Protection for Tour Properties
+                                    const tours = details?.tourInfo || [];
+                                    return (
+                                        <div>
+                                            <h4 className="font-bold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">
+                                                Status
+                                            </h4>
+                                            <div className="flex flex-col gap-1">
+                                                {!liveTourData && !isFetchingTour && (
+                                                    <button 
+                                                        onClick={handleFetchTourData}
+                                                        className="text-zinc-400 hover:text-primary transition-colors text-sm underline underline-offset-4 decoration-zinc-700 font-medium text-left w-fit"
+                                                    >
+                                                        Check tours
+                                                    </button>
+                                                )}
+                                                
+                                                {isFetchingTour && (
+                                                    <div className="flex items-center gap-2 text-sm font-medium text-zinc-500 animate-pulse">
+                                                        Checking...
+                                                    </div>
+                                                )}
+
+                                                {liveTourData && (
+                                                    <p className="text-sm text-zinc-400 leading-relaxed animate-in fade-in slide-in-from-top-1 duration-300 mt-1">
+                                                        {liveTourData}
+                                                    </p>
+                                                )}
+
+                                                {Array.isArray(tours) && tours.length > 0 && tours.map((tour: any, idx: number) => (
+                                                    <p key={idx} className="text-sm text-zinc-400">{String(tour)}</p>
+                                                ))}
+                                            </div>
                                         </div>
-                                    ) : (
-                                        <p className="text-base text-zinc-600 font-medium italic">No upcoming events</p>
-                                    )}
-                                </div>
+                                    );
+                                })()}
                             </div>
 
                             <div className="space-y-4">
@@ -711,7 +732,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         if (isMagazineViewOpen && magazineSearchQuery.trim()) {
             const query = magazineSearchQuery.toLowerCase().trim();
             result = result.filter(node => {
-                const details = detailsCache.get(node.id);
+                const details = detailsCache.get(node.id) || detailsCache.get(node.id.toLowerCase());
                 return (
                     node.id.toLowerCase().includes(query) ||
                     details?.details?.genre?.toLowerCase().includes(query) ||
@@ -724,8 +745,8 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         // Sort
         if (isMagazineViewOpen && magazineSortBy !== 'none') {
             result.sort((a, b) => {
-                const detailsA = detailsCache.get(a.id);
-                const detailsB = detailsCache.get(b.id);
+                const detailsA = detailsCache.get(a.id) || detailsCache.get(a.id.toLowerCase());
+                const detailsB = detailsCache.get(b.id) || detailsCache.get(b.id.toLowerCase());
                 
                 if (magazineSortBy === 'name') {
                     return a.id.localeCompare(b.id);
@@ -953,7 +974,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                 </div>
                             ) : (
                                 filteredAndSortedNodes.map((node) => {
-                                    const details = detailsCache.get(node.id) || null;
+                                    const details = detailsCache.get(node.id) || detailsCache.get(node.id.toLowerCase()) || null;
                                     const isRichData = details && details.imageUrl && details.summary.length > 200;
                                     const isHero = isMagazineViewOpen && (node.id === selectedNode?.id || (isRichData && node.type === 'artist'));
                                     const isInStack = stack.some(item => item.id.toLowerCase() === node.id.toLowerCase());

@@ -2,9 +2,9 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AlertCircle, X, CheckCircle2, Key } from 'lucide-react';
-import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project } from './types';
+import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project, ArtistCacheEntry } from './types';
 import { generateGraphData, fetchNodeDetails, extendGraphFromNode } from './services/geminiService';
-import { normalizeCacheKey, readArtistCache, writeArtistCache, updateCacheDetailsCache, incrementCacheHit } from './services/artistCacheService';
+import { normalizeArtistId, readArtistCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache } from './services/artistCacheService';
 import { auth, signInWithGoogle, logout, onAuthStateChanged, User, db, handleFirestoreError, OperationType } from './services/firebase';
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, getDocFromServer, serverTimestamp, addDoc, getDoc, getDocs, orderBy, where, writeBatch, getDocFromCache, updateDoc } from 'firebase/firestore';
 const StyleGuidePage = React.lazy(() => import('./components/DesignSystem').then(m => ({ default: m.StyleGuidePage })));
@@ -415,6 +415,46 @@ const mergeGraphData = (base: GraphData, enhancement: GraphData): GraphData => {
 };
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+const isCacheEntryFullyQualified = (data: any): boolean => {
+  if (!data) return false;
+  if (!data.graphData) return false;
+
+  // 1. Verify graphData layout is non-empty and has nodes
+  try {
+    const graph = typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData;
+    if (!graph || !graph.nodes || !Array.isArray(graph.nodes) || graph.nodes.length <= 10) {
+      return false;
+    }
+  } catch (e) {
+    return false;
+  }
+
+  // 2. Verify detailsCache exists, parses correctly, and has a populated bio/summary
+  if (!data.detailsCache) return false;
+  try {
+    const parsed = typeof data.detailsCache === 'string' ? JSON.parse(data.detailsCache) : data.detailsCache;
+    let targetObj = parsed;
+    
+    // Support legacy Map serialization format: Array of [key, value] pairs
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed[0]) && parsed[0].length === 2) {
+        targetObj = parsed[0][1];
+      } else {
+        targetObj = parsed[0];
+      }
+    }
+
+    const bio = targetObj?.summary || targetObj?.bio || targetObj?.description || targetObj?.text || '';
+    if (!bio || bio.trim().length <= 5) {
+      return false;
+    }
+  } catch (e) {
+    return false;
+  }
+
+  return true;
+};
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>(View.Home);
@@ -847,12 +887,127 @@ const App: React.FC = () => {
     setIsMenuOpen(false);
   }, []);
 
-  const handleNodeClick = useCallback((node: Node | null) => {
+  const handleNodeClick = useCallback(async (node: Node | null) => {
+    if (!node) {
+       setSelectedNode(null);
+       return;
+    }
+
+    // 1. Prioritize the Local Details Map
+    const cachedDetails = detailsCache.get(node.id) || detailsCache.get(node.id.toLowerCase());
+    
+    // 2. Load Locally and Block the Network
+    if (cachedDetails && cachedDetails.summary && cachedDetails.summary.length > 5) {
+       const hydratedNode = {
+          ...node,
+          bio: cachedDetails.summary,
+          summary: cachedDetails.summary,
+          genre: cachedDetails.details?.genre || "",
+          origin: cachedDetails.details?.origin || "",
+          founded: cachedDetails.details?.founded || "",
+          name: cachedDetails.details?.artist || node.id,
+          isLibrary: true
+       };
+       
+       setSelectedNode(hydratedNode);
+       if (node.type !== 'founded') {
+         setActiveNodes(prev => prev.some(n => n.id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node]);
+       }
+       
+       // Force stop all loading indicators for this node
+       fetchingNodeIdsRef.current.delete(node.id);
+       setLoadingNodeIds(prev => { const next = new Set(prev); next.delete(node.id); return next; });
+       return; // BLOCK network queue entirely
+    }
+    
+    // 2.5 GLOBAL ARTISTS FALLBACK
+    // If the local detailsCache is empty (e.g. freshly loaded project), query the root artists collection directly.
+    // Firestore stores detailsCache as a JSON string — parse it and unwrap any array wrapper layers.
+    try {
+        const standardizedId = normalizeArtistId(node.id);
+        
+        let globalDoc = await getDoc(doc(db, 'artists', standardizedId));
+        
+        if (globalDoc.exists()) {
+            const data = globalDoc.data();
+            if (data && data.detailsCache) {
+                // Step 1: Parse the raw JSON string
+                let parsed: any = data.detailsCache;
+                try {
+                    if (typeof parsed === 'string') parsed = JSON.parse(parsed);
+                } catch(e) { console.warn("[Node Click] detailsCache JSON.parse failed", e); }
+                
+                // Step 2: Unwrap array wrapper if the schema is [{...}] instead of {...}
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    parsed = parsed[0];
+                }
+                
+                // Step 3: Extract text values, checking multiple field name variants
+                const bio = parsed?.summary || parsed?.bio || parsed?.description || parsed?.text || "";
+                const imageUrl = parsed?.imageUrl || parsed?.image || "";
+                const genre = parsed?.details?.genre || parsed?.genre || parsed?.genres || "";
+                const origin = parsed?.details?.origin || parsed?.origin || parsed?.location || parsed?.country || "";
+                const founded = parsed?.details?.founded || parsed?.founded || parsed?.formed || parsed?.year || "";
+                const artistName = parsed?.details?.artist || parsed?.artist || parsed?.name || data.seedArtists || data.artistId || node.id;
+                const notableArtists = parsed?.details?.notableArtists || parsed?.notableArtists || [];
+                const members = parsed?.members || [];
+                const links = parsed?.links || [];
+                const discography = parsed?.discography || [];
+                const tourInfo = parsed?.tourInfo || "";
+                const recommendationReason = parsed?.recommendationReason || parsed?.reason || "";
+                const groundingLinks = parsed?.groundingLinks || [];
+                
+                if (bio && bio.length > 5) {
+                    const hydratedNode = {
+                        ...node,
+                        bio,
+                        summary: bio,
+                        genre,
+                        origin,
+                        founded,
+                        name: artistName,
+                        imageUrl,
+                        isLibrary: true
+                    };
+                    
+                    setSelectedNode(hydratedNode);
+                    if (node.type !== 'founded') {
+                        setActiveNodes(prev => prev.some(n => n.id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node]);
+                    }
+                    
+                    // Push to detailsCache so the background queue skips this node entirely
+                    const detailsPayload: NodeDetails = {
+                        summary: bio,
+                        imageUrl,
+                        details: { artist: artistName, genre, origin, founded, notableArtists },
+                        members,
+                        links,
+                        discography,
+                        tourInfo,
+                        recommendationReason,
+                        groundingLinks
+                    };
+                    setDetailsCache(prev => new Map(prev).set(node.id.toLowerCase(), detailsPayload).set(standardizedId, detailsPayload).set(node.id, detailsPayload));
+
+                    // Air-gap: clear all loading flags and hard-stop before any network call
+                    fetchingNodeIdsRef.current.delete(node.id);
+                    setLoadingNodeIds(prev => { const next = new Set(prev); next.delete(node.id); return next; });
+                    setIsLoading(false);
+                    console.log("[Node Click] Hydrated from global artists collection:", node.id, "→", standardizedId);
+                    return;
+                }
+            }
+        }
+    } catch(err) {
+        console.warn("[Node Click] Global fallback read failed:", err);
+    }
+
+    // 3. Fallback Only if Empty
     setSelectedNode(node);
-    if (node && node.type !== 'founded') {
+    if (node.type !== 'founded') {
       setActiveNodes(prev => prev.some(n => n.id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node]);
     }
-  }, []);
+  }, [detailsCache]);
 
   const handleToggleStack = useCallback(async (node: Node, link?: string) => {
     if (!user) {
@@ -950,13 +1105,19 @@ const App: React.FC = () => {
       };
 
       if (currentCacheKey) {
-        // New lightweight path: reference global cache
+        // Legacy path: if a compound cacheKey is still present in state (e.g. from a
+        // session started before Phase 1 landed), write it for backward compatibility.
+        // New sessions will always use artistIds instead.
         docPayload.cacheKey = currentCacheKey;
         docPayload.canvasLayout = JSON.stringify(canvasLayout);
       } else {
-        // Fallback: write full blobs if there's no cache key (shouldn't normally happen)
+        // Phase 1+: write individual artist ID references + canvas layout.
+        // Each ID points to its own isolated /artists/{id} Firestore document.
+        const seedList = seedArtists.split('::').map((a: string) => a.trim()).filter(Boolean);
+        const normalizedIds = seedList.map((name: string) => normalizeArtistId(name));
+        docPayload.artistIds = normalizedIds;
+        docPayload.canvasLayout = JSON.stringify(canvasLayout);
         docPayload.graphData = JSON.stringify(graphData);
-        docPayload.detailsCache = JSON.stringify(Array.from(detailsCache.entries()));
       }
 
       await setDoc(newDocRef, docPayload);
@@ -1058,8 +1219,108 @@ const App: React.FC = () => {
       return;
     }
 
-    const artistList = artists.split('::').map(a => a.trim()).filter(Boolean);
+    const artistList = artists.split('::').map(a => normalizeArtistId(a)).filter(Boolean);
     if (artistList.length > 25) { setError(`Limit: 25 artists.`); return; }
+
+    // --- STRICT FRONT-GATE CACHE CHECK ---
+    // If this is a fresh search for a single artist without special filters, check the cache immediately
+    if (artistList.length === 1 && !isRegeneration && !discoveryFilters.foundedAfter) {
+      const searchId = artistList[0];
+      const searchIdLower = searchId.toLowerCase();
+      
+      try {
+        let cacheDoc = await getDoc(doc(db, 'artists', searchId));
+        if (!cacheDoc.exists()) {
+          cacheDoc = await getDoc(doc(db, 'artists', searchIdLower));
+        }
+
+        if (cacheDoc.exists()) {
+          const data = cacheDoc.data();
+          if (data && isCacheEntryFullyQualified(data)) {
+            let parsedGraph = null;
+            try {
+              parsedGraph = typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData;
+            } catch (e) {
+              console.warn("Failed to parse cached graphData");
+            }
+            
+            if (parsedGraph && parsedGraph.nodes && parsedGraph.nodes.length > 0) {
+              console.log("[Front Gate Cache] Hit! Bypassing all generation logic for:", searchId);
+              setGraphData(parsedGraph);
+              
+              // 3. Extract the detailsCache string from the same document read
+              let parsedDetails: any = null;
+              if (data.detailsCache) {
+                  try {
+                      parsedDetails = typeof data.detailsCache === 'string' ? JSON.parse(data.detailsCache) : data.detailsCache;
+                      
+                      // Unwrap array wrapper layer [{ ... }] or [ [ "name", { ... } ] ]
+                      if (Array.isArray(parsedDetails) && parsedDetails.length > 0) {
+                          parsedDetails = Array.isArray(parsedDetails[0]) ? parsedDetails[0][1] : parsedDetails[0];
+                      }
+                      
+                      const bio = parsedDetails?.summary || parsedDetails?.bio || parsedDetails?.description || parsedDetails?.text || "";
+                      if (bio && bio.length > 5) {
+                         const detailsPayload = {
+                            summary: bio,
+                            imageUrl: parsedDetails?.imageUrl || parsedDetails?.image || "",
+                            details: {
+                               artist: parsedDetails?.details?.artist || parsedDetails?.artist || parsedDetails?.name || data.seedArtists || data.artistId || searchId,
+                               genre: parsedDetails?.details?.genre || parsedDetails?.genre || parsedDetails?.genres || "",
+                               origin: parsedDetails?.details?.origin || parsedDetails?.origin || parsedDetails?.location || parsedDetails?.country || "",
+                               founded: parsedDetails?.details?.founded || parsedDetails?.founded || parsedDetails?.formed || parsedDetails?.year || "",
+                               notableArtists: parsedDetails?.details?.notableArtists || parsedDetails?.notableArtists || []
+                            },
+                            members: parsedDetails?.members || [],
+                            links: parsedDetails?.links || [],
+                            discography: parsedDetails?.discography || [],
+                            tourInfo: parsedDetails?.tourInfo || "",
+                            recommendationReason: parsedDetails?.recommendationReason || parsedDetails?.reason || "",
+                            groundingLinks: parsedDetails?.groundingLinks || []
+                         };
+                         setDetailsCache(prev => new Map(prev).set(searchIdLower, detailsPayload).set(searchId, detailsPayload));
+                      }
+                  } catch(e) { console.warn("Failed to parse detailsCache", e); }
+              }
+              
+              // 4. Find the primary node and instantly hydrate it with the biography text
+              const primaryNode = parsedGraph.nodes.find((n: any) => n.id.toLowerCase() === searchIdLower);
+              if (primaryNode) {
+                  let unwrappedDetails = parsedDetails;
+                  if (Array.isArray(unwrappedDetails) && unwrappedDetails.length > 0) {
+                      unwrappedDetails = Array.isArray(unwrappedDetails[0]) ? unwrappedDetails[0][1] : unwrappedDetails[0];
+                  }
+                  const bio = unwrappedDetails?.summary || unwrappedDetails?.bio || unwrappedDetails?.description || unwrappedDetails?.text || primaryNode.bio || primaryNode.summary || "";
+                  const hydratedNode = {
+                      ...primaryNode,
+                      bio: bio,
+                      summary: bio,
+                      imageUrl: unwrappedDetails?.imageUrl || unwrappedDetails?.image || primaryNode.imageUrl || "",
+                      genre: unwrappedDetails?.details?.genre || unwrappedDetails?.genre || unwrappedDetails?.genres || primaryNode.genre || "",
+                      origin: unwrappedDetails?.details?.origin || unwrappedDetails?.origin || unwrappedDetails?.location || unwrappedDetails?.country || primaryNode.origin || "",
+                      founded: unwrappedDetails?.details?.founded || unwrappedDetails?.founded || unwrappedDetails?.formed || unwrappedDetails?.year || primaryNode.founded || "",
+                      isLibrary: true,
+                      type: 'artist' as const,
+                      group: 0
+                  };
+                  setSelectedNode(hydratedNode);
+                  setActiveNodes([{...hydratedNode}]);
+              }
+              
+              // Force all loading flags off and short-circuit the entire function
+              setIsLoading(false);
+              isFetchingDetailsRef.current = false;
+              showToast('⚡ Loaded from cache');
+              return;
+            }
+          } else {
+            console.log(`[Front Gate Cache] Cache doc found for "${searchId}" but failed strict validation. Treating as MISS for self-healing.`);
+          }
+        }
+      } catch (err) {
+        console.warn("[Front Gate Cache] Read failed, falling through:", err);
+      }
+    }
     if (abortControllerRef.current) abortControllerRef.current.abort();
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -1102,60 +1363,115 @@ const App: React.FC = () => {
 
 
     setIsLoading(true); setError(null); setSeedArtists(artists);
+    isFetchingDetailsRef.current = false;
+    fetchingNodeIdsRef.current.clear();
+    setLoadingNodeIds(new Set());
 
     if (discoveryFilters.foundedAfter) {
       showToast(`Discovery Mode: Filtering artists founded after ${discoveryFilters.foundedAfter}...`);
     }
 
-    // --- PHASE 02: GLOBAL CACHE CHECK ---
-    // Before invoking Gemini, check if this exact artist+filter combo is already cached globally.
-    const cacheKey = normalizeCacheKey(artists, discoveryFilters);
+    // --- PHASE 02: PER-ARTIST CACHE CHECK ---
+    // Concurrently read one Firestore doc per artist. Determine exactly which are
+    // cached and which are missing — then only call Gemini for the missing ones.
+    let fullCacheHit = false;
 
     try {
-      const cached = await readArtistCache(cacheKey);
-      if (cached && !controller.signal.aborted) {
-        console.log(`[Music Discovery] Cache HIT \u2014 skipping Gemini for: ${cacheKey}`);
-        incrementCacheHit(cacheKey); // fire-and-forget analytics
+      let cached = new Map<string, ArtistCacheEntry>();
+      let missing = [...artistList];
 
-        const g: GraphData = JSON.parse(cached.graphData);
-        // Normalise link source/target (D3 compatibility)
-        g.links = g.links.map((l: any) => ({
-          ...l,
-          source: typeof l.source === 'object' ? l.source.id : l.source,
-          target: typeof l.target === 'object' ? l.target.id : l.target,
-        }));
-        g.nodes.forEach((n: any) => { n.fx = null; n.fy = null; });
-
-        // Ensure all requested seed artists are present in the graph
-        const returnedIds = new Set(g.nodes.map((n: Node) => n.id.toLowerCase()));
-        let maxG = g.nodes.reduce((m: number, n: Node) => Math.max(m, n.group || 0), 0);
+      if (!isRegeneration) {
+        const cacheResult = await readArtistCacheMany(artistList, user?.uid);
+        cached = new Map<string, ArtistCacheEntry>();
+        missing = [];
         artistList.forEach(name => {
-          if (!returnedIds.has(name.toLowerCase())) {
+          const entry = cacheResult.cached.get(name) || cacheResult.cached.get(name.toLowerCase());
+          if (entry && isCacheEntryFullyQualified(entry)) {
+            cached.set(name, entry);
+            cached.set(name.toLowerCase(), entry);
+          } else {
+            console.log(`[Phase 02 Cache] Cache hit disqualified for "${name}". Forcing regeneration.`);
+            missing.push(name);
+          }
+        });
+      }
+
+      if (!controller.signal.aborted && missing.length === 0 && cached.size > 0) {
+        // 1. FORCE STEP 1 - Check local database cache first
+        console.log(`[Music Discovery] Full cache HIT for: ${artistList.map(n => normalizeArtistId(n)).join(', ')}`);
+        cached.forEach((_, name) => incrementCacheHit(normalizeArtistId(name), user?.uid));
+
+        // 2. FORCE STEP 2 - Immediately update the UI state from local data
+        const firstSlug = artistList[0];
+        const entry = cached.get(firstSlug.toLowerCase()) || cached.values().next().value;
+        let humanName = entry?.seedArtists || entry?.artistId || firstSlug;
+
+        // A. Parse the local detailsCache JSON block safely
+        let bio = "", genre = "", origin = "", founded = "", summary = "", imageUrl = "";
+        if (entry && entry.detailsCache) {
+             try {
+                let parsedData = typeof entry.detailsCache === 'string' ? JSON.parse(entry.detailsCache) : entry.detailsCache;
+                if (Array.isArray(parsedData) && parsedData.length > 0) {
+                   parsedData = Array.isArray(parsedData[0]) ? parsedData[0][1] : parsedData[0];
+                }
+                bio = parsedData?.summary || parsedData?.bio || parsedData?.description || parsedData?.text || "";
+                summary = bio;
+                imageUrl = parsedData?.imageUrl || parsedData?.image || "";
+                genre = parsedData?.details?.genre || parsedData?.genre || parsedData?.genres || "";
+                origin = parsedData?.details?.origin || parsedData?.origin || parsedData?.location || parsedData?.country || "";
+                founded = parsedData?.details?.founded || parsedData?.founded || parsedData?.formed || parsedData?.year || "";
+             } catch(e) {
+                console.warn("Silent parse failure on detailsCache:", e);
+             }
+        }
+
+        // B. Construct a clean node layout object
+        const hydratedNode = {
+             id: humanName,
+             name: humanName,
+             bio, summary, genre, origin, founded, imageUrl,
+             type: 'artist' as const,
+             isLibrary: true,
+             group: 0
+        };
+
+        // Pass it straight to setSelectedNode
+        setSelectedNode(hydratedNode);
+
+        // C. Set the pre-compiled graph array straight into setGraphData
+        let parsedGraphData = assembleGraphFromCache(cached);
+        
+        // Remap primary node identity if it differs from the requested slug
+        if (humanName.toLowerCase() !== firstSlug.toLowerCase()) {
+           const match = parsedGraphData.nodes.find(n => n.id.toLowerCase() === firstSlug.toLowerCase());
+           if (match) match.id = humanName;
+           parsedGraphData.links.forEach(l => {
+               if (typeof l.source === 'string' && l.source.toLowerCase() === firstSlug.toLowerCase()) l.source = humanName;
+               if (typeof l.target === 'string' && l.target.toLowerCase() === firstSlug.toLowerCase()) l.target = humanName;
+           });
+        }
+        
+        // Defensive guard
+        const returnedIds = new Set(parsedGraphData.nodes.map((n: Node) => n.id.toLowerCase()));
+        let maxG = parsedGraphData.nodes.reduce((m: number, n: Node) => Math.max(m, n.group || 0), 0);
+        artistList.forEach(name => {
+          if (!returnedIds.has(name.toLowerCase()) && !returnedIds.has(humanName.toLowerCase())) {
             maxG++;
-            g.nodes.push({ id: name, type: 'artist', group: maxG });
+            parsedGraphData.nodes.push({ id: name, type: 'artist', group: maxG });
           }
         });
 
-        let final = pruned ? mergeGraphData(pruned, g) : g;
+        let final = pruned ? mergeGraphData(pruned, parsedGraphData) : parsedGraphData;
         final = filterGraphByDiscoveryFilters(final, discoveryFilters, artists);
+        
         setGraphData(final);
-        setCurrentCacheKey(cacheKey);
 
-        // Restore enriched Deep Cut metadata from the cache
-        if (cached.detailsCache) {
-          try {
-            setDetailsCache(new Map(JSON.parse(cached.detailsCache)));
-          } catch (e) {
-            console.warn('[ArtistCache] Could not parse cached detailsCache:', e);
-          }
-        }
-
-        // Seed active nodes from the final graph
         setActiveNodes(prev => {
           const currentActive = [...prev];
           const seedMapped = artistList.map(name => {
-            const match = final.nodes.find(fn => fn.id.toLowerCase() === name.toLowerCase());
-            return (match || { id: name, type: 'artist' as any, group: 0 }) as Node;
+            const isFirst = name.toLowerCase() === firstSlug.toLowerCase();
+            const match = final.nodes.find(fn => fn.id.toLowerCase() === (isFirst ? humanName.toLowerCase() : name.toLowerCase()));
+            return (match || { id: isFirst ? humanName : name, type: 'artist' as any, group: 0 }) as Node;
           });
           const seedIds = new Set(seedMapped.map(s => s.id.toLowerCase()));
           const finalActive = [...seedMapped];
@@ -1169,17 +1485,140 @@ const App: React.FC = () => {
           return finalActive;
         });
 
-        showToast('\u26a1 Loaded from cache');
+        setDetailsCache(prev => {
+          const next = new Map(prev);
+          cached.forEach((cachedEntry, key) => {
+            if (cachedEntry && cachedEntry.detailsCache) {
+              try {
+                let parsedData = typeof cachedEntry.detailsCache === 'string' ? JSON.parse(cachedEntry.detailsCache) : cachedEntry.detailsCache;
+                if (Array.isArray(parsedData) && parsedData.length > 0) {
+                  parsedData = Array.isArray(parsedData[0]) ? parsedData[0][1] : parsedData[0];
+                }
+                const entryBio = parsedData?.summary || parsedData?.bio || parsedData?.description || parsedData?.text || "";
+                
+                // Guard: Only add to detailsCache if bio is present and has length > 5
+                if (!entryBio || entryBio.length < 5) return;
+
+                const entryGenre = parsedData?.details?.genre || parsedData?.genre || parsedData?.genres || "";
+                const entryOrigin = parsedData?.details?.origin || parsedData?.origin || parsedData?.location || parsedData?.country || "";
+                const entryFounded = parsedData?.details?.founded || parsedData?.founded || parsedData?.formed || parsedData?.year || "";
+                const entryArtistName = parsedData?.details?.artist || parsedData?.artist || parsedData?.name || cachedEntry.seedArtists || cachedEntry.artistId || key;
+
+                const detailsObj = {
+                  summary: entryBio,
+                  imageUrl: parsedData?.imageUrl || parsedData?.image || "",
+                  details: {
+                    genre: entryGenre,
+                    origin: entryOrigin,
+                    founded: entryFounded,
+                    artist: entryArtistName,
+                    notableArtists: parsedData?.details?.notableArtists || parsedData?.notableArtists || []
+                  },
+                  members: parsedData?.members || [],
+                  links: parsedData?.links || [],
+                  discography: parsedData?.discography || [],
+                  tourInfo: parsedData?.tourInfo || "",
+                  recommendationReason: parsedData?.recommendationReason || parsedData?.reason || "",
+                  groundingLinks: parsedData?.groundingLinks || []
+                };
+
+                next.set(key.toLowerCase(), detailsObj);
+                next.set(key, detailsObj);
+                if (cachedEntry.artistId) next.set(cachedEntry.artistId.toLowerCase(), detailsObj);
+                if (entryArtistName) {
+                  next.set(entryArtistName.toLowerCase(), detailsObj);
+                  next.set(entryArtistName, detailsObj);
+                }
+              } catch (e) {
+                console.warn("Silent parse failure on detailsCache in loop:", e);
+              }
+            }
+          });
+          return next;
+        });
+
+        // 3. FORCE STEP 3 - Shut down ALL loading states and force an absolute return
+        window.dispatchEvent(new CustomEvent('zcene-cache-hit-success', { 
+            detail: { artist: entry?.seedArtists || entry?.artistId || firstSlug } 
+        }));
+        
+        showToast('⚡ Loaded from cache');
         setIsLoading(false);
-        return; // Phase 02 & 03 skipped — go straight to Phase 04 (D3 physics)
+        
+        // Lock the deep cut queue momentarily to let React's async detailsCache commit settle
+        isFetchingDetailsRef.current = true;
+        setTimeout(() => { isFetchingDetailsRef.current = false; }, 500);
+        fullCacheHit = true;
+        return;
+
+      } else if (!controller.signal.aborted && missing.length > 0 && cached.size > 0) {
+        // ── PARTIAL CACHE HIT: some artists cached, some missing ─────────────
+        console.log(`[Music Discovery] Partial cache HIT. Cached: [${Array.from(cached.keys()).join(', ')}] | Missing: [${missing.join(', ')}]`);
+        showToast(`⚡ ${cached.size} artist${cached.size > 1 ? 's' : ''} from cache — fetching ${missing.join(', ')}...`);
+
+        // Call Gemini ONLY for the missing artists
+        const partialGraphPromise = generateGraphData(missing.join('::'), pruned, discoveryFilters, user?.uid);
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("The AI is taking too long to respond. The request has timed out.")), 120000)
+        );
+
+        const startTime = Date.now();
+        const freshData = await Promise.race([partialGraphPromise, timeoutPromise]) as GraphData;
+        console.log(`[Music Discovery] Partial AI fetch in ${((Date.now() - startTime) / 1000).toFixed(1)}s for: [${missing.join(', ')}]`);
+
+        if (controller.signal.aborted) return;
+        if (!freshData || !freshData.nodes || !freshData.links) {
+          throw new Error("The AI returned formless data for the missing artists. Please try again.");
+        }
+
+        // Write ONLY the newly fetched artists to Firestore (fire-and-forget)
+        writeArtistCacheMany(missing, freshData, user?.uid, discoveryFilters)
+          .then(() => console.log(`[Music Discovery] Cache write confirmed for: [${missing.join(', ')}]`))
+          .catch(e => console.error('[Music Discovery] Partial cache write failed:', e));
+
+        // Assemble the cached portion and merge with the fresh Gemini data
+        const cachedGraph = assembleGraphFromCache(cached);
+        const returnedIds = new Set(freshData.nodes.map(n => n.id.toLowerCase()));
+        let maxG = freshData.nodes.reduce((m, n) => Math.max(m, n.group || 0), 0);
+        missing.forEach(name => {
+          if (!returnedIds.has(name.toLowerCase())) { maxG++; freshData.nodes.push({ id: name, type: 'artist', group: maxG }); }
+        });
+
+        let merged = mergeGraphData(cachedGraph, freshData);
+        merged = filterGraphByDiscoveryFilters(merged, discoveryFilters, artists);
+        setGraphData(merged);
+
+        setActiveNodes(prev => {
+          const currentActive = [...prev];
+          const seedMapped = artistList.map(name => {
+            const match = merged.nodes.find(fn => fn.id.toLowerCase() === name.toLowerCase());
+            return (match || { id: name, type: 'artist' as any, group: 0 }) as Node;
+          });
+          const seedIds = new Set(seedMapped.map(s => s.id.toLowerCase()));
+          const finalActive = [...seedMapped];
+          currentActive.forEach(p => {
+            if (!seedIds.has(p.id.toLowerCase())) {
+              const match = merged.nodes.find(fn => fn.id.toLowerCase() === p.id.toLowerCase());
+              finalActive.push(match || p);
+              seedIds.add(p.id.toLowerCase());
+            }
+          });
+          return finalActive;
+        });
+
+        setIsLoading(false);
+        fullCacheHit = true;
+        return; // Partial hit complete — go to Phase 04
       }
     } catch (cacheErr) {
-      console.warn('[Music Discovery] Cache read error, falling back to Gemini:', cacheErr);
+      console.warn('[Music Discovery] Per-artist cache read error, falling back to full Gemini fetch:', cacheErr);
     }
     // --- END CACHE CHECK ---
 
+    if (fullCacheHit) return;
+
     try {
-      const graphPromise = generateGraphData(artists, pruned, discoveryFilters);
+      const graphPromise = generateGraphData(artists, pruned, discoveryFilters, user?.uid);
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error("The AI is taking too long to respond. The request has timed out.")), 120000)
       );
@@ -1199,14 +1638,12 @@ const App: React.FC = () => {
       let final = pruned ? mergeGraphData(pruned, newData) : newData;
       final = filterGraphByDiscoveryFilters(final, discoveryFilters, artists);
       setGraphData(final);
-      setCurrentCacheKey(cacheKey);
 
-      // Phase 02 complete — write to global cache so the NEXT generation is instant.
-      // Awaited here so any rule/write failure surfaces in the console immediately.
-      console.log(`[Music Discovery] Cache MISS — writing to artists/${cacheKey}`);
-      writeArtistCache(cacheKey, final, new Map(), artists, discoveryFilters)
-        .then(() => console.log(`[Music Discovery] Cache write confirmed: artists/${cacheKey}`))
-        .catch(e => console.error(`[Music Discovery] Cache write FAILED for artists/${cacheKey}:`, e));
+      // Phase 02 complete — write each artist as an isolated individual doc.
+      console.log(`[Music Discovery] Full cache MISS — writing per-artist docs for: [${artistList.join(', ')}]`);
+      writeArtistCacheMany(artistList, final, user?.uid, discoveryFilters)
+        .then(() => console.log(`[Music Discovery] Per-artist cache write confirmed for: [${artistList.join(', ')}]`))
+        .catch(e => console.error('[Music Discovery] Per-artist cache write failed:', e));
 
 
       // Update active nodes metadata from the final graph, ensuring all seeds are present
@@ -1233,10 +1670,18 @@ const App: React.FC = () => {
 
         return finalActive;
       });
+
+      // Find the primary/seed node in the final graph and select it to paint the sidebar immediately
+      const firstSlug = artistList[0];
+      const primaryNode = final.nodes.find(n => n.id.toLowerCase() === firstSlug.toLowerCase()) || final.nodes[0];
+      if (primaryNode) {
+        setSelectedNode(primaryNode);
+      }
     } catch (err: any) {
       if (err.name !== 'AbortError' && !controller.signal.aborted) {
-        setError(humanizeError(err));
+        showToast(humanizeError(err));
         setIsLoading(false);
+        isFetchingDetailsRef.current = false;
       }
     } finally {
       if (abortControllerRef.current === controller) {
@@ -1500,6 +1945,89 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, [user, isAuthInitialized, isFirebaseReady]);
 
+  // ── BATCH GLOBAL HYDRATION HELPER ──────────────────────────────────────
+  // Reads the global 'artists' collection for every node in a loaded graph
+  // and pre-populates the local detailsCache Map before the UI declares
+  // the load cycle complete. This completely prevents the deep cut queue
+  // from ever falling through to a live Gemini proxy call for known artists.
+  const batchHydrateDetailsCache = useCallback(async (nodes: any[]): Promise<void> => {
+    const artistNodes = nodes.filter((n: any) => n.type === 'artist' || !n.type);
+    if (!artistNodes.length) return;
+
+    const results = new Map<string, NodeDetails>();
+
+    await Promise.allSettled(artistNodes.map(async (n: any) => {
+      const standardizedId = normalizeArtistId(n.id);
+      
+      try {
+        let snap = await getDoc(doc(db, 'artists', standardizedId));
+        if (!snap.exists()) return;
+
+        const data = snap.data();
+        if (!data?.detailsCache) return;
+
+        // Parse the raw JSON string
+        let parsed: any = data.detailsCache;
+        if (typeof parsed === 'string') parsed = JSON.parse(parsed);
+
+        // Unwrap array wrapper layer [{ ... }] → { ... }
+        if (Array.isArray(parsed) && parsed.length > 0) parsed = parsed[0];
+
+        const bio = parsed?.summary || parsed?.bio || parsed?.description || parsed?.text || '';
+        const imageUrl = parsed?.imageUrl || parsed?.image || '';
+        const genre = parsed?.details?.genre || parsed?.genre || parsed?.genres || '';
+        const origin = parsed?.details?.origin || parsed?.origin || parsed?.location || parsed?.country || '';
+        const founded = parsed?.details?.founded || parsed?.founded || parsed?.formed || parsed?.year || '';
+        const artistName = parsed?.details?.artist || parsed?.artist || parsed?.name || data.seedArtists || data.artistId || n.id;
+        const notableArtists = parsed?.details?.notableArtists || parsed?.notableArtists || [];
+        const members = parsed?.members || [];
+        const links = parsed?.links || [];
+        const discography = parsed?.discography || [];
+        const tourInfo = parsed?.tourInfo || '';
+        const recommendationReason = parsed?.recommendationReason || parsed?.reason || '';
+        const groundingLinks = parsed?.groundingLinks || [];
+
+        if (!bio || bio.length < 5) return;
+
+        const payload: NodeDetails = {
+          summary: bio,
+          imageUrl,
+          details: { artist: artistName, genre, origin, founded, notableArtists },
+          members,
+          links,
+          discography,
+          tourInfo,
+          recommendationReason,
+          groundingLinks
+        };
+
+        // Register under all lookup key variants
+        results.set(n.id, payload);
+        results.set(n.id.toLowerCase(), payload);
+        results.set(standardizedId, payload);
+        console.log('[Batch Hydration] Loaded from global artists:', n.id, '→', standardizedId);
+      } catch (e) {
+        console.warn('[Batch Hydration] Failed for', n.id, e);
+      }
+    }));
+
+    if (results.size > 0) {
+      setDetailsCache(prev => {
+        const merged = new Map(prev);
+        results.forEach((v, k) => {
+          const existing = prev.get(k);
+          if (existing && existing.imageUrl && !v.imageUrl) {
+            console.log(`[Batch Hydration] Bypassing overwrite for ${k} because local cache has imageUrl but database is missing it`);
+            merged.set(k, { ...v, imageUrl: existing.imageUrl });
+          } else {
+            merged.set(k, v);
+          }
+        });
+        return merged;
+      });
+    }
+  }, []);
+
   // Re-hydrate and Sync current project from Firestore (Real-Time)
   useEffect(() => {
     if (!isAuthInitialized || !isFirebaseReady || !currentProjectId) {
@@ -1536,6 +2064,10 @@ const App: React.FC = () => {
     };
 
     const handleSnap = async (snap: any): Promise<boolean> => {
+      if (isHydratingSessionRef.current) {
+        console.log('[ProjectLoader] Bypassing snapshot handle because local session is saving/hydrating');
+        return false;
+      }
       if (!isMounted || !snap.exists()) return false;
 
       const data = snap.data();
@@ -1563,54 +2095,202 @@ const App: React.FC = () => {
       }
 
       try {
-        if (data.cacheKey) {
-          // --- NEW FORMAT: hydrate graph + metadata from global artists cache ---
-          console.log(`[ProjectLoader] New format detected. Hydrating from cache: ${data.cacheKey}`);
-          const cacheEntry = await readArtistCache(data.cacheKey);
-          if (!isMounted) return false;
-
-          if (cacheEntry) {
-            const g: GraphData = JSON.parse(cacheEntry.graphData);
-            // D3 compatibility normalisation
+        let loadedFromGraphData = false;
+        if (data.graphData && typeof data.graphData === 'string' && data.graphData.trim().length > 20) {
+          try {
+            console.log('[ProjectLoader] Hydrating directly from project graphData');
+            const g = JSON.parse(data.graphData);
             g.links = g.links.map((l: any) => ({
               ...l,
               source: typeof l.source === 'object' ? l.source.id : l.source,
               target: typeof l.target === 'object' ? l.target.id : l.target,
             }));
-            // Start with no pinned positions so D3 can settle them
-            g.nodes.forEach((n: any) => { n.fx = null; n.fy = null; });
 
-            // Re-apply saved artist canvas positions on top of the cached graph
+            // Re-apply saved canvas positions
             if (data.canvasLayout) {
               try {
                 const positions: Array<{ nodeId: string; x?: number; y?: number; fx?: number | null; fy?: number | null }> = JSON.parse(data.canvasLayout);
                 positions.forEach(ref => {
                   const node = g.nodes.find((n: any) => n.id === ref.nodeId);
-                  if (node) {
-                    node.x = ref.x;
-                    node.y = ref.y;
-                    node.fx = ref.fx ?? null;
-                    node.fy = ref.fy ?? null;
-                  }
+                  if (node) { node.x = ref.x; node.y = ref.y; node.fx = ref.fx ?? null; node.fy = ref.fy ?? null; }
                 });
               } catch (e) { console.warn('[ProjectLoader] canvasLayout parse failed:', e); }
             }
 
+            g.nodes.forEach((n: any) => { n.fx = n.fx ?? null; n.fy = n.fy ?? null; });
             setGraphData((prev: any) => isGraphEqual(prev, g) ? prev : g);
-            setCurrentCacheKey(data.cacheKey);
 
-            // Restore Deep Cut metadata from the cache entry
-            if (cacheEntry.detailsCache) {
+            // ── FIRESTORE-FIRST: batch-load all node biographies before marking load complete
+            await batchHydrateDetailsCache(g.nodes);
+
+            // Restore active nodes
+            if (data.activeNodes && Array.isArray(data.activeNodes)) {
+              const activeIds = new Set(data.activeNodes.map((item: any) => typeof item === 'string' ? item : item.id));
+              setActiveNodes((prev: any) => {
+                const fromGraph = g.nodes.filter((n: any) => activeIds.has(n.id));
+                if (prev.length !== fromGraph.length) return fromGraph;
+                return JSON.stringify(prev.map((n: any) => n.id)) === JSON.stringify(fromGraph.map((n: any) => n.id)) ? prev : fromGraph;
+              });
+            }
+
+            loadedFromGraphData = true;
+          } catch (e) {
+            console.error('[ProjectLoader] Failed to hydrate directly from graphData:', e);
+          }
+        }
+
+        if (!loadedFromGraphData) {
+          if (data.artistIds && Array.isArray(data.artistIds) && data.artistIds.length > 0) {
+            // --- PHASE 1 FORMAT: hydrate from individual per-artist /artists/{id} docs ---
+            console.log(`[ProjectLoader] Phase 1 format. Hydrating from artistIds: [${data.artistIds.join(', ')}]`);
+            const { cached, missing } = await readArtistCacheMany(
+              // artistIds are already normalized slugs — reconstruct display names from seedArtists
+              // but pass the slugs directly as lookup keys via a thin wrapper
+              data.artistIds.map((id: string) => id), // IDs are normalized slugs; readArtistCacheMany uses normalizeArtistId internally
+              user?.uid
+            );
+
+            if (!isMounted) return false;
+
+            if (cached.size > 0) {
+              const g = assembleGraphFromCache(cached);
+
+              // Re-apply saved canvas positions
+              if (data.canvasLayout) {
+                try {
+                  const positions: Array<{ nodeId: string; x?: number; y?: number; fx?: number | null; fy?: number | null }> = JSON.parse(data.canvasLayout);
+                  positions.forEach(ref => {
+                    const node = g.nodes.find((n: any) => n.id === ref.nodeId);
+                    if (node) { node.x = ref.x; node.y = ref.y; node.fx = ref.fx ?? null; node.fy = ref.fy ?? null; }
+                  });
+                } catch (e) { console.warn('[ProjectLoader] canvasLayout parse failed:', e); }
+              }
+
+              g.nodes.forEach((n: any) => { n.fx = n.fx ?? null; n.fy = n.fy ?? null; });
+              setGraphData((prev: any) => isGraphEqual(prev, g) ? prev : g);
+
+              // ── FIRESTORE-FIRST: batch-load all node biographies before marking load complete
+              await batchHydrateDetailsCache(g.nodes);
+
+              if (missing.length > 0) {
+                console.warn(`[ProjectLoader] ${missing.length} artist doc(s) missing from cache: [${missing.join(', ')}]. They will be re-fetched on next graph generation.`);
+              }
+            } else {
+              console.warn(`[ProjectLoader] All artistIds cache-missed — graph will be empty until regenerated.`);
+            }
+
+            // Restore active nodes
+            if (data.activeNodes && Array.isArray(data.activeNodes)) {
+              const activeIds = new Set(data.activeNodes.map((item: any) => typeof item === 'string' ? item : item.id));
+              setActiveNodes((prev: any) => {
+                const fromGraph = cached.size > 0
+                  ? assembleGraphFromCache(cached).nodes.filter((n: any) => activeIds.has(n.id))
+                  : [];
+                if (prev.length !== fromGraph.length) return fromGraph;
+                return JSON.stringify(prev.map((n: any) => n.id)) === JSON.stringify(fromGraph.map((n: any) => n.id)) ? prev : fromGraph;
+              });
+            }
+
+          } else if (data.cacheKey) {
+            // --- LEGACY FORMAT (deprecated): hydrate from compound /artists/{cacheKey} doc ---
+            console.log(`[ProjectLoader] Legacy cacheKey format detected. Hydrating from: ${data.cacheKey}`);
+            const legacyEntry = await readLegacyArtistCache(data.cacheKey);
+            if (!isMounted) return false;
+
+            if (legacyEntry) {
+              const g: GraphData = JSON.parse(legacyEntry.graphData);
+              g.links = g.links.map((l: any) => ({
+                ...l,
+                source: typeof l.source === 'object' ? l.source.id : l.source,
+                target: typeof l.target === 'object' ? l.target.id : l.target,
+              }));
+              g.nodes.forEach((n: any) => { n.fx = null; n.fy = null; });
+
+              if (data.canvasLayout) {
+                try {
+                  const positions: Array<{ nodeId: string; x?: number; y?: number; fx?: number | null; fy?: number | null }> = JSON.parse(data.canvasLayout);
+                  positions.forEach(ref => {
+                    const node = g.nodes.find((n: any) => n.id === ref.nodeId);
+                    if (node) { node.x = ref.x; node.y = ref.y; node.fx = ref.fx ?? null; node.fy = ref.fy ?? null; }
+                  });
+                } catch (e) { console.warn('[ProjectLoader] canvasLayout parse failed:', e); }
+              }
+
+              setGraphData((prev: any) => isGraphEqual(prev, g) ? prev : g);
+              setCurrentCacheKey(data.cacheKey);
+
+              // ── FIRESTORE-FIRST: batch-load biographies from global collection
+              await batchHydrateDetailsCache(g.nodes);
+
+
+              if (legacyEntry.detailsCache) {
+                try {
+                  const newCacheMap = new Map<string, NodeDetails>(JSON.parse(legacyEntry.detailsCache));
+                  setDetailsCache((prev) => {
+                    if (prev.size !== newCacheMap.size) return newCacheMap;
+                    return JSON.stringify(Array.from(prev.entries())) === legacyEntry.detailsCache ? prev : newCacheMap;
+                  });
+                } catch (e) { console.error("Details cache parse fail", e); }
+              }
+
+              if (data.activeNodes && Array.isArray(data.activeNodes)) {
+                const activeIds = new Set(data.activeNodes.map((item: any) => typeof item === 'string' ? item : item.id));
+                const nextActive = g.nodes.filter((n: any) => activeIds.has(n.id));
+                setActiveNodes((prev: any) => {
+                  if (prev.length !== nextActive.length) return nextActive;
+                  return JSON.stringify(prev.map((n: any) => n.id)) === JSON.stringify(nextActive.map((n: any) => n.id)) ? prev : nextActive;
+                });
+              }
+            } else {
+              // Legacy cache miss — fall back to inline graphData blob if available
+              console.warn(`[ProjectLoader] Legacy cache miss for key: ${data.cacheKey} — trying inline graphData fallback.`);
+              if (data.graphData && data.graphData.length > 20) {
+                const g = JSON.parse(data.graphData);
+                g.links = g.links.map((l: any) => ({
+                  ...l,
+                  source: typeof l.source === 'object' ? l.source.id : l.source,
+                  target: typeof l.target === 'object' ? l.target.id : l.target,
+                }));
+                g.nodes.forEach((n: any) => { n.fx = null; n.fy = null; });
+                if (g.nodes.length > 0) {
+                  setGraphData((prev: any) => isGraphEqual(prev, g) ? prev : g);
+                  if (data.activeNodes && Array.isArray(data.activeNodes)) {
+                    const activeIds = new Set(data.activeNodes.map((item: any) => typeof item === 'string' ? item : item.id));
+                    const nextActive = g.nodes.filter((n: any) => activeIds.has(n.id));
+                    setActiveNodes((prev: any) => {
+                      if (prev.length !== nextActive.length) return nextActive;
+                      return JSON.stringify(prev.map((n: any) => n.id)) === JSON.stringify(nextActive.map((n: any) => n.id)) ? prev : nextActive;
+                    });
+                  }
+                }
+              }
+            }
+          } else if (data.graphData) {
+            // --- VERY LEGACY FORMAT: full graph blob stored inline ---
+            console.log(`[ProjectLoader] Full blob legacy format — loading graphData inline.`);
+            const g = JSON.parse(data.graphData);
+            g.links = g.links.map((l: any) => ({
+              ...l,
+              source: typeof l.source === 'object' ? l.source.id : l.source,
+              target: typeof l.target === 'object' ? l.target.id : l.target
+            }));
+            g.nodes.forEach((n: any) => { n.fx = null; n.fy = null; });
+
+            setGraphData((prev: any) => isGraphEqual(prev, g) ? prev : g);
+
+            // ── FIRESTORE-FIRST: batch-load biographies from global collection
+            await batchHydrateDetailsCache(g.nodes);
+
+            if (data.detailsCache) {
               try {
-                const newCacheMap = new Map<string, NodeDetails>(JSON.parse(cacheEntry.detailsCache));
+                const newCacheMap = new Map<string, NodeDetails>(JSON.parse(data.detailsCache));
                 setDetailsCache((prev) => {
                   if (prev.size !== newCacheMap.size) return newCacheMap;
-                  return JSON.stringify(Array.from(prev.entries())) === cacheEntry.detailsCache ? prev : newCacheMap;
+                  return JSON.stringify(Array.from(prev.entries())) === data.detailsCache ? prev : newCacheMap;
                 });
               } catch (e) { console.error("Details cache parse fail", e); }
             }
 
-            // Set active nodes from saved list (resolved against the cached graph)
             if (data.activeNodes && Array.isArray(data.activeNodes)) {
               const activeIds = new Set(data.activeNodes.map((item: any) => typeof item === 'string' ? item : item.id));
               const nextActive = g.nodes.filter((n: any) => activeIds.has(n.id));
@@ -1619,60 +2299,6 @@ const App: React.FC = () => {
                 return JSON.stringify(prev.map((n: any) => n.id)) === JSON.stringify(nextActive.map((n: any) => n.id)) ? prev : nextActive;
               });
             }
-          } else {
-            // Cache miss — fall back to inline graphData if present (share doc may have it as backup)
-            console.warn(`[ProjectLoader] Cache miss for key: ${data.cacheKey} — trying inline graphData fallback.`);
-            if (data.graphData && data.graphData.length > 20) {
-              const g = JSON.parse(data.graphData);
-              g.links = g.links.map((l: any) => ({
-                ...l,
-                source: typeof l.source === 'object' ? l.source.id : l.source,
-                target: typeof l.target === 'object' ? l.target.id : l.target,
-              }));
-              g.nodes.forEach((n: any) => { n.fx = null; n.fy = null; });
-              if (g.nodes.length > 0) {
-                setGraphData((prev: any) => isGraphEqual(prev, g) ? prev : g);
-                if (data.activeNodes && Array.isArray(data.activeNodes)) {
-                  const activeIds = new Set(data.activeNodes.map((item: any) => typeof item === 'string' ? item : item.id));
-                  const nextActive = g.nodes.filter((n: any) => activeIds.has(n.id));
-                  setActiveNodes((prev: any) => {
-                    if (prev.length !== nextActive.length) return nextActive;
-                    return JSON.stringify(prev.map((n: any) => n.id)) === JSON.stringify(nextActive.map((n: any) => n.id)) ? prev : nextActive;
-                  });
-                }
-              }
-            }
-          }
-        } else if (data.graphData) {
-          // --- LEGACY FORMAT: full graph blob stored inline ---
-          console.log(`[ProjectLoader] Legacy format detected — loading full graphData blob.`);
-          const g = JSON.parse(data.graphData);
-          g.links = g.links.map((l: any) => ({
-            ...l,
-            source: typeof l.source === 'object' ? l.source.id : l.source,
-            target: typeof l.target === 'object' ? l.target.id : l.target
-          }));
-          g.nodes.forEach((n: any) => { n.fx = null; n.fy = null; });
-
-          setGraphData((prev: any) => isGraphEqual(prev, g) ? prev : g);
-
-          if (data.detailsCache) {
-            try {
-              const newCacheMap = new Map<string, NodeDetails>(JSON.parse(data.detailsCache));
-              setDetailsCache((prev) => {
-                if (prev.size !== newCacheMap.size) return newCacheMap;
-                return JSON.stringify(Array.from(prev.entries())) === data.detailsCache ? prev : newCacheMap;
-              });
-            } catch (e) { console.error("Details cache parse fail", e); }
-          }
-
-          if (data.activeNodes && Array.isArray(data.activeNodes)) {
-            const activeIds = new Set(data.activeNodes.map((item: any) => typeof item === 'string' ? item : item.id));
-            const nextActive = g.nodes.filter((n: any) => activeIds.has(n.id));
-            setActiveNodes((prev: any) => {
-              if (prev.length !== nextActive.length) return nextActive;
-              return JSON.stringify(prev.map((n: any) => n.id)) === JSON.stringify(nextActive.map((n: any) => n.id)) ? prev : nextActive;
-            });
           }
         }
       } catch (err) {
@@ -1783,13 +2409,25 @@ const App: React.FC = () => {
         };
 
         if (currentCacheKey) {
-          // Lightweight cache reference
+          // Legacy path: preserve the compound cacheKey if it was set in the current session
+          // (e.g. session started before Phase 1 was deployed). Write it for backward compatibility.
           docPayload.cacheKey = currentCacheKey;
           docPayload.canvasLayout = JSON.stringify(canvasLayout);
         } else {
-          // Fallback to full blobs if no cacheKey
-          docPayload.graphData = JSON.stringify(graphData);
-          docPayload.detailsCache = JSON.stringify(Array.from(detailsCache.entries()));
+          // Phase 1+: derive the artistIds array from all artist nodes currently in the graph.
+          // Each entry points to an individual /artists/{id} Firestore document.
+          const currentArtistList = graphData.nodes
+            .filter((n: any) => n.type === 'artist')
+            .map((n: any) => n.id);
+
+          if (currentArtistList.length > 0) {
+            docPayload.artistIds = currentArtistList.map((name: string) => normalizeArtistId(name));
+            docPayload.canvasLayout = JSON.stringify(canvasLayout);
+            docPayload.graphData = JSON.stringify(graphData);
+          } else {
+            // No artists present yet — fall back to full blob (should be rare)
+            docPayload.graphData = JSON.stringify(graphData);
+          }
         }
 
         await setDoc(doc(db, projectPath), docPayload, { merge: true });
@@ -1803,7 +2441,7 @@ const App: React.FC = () => {
     }, 3000);
 
     return () => clearTimeout(timer);
-  }, [user, isFirebaseReady, isAuthInitialized, currentProjectId, graphData, seedArtists, discoveryFilters, activeNodes, isMagazineViewOpen, detailsCache, chatHistories, lastViewedStackCount, currentCacheKey]);
+  }, [user, isFirebaseReady, isAuthInitialized, currentProjectId, graphData, seedArtists, discoveryFilters, activeNodes, isMagazineViewOpen, chatHistories, lastViewedStackCount, currentCacheKey]);
 
   const lastProcessedHashRef = useRef<string>('');
   const lastProcessedSelectedRef = useRef<string | null>(null);
@@ -1941,6 +2579,7 @@ const App: React.FC = () => {
             setGraphData(g);
             setSeedArtists(data.seedArtists);
             if (data.detailsCache) setDetailsCache(new Map(JSON.parse(data.detailsCache)));
+            await batchHydrateDetailsCache(g.nodes);
             if (data.activeNodes && Array.isArray(data.activeNodes)) {
               const activeIds = new Set((data.activeNodes as string[]).map(id => id.toLowerCase()));
               setActiveNodes(g.nodes.filter((n: any) => activeIds.has(n.id.toLowerCase())));
@@ -1987,7 +2626,27 @@ const App: React.FC = () => {
     });
   }, [selectedNode]);
 
-  const handleRefreshNode = useCallback((nodeId: string) => setDetailsCache(prev => { const n = new Map(prev); n.delete(nodeId); return n; }), []);
+  const handleRefreshNode = useCallback(async (nodeId: string) => {
+    // 1. Evict from local state immediately to show loading spinner
+    setDetailsCache(prev => { 
+        const n = new Map(prev); 
+        n.delete(nodeId); 
+        return n; 
+    });
+    
+    // 2. Hard-delete the Firestore cache document to bypass cache
+    try {
+        const cacheId = normalizeArtistId(nodeId);
+        try {
+            await deleteDoc(doc(db, 'artists', cacheId));
+            console.log(`[Cache Eviction] Deleted Firestore cache for: ${cacheId}`);
+        } catch (error: any) {
+            console.warn("Global write bypassed due to rule restrictions:", error.message);
+        }
+    } catch (error) {
+        console.error(`[Cache Eviction] Failed to delete Firestore cache for ${nodeId}:`, error);
+    }
+  }, []);
   const handleExtendNode = useCallback(async (node: Node) => {
     if (!graphData) return;
 
@@ -2115,15 +2774,34 @@ const App: React.FC = () => {
   }, [currentProjectId]);
 
   useEffect(() => {
+    if (isLoading) return;
     const fetch = async () => {
-      const nodes = activeNodes.filter(n => !detailsCache.has(n.id) && !fetchingNodeIdsRef.current.has(n.id));
+      // 1. Block Automated Background Fetches: ✦
+      // ONLY process the actively selected node to prevent neighbor chain-fetching
+      const nodes = activeNodes.filter(n => {
+        const isSelected = selectedNode?.id.toLowerCase() === n.id.toLowerCase();
+        const seedList = seedArtists.split('::').map(s => s.trim().toLowerCase()).filter(Boolean);
+        const isSeedArtist = seedList.includes(n.id.toLowerCase());
+        
+        // If the selected node has already been hydrated with bio text from the local cache, 
+        // DO NOT fetch again, even if the detailsCache Map hasn't technically committed to the component yet.
+        const hasHydratedBio = isSelected && (selectedNode as any)?.bio && (selectedNode as any).bio.length > 5;
+        
+        return !detailsCache.has(n.id) && 
+               !detailsCache.has(n.id.toLowerCase()) && 
+               !fetchingNodeIdsRef.current.has(n.id) &&
+               (isSelected || isSeedArtist) &&
+               !hasHydratedBio;
+      });
+      
       if (!nodes.length || isFetchingDetailsRef.current) return;
       isFetchingDetailsRef.current = true;
       lastProgressTimestampRef.current = Date.now();
 
       try {
         for (const node of nodes) {
-          if (detailsCache.has(node.id) || fetchingNodeIdsRef.current.has(node.id)) continue;
+          const slugId = node.id.toLowerCase().replace(/\s+/g, '-');
+          if (detailsCache.has(node.id) || detailsCache.has(node.id.toLowerCase()) || detailsCache.has(slugId) || fetchingNodeIdsRef.current.has(node.id)) continue;
 
           fetchingNodeIdsRef.current.add(node.id);
           setLoadingNodeIds(prev => new Set(prev).add(node.id));
@@ -2134,23 +2812,85 @@ const App: React.FC = () => {
             try {
               if (!graphData) throw new Error("No data");
 
-              // Individual node timeout (45s) to prevent the whole queue from hanging
-              const nodeDetailsPromise = fetchNodeDetails(node, graphData, seedArtists, urlOriginHint);
-              const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error("Request timed out after 45s")), 45000)
-              );
+              // Global Artists Fallback Read
+              let fallbackDetails: NodeDetails | null = null;
+              try {
+                const cacheId = normalizeArtistId(node.id);
+                let cacheDoc = await getDoc(doc(db, 'artists', cacheId));
+                
+                if (cacheDoc.exists()) {
+                   const data = cacheDoc.data();
+                   if (data && data.detailsCache) {
+                      try {
+                          const parsed = typeof data.detailsCache === 'string' ? JSON.parse(data.detailsCache) : data.detailsCache;
+                          if (parsed && (parsed.bio || parsed.summary)) {
+                             const bio = parsed.summary || parsed.bio || parsed.description || parsed.text || "";
+                             const imageUrl = parsed.imageUrl || parsed.image || "";
+                             const genre = parsed.details?.genre || parsed.genre || parsed.genres || "";
+                             const origin = parsed.details?.origin || parsed.origin || parsed.location || parsed.country || "";
+                             const founded = parsed.details?.founded || parsed.founded || parsed.formed || parsed.year || "";
+                             const artistName = parsed.details?.artist || parsed.artist || parsed.name || data.seedArtists || data.artistId || node.id;
+                             const notableArtists = parsed.details?.notableArtists || parsed.notableArtists || [];
+                             const members = parsed.members || [];
+                             const links = parsed.links || [];
+                             const discography = parsed.discography || [];
+                             const tourInfo = parsed.tourInfo || "";
+                             const recommendationReason = parsed.recommendationReason || parsed.reason || "";
+                             const groundingLinks = parsed.groundingLinks || [];
 
-              const details = await Promise.race([nodeDetailsPromise, timeoutPromise]) as NodeDetails;
+                             fallbackDetails = {
+                                summary: bio,
+                                imageUrl,
+                                details: {
+                                    artist: artistName,
+                                    genre,
+                                    origin,
+                                    founded,
+                                    notableArtists
+                                },
+                                members,
+                                links,
+                                discography,
+                                tourInfo,
+                                recommendationReason,
+                                groundingLinks
+                             };
+                             console.log("[Global Cache] Fallback successful for:", node.id);
+                          }
+                      } catch(e) { console.warn("Failed parsing global detailsCache", e); }
+                   }
+                }
+              } catch (e) { console.warn("[Global Cache] Fallback read failed", e); }
+
+              let details: NodeDetails;
+              if (fallbackDetails) {
+                 details = fallbackDetails;
+              } else {
+                 // Individual node timeout (45s) to prevent the whole queue from hanging
+                 const nodeDetailsPromise = fetchNodeDetails(node, graphData, seedArtists, urlOriginHint);
+                 const timeoutPromise = new Promise((_, reject) =>
+                   setTimeout(() => reject(new Error("Request timed out after 45s")), 45000)
+                 );
+                 details = await Promise.race([nodeDetailsPromise, timeoutPromise]) as NodeDetails;
+              }
 
               setDetailsCache(prev => {
                 const updated = new Map(prev).set(node.id, details);
-                // Phase 03 write-back: incrementally update global cache so future users
-                // get pre-populated Deep Cuts on a cache hit (fire-and-forget)
-                if (currentCacheKey) {
-                  updateCacheDetailsCache(currentCacheKey, updated);
-                }
                 return updated;
               });
+
+              if (!fallbackDetails) {
+                const cacheId = normalizeArtistId(node.id);
+                try {
+                  await setDoc(doc(db, 'artists', cacheId), {
+                    detailsCache: JSON.stringify(details)
+                  }, { merge: true });
+                  console.log(`[Deep Cut Queue] Saved detailsCache to global artist doc: ${cacheId}`);
+                } catch (e: any) {
+                  console.warn("Global write bypassed due to rule restrictions:", e.message);
+                }
+              }
+              
               success = true;
               lastProgressTimestampRef.current = Date.now();
               await wait(1000);
@@ -2168,7 +2908,12 @@ const App: React.FC = () => {
                 await wait(1000);
               } else {
                 console.error(`[Deep Cut Queue] Failed for node ${node.id}:`, err);
-                if (selectedNode?.id === node.id) setDetailsError(humanizeError(err));
+                
+                // 2. Insulate the Sidebar Lifecycle:
+                // Show a toast instead of setting detailsError to prevent the sidebar from wiping cache values
+                if (selectedNode?.id === node.id) {
+                    showToast(humanizeError(err));
+                }
                 break;
               }
             }
@@ -2180,7 +2925,7 @@ const App: React.FC = () => {
       } finally { isFetchingDetailsRef.current = false; }
     };
     fetch();
-  }, [activeNodes, detailsCache, graphData, seedArtists, selectedNode, urlOriginHint, humanizeError]);
+  }, [activeNodes, detailsCache, graphData, seedArtists, selectedNode, urlOriginHint, humanizeError, user, isLoading]);
 
   const handleViewChange = useCallback((newView: View) => {
     if (newView === View.Graph && !graphData) setGraphData({ nodes: [], links: [] });
@@ -2267,7 +3012,7 @@ const App: React.FC = () => {
           {graphData && (
             <GraphPage
               data={graphData} baseGraph={baseGraph} libraryArtists={libraryArtists} seedArtists={seedArtists}
-              onRegenerate={(n) => handleGenerateGraph(n, true, graphData)} isLoading={isLoading}
+              onRegenerate={(n) => handleGenerateGraph(n, false, graphData)} isLoading={isLoading}
               onCancelGeneration={handleCancel} onFileUpload={(f) => {
                 const r = new FileReader(); r.onload = (e) => {
                   const t = e.target?.result as string;
@@ -2448,7 +3193,7 @@ const App: React.FC = () => {
         }}
         onAddArtist={(name) => {
           const newSeeds = seedArtists ? `${seedArtists}::${name}` : name;
-          handleGenerateGraph(newSeeds, true);
+          handleGenerateGraph(newSeeds, false);
         }}
         seedArtists={(seedArtists || "").split('::').filter(Boolean)}
       />

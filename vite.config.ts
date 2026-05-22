@@ -15,14 +15,17 @@ export default defineConfig(({ mode }) => {
       ],
       proxy: {
         '/api/gemini': {
-          target: 'https://generativelanguage.googleapis.com',
+          target: 'https://remix-145-zcene-live-800155534113.us-west1.run.app',
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api\/gemini/, ''),
           configure: (proxy) => {
-            proxy.on('proxyReq', (proxyReq) => {
-              if (env.GEMINI_API_KEY) {
-                proxyReq.setHeader('x-goog-api-key', env.GEMINI_API_KEY);
-              }
+            proxy.on('proxyReq', (proxyReq, req) => {
+              console.log(`[Proxy Request] Path: ${req.url} -> Target: ${proxyReq.path}`);
+            });
+            proxy.on('proxyRes', (proxyRes, req) => {
+              console.log(`[Proxy Response] Status: ${proxyRes.statusCode} for ${req.url}`);
+            });
+            proxy.on('error', (err, req) => {
+              console.error(`[Proxy Error] ${err.message} for ${req.url}`);
             });
           }
         }
