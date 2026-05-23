@@ -23,6 +23,62 @@ export const normalizeArtistId = (name: string): string =>
     .replace(/^-+|-+$/g, '')
     .substring(0, 256);
 
+/**
+ * Standardizes a graph's node IDs and links to ensure consistency:
+ * - Artist node IDs are converted to lowercase hyphenated slugs (using normalizeArtistId).
+ * - Other node IDs (genre, label, country, founded) are lowercased and stripped of leading/trailing whitespace.
+ * - Original human casing of all nodes is preserved in the 'label' field.
+ * - Link source and target properties are mapped to the normalized IDs.
+ */
+export const normalizeGraphData = (graph: GraphData): GraphData => {
+  if (!graph || !graph.nodes) return graph;
+
+  const idMap = new Map<string, string>(); // Original ID -> Normalized ID
+
+  const normalizedNodes = graph.nodes.map(node => {
+    const originalId = node.id;
+    let normalizedId = originalId.trim();
+    
+    if (node.type === 'artist') {
+      normalizedId = normalizeArtistId(originalId);
+    } else {
+      normalizedId = normalizedId.toLowerCase();
+    }
+    
+    idMap.set(originalId, normalizedId);
+    idMap.set(originalId.toLowerCase(), normalizedId); // fallback
+
+    return {
+      ...node,
+      id: normalizedId,
+      label: node.label || originalId.trim()
+    };
+  });
+
+  const normalizedLinks = (graph.links || []).map(link => {
+    const sourceId = typeof link.source === 'string' ? link.source : (link.source as Node).id;
+    const targetId = typeof link.target === 'string' ? link.target : (link.target as Node).id;
+
+    const sourceLower = sourceId.trim().toLowerCase();
+    const targetLower = targetId.trim().toLowerCase();
+
+    const newSource = idMap.get(sourceId) || idMap.get(sourceLower) || sourceId.trim();
+    const newTarget = idMap.get(targetId) || idMap.get(targetLower) || targetId.trim();
+
+    return {
+      ...link,
+      source: newSource,
+      target: newTarget
+    };
+  });
+
+  return {
+    nodes: normalizedNodes,
+    links: normalizedLinks
+  };
+};
+
+
 // ─── GRAPH ISOLATION ──────────────────────────────────────────────────────────
 
 /**
@@ -175,21 +231,22 @@ export const writeArtistCacheMany = async (
   activeUserId?: string | null,
   filters?: any
 ): Promise<void> => {
+  const normalizedGraph = normalizeGraphData(fullGraph);
   await Promise.allSettled(
     artistNames.map(async name => {
       const artistId = normalizeArtistId(name);
-      const { nodes, links } = extractArtistSubGraph(name, fullGraph);
+      const { nodes, links } = extractArtistSubGraph(name, normalizedGraph);
 
       if (nodes.length === 0) {
         console.warn(`[ArtistCache] Skipping write for "${name}" — artist node not found in graph.`);
         return;
       }
 
-      // Find the canonical name from the artist node itself (preserves AI casing)
+      // Find the canonical name from the artist node itself (preserves AI casing in label)
       const canonicalNode = nodes.find(
-        n => n.type === 'artist' && n.id.trim().toLowerCase() === name.trim().toLowerCase()
+        n => n.type === 'artist' && (n.id.trim().toLowerCase() === name.trim().toLowerCase() || normalizeArtistId(n.id) === artistId)
       );
-      const canonicalName = canonicalNode?.id ?? name;
+      const canonicalName = canonicalNode?.label ?? canonicalNode?.id ?? name;
 
       try {
         await setDoc(doc(db, 'artists', artistId), {
@@ -234,7 +291,7 @@ export const assembleGraphFromCache = (
 
     if (entry.graphData) {
       try {
-        const parsedGraph = JSON.parse(entry.graphData);
+        const parsedGraph = normalizeGraphData(JSON.parse(entry.graphData));
         if (parsedGraph.nodes) entryNodes = parsedGraph.nodes;
         if (parsedGraph.links) entryLinks = parsedGraph.links;
       } catch (e) {
@@ -252,8 +309,8 @@ export const assembleGraphFromCache = (
 
     // Deduplicate links by source→target pair
     entryLinks.forEach(link => {
-      const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
-      const targetId = typeof link.target === 'string' ? link.target : link.target.id;
+      const sourceId = typeof link.source === 'string' ? link.source : (link.source as Node).id;
+      const targetId = typeof link.target === 'string' ? link.target : (link.target as Node).id;
       const linkKey = `${sourceId.trim().toLowerCase()}→${targetId.trim().toLowerCase()}`;
       if (!linkSet.has(linkKey)) {
         linkSet.add(linkKey);
@@ -267,12 +324,12 @@ export const assembleGraphFromCache = (
        const fallbackId = 'Cached Profile';
        const fallbackKey = fallbackId.toLowerCase();
        if (!nodeMap.has(fallbackKey)) {
-          nodeMap.set(fallbackKey, { id: fallbackId, type: 'genre', group: 0, fx: null, fy: null });
+          nodeMap.set(fallbackKey, { id: fallbackKey, label: fallbackId, type: 'genre', group: 0, fx: null, fy: null });
        }
        const linkKey = `${artistIdStr}→${fallbackKey}`;
        if (!linkSet.has(linkKey)) {
           linkSet.add(linkKey);
-          links.push({ source: entry.seedArtists || entry.artistId, target: fallbackId, value: 1 });
+          links.push({ source: normalizeArtistId(entry.seedArtists || entry.artistId), target: fallbackKey, value: 1 });
        }
     }
   });

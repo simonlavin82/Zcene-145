@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Plus, Minus, Loader2 } from 'lucide-react';
 import { GraphData, Node, Link, GraphSettings } from '../types';
 import { LegendSymbol } from './Icons';
+import { normalizeArtistId } from '../services/artistCacheService';
 
 type FilterKeys = 'genre' | 'label' | 'country' | 'founded' | 'seed' | 'recommended';
 type FocusMode = 'organic' | 'cluster';
@@ -116,7 +117,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
   const { visibleNodes, visibleLinks } = useMemo(() => {
     if (!data) return { visibleNodes: [], visibleLinks: [] };
-    const seedArtistSet = new Set(seedArtists.map(a => a.toLowerCase()));
+    const seedArtistSet = new Set(seedArtists.map(a => normalizeArtistId(a)));
     
     // 1. Identify visible artists based on filters (Seed/Recommended)
     const visibleArtists = data.nodes.filter(node => {
@@ -237,7 +238,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   useEffect(() => {
     if (!svgRef.current || dimensions.width === 0) return;
     const svg = d3.select(svgRef.current);
-    const seedArtistSet = new Set(seedArtists.map(a => a.toLowerCase()));
+    const seedArtistSet = new Set(seedArtists.map(a => normalizeArtistId(a)));
     const { width, height } = dimensions;
     
     let container = svg.select<SVGGElement>("g.main-container");
@@ -364,7 +365,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
     if (focusOn === 'cluster') {
         // Cluster mode: Cluster attributes around their artists like petals
-        const seedArtistSet = new Set(seedArtists.map(a => a.toLowerCase()));
+        const seedArtistSet = new Set(seedArtists.map(a => normalizeArtistId(a)));
         const artistNodes = visibleNodes.filter(n => n.type === 'artist');
         
         // Position artists on a radial spread - spread them further to avoid "one giant bloom"
@@ -590,13 +591,13 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         .transition().duration(300)
         .attr("stroke-width", d => {
             const isSelected = selectedNode?.id === d.id;
-            const isSeed = seedArtists.some(a => a.toLowerCase() === d.id.toLowerCase());
+            const isSeed = seedArtists.some(a => normalizeArtistId(a) === d.id);
             if (isSelected) return 4;
             return isSeed ? 3 : 2;
         })
         .attr("stroke", d => {
             const isSelected = selectedNode?.id === d.id;
-            const isSeed = seedArtists.some(a => a.toLowerCase() === d.id.toLowerCase());
+            const isSeed = seedArtists.some(a => normalizeArtistId(a) === d.id);
             if (isSelected) return '#F6E468';
             return isSeed ? '#F6E468' : '#1F1F1E';
         })

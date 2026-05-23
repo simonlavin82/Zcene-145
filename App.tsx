@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { AlertCircle, X, CheckCircle2, Key } from 'lucide-react';
 import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project, ArtistCacheEntry } from './types';
 import { generateGraphData, fetchNodeDetails, extendGraphFromNode } from './services/geminiService';
-import { normalizeArtistId, readArtistCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache } from './services/artistCacheService';
+import { normalizeArtistId, readArtistCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData } from './services/artistCacheService';
 import { auth, signInWithGoogle, logout, onAuthStateChanged, User, db, handleFirestoreError, OperationType } from './services/firebase';
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, getDocFromServer, serverTimestamp, addDoc, getDoc, getDocs, orderBy, where, writeBatch, getDocFromCache, updateDoc } from 'firebase/firestore';
 const StyleGuidePage = React.lazy(() => import('./components/DesignSystem').then(m => ({ default: m.StyleGuidePage })));
@@ -887,6 +887,30 @@ const App: React.FC = () => {
     setIsMenuOpen(false);
   }, []);
 
+  const restoreActiveNodesHelper = useCallback((activeNodesData: any[], graphNodes: Node[]): Node[] => {
+    if (!activeNodesData || !Array.isArray(activeNodesData) || !graphNodes) return [];
+    const normalizedGraphNodeMap = new Map<string, Node>();
+    graphNodes.forEach((n: any) => {
+      const normId = n.type === 'artist' ? normalizeArtistId(n.id) : n.id.trim().toLowerCase();
+      normalizedGraphNodeMap.set(normId, n);
+    });
+
+    const activeNodesToRestore: Node[] = [];
+    activeNodesData.forEach((item: any) => {
+      const originalId = typeof item === 'string' ? item : item.id;
+      if (!originalId) return;
+      const asArtistNorm = normalizeArtistId(originalId);
+      const asMetaNorm = originalId.trim().toLowerCase();
+      
+      const matchedNode = normalizedGraphNodeMap.get(asArtistNorm) || normalizedGraphNodeMap.get(asMetaNorm);
+      if (matchedNode) {
+        activeNodesToRestore.push(matchedNode);
+      }
+    });
+    return activeNodesToRestore;
+  }, []);
+
+
   const handleNodeClick = useCallback(async (node: Node | null) => {
     if (!node) {
        setSelectedNode(null);
@@ -894,7 +918,7 @@ const App: React.FC = () => {
     }
 
     // 1. Prioritize the Local Details Map
-    const cachedDetails = detailsCache.get(node.id) || detailsCache.get(node.id.toLowerCase());
+    const cachedDetails = detailsCache.get(node.id) || detailsCache.get(node.id.toLowerCase()) || detailsCache.get(normalizeArtistId(node.id));
     
     // 2. Load Locally and Block the Network
     if (cachedDetails && cachedDetails.summary && cachedDetails.summary.length > 5) {
@@ -1245,8 +1269,9 @@ const App: React.FC = () => {
             }
             
             if (parsedGraph && parsedGraph.nodes && parsedGraph.nodes.length > 0) {
+              const normalizedGraph = normalizeGraphData(parsedGraph);
               console.log("[Front Gate Cache] Hit! Bypassing all generation logic for:", searchId);
-              setGraphData(parsedGraph);
+              setGraphData(normalizedGraph);
               
               // 3. Extract the detailsCache string from the same document read
               let parsedDetails: any = null;
@@ -1278,13 +1303,13 @@ const App: React.FC = () => {
                             recommendationReason: parsedDetails?.recommendationReason || parsedDetails?.reason || "",
                             groundingLinks: parsedDetails?.groundingLinks || []
                          };
-                         setDetailsCache(prev => new Map(prev).set(searchIdLower, detailsPayload).set(searchId, detailsPayload));
+                          setDetailsCache(prev => new Map(prev).set(searchIdLower, detailsPayload).set(searchId, detailsPayload).set(normalizeArtistId(searchId), detailsPayload));
                       }
                   } catch(e) { console.warn("Failed to parse detailsCache", e); }
               }
               
               // 4. Find the primary node and instantly hydrate it with the biography text
-              const primaryNode = parsedGraph.nodes.find((n: any) => n.id.toLowerCase() === searchIdLower);
+              const primaryNode = normalizedGraph.nodes.find((n: any) => n.id.toLowerCase() === searchIdLower) as any;
               if (primaryNode) {
                   let unwrappedDetails = parsedDetails;
                   if (Array.isArray(unwrappedDetails) && unwrappedDetails.length > 0) {
@@ -1427,7 +1452,8 @@ const App: React.FC = () => {
 
         // B. Construct a clean node layout object
         const hydratedNode = {
-             id: humanName,
+             id: firstSlug.toLowerCase(),
+             label: humanName,
              name: humanName,
              bio, summary, genre, origin, founded, imageUrl,
              type: 'artist' as const,
@@ -1441,23 +1467,13 @@ const App: React.FC = () => {
         // C. Set the pre-compiled graph array straight into setGraphData
         let parsedGraphData = assembleGraphFromCache(cached);
         
-        // Remap primary node identity if it differs from the requested slug
-        if (humanName.toLowerCase() !== firstSlug.toLowerCase()) {
-           const match = parsedGraphData.nodes.find(n => n.id.toLowerCase() === firstSlug.toLowerCase());
-           if (match) match.id = humanName;
-           parsedGraphData.links.forEach(l => {
-               if (typeof l.source === 'string' && l.source.toLowerCase() === firstSlug.toLowerCase()) l.source = humanName;
-               if (typeof l.target === 'string' && l.target.toLowerCase() === firstSlug.toLowerCase()) l.target = humanName;
-           });
-        }
-        
         // Defensive guard
         const returnedIds = new Set(parsedGraphData.nodes.map((n: Node) => n.id.toLowerCase()));
         let maxG = parsedGraphData.nodes.reduce((m: number, n: Node) => Math.max(m, n.group || 0), 0);
         artistList.forEach(name => {
-          if (!returnedIds.has(name.toLowerCase()) && !returnedIds.has(humanName.toLowerCase())) {
+          if (!returnedIds.has(name.toLowerCase())) {
             maxG++;
-            parsedGraphData.nodes.push({ id: name, type: 'artist', group: maxG });
+            parsedGraphData.nodes.push({ id: name.toLowerCase(), type: 'artist', label: name, group: maxG });
           }
         });
 
@@ -1524,10 +1540,15 @@ const App: React.FC = () => {
 
                 next.set(key.toLowerCase(), detailsObj);
                 next.set(key, detailsObj);
-                if (cachedEntry.artistId) next.set(cachedEntry.artistId.toLowerCase(), detailsObj);
+                next.set(normalizeArtistId(key), detailsObj);
+                if (cachedEntry.artistId) {
+                  next.set(cachedEntry.artistId.toLowerCase(), detailsObj);
+                  next.set(normalizeArtistId(cachedEntry.artistId), detailsObj);
+                }
                 if (entryArtistName) {
                   next.set(entryArtistName.toLowerCase(), detailsObj);
                   next.set(entryArtistName, detailsObj);
+                  next.set(normalizeArtistId(entryArtistName), detailsObj);
                 }
               } catch (e) {
                 console.warn("Silent parse failure on detailsCache in loop:", e);
@@ -2099,7 +2120,7 @@ const App: React.FC = () => {
         if (data.graphData && typeof data.graphData === 'string' && data.graphData.trim().length > 20) {
           try {
             console.log('[ProjectLoader] Hydrating directly from project graphData');
-            const g = JSON.parse(data.graphData);
+            const g = normalizeGraphData(JSON.parse(data.graphData));
             g.links = g.links.map((l: any) => ({
               ...l,
               source: typeof l.source === 'object' ? l.source.id : l.source,
@@ -2125,11 +2146,10 @@ const App: React.FC = () => {
 
             // Restore active nodes
             if (data.activeNodes && Array.isArray(data.activeNodes)) {
-              const activeIds = new Set(data.activeNodes.map((item: any) => typeof item === 'string' ? item : item.id));
+              const nextActive = restoreActiveNodesHelper(data.activeNodes, g.nodes);
               setActiveNodes((prev: any) => {
-                const fromGraph = g.nodes.filter((n: any) => activeIds.has(n.id));
-                if (prev.length !== fromGraph.length) return fromGraph;
-                return JSON.stringify(prev.map((n: any) => n.id)) === JSON.stringify(fromGraph.map((n: any) => n.id)) ? prev : fromGraph;
+                if (prev.length !== nextActive.length) return nextActive;
+                return JSON.stringify(prev.map((n: any) => n.id)) === JSON.stringify(nextActive.map((n: any) => n.id)) ? prev : nextActive;
               });
             }
 
@@ -2181,13 +2201,11 @@ const App: React.FC = () => {
 
             // Restore active nodes
             if (data.activeNodes && Array.isArray(data.activeNodes)) {
-              const activeIds = new Set(data.activeNodes.map((item: any) => typeof item === 'string' ? item : item.id));
               setActiveNodes((prev: any) => {
-                const fromGraph = cached.size > 0
-                  ? assembleGraphFromCache(cached).nodes.filter((n: any) => activeIds.has(n.id))
-                  : [];
-                if (prev.length !== fromGraph.length) return fromGraph;
-                return JSON.stringify(prev.map((n: any) => n.id)) === JSON.stringify(fromGraph.map((n: any) => n.id)) ? prev : fromGraph;
+                const gNodes = cached.size > 0 ? assembleGraphFromCache(cached).nodes : [];
+                const nextActive = restoreActiveNodesHelper(data.activeNodes, gNodes);
+                if (prev.length !== nextActive.length) return nextActive;
+                return JSON.stringify(prev.map((n: any) => n.id)) === JSON.stringify(nextActive.map((n: any) => n.id)) ? prev : nextActive;
               });
             }
 
@@ -2225,17 +2243,22 @@ const App: React.FC = () => {
 
               if (legacyEntry.detailsCache) {
                 try {
-                  const newCacheMap = new Map<string, NodeDetails>(JSON.parse(legacyEntry.detailsCache));
+                  const rawMap = new Map<string, NodeDetails>(JSON.parse(legacyEntry.detailsCache));
+                  const newCacheMap = new Map<string, NodeDetails>();
+                  rawMap.forEach((v, k) => {
+                    newCacheMap.set(k, v);
+                    newCacheMap.set(k.toLowerCase(), v);
+                    newCacheMap.set(normalizeArtistId(k), v);
+                  });
                   setDetailsCache((prev) => {
                     if (prev.size !== newCacheMap.size) return newCacheMap;
-                    return JSON.stringify(Array.from(prev.entries())) === legacyEntry.detailsCache ? prev : newCacheMap;
+                    return JSON.stringify(Array.from(prev.entries())) === JSON.stringify(Array.from(newCacheMap.entries())) ? prev : newCacheMap;
                   });
                 } catch (e) { console.error("Details cache parse fail", e); }
               }
 
               if (data.activeNodes && Array.isArray(data.activeNodes)) {
-                const activeIds = new Set(data.activeNodes.map((item: any) => typeof item === 'string' ? item : item.id));
-                const nextActive = g.nodes.filter((n: any) => activeIds.has(n.id));
+                const nextActive = restoreActiveNodesHelper(data.activeNodes, g.nodes);
                 setActiveNodes((prev: any) => {
                   if (prev.length !== nextActive.length) return nextActive;
                   return JSON.stringify(prev.map((n: any) => n.id)) === JSON.stringify(nextActive.map((n: any) => n.id)) ? prev : nextActive;
@@ -2245,7 +2268,7 @@ const App: React.FC = () => {
               // Legacy cache miss — fall back to inline graphData blob if available
               console.warn(`[ProjectLoader] Legacy cache miss for key: ${data.cacheKey} — trying inline graphData fallback.`);
               if (data.graphData && data.graphData.length > 20) {
-                const g = JSON.parse(data.graphData);
+                const g = normalizeGraphData(JSON.parse(data.graphData));
                 g.links = g.links.map((l: any) => ({
                   ...l,
                   source: typeof l.source === 'object' ? l.source.id : l.source,
@@ -2255,8 +2278,7 @@ const App: React.FC = () => {
                 if (g.nodes.length > 0) {
                   setGraphData((prev: any) => isGraphEqual(prev, g) ? prev : g);
                   if (data.activeNodes && Array.isArray(data.activeNodes)) {
-                    const activeIds = new Set(data.activeNodes.map((item: any) => typeof item === 'string' ? item : item.id));
-                    const nextActive = g.nodes.filter((n: any) => activeIds.has(n.id));
+                    const nextActive = restoreActiveNodesHelper(data.activeNodes, g.nodes);
                     setActiveNodes((prev: any) => {
                       if (prev.length !== nextActive.length) return nextActive;
                       return JSON.stringify(prev.map((n: any) => n.id)) === JSON.stringify(nextActive.map((n: any) => n.id)) ? prev : nextActive;
@@ -2268,7 +2290,7 @@ const App: React.FC = () => {
           } else if (data.graphData) {
             // --- VERY LEGACY FORMAT: full graph blob stored inline ---
             console.log(`[ProjectLoader] Full blob legacy format — loading graphData inline.`);
-            const g = JSON.parse(data.graphData);
+            const g = normalizeGraphData(JSON.parse(data.graphData));
             g.links = g.links.map((l: any) => ({
               ...l,
               source: typeof l.source === 'object' ? l.source.id : l.source,
@@ -2283,17 +2305,22 @@ const App: React.FC = () => {
 
             if (data.detailsCache) {
               try {
-                const newCacheMap = new Map<string, NodeDetails>(JSON.parse(data.detailsCache));
+                const rawMap = new Map<string, NodeDetails>(JSON.parse(data.detailsCache));
+                const newCacheMap = new Map<string, NodeDetails>();
+                rawMap.forEach((v, k) => {
+                  newCacheMap.set(k, v);
+                  newCacheMap.set(k.toLowerCase(), v);
+                  newCacheMap.set(normalizeArtistId(k), v);
+                });
                 setDetailsCache((prev) => {
                   if (prev.size !== newCacheMap.size) return newCacheMap;
-                  return JSON.stringify(Array.from(prev.entries())) === data.detailsCache ? prev : newCacheMap;
+                  return JSON.stringify(Array.from(prev.entries())) === JSON.stringify(Array.from(newCacheMap.entries())) ? prev : newCacheMap;
                 });
               } catch (e) { console.error("Details cache parse fail", e); }
             }
 
             if (data.activeNodes && Array.isArray(data.activeNodes)) {
-              const activeIds = new Set(data.activeNodes.map((item: any) => typeof item === 'string' ? item : item.id));
-              const nextActive = g.nodes.filter((n: any) => activeIds.has(n.id));
+              const nextActive = restoreActiveNodesHelper(data.activeNodes, g.nodes);
               setActiveNodes((prev: any) => {
                 if (prev.length !== nextActive.length) return nextActive;
                 return JSON.stringify(prev.map((n: any) => n.id)) === JSON.stringify(nextActive.map((n: any) => n.id)) ? prev : nextActive;
@@ -2568,7 +2595,7 @@ const App: React.FC = () => {
           const shareSnap = await getDoc(shareRef);
           if (shareSnap.exists()) {
             const data = shareSnap.data();
-            const g = JSON.parse(data.graphData);
+            const g = normalizeGraphData(JSON.parse(data.graphData));
             g.links = g.links.map((l: any) => ({
               ...l,
               source: typeof l.source === 'object' ? l.source.id : l.source,
@@ -2581,8 +2608,7 @@ const App: React.FC = () => {
             if (data.detailsCache) setDetailsCache(new Map(JSON.parse(data.detailsCache)));
             await batchHydrateDetailsCache(g.nodes);
             if (data.activeNodes && Array.isArray(data.activeNodes)) {
-              const activeIds = new Set((data.activeNodes as string[]).map(id => id.toLowerCase()));
-              setActiveNodes(g.nodes.filter((n: any) => activeIds.has(n.id.toLowerCase())));
+              setActiveNodes(restoreActiveNodesHelper(data.activeNodes, g.nodes));
             }
             showToast("Zcene Imported");
           } else {
@@ -2631,6 +2657,8 @@ const App: React.FC = () => {
     setDetailsCache(prev => { 
         const n = new Map(prev); 
         n.delete(nodeId); 
+        n.delete(nodeId.toLowerCase());
+        n.delete(normalizeArtistId(nodeId));
         return n; 
     });
     
@@ -2779,15 +2807,16 @@ const App: React.FC = () => {
       // 1. Block Automated Background Fetches: ✦
       // ONLY process the actively selected node to prevent neighbor chain-fetching
       const nodes = activeNodes.filter(n => {
-        const isSelected = selectedNode?.id.toLowerCase() === n.id.toLowerCase();
-        const seedList = seedArtists.split('::').map(s => s.trim().toLowerCase()).filter(Boolean);
-        const isSeedArtist = seedList.includes(n.id.toLowerCase());
+        const isSelected = selectedNode && normalizeArtistId(selectedNode.id) === normalizeArtistId(n.id);
+        const seedList = seedArtists.split('::').map(s => normalizeArtistId(s)).filter(Boolean);
+        const isSeedArtist = seedList.includes(normalizeArtistId(n.id));
         
         // If the selected node has already been hydrated with bio text from the local cache, 
         // DO NOT fetch again, even if the detailsCache Map hasn't technically committed to the component yet.
         const hasHydratedBio = isSelected && (selectedNode as any)?.bio && (selectedNode as any).bio.length > 5;
         
-        return !detailsCache.has(n.id) && 
+        const normId = normalizeArtistId(n.id);
+        return !detailsCache.has(normId) && 
                !detailsCache.has(n.id.toLowerCase()) && 
                !fetchingNodeIdsRef.current.has(n.id) &&
                (isSelected || isSeedArtist) &&
@@ -2800,7 +2829,7 @@ const App: React.FC = () => {
 
       try {
         for (const node of nodes) {
-          const slugId = node.id.toLowerCase().replace(/\s+/g, '-');
+          const slugId = normalizeArtistId(node.id);
           if (detailsCache.has(node.id) || detailsCache.has(node.id.toLowerCase()) || detailsCache.has(slugId) || fetchingNodeIdsRef.current.has(node.id)) continue;
 
           fetchingNodeIdsRef.current.add(node.id);
@@ -2875,7 +2904,10 @@ const App: React.FC = () => {
               }
 
               setDetailsCache(prev => {
-                const updated = new Map(prev).set(node.id, details);
+                const updated = new Map(prev);
+                updated.set(node.id, details);
+                updated.set(node.id.toLowerCase(), details);
+                updated.set(normalizeArtistId(node.id), details);
                 return updated;
               });
 
@@ -3021,7 +3053,7 @@ const App: React.FC = () => {
                     if (f.name.endsWith('.xml')) res = parseAppleMusicXml(t);
                     else if (f.name.endsWith('.csv')) res = parseCsvData(t);
                     else res = { artists: Array.from(new Set(t.split(/[\n,]+/))).map(n => ({ name: n.trim(), dateAdded: null })).filter(a => a.name), baseGraph: { nodes: [], links: [] } };
-                    setLibraryArtists(res.artists); setBaseGraph(res.baseGraph);
+                    setLibraryArtists(res.artists); setBaseGraph(normalizeGraphData(res.baseGraph));
                     if (res.artists.length && user) {
                       setDoc(doc(db, 'users', user.uid), {
                         libraryArtists: JSON.stringify(res.artists)

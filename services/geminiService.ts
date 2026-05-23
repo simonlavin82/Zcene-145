@@ -3,7 +3,7 @@ import { GoogleGenAI, Type, GenerateContentResponse, ThinkingLevel } from "@goog
 import { GraphData, Node, NodeDetails, Link, ChatMessage, DiscoveryFilters } from "../types";
 import { db } from './firebase';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { normalizeArtistId, extractArtistSubGraph, readArtistCacheMany } from './artistCacheService';
+import { normalizeArtistId, extractArtistSubGraph, readArtistCacheMany, normalizeGraphData } from './artistCacheService';
 
 // --- EXPORTED CONSTANTS FOR SOURCE PAGE VISIBILITY ---
 
@@ -611,10 +611,10 @@ export const generateGraphData = async (artists: string, baseGraph?: GraphData, 
       });
 
       // Explicitly assign generated arrays to the returned graph metadata object
-      const finalGraph: GraphData = {
+      const finalGraph: GraphData = normalizeGraphData({
           nodes: Array.isArray(deduplicatedNodes) ? deduplicatedNodes : [],
           links: Array.isArray(validLinks) ? validLinks : []
-      };
+      });
 
       // --- Direct Firestore Write Loop for each artist node in the returned graph ---
       if (activeUserId) {
@@ -738,10 +738,10 @@ export const extendGraphFromNode = async (node: Node, baseGraph: GraphData): Pro
   }
 
   try {
-    return JSON.parse(cleanedJsonText) as GraphData;
+    return normalizeGraphData(JSON.parse(cleanedJsonText) as GraphData);
   } catch (e) {
     const repaired = repairJson(cleanedJsonText);
-    return JSON.parse(repaired) as GraphData;
+    return normalizeGraphData(JSON.parse(repaired) as GraphData);
   }
 };
 

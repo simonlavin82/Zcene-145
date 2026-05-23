@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { GraphData, Node, ParsedArtist, View, NodeDetails, GraphSettings, Link, ChatMessage, StackItem, DiscoveryFilters } from '../types';
 import { User } from '../services/firebase';
 import { motion, AnimatePresence } from 'motion/react';
+import { normalizeArtistId } from '../services/artistCacheService';
 import HelpPage from './HelpPage';
 import Header from './Header';
 import MusicGraph from './MusicGraph';
@@ -969,8 +970,8 @@ const GraphPage: React.FC<GraphPageProps> = ({
   const isOverLimit = selectedSeedArtists.length > MAX_SEED_ARTISTS;
   
   const isArtistPending = useMemo(() => {
-    const currentEnabled = selectedSeedArtists.filter(a => a.enabled).map(a => a.name.toLowerCase()).sort().join('::');
-    const lastGenerated = seedArtists.split('::').map(s => s.trim().toLowerCase()).filter(Boolean).sort().join('::');
+    const currentEnabled = selectedSeedArtists.filter(a => a.enabled).map(a => normalizeArtistId(a.name)).sort().join('::');
+    const lastGenerated = seedArtists.split('::').map(s => normalizeArtistId(s)).filter(Boolean).sort().join('::');
     const hasSearchTerm = searchTerm.trim().length > 0;
     return (currentEnabled !== lastGenerated && currentEnabled.length > 0) || hasSearchTerm;
   }, [selectedSeedArtists, seedArtists, searchTerm]);
@@ -997,7 +998,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
     if (searchTerm.trim()) {
       const newArtists = searchTerm.split(';').map(a => a.trim()).filter(Boolean);
       if (newArtists.length > 0) {
-        const uniqueNew = newArtists.filter(name => !currentArtists.some(s => s.name.toLowerCase() === name.toLowerCase()));
+        const uniqueNew = newArtists.filter(name => !currentArtists.some(s => normalizeArtistId(s.name) === normalizeArtistId(name)));
         
         if (currentArtists.length + uniqueNew.length > MAX_SEED_ARTISTS) {
           setShowLimitDialog(true);
@@ -1005,9 +1006,9 @@ const GraphPage: React.FC<GraphPageProps> = ({
         }
 
         const artistsToAdd = newArtists.map(artistName => {
-          const libraryMatch = libraryArtists.find(a => a.name.toLowerCase() === artistName.toLowerCase());
+          const libraryMatch = libraryArtists.find(a => normalizeArtistId(a.name) === normalizeArtistId(artistName));
           return libraryMatch ? libraryMatch.name : artistName;
-        }).filter(name => !currentArtists.some(a => a.name.toLowerCase() === name.toLowerCase()));
+        }).filter(name => !currentArtists.some(a => normalizeArtistId(a.name) === normalizeArtistId(name)));
 
         const newBatch = artistsToAdd.map(name => ({ name, enabled: true }));
         currentArtists = [...currentArtists, ...newBatch];
@@ -1033,14 +1034,14 @@ const GraphPage: React.FC<GraphPageProps> = ({
     e.preventDefault();
     const newArtists = searchTerm.split(';').map(a => a.trim()).filter(Boolean);
     if (newArtists.length > 0) {
-      const uniqueNew = newArtists.filter(name => !selectedSeedArtists.some(s => s.name.toLowerCase() === name.toLowerCase()));
+      const uniqueNew = newArtists.filter(name => !selectedSeedArtists.some(s => normalizeArtistId(s.name) === normalizeArtistId(name)));
       if (selectedSeedArtists.length + uniqueNew.length > MAX_SEED_ARTISTS) { setShowLimitDialog(true); return; }
       setSelectedSeedArtists(prev => {
-        const existingNames = new Set(prev.map(a => a.name.toLowerCase()));
+        const existingNorms = new Set(prev.map(a => normalizeArtistId(a.name)));
         const artistsToAdd = newArtists.map(artistName => {
-            const libraryMatch = libraryArtists.find(a => a.name.toLowerCase() === artistName.toLowerCase());
+            const libraryMatch = libraryArtists.find(a => normalizeArtistId(a.name) === normalizeArtistId(artistName));
             return libraryMatch ? libraryMatch.name : artistName;
-          }).filter(name => !existingNames.has(name.toLowerCase()));
+          }).filter(name => !existingNorms.has(normalizeArtistId(name)));
         return [...prev, ...artistsToAdd.map(name => ({ name, enabled: true }))];
       });
       setSearchTerm('');
@@ -1054,11 +1055,12 @@ const GraphPage: React.FC<GraphPageProps> = ({
   };
   
   const handleLibraryArtistToggle = (artistName: string) => {
-    const isAlreadySelected = selectedSeedArtists.some(a => a.name === artistName);
+    const normName = normalizeArtistId(artistName);
+    const isAlreadySelected = selectedSeedArtists.some(a => normalizeArtistId(a.name) === normName);
     if (!isAlreadySelected && selectedSeedArtists.length >= MAX_SEED_ARTISTS) { setShowLimitDialog(true); return; }
     setSelectedSeedArtists(prev => {
-        const isSelected = prev.some(a => a.name === artistName);
-        if (isSelected) return prev.filter(a => a.name !== artistName);
+        const isSelected = prev.some(a => normalizeArtistId(a.name) === normName);
+        if (isSelected) return prev.filter(a => normalizeArtistId(a.name) !== normName);
         else return [...prev, { name: artistName, enabled: true }];
     });
     if (!onboardingProgress.step1) updateOnboarding('step1');
@@ -1174,7 +1176,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
   const totalPendingCount = useMemo(() => {
     if (!searchTerm.trim()) return enabledArtistsCount;
     const newArtists = searchTerm.split(',').map(a => a.trim()).filter(Boolean);
-    const uniqueNewCount = newArtists.filter(name => !selectedSeedArtists.some(s => s.name.toLowerCase() === name.toLowerCase())).length;
+    const uniqueNewCount = newArtists.filter(name => !selectedSeedArtists.some(s => normalizeArtistId(s.name) === normalizeArtistId(name))).length;
     return enabledArtistsCount + uniqueNewCount;
   }, [searchTerm, enabledArtistsCount, selectedSeedArtists]);
 
@@ -1500,7 +1502,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                         graphData={data} 
                                         libraryArtists={memoizedLibraryArtists} 
                                         seedArtists={memoizedAllSeedArtists} 
-                                        onAddArtist={(artist) => { setSelectedSeedArtists(prev => [...prev, {name: artist, enabled: true}]); onShowToast(`Added ${artist} to seed list`) }} 
+                                        onAddArtist={(artist) => { setSelectedSeedArtists(prev => { if (prev.some(s => normalizeArtistId(s.name) === normalizeArtistId(artist))) return prev; return [...prev, {name: artist, enabled: true}]; }); onShowToast(`Added ${artist} to seed list`) }} 
                                         isCollapsed={false} 
                                         onToggleCollapse={() => {}} 
                                         isSmallScreen={isSmallScreen} 
@@ -1599,7 +1601,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                        graphData={data} 
                        libraryArtists={memoizedLibraryArtists} 
                        seedArtists={memoizedAllSeedArtists} 
-                       onAddArtist={(artist) => { setSelectedSeedArtists(prev => [...prev, { name: artist, enabled: true }]); onShowToast(`Added ${artist} to seed list`); }} 
+                       onAddArtist={(artist) => { setSelectedSeedArtists(prev => { if (prev.some(s => normalizeArtistId(s.name) === normalizeArtistId(artist))) return prev; return [...prev, { name: artist, enabled: true }]; }); onShowToast(`Added ${artist} to seed list`); }} 
                        isCollapsed={isDetailsPanelCollapsed} 
                        onToggleCollapse={toggleDetailsPanel} 
                        isSmallScreen={isSmallScreen} 

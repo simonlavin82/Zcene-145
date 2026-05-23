@@ -98,10 +98,10 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
     const isArtistNode = node.type === 'artist';
     const isLabelNode = node.type === 'label';
-    const nodeIdLower = isArtistNode ? node.id.toLowerCase() : '';
+    const normalizedArtistNodeId = isArtistNode ? normalizeArtistId(node.id) : '';
 
-    const isLibraryArtist = isArtistNode && libraryArtistSet.has(nodeIdLower);
-    const isSeedArtist = isArtistNode && seedArtistSet.has(nodeIdLower);
+    const isLibraryArtist = isArtistNode && libraryArtistSet.has(normalizedArtistNodeId);
+    const isSeedArtist = isArtistNode && seedArtistSet.has(normalizedArtistNodeId);
     const isAiSuggestion = isArtistNode && !isSeedArtist;
     const isManualAdd = isArtistNode && isSeedArtist && !isLibraryArtist;
 
@@ -198,7 +198,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 )}
                                 {isArtistNode && !isGuest && (
                                     <button
-                                        onClick={() => onAddArtist(node.id)}
+                                        onClick={() => onAddArtist(normalizeArtistId(node.id))}
                                         disabled={isSeedArtist}
                                         className={`w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 active:scale-95 leading-none ${isSeedArtist ? 'text-primary bg-primary/5 border-primary/30 cursor-not-allowed' : 'text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-primary'}`}
                                         title={isSeedArtist ? "Seed Artist" : "Add to Seeds"}
@@ -221,7 +221,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 title="Click to copy name"
                             >
                                 <h3 className={`${headerSizeClass} text-white leading-[0.9] py-1 break-normal`}>
-                                    {node.id}
+                                    {node.label || node.id}
                                 </h3>
                                 <span className={`material-symbols-outlined !text-[16px] flex-shrink-0 transition-all duration-300 ${isIdCopied ? 'text-primary opacity-100 scale-110' : 'text-zinc-500 opacity-0 group-hover:opacity-100'}`}>
                                     {isIdCopied ? 'check' : 'content_copy'}
@@ -271,7 +271,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 <div className={`aspect-video w-full bg-zinc-800 overflow-hidden relative border border-zinc-800/50 shadow-2xl transition-opacity duration-700 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}>
                                     <img 
                                         src={details.imageUrl} 
-                                        alt={node.id} 
+                                        alt={node.label || node.id} 
                                         className="w-full h-full object-cover scale-105 hover:scale-100 transition-transform duration-1000"
                                         onLoad={() => setImgLoaded(true)}
                                         onError={() => setImageError(true)}
@@ -363,7 +363,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     <h4 className="font-semibold text-zinc-500 mb-3 text-[10px] uppercase tracking-widest">Scene Circle</h4>
                                     <div className="flex flex-wrap gap-2">
                                         {details.details.notableArtists.map(artistName => {
-                                            const isAlreadySeed = seedArtistSet.has(artistName.toLowerCase());
+                                            const isAlreadySeed = seedArtistSet.has(normalizeArtistId(artistName));
                                             if (isGuest) {
                                               return (
                                                 <div 
@@ -377,7 +377,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                             return (
                                                 <button 
                                                     key={artistName} 
-                                                    onClick={() => onAddArtist(artistName)}
+                                                    onClick={() => onAddArtist(normalizeArtistId(artistName))}
                                                     disabled={isAlreadySeed}
                                                     className={`border py-1.5 px-3 transition-all text-sm flex items-center gap-1.5 rounded-xl ${
                                                         isAlreadySeed 
@@ -732,9 +732,9 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         if (isMagazineViewOpen && magazineSearchQuery.trim()) {
             const query = magazineSearchQuery.toLowerCase().trim();
             result = result.filter(node => {
-                const details = detailsCache.get(node.id) || detailsCache.get(node.id.toLowerCase());
+                const details = detailsCache.get(node.id) || detailsCache.get(node.id.toLowerCase()) || detailsCache.get(normalizeArtistId(node.id));
                 return (
-                    node.id.toLowerCase().includes(query) ||
+                    (node.label || node.id).toLowerCase().includes(query) ||
                     details?.details?.genre?.toLowerCase().includes(query) ||
                     details?.details?.origin?.toLowerCase().includes(query) ||
                     details?.summary?.toLowerCase().includes(query)
@@ -745,11 +745,11 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         // Sort
         if (isMagazineViewOpen && magazineSortBy !== 'none') {
             result.sort((a, b) => {
-                const detailsA = detailsCache.get(a.id) || detailsCache.get(a.id.toLowerCase());
-                const detailsB = detailsCache.get(b.id) || detailsCache.get(b.id.toLowerCase());
+                const detailsA = detailsCache.get(a.id) || detailsCache.get(a.id.toLowerCase()) || detailsCache.get(normalizeArtistId(a.id));
+                const detailsB = detailsCache.get(b.id) || detailsCache.get(b.id.toLowerCase()) || detailsCache.get(normalizeArtistId(b.id));
                 
                 if (magazineSortBy === 'name') {
-                    return a.id.localeCompare(b.id);
+                    return (a.label || a.id).localeCompare(b.label || b.id);
                 }
                 
                 const valA = (detailsA?.details?.[magazineSortBy] || '').toString().toLowerCase();
@@ -924,7 +924,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                         key={node.id} 
                                         onClick={() => { setViewedIndex(i); onNodeClick(node); }}
                                         className={`h-1 transition-all cursor-pointer ${i === viewedIndex ? 'w-4 bg-primary' : 'w-1 bg-zinc-600 active:bg-zinc-400'}`}
-                                        title={node.id}
+                                        title={node.label || node.id}
                                     />
                                 ))}
                             </div>
@@ -974,7 +974,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                 </div>
                             ) : (
                                 filteredAndSortedNodes.map((node) => {
-                                    const details = detailsCache.get(node.id) || detailsCache.get(node.id.toLowerCase()) || null;
+                                    const details = detailsCache.get(node.id) || detailsCache.get(node.id.toLowerCase()) || detailsCache.get(normalizeArtistId(node.id)) || null;
                                     const isRichData = details && details.imageUrl && details.summary.length > 200;
                                     const isHero = isMagazineViewOpen && (node.id === selectedNode?.id || (isRichData && node.type === 'artist'));
                                     const isInStack = stack.some(item => item.id.toLowerCase() === node.id.toLowerCase());
