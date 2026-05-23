@@ -62,6 +62,32 @@ const Header: React.FC<HeaderProps> = ({
 }) => {
   const isDashboard = view === 'dashboard';
 
+  const [localName, setLocalName] = React.useState(projectName);
+
+  React.useEffect(() => {
+    setLocalName(projectName);
+  }, [projectName]);
+
+  const handleCommit = React.useCallback(() => {
+    const trimmed = localName.trim();
+    if (trimmed === "") {
+      const fallback = "Untitled Zcene";
+      setLocalName(fallback);
+      onProjectNameChange?.(fallback);
+    } else if (trimmed !== projectName) {
+      onProjectNameChange?.(trimmed);
+    }
+  }, [localName, projectName, onProjectNameChange]);
+
+  const handleKeyDown = React.useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.currentTarget.blur();
+    } else if (e.key === 'Escape') {
+      setLocalName(projectName);
+      e.currentTarget.blur();
+    }
+  }, [projectName]);
+
   return (
     <header className={`relative z-[100] flex-shrink-0 flex items-center pointer-events-none transition-all duration-300 ${isMagazineViewOpen ? 'hidden md:block h-0 opacity-0 overflow-hidden' : (isSmallScreen ? 'h-16 px-4' : 'h-16 px-6 lg:px-8')} ${isMagazineViewOpen ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100'}`}>
         <div className="flex items-center w-full h-full">
@@ -75,7 +101,7 @@ const Header: React.FC<HeaderProps> = ({
                     <FaviconLogo className="h-full w-full text-primary pointer-events-none" />
                 </button>
                 
-                <div className="flex items-center pointer-events-auto">
+                <div className="flex items-center pointer-events-auto flex-grow max-w-[160px] sm:max-w-[320px] md:max-w-[480px]">
                   {isDashboard ? (
                     <h1 
                       onClick={onLogoClick}
@@ -90,10 +116,15 @@ const Header: React.FC<HeaderProps> = ({
                       </h1>
                     ) : (
                       <input
-                        value={projectName}
-                        onChange={(e) => onProjectNameChange?.(e.target.value)}
+                        value={localName}
+                        onChange={(e) => setLocalName(e.target.value)}
+                        onBlur={handleCommit}
+                        onKeyDown={handleKeyDown}
                         placeholder="Untitled Project"
-                        className={`bg-transparent text-white font-medium ${isSmallScreen ? 'text-base' : 'text-lg'} border-none focus:ring-0 focus:outline-none p-0 m-0 w-full truncate placeholder:text-zinc-500 tracking-tight`}
+                        size={Math.max(1, localName.length || 1)}
+                        className={`bg-transparent text-white font-medium ${
+                          isSmallScreen ? 'text-base' : 'text-lg'
+                        } border border-transparent focus:ring-1 focus:ring-primary focus:bg-zinc-900/40 rounded-xl px-1.5 -mx-1.5 py-1 -my-1 placeholder:text-zinc-500 tracking-tight transition-all duration-200 focus:outline-none cursor-text`}
                         title="Rename Project"
                       />
                     )

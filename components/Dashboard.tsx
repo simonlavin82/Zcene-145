@@ -112,13 +112,13 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   return (
     <div 
-        className="absolute inset-0 flex flex-col overflow-hidden"
-        style={{
-            backgroundImage: 'url("https://storage.googleapis.com/zcene/Zcene%20general%20background.jpeg")',
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundAttachment: 'fixed'
-        }}
+      className="absolute inset-0 flex flex-col overflow-hidden bg-background-dark text-zinc-200 font-display"
+      style={{
+        backgroundImage: 'url("https://storage.googleapis.com/zcene/Zcene%20general%20background.jpeg")',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundAttachment: 'fixed'
+      }}
     >
       
       <Header
@@ -146,10 +146,10 @@ const Dashboard: React.FC<DashboardProps> = ({
       
       <main className={`flex-1 overflow-y-auto ${isSmallScreen ? 'px-4' : 'px-6 lg:px-8'} py-8 relative z-10`}>
         <div className="max-w-7xl mx-auto space-y-8">
-          <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex flex-col items-center justify-center text-center md:flex-row md:justify-between md:items-center gap-4">
             <h1 className="text-lg font-bold uppercase tracking-normal text-zinc-200">YOUR ZCENES</h1>
             
-            <div className="flex items-center gap-2 h-[36px] w-full justify-end">
+            <div className="flex items-center gap-2 h-[36px] w-full justify-center md:w-auto md:justify-end">
               {/* Grid/List View Toggle */}
               <ViewToggle 
                 value={view}
@@ -162,37 +162,41 @@ const Dashboard: React.FC<DashboardProps> = ({
               />
 
               {/* Sorting Dropdown */}
-              <div className="relative h-full" ref={sortDropdownRef}>
+              <div className="relative flex items-center h-full" ref={sortDropdownRef}>
                 <button
                   onClick={() => setIsSortOpen(!isSortOpen)}
-                  className="h-full rounded-lg text-sm px-4 bg-zinc-950 border border-zinc-800 hover:bg-zinc-900 font-semibold text-zinc-300 flex items-center gap-2 cursor-pointer"
+                  className={`h-full flex flex-shrink-0 items-center justify-center rounded-xl border border-zinc-700/50 shadow-lg transition-colors leading-none relative pl-2 pr-3 gap-2 cursor-pointer text-xs font-medium ${
+                    isSortOpen 
+                      ? 'bg-zinc-800 text-white' 
+                      : 'bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800'
+                  }`}
                 >
-                  <span className="material-symbols-outlined !text-[14px]">sort</span>
-                  <span>{sortBy === 'recent' ? 'Most Recent' : 'Title'}</span>
-                  <span className="material-symbols-outlined !text-[14px] transition-transform duration-200" style={{ transform: isSortOpen ? 'rotate(180deg)' : 'none' }}>keyboard_arrow_down</span>
+                  <span className="material-symbols-outlined !text-[18px]">sort</span>
+                  <span>{sortBy === 'recent' ? 'Recent' : 'Title (A-Z)'}</span>
+                  <span className="material-symbols-outlined !text-[18px] transition-transform duration-200" style={{ transform: isSortOpen ? 'rotate(180deg)' : 'none' }}>keyboard_arrow_down</span>
                 </button>
                 
                 {isSortOpen && (
-                  <div className="absolute right-0 mt-1.5 w-40 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl z-50 py-1 overflow-hidden animate-fade-in-down">
+                  <div className="absolute right-0 top-full mt-2 w-40 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl p-1 z-50">
                     <button
                       onClick={() => {
                         setSortBy('recent');
                         setIsSortOpen(false);
                       }}
-                      className={`w-full text-left px-4 py-2.5 text-xs font-semibold transition-all flex items-center justify-between ${sortBy === 'recent' ? 'bg-primary/10 text-primary' : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'}`}
+                      className={`w-full text-left px-2 py-1.5 text-xs font-normal rounded-lg flex items-center justify-between transition-colors ${sortBy === 'recent' ? 'bg-primary/10 text-primary' : 'text-zinc-300 hover:bg-zinc-800 hover:text-white'}`}
                     >
-                      Most Recent
-                      {sortBy === 'recent' && <span className="material-symbols-outlined !text-[14px]">check</span>}
+                      <span>Recent</span>
+                      {sortBy === 'recent' && <span className="material-symbols-outlined !text-[14px] text-primary">check</span>}
                     </button>
                     <button
                       onClick={() => {
                         setSortBy('title');
                         setIsSortOpen(false);
                       }}
-                      className={`w-full text-left px-4 py-2.5 text-xs font-semibold transition-all flex items-center justify-between ${sortBy === 'title' ? 'bg-primary/10 text-primary' : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'}`}
+                      className={`w-full text-left px-2 py-1.5 text-xs font-normal rounded-lg flex items-center justify-between transition-colors ${sortBy === 'title' ? 'bg-primary/10 text-primary' : 'text-zinc-300 hover:bg-zinc-800 hover:text-white'}`}
                     >
-                      Title (A-Z)
-                      {sortBy === 'title' && <span className="material-symbols-outlined !text-[14px]">check</span>}
+                      <span>Title (A-Z)</span>
+                      {sortBy === 'title' && <span className="material-symbols-outlined !text-[14px] text-primary">check</span>}
                     </button>
                   </div>
                 )}
@@ -202,7 +206,7 @@ const Dashboard: React.FC<DashboardProps> = ({
               <button 
                 onClick={onCreateProject}
                 disabled={isCreatingProject}
-                className="h-full rounded-lg bg-[#F2E572] text-black text-sm px-4 font-medium flex items-center gap-2 whitespace-nowrap"
+                className="h-full rounded-xl bg-[#F2E572] text-black text-sm px-4 font-medium flex items-center gap-2 whitespace-nowrap"
               >
                 {isCreatingProject ? (
                   <>
