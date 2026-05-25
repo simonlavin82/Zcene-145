@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View } from '../types';
-import { ZceneLogo, InstagramIcon, VisibilityIcon, VisibilityOffIcon } from './Icons';
+import { ZceneLogo, InstagramIcon } from './Icons';
+import Header from './Header';
 import { 
     GRAPH_RESPONSE_SCHEMA, 
     NODE_DETAILS_SCHEMA,
@@ -14,6 +15,24 @@ interface SourcePageProps {
     isActive: boolean;
     profile: any;
     onUpdateProfile: (updates: any) => void;
+    user: any;
+    onLogoClick: () => void;
+    isSmallScreen: boolean;
+    stackCount: number;
+    isStackNew: boolean;
+    onOpenStack: () => void;
+    onLogout: () => void;
+    onDeleteAccount: () => void;
+    isAdmin?: boolean;
+    isProfileOpen: boolean;
+    setIsProfileOpen: (open: boolean) => void;
+    isDeleteAccountModalOpen: boolean;
+    setIsDeleteAccountModalOpen: (open: boolean) => void;
+    isMenuOpen: boolean;
+    setIsMenuOpen: (open: boolean) => void;
+    onRestartWalkthrough?: () => void;
+    onClose?: () => void;
+    onNavigateMenu?: (path: string) => void;
 }
 
 const ARCHITECTURE_DOCUMENTATION = `
@@ -459,11 +478,30 @@ const SharingFlowDiagram: React.FC = () => (
     </div>
 );
 
-export const EnginePage: React.FC<SourcePageProps> = ({ onNavigate, isActive, profile, onUpdateProfile }) => {
-    const isAuthenticated = profile?.pageAuth?.engine === true;
-    const [password, setPassword] = useState('');
-    const [showPassword, setShowPassword] = useState(false);
-    const [error, setError] = useState(false);
+export const EnginePage: React.FC<SourcePageProps> = ({ 
+    onNavigate, 
+    isActive, 
+    profile, 
+    onUpdateProfile,
+    user,
+    onLogoClick,
+    isSmallScreen,
+    stackCount,
+    isStackNew,
+    onOpenStack,
+    onLogout,
+    onDeleteAccount,
+    isAdmin,
+    isProfileOpen,
+    setIsProfileOpen,
+    isDeleteAccountModalOpen,
+    setIsDeleteAccountModalOpen,
+    isMenuOpen,
+    setIsMenuOpen,
+    onRestartWalkthrough,
+    onClose,
+    onNavigateMenu
+}) => {
     const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -471,19 +509,6 @@ export const EnginePage: React.FC<SourcePageProps> = ({ onNavigate, isActive, pr
             containerRef.current.scrollTo(0, 0);
         }
     }, [isActive]);
-
-    const handleLogin = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (password === 'Zcenester') {
-            onUpdateProfile({ 
-                pageAuth: { ...profile?.pageAuth, engine: true } 
-            });
-            setError(false);
-        } else {
-            setError(true);
-            setPassword('');
-        }
-    };
 
     const CodeBlock: React.FC<{ title: string; content: any; isJson?: boolean }> = ({ title, content, isJson = false }) => (
         <div className="rounded-xl border border-zinc-700/50 bg-zinc-900/50 overflow-hidden mb-12">
@@ -499,83 +524,42 @@ export const EnginePage: React.FC<SourcePageProps> = ({ onNavigate, isActive, pr
         </div>
     );
 
-    if (!isAuthenticated) {
-        return (
-            <div ref={containerRef} className="h-full w-full overflow-y-auto bg-background-dark text-zinc-200 font-display flex flex-col items-center justify-center p-4">
-                <div className="w-full max-w-md bg-zinc-900 border border-zinc-700 rounded-xl p-8 shadow-2xl my-auto">
-                    <div className="text-center mb-8">
-                        <ZceneLogo className="h-10 w-auto text-primary mx-auto mb-6" />
-                        <h2 className="text-xl font-medium text-white">Restricted Access</h2>
-                        <p className="text-zinc-400 text-sm mt-2">Please enter the password to view the Engine & Architecture documentation.</p>
-                    </div>
-                    <form onSubmit={handleLogin} className="space-y-4">
-                        <div className="space-y-2">
-                            <div className="relative">
-                                <input 
-                                    type={showPassword ? "text" : "password"} 
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    placeholder="Enter password"
-                                    className={`w-full bg-zinc-950 border ${error ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-primary'} rounded-xl px-4 pr-12 py-3.5 lg:py-3 text-base lg:text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-primary/50 transition-colors`}
-                                    autoFocus
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors focus:outline-none h-10 w-10 flex items-center justify-center"
-                                    aria-label={showPassword ? "Hide password" : "Show password"}
-                                >
-                                    {showPassword ? <VisibilityOffIcon className="w-6 h-6" /> : <VisibilityIcon className="w-6 h-6" />}
-                                </button>
-                            </div>
-                            {error && <p className="text-red-500 text-xs ml-1">Incorrect password. Please try again.</p>}
-                        </div>
-                        <button 
-                            type="submit"
-                            className="w-full bg-primary text-brand-black font-medium py-3 rounded-xl hover:bg-primary/90 transition-colors"
-                        >
-                            Access Source
-                        </button>
-                    </form>
-                    <div className="mt-6 text-center">
-                        <button onClick={() => onNavigate(View.Home)} className="text-zinc-500 text-sm hover:text-zinc-300 transition-colors">
-                            Return Home
-                        </button>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
     return (
         <div ref={containerRef} className="h-full w-full overflow-y-auto bg-background-dark text-zinc-200 font-display flex flex-col relative">
-            <header className="px-4 sm:px-6 lg:px-8 z-20 flex-shrink-0 border-b border-zinc-700 sticky top-0 bg-background-dark/80 backdrop-blur-sm">
-                <div className="flex h-12 items-center justify-between">
-                    <button onClick={() => onNavigate(View.Home)} className="flex items-center gap-4 cursor-pointer">
-                        <ZceneLogo className="h-8 w-auto text-primary" />
-                        <span className="text-xl font-medium text-white hidden sm:block">Engine & Architecture</span>
-                    </button>
-                    <div className="flex items-center gap-4">
-                        <button 
-                            onClick={() => {
-                                onUpdateProfile({ 
-                                    pageAuth: { ...profile?.pageAuth, engine: false } 
-                                });
-                            }}
-                            className="text-sm font-medium text-zinc-400 hover:text-white transition-colors"
-                        >
-                            Lock
-                        </button>
-                        <button onClick={() => onNavigate(View.Home)} className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800">
-                            <span className="material-symbols-outlined">arrow_back</span>
-                            Back
-                        </button>
-                    </div>
-                </div>
-            </header>
+            <Header
+                user={user}
+                onLogoClick={onLogoClick}
+                view="dashboard"
+                isSmallScreen={isSmallScreen}
+                isMagazineViewOpen={false}
+                stackCount={stackCount}
+                isStackNew={isStackNew}
+                onOpenStack={onOpenStack}
+                onNavigate={onNavigateMenu || onNavigate}
+                onLogout={onLogout}
+                onDeleteAccount={onDeleteAccount}
+                isAdmin={isAdmin}
+                isProfileOpen={isProfileOpen}
+                setIsProfileOpen={setIsProfileOpen}
+                isDeleteAccountModalOpen={isDeleteAccountModalOpen}
+                setIsDeleteAccountModalOpen={setIsDeleteAccountModalOpen}
+                isMenuOpen={isMenuOpen}
+                setIsMenuOpen={setIsMenuOpen}
+                onRestartWalkthrough={onRestartWalkthrough}
+            />
 
             <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-12 flex-grow">
                 <div className="max-w-5xl mx-auto">
+                    <div className="pt-6 pb-2">
+                        <button 
+                            onClick={() => onClose ? onClose() : (window.history.length > 1 ? window.history.back() : onNavigate(View.Home))} 
+                            className="inline-flex items-center gap-2 text-zinc-400 hover:text-white transition-colors bg-transparent border-0 p-0 cursor-pointer text-sm font-medium"
+                        >
+                            <span className="material-symbols-outlined text-sm">arrow_back</span>
+                            Back
+                        </button>
+                    </div>
+
                     <div className="mb-10 border-b border-zinc-700 pb-8">
                         <h1 className="text-3xl font-medium text-white mb-4">The Zcene Engine</h1>
                         <p className="text-zinc-400 leading-relaxed max-w-3xl text-base">
@@ -699,27 +683,9 @@ const StyleGuidePage = React.lazy(() => import('./StyleGuidePage'));
             </main>
 
             <footer className="w-full p-8 text-zinc-400 text-sm z-10 relative bg-neutral-900 flex-shrink-0 border-t border-neutral-800">
-                <div className="container mx-auto">
-                    <div className="flex flex-col items-center gap-8">
-                        <button onClick={() => onNavigate(View.Home)} className="cursor-pointer">
-                            <ZceneLogo className="h-8 w-auto text-primary" />
-                        </button>
-                        <nav className="flex flex-wrap justify-center gap-x-6 gap-y-2 font-medium">
-                            <button onClick={() => onNavigate(View.Home)} className="hover:text-primary transition-colors">Home</button>
-                            <button onClick={() => onNavigate(View.Graph)} className="hover:text-primary transition-colors">App</button>
-                            <button onClick={() => onNavigate(View.Help)} className="hover:text-primary transition-colors">Help</button>
-                            <button onClick={() => onNavigate(View.StyleGuide)} className="hover:text-primary transition-colors">Design System</button>
-                            <button onClick={() => onNavigate(View.Engine)} className="hover:text-primary transition-colors">Engine</button>
-                        </nav>
-                        <div className="flex items-center gap-4">
-                            <a href="https://www.instagram.com/zcene.online/" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
-                                <InstagramIcon className="w-6 h-6 hover:text-primary transition-colors" />
-                            </a>
-                        </div>
-                    </div>
-                    <div className="mt-8 border-t border-zinc-600/50 pt-8 text-center">
-                        <p>© 2026 Zcene. All Rights Reserved.</p>
-                    </div>
+                <div className="container mx-auto text-center">
+                    <ZceneLogo className="h-8 w-auto text-primary mx-auto mb-4" />
+                    <p className="text-zinc-600">© 2026 Zcene Admin Console. Restricted access authorisation engine.</p>
                 </div>
             </footer>
         </div>

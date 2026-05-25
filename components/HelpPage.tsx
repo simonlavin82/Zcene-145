@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { View } from '../types';
 import * as d3 from 'd3';
 import { ZceneLogo, LegendSymbol, InstagramIcon, MicIcon, StackIcon } from './Icons';
+import Header from './Header';
 
 // --- Visual Support Components ---
 
@@ -195,9 +196,46 @@ interface HelpPageProps {
   isActive: boolean;
   onClose?: () => void;
   isAdmin?: boolean;
+  user: any;
+  onLogoClick: () => void;
+  isSmallScreen: boolean;
+  stackCount: number;
+  isStackNew: boolean;
+  onOpenStack: () => void;
+  onNavigateMenu?: (path: string) => void;
+  onLogout: () => void;
+  onDeleteAccount: () => void;
+  isProfileOpen: boolean;
+  setIsProfileOpen: (open: boolean) => void;
+  isDeleteAccountModalOpen: boolean;
+  setIsDeleteAccountModalOpen: (open: boolean) => void;
+  isMenuOpen: boolean;
+  setIsMenuOpen: (open: boolean) => void;
+  onRestartWalkthrough?: () => void;
 }
 
-const HelpPage: React.FC<HelpPageProps> = ({ onNavigate, isActive, onClose, isAdmin }) => {
+const HelpPage: React.FC<HelpPageProps> = ({ 
+    onNavigate, 
+    isActive, 
+    onClose, 
+    isAdmin,
+    user,
+    onLogoClick,
+    isSmallScreen,
+    stackCount,
+    isStackNew,
+    onOpenStack,
+    onLogout,
+    onDeleteAccount,
+    isProfileOpen,
+    setIsProfileOpen,
+    isDeleteAccountModalOpen,
+    setIsDeleteAccountModalOpen,
+    isMenuOpen,
+    setIsMenuOpen,
+    onRestartWalkthrough,
+    onNavigateMenu
+}) => {
     const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -247,21 +285,39 @@ const HelpPage: React.FC<HelpPageProps> = ({ onNavigate, isActive, onClose, isAd
 
     return (
         <div ref={containerRef} className="h-full w-full overflow-y-auto bg-background-dark text-zinc-200 font-display flex flex-col relative">
-            <header className="px-4 sm:px-6 lg:px-8 z-20 flex-shrink-0 border-b border-zinc-700 sticky top-0 bg-background-dark/80 backdrop-blur-sm">
-                <div className="flex h-12 items-center justify-between">
-                    <button onClick={() => onNavigate(View.Home)} className="flex items-center gap-4 cursor-pointer">
-                        <ZceneLogo className="h-8 w-auto text-primary" />
-                        <span className="text-xl font-medium text-white hidden sm:block">How to use Zcene</span>
-                    </button>
-                    <button onClick={() => onClose ? onClose() : onNavigate(View.Home)} className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800">
-                        <span className="material-symbols-outlined">arrow_back</span>
-                        Back
-                    </button>
-                </div>
-            </header>
+            <Header
+                user={user}
+                onLogoClick={onLogoClick}
+                view="dashboard"
+                isSmallScreen={isSmallScreen}
+                isMagazineViewOpen={false}
+                stackCount={stackCount}
+                isStackNew={isStackNew}
+                onOpenStack={onOpenStack}
+                onNavigate={onNavigateMenu || onNavigate}
+                onLogout={onLogout}
+                onDeleteAccount={onDeleteAccount}
+                isAdmin={isAdmin}
+                isProfileOpen={isProfileOpen}
+                setIsProfileOpen={setIsProfileOpen}
+                isDeleteAccountModalOpen={isDeleteAccountModalOpen}
+                setIsDeleteAccountModalOpen={setIsDeleteAccountModalOpen}
+                isMenuOpen={isMenuOpen}
+                setIsMenuOpen={setIsMenuOpen}
+                onRestartWalkthrough={onRestartWalkthrough}
+            />
 
             <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-20 flex-grow">
                 <div className="max-w-4xl mx-auto">
+                    <div className="pt-6 pb-2">
+                        <button 
+                            onClick={() => onClose ? onClose() : (window.history.length > 1 ? window.history.back() : onNavigate(View.Home))} 
+                            className="inline-flex items-center gap-2 text-zinc-400 hover:text-white transition-colors bg-transparent border-0 p-0 cursor-pointer text-sm font-medium"
+                        >
+                            <span className="material-symbols-outlined text-sm">arrow_back</span>
+                            Back
+                        </button>
+                    </div>
                     
                     {/* Intro Section */}
                     <section className="text-center space-y-6 mb-24">

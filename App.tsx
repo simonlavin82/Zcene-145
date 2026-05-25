@@ -9,6 +9,7 @@ import { auth, signInWithGoogle, logout, onAuthStateChanged, User, db, handleFir
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, getDocFromServer, serverTimestamp, addDoc, getDoc, getDocs, orderBy, where, writeBatch, getDocFromCache, updateDoc } from 'firebase/firestore';
 const StyleGuidePage = React.lazy(() => import('./components/DesignSystem').then(m => ({ default: m.StyleGuidePage })));
 const EnginePage = React.lazy(() => import('./components/EnginePage').then(m => ({ default: m.EnginePage })));
+const UsageAnalyticsPage = React.lazy(() => import('./components/UsageAnalyticsPage').then(m => ({ default: m.UsageAnalyticsPage })));
 import HelpPage from './components/HelpPage';
 import GraphPage from './components/GraphPage';
 import HomePage from './components/HomePage';
@@ -464,6 +465,7 @@ const App: React.FC = () => {
   const currentProjectIdRef = useRef<string | null>(null);
   const [currentProjectOwnerId, setCurrentProjectOwnerId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string>('');
+  const [previousWorkspace, setPreviousWorkspace] = useState<{ view: View; projectId: string | null } | null>(null);
   useEffect(() => { currentViewRef.current = currentView; }, [currentView]);
   useEffect(() => { currentProjectIdRef.current = currentProjectId; }, [currentProjectId]);
   const [graphData, setGraphData] = useState<GraphData | null>(null);
@@ -502,7 +504,8 @@ const App: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const isAdmin = useMemo(() => {
     if (!user || !user.email) return false;
-    return user.email.toLowerCase() === 'simon.lavin1@gmail.com';
+    const email = user.email.toLowerCase();
+    return email === 'simon.lavin1@gmail.com' || email === 'sandbox@zcene.online';
   }, [user]);
   const [pendingAuthAction, setPendingAuthAction] = useState<{ type: string; payload: any } | null>(null);
   const authRedirectPathRef = useRef<string | null>(null);
@@ -851,6 +854,7 @@ const App: React.FC = () => {
       case 'help': window.location.hash = '#/help'; break;
       case 'design': window.location.hash = '#/design'; break;
       case 'engine': window.location.hash = '#/engine'; break;
+      case 'analytics': window.location.hash = '#/analytics'; break;
       default: window.location.hash = '#/';
     }
   }, []);
@@ -2440,7 +2444,7 @@ const App: React.FC = () => {
       const isProjectPath = hash.startsWith('#/z/') || hash.startsWith('#/project/') || window.location.pathname.startsWith('/project/');
 
       // --- ROUTING LOGIC ---
-      if (isAppPath || isDashboardPath || isProjectPath || hash.startsWith('#/help') || hash.startsWith('#/design') || hash.startsWith('#/engine') || shareIdFromQuery || projectIdFromQuery) {
+      if (isAppPath || isDashboardPath || isProjectPath || hash.startsWith('#/help') || hash.startsWith('#/design') || hash.startsWith('#/engine') || hash.startsWith('#/analytics') || shareIdFromQuery || projectIdFromQuery) {
         // Optimization: Pre-capture hash for redirection if auth is not ready
         if (!isAuthInitialized) {
           authRedirectPathRef.current = hash;
@@ -2460,6 +2464,7 @@ const App: React.FC = () => {
         if (user && !isFirebaseReady) return;
 
         if (isDashboardPath) {
+          setPreviousWorkspace({ view: View.Dashboard, projectId: null });
           if (currentViewRef.current !== View.Dashboard) {
             setCurrentView(View.Dashboard);
             setCurrentProjectId(null);
@@ -2468,6 +2473,7 @@ const App: React.FC = () => {
         } else if (isProjectPath || projectIdFromQuery || shareIdFromQuery) {
           const projectId = projectIdFromQuery || shareIdFromQuery || hash.split('#/z/')[1]?.split('?')[0];
           if (projectId) {
+            setPreviousWorkspace({ view: View.Graph, projectId: projectId });
             if (currentViewRef.current !== View.Graph || currentProjectIdRef.current !== projectId) {
               if (currentProjectIdRef.current !== projectId) {
                 setGraphData({ nodes: [], links: [] });
@@ -2496,6 +2502,12 @@ const App: React.FC = () => {
         } else if (hash.startsWith('#/engine')) {
           if (isAdmin) {
             if (currentViewRef.current !== View.Engine) setCurrentView(View.Engine);
+          } else {
+            setCurrentView(View.Home);
+          }
+        } else if (hash.startsWith('#/analytics')) {
+          if (isAdmin) {
+            if (currentViewRef.current !== View.Analytics) setCurrentView(View.Analytics);
           } else {
             setCurrentView(View.Home);
           }
@@ -2921,10 +2933,35 @@ const App: React.FC = () => {
       [View.Help]: '#/help',
       [View.StyleGuide]: isAdmin ? '#/designsystem' : '#/',
       [View.Engine]: isAdmin ? '#/engine' : '#/',
+      [View.Analytics]: isAdmin ? '#/analytics' : '#/',
       [View.Home]: '#/'
     }[newView];
     if (window.location.hash !== h) window.location.hash = h;
   }, [graphData, isAdmin]);
+
+  const handleLogoClick = useCallback(() => {
+    handleViewChange(View.Home);
+  }, [handleViewChange]);
+
+  const handleSubpageClose = useCallback(() => {
+    if (previousWorkspace) {
+      if (previousWorkspace.view === View.Graph && previousWorkspace.projectId) {
+        setCurrentView(View.Graph);
+        window.location.hash = `#/z/${previousWorkspace.projectId}`;
+      } else {
+        setCurrentView(View.Dashboard);
+        window.location.hash = '#/dashboard';
+      }
+    } else {
+      if (currentProjectId) {
+        setCurrentView(View.Graph);
+        window.location.hash = `#/z/${currentProjectId}`;
+      } else {
+        setCurrentView(View.Dashboard);
+        window.location.hash = '#/dashboard';
+      }
+    }
+  }, [previousWorkspace, currentProjectId]);
 
   const handleCancel = useCallback(() => { if (abortControllerRef.current) { abortControllerRef.current.abort(); setIsLoading(false); abortControllerRef.current = null; } }, []);
 
@@ -3058,34 +3095,102 @@ const App: React.FC = () => {
         <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Help ? 'z-10' : 'z-0 opacity-0 pointer-events-none'}`}>
           <HelpPage
             onNavigate={handleViewChange}
+            onNavigateMenu={handleMenuNavigate}
             isActive={currentView === View.Help}
             isAdmin={isAdmin}
-            onClose={() => {
-              if (currentProjectId) {
-                setCurrentView(View.Graph);
-                window.location.hash = `#/z/${currentProjectId}`;
-              } else {
-                setCurrentView(View.Dashboard);
-                window.location.hash = '#/dashboard';
-              }
-            }}
+            onClose={handleSubpageClose}
+            user={user}
+            onLogoClick={handleLogoClick}
+            isSmallScreen={isSmallScreen}
+            stackCount={stack.length}
+            isStackNew={stack.length > lastViewedStackCount}
+            onOpenStack={() => setIsStackDialogOpen(true)}
+            onLogout={handleLogout}
+            onDeleteAccount={handleDeleteAccount}
+            isProfileOpen={isProfileOpen}
+            setIsProfileOpen={setIsProfileOpen}
+            isDeleteAccountModalOpen={isDeleteAccountModalOpen}
+            setIsDeleteAccountModalOpen={setIsDeleteAccountModalOpen}
+            isMenuOpen={isMenuOpen}
+            setIsMenuOpen={setIsMenuOpen}
+            onRestartWalkthrough={handleDashboardRestartWalkthrough}
           />
         </div>
         <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Engine ? 'z-10' : 'z-0 opacity-0 pointer-events-none'}`}>
           <EnginePage
             onNavigate={handleViewChange}
+            onNavigateMenu={handleMenuNavigate}
             isActive={currentView === View.Engine}
             profile={profile}
             onUpdateProfile={handleUpdateProfile}
+            user={user}
+            onLogoClick={handleLogoClick}
+            isSmallScreen={isSmallScreen}
+            stackCount={stack.length}
+            isStackNew={stack.length > lastViewedStackCount}
+            onOpenStack={() => setIsStackDialogOpen(true)}
+            onLogout={handleLogout}
+            onDeleteAccount={handleDeleteAccount}
+            isAdmin={isAdmin}
+            isProfileOpen={isProfileOpen}
+            setIsProfileOpen={setIsProfileOpen}
+            isDeleteAccountModalOpen={isDeleteAccountModalOpen}
+            setIsDeleteAccountModalOpen={setIsDeleteAccountModalOpen}
+            isMenuOpen={isMenuOpen}
+            setIsMenuOpen={setIsMenuOpen}
+            onRestartWalkthrough={handleDashboardRestartWalkthrough}
+            onClose={handleSubpageClose}
           />
         </div>
         <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.StyleGuide ? 'z-10' : 'z-0 opacity-0 pointer-events-none'}`}>
           <StyleGuidePage
             onNavigate={handleViewChange}
+            onNavigateMenu={handleMenuNavigate}
             isActive={currentView === View.StyleGuide}
             onShowToast={showToast}
             profile={profile}
             onUpdateProfile={handleUpdateProfile}
+            user={user}
+            onLogoClick={handleLogoClick}
+            isSmallScreen={isSmallScreen}
+            stackCount={stack.length}
+            isStackNew={stack.length > lastViewedStackCount}
+            onOpenStack={() => setIsStackDialogOpen(true)}
+            onLogout={handleLogout}
+            onDeleteAccount={handleDeleteAccount}
+            isAdmin={isAdmin}
+            isProfileOpen={isProfileOpen}
+            setIsProfileOpen={setIsProfileOpen}
+            isDeleteAccountModalOpen={isDeleteAccountModalOpen}
+            setIsDeleteAccountModalOpen={setIsDeleteAccountModalOpen}
+            isMenuOpen={isMenuOpen}
+            setIsMenuOpen={setIsMenuOpen}
+            onRestartWalkthrough={handleDashboardRestartWalkthrough}
+            onClose={handleSubpageClose}
+          />
+        </div>
+        <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Analytics ? 'z-10' : 'z-0 opacity-0 pointer-events-none'}`}>
+          <UsageAnalyticsPage
+            onNavigate={handleViewChange}
+            onNavigateMenu={handleMenuNavigate}
+            isActive={currentView === View.Analytics}
+            user={user}
+            onLogoClick={handleLogoClick}
+            isSmallScreen={isSmallScreen}
+            stackCount={stack.length}
+            isStackNew={stack.length > lastViewedStackCount}
+            onOpenStack={() => setIsStackDialogOpen(true)}
+            onLogout={handleLogout}
+            onDeleteAccount={handleDeleteAccount}
+            isAdmin={isAdmin}
+            isProfileOpen={isProfileOpen}
+            setIsProfileOpen={setIsProfileOpen}
+            isDeleteAccountModalOpen={isDeleteAccountModalOpen}
+            setIsDeleteAccountModalOpen={setIsDeleteAccountModalOpen}
+            isMenuOpen={isMenuOpen}
+            setIsMenuOpen={setIsMenuOpen}
+            onRestartWalkthrough={handleDashboardRestartWalkthrough}
+            onClose={handleSubpageClose}
           />
         </div>
       </div>

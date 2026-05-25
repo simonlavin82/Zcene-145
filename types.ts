@@ -5,6 +5,7 @@ export enum View {
   Help = 'help',
   StyleGuide = 'styleguide',
   Engine = 'engine',
+  Analytics = 'analytics',
 }
 
 export interface Node {

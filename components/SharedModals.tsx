@@ -114,11 +114,11 @@ export const HeaderMenu: React.FC<{
     if (!isOpen) return null;
 
     const menuItems = [
-        { label: 'Dashboard', icon: 'dashboard', path: 'dashboard' },
-        { label: 'Help & FAQ', icon: 'help', path: 'help' },
+        { label: 'Help', icon: 'help', path: 'help' },
         ...(isAdmin ? [
             { label: 'Design System', icon: 'grid_view', path: 'design' },
             { label: 'Engine', icon: 'settings_input_component', path: 'engine' },
+            { label: 'Discovery Ledger', icon: 'monitoring', path: 'analytics' },
         ] : []),
         { label: 'Instagram', icon: 'camera_alt', path: 'instagram', isExternal: true },
     ];

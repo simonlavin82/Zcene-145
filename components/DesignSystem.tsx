@@ -3,6 +3,7 @@ import { View } from '../types';
 import * as d3 from 'd3';
 import { ZceneLogo, InstagramIcon, ZceneAbbreviatedLogo, FaviconLogo, LegendSymbol, SortControls, Spinner, HelpIcon, MicIcon, VisibilityIcon, VisibilityOffIcon, LoadingSpinner, DETAIL_THINKING_STEPS, GRAPH_THINKING_STEPS } from './Icons';
 import ViewToggle from './ViewToggle';
+import Header from './Header';
 
 const ColorSwatch: React.FC<{ name: string; hex: string; className?: string; style?: React.CSSProperties; description?: string }> = ({ name, hex, className = "", style, description }) => {
     return (
@@ -112,14 +113,52 @@ interface StyleGuidePageProps {
     onShowToast?: (message: string) => void;
     profile: any;
     onUpdateProfile: (updates: any) => void;
+    user: any;
+    onLogoClick: () => void;
+    isSmallScreen: boolean;
+    stackCount: number;
+    isStackNew: boolean;
+    onOpenStack: () => void;
+    onLogout: () => void;
+    onDeleteAccount: () => void;
+    isAdmin?: boolean;
+    isProfileOpen: boolean;
+    setIsProfileOpen: (open: boolean) => void;
+    isDeleteAccountModalOpen: boolean;
+    setIsDeleteAccountModalOpen: (open: boolean) => void;
+    isMenuOpen: boolean;
+    setIsMenuOpen: (open: boolean) => void;
+    onRestartWalkthrough?: () => void;
+    onClose?: () => void;
+    onNavigateMenu?: (path: string) => void;
 }
 
-export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isActive, onShowToast, profile, onUpdateProfile }) => {
-    const isAuthenticated = profile?.pageAuth?.styleGuide === true;
+export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ 
+    onNavigate, 
+    isActive, 
+    onShowToast, 
+    profile, 
+    onUpdateProfile,
+    user,
+    onLogoClick,
+    isSmallScreen,
+    stackCount,
+    isStackNew,
+    onOpenStack,
+    onLogout,
+    onDeleteAccount,
+    isAdmin,
+    isProfileOpen,
+    setIsProfileOpen,
+    isDeleteAccountModalOpen,
+    setIsDeleteAccountModalOpen,
+    isMenuOpen,
+    setIsMenuOpen,
+    onRestartWalkthrough,
+    onClose,
+    onNavigateMenu
+}) => {
     const [demoFocusMode, setDemoFocusMode] = useState<'organic' | 'cluster'>('organic');
-    const [password, setPassword] = useState('');
-    const [showPassword, setShowPassword] = useState(false);
-    const [error, setError] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -127,19 +166,6 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
             containerRef.current.scrollTo(0, 0);
         }
     }, [isActive]);
-
-    const handleLogin = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (password === 'Zcenester') {
-            onUpdateProfile({ 
-                pageAuth: { ...profile?.pageAuth, styleGuide: true } 
-            });
-            setError(false);
-        } else {
-            setError(true);
-            setPassword('');
-        }
-    };
 
     const sections = [
         { id: 'introduction', title: 'Introduction' },
@@ -199,70 +225,31 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
         e.target.value = "";
     };
 
-    if (!isAuthenticated) {
-        return (
-            <div ref={containerRef} className="h-full w-full overflow-y-auto bg-background-dark text-zinc-200 font-display flex flex-col items-center justify-center p-4">
-                <div className="w-full max-w-md bg-zinc-900 border border-zinc-700 rounded-none p-8 shadow-2xl my-auto">
-                    <div className="text-center mb-8">
-                        <ZceneLogo className="h-10 w-auto text-primary mx-auto mb-6" />
-                        <h2 className="text-xl font-medium text-white">Restricted Access</h2>
-                        <p className="text-zinc-400 text-sm mt-2">Please enter the password to view the design system.</p>
-                    </div>
-                    <form onSubmit={handleLogin} className="space-y-4">
-                        <div className="space-y-2">
-                            <div className="relative">
-                                <input 
-                                    type={showPassword ? "text" : "password"} 
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    placeholder="Enter password"
-                                    className={`w-full bg-zinc-950 border ${error ? 'border-red-500 focus:border-red-500' : 'border-zinc-700 focus:border-primary'} rounded-xl px-4 pr-12 py-3 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-1 transition-colors`}
-                                    autoFocus
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 h-10 w-10 flex items-center justify-center"
-                                >
-                                    {showPassword ? <VisibilityOffIcon className="w-6 h-6" /> : <VisibilityIcon className="w-6 h-6" />}
-                                </button>
-                            </div>
-                            {error && <p className="text-red-500 text-xs ml-1">Incorrect password.</p>}
-                        </div>
-                        <button type="submit" className="w-full bg-primary text-brand-black font-medium py-3 rounded-xl hover:bg-primary/90 transition-colors">Access Design System</button>
-                    </form>
-                    <div className="mt-6 text-center">
-                        <button onClick={() => onNavigate(View.Home)} className="text-zinc-500 text-sm hover:text-zinc-300 transition-colors">Return Home</button>
-                    </div>
-                </div>
-            </div>
-        );
-    }
+
 
     return (
         <div ref={containerRef} className="h-full w-full overflow-y-auto bg-background-dark text-zinc-200 font-display flex flex-col relative">
-            <header className="px-4 sm:px-6 lg:px-8 z-[100] flex-shrink-0 border-b border-zinc-700 sticky top-0 bg-background-dark/80 backdrop-blur-sm">
-                <div className="flex h-12 items-center justify-between">
-                    <button onClick={() => onNavigate(View.Home)} className="flex items-center gap-4 cursor-pointer">
-                        <ZceneLogo className="h-8 w-auto text-primary" />
-                        <div className="flex items-baseline gap-2">
-                            <span className="text-xl font-medium text-white hidden sm:block">Design System</span>
-                            <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest hidden sm:block">v1.1</span>
-                        </div>
-                    </button>
-                    <div className="flex items-center gap-4">
-                        <button onClick={() => { 
-                            onUpdateProfile({ 
-                                pageAuth: { ...profile?.pageAuth, styleGuide: false } 
-                            });
-                        }} className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">Lock</button>
-                        <button onClick={() => onNavigate(View.Home)} className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800">
-                            <span className="material-symbols-outlined">arrow_back</span>
-                            Back
-                        </button>
-                    </div>
-                </div>
-            </header>
+            <Header
+                user={user}
+                onLogoClick={onLogoClick}
+                view="dashboard"
+                isSmallScreen={isSmallScreen}
+                isMagazineViewOpen={false}
+                stackCount={stackCount}
+                isStackNew={isStackNew}
+                onOpenStack={onOpenStack}
+                onNavigate={onNavigateMenu || onNavigate}
+                onLogout={onLogout}
+                onDeleteAccount={onDeleteAccount}
+                isAdmin={isAdmin}
+                isProfileOpen={isProfileOpen}
+                setIsProfileOpen={setIsProfileOpen}
+                isDeleteAccountModalOpen={isDeleteAccountModalOpen}
+                setIsDeleteAccountModalOpen={setIsDeleteAccountModalOpen}
+                isMenuOpen={isMenuOpen}
+                setIsMenuOpen={setIsMenuOpen}
+                onRestartWalkthrough={onRestartWalkthrough}
+            />
             
             <div className="lg:hidden p-4 sticky top-16 bg-background-dark z-[90] border-b border-zinc-700">
                 <div className="relative">
@@ -281,6 +268,15 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
 
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex gap-12 flex-grow">
                 <aside className="w-56 flex-shrink-0 sticky top-28 self-start h-[calc(100vh-8rem)] hidden lg:block overflow-y-auto overflow-x-hidden pl-4 scrollbar-thin scrollbar-thumb-zinc-800">
+                    <div className="pt-6 pb-2">
+                        <button 
+                            onClick={() => onClose ? onClose() : (window.history.length > 1 ? window.history.back() : onNavigate(View.Home))} 
+                            className="inline-flex items-center gap-2 text-zinc-400 hover:text-white transition-colors bg-transparent border-0 p-0 cursor-pointer text-sm font-medium"
+                        >
+                            <span className="material-symbols-outlined text-sm">arrow_back</span>
+                            Back
+                        </button>
+                    </div>
                     <nav className="space-y-1">
                         <h3 className="font-medium text-white text-lg mb-4">Jump to section</h3>
                         {sections.map(section => (
@@ -290,6 +286,15 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
                 </aside>
 
                 <main className="flex-1 py-10 space-y-24 min-w-0">
+                    <div className="lg:hidden pt-6 pb-2">
+                        <button 
+                            onClick={() => onClose ? onClose() : (window.history.length > 1 ? window.history.back() : onNavigate(View.Home))} 
+                            className="inline-flex items-center gap-2 text-zinc-400 hover:text-white transition-colors bg-transparent border-0 p-0 cursor-pointer text-sm font-medium"
+                        >
+                            <span className="material-symbols-outlined text-sm">arrow_back</span>
+                            Back
+                        </button>
+                    </div>
                     {/* 0. INTRODUCTION */}
                     <section id="introduction">
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Introduction</h2>
@@ -2398,7 +2403,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ onNavigate, isAc
             <footer className="w-full p-8 text-zinc-400 text-sm z-10 relative bg-neutral-900 flex-shrink-0 border-t border-neutral-800">
                 <div className="container mx-auto text-center">
                     <ZceneLogo className="h-8 w-auto text-primary mx-auto mb-4" />
-                    <p className="text-zinc-600">© 2026 Zcene. All Rights Reserved.</p>
+                    <p className="text-zinc-600">© 2026 Zcene Admin Console. Restricted access authorisation design system.</p>
                 </div>
             </footer>
         </div>
