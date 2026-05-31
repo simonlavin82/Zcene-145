@@ -107,67 +107,44 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     const isAiSuggestion = isArtistNode && !isSeedArtist;
     const isManualAdd = isArtistNode && isSeedArtist && !isLibraryArtist;
 
-    const tasteMatch = useMemo(() => {
-        if (!userTaste || !details) return null;
-        
-        const hasTasteData = 
-            userTaste.favoriteArtist?.trim() || 
-            userTaste.favoriteGenre?.trim() || 
-            userTaste.favoriteOrigin?.trim() || 
-            userTaste.eraMin !== null || 
-            userTaste.eraMax !== null;
+    const tasteCompatibility = useMemo(() => {
+        if (!userTaste || !details) return {
+            hasTasteData: false,
+            totalActive: 0,
+            matches: 0,
+            criteria: [
+                { id: 'genre', name: 'Genre', active: false, matched: false },
+                { id: 'origin', name: 'Origin', active: false, matched: false },
+                { id: 'era', name: 'Era', active: false, matched: false }
+            ]
+        };
 
-        if (!hasTasteData) return null;
+        const favGenreActive = !!userTaste.favoriteGenre?.trim();
+        const favOriginActive = !!userTaste.favoriteOrigin?.trim();
+        const eraActive = userTaste.eraMin !== null || userTaste.eraMax !== null;
 
-        let totalActive = 0;
-        let matches = 0;
+        const hasTasteData = favGenreActive || favOriginActive || eraActive;
 
-        // 1. Match Favorite Artist
-        if (userTaste.favoriteArtist?.trim()) {
-            totalActive++;
-            const favArtist = userTaste.favoriteArtist.toLowerCase().trim();
-            const nodeId = node.id.toLowerCase();
-            const nodeLabel = (node.label || '').toLowerCase();
-            
-            let isArtistMatch = nodeId.includes(favArtist) || favArtist.includes(nodeId) ||
-                                nodeLabel.includes(favArtist) || favArtist.includes(nodeLabel);
-            
-            if (!isArtistMatch && details?.details?.notableArtists) {
-                isArtistMatch = details.details.notableArtists.some(artist => 
-                    artist.toLowerCase().includes(favArtist) || favArtist.includes(artist.toLowerCase())
-                );
-            }
-            
-            if (isArtistMatch) {
-                matches++;
-            }
-        }
+        let favGenreMatched = false;
+        let favOriginMatched = false;
+        let eraMatched = false;
 
-        // 2. Match Favorite Genre
-        if (userTaste.favoriteGenre?.trim()) {
-            totalActive++;
+        // 1. Match Favorite Genre
+        if (favGenreActive) {
             const favGenre = userTaste.favoriteGenre.toLowerCase().trim();
             const genre = (details?.details?.genre || '').toLowerCase().trim();
-            
-            if (genre && (genre.includes(favGenre) || favGenre.includes(genre))) {
-                matches++;
-            }
+            favGenreMatched = !!genre && (genre.includes(favGenre) || favGenre.includes(genre));
         }
 
-        // 3. Match Favorite Origin
-        if (userTaste.favoriteOrigin?.trim()) {
-            totalActive++;
+        // 2. Match Favorite Origin
+        if (favOriginActive) {
             const favOrigin = userTaste.favoriteOrigin.toLowerCase().trim();
             const origin = (details?.details?.origin || '').toLowerCase().trim();
-            
-            if (origin && (origin.includes(favOrigin) || favOrigin.includes(origin))) {
-                matches++;
-            }
+            favOriginMatched = !!origin && (origin.includes(favOrigin) || favOrigin.includes(origin));
         }
 
-        // 4. Match Era Range
-        if (userTaste.eraMin !== null || userTaste.eraMax !== null) {
-            totalActive++;
+        // 3. Match Era Range
+        if (eraActive) {
             const foundedStr = details?.details?.founded || '';
             if (foundedStr) {
                 const yearMatch = foundedStr.match(/\b(19\d{2}|20\d{2})\b/);
@@ -189,27 +166,26 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                     if (userTaste.eraMax !== null && year > userTaste.eraMax) {
                         isEraMatch = false;
                     }
-                    if (isEraMatch) {
-                        matches++;
-                    }
+                    eraMatched = isEraMatch;
                 }
             }
         }
 
-        if (totalActive === 0) return null;
+        const criteria = [
+            { id: 'genre', name: 'Genre', active: favGenreActive, matched: favGenreMatched },
+            { id: 'origin', name: 'Origin', active: favOriginActive, matched: favOriginMatched },
+            { id: 'era', name: 'Era', active: eraActive, matched: eraMatched }
+        ];
 
-        if (totalActive === 1) {
-            return matches === 1 ? 'high' : 'low';
-        } else if (totalActive === 2) {
-            if (matches === 2) return 'high';
-            if (matches === 1) return 'medium';
-            return 'low';
-        } else {
-            const ratio = matches / totalActive;
-            if (ratio >= 0.75) return 'high';
-            if (ratio >= 0.33) return 'medium';
-            return 'low';
-        }
+        const totalActive = (favGenreActive ? 1 : 0) + (favOriginActive ? 1 : 0) + (eraActive ? 1 : 0);
+        const matches = (favGenreMatched ? 1 : 0) + (favOriginMatched ? 1 : 0) + (eraMatched ? 1 : 0);
+
+        return {
+            hasTasteData,
+            totalActive,
+            matches,
+            criteria
+        };
     }, [userTaste, details, node.id, node.label]);
 
     useEffect(() => {
@@ -272,7 +248,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     }, [details?.links]);
 
     const headerSizeClass = isFullScreenMode 
-        ? (isHero ? 'text-[clamp(2rem,5vw,4.5rem)] font-bold tracking-tighter' : 'text-[clamp(1.125rem,2vw,1.75rem)] font-bold tracking-tight')
+        ? 'text-5xl font-bold tracking-tighter'
         : 'text-xl font-medium';
 
     return (
@@ -316,8 +292,8 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     </button>
                                 )}
 
-                                <button onClick={onClose} className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-700 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none" title="Close Card">
-                                        <span className="material-symbols-outlined !text-[18px]">close</span>
+                                <button onClick={onClose} className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-700 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none" title="Remove Card">
+                                        <span className="material-symbols-outlined !text-[18px]">remove</span>
                                 </button>
                             </div>
                         </div>
@@ -339,28 +315,12 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 {isManualAdd && <span className="text-[10px] font-semibold uppercase tracking-[0.2em] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 border border-emerald-500/30 rounded-md">Manual</span>}
                                 {isAiSuggestion && <span className="text-[10px] font-semibold uppercase tracking-[0.2em] bg-purple-500/20 text-purple-400 px-2 py-0.5 border border-purple-500/30 flex items-center gap-1 rounded-md"><span className="material-symbols-outlined !text-[12px]">star</span>AI</span>}
                                 {isLibraryArtist && <span className="text-[10px] font-semibold uppercase tracking-[0.2em] bg-sky-500/20 text-sky-400 px-2 py-0.5 border border-sky-500/30 rounded-md">Library</span>}
-                                
-                                {tasteMatch === 'high' && (
-                                    <span className="text-[10px] font-semibold uppercase tracking-[0.2em] bg-fuchsia-500/20 text-fuchsia-400 px-2 py-0.5 border border-fuchsia-500/30 rounded-md">
-                                        Core Vibe
-                                    </span>
-                                )}
-                                {tasteMatch === 'medium' && (
-                                    <span className="text-[10px] font-semibold uppercase tracking-[0.2em] bg-amber-500/20 text-amber-400 px-2 py-0.5 border border-amber-500/30 rounded-md">
-                                        Good Match
-                                    </span>
-                                )}
-                                {tasteMatch === 'low' && (
-                                    <span className="text-[10px] font-semibold uppercase tracking-[0.2em] bg-zinc-800/80 text-zinc-400 px-2 py-0.5 border border-zinc-700/50 rounded-md">
-                                        Fresh Find
-                                    </span>
-                                )}
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div className={`px-4 py-8 space-y-10 flex-grow min-h-0 ${isFullScreenMode ? 'md:px-8' : ''}`}>
+                <div className={`px-4 space-y-10 flex-grow min-h-0 ${isFullScreenMode ? 'py-4 md:px-8' : 'py-8'}`}>
                     {!details && (
                         <div className="flex flex-col items-center justify-center text-center py-12 space-y-8 h-full bg-zinc-900">
                             {isLoading ? (
@@ -402,16 +362,67 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 </div>
                             )}
 
-                            {details.recommendationReason && (
-                                <div className="py-8 border-y border-zinc-800/80 relative">
-                                    <div className="absolute -top-3 left-0 bg-zinc-900 pr-4 text-[11px] font-bold uppercase tracking-[0.3em] text-purple-400 flex items-center gap-2">
-                                        <span className="material-symbols-outlined !text-sm">star</span> Curator Insight
+                            <div className="flex flex-col gap-3">
+                                {details.recommendationReason && (
+                                    <div className="pt-2">
+                                        <p className="italic text-zinc-100 leading-tight font-serif tracking-tight text-2xl">
+                                            "{details.recommendationReason}"
+                                        </p>
                                     </div>
-                                    <p className={`italic text-zinc-100 leading-tight font-serif tracking-tight ${isHero ? 'text-[clamp(1.125rem,2vw,1.5rem)]' : 'text-[clamp(1.125rem,1.5vw,1.25rem)]'}`}>
-                                        "{details.recommendationReason}"
-                                    </p>
+                                )}
+
+                                {/* Compatibility Meter */}
+                                <div className="flex flex-col gap-1.5 w-full">
+                                    <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">
+                                        <span>MY TASTE</span>
+                                        {tasteCompatibility.hasTasteData ? (
+                                            <span className="font-mono text-[#a855f7] font-bold">
+                                                {tasteCompatibility.matches}/{tasteCompatibility.totalActive} Hits
+                                            </span>
+                                        ) : (
+                                            <span className="text-zinc-500 normal-case font-medium">Empty Taste Profile</span>
+                                        )}
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-1.5 w-full">
+                                        {tasteCompatibility.criteria.map((c) => {
+                                            let bgClass = '';
+                                            let borderClass = '';
+                                            if (c.active) {
+                                                if (c.matched) {
+                                                    bgClass = 'bg-[#a855f7]';
+                                                    borderClass = 'border-[#a855f7]';
+                                                } else {
+                                                    bgClass = 'bg-transparent';
+                                                    borderClass = 'border-[#52525b] border-solid';
+                                                }
+                                            } else {
+                                                bgClass = 'bg-transparent';
+                                                borderClass = 'border-[#52525b] border-dashed';
+                                            }
+                                            return (
+                                                <div 
+                                                    key={c.id} 
+                                                    className={`h-2 border transition-all duration-300 ${bgClass} ${borderClass}`}
+                                                    title={`${c.name}: ${c.active ? (c.matched ? 'Matched' : 'Unmatched') : 'Not Configured'}`}
+                                                />
+                                            );
+                                        })}
+                                    </div>
+                                    <div className="flex justify-between text-[8px] font-mono tracking-widest text-zinc-500 uppercase select-none">
+                                        {tasteCompatibility.criteria.map((c) => {
+                                            let textClass = 'text-zinc-600';
+                                            if (c.active) {
+                                                textClass = c.matched ? 'text-[#a855f7] font-bold' : 'text-zinc-400';
+                                            }
+                                            return (
+                                                <span key={c.id} className={textClass}>
+                                                    {c.name}
+                                                </span>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
-                            )}
+                            </div>
 
                             <div className={`grid ${isHero ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2'} gap-8 py-4 border-b border-zinc-800/50`}>
                                 <div>

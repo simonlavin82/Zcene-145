@@ -173,6 +173,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
         { id: 'typography', title: 'Typography' },
         { id: 'bio-scannability', title: 'Bio Scannability' },
         { id: 'artist-metadata', title: 'Artist Metadata' },
+        { id: 'taste-compatibility', title: 'Taste Compatibility' },
         { id: 'colour-palette', title: 'Colour Palette' },
         { id: 'layout-spacing', title: 'Layout & Spacing' },
         { id: 'iconography', title: 'Iconography' },
@@ -477,6 +478,21 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                      <TypographyScaleRow role="Curator Quote" sample="A foundational cornerstone of the mid-90s..." className="text-[clamp(1.125rem,2vw,1.5rem)] italic font-serif text-zinc-200" classSpec="text-[clamp(...)]" pixelSize="18px - 24px" weight="Regular (400)" usage="Stylized quotes and high-impact editorial insights with controlled scaling." />
                                 </div>
                             </div>
+
+                            {/* Magazine View Typography Rules */}
+                            <div className="mt-12 p-6 bg-zinc-900/40 border border-zinc-800 rounded-xl space-y-4">
+                                <div className="flex items-center gap-3">
+                                    <span className="material-symbols-outlined text-primary">auto_stories</span>
+                                    <h3 className="text-lg font-medium text-white">Magazine View Typography Rules</h3>
+                                </div>
+                                <p className="text-sm text-zinc-400 leading-relaxed">
+                                    To restore the large-format editorial impact of the magazine layout, typography sizes are standardized and kept static (non-dynamic) to prevent text shrinkage and layout inconsistencies across cards:
+                                </p>
+                                <ul className="space-y-2 text-sm text-zinc-400 list-disc pl-5">
+                                    <li><strong>Main Artist Header:</strong> Standardized to <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">text-5xl font-bold tracking-tighter</code> (48px static). Longer names wrap naturally onto two lines instead of shrinking.</li>
+                                    <li><strong>Curator Summary Quote:</strong> Standardized to <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">text-2xl font-serif italic text-zinc-100</code> (24px static). Placed tightly beneath metadata tags to eliminate empty layout spacers.</li>
+                                </ul>
+                            </div>
                         </div>
                     </section>
 
@@ -574,6 +590,73 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <p className="text-sm text-zinc-400 leading-relaxed">
                                         The "Active events" label itself acts as a toggle link, using <strong>underline-offset-4</strong> and <strong>decoration-primary/30</strong> to signal interactivity without adding extra visual noise like "Show more" labels.
                                     </p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* 2.3 TASTE COMPATIBILITY */}
+                    <section id="taste-compatibility">
+                        <h2 className="text-3xl font-medium text-white border-b-2 border-primary/50 pb-2 mb-8">Taste Compatibility</h2>
+                        <div className="space-y-12">
+                            <p className="text-base text-zinc-400 leading-relaxed max-w-3xl">
+                                Zcene includes a deterministic, client-side visual compatibility meter within Deep Cut panels that compares the selected artist's attributes directly against the user's active "My Taste" profile.
+                            </p>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-xl space-y-4">
+                                    <h4 className="text-xs font-semibold text-primary uppercase tracking-widest">Meter Architecture</h4>
+                                    <ul className="space-y-4 text-sm text-zinc-400">
+                                        <li>
+                                            <span className="text-white font-medium block font-bold">3-Segment Layout</span>
+                                            The meter consists of exactly 3 blocks mapped exclusively to <strong>Genre</strong>, <strong>Origin</strong>, and <strong>Era</strong> from left to right.
+                                        </li>
+                                        <li>
+                                            <span className="text-white font-medium block font-bold">Static Header Label</span>
+                                            The gauge tracks under a minimal, static tracking uppercase header label: <strong className="text-white">"MY TASTE"</strong>.
+                                        </li>
+                                        <li>
+                                            <span className="text-white font-medium block font-bold">Deterministic Matching</span>
+                                            Matches are computed dynamically on the client side without AI API overhead, comparing properties directly to active filters.
+                                        </li>
+                                    </ul>
+                                </div>
+
+                                <div className="p-6 bg-zinc-950 border border-zinc-800 rounded-xl space-y-6">
+                                    <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Visual States & Color Coding</h4>
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-12 h-2 bg-[#a855f7] border border-[#a855f7]"></div>
+                                            <span className="text-sm text-zinc-300"><strong>Active & Matched:</strong> Filled with AI purple (<code className="text-xs font-mono text-purple-400">#a855f7</code>).</span>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-12 h-2 bg-transparent border border-[#52525b] border-solid"></div>
+                                            <span className="text-sm text-zinc-300"><strong>Active & Unmatched:</strong> Solid zinc-600 outline.</span>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-12 h-2 bg-transparent border border-[#52525b] border-dashed"></div>
+                                            <span className="text-sm text-zinc-300"><strong>Unconfigured Profile State:</strong> Dashed outline.</span>
+                                        </div>
+                                    </div>
+                                    <div className="pt-4 border-t border-zinc-800/80">
+                                        <h5 className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest mb-2">Live Demo Sandbox Reference</h5>
+                                        <div className="flex flex-col gap-1.5 max-w-xs bg-zinc-900 p-3 border border-zinc-800">
+                                            <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">
+                                                <span>MY TASTE</span>
+                                                <span className="font-mono text-[#a855f7] font-bold">2/3 Hits</span>
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-1.5 w-full">
+                                                <div className="h-2 bg-[#a855f7] border border-[#a855f7]" title="Genre: Matched" />
+                                                <div className="h-2 bg-transparent border border-[#52525b] border-solid" title="Origin: Unmatched" />
+                                                <div className="h-2 bg-[#a855f7] border border-[#a855f7]" title="Era: Matched" />
+                                            </div>
+                                            <div className="flex justify-between text-[8px] font-mono tracking-widest text-zinc-500 uppercase">
+                                                <span className="text-[#a855f7] font-bold">Genre</span>
+                                                <span className="text-zinc-400">Origin</span>
+                                                <span className="text-[#a855f7] font-bold">Era</span>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -686,7 +769,8 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                                     <IconDisplay icon={<span className="material-symbols-outlined">first_page</span>} name="Collapse Panel (Left)" pxSize="18px" description="Collapses left sidebar." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
                                     <IconDisplay icon={<span className="material-symbols-outlined">last_page</span>} name="Collapse Panel (Right)" pxSize="18px" description="Collapses right sidebar toward the edge." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
-                                    <IconDisplay icon={<span className="material-symbols-outlined">close</span>} name="Close / Dismiss" pxSize="18px" description="Closes a details card, modal, or clears a search field." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">close</span>} name="Close Panel / Exit" pxSize="18px" description="Exits magazine full-screen view or closes side panels." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">remove</span>} name="Remove Card" pxSize="18px" description="Dismisses/removes a single artist details card from the workspace stack view." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
                                     <IconDisplay icon={<span className="material-symbols-outlined">refresh</span>} name="Refresh" pxSize="18px" description="Reloads content for a specific node or panel." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
                                     <IconDisplay icon={<span className="material-symbols-outlined">arrow_back</span>} name="Back" pxSize="18px" description="Navigates to the previous primary view." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
                                     <IconDisplay icon={<HelpIcon />} name="Help Guide" pxSize="18px" description="Triggers help section navigation." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
