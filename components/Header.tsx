@@ -2,8 +2,9 @@ import React from 'react';
 import { FaviconLogo, StackIcon, Spinner } from './Icons';
 import { User } from 'firebase/auth';
 import { AnimatePresence, motion } from 'framer-motion';
+import { UserTaste } from '../types';
 
-import { HeaderMenu } from './SharedModals';
+import { HeaderMenu, MyTasteDialog } from './SharedModals';
 
 interface HeaderProps {
   user: User | null;
@@ -31,6 +32,8 @@ interface HeaderProps {
   setIsMenuOpen: (open: boolean) => void;
   isGuest?: boolean;
   onRestartWalkthrough?: () => void;
+  userTaste?: UserTaste;
+  onSaveTaste?: (taste: UserTaste) => Promise<void>;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -58,9 +61,47 @@ const Header: React.FC<HeaderProps> = ({
   isMenuOpen,
   setIsMenuOpen,
   isGuest = false,
-  onRestartWalkthrough
+  onRestartWalkthrough,
+  userTaste,
+  onSaveTaste
 }) => {
   const isDashboard = view === 'dashboard';
+
+  const [isTasteDialogOpen, setIsTasteDialogOpen] = React.useState(false);
+  const [localTaste, setLocalTaste] = React.useState<UserTaste>({
+    favoriteArtist: '',
+    favoriteGenre: '',
+    favoriteOrigin: '',
+    eraMin: null,
+    eraMax: null
+  });
+
+  React.useEffect(() => {
+    if (userTaste) {
+      setLocalTaste(userTaste);
+    } else {
+      try {
+        const saved = localStorage.getItem('zcene_user_taste');
+        if (saved) {
+          setLocalTaste(JSON.parse(saved));
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, [userTaste]);
+
+  const handleSaveTaste = async (taste: UserTaste) => {
+    try {
+      localStorage.setItem('zcene_user_taste', JSON.stringify(taste));
+      setLocalTaste(taste);
+      if (onSaveTaste) {
+        await onSaveTaste(taste);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const [localName, setLocalName] = React.useState(projectName);
 
@@ -133,6 +174,15 @@ const Header: React.FC<HeaderProps> = ({
             </div>
             
             <div className="flex-shrink-0 flex items-center pointer-events-auto transition-all duration-300 justify-end gap-2 lg:gap-3 pr-0">
+            <button 
+                onClick={() => setIsTasteDialogOpen(true)}
+                className={`h-8 flex flex-shrink-0 items-center justify-center rounded-xl bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 transition-colors leading-none shadow-lg border border-zinc-700/50 relative ${isSmallScreen ? 'w-8' : 'pl-2 pr-3 gap-2'}`} 
+                title="My Taste"
+            >
+                <span className="material-symbols-outlined !text-[18px]">favorite</span>
+                {!isSmallScreen && <span className="text-xs font-medium">My Taste</span>}
+            </button>
+
             <button 
                 onClick={onOpenStack}
                 className={`h-8 flex flex-shrink-0 items-center justify-center rounded-xl bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 transition-colors leading-none shadow-lg border border-zinc-700/50 relative ${isSmallScreen ? 'w-8' : 'pl-2 pr-3 gap-2'}`} 
@@ -239,6 +289,12 @@ const Header: React.FC<HeaderProps> = ({
             )}
             </div>
         </div>
+        <MyTasteDialog 
+            isOpen={isTasteDialogOpen} 
+            onClose={() => setIsTasteDialogOpen(false)} 
+            taste={localTaste} 
+            onSave={handleSaveTaste} 
+        />
     </header>
   );
 };

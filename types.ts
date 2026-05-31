@@ -132,13 +132,25 @@ export interface Project {
   discoveryFilters?: string; // JSON
   lastViewedStackCount?: number;
   isMagazineViewOpen?: boolean;
+  authorId?: string;
   createdAt?: any;
   updatedAt?: any;
 }
 
 export interface DiscoveryFilters {
   foundedAfter?: number;
+  foundedBefore?: number;
   includeOrigins?: string[];
   excludeOrigins?: string[];
+  includeGenres?: string[];
   additionalInstructions?: string;
 }
+
+export interface UserTaste {
+  favoriteArtist: string;
+  favoriteGenre: string;
+  favoriteOrigin: string;
+  eraMin: number | null;
+  eraMax: number | null;
+}
+

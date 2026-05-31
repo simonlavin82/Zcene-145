@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { GraphData, Node, ParsedArtist, View, NodeDetails, GraphSettings, Link, ChatMessage, StackItem, DiscoveryFilters } from '../types';
+import { GraphData, Node, ParsedArtist, View, NodeDetails, GraphSettings, Link, ChatMessage, StackItem, DiscoveryFilters, UserTaste } from '../types';
 import { User } from '../services/firebase';
 import { motion, AnimatePresence } from 'motion/react';
 import { normalizeArtistId } from '../services/artistCacheService';
@@ -122,7 +122,8 @@ const DiscoveryFiltersPanel: React.FC<{
   onUpdate: (filters: DiscoveryFilters) => void;
   isGuest?: boolean;
   onAuthRequest?: () => void;
-}> = ({ filters, onUpdate, isGuest, onAuthRequest }) => {
+  userTaste?: UserTaste;
+}> = ({ filters, onUpdate, isGuest, onAuthRequest, userTaste }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   if (isGuest) {
@@ -133,7 +134,28 @@ const DiscoveryFiltersPanel: React.FC<{
     onUpdate({ ...filters, [field]: value });
   };
 
+  const hasTasteData = !!userTaste && !!(
+    userTaste.favoriteArtist?.trim() ||
+    userTaste.favoriteGenre?.trim() ||
+    userTaste.favoriteOrigin?.trim() ||
+    userTaste.eraMin !== null ||
+    userTaste.eraMax !== null
+  );
+
+  const handleApplyTaste = () => {
+    if (!userTaste) return;
+    onUpdate({
+      ...filters,
+      foundedAfter: userTaste.eraMin ?? undefined,
+      foundedBefore: userTaste.eraMax ?? undefined,
+      includeGenres: userTaste.favoriteGenre?.trim() ? [userTaste.favoriteGenre.trim()] : undefined,
+      includeOrigins: userTaste.favoriteOrigin?.trim() ? [userTaste.favoriteOrigin.trim()] : undefined,
+    });
+  };
+
   const hasActiveFilters = filters.foundedAfter || 
+                          filters.foundedBefore ||
+                          (filters.includeGenres && filters.includeGenres.length > 0) ||
                           (filters.includeOrigins && filters.includeOrigins.length > 0) || 
                           (filters.excludeOrigins && filters.excludeOrigins.length > 0) || 
                           filters.additionalInstructions;
@@ -155,13 +177,48 @@ const DiscoveryFiltersPanel: React.FC<{
 
       {isExpanded && (
         <div className="mt-3 p-4 rounded-none bg-zinc-800/30 border border-zinc-700/50 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+          {hasTasteData && (
+            <div className="flex justify-center mb-2">
+              <button
+                type="button"
+                onClick={handleApplyTaste}
+                className="flex items-center px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-white rounded-xl border border-zinc-700/50 transition-colors duration-200 cursor-pointer"
+              >
+                Apply my taste
+              </button>
+            </div>
+          )}
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Founded After (Year)</label>
+            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Founded Era Range (Years)</label>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <input
+                  type="number"
+                  placeholder="Min Year (e.g. 1990)"
+                  value={filters.foundedAfter || ''}
+                  onChange={(e) => updateField('foundedAfter', e.target.value ? parseInt(e.target.value) : undefined)}
+                  className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900/60 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200"
+                />
+              </div>
+              <div className="space-y-1">
+                <input
+                  type="number"
+                  placeholder="Max Year (e.g. 2010)"
+                  value={filters.foundedBefore || ''}
+                  onChange={(e) => updateField('foundedBefore', e.target.value ? parseInt(e.target.value) : undefined)}
+                  className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900/60 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Include Genres</label>
             <input
-              type="number"
-              placeholder="e.g. 2020"
-              value={filters.foundedAfter || ''}
-              onChange={(e) => updateField('foundedAfter', e.target.value ? parseInt(e.target.value) : undefined)}
+              type="text"
+              placeholder="e.g. Hardcore Punk, Grunge"
+              value={filters.includeGenres?.join(', ') || ''}
+              onChange={(e) => updateField('includeGenres', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
               className="w-full bg-zinc-900/60 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
             />
           </div>
@@ -1257,6 +1314,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
             onUpdate={onUpdateDiscoveryFilters} 
             isGuest={isGuest}
             onAuthRequest={() => { user ? onSaveToDashboard?.() : onLogin(); }}
+            userTaste={profile?.taste}
           />
 
           {/* New Inline Action Button: Moving from absolute footer to inline flow */}
@@ -1433,6 +1491,10 @@ const GraphPage: React.FC<GraphPageProps> = ({
             setIsMenuOpen={setIsMenuOpen}
             isAdmin={isAdmin}
             isGuest={isGuest}
+            userTaste={profile?.taste}
+            onSaveTaste={async (taste) => {
+              await onUpdateProfile({ taste });
+            }}
             onRestartWalkthrough={handleRestartWalkthrough}
         />
 
@@ -1521,6 +1583,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                         isGuest={isGuest}
                                         user={user}
                                         onAuthRequest={() => { user ? onSaveToDashboard?.() : onLogin(); }}
+                                        userTaste={profile?.taste}
                                     />
                                 </div>
                             </div>
@@ -1583,7 +1646,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                     </div>
                 </div>
                 
-                <aside style={{ width: isMagazineViewOpen ? '100%' : `${rightPanelWidth}px` }} className={`z-50 flex flex-col flex-shrink-0 ${isMagazineViewOpen ? '!fixed !inset-0 !top-0 !left-0 !m-0 !w-screen !h-screen !z-[1000] bg-background-dark/95' : 'relative h-full bg-zinc-900 border border-zinc-600/50 overflow-hidden transition-all duration-300 ease-in-out'}`}>
+                <aside style={isMagazineViewOpen ? {} : { width: `${rightPanelWidth}px` }} className={`z-50 flex flex-col flex-shrink-0 ${isMagazineViewOpen ? '!fixed !inset-0 !top-0 !left-0 !m-0 !w-screen !h-screen !z-[1000] bg-background-dark/95' : 'relative h-full bg-zinc-900 border border-zinc-600/50 overflow-hidden transition-all duration-300 ease-in-out'}`}>
                      {!isDetailsPanelCollapsed && !isMagazineViewOpen && (
                        <div onMouseDown={handleMouseDown('right')} className="absolute top-0 left-0 h-full w-2 cursor-col-resize select-none touch-none z-10 group" aria-label="Resize right panel" role="separator">
                          <div className="w-full h-full bg-transparent group-hover:bg-primary/20 transition-colors"></div>
@@ -1621,6 +1684,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                        isGuest={isGuest}
                        user={user}
                        onAuthRequest={() => { user ? onSaveToDashboard?.() : onLogin(); }}
+                       userTaste={profile?.taste}
                      />
                 </aside>
             </main>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StackItem, Node } from '../types';
+import { StackItem, Node, UserTaste } from '../types';
 import { StackIcon } from './Icons';
 
 // --- My Stack Dialog Component ---
@@ -91,8 +91,11 @@ export const MyStackDialog: React.FC<{
                     })
                 )}
             </div>
-            <footer className="p-4 bg-zinc-900 border-t border-zinc-700 flex justify-end">
-                <button onClick={onClose} className="rounded-xl bg-primary px-6 py-2 text-sm font-medium text-brand-black transition-opacity hover:opacity-90">
+            <footer className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2">
+                <button onClick={onClose} className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors">
+                    Cancel
+                </button>
+                <button onClick={onClose} className="px-6 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90">
                     Done
                 </button>
             </footer>
@@ -174,4 +177,138 @@ export const HeaderMenu: React.FC<{
         </>
     );
 };
+
+export const MyTasteDialog: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  taste?: UserTaste;
+  onSave: (taste: UserTaste) => Promise<void>;
+}> = ({ isOpen, onClose, taste, onSave }) => {
+  const [favoriteArtist, setFavoriteArtist] = useState(taste?.favoriteArtist || '');
+  const [favoriteGenre, setFavoriteGenre] = useState(taste?.favoriteGenre || '');
+  const [favoriteOrigin, setFavoriteOrigin] = useState(taste?.favoriteOrigin || '');
+  const [eraMin, setEraMin] = useState<number | null>(taste?.eraMin ?? null);
+  const [eraMax, setEraMax] = useState<number | null>(taste?.eraMax ?? null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Sync state if taste changes
+  React.useEffect(() => {
+    if (isOpen) {
+      setFavoriteArtist(taste?.favoriteArtist || '');
+      setFavoriteGenre(taste?.favoriteGenre || '');
+      setFavoriteOrigin(taste?.favoriteOrigin || '');
+      setEraMin(taste?.eraMin ?? null);
+      setEraMax(taste?.eraMax ?? null);
+    }
+  }, [isOpen, taste]);
+
+  if (!isOpen) return null;
+
+  const handleSaveClick = async () => {
+    setIsSaving(true);
+    try {
+      await onSave({
+        favoriteArtist,
+        favoriteGenre,
+        favoriteOrigin,
+        eraMin,
+        eraMax
+      });
+      onClose();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-[120] flex items-center justify-center p-4 animate-fade-in-down pointer-events-auto" style={{ animationDuration: '200ms' }} onClick={onClose}>
+      <div className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-hidden animate-fade-in-down" style={{ animationDuration: '200ms' }} onClick={e => e.stopPropagation()}>
+        <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary !text-[18px]">favorite</span>
+            <h3 className="text-lg font-medium text-white">My Taste Profile</h3>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none">
+            <span className="material-symbols-outlined !text-[18px]">close</span>
+          </button>
+        </header>
+
+        <div className="flex-grow overflow-y-auto p-5 space-y-5">
+          <p className="text-xs text-zinc-400 leading-relaxed">
+            Customize your permanent music taste. Deep Cut cards will display compatibility indicators based on these criteria.
+          </p>
+
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Favourite Artist</label>
+            <input 
+              type="text" 
+              placeholder="e.g. Turnstile"
+              value={favoriteArtist}
+              onChange={(e) => setFavoriteArtist(e.target.value)}
+              className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900/60 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Favorite Genre</label>
+            <input 
+              type="text" 
+              placeholder="e.g. Hardcore Punk"
+              value={favoriteGenre}
+              onChange={(e) => setFavoriteGenre(e.target.value)}
+              className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900/60 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Favorite Origin</label>
+            <input 
+              type="text" 
+              placeholder="e.g. Baltimore"
+              value={favoriteOrigin}
+              onChange={(e) => setFavoriteOrigin(e.target.value)}
+              className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900/60 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Founded Era Range (Years)</label>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <input 
+                  type="number" 
+                  placeholder="Min Year (e.g. 1990)"
+                  value={eraMin ?? ''}
+                  onChange={(e) => setEraMin(e.target.value ? parseInt(e.target.value) : null)}
+                  className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900/60 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
+                />
+              </div>
+              <div className="space-y-1">
+                <input 
+                  type="number" 
+                  placeholder="Max Year (e.g. 2010)"
+                  value={eraMax ?? ''}
+                  onChange={(e) => setEraMax(e.target.value ? parseInt(e.target.value) : null)}
+                  className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900/60 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <footer className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2">
+          <button onClick={onClose} disabled={isSaving} className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors disabled:opacity-50">
+            Cancel
+          </button>
+          <button onClick={handleSaveClick} disabled={isSaving} className="px-6 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90 disabled:opacity-50">
+            {isSaving ? 'Saving...' : 'Save'}
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
+};
+
 

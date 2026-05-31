@@ -326,7 +326,249 @@ export const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed infor
 
 // --- SERVICE FUNCTIONS ---
 
+// --- LOCAL SANDBOX MOCKS ---
+const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+const generateMockGraphData = (artists: string, baseGraph?: GraphData, filters?: DiscoveryFilters): GraphData => {
+  const artistList = artists.split('::').map(a => a.trim()).filter(Boolean);
+  const nodes: Node[] = baseGraph ? [...baseGraph.nodes] : [];
+  const links: Link[] = baseGraph ? [...baseGraph.links] : [];
+  const nodeIds = new Set(nodes.map(n => n.id.toLowerCase()));
+
+  const addNode = (n: Node) => {
+    const key = n.id.toLowerCase();
+    if (!nodeIds.has(key)) {
+      nodes.push(n);
+      nodeIds.add(key);
+    }
+  };
+
+  const addLink = (source: string, target: string, value: number = 1) => {
+    const s = source.toLowerCase();
+    const t = target.toLowerCase();
+    if (s === t) return;
+    const exists = links.some(l => {
+      const ls = (typeof l.source === 'string' ? l.source : l.source.id).toLowerCase();
+      const lt = (typeof l.target === 'string' ? l.target : l.target.id).toLowerCase();
+      return (ls === s && lt === t) || (ls === t && lt === s);
+    });
+    if (!exists) {
+      links.push({ source, target, value });
+    }
+  };
+
+  const presets: Record<string, { genres: string[], labels: string[], country: string, founded: string, related: string[] }> = {
+    'radiohead': {
+      genres: ['Art Rock', 'Alternative Rock', 'Electronic'],
+      labels: ['XL Recordings', 'Parlophone'],
+      country: 'United Kingdom',
+      founded: '1985',
+      related: ['The Smile', 'Thom Yorke', 'Ultraísta', 'Portishead', 'Sigur Rós', 'Massive Attack']
+    },
+    'blink-182': {
+      genres: ['Pop Punk', 'Alternative Rock'],
+      labels: ['MCA Records', 'Geffen Records'],
+      country: 'United States',
+      founded: '1992',
+      related: ['Box Car Racer', '+44', 'Green Day', 'Alkaline Trio', 'Sum 41', 'Simple Plan']
+    },
+    'orange 9mm': {
+      genres: ['Post-Hardcore', 'Rap Metal'],
+      labels: ['East West Records', 'Revelation Records'],
+      country: 'United States',
+      founded: '1995',
+      related: ['Burn', 'Quicksand', 'Helmet', 'Snapcase', 'Handsome', 'Shift']
+    },
+    'madball': {
+      genres: ['New York Hardcore', 'Hardcore Punk'],
+      labels: ['Roadrunner Records', 'Epitaph Records'],
+      country: 'United States',
+      founded: '1988',
+      related: ['Agnostic Front', 'Sick of It All', 'H2O', 'Cro-Mags', 'Terror', 'Warzone']
+    },
+    'h2o': {
+      genres: ['Melodic Hardcore', 'Punk Rock'],
+      labels: ['Bridge Nine Records', 'Epitaph Records'],
+      country: 'United States',
+      founded: '1994',
+      related: ['Madball', 'Sick of It All', 'Bane', 'Saves the Day', 'Gorilla Biscuits', 'Shelter']
+    }
+  };
+
+  const countries = ['United States', 'United Kingdom', 'Canada', 'Australia', 'Sweden', 'Germany'];
+  const genericGenres = ['Post-Punk', 'Shoegaze', 'Dream Pop', 'Garage Rock', 'Synthpop', 'Indie Rock'];
+  const genericLabels = ['Sub Pop', 'Matador Records', 'Merge Records', 'Warp Records', 'Domino'];
+
+  artistList.forEach((artistName, index) => {
+    const norm = artistName.toLowerCase();
+    const group = index + 1;
+    const preset = presets[norm] || {
+      genres: [genericGenres[Math.floor(Math.random() * genericGenres.length)]],
+      labels: [genericLabels[Math.floor(Math.random() * genericLabels.length)]],
+      country: countries[Math.floor(Math.random() * countries.length)],
+      founded: (1990 + Math.floor(Math.random() * 28)).toString(),
+      related: [
+        `${artistName} Wave`,
+        `${artistName} Project`,
+        `The ${artistName}s`,
+        `Club ${artistName.split(' ')[0] || 'Music'}`,
+        `Echo ${artistName.split(' ')[0] || 'Sound'}`
+      ]
+    };
+
+    let foundedYear = preset.founded;
+    if (filters?.foundedAfter) {
+      const limit = Number(filters.foundedAfter);
+      if (Number(foundedYear) <= limit) {
+        foundedYear = (limit + 1 + Math.floor(Math.random() * 10)).toString();
+      }
+    }
+    if (filters?.foundedBefore) {
+      const limit = Number(filters.foundedBefore);
+      if (Number(foundedYear) >= limit) {
+        foundedYear = (limit - 1 - Math.floor(Math.random() * 10)).toString();
+      }
+    }
+
+    let country = preset.country;
+    if (filters?.includeOrigins && filters.includeOrigins.length > 0) {
+      country = filters.includeOrigins[0];
+    }
+
+    addNode({ id: artistName, type: 'artist', group, label: artistName });
+
+    const genresToUse = [...preset.genres];
+    if (filters?.includeGenres && filters.includeGenres.length > 0) {
+      genresToUse[0] = filters.includeGenres[0];
+    }
+
+    genresToUse.forEach(g => {
+      addNode({ id: g, type: 'genre', group: 1000, label: g });
+      addLink(artistName, g);
+    });
+
+    preset.labels.forEach(l => {
+      addNode({ id: l, type: 'label', group: 2000, label: l });
+      addLink(artistName, l);
+    });
+
+    addNode({ id: country, type: 'country', group: 3000, label: country });
+    addLink(artistName, country);
+
+    addNode({ id: foundedYear, type: 'founded', group: 4000, label: foundedYear });
+    addLink(artistName, foundedYear);
+
+    preset.related.forEach(relName => {
+      let relFounded = (Number(foundedYear) + Math.floor(Math.random() * 8) - 4).toString();
+      if (filters?.foundedAfter && Number(relFounded) <= Number(filters.foundedAfter)) {
+        relFounded = (Number(filters.foundedAfter) + 1 + Math.floor(Math.random() * 5)).toString();
+      }
+      if (filters?.foundedBefore && Number(relFounded) >= Number(filters.foundedBefore)) {
+        relFounded = (Number(filters.foundedBefore) - 1 - Math.floor(Math.random() * 5)).toString();
+      }
+
+      addNode({ id: relName, type: 'artist', group, label: relName });
+      addLink(artistName, relName);
+
+      const relGenre = genresToUse[0];
+      addLink(relName, relGenre);
+
+      const relLabel = preset.labels[0];
+      addLink(relName, relLabel);
+
+      addLink(relName, country);
+
+      addNode({ id: relFounded, type: 'founded', group: 4000, label: relFounded });
+      addLink(relName, relFounded);
+    });
+  });
+
+  if (artistList.length > 1) {
+    for (let i = 0; i < artistList.length - 1; i++) {
+      addLink(artistList[i], artistList[i+1], 2);
+    }
+  }
+
+  return normalizeGraphData({ nodes, links });
+};
+
+const generateMockNodeDetails = (node: Node): NodeDetails => {
+  const norm = node.id.toLowerCase();
+  
+  const summaries: Record<string, string> = {
+    'radiohead': '**Radiohead** are an English art rock band formed in Abingdon, Oxfordshire, in 1985. They have sold more than 30 million albums worldwide and are widely considered one of the most creative and influential bands of the alternative rock era.',
+    'blink-182': '**blink-182** is an American pop punk band formed in Poway, California, in 1992. They are considered a key group in the development and mainstream popularity of pop punk, selling over 50 million records worldwide.',
+    'orange 9mm': '**Orange 9mm** was an American post-hardcore band formed in New York City in 1995. They blended metal, hardcore, and rap influences into a highly aggressive, groove-heavy sound that defined the mid-90s underground scene.',
+    'madball': '**Madball** is an American hardcore punk band formed in New York City in 1988. Led by Freddy Cricien, they are one of the cornerstone bands of the New York Hardcore (NYHC) scene, famous for their street-level intensity.',
+    'h2o': '**H2O** is an American melodic hardcore band formed in New York City in 1994. They combined the speed and PMA (Positive Mental Attitude) of DC hardcore with catchy, melodic punk choruses, gaining a dedicated international following.'
+  };
+
+  const members: Record<string, string[]> = {
+    'radiohead': ['Thom Yorke (Vocals)', 'Jonny Greenwood (Guitar)', 'Colin Greenwood (Bass)', 'Ed O\'Brien (Guitar)', 'Philip Selway (Drums)'],
+    'blink-182': ['Mark Hoppus (Bass/Vocals)', 'Travis Barker (Drums)', 'Tom DeLonge (Guitar/Vocals)'],
+    'orange 9mm': ['Chaka Malik (Vocals)', 'Chris Traynor (Guitar)', 'Davide Gentile (Bass)', 'Matthew Cross (Drums)'],
+    'madball': ['Freddy Cricien (Vocals)', 'Mitt Ginetto (Guitar)', 'Hoya Roc (Bass)', 'Mike Justian (Drums)'],
+    'h2o': ['Toby Morse (Vocals)', 'Rusty Pistachio (Guitar)', 'Todd Friend (Drums)', 'Adam Blake (Bass)', 'Colin McGinniss (Guitar)']
+  };
+
+  const albums: Record<string, { albumName: string, releaseYear: string }[]> = {
+    'radiohead': [
+      { albumName: 'OK Computer', releaseYear: '1997' },
+      { albumName: 'Kid A', releaseYear: '2000' },
+      { albumName: 'In Rainbows', releaseYear: '2007' }
+    ],
+    'blink-182': [
+      { albumName: 'Enema of the State', releaseYear: '1999' },
+      { albumName: 'Take Off Your Pants and Jacket', releaseYear: '2001' },
+      { albumName: 'Blink-182', releaseYear: '2003' }
+    ],
+    'orange 9mm': [
+      { albumName: 'Driver Not Included', releaseYear: '1995' },
+      { albumName: 'Tragic', releaseYear: '1996' },
+      { albumName: 'Pretend I\'m Human', releaseYear: '1999' }
+    ],
+    'madball': [
+      { albumName: 'Set It Off', releaseYear: '1994' },
+      { albumName: 'Demonstrating My Style', releaseYear: '1996' },
+      { albumName: 'Look My Way', releaseYear: '1998' }
+    ],
+    'h2o': [
+      { albumName: 'H2O', releaseYear: '1996' },
+      { albumName: 'Thicker Than Water', releaseYear: '1997' },
+      { albumName: 'Nothing to Prove', releaseYear: '2008' }
+    ]
+  };
+
+  const defaultSummary = `**${node.id}** is a notable music entity in the scene. They are highly recognized for their stylistic contributions, helping shape the sonic evolution and community around alternative music.`;
+  const defaultMembers = ['Lead Artist / Musician', 'Session Players'];
+  const defaultAlbums = [
+    { albumName: 'Self-Titled Debut', releaseYear: '2015' },
+    { albumName: 'Breakthrough Album', releaseYear: '2018' },
+    { albumName: 'Latest Release', releaseYear: '2022' }
+  ];
+
+  return {
+    summary: summaries[norm] || defaultSummary,
+    imageUrl: 'https://en.wikipedia.org/wiki/Special:FilePath/Record_icon.svg',
+    members: members[norm] || defaultMembers,
+    details: {
+      genre: 'Alternative / Hardcore',
+      origin: 'New York, USA',
+      founded: '1995'
+    },
+    links: [
+      { site: 'Wikipedia', url: `https://en.wikipedia.org/wiki/${encodeURIComponent(node.id)}` },
+      { site: 'Official Website', url: 'http://www.zcene.online' }
+    ],
+    discography: albums[norm] || defaultAlbums,
+    recommendationReason: `Essential artist that defines the roots and branchings of the ${node.id} scene.`
+  };
+};
+
 export const generateGraphData = async (artists: string, baseGraph?: GraphData, filters?: DiscoveryFilters, activeUserId?: string | null): Promise<GraphData> => {
+  if (isLocal) {
+    return generateMockGraphData(artists, baseGraph, filters);
+  }
   const proxyKey = 'backend-proxy-key'; // Actual key is securely injected by the proxy
   const baseUrl = typeof window !== 'undefined' ? window.location.origin + '/api/gemini' : 'http://localhost:8080/api/gemini';
 
@@ -375,6 +617,9 @@ export const generateGraphData = async (artists: string, baseGraph?: GraphData, 
       if (filters?.foundedAfter) {
           dynamicSchema.properties.nodes.description += ` MANDATORY: All NEW artists MUST have been founded AFTER ${filters.foundedAfter}.`;
       }
+      if (filters?.foundedBefore) {
+          dynamicSchema.properties.nodes.description += ` MANDATORY: All NEW artists MUST have been founded BEFORE ${filters.foundedBefore}.`;
+      }
 
       if (isMultiSeed) {
           systemInstruction = GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE
@@ -401,6 +646,16 @@ export const generateGraphData = async (artists: string, baseGraph?: GraphData, 
               filterRules += `\n- NO FALLBACK: If you cannot find an artist founded after ${filters.foundedAfter}, DO NOT include a substitute. Return an empty array for that recommendation slot.`;
               filterRules += `\n- LOGIC: If the seed artist is old (e.g. from the 90s), look for MODERN bands (founded > ${filters.foundedAfter}) that are influenced by them or part of the current 'revival' scene.`;
           }
+
+          if (filters.foundedBefore) {
+              filterRules += `\n- MANDATORY: Every NEW artist you add MUST have been founded BEFORE the year ${filters.foundedBefore}.`;
+              filterRules += `\n- FORBIDDEN: Do not include any artists founded in ${filters.foundedBefore} or later.`;
+              filterRules += `\n- NO FALLBACK: If you cannot find an artist founded before ${filters.foundedBefore}, DO NOT include a substitute. Return an empty array for that recommendation slot.`;
+          }
+
+          if (filters.includeGenres && filters.includeGenres.length > 0) {
+              filterRules += `\n- GENRE MANDATE: Only include new artists that play/belong to these genres: ${filters.includeGenres.join(', ')}.`;
+          }
           
           if (filters.includeOrigins && filters.includeOrigins.length > 0) {
               filterRules += `\n- ORIGIN MANDATE: Only include new artists from: ${filters.includeOrigins.join(', ')}.`;
@@ -416,12 +671,18 @@ export const generateGraphData = async (artists: string, baseGraph?: GraphData, 
 
           filterRules += "\n\nIMPORTANT: Do NOT include any search citations, grounding markers (like [1], [2]), or footnotes in the JSON output. The JSON must be clean and parseable.";
           filterRules += `\n\n(Note: The seed artists [${artists}] are the ONLY exception. ALL other artists MUST obey these rules or be excluded.)`;
-          filterRules += "\n\nFINAL VERIFICATION: Before generating JSON, audit your list. If an artist was founded in or before the filter year, DELETE them from your response.";
+          filterRules += "\n\nFINAL VERIFICATION: Before generating JSON, audit your list. Ensure all filters are strictly obeyed. If an artist violates any of the rules above, DELETE them from your response.";
           
           systemInstruction += filterRules;
           
           // Also reinforce in the user prompt
-          userPrompt += `\n\nREMINDER: All new artists MUST be founded AFTER ${filters.foundedAfter || 'N/A'}. No exceptions.`;
+          let reminder = `\n\nREMINDER: All new artists MUST meet the active filters:`;
+          if (filters.foundedAfter) reminder += ` founded after ${filters.foundedAfter};`;
+          if (filters.foundedBefore) reminder += ` founded before ${filters.foundedBefore};`;
+          if (filters.includeOrigins && filters.includeOrigins.length > 0) reminder += ` origins in ${filters.includeOrigins.join(', ')};`;
+          if (filters.excludeOrigins && filters.excludeOrigins.length > 0) reminder += ` origins NOT in ${filters.excludeOrigins.join(', ')};`;
+          if (filters.includeGenres && filters.includeGenres.length > 0) reminder += ` genres in ${filters.includeGenres.join(', ')};`;
+          userPrompt += reminder;
       }
 
       // Format standard REST request body
@@ -678,6 +939,9 @@ export const generateGraphData = async (artists: string, baseGraph?: GraphData, 
 };
 
 export const extendGraphFromNode = async (node: Node, baseGraph: GraphData): Promise<GraphData> => {
+  if (isLocal) {
+    return generateMockGraphData(node.id, baseGraph);
+  }
   const proxyKey = 'backend-proxy-key';
   const baseUrl = typeof window !== 'undefined' ? window.location.origin + '/api/gemini' : 'http://localhost:8080/api/gemini';
   
@@ -746,6 +1010,9 @@ export const extendGraphFromNode = async (node: Node, baseGraph: GraphData): Pro
 };
 
 export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArtists: string, originHint?: string | null): Promise<NodeDetails> => {
+    if (isLocal) {
+        return generateMockNodeDetails(node);
+    }
     const proxyKey = 'backend-proxy-key';
     const baseUrl = typeof window !== 'undefined' ? window.location.origin + '/api/gemini' : 'http://localhost:8080/api/gemini';
     
@@ -881,6 +1148,23 @@ export const streamNodeChat = async (
   graphData: GraphData,
   onChunk: (text: string) => void
 ) => {
+    if (isLocal) {
+        const responses = [
+          `Discussing ${currentNode.id} is always exciting. They represent a major stylistic milestone in this scene, particularly with their signature blend of raw energy and musical craftsmanship.`,
+          `${currentNode.id} really broke barriers by fusing their core style with experimental elements. This created a ripple effect, influencing dozens of bands in the subsequent years.`,
+          `If you listen to their early discography, you can hear how ${currentNode.id} shaped the scene's aesthetic. They brought a unique, analog warmth that modern digital releases try hard to replicate.`
+        ];
+        
+        const fullText = responses[Math.floor(Math.random() * responses.length)];
+        let current = "";
+        const words = fullText.split(" ");
+        for (let i = 0; i < words.length; i++) {
+          current += (i === 0 ? "" : " ") + words[i];
+          onChunk(current);
+          await new Promise(resolve => setTimeout(resolve, 60));
+        }
+        return fullText;
+    }
     const proxyKey = 'backend-proxy-key';
     const baseUrl = typeof window !== 'undefined' ? window.location.origin + '/api/gemini' : 'http://localhost:8080/api/gemini';
     const ai = new GoogleGenAI({ 
@@ -936,6 +1220,9 @@ export const streamNodeChat = async (
  * This runs completely bypasses Firestore and does not pollute the permanent artist cache.
  */
 export const fetchLiveTourData = async (artistName: string): Promise<string> => {
+    if (isLocal) {
+        return `[Offline Sandbox] Upcoming live tour dates for ${artistName}: Scheduled events in London, New York, and Berlin. Check official site for tickets.`;
+    }
     const proxyKey = 'backend-proxy-key';
     const baseUrl = typeof window !== 'undefined' ? window.location.origin + '/api/gemini' : 'http://localhost:8080/api/gemini';
 

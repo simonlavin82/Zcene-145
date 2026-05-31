@@ -256,14 +256,15 @@ const parseCsvData = (csvString: string): ParsedResult => {
 
 const filterGraphByDiscoveryFilters = (data: GraphData, filters: DiscoveryFilters, seedArtists: string): GraphData => {
   if (!data || !data.nodes || !data.links) return data || { nodes: [], links: [] };
-  if (!filters.foundedAfter && (!filters.includeOrigins || filters.includeOrigins.length === 0) && (!filters.excludeOrigins || filters.excludeOrigins.length === 0)) return data;
+  if (!filters.foundedAfter && !filters.foundedBefore && (!filters.includeOrigins || filters.includeOrigins.length === 0) && (!filters.excludeOrigins || filters.excludeOrigins.length === 0) && (!filters.includeGenres || filters.includeGenres.length === 0)) return data;
 
   const seedArtistIds = new Set(seedArtists.split('::').map(a => a.trim().toLowerCase()));
   const nodesToRemove = new Set<string>();
 
-  // Map artists to their founded years and origins from the graph
+  // Map artists to their founded years, origins, and genres from the graph
   const artistToYear = new Map<string, number>();
   const artistToOrigins = new Map<string, Set<string>>();
+  const artistToGenres = new Map<string, Set<string>>();
   const nodeMap = new Map(data.nodes.map(n => [n.id, n]));
 
   data.links.forEach(link => {
@@ -280,6 +281,9 @@ const filterGraphByDiscoveryFilters = (data: GraphData, filters: DiscoveryFilter
       } else if (targetNode?.type === 'country') {
         if (!artistToOrigins.has(sourceId.toLowerCase())) artistToOrigins.set(sourceId.toLowerCase(), new Set());
         artistToOrigins.get(sourceId.toLowerCase())!.add(targetNode.id.toLowerCase());
+      } else if (targetNode?.type === 'genre') {
+        if (!artistToGenres.has(sourceId.toLowerCase())) artistToGenres.set(sourceId.toLowerCase(), new Set());
+        artistToGenres.get(sourceId.toLowerCase())!.add(targetNode.id.toLowerCase());
       }
     } else if (targetNode?.type === 'artist') {
       if (sourceNode?.type === 'founded') {
@@ -288,17 +292,48 @@ const filterGraphByDiscoveryFilters = (data: GraphData, filters: DiscoveryFilter
       } else if (sourceNode?.type === 'country') {
         if (!artistToOrigins.has(targetId.toLowerCase())) artistToOrigins.set(targetId.toLowerCase(), new Set());
         artistToOrigins.get(targetId.toLowerCase())!.add(sourceNode.id.toLowerCase());
+      } else if (sourceNode?.type === 'genre') {
+        if (!artistToGenres.has(targetId.toLowerCase())) artistToGenres.set(targetId.toLowerCase(), new Set());
+        artistToGenres.get(targetId.toLowerCase())!.add(sourceNode.id.toLowerCase());
       }
     }
   });
 
   data.nodes.forEach(node => {
     if (node.type === 'artist' && !seedArtistIds.has(node.id.toLowerCase())) {
-      // Year Filter
+      // Year Filter (Min Year)
       if (filters.foundedAfter) {
         const threshold = Number(filters.foundedAfter);
         const year = artistToYear.get(node.id.toLowerCase());
         if (year && year <= threshold) {
+          nodesToRemove.add(node.id);
+          return;
+        }
+      }
+
+      // Year Filter (Max Year)
+      if (filters.foundedBefore) {
+        const maxThreshold = Number(filters.foundedBefore);
+        const year = artistToYear.get(node.id.toLowerCase());
+        if (year && year >= maxThreshold) {
+          nodesToRemove.add(node.id);
+          return;
+        }
+      }
+
+      // Genre Include Filter
+      if (filters.includeGenres && filters.includeGenres.length > 0) {
+        const genres = artistToGenres.get(node.id.toLowerCase());
+        const allowed = filters.includeGenres.map(g => g.toLowerCase());
+        if (genres) {
+          const hasAllowed = Array.from(genres).some(g => 
+            allowed.some(allowedGenre => g.includes(allowedGenre) || allowedGenre.includes(g))
+          );
+          if (!hasAllowed) {
+            nodesToRemove.add(node.id);
+            return;
+          }
+        } else {
           nodesToRemove.add(node.id);
           return;
         }
@@ -829,10 +864,22 @@ const App: React.FC = () => {
     const path = `users/${user.uid}`;
     try {
       await setDoc(doc(db, 'users', user.uid), updates, { merge: true });
+      setProfile(prev => prev ? { ...prev, ...updates } : updates);
+      
+      if (user.uid === 'mock-user-123') {
+        const currentProfile = {
+          displayName: 'Sandbox User',
+          email: 'sandbox@zcene.online',
+          onboardingProgress: { step1: true, step2: true, step3: true, step4: true, step5: true },
+          ...profile,
+          ...updates
+        };
+        localStorage.setItem(`zcene_mock_profile_${user.uid}`, JSON.stringify(currentProfile));
+      }
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, path);
     }
-  }, [user]);
+  }, [user, profile]);
 
   const handleSelectKey = useCallback(async () => {
     // @ts-ignore - aistudio is globally defined by the environment
@@ -1407,8 +1454,8 @@ const App: React.FC = () => {
     fetchingNodeIdsRef.current.clear();
     setLoadingNodeIds(new Set());
 
-    if (discoveryFilters.foundedAfter) {
-      showToast(`Discovery Mode: Filtering artists founded after ${discoveryFilters.foundedAfter}...`);
+    if (discoveryFilters.foundedAfter || discoveryFilters.foundedBefore || (discoveryFilters.includeOrigins && discoveryFilters.includeOrigins.length > 0) || (discoveryFilters.includeGenres && discoveryFilters.includeGenres.length > 0)) {
+      showToast(`Discovery Mode: Applying advanced filters...`);
     }
 
     // --- PHASE 02: PER-ARTIST CACHE CHECK ---
@@ -1771,11 +1818,24 @@ const App: React.FC = () => {
 
     // Offline Sandbox Interception
     console.log(`[Offline Sandbox] Mocking user profile sync for UID: ${user.uid}`);
-    setProfile({
-      displayName: 'Sandbox User',
-      email: 'sandbox@zcene.online',
-      onboardingProgress: { step1: true, step2: true, step3: true, step4: true, step5: true }
-    });
+    const savedMockProfile = localStorage.getItem(`zcene_mock_profile_${user.uid}`);
+    if (savedMockProfile) {
+      try {
+        setProfile(JSON.parse(savedMockProfile));
+      } catch (e) {
+        setProfile({
+          displayName: 'Sandbox User',
+          email: 'sandbox@zcene.online',
+          onboardingProgress: { step1: true, step2: true, step3: true, step4: true, step5: true }
+        });
+      }
+    } else {
+      setProfile({
+        displayName: 'Sandbox User',
+        email: 'sandbox@zcene.online',
+        onboardingProgress: { step1: true, step2: true, step3: true, step4: true, step5: true }
+      });
+    }
     setLibraryArtists([]);
 
     return () => {};
@@ -2275,13 +2335,13 @@ const App: React.FC = () => {
           console.log(`[ProjectLoader] [Offline Sandbox] Hydrating sandbox-project-1`);
           const mockProj = {
             nodes: [
-              { id: 'Orange 9mm', type: 'artist', x: 200, y: 200 },
-              { id: 'Madball', type: 'artist', x: 250, y: 220 },
-              { id: 'H2O', type: 'artist', x: 220, y: 280 }
+              { id: 'Orange 9mm', type: 'artist' as const, group: 1, x: 200, y: 200 },
+              { id: 'Madball', type: 'artist' as const, group: 2, x: 250, y: 220 },
+              { id: 'H2O', type: 'artist' as const, group: 3, x: 220, y: 280 }
             ],
             links: [
-              { source: 'Orange 9mm', target: 'Madball' },
-              { source: 'Orange 9mm', target: 'H2O' }
+              { source: 'Orange 9mm', target: 'Madball', value: 1 },
+              { source: 'Orange 9mm', target: 'H2O', value: 1 }
             ]
           };
           setGraphData(mockProj);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import Markdown from 'react-markdown';
-import { Node, NodeDetails, GraphData, View, ChatMessage, StackItem } from '../types';
+import { Node, NodeDetails, GraphData, View, ChatMessage, StackItem, UserTaste } from '../types';
 import { streamNodeChat, fetchLiveTourData } from '../services/geminiService';
 import { normalizeArtistId } from '../services/artistCacheService';
 import { analyticsService } from '../services/analyticsService';
@@ -63,11 +63,13 @@ interface NodeDetailsCardProps {
   isGuest?: boolean;
   user?: any;
   onAuthRequest?: () => void;
+  userTaste?: UserTaste;
 }
 
 const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     node, details, isLoading, isGlobalLoading, graphData, libraryArtists, seedArtists, onAddArtist, isSmallScreen, onRefresh, onClose, onNodeClick, onNavigate,
-    chatHistory, onSendMessage, isChatLoading, isFullScreenMode = false, isHero = false, isInStack, onToggleStack, onToggleMagazineView, isGuest = false, onAuthRequest, user
+    chatHistory, onSendMessage, isChatLoading, isFullScreenMode = false, isHero = false, isInStack, onToggleStack, onToggleMagazineView, isGuest = false, onAuthRequest, user,
+    userTaste
 }) => {
     const [chatInput, setChatInput] = useState('');
     const [isListening, setIsListening] = useState(false);
@@ -104,6 +106,111 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     const isSeedArtist = isArtistNode && seedArtistSet.has(normalizedArtistNodeId);
     const isAiSuggestion = isArtistNode && !isSeedArtist;
     const isManualAdd = isArtistNode && isSeedArtist && !isLibraryArtist;
+
+    const tasteMatch = useMemo(() => {
+        if (!userTaste || !details) return null;
+        
+        const hasTasteData = 
+            userTaste.favoriteArtist?.trim() || 
+            userTaste.favoriteGenre?.trim() || 
+            userTaste.favoriteOrigin?.trim() || 
+            userTaste.eraMin !== null || 
+            userTaste.eraMax !== null;
+
+        if (!hasTasteData) return null;
+
+        let totalActive = 0;
+        let matches = 0;
+
+        // 1. Match Favorite Artist
+        if (userTaste.favoriteArtist?.trim()) {
+            totalActive++;
+            const favArtist = userTaste.favoriteArtist.toLowerCase().trim();
+            const nodeId = node.id.toLowerCase();
+            const nodeLabel = (node.label || '').toLowerCase();
+            
+            let isArtistMatch = nodeId.includes(favArtist) || favArtist.includes(nodeId) ||
+                                nodeLabel.includes(favArtist) || favArtist.includes(nodeLabel);
+            
+            if (!isArtistMatch && details?.details?.notableArtists) {
+                isArtistMatch = details.details.notableArtists.some(artist => 
+                    artist.toLowerCase().includes(favArtist) || favArtist.includes(artist.toLowerCase())
+                );
+            }
+            
+            if (isArtistMatch) {
+                matches++;
+            }
+        }
+
+        // 2. Match Favorite Genre
+        if (userTaste.favoriteGenre?.trim()) {
+            totalActive++;
+            const favGenre = userTaste.favoriteGenre.toLowerCase().trim();
+            const genre = (details?.details?.genre || '').toLowerCase().trim();
+            
+            if (genre && (genre.includes(favGenre) || favGenre.includes(genre))) {
+                matches++;
+            }
+        }
+
+        // 3. Match Favorite Origin
+        if (userTaste.favoriteOrigin?.trim()) {
+            totalActive++;
+            const favOrigin = userTaste.favoriteOrigin.toLowerCase().trim();
+            const origin = (details?.details?.origin || '').toLowerCase().trim();
+            
+            if (origin && (origin.includes(favOrigin) || favOrigin.includes(origin))) {
+                matches++;
+            }
+        }
+
+        // 4. Match Era Range
+        if (userTaste.eraMin !== null || userTaste.eraMax !== null) {
+            totalActive++;
+            const foundedStr = details?.details?.founded || '';
+            if (foundedStr) {
+                const yearMatch = foundedStr.match(/\b(19\d{2}|20\d{2})\b/);
+                let year = yearMatch ? parseInt(yearMatch[0]) : null;
+                
+                if (!year) {
+                    const decadeMatch = foundedStr.match(/\b(\d{2})s\b/);
+                    if (decadeMatch) {
+                        const decVal = parseInt(decadeMatch[1]);
+                        year = decVal >= 50 ? 1900 + decVal : 2000 + decVal;
+                    }
+                }
+                
+                if (year) {
+                    let isEraMatch = true;
+                    if (userTaste.eraMin !== null && year < userTaste.eraMin) {
+                        isEraMatch = false;
+                    }
+                    if (userTaste.eraMax !== null && year > userTaste.eraMax) {
+                        isEraMatch = false;
+                    }
+                    if (isEraMatch) {
+                        matches++;
+                    }
+                }
+            }
+        }
+
+        if (totalActive === 0) return null;
+
+        if (totalActive === 1) {
+            return matches === 1 ? 'high' : 'low';
+        } else if (totalActive === 2) {
+            if (matches === 2) return 'high';
+            if (matches === 1) return 'medium';
+            return 'low';
+        } else {
+            const ratio = matches / totalActive;
+            if (ratio >= 0.75) return 'high';
+            if (ratio >= 0.33) return 'medium';
+            return 'low';
+        }
+    }, [userTaste, details, node.id, node.label]);
 
     useEffect(() => {
         setImageError(false);
@@ -232,6 +339,22 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 {isManualAdd && <span className="text-[10px] font-semibold uppercase tracking-[0.2em] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 border border-emerald-500/30 rounded-md">Manual</span>}
                                 {isAiSuggestion && <span className="text-[10px] font-semibold uppercase tracking-[0.2em] bg-purple-500/20 text-purple-400 px-2 py-0.5 border border-purple-500/30 flex items-center gap-1 rounded-md"><span className="material-symbols-outlined !text-[12px]">star</span>AI</span>}
                                 {isLibraryArtist && <span className="text-[10px] font-semibold uppercase tracking-[0.2em] bg-sky-500/20 text-sky-400 px-2 py-0.5 border border-sky-500/30 rounded-md">Library</span>}
+                                
+                                {tasteMatch === 'high' && (
+                                    <span className="text-[10px] font-semibold uppercase tracking-[0.2em] bg-fuchsia-500/20 text-fuchsia-400 px-2 py-0.5 border border-fuchsia-500/30 rounded-md">
+                                        Core Vibe
+                                    </span>
+                                )}
+                                {tasteMatch === 'medium' && (
+                                    <span className="text-[10px] font-semibold uppercase tracking-[0.2em] bg-amber-500/20 text-amber-400 px-2 py-0.5 border border-amber-500/30 rounded-md">
+                                        Good Match
+                                    </span>
+                                )}
+                                {tasteMatch === 'low' && (
+                                    <span className="text-[10px] font-semibold uppercase tracking-[0.2em] bg-zinc-800/80 text-zinc-400 px-2 py-0.5 border border-zinc-700/50 rounded-md">
+                                        Fresh Find
+                                    </span>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -615,6 +738,7 @@ interface DetailsPanelProps {
   isGuest?: boolean;
   user?: any;
   onAuthRequest?: () => void;
+  userTaste?: UserTaste;
 }
 
 export const DetailsPanel: React.FC<DetailsPanelProps> = ({
@@ -622,7 +746,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
   error, systemError, graphData, libraryArtists, seedArtists, onAddArtist, isCollapsed, onToggleCollapse,
   isSmallScreen, onNodeClick, onNavigate, isGlobalLoading, onCancelGlobalLoading, unreadCount, isActive, collapseBtnRef,
   isMagazineViewOpen, onMagazineViewToggle, chatHistories, onUpdateChatHistories, stack, onToggleStack,
-  isGuest = false, onAuthRequest, user
+  isGuest = false, onAuthRequest, user, userTaste
 }) => {
     const [viewedIndex, setViewedIndex] = useState(0);
     const [isChatLoading, setIsChatLoading] = useState(false);
@@ -823,20 +947,18 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     </div>
                 </div>
             ) : (
-                <div className={`h-12 flex-shrink-0 border-b border-zinc-600/50 flex items-center relative z-[60] bg-zinc-900 ${isCollapsed ? 'justify-center' : (isMagazineViewOpen ? 'justify-between' : 'justify-between px-4')}`}>
-                    {!isCollapsed && (
-                        <div className={`flex items-center gap-4 overflow-hidden ${isMagazineViewOpen ? 'w-full px-4 md:px-6 lg:px-8' : ''}`}>
-                            <div className="flex items-center gap-2">
-                                <h2 className="text-base text-white font-bold uppercase tracking-widest whitespace-nowrap">Deep Cut</h2>
-                                <span className={`h-5 w-5 flex flex-shrink-0 items-center justify-center text-[9px] font-bold border rounded-md transition-all duration-500 ${unreadCount > 0 ? 'bg-brand-black text-primary border-primary/50' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>
-                                    {activeNodes.length}
-                                </span>
-                            </div>
-
-                            {isMagazineViewOpen && (
+                isMagazineViewOpen ? (
+                    <div className="h-12 flex-shrink-0 border-b border-zinc-600/50 bg-zinc-900 z-[60] relative">
+                        <div className="max-w-[1400px] mx-auto w-full h-full px-4 md:px-6 lg:px-8 flex items-center justify-between relative">
+                            <div className="flex items-center gap-4 overflow-hidden w-full">
+                                <div className="flex items-center gap-2">
+                                    <h2 className="text-base text-white font-bold uppercase tracking-widest whitespace-nowrap">Deep Cut</h2>
+                                    <span className={`h-5 w-5 flex flex-shrink-0 items-center justify-center text-[9px] font-bold border rounded-md transition-all duration-500 ${unreadCount > 0 ? 'bg-brand-black text-primary border-primary/50' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>
+                                        {activeNodes.length}
+                                    </span>
+                                </div>
                                 <div className="flex items-center gap-4 flex-grow animate-in fade-in slide-in-from-left-4 duration-500">
                                     <div className="h-6 w-px bg-zinc-700 mx-2 hidden md:block" />
-                                    
                                     <div className="flex items-center gap-3 flex-grow max-w-2xl">
                                         <div className="relative flex-grow">
                                             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 !text-[18px]">search</span>
@@ -848,7 +970,6 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 className="w-full appearance-none border border-zinc-700 bg-zinc-900/60 py-2 pl-10 pr-4 text-base lg:text-sm text-white placeholder:text-zinc-500 rounded-xl focus:ring-1 focus:ring-primary focus:outline-none transition-all"
                                             />
                                         </div>
-
                                         <div className="flex items-center gap-2 shrink-0">
                                             <span className="text-xs text-zinc-500 uppercase tracking-widest hidden sm:block">Sort by</span>
                                             <div className="relative">
@@ -868,30 +989,42 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                         </div>
                                     </div>
                                 </div>
-                            )}
+                            </div>
+                            <div className="flex items-center gap-0.5 ml-4 shrink-0">
+                                <button 
+                                    onClick={() => onMagazineViewToggle(false)}
+                                    className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 active:scale-95 transition-all leading-none border border-zinc-800"
+                                    title="Exit Magazine View"
+                                >
+                                    <span className="material-symbols-outlined !text-[18px]">close</span>
+                                </button>
+                            </div>
                         </div>
-                    )}
-                    
-                    <div className={`flex items-center gap-0.5 ${isMagazineViewOpen ? 'absolute right-4 md:right-6 lg:right-8 top-1/2 -translate-y-1/2' : 'w-8 justify-center'}`}>
-                        {isMagazineViewOpen && (
-                            <button 
-                                onClick={() => onMagazineViewToggle(false)}
-                                className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 active:scale-95 transition-all leading-none border border-zinc-800"
-                                title="Exit Magazine View"
-                            >
-                                <span className="material-symbols-outlined !text-[18px]">close</span>
-                            </button>
-                        )}
-                        <button 
-                            ref={collapseBtnRef}
-                            onClick={onToggleCollapse} 
-                            className={`relative z-[70] w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 rounded-xl transition-colors leading-none pointer-events-auto ${isMagazineViewOpen ? 'hidden' : ''}`} 
-                            title={isCollapsed ? "Expand Deep Cut" : "Collapse Deep Cut"}
-                        >
-                            <span className="material-symbols-outlined !text-[18px]">{isCollapsed ? 'first_page' : 'last_page'}</span>
-                        </button>
                     </div>
-                </div>
+                ) : (
+                    <div className={`h-12 flex-shrink-0 border-b border-zinc-600/50 flex items-center relative z-[60] bg-zinc-900 ${isCollapsed ? 'justify-center' : 'justify-between px-4'}`}>
+                        {!isCollapsed && (
+                            <div className="flex items-center gap-4 overflow-hidden">
+                                <div className="flex items-center gap-2">
+                                    <h2 className="text-base text-white font-bold uppercase tracking-widest whitespace-nowrap">Deep Cut</h2>
+                                    <span className={`h-5 w-5 flex flex-shrink-0 items-center justify-center text-[9px] font-bold border rounded-md transition-all duration-500 ${unreadCount > 0 ? 'bg-brand-black text-primary border-primary/50' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>
+                                        {activeNodes.length}
+                                    </span>
+                                </div>
+                            </div>
+                        )}
+                        <div className={`flex items-center gap-0.5 ${isCollapsed ? 'w-8 justify-center' : ''}`}>
+                            <button 
+                                ref={collapseBtnRef}
+                                onClick={onToggleCollapse} 
+                                className="relative z-[70] w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 rounded-xl transition-colors leading-none pointer-events-auto" 
+                                title={isCollapsed ? "Expand Deep Cut" : "Collapse Deep Cut"}
+                            >
+                                <span className="material-symbols-outlined !text-[18px]">{isCollapsed ? 'first_page' : 'last_page'}</span>
+                            </button>
+                        </div>
+                    </div>
+                )
             )}
 
             {isCollapsed && !isSmallScreen ? (
@@ -947,7 +1080,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     >
                         <div 
                             className={`${isMagazineViewOpen 
-                                ? 'columns-1 md:columns-[450px] gap-4 md:gap-6 w-full pb-12' 
+                                ? 'grid grid-cols-[repeat(auto-fit,minmax(min(100%,400px),1fr))] gap-6 items-start w-full max-w-[1400px] mx-auto pb-12' 
                                 : 'flex h-full w-full transition-transform duration-300 ease-in-out will-change-transform touch-pan-y'}`}
                             style={!isMagazineViewOpen ? { 
                                 transform: `translateX(-${viewedIndex * 100}%)`,
@@ -1011,6 +1144,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 isGuest={isGuest}
                                                 user={user}
                                                 onAuthRequest={onAuthRequest}
+                                                userTaste={userTaste}
                                             />
                                         </div>
                                     );
