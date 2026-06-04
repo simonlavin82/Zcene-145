@@ -37,6 +37,9 @@ The client edge operates as a Single Page Application (SPA) responsible for inte
 *   **Resilience & Rate Limiting:** Implements sequential queueing (1-at-a-time fetches) and exponential backoff to handle free-tier Gemini API limitations (15 RPM) gracefully without UI disruption.
 *   **Client-Side Verification ("Nuclear Option"):** A post-processing pipeline in `App.tsx` manually filters and prunes LLM outputs. It strips out artists violating geographical/era search filters and prunes orphaned links where source or target nodes are missing.
 *   **Security Gating:** Gated pages (such as the `EnginePage` and `StyleGuidePage`) are lazy-loaded via dynamic bundle-splitting (`React.lazy`) and rendered only to authorized accounts (e.g. admin accounts) to prevent public code discovery.
+*   **Token Confirmation Interceptor:** Intercepts net-new generation flows (graph creation queries), node expansions (graph extensions), and individual node clicks (Deep Cut biography creation) for uncached artists. It displays a design system-compliant warning dialog showing split lists of "Ready (Cached/Free)" vs "Synthesis Required ($0.0015 / AI)" artists, with cost metrics ($0.0015/query) mapped directly from the platform Usage Analytics ledger.
+*   **Smart Cancel Fallback Routing:** On a partial cache hit for multi-artist queries, if the user cancels the token warning dialog, the system does not completely discard the query; it automatically strips out the uncached subset and re-routes the query using only the cached subset of artists. Canceled artist states are cleanly reverted to prevent them from leaking into the active nodes queue or Deep Cut slider panel stack.
+*   **Sandbox Short-Circuiting:** Enforces complete API short-circuiting by bypassing outbound HTTP dispatches to the Gemini proxy gateway with local static JSON payloads and mock generators to prevent billable consumption.
 *   **Platform Optimizations:** Acquires a sentinel using the browser `Screen Wake Lock API` during active AI generations to prevent mobile devices from sleeping and suspending the background processes.
 *   **Taste Profile & Compatibility Meter:** A client-side visual compatibility gauge is calculated deterministically on the client using the active user's taste filters (Genre, Origin, and Era range) without any AI API key overhead or external requests, ensuring lightning-fast layout updates.
 
@@ -166,15 +169,37 @@ User (Browser)          Frontend UI          Firestore DB          Cloud Storage
 2.  **Phase 02: Verification & AI Orchestration:**
     *   Once a user commits seed input, the application checks Firestore's `/artists` path via a multi-get operation (`readArtistCacheMany`) to query normalized artist IDs.
     *   If a cache hit occurs, the cached nodes and links are returned, bypassing step 3.
-    *   On a cache miss, the frontend formats a request containing the prompt, response schema requirements, and user filters, transmitting it to `/api/gemini`.
-    *   The Cloud Run proxy intercepts the request, appends the security authorization header (`x-goog-api-key`), and redirects it to the Google Gemini service executing `gemini-3.1-pro-preview`.
+    *   On a cache miss (or partial hit), the frontend intercepts the flow and triggers the **Token Confirmation Dialog** displaying the estimated query cost ($0.0015/query) and splitting the inputs into cached and synthesis-required badges.
+    *   On cancellation of a partial hit, the pipeline filters out the uncached subset of artists and automatically re-routes using the cached subset. If the query has no cached subset or is canceled, the loading state is rolled back and the flow halts, cleanly resetting active states to prevent canceled entries from leaking into the slider stack. If the user confirms, the frontend formats a request containing the prompt, response schema requirements, and user filters, transmitting it to `/api/gemini` (which is completely short-circuited with a static JSON payload in sandbox configurations).
+    *   The Cloud Run proxy intercepts live requests, appends the security authorization header (`x-goog-api-key`), and redirects it to the Google Gemini service executing `gemini-3.1-pro-preview`.
 3.  **Phase 03: Post-Processing, Writing to Cache, and Physics convergence:**
     *   Once the model responds with structured JSON, the frontend filters out any nodes that violate era or origin criteria.
     *   The pruned sub-graphs are separated by artist and pushed asynchronously to Firestore under `/artists/{cacheKey}` with an initialized `hitCount: 0`.
     *   The compiled graph is loaded into the React state. The D3 force engine initializes physics nodes, applies momentum constraints (`velocityDecay: 0.7`), and converges the simulation. If a project is loaded, coordinate positions are read from `canvasLayout` and pinned.
 4.  **Phase 04: Detail Enrichment (Deep Cuts):**
-    *   When the user selects an artist node, the details card panel mounts.
-    *   The frontend searches for biographical details under the local project state or `/artists/{cacheKey}`.
-    *   If unavailable, a query is sent through the proxy gateway to Gemini `gemini-3-flash-preview` configured with Web Search grounding (`googleSearch: {}`).
+    *   When the user selects an artist node (on map click, My Stack details navigation, or related Scene Circle click), the details card panel mounts.
+    *   The frontend searches for biographical details under the local project state or `/artists/{cacheKey}` (Firestore global collection).
+    *   If unavailable (cache miss), the action is frozen, and the user is prompted with the **Token Confirmation Dialog** displaying the query type as `DEEP CUT CREATION` at a cost of `$0.0015`, listing the artist under the synthesis required badge.
+    *   If the user cancels, the action is aborted cleanly and the UI state (including active nodes and sidebar) remains completely unchanged. If confirmed, the request is sent through the proxy gateway to Gemini `gemini-3-flash-preview` configured with Web Search grounding (`googleSearch: {}`).
     *   The UI loads specific card backgrounds (`Artist background.png` or `Deep Cut background.png`) from Google Cloud Storage to render the details card.
     *   The scraped biography is written back to the global `/artists/{cacheKey}` under the `detailsCache` key, ensuring subsequent lookups avoid duplicate LLM invocations.
+
+---
+
+## 3.0 Cost Estimation Architecture
+
+### 3.1 Platform Cost Metrics Ledger
+Usage cost metrics are mapped directly from the platform Usage Analytics ledger. The platform has a base rate defined as:
+*   `COST_PER_AI_CALL = 0.0015` ($0.0015 per query / AI invocation).
+
+This rate applies uniformly across all three primary AI invocation entry-points:
+1.  **Graph Generation:** Initiated when searching for a set of seed artists where one or more are uncached.
+2.  **Node Expansion (Graph Extension):** Initiated when extending the graph from a specific node to fetch new connections.
+3.  **Deep Cut Creation (Node Click):** Initiated when clicking a node whose biography has not been generated and cached in Firestore.
+
+### 3.2 Cache-Gating Principles & Rationales
+Every outbound request to the Gemini API incurs real-world usage costs. To manage billing consumption efficiently, Zcene applies a strict cache-first strategy before triggering confirmations:
+*   **Zero-Cost Cache Hits:** If requested data (full sub-graphs or biography details) is found in local memory or within the global `/artists` collection in Firestore, it is returned instantly and for free.
+*   **Gated AI Invocations:** If a query requires net-new model synthesis, the user is warned of the token cost before any network requests or optimistic UI changes are committed.
+*   **Smart Fallback Routing:** On mixed queries, the cancel warning acts as an intelligent routing mechanism. Rather than discarding the entire search, the app strips the uncached bands on the fly and re-routes the process using only cached (free) bands.
+*   **Sandbox Safety Gates:** In sandbox/development environments, the local application forces `isLocal = true` in the services layer. This short-circuits live outbound dispatches with local static JSON mock data, completely protecting billing limits while still allowing developers to test the warning flows and ledger logging logic.

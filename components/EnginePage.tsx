@@ -98,18 +98,21 @@ the entire dataset, the app evolves existing visual structures.
    every link's 'source' and 'target' corresponds to a validated node ID 
    present in either the legacy graph or the new delta.
 
-5. GLOBAL CACHE ALIGNMENT (artistCacheService.ts):
+5. GLOBAL CACHE ALIGNMENT & TOKEN GATING (artistCacheService.ts / App.tsx):
    Before invoking Gemini for Phase 02 Orchestration, the engine computes a 
    normalized cache key (sorted artist list + serialized filters) and probes 
    the global 'artists' Firestore collection.
    - Cache HIT: Graph structure + Deep Cut metadata are returned instantly. 
      Phases 02 and 03 are bypassed entirely. D3 Phase 04 begins immediately, 
      and artist canvas positions from the project's canvasLayout are restored.
-   - Cache MISS: The normal Gemini generation pipeline executes. On success, 
-     the computed graph is written to the global cache (detailsCache starts 
-     empty). As each Phase 03 Deep Cut fetch completes, it incrementally 
-     writes the enriched metadata back into the cache entry so future users 
-     receive pre-populated Deep Cuts on a cache hit.
+   - Cache MISS / Partial Cache Hit Gating: If a query requires net-new model 
+     synthesis, the engine intercepts the flow and triggers the Token Confirmation 
+     Dialog showing split lists of "Ready (Cached/Free)" vs "Synthesis Required" artists.
+   - Smart Cancel Fallback Routing: If the user cancels a mixed query warning, 
+     the engine strips out the uncached subset on the fly and recursively re-routes 
+     the search using only the cached (free) subset of artists.
+   - State Rollback: Active node and seed artist states are reverted on cancel 
+     to prevent canceled artists from leaking into the Deep Cut slider stack.
    - Key Format: lowercase, alphanumeric + hyphens, artists sorted and joined 
      with '--', filters appended as suffixes (e.g. 'after2010'). Max 512 chars.
    - Permanent cache by design: music histories, genre bridges, and Deep Cut 
@@ -212,6 +215,13 @@ Serial Fetch & Backoff Strategy in App.tsx and OS-level stability logic.
    - Purpose: Prevents JavaScript suspension and socket closure.
    - Recovery: Automatically re-acquires lock on 'visibilitychange' if the 
      user returns to an active loading state.
+
+6. DEEP CUT CREATION GATING (App.tsx):
+   Clicking a node whose biography is not cached in local state or Firestore 
+   triggers the Token Quota Warning dialog before any sidebar updates or loading states 
+   are applied. The query is labeled as "DEEP CUT CREATION" at a cost of $0.0015. 
+   If canceled, the operation aborts cleanly and the screen remains unchanged. 
+   If confirmed, the sidebar opens and detail generation proceeds.
 `;
 
 const SHARING_FLOW_DOCUMENTATION = `
@@ -289,6 +299,33 @@ designed for expert-friend utility.
    The model is forbidden from using conversational fillers (e.g., "Hi," 
    "Sure thing"). It starts immediately with the musical insight to 
    maximize information density.
+`;
+
+const COST_ESTIMATION_DOCUMENTATION = `
+Zcene implements an explicit cost estimation ledger to track and gate billable 
+AI API credit utilization.
+
+1. LEDGER METRICS (UsageAnalyticsPage.tsx):
+   The platform's base usage rate is defined as:
+   - COST_PER_AI_CALL = 0.0015 ($0.0015 per query / AI invocation).
+   This base rate is mapped directly from the platform's Usage Analytics ledger 
+   to ensure UI warnings match the backend billing metrics.
+
+2. INVOCATION ENTRY-POINTS:
+   The cost metrics apply uniformly to all three billable API endpoints:
+   - Graph Generation: Triggered when creating/updating the spiderweb graph with uncached seeds.
+   - Node Expansion (Graph Extension): Triggered when extending connection nodes.
+   - Deep Cut Creation (Node Click): Triggered when enriching/generating an uncached biography.
+
+3. CACHE-GATING RATIONALES (Plain English):
+   - Outbound Gemini calls generate real-world token usage charges. To minimize cost, 
+     any request matching pre-existing Firestore global artist document results is loaded 
+     for free as a zero-cost cache hit.
+   - Warning pop-ups provide transparency, ensuring users explicitly opt-in to credit 
+     consumption for net-new generation flows.
+   - Sandbox environments hardcode "isLocal = true" in the services layer. This short-circuits 
+     all live dispatches with local mock payloads, preserving billing limits while still 
+     simulating the full token warning and ledger logging behaviors.
 `;
 
 const SitemapNode: React.FC<{ title: string; description: string; children?: React.ReactNode }> = ({ title, description, children }) => (
@@ -633,6 +670,9 @@ export const EnginePage: React.FC<SourcePageProps> = ({
 
                         <h2 className="text-xl font-medium text-primary mb-6 pt-8 border-t border-zinc-700">System Resilience</h2>
                         <CodeBlock title="Network Logic & Selection strategy" content={RESILIENCE_DOCUMENTATION} />
+
+                        <h2 className="text-xl font-medium text-primary mb-6 pt-8 border-t border-zinc-700">Cost Estimation Architecture</h2>
+                        <CodeBlock title="Ledger Rules & Caching Strategy" content={COST_ESTIMATION_DOCUMENTATION} />
 
                         <h2 className="text-xl font-medium text-primary mb-6 pt-8 border-t border-zinc-700">Graph Generation</h2>
                         <CodeBlock title="Initial Graph Prompt" content={GENERATE_GRAPH_PROMPT_TEMPLATE} />

@@ -311,4 +311,117 @@ export const MyTasteDialog: React.FC<{
   );
 };
 
+// --- Token Confirmation Interceptor Dialog Component ---
+export const TokenConfirmationDialog: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  type: 'generation' | 'extension' | 'deep_cut_creation';
+  cost: number;
+  cachedArtists: string[];
+  missingArtists: string[];
+}> = ({ isOpen, onClose, onConfirm, type, cost, cachedArtists, missingArtists }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div 
+      className="fixed inset-0 bg-black/60 z-[130] flex items-center justify-center p-4 animate-fade-in-down" 
+      style={{ animationDuration: '200ms' }}
+      onClick={onClose}
+    >
+      <div 
+        className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-hidden" 
+        onClick={e => e.stopPropagation()}
+      >
+        <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary !text-[18px]">info</span>
+            <h3 className="text-base font-medium text-white">Token Quota Warning</h3>
+          </div>
+          <button 
+            onClick={onClose} 
+            className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none"
+          >
+            <span className="material-symbols-outlined !text-[18px]">close</span>
+          </button>
+        </header>
+
+        <div className="p-5 space-y-4 text-sm text-zinc-400">
+          <p className="leading-relaxed">
+            You are initiating a net-new AI generation flow that requires contacting the live models.
+          </p>
+          <div className="bg-zinc-900/60 p-4 border border-zinc-800 space-y-2.5">
+            <div className="flex justify-between font-mono text-xs border-b border-zinc-800 pb-1.5">
+              <span className="text-zinc-500">Query Type:</span>
+              <span className="text-zinc-300 font-semibold uppercase tracking-wider">
+                {type === 'generation' 
+                  ? 'Graph Generation' 
+                  : type === 'extension' 
+                    ? 'Node Expansion' 
+                    : 'Deep Cut Creation'}
+              </span>
+            </div>
+            <div className="flex justify-between font-mono text-xs border-b border-zinc-800 pb-1.5">
+              <span className="text-zinc-500">Estimated Cost:</span>
+              <span className="text-primary font-bold">
+                ${cost.toFixed(4)} / query
+              </span>
+            </div>
+
+            {/* Split breakdown of cached vs synthesis required */}
+            {cachedArtists && cachedArtists.length > 0 && (
+              <div className="space-y-1 pb-1.5 border-b border-zinc-800">
+                <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest block">
+                  Ready (Cached/Free)
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {cachedArtists.map(artist => (
+                    <span key={artist} className="text-[10px] font-mono bg-zinc-800/80 text-zinc-300 px-2 py-0.5 border border-zinc-700/50 rounded-full">
+                      {artist}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {missingArtists && missingArtists.length > 0 && (
+              <div className="space-y-1">
+                <span className="text-[10px] font-semibold text-red-400 uppercase tracking-widest block">
+                  Synthesis Required (${cost.toFixed(4)} / AI)
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {missingArtists.map(artist => (
+                    <span key={artist} className="text-[10px] font-mono bg-red-950/20 text-red-400 px-2 py-0.5 border border-red-900/30 rounded-full">
+                      {artist}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+          <p className="text-xs text-zinc-500 leading-relaxed">
+            Note: All live outbound API dispatches are completely short-circuited with a static JSON payload in sandbox mode to protect billing limits.
+          </p>
+        </div>
+
+        <footer className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2">
+          <button 
+            onClick={onClose} 
+            className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors"
+          >
+            Cancel
+          </button>
+          <button 
+            onClick={onConfirm} 
+            className="px-4 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 transition-opacity hover:opacity-90"
+          >
+            <span className="material-symbols-outlined !text-[16px]">check</span>
+            Confirm
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
+};
+
 

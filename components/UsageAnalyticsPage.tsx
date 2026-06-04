@@ -44,7 +44,7 @@ interface UsageAnalyticsPageProps {
 }
 
 // Fixed unit cost constant for calculations (e.g. $0.0015 per live API request)
-const COST_PER_AI_CALL = 0.0015;
+export const COST_PER_AI_CALL = 0.0015;
 
 // Mock ledger data representing platform usage database logs
 const mockLedgerData: UserTelemetry[] = [
