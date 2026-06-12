@@ -6,7 +6,7 @@ const CollectionIntelligenceVisual: React.FC<{ className?: string }> = ({ classN
         <div className={`w-full aspect-[3/4] md:aspect-video bg-zinc-950 border border-zinc-800/50 shadow-2xl flex items-center justify-center p-4 md:p-8 overflow-hidden relative pointer-events-none ${className}`}>
              {/* Background Image Overlay */}
              <img 
-                src="https://storage.googleapis.com/zcene/Deep%20Cut%20background.png" 
+                src="https://storage.googleapis.com/zcene-prod-assets/Deep%20Cut%20background.png" 
                 alt="" 
                 className="absolute inset-0 w-full h-full object-cover opacity-20"
              />

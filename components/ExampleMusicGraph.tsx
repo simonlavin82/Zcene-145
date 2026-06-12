@@ -510,7 +510,7 @@ const ExampleMusicGraph: React.FC = () => {
         <div className={`w-full aspect-[3/4] md:aspect-video bg-zinc-950 border border-zinc-800/50 shadow-2xl overflow-hidden relative pointer-events-none select-none`}>
              {/* Background Image Overlay */}
              <img 
-                src="https://storage.googleapis.com/zcene/Zcene%20general%20background.jpeg" 
+                src="https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg" 
                 alt="" 
                 className="absolute inset-0 w-full h-full object-cover opacity-30"
              />

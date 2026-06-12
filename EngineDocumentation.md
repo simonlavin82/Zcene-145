@@ -57,9 +57,9 @@ A lightweight Node.js Express server (`server.js`) deployed on Google Cloud Run 
     *   **Global Artist Cache (`/artists/{cacheKey}`):** Stores isolated subgraphs (extracted via `extractArtistSubGraph`) and curated node details. Security rules allow read access to all users, write access (`create`) only on cache misses, and patch access (`update`) restricted solely to the `detailsCache` (Deep Cuts details) and `hitCount` (analytics) fields to prevent graph poisoning.
     *   **Public Shares (`/sharedZcenes/{shareId}`):** Publicly readable read-only graphs that are write-gated to their authenticated authors.
 *   **Google Cloud Storage (GCS):** Serves static high-fidelity page backdrops and visual cards via secure HTTPS endpoint paths:
-    *   `https://storage.googleapis.com/zcene/Zcene%20general%20background.jpeg` (Main UI background, graph canvas background, details panel base).
-    *   `https://storage.googleapis.com/zcene/Artist%20background.png` (Artist bio features/panels background).
-    *   `https://storage.googleapis.com/zcene/Deep%20Cut%20background.png` (Deep Cut details panel background and Collection Intelligence visual background).
+    *   `https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg` (Main UI background, graph canvas background, details panel base).
+    *   `https://storage.googleapis.com/zcene-prod-assets/Artist%20background.png` (Artist bio features/panels background).
+    *   `https://storage.googleapis.com/zcene-prod-assets/Deep%20Cut%20background.png` (Deep Cut details panel background and Collection Intelligence visual background).
 
 ---
 

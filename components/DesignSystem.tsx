@@ -2196,7 +2196,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </p>
                                 <div className="space-y-4">
                                         <div className="rounded-xl overflow-hidden border border-zinc-800">
-                                            <img src="https://storage.googleapis.com/zcene/Artist%20background.png" alt="Artist Feature Background" className="w-full h-48 object-cover opacity-60" />
+                                            <img src="https://storage.googleapis.com/zcene-prod-assets/Artist%20background.png" alt="Artist Feature Background" className="w-full h-48 object-cover opacity-60" />
                                             <div className="p-4 bg-zinc-900 grid grid-cols-2 gap-4">
                                                 <div>
                                                     <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Overlay</p>
@@ -2238,7 +2238,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         Documentation for the <strong>AI Insight Engine</strong>. It showcases the conversational interface, metadata categorization, and the carousel-based navigation for exploring multiple results.
                                     </p>
                                     <div className="rounded-xl overflow-hidden border border-zinc-800">
-                                        <img src="https://storage.googleapis.com/zcene/Deep%20Cut%20background.png" alt="Deep Cut Background" className="w-full h-64 object-cover opacity-60" />
+                                        <img src="https://storage.googleapis.com/zcene-prod-assets/Deep%20Cut%20background.png" alt="Deep Cut Background" className="w-full h-64 object-cover opacity-60" />
                                         <div className="p-6 bg-zinc-900 grid grid-cols-1 md:grid-cols-3 gap-8">
                                             <div>
                                                 <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest mb-1">Chat UI</p>
@@ -2258,7 +2258,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             </div>
                             
                             <div className="rounded-xl overflow-hidden border border-zinc-800">
-                                 <img src="https://storage.googleapis.com/zcene/Zcene%20general%20background.jpeg" alt="Graph Background" className="w-full h-48 object-cover opacity-60" />
+                                 <img src="https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg" alt="Graph Background" className="w-full h-48 object-cover opacity-60" />
                                  <div className="p-4 bg-zinc-900 text-xs font-mono text-zinc-500">Texture: Organic Grid Overlays</div>
                             </div>
                         </div>

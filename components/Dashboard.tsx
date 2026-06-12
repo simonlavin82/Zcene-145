@@ -114,7 +114,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     <div 
       className="absolute inset-0 flex flex-col overflow-hidden bg-background-dark text-zinc-200 font-display"
       style={{
-        backgroundImage: 'url("https://storage.googleapis.com/zcene/Zcene%20general%20background.jpeg")',
+        backgroundImage: 'url("https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg")',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundAttachment: 'fixed'
