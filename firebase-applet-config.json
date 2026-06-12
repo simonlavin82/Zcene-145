@@ -1,10 +1,10 @@
 {
-  "projectId": "gen-lang-client-0482359498",
-  "appId": "1:800155534113:web:df6082b8fecf17ef2bb460",
-  "apiKey": "AIzaSyChgHHHjt6TNfcWDk-0I-uTiRQX1Mj3z0o",
-  "authDomain": "gen-lang-client-0482359498.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-0b104528-c852-4a4c-ad55-b48bb58d0c1d",
-  "storageBucket": "gen-lang-client-0482359498.firebasestorage.app",
-  "messagingSenderId": "800155534113",
-  "measurementId": ""
+  "projectId": "zcene-production",
+  "appId": "1:31385926579:web:822e5549a63d8c9b9469c6",
+  "apiKey": "AIzaSyB3TaeyEwAomtTjlE69-BGrpI70IiCRKwk",
+  "authDomain": "zcene-production.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "zcene-production.firebasestorage.app",
+  "messagingSenderId": "31385926579",
+  "measurementId": "G-WXSEHVYTHJ"
 }

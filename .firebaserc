@@ -1,7 +1,5 @@
 {
   "projects": {
-    "production": "gen-lang-client-0482359498"
-  },
-  "targets": {},
-  "etags": {}
+    "default": "zcene-production"
+  }
 }
