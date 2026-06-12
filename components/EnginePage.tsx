@@ -691,7 +691,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                                 content={`// IDENTITY-BASED AUTHORIZATION
 // Access to sensitive modules (Engine & Design System) is strictly gated 
 // by identity-based authorization.
-const ADMIN_EMAIL = 'simon.lavin1@gmail.com';
+const ADMIN_EMAIL = 'zcene.online@gmail.com';
 const isAdmin = user?.email === ADMIN_EMAIL;
 
 // DYNAMIC BUNDLE SPLITTING (React.lazy)

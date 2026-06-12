@@ -17,6 +17,15 @@ if (!GEMINI_API_KEY) {
 // Proxy all requests starting with /api/gemini/ to the Google GenAI API
 app.use(
   '/api/gemini',
+  (req, res, next) => {
+    // Cleanse request headers to prevent Google's gateway from seeing
+    // Firebase Hosting credentials (authorization) or client session cookies (cookie).
+    delete req.headers['authorization'];
+    delete req.headers['Authorization'];
+    delete req.headers['cookie'];
+    delete req.headers['Cookie'];
+    next();
+  },
   createProxyMiddleware({
     target: 'https://generativelanguage.googleapis.com',
     changeOrigin: true,
@@ -38,7 +47,7 @@ app.use(
 app.use(
   '/__/auth',
   createProxyMiddleware({
-    target: 'https://gen-lang-client-0482359498.firebaseapp.com',
+    target: 'https://zcene-production.firebaseapp.com',
     changeOrigin: true,
   })
 );

@@ -33,7 +33,7 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn() && (
-        request.auth.token.email == 'Simon.Lavin1@gmail.com' ||
+        request.auth.token.email == 'zcene.online@gmail.com' ||
         exists(/databases/$(database)/documents/admins/$(request.auth.uid))
       );
     }
@@ -64,6 +64,7 @@ service cloud.firestore {
              // NEW lightweight reference fields
              (!('cacheKey' in data) || (data.cacheKey is string && data.cacheKey.size() <= 512)) &&
              (!('canvasLayout' in data) || (data.canvasLayout is string)) &&
+             (!('artistIds' in data) || (data.artistIds is list)) &&
              (!('activeNodes' in data) || (data.activeNodes is list)) &&
              (!('chatHistories' in data) || (data.chatHistories == null || data.chatHistories is string)) &&
              (!('discoveryFilters' in data) || (data.discoveryFilters is string)) &&

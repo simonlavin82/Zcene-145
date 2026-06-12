@@ -327,7 +327,7 @@ export const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed infor
 // --- SERVICE FUNCTIONS ---
 
 // --- LOCAL SANDBOX MOCKS ---
-const isLocal = true; // Hardcoded true to completely short-circuit all live backend dispatches and protect API billing limits
+const isLocal = import.meta.env.DEV || (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')); // Evaluate dynamically to short-circuit on local runs but run live on production
 
 const generateMockGraphData = (artists: string, baseGraph?: GraphData, filters?: DiscoveryFilters): GraphData => {
   const artistList = artists.split('::').map(a => a.trim()).filter(Boolean);

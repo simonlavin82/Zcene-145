@@ -49,7 +49,7 @@ export const COST_PER_AI_CALL = 0.0015;
 // Mock ledger data representing platform usage database logs
 const mockLedgerData: UserTelemetry[] = [
     {
-        email: "simon.lavin1@gmail.com",
+        email: "zcene.online@gmail.com",
         projectsCount: 14,
         actionTriggers: { createCount: 12, updateCount: 45 },
         artistSearches: {

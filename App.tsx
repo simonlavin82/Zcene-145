@@ -483,7 +483,7 @@ const isCacheEntryFullyQualified = (data: any): boolean => {
     }
 
     const bio = targetObj?.summary || targetObj?.bio || targetObj?.description || targetObj?.text || '';
-    if (!bio || bio.trim().length <= 5) {
+    if (!bio || bio.trim().length <= 5 || bio.includes('sandbox mock') || bio.includes('test scenarios')) {
       return false;
     }
   } catch (e) {
@@ -541,7 +541,7 @@ const App: React.FC = () => {
   const isAdmin = useMemo(() => {
     if (!user || !user.email) return false;
     const email = user.email.toLowerCase();
-    return email === 'simon.lavin1@gmail.com' || email === 'sandbox@zcene.online';
+    return email === 'zcene.online@gmail.com';
   }, [user]);
   const [pendingAuthAction, setPendingAuthAction] = useState<{ type: string; payload: any } | null>(null);
   const [tokenConfirmation, setTokenConfirmation] = useState<{
@@ -848,7 +848,6 @@ const App: React.FC = () => {
       localStorage.setItem(`zcene_project_name_${currentProjectId}`, name);
       console.log(`[Offline Sandbox] Saved name to localStorage: ${name}`);
     }
-    /* Temporarily bypassed during suspension
     if (!user || !currentProjectId) return;
     const path = `users/${user.uid}/projects/${currentProjectId}`;
     try {
@@ -859,14 +858,12 @@ const App: React.FC = () => {
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, path);
     }
-    */
   }, [user, currentProjectId]);
 
   const handleRenameProject = useCallback(async (projectId: string, name: string) => {
     localStorage.setItem(`zcene_project_name_${projectId}`, name);
     console.log(`[Offline Sandbox] Saved name to localStorage for project ${projectId}: ${name}`);
     showToast("Zcene renamed (offline sandbox)");
-    /* Temporarily bypassed during suspension
     if (!user) return;
     const path = `users/${user.uid}/projects/${projectId}`;
     try {
@@ -878,7 +875,6 @@ const App: React.FC = () => {
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, path);
     }
-    */
   }, [user, showToast]);
 
   const displayProjectName = useMemo(() => {
@@ -1014,7 +1010,10 @@ const App: React.FC = () => {
     const cachedDetails = detailsCache.get(node.id) || detailsCache.get(node.id.toLowerCase()) || detailsCache.get(normalizeArtistId(node.id));
     
     // 2. Load Locally and Block the Network
-    if (cachedDetails && cachedDetails.summary && cachedDetails.summary.length > 5) {
+    const isPlaceholderBio = cachedDetails && cachedDetails.summary && 
+      (cachedDetails.summary.includes('sandbox mock') || cachedDetails.summary.includes('test scenarios'));
+      
+    if (cachedDetails && cachedDetails.summary && cachedDetails.summary.length > 5 && !isPlaceholderBio) {
        const hydratedNode = {
           ...node,
           bio: cachedDetails.summary,
@@ -1074,7 +1073,8 @@ const App: React.FC = () => {
                 const recommendationReason = parsed?.recommendationReason || parsed?.reason || "";
                 const groundingLinks = parsed?.groundingLinks || [];
                 
-                if (bio && bio.length > 5) {
+                const isPlaceholderBio = bio.includes('sandbox mock') || bio.includes('test scenarios');
+                if (bio && bio.length > 5 && !isPlaceholderBio) {
                     const hydratedNode = {
                         ...node,
                         bio,
@@ -1513,7 +1513,8 @@ const App: React.FC = () => {
         artistList.forEach(name => {
           const normName = name.toLowerCase();
           const entry = cacheResult.cached.get(name) || cacheResult.cached.get(normName);
-          const forceMockHit = ['sick of it all', 'h2o', 'radiohead', 'blink-182', 'orange 9mm', 'madball'].includes(normName);
+          const forceMockHit = (import.meta.env.DEV || import.meta.env.VITE_USE_MOCKS === 'true') && 
+            ['sick of it all', 'h2o', 'radiohead', 'blink-182', 'orange 9mm', 'madball'].includes(normName);
 
           if (forceMockHit || (entry && isCacheEntryFullyQualified(entry))) {
             const finalEntry = entry || {
@@ -1878,52 +1879,44 @@ const App: React.FC = () => {
     };
     runHealthCheck();
 
-    // Mock user session for offline sandbox
-    const mockCurrentUser = {
-      uid: 'mock-user-123',
-      email: 'sandbox@zcene.online',
-      displayName: 'Sandbox User',
-      photoURL: null,
-      emailVerified: true
-    } as any;
-
-    const timer = setTimeout(() => {
-      setUser(mockCurrentUser);
+    // Standard Firebase Auth State Observer
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
       setIsAuthInitialized(true);
       setIsFirebaseReady(true);
-      console.log('[Offline Sandbox] Mock user logged in:', mockCurrentUser.uid);
-    }, 100);
+      console.log('[Auth] User state changed:', currentUser?.email);
+    });
 
-    return () => clearTimeout(timer);
+    return () => unsubscribe();
   }, []);
 
-  // Sync user profile and fetch extended data (Real-Time)
+  // Sync user profile from Firestore (Real-Time)
   useEffect(() => {
-    if (!user || !isAuthInitialized || !isFirebaseReady) return;
-
-    // Offline Sandbox Interception
-    console.log(`[Offline Sandbox] Mocking user profile sync for UID: ${user.uid}`);
-    const savedMockProfile = localStorage.getItem(`zcene_mock_profile_${user.uid}`);
-    if (savedMockProfile) {
-      try {
-        setProfile(JSON.parse(savedMockProfile));
-      } catch (e) {
-        setProfile({
-          displayName: 'Sandbox User',
-          email: 'sandbox@zcene.online',
-          onboardingProgress: { step1: true, step2: true, step3: true, step4: true, step5: true }
-        });
-      }
-    } else {
-      setProfile({
-        displayName: 'Sandbox User',
-        email: 'sandbox@zcene.online',
-        onboardingProgress: { step1: true, step2: true, step3: true, step4: true, step5: true }
-      });
+    if (!user || !isAuthInitialized || !isFirebaseReady) {
+      setProfile(null);
+      return;
     }
-    setLibraryArtists([]);
 
-    return () => {};
+    // Subscribe to real-time profile updates from Firestore
+    const userRef = doc(db, 'users', user.uid);
+    const unsubscribe = onSnapshot(userRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setProfile(docSnap.data());
+      } else {
+        // Automatically initialize profile record on signup
+        const initialProfile = {
+          email: user.email || '',
+          displayName: user.displayName || '',
+          onboardingProgress: { step1: true, step2: true, step3: true, step4: true, step5: true }
+        };
+        setProfile(initialProfile);
+        setDoc(userRef, initialProfile, { merge: true }).catch(console.error);
+      }
+    }, (err) => {
+      console.error("[Profile Listener] Failed to fetch profile:", err);
+    });
+
+    return () => unsubscribe();
   }, [user, isAuthInitialized, isFirebaseReady]);
 
   useEffect(() => {
@@ -1988,58 +1981,29 @@ const App: React.FC = () => {
 
   // Sync projects list (Dashboard)
   useEffect(() => {
-    if (!user || !isAuthInitialized || !isFirebaseReady) return;
-
-    // Offline Sandbox Interception
-    console.log(`[Offline Sandbox] Mocking projects list sync for UID: ${user.uid}`);
-    const storedProjectsJson = localStorage.getItem(`zcene_mock_projects_${user.uid}`);
-    let projs: Project[] = [];
-    if (storedProjectsJson) {
-      try {
-        projs = JSON.parse(storedProjectsJson);
-      } catch (e) {}
+    if (!user || !isAuthInitialized || !isFirebaseReady) {
+      setProjects([]);
+      return;
     }
 
-    if (projs.length === 0) {
-      projs = [
-        {
-          id: 'sandbox-project-1',
-          name: localStorage.getItem('zcene_project_name_sandbox-project-1') || 'Offline Zcene Project',
-          seedArtists: 'Orange 9mm::Madball::H2O',
-          graphData: JSON.stringify({
-            nodes: [
-              { id: 'Orange 9mm', type: 'artist', x: 200, y: 200 },
-              { id: 'Madball', type: 'artist', x: 250, y: 220 },
-              { id: 'H2O', type: 'artist', x: 220, y: 280 }
-            ],
-            links: [
-              { source: 'Orange 9mm', target: 'Madball' },
-              { source: 'Orange 9mm', target: 'H2O' }
-            ]
-          }),
-          activeNodes: [],
-          detailsCache: '[]',
-          chatHistories: '[]',
-          discoveryFilters: '{}',
-          lastViewedStackCount: 0,
-          isMagazineViewOpen: false,
-          authorId: user.uid,
-          createdAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
-          updatedAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any
-        }
-      ];
-      localStorage.setItem(`zcene_mock_projects_${user.uid}`, JSON.stringify(projs));
-    }
-
-    projs = projs.map(p => {
-      const savedName = localStorage.getItem(`zcene_project_name_${p.id}`);
-      if (savedName) p.name = savedName;
-      return p;
+    const projectsRef = collection(db, 'users', user.uid, 'projects');
+    const unsubscribe = onSnapshot(projectsRef, (snapshot) => {
+      const projs: Project[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        projs.push({
+          id: docSnap.id,
+          ...data
+        } as Project);
+      });
+      setProjects(projs);
+      console.log(`[Projects Listener] Synchronized ${projs.length} projects.`);
+    }, (err) => {
+      console.error("[Projects Listener] Failed to fetch projects:", err);
     });
 
-    setProjects(projs);
-    return () => {};
-  }, [user, isAuthInitialized, isFirebaseReady, projectName]);
+    return () => unsubscribe();
+  }, [user, isAuthInitialized, isFirebaseReady]);
 
   // ── BATCH GLOBAL HYDRATION HELPER ──────────────────────────────────────
   // Reads the global 'artists' collection for every node in a loaded graph
@@ -2558,9 +2522,9 @@ const App: React.FC = () => {
           }
         }
 
-        // Temporarily bypassed during suspension
-        // await setDoc(doc(db, projectPath), docPayload, { merge: true });
-        console.log(`[Offline Sandbox] Bypassed background database save for project: ${projectPath}`);
+        // Sync project state to Firestore
+        await setDoc(doc(db, projectPath), docPayload, { merge: true });
+        console.log(`[Database Reporter] SUCCESS: Project synced.`);
 
         console.log(`[Database Reporter] SUCCESS: Project synced (mock).`);
         setTimeout(() => { isHydratingSessionRef.current = false; }, 1000);
