@@ -1598,7 +1598,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                     adClient="ca-pub-9665950244000141" 
                                     adSlot="3666473373" 
                                     style={{ display: 'inline-block', width: '320px', height: '50px' }} 
-                                    customImageUrl="https://storage.googleapis.com/zcene/Zcene%20App%20Mobile%20(slim).png"
+                                    customImageUrl="https://storage.googleapis.com/zcene-prod-assets/Zcene%20App%20Mobile%20(slim).png"
                                     linkUrl="#/merch"
                                 />
                             </div>
@@ -1627,7 +1627,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                         adClient="ca-pub-9665950244000141" 
                                         adSlot="3666473373" 
                                         style={{ display: 'inline-block', width: '320px', height: '50px' }} 
-                                        customImageUrl="https://storage.googleapis.com/zcene/Zcene%20App%20Mobile%20(slim).png"
+                                        customImageUrl="https://storage.googleapis.com/zcene-prod-assets/Zcene%20App%20Mobile%20(slim).png"
                                         linkUrl="#/merch"
                                     />
                                 </div>
@@ -1637,7 +1637,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                         adClient="ca-pub-9665950244000141" 
                                         adSlot="3666473373" 
                                         style={{ display: 'inline-block', width: '728px', height: '90px' }} 
-                                        customImageUrl="https://storage.googleapis.com/zcene/Zcene%20App%20Desktop.png"
+                                        customImageUrl="https://storage.googleapis.com/zcene-prod-assets/Zcene%20App%20Desktop.png"
                                         linkUrl="#/merch"
                                     />
                                 </div>
