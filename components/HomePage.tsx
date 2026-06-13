@@ -247,6 +247,7 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                           {hasExistingGraph ? 'Resume Your Zcene' : 'Create Your Zcene'}
                         </button>
                         <p className="text-base text-zinc-500">Completely Free. Start by signing in with Google.</p>
+                        {!user && <p className="text-xs text-zinc-600 font-normal mt-1">We collect your email address via Google Sign-In to manage your account.</p>}
                     </div>
                 </div>
             </div>
@@ -420,6 +421,7 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                     >
                         {hasExistingGraph ? 'Resume Your Zcene' : 'Create Your Zcene'}
                     </button>
+                    {!user && <p className="text-xs text-black/50 font-normal">We collect your email address via Google Sign-In to manage your account.</p>}
                 </div>
              </div>
         </section>
