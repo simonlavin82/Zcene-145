@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import * as d3 from 'd3';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plus, Minus, Loader2 } from 'lucide-react';
-import { GraphData, Node, Link, GraphSettings } from '../types';
+import { GraphData, Node, Link, GraphSettings, NodeDetails } from '../types';
 import { LegendSymbol } from './Icons';
 import { normalizeArtistId } from '../services/artistCacheService';
 
@@ -32,13 +32,15 @@ interface MusicGraphProps {
   onExtendNode?: (node: Node) => void;
   onRemoveNode?: (node: Node) => void;
   isGuest?: boolean;
+  detailsCache?: Map<string, NodeDetails>;
 }
 
 const MusicGraph: React.FC<MusicGraphProps> = ({
   data, libraryArtists, seedArtists, onNodeClick, selectedNode, isSmallScreen,
   activeFilters, focusOn, searchQuery, toggleFilter,
   legendConfig, legendOrder, graphSettings = { linkDistance: 3, nodeSize: 3 },
-  legendRef, onInteraction, onLegendInteraction, onExtendNode, onRemoveNode, isGuest
+  legendRef, onInteraction, onLegendInteraction, onExtendNode, onRemoveNode, isGuest,
+  detailsCache
 }) => {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const simulationRef = useRef<d3.Simulation<Node, Link> | null>(null);
@@ -79,6 +81,21 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     // No longer kicking the simulation on selection to maintain absolute stability.
     // The selectedNodePos useEffect handles the button positioning even when simulation is idle.
   }, [onNodeClick, onInteraction, selectedNode]);
+
+  // Restart D3 simulation to update position calculations when details hydrate
+  const details = useMemo(() => {
+    if (!selectedNode || !detailsCache) return null;
+    const normId = normalizeArtistId(selectedNode.id);
+    return detailsCache.get(selectedNode.id) || 
+           detailsCache.get(selectedNode.id.toLowerCase()) || 
+           detailsCache.get(normId);
+  }, [selectedNode, detailsCache]);
+
+  useEffect(() => {
+    if (details) {
+      simulationRef.current?.alpha(0.15).restart();
+    }
+  }, [details]);
 
   const distMult = Math.pow(1.8, graphSettings.linkDistance - 3);
   const sizeMult = Math.max(0.1, graphSettings.nodeSize / 3);

@@ -617,7 +617,7 @@ export const generateGraphData = async (artists: string, baseGraph?: GraphData, 
   }
 
   const attemptRequest = async (retriesLeft: number): Promise<GraphData> => {
-    const currentModel = "gemini-3-flash-preview";
+    const currentModel = "gemini-3.1-pro-preview";
     
     try {
       let userPrompt: string;
@@ -989,7 +989,7 @@ export const extendGraphFromNode = async (node: Node, baseGraph: GraphData): Pro
     }
   };
 
-  const url = `${baseUrl}/v1beta/models/gemini-3-flash-preview:generateContent`;
+  const url = `${baseUrl}/v1beta/models/gemini-3.1-pro-preview:generateContent`;
   const response = await fetch(url, {
     method: 'POST',
     headers: {
