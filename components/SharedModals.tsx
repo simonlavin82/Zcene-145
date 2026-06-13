@@ -112,8 +112,9 @@ export const HeaderMenu: React.FC<{
     onClose: () => void;
     onNavigate: (path: string) => void;
     isAdmin?: boolean;
+    isGuest?: boolean;
     onRestartWalkthrough?: () => void;
-}> = ({ isOpen, onClose, onNavigate, isAdmin, onRestartWalkthrough }) => {
+}> = ({ isOpen, onClose, onNavigate, isAdmin, isGuest = false, onRestartWalkthrough }) => {
     if (!isOpen) return null;
 
     const menuItems = [
@@ -121,6 +122,8 @@ export const HeaderMenu: React.FC<{
         ...(isAdmin ? [
             { label: 'Design System', icon: 'grid_view', path: 'design' },
             { label: 'Engine', icon: 'settings_input_component', path: 'engine' },
+        ] : []),
+        ...(!isGuest ? [
             { label: 'Discovery Ledger', icon: 'monitoring', path: 'analytics' },
         ] : []),
         { label: 'Instagram', icon: 'camera_alt', path: 'instagram', isExternal: true },

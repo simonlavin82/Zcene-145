@@ -137,6 +137,34 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
 
     const activeUserEmail = user?.email || 'sandbox@zcene.online';
 
+    // Compute if we are displaying in restricted Normal User Mode
+    const isNormalUserView = !isAdmin || simulateNormalUser;
+
+    // Ensure any logged-in user has telemetry details generated dynamically
+    const ledgerData = useMemo(() => {
+        const hasActiveUser = mockLedgerData.some(u => u.email.toLowerCase() === activeUserEmail.toLowerCase());
+        if (!hasActiveUser && activeUserEmail) {
+            return [
+                ...mockLedgerData,
+                {
+                    email: activeUserEmail,
+                    projectsCount: 2,
+                    actionTriggers: { createCount: 1, updateCount: 5 },
+                    artistSearches: {
+                        globalCount: 6,
+                        topSearches: [
+                            { artistName: "Slowdive", count: 3 },
+                            { artistName: "Radiohead", count: 2 },
+                            { artistName: "Turnstile", count: 1 }
+                        ]
+                    },
+                    cacheEfficiency: { liveQueries: 2, cacheHits: 4 }
+                }
+            ];
+        }
+        return mockLedgerData;
+    }, [activeUserEmail]);
+
     useEffect(() => {
         if (isActive && containerRef.current) {
             containerRef.current.scrollTo(0, 0);
@@ -164,13 +192,13 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
 
     // Calculations based on the ledger state
     const filteredLedger = useMemo(() => {
-        if (simulateNormalUser) {
-            return mockLedgerData.filter(u => u.email.toLowerCase() === activeUserEmail.toLowerCase());
+        if (isNormalUserView) {
+            return ledgerData.filter(u => u.email.toLowerCase() === activeUserEmail.toLowerCase());
         }
-        return mockLedgerData.filter(user => 
+        return ledgerData.filter(user => 
             user.email.toLowerCase().includes(searchTerm.toLowerCase())
         );
-    }, [searchTerm, simulateNormalUser, activeUserEmail]);
+    }, [searchTerm, isNormalUserView, activeUserEmail, ledgerData]);
 
     const aggregateMetrics = useMemo(() => {
         let totalProjects = 0;
@@ -179,7 +207,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
         let totalLiveQueries = 0;
         let totalCacheHits = 0;
 
-        mockLedgerData.forEach(user => {
+        ledgerData.forEach(user => {
             totalProjects += user.projectsCount;
             totalCreates += user.actionTriggers.createCount;
             totalUpdates += user.actionTriggers.updateCount;
@@ -201,7 +229,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
             totalCosts,
             totalSavings
         };
-    }, []);
+    }, [ledgerData]);
 
     const toggleRow = (email: string) => {
         setExpandedRow(prev => prev === email ? null : email);
@@ -256,31 +284,33 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                         <div>
                             <h2 className="text-3xl font-medium text-white mb-2">The Discovery Ledger</h2>
                             <p className="text-zinc-400 text-sm max-w-2xl leading-relaxed">
-                                {simulateNormalUser 
+                                {isNormalUserView 
                                     ? "Personal discovery ledger tracking your curation volume, seed-artist expansions, AI synthesis requests, and local memory conservation."
                                     : "Platform-wide ledger tracking curation volume, seed-artist expansions, AI synthesis requests, and local memory conservation across all Authors."
                                 }
                             </p>
                         </div>
-                        <div className="flex-shrink-0">
-                            <button
-                                onClick={() => setSimulateNormalUser(prev => !prev)}
-                                className={`flex items-center gap-2 px-4 py-2 border transition-all cursor-pointer ${
-                                    simulateNormalUser 
-                                        ? 'bg-primary border-primary text-black font-semibold' 
-                                        : 'bg-zinc-900 border-zinc-700 text-zinc-300 hover:border-zinc-500'
-                                }`}
-                            >
-                                <span className="material-symbols-outlined text-sm">
-                                    {simulateNormalUser ? 'person' : 'admin_panel_settings'}
-                                </span>
-                                {simulateNormalUser ? 'Viewing: Normal User' : 'Preview Normal User'}
-                            </button>
-                        </div>
+                        {isAdmin && (
+                            <div className="flex-shrink-0">
+                                <button
+                                    onClick={() => setSimulateNormalUser(prev => !prev)}
+                                    className={`flex items-center gap-2 px-4 py-2 border transition-all cursor-pointer ${
+                                        simulateNormalUser 
+                                            ? 'bg-primary border-primary text-black font-semibold' 
+                                            : 'bg-zinc-900 border-zinc-700 text-zinc-300 hover:border-zinc-500'
+                                    }`}
+                                >
+                                    <span className="material-symbols-outlined text-sm">
+                                        {simulateNormalUser ? 'person' : 'admin_panel_settings'}
+                                    </span>
+                                    {simulateNormalUser ? 'Viewing: Normal User' : 'Preview Normal User'}
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     {/* Overview Cards (Calculations block) */}
-                    {!simulateNormalUser && (
+                    {!isNormalUserView && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                             <div className="bg-zinc-900/30 border border-zinc-800 p-6 rounded-none flex flex-col justify-between">
                                 <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mb-2">Recall Resonance</span>
@@ -317,7 +347,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                     )}
 
                     {/* Filter controls */}
-                    {!simulateNormalUser && (
+                    {!isNormalUserView && (
                         <div className="flex items-center gap-4 bg-zinc-950 p-4 border border-zinc-800 rounded-none">
                             <span className="material-symbols-outlined text-zinc-500">search</span>
                             <input

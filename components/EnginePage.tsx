@@ -100,21 +100,25 @@ the entire dataset, the app evolves existing visual structures.
 
 5. GLOBAL CACHE ALIGNMENT & TOKEN GATING (artistCacheService.ts / App.tsx):
    Before invoking Gemini for Phase 02 Orchestration, the engine computes a 
-   normalized cache key (sorted artist list + serialized filters) and probes 
-   the global 'artists' Firestore collection.
+   normalized single-artist ID (using Unicode NFD accent-stripping and hyphen replacement) 
+   and probes the global 'artists' collection concurrently for all seeds.
    - Cache HIT: Graph structure + Deep Cut metadata are returned instantly. 
      Phases 02 and 03 are bypassed entirely. D3 Phase 04 begins immediately, 
      and artist canvas positions from the project's canvasLayout are restored.
    - Cache MISS / Partial Cache Hit Gating: If a query requires net-new model 
      synthesis, the engine intercepts the flow and triggers the Token Confirmation 
      Dialog showing split lists of "Ready (Cached/Free)" vs "Synthesis Required" artists.
+   - Cache Upgrades & Self-Healing: If a cache document exists but fails validation 
+     (e.g., legacy version), a "cache_upgrade" confirmation warning is shown. 
+     If confirmed, live model queries update the cache. If canceled, the system triggers 
+     a fallback using bypassCacheValidation = true to render legacy data.
    - Smart Cancel Fallback Routing: If the user cancels a mixed query warning, 
      the engine strips out the uncached subset on the fly and recursively re-routes 
-     the search using only the cached (free) subset of artists.
+     the search using only the cached (free) subset of artists (passing bypassCacheValidation = true).
    - State Rollback: Active node and seed artist states are reverted on cancel 
      to prevent canceled artists from leaking into the Deep Cut slider stack.
-   - Key Format: lowercase, alphanumeric + hyphens, artists sorted and joined 
-     with '--', filters appended as suffixes (e.g. 'after2010'). Max 512 chars.
+   - Key Format: lowercase, alphanumeric + hyphens, mapped directly to normalizeArtistId 
+     (e.g. 'slowdive', 'my-bloody-valentine'). Max 256 chars.
    - Permanent cache by design: music histories, genre bridges, and Deep Cut 
      metadata rarely change. Admin manual deletion handles edge cases.
 
@@ -447,7 +451,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                 <div className="px-6 py-4 rounded-xl border border-primary/20 bg-primary/5 text-center w-full max-w-md">
                     <div className="text-primary text-[10px] font-mono mb-1 uppercase tracking-tighter">Phase 05: Persistence</div>
                     <div className="text-white font-medium">Lightweight Firestore Commit</div>
-                    <div className="text-[11px] text-zinc-400 mt-1">Project record stores only a <span className="text-primary font-mono">cacheKey</span> reference + artist <span className="text-primary font-mono">canvasLayout</span> positions. Heavy graph data lives in the global artists cache.</div>
+                    <div className="text-[11px] text-zinc-400 mt-1">Project record stores seed list inputs + artist <span className="text-primary font-mono">canvasLayout</span> positions. Heavy graph data lives in the global artists cache.</div>
                 </div>
             </div>
         </div>

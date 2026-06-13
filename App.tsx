@@ -2829,7 +2829,7 @@ const App: React.FC = () => {
             setCurrentView(View.Home);
           }
         } else if (hash.startsWith('#/analytics')) {
-          if (isAdmin) {
+          if (user) {
             if (currentViewRef.current !== View.Analytics) setCurrentView(View.Analytics);
           } else {
             setCurrentView(View.Home);
@@ -3300,11 +3300,11 @@ const App: React.FC = () => {
       [View.Help]: '#/help',
       [View.StyleGuide]: isAdmin ? '#/designsystem' : '#/',
       [View.Engine]: isAdmin ? '#/engine' : '#/',
-      [View.Analytics]: isAdmin ? '#/analytics' : '#/',
+      [View.Analytics]: user ? '#/analytics' : '#/',
       [View.Home]: '#/'
     }[newView];
     if (window.location.hash !== h) window.location.hash = h;
-  }, [graphData, isAdmin]);
+  }, [graphData, isAdmin, user]);
 
   const handleLogoClick = useCallback(() => {
     handleViewChange(View.Home);

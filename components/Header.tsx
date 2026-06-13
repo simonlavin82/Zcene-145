@@ -230,6 +230,7 @@ const Header: React.FC<HeaderProps> = ({
                     onClose={() => setIsMenuOpen(false)}
                     onNavigate={onNavigate}
                     isAdmin={isAdmin}
+                    isGuest={isGuest}
                     onRestartWalkthrough={onRestartWalkthrough}
                 />
             </div>
