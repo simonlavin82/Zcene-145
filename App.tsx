@@ -663,7 +663,7 @@ const App: React.FC = () => {
   const [pendingAuthAction, setPendingAuthAction] = useState<{ type: string; payload: any } | null>(null);
   const [tokenConfirmation, setTokenConfirmation] = useState<{
     isOpen: boolean;
-    type: 'generation' | 'extension' | 'deep_cut_creation' | 'partial_synthesis';
+    type: 'generation' | 'extension' | 'deep_cut_creation' | 'partial_synthesis' | 'cache_upgrade';
     cost: number;
     cachedArtists: string[];
     missingArtists: string[];
@@ -673,7 +673,7 @@ const App: React.FC = () => {
   } | null>(null);
 
   const confirmTokenUsage = useCallback((
-    type: 'generation' | 'extension' | 'deep_cut_creation' | 'partial_synthesis',
+    type: 'generation' | 'extension' | 'deep_cut_creation' | 'partial_synthesis' | 'cache_upgrade',
     cachedArtists: string[],
     missingArtists: string[],
     enrichmentArtists?: string[]
@@ -1464,7 +1464,12 @@ const App: React.FC = () => {
     }
   };
 
-  const handleGenerateGraph = useCallback(async (artists: string, isRegeneration: boolean = false, graphToEnhance?: GraphData | null) => {
+  const handleGenerateGraph = useCallback(async (
+    artists: string,
+    isRegeneration: boolean = false,
+    graphToEnhance?: GraphData | null,
+    bypassCacheValidation: boolean = false
+  ) => {
     const prevActiveNodes = activeNodes;
     const prevSeedArtists = seedArtists;
 
@@ -1472,7 +1477,7 @@ const App: React.FC = () => {
       // Only gate if it's a manual action (regeneration or fresh start)
       // Imports (via deep links) are allowed for guests
       console.log(`[Lazy Registration] Queueing generateGraph for guest. User: ${!!user}`);
-      setPendingAuthAction({ type: 'generateGraph', payload: { artists, isRegeneration, graphToEnhance } });
+      setPendingAuthAction({ type: 'generateGraph', payload: { artists, isRegeneration, graphToEnhance, bypassCacheValidation } });
       handleLogin();
       return;
     }
@@ -1494,7 +1499,7 @@ const App: React.FC = () => {
 
         if (cacheDoc.exists()) {
           const data = cacheDoc.data();
-          if (data && isCacheEntryFullyQualified(data)) {
+          if (data && (bypassCacheValidation || isCacheEntryFullyQualified(data))) {
             let parsedGraph = null;
             try {
               parsedGraph = typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData;
@@ -1574,7 +1579,17 @@ const App: React.FC = () => {
               return;
             }
           } else {
-            console.log(`[Front Gate Cache] Cache doc found for "${searchId}" but failed strict validation. Treating as MISS for self-healing.`);
+            console.log(`[Front Gate Cache] Cache doc found for "${searchId}" but failed strict validation. Intercepting for self-healing.`);
+            setIsLoading(true);
+            const confirmed = await confirmTokenUsage('cache_upgrade', [], [searchId], []);
+            if (confirmed) {
+              console.log(`[Front Gate Cache] User confirmed cache upgrade. Overwriting old entry.`);
+              // Fall through to live generation logic (which will generate and write back)
+            } else {
+              console.log(`[Front Gate Cache] User cancelled cache upgrade. Falling back to legacy data.`);
+              handleGenerateGraph(artists, isRegeneration, graphToEnhance, true);
+              return;
+            }
           }
         }
       } catch (err) {
@@ -1648,7 +1663,7 @@ const App: React.FC = () => {
 
           const validation = entry ? validateCacheEntry(entry) : null;
 
-          if (forceMockHit || (entry && validation?.isFullyQualified)) {
+          if (forceMockHit || (entry && (bypassCacheValidation || validation?.isFullyQualified))) {
             fullHits.push(name);
             const finalEntry: ArtistCacheEntry = entry || {
               artistId: normalizeArtistId(name),
@@ -1869,18 +1884,19 @@ const App: React.FC = () => {
 
         // Intercept with token confirmation modal
         const confirmed = await confirmTokenUsage(
-          enrichmentRequired.length > 0 && missing.length === 0 ? 'partial_synthesis' : 'generation',
+          enrichmentRequired.length > 0 && missing.length === 0 ? 'cache_upgrade' : 'generation',
           fullHits,
           missing,
           enrichmentRequired
         );
         if (!confirmed || controller.signal.aborted) {
           setIsLoading(false);
-          if (fullHits.length > 0) {
+          const legacyArtists = [...fullHits, ...enrichmentRequired];
+          if (legacyArtists.length > 0) {
             setActiveNodes(prevActiveNodes);
             setSeedArtists(prevSeedArtists);
-            showToast(`Loading cached artists: ${fullHits.join(', ')}`);
-            handleGenerateGraph(fullHits.join('::'), isRegeneration, graphToEnhance);
+            showToast(`Loading cached artists: ${legacyArtists.join(', ')}`);
+            handleGenerateGraph(legacyArtists.join('::'), isRegeneration, graphToEnhance, true);
           } else {
             setActiveNodes(prevActiveNodes);
             setSeedArtists(prevSeedArtists);
