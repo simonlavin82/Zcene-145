@@ -52,7 +52,7 @@ export interface NodeDetails {
   members?: string[];
   links: Array<{
     site: string;
-    url: string;
+    url: string | null;
   }>;
   tourInfo?: string;
   discography?: Array<{

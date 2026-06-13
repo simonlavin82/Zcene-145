@@ -156,7 +156,7 @@ export const NODE_DETAILS_SCHEMA = {
     },
     imageUrl: {
       type: Type.STRING,
-      description: "URL to high-quality photo."
+      description: "MUST be a Wikipedia Special:FilePath URL (https://en.wikipedia.org/wiki/Special:FilePath/...). Do not use image URLs from official artist sites or third-party hosts — only Wikipedia FilePath URLs are trusted by the image pipeline."
     },
     members: {
       type: Type.ARRAY,
@@ -178,13 +178,18 @@ export const NODE_DETAILS_SCHEMA = {
     },
     links: {
       type: Type.ARRAY,
+      description: "Wikipedia link MUST be index 0 if found. Do NOT include Official Website or Bandcamp entries — those are handled by the client. Only include grounded reference links.",
       items: {
         type: Type.OBJECT,
         properties: {
           site: { type: Type.STRING },
-          url: { type: Type.STRING }
+          url: {
+            type: Type.STRING,
+            nullable: true,
+            description: "The verified, active URL. MUST be null if the URL cannot be confirmed. Do NOT guess or fabricate."
+          }
         },
-        required: ["site", "url"]
+        required: ["site"]
       }
     },
     discography: {
@@ -203,7 +208,7 @@ export const NODE_DETAILS_SCHEMA = {
       description: "Curator insight."
     }
   },
-  required: ["summary", "details", "links", "discography", "recommendationReason"]
+  required: ["summary", "details", "discography", "recommendationReason"]
 };
 
 export const GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = `I have an existing music graph. The user wants to enhance it by adding connections for these seed artists: {{artists}}.
@@ -291,7 +296,7 @@ export const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed infor
        - Text Segmentation: Use short paragraphs and meaningful phrases.
        - Formatting: Use bolding for key terms and bullet points where appropriate to create white space.
        - Semantic Splitting: Group related content together by meaning.
-    2. The canonical Wikipedia FilePath or high-quality official photo.
+    2. The canonical Wikipedia Special:FilePath image URL. imageUrl MUST be a Wikipedia Special:FilePath URL (https://en.wikipedia.org/wiki/Special:FilePath/...). Do not use image URLs from official artist sites or any third-party host.
     3. Confirmed top 3 studio albums.
     
     Your task is to generate a JSON object. You MUST follow this structure precisely:
@@ -306,13 +311,23 @@ export const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed infor
         "notableArtists": ["Artist Name", ...]
       },
       "links": [
-        {"site": "Wikipedia", "url": "..."},
-        {"site": "Official Website", "url": "..."},
-        {"site": "Bandcamp", "url": "..."}
+        {"site": "Wikipedia", "url": "https://en.wikipedia.org/wiki/..."}
       ],
       "discography": [{"albumName": "Name", "releaseYear": "YYYY"}],
       "recommendationReason": "Curator insight about their role in this scene."
     }
+
+    WIKIPEDIA ORDERING RULE (MANDATORY):
+    If a Wikipedia link is found, it MUST be the very first item (index 0) in the links array.
+
+    OFFICIAL WEBSITE RULE:
+    Do NOT include an "Official Website" entry in your links array. The client application handles Official Website routing independently and safely.
+
+    BANDCAMP RULE:
+    Do NOT include a "Bandcamp" entry in your links array. The client application handles Bandcamp routing independently.
+
+    WIKIPEDIA / OTHER INFO LINKS:
+    Include grounded Wikipedia or other reference links if confirmed by Google Search results. Wikipedia MUST be index 0.
 
     CURATOR TONE & VARIETY (CRITICAL):
     - BREVITY: Max 25 words. Use exactly ONE snappy, high-impact sentence.
@@ -557,8 +572,7 @@ const generateMockNodeDetails = (node: Node): NodeDetails => {
       founded: '1995'
     },
     links: [
-      { site: 'Wikipedia', url: `https://en.wikipedia.org/wiki/${encodeURIComponent(node.id)}` },
-      { site: 'Official Website', url: 'http://www.zcene.online' }
+      { site: 'Wikipedia', url: `https://en.wikipedia.org/wiki/${encodeURIComponent(node.id)}` }
     ],
     discography: albums[norm] || defaultAlbums,
     recommendationReason: `Essential artist that defines the roots and branchings of the ${node.id} scene.`
@@ -603,7 +617,7 @@ export const generateGraphData = async (artists: string, baseGraph?: GraphData, 
   }
 
   const attemptRequest = async (retriesLeft: number): Promise<GraphData> => {
-    const currentModel = "gemini-3.1-pro-preview";
+    const currentModel = "gemini-3-flash-preview";
     
     try {
       let userPrompt: string;
@@ -975,7 +989,7 @@ export const extendGraphFromNode = async (node: Node, baseGraph: GraphData): Pro
     }
   };
 
-  const url = `${baseUrl}/v1beta/models/gemini-3.1-pro-preview:generateContent`;
+  const url = `${baseUrl}/v1beta/models/gemini-3-flash-preview:generateContent`;
   const response = await fetch(url, {
     method: 'POST',
     headers: {
@@ -1111,12 +1125,21 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
         }
     }
 
-    // Ensure all required fields exist to prevent UI crashes if AI returned partial data
+    // Ensure all required fields exist to prevent UI crashes if AI returned partial data.
+    // URL sanitisation pass: strip any url that is not a valid http(s) URL — treats empty strings,
+    // the literal string "null", and bare domains as equivalent to null per Section 5 / Link Hardening.
+    const sanitisedLinks = (details.links || []).map(l => ({
+        ...l,
+        url: (l.url && typeof l.url === 'string' && l.url.trim().startsWith('http'))
+            ? l.url.trim()
+            : null
+    }));
+
     const hydratedDetails: NodeDetails = {
         ...details,
         summary: details.summary || "No summary available (AI response was truncated).",
         details: details.details || {},
-        links: details.links || [],
+        links: sanitisedLinks,
         discography: details.discography || [],
         members: details.members || [],
         recommendationReason: details.recommendationReason || "No insight provided.",

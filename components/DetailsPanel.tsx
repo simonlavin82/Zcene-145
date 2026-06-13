@@ -241,11 +241,39 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     };
 
     const links = useMemo(() => {
-        const all = details?.links || [];
+        // --- Deterministic Catalog Fallbacks (Section 5 / Link Hardening) ---
+        // The client fully owns both purchase-tier buttons. AI-provided raw domains are never
+        // rendered directly — hijacked official sites return HTTP 200 and bypass the http-sanitiser.
+        // Both search destinations are structurally guaranteed never to 404 or redirect to spam.
+        const bandcampSearchUrl = `https://bandcamp.com/search?q=${encodeURIComponent(node.id)}`;
+        const officialSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(node.id)}+official+website`;
+
+        // Null-filter AI-supplied links (strips empty strings, non-http, legacy cache junk).
+        // AI is instructed not to include Official Website or Bandcamp, so aiLinks should
+        // only contain Wikipedia and other grounded reference links.
+        const aiLinks = (details?.links || []).filter(l => !!l.url);
+
+        // Honour an AI-verified Bandcamp URL if present; otherwise use the search fallback.
+        const hasBandcampFromAi = aiLinks.some(l => /bandcamp/i.test(l.site));
+        const bandcampEntry = hasBandcampFromAi
+            ? null
+            : { site: 'Bandcamp', url: bandcampSearchUrl };
+
+        // Official Website: ALWAYS use the deterministic Google search URL.
+        // Never render a raw AI-provided official domain — even a valid-looking domain may be
+        // a hijacked asset that resolves 200 OK but serves malicious or spam content.
+        const officialEntry = { site: 'Official Website', url: officialSearchUrl };
+
+        const all = [
+            ...aiLinks.filter(l => !/bandcamp|official website/i.test(l.site)), // Wikipedia + other info links
+            ...(bandcampEntry ? [bandcampEntry] : aiLinks.filter(l => /bandcamp/i.test(l.site))),
+            officialEntry,
+        ];
+
         const purchase = all.filter(l => /bandcamp|official website/i.test(l.site));
-        const info = all.filter(l => !/bandcamp|official website/i.test(l.site));
+        const info     = all.filter(l => !/bandcamp|official website/i.test(l.site));
         return { purchase, info };
-    }, [details?.links]);
+    }, [details?.links, node.id]);
 
     const headerSizeClass = isFullScreenMode 
         ? 'text-5xl font-bold tracking-tight'
