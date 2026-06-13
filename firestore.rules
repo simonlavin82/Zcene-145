@@ -188,11 +188,16 @@ service cloud.firestore {
                        incoming().seedArtists is string &&
                        incoming().hitCount == 0;
 
-      // Authenticated users may update ONLY detailsCache (Phase 03 write-back) and hitCount (analytics).
-      // No other fields may be mutated — prevents graph poisoning via updates.
+      // Authenticated users may update detailsCache (Phase 03 write-back) and hitCount (analytics).
+      // They may also upgrade legacy cache entries (cacheVersion < 2) to version 2 by writing graphData and filters.
+      // General modifications to graphData for version 2+ remain blocked to prevent graph poisoning.
       allow update: if isSignedIn() &&
-                       request.resource.data.diff(resource.data).affectedKeys()
-                         .hasOnly(['detailsCache', 'hitCount']);
+                       (request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['detailsCache', 'hitCount']) ||
+                        (existing().cacheVersion < 2 &&
+                         incoming().cacheVersion == 2 &&
+                         request.resource.data.diff(resource.data).affectedKeys()
+                           .hasOnly(['detailsCache', 'hitCount', 'graphData', 'cacheVersion', 'filters'])));
 
       // Only admins may delete cache entries (manual invalidation).
       allow delete: if isAdmin();

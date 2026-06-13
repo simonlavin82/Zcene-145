@@ -316,11 +316,12 @@ export const TokenConfirmationDialog: React.FC<{
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void;
-  type: 'generation' | 'extension' | 'deep_cut_creation';
+  type: 'generation' | 'extension' | 'deep_cut_creation' | 'partial_synthesis';
   cost: number;
   cachedArtists: string[];
   missingArtists: string[];
-}> = ({ isOpen, onClose, onConfirm, type, cost, cachedArtists, missingArtists }) => {
+  enrichmentArtists?: string[];
+}> = ({ isOpen, onClose, onConfirm, type, cost, cachedArtists, missingArtists, enrichmentArtists }) => {
   if (!isOpen) return null;
 
   return (
@@ -358,7 +359,9 @@ export const TokenConfirmationDialog: React.FC<{
                   ? 'Graph Generation' 
                   : type === 'extension' 
                     ? 'Node Expansion' 
-                    : 'Deep Cut Creation'}
+                    : type === 'partial_synthesis'
+                      ? 'Partial Synthesis (Enrichment)'
+                      : 'Deep Cut Creation'}
               </span>
             </div>
             <div className="flex justify-between font-mono text-xs border-b border-zinc-800 pb-1.5">
@@ -377,6 +380,21 @@ export const TokenConfirmationDialog: React.FC<{
                 <div className="flex flex-wrap gap-1.5">
                   {cachedArtists.map(artist => (
                     <span key={artist} className="text-[10px] font-mono bg-zinc-800/80 text-zinc-300 px-2 py-0.5 border border-zinc-700/50 rounded-full">
+                      {artist}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {enrichmentArtists && enrichmentArtists.length > 0 && (
+              <div className="space-y-1 pb-1.5 border-b border-zinc-800">
+                <span className="text-[10px] font-semibold text-amber-400 uppercase tracking-widest block">
+                  Enrichment Required (Missing Peer Bands/Attributes)
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {enrichmentArtists.map(artist => (
+                    <span key={artist} className="text-[10px] font-mono bg-amber-950/20 text-amber-400 px-2 py-0.5 border border-amber-900/30 rounded-full">
                       {artist}
                     </span>
                   ))}

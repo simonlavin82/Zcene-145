@@ -99,9 +99,13 @@ export const normalizeGraphData = (graph: GraphData): GraphData => {
  */
 export const extractArtistSubGraph = (
   artistName: string,
-  fullGraph: GraphData
+  fullGraph: GraphData,
+  allSeeds: string[] = []
 ): { nodes: Node[]; links: Link[] } => {
   const artistNameLower = artistName.trim().toLowerCase();
+  const seedsLower = new Set(allSeeds.map(s => s.trim().toLowerCase()));
+  // Make sure the target artist itself is not in the other seeds set we want to exclude
+  seedsLower.delete(artistNameLower);
 
   // Find the canonical artist node from the full graph
   const artistNode = fullGraph.nodes.find(
@@ -112,52 +116,73 @@ export const extractArtistSubGraph = (
     return { nodes: [], links: [] };
   }
 
-  // Collect all artist node IDs in the full graph (to detect cross-artist edges)
-  const allArtistIds = new Set(
-    fullGraph.nodes
-      .filter(n => n.type === 'artist')
-      .map(n => n.id.trim().toLowerCase())
-  );
-
   // Resolve link endpoints to string IDs
   const resolveId = (endpoint: string | Node): string =>
     typeof endpoint === 'string' ? endpoint : endpoint.id;
 
-  const artistId = artistNode.id;
+  // 1. Identify direct peer bands of the target artist node (excluding other query seeds)
+  const peerArtistIds = new Set<string>();
+  (fullGraph.links || []).forEach(link => {
+    const s = resolveId(link.source);
+    const t = resolveId(link.target);
+    const sLower = s.trim().toLowerCase();
+    const tLower = t.trim().toLowerCase();
 
-  // Find all links where this artist is one endpoint and the OTHER endpoint
-  // is NOT another artist node (i.e. only structural metadata links)
-  const ownLinks = fullGraph.links.filter(link => {
-    const sourceId = resolveId(link.source);
-    const targetId = resolveId(link.target);
-    const sourceLower = sourceId.trim().toLowerCase();
-    const targetLower = targetId.trim().toLowerCase();
-
-    const involvesSelf =
-      sourceLower === artistNameLower || targetLower === artistNameLower;
-    if (!involvesSelf) return false;
-
-    // Determine the other endpoint
-    const otherId = sourceLower === artistNameLower ? targetLower : sourceLower;
-
-    // Strip cross-artist edges: exclude if the other node is also an artist
-    return !allArtistIds.has(otherId);
+    if (sLower === artistNameLower || tLower === artistNameLower) {
+      const otherId = sLower === artistNameLower ? t : s;
+      const otherLower = otherId.trim().toLowerCase();
+      
+      const otherNode = fullGraph.nodes.find(n => n.id.trim().toLowerCase() === otherLower);
+      if (otherNode && otherNode.type === 'artist' && !seedsLower.has(otherLower)) {
+        peerArtistIds.add(otherNode.id);
+      }
+    }
   });
 
-  // Collect the metadata node IDs referenced by the kept links
+  // 2. Combine all kept artist nodes (target artist itself + its peer bands)
+  const keptArtistIds = new Set<string>([artistNode.id]);
+  peerArtistIds.forEach(id => keptArtistIds.add(id));
+  const keptArtistIdsLower = new Set<string>(
+    Array.from(keptArtistIds).map(id => id.trim().toLowerCase())
+  );
+
+  // 3. Collect all metadata nodes connected to any of the kept artist nodes
   const metadataNodeIds = new Set<string>();
-  ownLinks.forEach(link => {
-    const sourceId = resolveId(link.source);
-    const targetId = resolveId(link.target);
-    const sourceLower = sourceId.trim().toLowerCase();
-    if (sourceLower !== artistNameLower) metadataNodeIds.add(sourceId);
-    else metadataNodeIds.add(targetId);
+  (fullGraph.links || []).forEach(link => {
+    const s = resolveId(link.source);
+    const t = resolveId(link.target);
+    const sLower = s.trim().toLowerCase();
+    const tLower = t.trim().toLowerCase();
+
+    const sIsKeptArtist = keptArtistIdsLower.has(sLower);
+    const tIsKeptArtist = keptArtistIdsLower.has(tLower);
+
+    if (sIsKeptArtist || tIsKeptArtist) {
+      const otherId = sIsKeptArtist ? t : s;
+      const otherLower = otherId.trim().toLowerCase();
+      const otherNode = fullGraph.nodes.find(n => n.id.trim().toLowerCase() === otherLower);
+      if (otherNode && otherNode.type !== 'artist') {
+        metadataNodeIds.add(otherNode.id);
+      }
+    }
   });
 
-  // Collect the kept nodes: this artist + its metadata nodes
-  const ownNodes = fullGraph.nodes.filter(n => {
-    const nLower = n.id.trim().toLowerCase();
-    return nLower === artistNameLower || metadataNodeIds.has(n.id);
+  // 4. Gather all final node IDs to keep
+  const keptNodeIds = new Set<string>();
+  keptNodeIds.add(artistNode.id);
+  peerArtistIds.forEach(id => keptNodeIds.add(id));
+  metadataNodeIds.forEach(id => keptNodeIds.add(id));
+
+  const keptNodeIdsLower = new Set<string>(
+    Array.from(keptNodeIds).map(id => id.trim().toLowerCase())
+  );
+
+  // 5. Filter the nodes and links
+  const ownNodes = fullGraph.nodes.filter(n => keptNodeIdsLower.has(n.id.trim().toLowerCase()));
+  const ownLinks = (fullGraph.links || []).filter(link => {
+    const s = resolveId(link.source).trim().toLowerCase();
+    const t = resolveId(link.target).trim().toLowerCase();
+    return keptNodeIdsLower.has(s) && keptNodeIdsLower.has(t);
   });
 
   return { nodes: ownNodes, links: ownLinks };
@@ -235,7 +260,7 @@ export const writeArtistCacheMany = async (
   await Promise.allSettled(
     artistNames.map(async name => {
       const artistId = normalizeArtistId(name);
-      const { nodes, links } = extractArtistSubGraph(name, normalizedGraph);
+      const { nodes, links } = extractArtistSubGraph(name, normalizedGraph, artistNames);
 
       if (nodes.length === 0) {
         console.warn(`[ArtistCache] Skipping write for "${name}" — artist node not found in graph.`);

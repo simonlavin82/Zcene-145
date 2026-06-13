@@ -156,18 +156,24 @@ const Header: React.FC<HeaderProps> = ({
                         {projectName || 'Untitled Project'}
                       </h1>
                     ) : (
-                      <input
-                        value={localName}
-                        onChange={(e) => setLocalName(e.target.value)}
-                        onBlur={handleCommit}
-                        onKeyDown={handleKeyDown}
-                        placeholder="Untitled Project"
-                        size={Math.max(1, localName.length || 1)}
-                        className={`bg-transparent text-white font-medium ${
+                      <div className="relative inline-grid grid-cols-1 items-center max-w-full">
+                        <span className={`invisible col-start-1 row-start-1 px-1.5 py-1 ${
                           isSmallScreen ? 'text-base' : 'text-lg'
-                        } border border-transparent focus:ring-1 focus:ring-primary focus:bg-zinc-900/40 rounded-xl px-1.5 -mx-1.5 py-1 -my-1 placeholder:text-zinc-500 tracking-tight transition-all duration-200 focus:outline-none cursor-text`}
-                        title="Rename Project"
-                      />
+                        } font-medium tracking-tight whitespace-pre`}>
+                          {localName || "Untitled Project"}
+                        </span>
+                        <input
+                          value={localName}
+                          onChange={(e) => setLocalName(e.target.value)}
+                          onBlur={handleCommit}
+                          onKeyDown={handleKeyDown}
+                          placeholder="Untitled Project"
+                          className={`col-start-1 row-start-1 w-full bg-transparent text-white font-medium ${
+                            isSmallScreen ? 'text-base' : 'text-lg'
+                          } border border-transparent focus:ring-1 focus:ring-primary focus:bg-zinc-900/40 rounded-xl px-1.5 -mx-1.5 py-1 -my-1 placeholder:text-zinc-500 tracking-tight transition-all duration-200 focus:outline-none cursor-text`}
+                          title="Rename Project"
+                        />
+                      </div>
                     )
                   )}
                 </div>

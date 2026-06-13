@@ -1425,7 +1425,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
     return (
         <div className="relative flex items-center gap-2">
             <div className="relative">
-                <input type="search" placeholder="Search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-48 appearance-none rounded-xl border border-zinc-700 bg-zinc-900/60 text-zinc-300 py-2 pl-4 pr-12 text-sm font-normal focus:ring-1 focus:ring-primary focus:outline-none backdrop-blur-sm" />
+                <input type="search" placeholder="Search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-60 appearance-none rounded-xl border border-zinc-700 bg-zinc-900/60 text-zinc-300 py-2 pl-4 pr-12 text-sm font-normal focus:ring-1 focus:ring-primary focus:outline-none backdrop-blur-sm" />
                 <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">{!searchQuery && (<button onClick={() => handleSpeechToText('graph')} className={`w-8 h-8 flex items-center justify-center rounded-[10px] transition-colors leading-none ${isListeningForGraph ? 'text-primary animate-pulse' : 'text-zinc-500 hover:text-white'}`} title="Search by voice"><MicIcon className="!text-[18px]" /></button>)}{searchQuery && (<button onClick={() => setSearchQuery('')} className="w-8 h-8 flex items-center justify-center rounded-[10px] text-zinc-400 hover:text-white transition-colors leading-none" aria-label="Clear search"><span className="material-symbols-outlined !text-[18px]">close</span></button>)}</div>
             </div>
             

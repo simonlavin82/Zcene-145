@@ -248,7 +248,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     }, [details?.links]);
 
     const headerSizeClass = isFullScreenMode 
-        ? 'text-5xl font-bold tracking-tighter'
+        ? 'text-5xl font-bold tracking-tight'
         : 'text-xl font-medium';
 
     return (
@@ -502,9 +502,9 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                               return (
                                                 <div 
                                                     key={artistName} 
-                                                    className="border border-zinc-800 bg-zinc-900/50 text-zinc-500 py-1.5 px-3 text-sm rounded-xl"
+                                                    className="border border-zinc-800 bg-zinc-900/50 text-zinc-500 py-1.5 px-4 text-sm rounded-xl"
                                                 >
-                                                    <span className="truncate uppercase font-semibold tracking-tighter">{artistName}</span>
+                                                    <span className="truncate uppercase font-semibold px-0.5 tracking-normal">{artistName}</span>
                                                 </div>
                                               );
                                             }
@@ -513,13 +513,13 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                     key={artistName} 
                                                     onClick={() => onAddArtist(normalizeArtistId(artistName))}
                                                     disabled={isAlreadySeed}
-                                                    className={`border py-1.5 px-3 transition-all text-sm flex items-center gap-1.5 rounded-xl ${
+                                                    className={`border py-1.5 px-4 transition-all text-sm flex items-center gap-1.5 rounded-xl ${
                                                         isAlreadySeed 
                                                             ? 'text-primary border-primary/30 bg-primary/5 cursor-default' 
                                                             : 'border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:text-white hover:bg-zinc-800 hover:border-zinc-700 active:scale-95'
                                                     }`}
                                                 >
-                                                    <span className="truncate uppercase font-semibold tracking-tighter">{artistName}</span>
+                                                    <span className="truncate uppercase font-semibold tracking-normal">{artistName}</span>
                                                     {!isAlreadySeed && <span className="material-symbols-outlined !text-[14px]">add_circle</span>}
                                                 </button>
                                             );
@@ -534,7 +534,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     <div className="grid grid-cols-1 gap-2">
                                         {details.discography.map((album, i) => (
                                             <div key={i} className="flex justify-between items-baseline border-b border-zinc-800/50 pb-1">
-                                                <span className="font-semibold text-zinc-200 uppercase tracking-tighter text-sm">{album.albumName}</span>
+                                                <span className="font-semibold text-zinc-200 uppercase px-0.5 tracking-normal text-sm">{album.albumName}</span>
                                                 <span className="text-zinc-500 flex-shrink-0 font-mono text-[10px]">{album.releaseYear}</span>
                                             </div>
                                         ))}
@@ -566,7 +566,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                         <span className="material-symbols-outlined !text-[18px]">
                                                             {isBandcamp ? 'shopping_bag' : 'public'}
                                                         </span>
-                                                        <span className="font-semibold uppercase tracking-tighter text-sm">
+                                                        <span className="font-semibold uppercase px-0.5 tracking-normal text-sm">
                                                             {isBandcamp ? `Shop on ${link.site}` : link.site}
                                                         </span>
                                                     </div>

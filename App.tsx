@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { AlertCircle, X, CheckCircle2, Key } from 'lucide-react';
 import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project, ArtistCacheEntry } from './types';
 import { generateGraphData, fetchNodeDetails, extendGraphFromNode } from './services/geminiService';
-import { normalizeArtistId, readArtistCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData } from './services/artistCacheService';
+import { normalizeArtistId, readArtistCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph } from './services/artistCacheService';
 import { auth, signInWithGoogle, logout, onAuthStateChanged, User, db, handleFirestoreError, OperationType } from './services/firebase';
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, getDocFromServer, serverTimestamp, addDoc, getDoc, getDocs, orderBy, where, writeBatch, getDocFromCache, updateDoc } from 'firebase/firestore';
 const StyleGuidePage = React.lazy(() => import('./components/DesignSystem').then(m => ({ default: m.StyleGuidePage })));
@@ -451,24 +451,99 @@ const mergeGraphData = (base: GraphData, enhancement: GraphData): GraphData => {
   return { nodes: combinedNodes, links: combinedLinks };
 };
 
+const pruneGraphToSeeds = (graph: GraphData, seedNamesLower: Set<string>): GraphData => {
+  if (!graph || !graph.nodes || graph.nodes.length === 0) {
+    return { nodes: [], links: [] };
+  }
+
+  // Find all actual seed nodes matching the lowercase seed names.
+  const seedNodes = graph.nodes.filter(node => 
+    node.type === 'artist' && seedNamesLower.has(node.id.toLowerCase())
+  );
+  
+  if (seedNodes.length === 0) {
+    return { nodes: [], links: [] };
+  }
+
+  // Build adjacency list
+  const adj = new Map<string, string[]>();
+  graph.nodes.forEach(n => adj.set(n.id, []));
+  (graph.links || []).forEach(l => {
+    const s = typeof l.source === 'string' ? l.source : (l.source as Node).id;
+    const t = typeof l.target === 'string' ? l.target : (l.target as Node).id;
+    // Defensive check: only record edge if both nodes exist in the graph.
+    if (adj.has(s) && adj.has(t)) {
+      adj.get(s)!.push(t);
+      adj.get(t)!.push(s);
+    }
+  });
+
+  // BFS traversal
+  const queue: string[] = seedNodes.map(n => n.id);
+  const visited = new Set<string>(queue);
+  let head = 0;
+  while (head < queue.length) {
+    const curr = queue[head++];
+    const neighbors = adj.get(curr) || [];
+    for (const neighbor of neighbors) {
+      if (!visited.has(neighbor)) {
+        visited.add(neighbor);
+        queue.push(neighbor);
+      }
+    }
+  }
+
+  const prunedNodes = graph.nodes.filter(n => visited.has(n.id));
+  const prunedLinks = (graph.links || []).filter(l => {
+    const s = typeof l.source === 'string' ? l.source : (l.source as Node).id;
+    const t = typeof l.target === 'string' ? l.target : (l.target as Node).id;
+    return visited.has(s) && visited.has(t);
+  });
+
+  return { nodes: prunedNodes, links: prunedLinks };
+};
+
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-const isCacheEntryFullyQualified = (data: any): boolean => {
-  if (!data) return false;
-  if (!data.graphData) return false;
+interface CacheValidationResult {
+  isFullyQualified: boolean;
+  needsPeerBands: boolean;
+  needsFutureFields: boolean;
+}
+
+const validateCacheEntry = (data: any): CacheValidationResult => {
+  if (!data) {
+    return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
+  }
+
+  let needsPeerBands = false;
+  let needsFutureFields = false;
 
   // 1. Verify graphData layout is non-empty and has nodes
+  if (!data.graphData) {
+    return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
+  }
+
   try {
     const graph = typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData;
-    if (!graph || !graph.nodes || !Array.isArray(graph.nodes) || graph.nodes.length <= 10) {
-      return false;
+    if (!graph || !graph.nodes || !Array.isArray(graph.nodes) || graph.nodes.length === 0) {
+      return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
+    }
+    
+    // Check if there are peer bands (multiple artist nodes)
+    const artistNodes = graph.nodes.filter((n: any) => n.type === 'artist');
+    if (artistNodes.length <= 1) {
+      needsPeerBands = true;
     }
   } catch (e) {
-    return false;
+    return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
   }
 
   // 2. Verify detailsCache exists, parses correctly, and has a populated bio/summary
-  if (!data.detailsCache) return false;
+  if (!data.detailsCache) {
+    return { isFullyQualified: false, needsPeerBands: true, needsFutureFields: false };
+  }
+
   try {
     const parsed = typeof data.detailsCache === 'string' ? JSON.parse(data.detailsCache) : data.detailsCache;
     let targetObj = parsed;
@@ -484,13 +559,30 @@ const isCacheEntryFullyQualified = (data: any): boolean => {
 
     const bio = targetObj?.summary || targetObj?.bio || targetObj?.description || targetObj?.text || '';
     if (!bio || bio.trim().length <= 5 || bio.includes('sandbox mock') || bio.includes('test scenarios')) {
-      return false;
+      return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
+    }
+
+    // Future-proof placeholder: check if there's any links array (as an example of future properties)
+    const links = targetObj?.links || [];
+    if (!links || links.length === 0) {
+      needsFutureFields = true;
     }
   } catch (e) {
-    return false;
+    return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
   }
 
-  return true;
+  // A document is fully qualified if it has no deficiencies
+  const isFullyQualified = !needsPeerBands && !needsFutureFields;
+
+  return {
+    isFullyQualified,
+    needsPeerBands,
+    needsFutureFields
+  };
+};
+
+const isCacheEntryFullyQualified = (data: any): boolean => {
+  return validateCacheEntry(data).isFullyQualified;
 };
 
 const App: React.FC = () => {
@@ -546,15 +638,21 @@ const App: React.FC = () => {
   const [pendingAuthAction, setPendingAuthAction] = useState<{ type: string; payload: any } | null>(null);
   const [tokenConfirmation, setTokenConfirmation] = useState<{
     isOpen: boolean;
-    type: 'generation' | 'extension' | 'deep_cut_creation';
+    type: 'generation' | 'extension' | 'deep_cut_creation' | 'partial_synthesis';
     cost: number;
     cachedArtists: string[];
     missingArtists: string[];
+    enrichmentArtists?: string[];
     onConfirm: () => void;
     onCancel: () => void;
   } | null>(null);
 
-  const confirmTokenUsage = useCallback((type: 'generation' | 'extension' | 'deep_cut_creation', cachedArtists: string[], missingArtists: string[]) => {
+  const confirmTokenUsage = useCallback((
+    type: 'generation' | 'extension' | 'deep_cut_creation' | 'partial_synthesis',
+    cachedArtists: string[],
+    missingArtists: string[],
+    enrichmentArtists?: string[]
+  ) => {
     return new Promise<boolean>((resolve) => {
       setTokenConfirmation({
         isOpen: true,
@@ -562,6 +660,7 @@ const App: React.FC = () => {
         cost: COST_PER_AI_CALL,
         cachedArtists,
         missingArtists,
+        enrichmentArtists,
         onConfirm: () => {
           setTokenConfirmation(null);
           resolve(true);
@@ -885,6 +984,15 @@ const App: React.FC = () => {
     }
     return 'Untitled Zcene';
   }, [projectName, seedArtists]);
+
+  useEffect(() => {
+    if (seedArtists && (!projectName || projectName === 'Untitled Zcene')) {
+      const first = seedArtists.split('::')[0]?.trim();
+      if (first) {
+        handleUpdateProjectName(first);
+      }
+    }
+  }, [seedArtists, projectName, handleUpdateProjectName]);
 
   const handleUpdateProfile = useCallback(async (updates: any) => {
     if (!user) return;
@@ -1433,6 +1541,7 @@ const App: React.FC = () => {
                   setActiveNodes([{...hydratedNode}]);
               }
               
+              setSeedArtists(artists);
               // Force all loading flags off and short-circuit the entire function
               setIsLoading(false);
               isFetchingDetailsRef.current = false;
@@ -1467,21 +1576,7 @@ const App: React.FC = () => {
     let pruned: GraphData | undefined = undefined;
     if (graphToEnhance && graphToEnhance.nodes && graphToEnhance.nodes.length > 0) {
       const seedsLower = new Set(artists.split('::').map(a => a.trim().toLowerCase()));
-      const seedNodes = graphToEnhance.nodes.filter(node => node.type === 'artist' && seedsLower.has(node.id.toLowerCase()));
-      const seedNodesIds = new Set(seedNodes.map(n => n.id));
-      if (seedNodesIds.size > 0) {
-        const relevant = new Set<string>(seedNodesIds);
-        graphToEnhance.links.forEach(l => {
-          const s = typeof l.source === 'string' ? l.source : l.source.id, t = typeof l.target === 'string' ? l.target : l.target.id;
-          if (seedNodesIds.has(s)) relevant.add(t); if (seedNodesIds.has(t)) relevant.add(s);
-        });
-        pruned = {
-          nodes: graphToEnhance.nodes.filter(n => relevant.has(n.id)), links: graphToEnhance.links.filter(l => {
-            const s = typeof l.source === 'string' ? l.source : l.source.id, t = typeof l.target === 'string' ? l.target : l.target.id;
-            return relevant.has(s) && relevant.has(t);
-          })
-        };
-      }
+      pruned = pruneGraphToSeeds(graphToEnhance, seedsLower);
     }
     if (pruned) {
       pruned = filterGraphByDiscoveryFilters(pruned, discoveryFilters, artists);
@@ -1504,25 +1599,36 @@ const App: React.FC = () => {
 
     try {
       let cached = new Map<string, ArtistCacheEntry>();
-      let missing = [...artistList];
+      let missing: string[] = [];
+      let enrichmentRequired: string[] = [];
+      let fullHits: string[] = [];
 
       if (!isRegeneration) {
         const cacheResult = await readArtistCacheMany(artistList, user?.uid);
         cached = new Map<string, ArtistCacheEntry>();
         missing = [];
+        enrichmentRequired = [];
+        fullHits = [];
+        
+        const currentSeeds = prevSeedArtists.split('::').map(s => normalizeArtistId(s)).filter(Boolean);
+        
         artistList.forEach(name => {
           const normName = name.toLowerCase();
           const entry = cacheResult.cached.get(name) || cacheResult.cached.get(normName);
           const forceMockHit = (import.meta.env.DEV || import.meta.env.VITE_USE_MOCKS === 'true') && 
             ['sick of it all', 'h2o', 'radiohead', 'blink-182', 'orange 9mm', 'madball'].includes(normName);
 
-          if (forceMockHit || (entry && isCacheEntryFullyQualified(entry))) {
-            const finalEntry = entry || {
-              cacheKey: normalizeArtistId(name),
+          const isAlreadyInGraph = currentSeeds.includes(normName) || 
+            (graphData?.nodes.some(n => n.id.toLowerCase() === normName || normalizeArtistId(n.id) === normName) ?? false);
+
+          const validation = entry ? validateCacheEntry(entry) : null;
+
+          if (forceMockHit || (entry && validation?.isFullyQualified)) {
+            fullHits.push(name);
+            const finalEntry: ArtistCacheEntry = entry || {
               artistId: normalizeArtistId(name),
               seedArtists: name,
               graphData: JSON.stringify({ nodes: [{ id: name, type: 'artist', label: name, group: 1 }], links: [] }),
-              filters: {},
               cacheVersion: 2,
               cachedAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
               hitCount: 0,
@@ -1537,14 +1643,40 @@ const App: React.FC = () => {
             };
             cached.set(name, finalEntry);
             cached.set(normName, finalEntry);
+          } else if (entry && (validation?.needsPeerBands || validation?.needsFutureFields)) {
+            enrichmentRequired.push(name);
+            cached.set(name, entry);
+            cached.set(normName, entry);
+            console.log(`[Phase 02 Cache] Cache hit for "${name}" needs enrichment. Validation:`, validation);
+          } else if (isAlreadyInGraph) {
+            // Local scene check: if artist is already in the graph, extract its subgraph to avoid redundant query/AI calls
+            const { nodes, links } = extractArtistSubGraph(name, graphData || { nodes: [], links: [] }, artistList);
+            if (nodes.length > 0) {
+              const details = detailsCache.get(normName) || detailsCache.get(name) || detailsCache.get(normalizeArtistId(name));
+              const virtualEntry: ArtistCacheEntry = {
+                artistId: normalizeArtistId(name),
+                seedArtists: name,
+                graphData: JSON.stringify({ nodes, links }),
+                cacheVersion: 2,
+                cachedAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
+                hitCount: 0,
+                detailsCache: details ? JSON.stringify(details) : undefined
+              };
+              fullHits.push(name);
+              cached.set(name, virtualEntry);
+              cached.set(normName, virtualEntry);
+              console.log(`[Phase 02 Cache] Handled existing artist "${name}" from local graphData`);
+            } else {
+              missing.push(name);
+            }
           } else {
-            console.log(`[Phase 02 Cache] Cache hit disqualified for "${name}". Forcing regeneration.`);
+            console.log(`[Phase 02 Cache] Cache miss for "${name}". Forcing regeneration.`);
             missing.push(name);
           }
         });
       }
 
-      if (!controller.signal.aborted && missing.length === 0 && cached.size > 0) {
+      if (!controller.signal.aborted && missing.length === 0 && enrichmentRequired.length === 0 && cached.size > 0) {
         // 1. FORCE STEP 1 - Check local database cache first
         console.log(`[Music Discovery] Full cache HIT for: ${artistList.map(n => normalizeArtistId(n)).join(', ')}`);
         cached.forEach((_, name) => incrementCacheHit(normalizeArtistId(name), user?.uid));
@@ -1582,7 +1714,7 @@ const App: React.FC = () => {
              type: 'artist' as const,
              isLibrary: true,
              group: 0
-        };
+         };
 
         // Pass it straight to setSelectedNode
         setSelectedNode(hydratedNode);
@@ -1695,21 +1827,26 @@ const App: React.FC = () => {
         fullCacheHit = true;
         return;
 
-      } else if (!controller.signal.aborted && missing.length > 0 && cached.size > 0) {
-        // ── PARTIAL CACHE HIT: some artists cached, some missing ─────────────
-        console.log(`[Music Discovery] Partial cache HIT. Cached: [${Array.from(cached.keys()).join(', ')}] | Missing: [${missing.join(', ')}]`);
-        showToast(`⚡ ${cached.size} artist${cached.size > 1 ? 's' : ''} from cache — fetching ${missing.join(', ')}...`);
+      } else if (!controller.signal.aborted && (missing.length > 0 || enrichmentRequired.length > 0) && (cached.size > 0 || fullHits.length > 0)) {
+        // ── PARTIAL CACHE HIT: some artists cached (or needing enrichment), some missing/needing-enrichment ─────────────
+        const toFetch = [...missing, ...enrichmentRequired];
+        console.log(`[Music Discovery] Partial cache HIT. Full hits: [${fullHits.join(', ')}] | Enrichment required: [${enrichmentRequired.join(', ')}] | Missing: [${missing.join(', ')}]`);
+        showToast(`⚡ ${fullHits.length + enrichmentRequired.length} artist${(fullHits.length + enrichmentRequired.length) > 1 ? 's' : ''} from cache — fetching ${toFetch.join(', ')}...`);
 
         // Intercept with token confirmation modal
-        const cachedArtists = artistList.filter(name => cached.has(name.toLowerCase()));
-        const confirmed = await confirmTokenUsage('generation', cachedArtists, missing);
+        const confirmed = await confirmTokenUsage(
+          enrichmentRequired.length > 0 && missing.length === 0 ? 'partial_synthesis' : 'generation',
+          fullHits,
+          missing,
+          enrichmentRequired
+        );
         if (!confirmed || controller.signal.aborted) {
           setIsLoading(false);
-          if (cachedArtists.length > 0) {
+          if (fullHits.length > 0) {
             setActiveNodes(prevActiveNodes);
             setSeedArtists(prevSeedArtists);
-            showToast(`Loading cached artists: ${cachedArtists.join(', ')}`);
-            handleGenerateGraph(cachedArtists.join('::'), isRegeneration, graphToEnhance);
+            showToast(`Loading cached artists: ${fullHits.join(', ')}`);
+            handleGenerateGraph(fullHits.join('::'), isRegeneration, graphToEnhance);
           } else {
             setActiveNodes(prevActiveNodes);
             setSeedArtists(prevSeedArtists);
@@ -1717,35 +1854,38 @@ const App: React.FC = () => {
           return;
         }
 
-        // Call Gemini ONLY for the missing artists
-        const partialGraphPromise = generateGraphData(missing.join('::'), pruned, discoveryFilters, user?.uid);
+        // Call Gemini ONLY for the missing and enrichment artists
+        const partialGraphPromise = generateGraphData(toFetch.join('::'), pruned, discoveryFilters, user?.uid);
         const timeoutPromise = new Promise((_, reject) =>
           setTimeout(() => reject(new Error("The AI is taking too long to respond. The request has timed out.")), 120000)
         );
 
         const startTime = Date.now();
         const freshData = await Promise.race([partialGraphPromise, timeoutPromise]) as GraphData;
-        console.log(`[Music Discovery] Partial AI fetch in ${((Date.now() - startTime) / 1000).toFixed(1)}s for: [${missing.join(', ')}]`);
+        console.log(`[Music Discovery] Partial AI fetch in ${((Date.now() - startTime) / 1000).toFixed(1)}s for: [${toFetch.join(', ')}]`);
 
         if (controller.signal.aborted) return;
         if (!freshData || !freshData.nodes || !freshData.links) {
           throw new Error("The AI returned formless data for the missing artists. Please try again.");
         }
 
-        // Write ONLY the newly fetched artists to Firestore (fire-and-forget)
-        writeArtistCacheMany(missing, freshData, user?.uid, discoveryFilters)
-          .then(() => console.log(`[Music Discovery] Cache write confirmed for: [${missing.join(', ')}]`))
-          .catch(e => console.error('[Music Discovery] Partial cache write failed:', e));
+        // Write both newly fetched and enriched/upgraded artists to Firestore (fire-and-forget)
+        writeArtistCacheMany(toFetch, freshData, user?.uid, discoveryFilters)
+          .then(() => console.log(`[Music Discovery] Cache write/upgrade confirmed for: [${toFetch.join(', ')}]`))
+          .catch(e => console.error('[Music Discovery] Cache write/upgrade failed:', e));
 
         // Assemble the cached portion and merge with the fresh Gemini data
         const cachedGraph = assembleGraphFromCache(cached);
         const returnedIds = new Set(freshData.nodes.map(n => n.id.toLowerCase()));
         let maxG = freshData.nodes.reduce((m, n) => Math.max(m, n.group || 0), 0);
-        missing.forEach(name => {
+        toFetch.forEach(name => {
           if (!returnedIds.has(name.toLowerCase())) { maxG++; freshData.nodes.push({ id: name, type: 'artist', group: maxG }); }
         });
 
         let merged = mergeGraphData(cachedGraph, freshData);
+        if (pruned) {
+          merged = mergeGraphData(pruned, merged);
+        }
         merged = filterGraphByDiscoveryFilters(merged, discoveryFilters, artists);
         setGraphData(merged);
 
@@ -2753,6 +2893,47 @@ const App: React.FC = () => {
   const handleExtendNode = useCallback(async (node: Node) => {
     if (!graphData) return;
 
+    const standardizedId = normalizeArtistId(node.id);
+    let cachedEntry: ArtistCacheEntry | null = null;
+    
+    // Check global collection first
+    try {
+      const snap = await getDoc(doc(db, 'artists', standardizedId));
+      if (snap.exists()) {
+        const data = snap.data() as ArtistCacheEntry;
+        if (data && isCacheEntryFullyQualified(data)) {
+          cachedEntry = data;
+        }
+      }
+    } catch (e) {
+      console.warn("[Node Extension] Global cache check failed:", e);
+    }
+
+    if (cachedEntry) {
+      // Global cache hit! Silently merge the cached subgraph
+      console.log(`[Node Extension] Cache HIT for: ${node.id}`);
+      try {
+        let parsedGraph = typeof cachedEntry.graphData === 'string' 
+          ? JSON.parse(cachedEntry.graphData) 
+          : cachedEntry.graphData;
+        
+        if (parsedGraph && parsedGraph.nodes && parsedGraph.nodes.length > 0) {
+          const normalizedGraph = normalizeGraphData(parsedGraph);
+          
+          setGraphData(prev => {
+            if (!prev) return prev;
+            return mergeGraphData(prev, normalizedGraph);
+          });
+          
+          showToast(`⚡ Expanded from cache`);
+          incrementCacheHit(standardizedId, user?.uid);
+          return; // Skip Token Quota Warning and live Gemini fetch!
+        }
+      } catch (e) {
+        console.warn("[Node Extension] Failed to parse cached graph data:", e);
+      }
+    }
+
     const confirmed = await confirmTokenUsage('extension', [], [node.id]);
     if (!confirmed) return;
 
@@ -3415,6 +3596,7 @@ const App: React.FC = () => {
         cost={tokenConfirmation?.cost || 0}
         cachedArtists={tokenConfirmation?.cachedArtists || []}
         missingArtists={tokenConfirmation?.missingArtists || []}
+        enrichmentArtists={tokenConfirmation?.enrichmentArtists || []}
       />
 
       <AnimatePresence>
