@@ -33,6 +33,7 @@ interface MusicGraphProps {
   onRemoveNode?: (node: Node) => void;
   isGuest?: boolean;
   detailsCache?: Map<string, NodeDetails>;
+  isActive?: boolean;
 }
 
 const MusicGraph: React.FC<MusicGraphProps> = ({
@@ -40,7 +41,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   activeFilters, focusOn, searchQuery, toggleFilter,
   legendConfig, legendOrder, graphSettings = { linkDistance: 3, nodeSize: 3 },
   legendRef, onInteraction, onLegendInteraction, onExtendNode, onRemoveNode, isGuest,
-  detailsCache
+  detailsCache, isActive = false
 }) => {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const simulationRef = useRef<d3.Simulation<Node, Link> | null>(null);
@@ -96,6 +97,12 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
       simulationRef.current?.alpha(0.15).restart();
     }
   }, [details]);
+
+  useEffect(() => {
+    if (isActive && simulationRef.current) {
+      simulationRef.current.alpha(0.3).restart();
+    }
+  }, [isActive]);
 
   const distMult = Math.pow(1.8, graphSettings.linkDistance - 3);
   const sizeMult = Math.max(0.1, graphSettings.nodeSize / 3);

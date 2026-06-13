@@ -17,11 +17,14 @@ import { GraphData, Node, Link, ArtistCacheEntry } from '../types';
  */
 export const normalizeArtistId = (name: string): string =>
   name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .substring(0, 256);
+
 
 /**
  * Standardizes a graph's node IDs and links to ensure consistency:
@@ -47,6 +50,7 @@ export const normalizeGraphData = (graph: GraphData): GraphData => {
     
     idMap.set(originalId, normalizedId);
     idMap.set(originalId.toLowerCase(), normalizedId); // fallback
+    idMap.set(normalizeArtistId(originalId), normalizedId); // accent-insensitive fallback
 
     return {
       ...node,
@@ -61,9 +65,11 @@ export const normalizeGraphData = (graph: GraphData): GraphData => {
 
     const sourceLower = sourceId.trim().toLowerCase();
     const targetLower = targetId.trim().toLowerCase();
+    const sourceNorm = normalizeArtistId(sourceId);
+    const targetNorm = normalizeArtistId(targetId);
 
-    const newSource = idMap.get(sourceId) || idMap.get(sourceLower) || sourceId.trim();
-    const newTarget = idMap.get(targetId) || idMap.get(targetLower) || targetId.trim();
+    const newSource = idMap.get(sourceId) || idMap.get(sourceLower) || idMap.get(sourceNorm) || sourceLower;
+    const newTarget = idMap.get(targetId) || idMap.get(targetLower) || idMap.get(targetNorm) || targetLower;
 
     return {
       ...link,
@@ -102,14 +108,14 @@ export const extractArtistSubGraph = (
   fullGraph: GraphData,
   allSeeds: string[] = []
 ): { nodes: Node[]; links: Link[] } => {
-  const artistNameLower = artistName.trim().toLowerCase();
-  const seedsLower = new Set(allSeeds.map(s => s.trim().toLowerCase()));
+  const artistNameNorm = normalizeArtistId(artistName);
+  const seedsNorm = new Set(allSeeds.map(s => normalizeArtistId(s)));
   // Make sure the target artist itself is not in the other seeds set we want to exclude
-  seedsLower.delete(artistNameLower);
+  seedsNorm.delete(artistNameNorm);
 
   // Find the canonical artist node from the full graph
   const artistNode = fullGraph.nodes.find(
-    n => n.type === 'artist' && n.id.trim().toLowerCase() === artistNameLower
+    n => n.type === 'artist' && normalizeArtistId(n.id) === artistNameNorm
   );
 
   if (!artistNode) {
@@ -125,15 +131,15 @@ export const extractArtistSubGraph = (
   (fullGraph.links || []).forEach(link => {
     const s = resolveId(link.source);
     const t = resolveId(link.target);
-    const sLower = s.trim().toLowerCase();
-    const tLower = t.trim().toLowerCase();
+    const sNorm = normalizeArtistId(s);
+    const tNorm = normalizeArtistId(t);
 
-    if (sLower === artistNameLower || tLower === artistNameLower) {
-      const otherId = sLower === artistNameLower ? t : s;
-      const otherLower = otherId.trim().toLowerCase();
+    if (sNorm === artistNameNorm || tNorm === artistNameNorm) {
+      const otherId = sNorm === artistNameNorm ? t : s;
+      const otherNorm = normalizeArtistId(otherId);
       
-      const otherNode = fullGraph.nodes.find(n => n.id.trim().toLowerCase() === otherLower);
-      if (otherNode && otherNode.type === 'artist' && !seedsLower.has(otherLower)) {
+      const otherNode = fullGraph.nodes.find(n => normalizeArtistId(n.id) === otherNorm);
+      if (otherNode && otherNode.type === 'artist' && !seedsNorm.has(otherNorm)) {
         peerArtistIds.add(otherNode.id);
       }
     }
@@ -142,8 +148,8 @@ export const extractArtistSubGraph = (
   // 2. Combine all kept artist nodes (target artist itself + its peer bands)
   const keptArtistIds = new Set<string>([artistNode.id]);
   peerArtistIds.forEach(id => keptArtistIds.add(id));
-  const keptArtistIdsLower = new Set<string>(
-    Array.from(keptArtistIds).map(id => id.trim().toLowerCase())
+  const keptArtistIdsNorm = new Set<string>(
+    Array.from(keptArtistIds).map(id => normalizeArtistId(id))
   );
 
   // 3. Collect all metadata nodes connected to any of the kept artist nodes
@@ -151,11 +157,11 @@ export const extractArtistSubGraph = (
   (fullGraph.links || []).forEach(link => {
     const s = resolveId(link.source);
     const t = resolveId(link.target);
-    const sLower = s.trim().toLowerCase();
-    const tLower = t.trim().toLowerCase();
+    const sNorm = normalizeArtistId(s);
+    const tNorm = normalizeArtistId(t);
 
-    const sIsKeptArtist = keptArtistIdsLower.has(sLower);
-    const tIsKeptArtist = keptArtistIdsLower.has(tLower);
+    const sIsKeptArtist = keptArtistIdsNorm.has(sNorm);
+    const tIsKeptArtist = keptArtistIdsNorm.has(tNorm);
 
     if (sIsKeptArtist || tIsKeptArtist) {
       const otherId = sIsKeptArtist ? t : s;
@@ -176,13 +182,25 @@ export const extractArtistSubGraph = (
   const keptNodeIdsLower = new Set<string>(
     Array.from(keptNodeIds).map(id => id.trim().toLowerCase())
   );
+  const keptNodeIdsNorm = new Set<string>(
+    Array.from(keptNodeIds).map(id => normalizeArtistId(id))
+  );
 
   // 5. Filter the nodes and links
-  const ownNodes = fullGraph.nodes.filter(n => keptNodeIdsLower.has(n.id.trim().toLowerCase()));
+  const ownNodes = fullGraph.nodes.filter(n => {
+    const norm = normalizeArtistId(n.id);
+    const lower = n.id.trim().toLowerCase();
+    return keptNodeIdsNorm.has(norm) || keptNodeIdsLower.has(lower);
+  });
   const ownLinks = (fullGraph.links || []).filter(link => {
-    const s = resolveId(link.source).trim().toLowerCase();
-    const t = resolveId(link.target).trim().toLowerCase();
-    return keptNodeIdsLower.has(s) && keptNodeIdsLower.has(t);
+    const s = resolveId(link.source);
+    const t = resolveId(link.target);
+    const sNorm = normalizeArtistId(s);
+    const tNorm = normalizeArtistId(t);
+    const sLower = s.trim().toLowerCase();
+    const tLower = t.trim().toLowerCase();
+    return (keptNodeIdsNorm.has(sNorm) || keptNodeIdsLower.has(sLower)) && 
+           (keptNodeIdsNorm.has(tNorm) || keptNodeIdsLower.has(tLower));
   });
 
   return { nodes: ownNodes, links: ownLinks };

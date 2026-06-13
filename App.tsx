@@ -503,6 +503,31 @@ const pruneGraphToSeeds = (graph: GraphData, seedNamesLower: Set<string>): Graph
   return { nodes: prunedNodes, links: prunedLinks };
 };
 
+const applyHumanCasedLabels = (graph: GraphData, seedsStr: string): GraphData => {
+  if (!graph || !graph.nodes) return graph;
+  const originalSeeds = seedsStr.split('::').map(s => s.trim()).filter(Boolean);
+  const originalSeedMap = new Map<string, string>();
+  originalSeeds.forEach(s => {
+    originalSeedMap.set(normalizeArtistId(s), s);
+  });
+
+  const updatedNodes = graph.nodes.map(n => {
+    if (n.type === 'artist') {
+      const norm = normalizeArtistId(n.id);
+      const rawSeed = originalSeedMap.get(norm);
+      if (rawSeed) {
+        return { ...n, label: rawSeed };
+      }
+    }
+    return n;
+  });
+
+  return {
+    ...graph,
+    nodes: updatedNodes
+  };
+};
+
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 interface CacheValidationResult {
@@ -1478,7 +1503,7 @@ const App: React.FC = () => {
             }
             
             if (parsedGraph && parsedGraph.nodes && parsedGraph.nodes.length > 0) {
-              const normalizedGraph = normalizeGraphData(parsedGraph);
+              const normalizedGraph = applyHumanCasedLabels(normalizeGraphData(parsedGraph), artists);
               console.log("[Front Gate Cache] Hit! Bypassing all generation logic for:", searchId);
               setGraphData(normalizedGraph);
               
@@ -1682,9 +1707,15 @@ const App: React.FC = () => {
         cached.forEach((_, name) => incrementCacheHit(normalizeArtistId(name), user?.uid));
 
         // 2. FORCE STEP 2 - Immediately update the UI state from local data
+        const originalSeeds = artists.split('::').map(s => s.trim()).filter(Boolean);
+        const originalSeedMap = new Map<string, string>();
+        originalSeeds.forEach(s => {
+          originalSeedMap.set(normalizeArtistId(s), s);
+        });
+
         const firstSlug = artistList[0];
         const entry = cached.get(firstSlug.toLowerCase()) || cached.values().next().value;
-        let humanName = entry?.seedArtists || entry?.artistId || firstSlug;
+        let humanName = originalSeedMap.get(firstSlug.toLowerCase()) || entry?.seedArtists || entry?.artistId || firstSlug;
 
         // A. Parse the local detailsCache JSON block safely
         let bio = "", genre = "", origin = "", founded = "", summary = "", imageUrl = "";
@@ -1725,14 +1756,17 @@ const App: React.FC = () => {
         // Defensive guard
         const returnedIds = new Set(parsedGraphData.nodes.map((n: Node) => n.id.toLowerCase()));
         let maxG = parsedGraphData.nodes.reduce((m: number, n: Node) => Math.max(m, n.group || 0), 0);
-        artistList.forEach(name => {
-          if (!returnedIds.has(name.toLowerCase())) {
+        artistList.forEach((name, idx) => {
+          const normName = name.toLowerCase();
+          if (!returnedIds.has(normName)) {
             maxG++;
-            parsedGraphData.nodes.push({ id: name.toLowerCase(), type: 'artist', label: name, group: maxG });
+            const rawName = originalSeeds[idx] || name;
+            parsedGraphData.nodes.push({ id: normName, type: 'artist', label: rawName, group: maxG });
           }
         });
 
         let final = pruned ? mergeGraphData(pruned, parsedGraphData) : parsedGraphData;
+        final = applyHumanCasedLabels(final, artists);
         final = filterGraphByDiscoveryFilters(final, discoveryFilters, artists);
         
         setGraphData(final);
@@ -1886,6 +1920,7 @@ const App: React.FC = () => {
         if (pruned) {
           merged = mergeGraphData(pruned, merged);
         }
+        merged = applyHumanCasedLabels(merged, artists);
         merged = filterGraphByDiscoveryFilters(merged, discoveryFilters, artists);
         setGraphData(merged);
 
@@ -1945,6 +1980,7 @@ const App: React.FC = () => {
       let maxG = newData.nodes.reduce((m, n) => Math.max(m, n.group || 0), 0);
       artistList.forEach(name => { if (!returnedIds.has(name.toLowerCase())) { maxG++; newData.nodes.push({ id: name, type: 'artist', group: maxG }); } });
       let final = pruned ? mergeGraphData(pruned, newData) : newData;
+      final = applyHumanCasedLabels(final, artists);
       final = filterGraphByDiscoveryFilters(final, discoveryFilters, artists);
       setGraphData(final);
 
@@ -2271,6 +2307,28 @@ const App: React.FC = () => {
       if (!isMounted || !snap.exists()) return false;
 
       const data = snap.data();
+
+      // Guard against race condition: if local state is already populated (e.g. from a cache hit or manual generation),
+      // do not let a snapshot with empty graph/seeds overwrite it, because the local save has not synced to Firestore yet.
+      const localGraphPopulated = graphDataRef.current && graphDataRef.current.nodes && graphDataRef.current.nodes.length > 0;
+      let incomingGraphEmpty = true;
+      if (data.graphData) {
+        try {
+          const parsed = typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData;
+          if (parsed && parsed.nodes && parsed.nodes.length > 0) {
+            incomingGraphEmpty = false;
+          }
+        } catch (e) {}
+      } else if (data.artistIds && Array.isArray(data.artistIds) && data.artistIds.length > 0) {
+        incomingGraphEmpty = false;
+      } else if (data.cacheKey) {
+        incomingGraphEmpty = false;
+      }
+
+      if (localGraphPopulated && incomingGraphEmpty) {
+        console.log('[ProjectLoader] Bypassing snapshot handle because local state is populated but incoming database state is empty/blank');
+        return false;
+      }
       setCurrentProjectOwnerId(data.authorId || null);
       if (data.name !== undefined) setProjectName(data.name);
 

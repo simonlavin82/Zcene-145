@@ -76,6 +76,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     const [imageError, setImageError] = useState(false);
     const [imgLoaded, setImgLoaded] = useState(false);
     const [isIdCopied, setIsIdCopied] = useState(false);
+    const imgRef = useRef<HTMLImageElement>(null);
     
     const [liveTourData, setLiveTourData] = useState<string | null>(null);
     const [isFetchingTour, setIsFetchingTour] = useState(false);
@@ -192,6 +193,12 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         setImageError(false);
         setImgLoaded(false);
     }, [node.id, details?.imageUrl]);
+
+    useEffect(() => {
+        if (imgRef.current && imgRef.current.complete) {
+            setImgLoaded(true);
+        }
+    }, [details?.imageUrl]);
 
     useEffect(() => {
       if (chatHistory.length > 0 && (chatHistory.length > prevHistoryLength.current || isChatLoading)) {
@@ -381,6 +388,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             {details.imageUrl && !imageError && (
                                 <div className={`aspect-video w-full bg-zinc-800 overflow-hidden relative border border-zinc-800/50 shadow-2xl transition-opacity duration-700 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}>
                                     <img 
+                                        ref={imgRef}
                                         src={details.imageUrl} 
                                         alt={node.label || node.id} 
                                         className="w-full h-full object-cover scale-105 hover:scale-100 transition-transform duration-1000"
