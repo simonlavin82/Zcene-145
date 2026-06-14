@@ -2253,7 +2253,7 @@ const App: React.FC = () => {
 
         // Write both newly fetched and enriched/upgraded artists to Firestore (fire-and-forget) - only for standalone queries
         if (artistList.length === 1) {
-          writeArtistCacheMany(toFetch, freshData, user?.uid, activeDiscoveryFilters)
+          writeArtistCacheMany(toFetch, freshData, user?.uid, activeDiscoveryFilters, true)
             .then(() => console.log(`[Music Discovery] Cache write/upgrade confirmed for: [${toFetch.join(', ')}]`))
             .catch(e => console.error('[Music Discovery] Cache write/upgrade failed:', e));
         }
@@ -2339,7 +2339,7 @@ const App: React.FC = () => {
       // Phase 02 complete — write each artist as an isolated individual doc - only for standalone queries
       if (artistList.length === 1) {
         console.log(`[Music Discovery] Full cache MISS — writing per-artist docs for: [${artistList.join(', ')}]`);
-        writeArtistCacheMany(artistList, final, user?.uid, activeDiscoveryFilters)
+        writeArtistCacheMany(artistList, final, user?.uid, activeDiscoveryFilters, true)
           .then(() => console.log(`[Music Discovery] Per-artist cache write confirmed for: [${artistList.join(', ')}]`))
           .catch(e => console.error('[Music Discovery] Per-artist cache write failed:', e));
       }

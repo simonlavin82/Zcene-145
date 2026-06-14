@@ -272,13 +272,16 @@ export const writeArtistCacheMany = async (
   artistNames: string[],
   fullGraph: GraphData,
   activeUserId?: string | null,
-  filters?: any
+  filters?: any,
+  preserveFullGraph?: boolean
 ): Promise<void> => {
   const normalizedGraph = normalizeGraphData(fullGraph);
   await Promise.allSettled(
     artistNames.map(async name => {
       const artistId = normalizeArtistId(name);
-      const { nodes, links } = extractArtistSubGraph(name, normalizedGraph, artistNames);
+      const { nodes, links } = preserveFullGraph
+        ? { nodes: normalizedGraph.nodes, links: normalizedGraph.links }
+        : extractArtistSubGraph(name, normalizedGraph, artistNames);
 
       if (nodes.length === 0) {
         console.warn(`[ArtistCache] Skipping write for "${name}" — artist node not found in graph.`);
