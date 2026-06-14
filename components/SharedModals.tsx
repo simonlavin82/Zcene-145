@@ -52,7 +52,7 @@ export const MyStackDialog: React.FC<{
                                         <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded-md">{item.type}</span>
                                         <span className="text-[9px] text-zinc-600 font-mono">{new Date(item.dateSaved).toLocaleDateString()}</span>
                                     </div>
-                                    <h4 className="text-lg font-medium text-white truncate">{item.id}</h4>
+                                    <h4 className="text-lg font-medium text-white truncate">{item.id.replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</h4>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     {item.link && (
