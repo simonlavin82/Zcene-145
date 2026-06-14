@@ -14,7 +14,6 @@ export const MyStackDialog: React.FC<{
 }> = ({ isOpen, onClose, stack, onRemove, onView, onAddArtist, seedArtists }) => {
   if (!isOpen) return null;
 
-  const seedArtistSet = new Set(seedArtists.map(a => a.toLowerCase()));
 
   return (
     <div className="fixed inset-0 bg-black/60 z-[110] flex items-center justify-center p-4 animate-fade-in-down" style={{ animationDuration: '200ms' }} onClick={onClose}>
@@ -42,7 +41,9 @@ export const MyStackDialog: React.FC<{
                 ) : (
                     [...stack].reverse().map(item => {
                         const isArtist = item.type === 'artist';
-                        const isSeedArtist = isArtist && seedArtistSet.has(item.id.toLowerCase());
+                        const normalizeId = (s: string) => s.toLowerCase().replace(/[-_]/g, ' ').trim();
+                        const normalizedSeedSet = new Set(seedArtists.map(a => normalizeId(a)));
+                        const isSeedArtist = isArtist && normalizedSeedSet.has(normalizeId(item.id));
                         
                         return (
                             <div key={item.id} className="group bg-zinc-900/60 border border-zinc-700/50 p-4 rounded-xl flex items-center justify-between gap-4 hover:border-zinc-500 transition-colors">

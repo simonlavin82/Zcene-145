@@ -4162,7 +4162,12 @@ const App: React.FC = () => {
           }
         }}
         onAddArtist={(name) => {
-          const newSeeds = seedArtists ? `${seedArtists}::${name}` : name;
+          const normalize = (s: string) => s.toLowerCase().replace(/[-_]/g, ' ').trim();
+          const normalizedName = normalize(name);
+          const existingSeeds = (seedArtists || '').split('::').filter(Boolean);
+          const alreadyExists = existingSeeds.some(s => normalize(s) === normalizedName);
+          if (alreadyExists) return;
+          const newSeeds = existingSeeds.length > 0 ? `${seedArtists}::${name}` : name;
           handleGenerateGraph(newSeeds, true, graphData);
         }}
         seedArtists={(seedArtists || "").split('::').filter(Boolean)}
