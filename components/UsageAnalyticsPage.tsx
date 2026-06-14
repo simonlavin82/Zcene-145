@@ -4,6 +4,52 @@ import { ZceneLogo } from './Icons';
 import Header from './Header';
 import { db } from '../services/firebase';
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
+import { motion } from 'motion/react';
+
+const InfoTooltip = ({ content }: { content: string }) => {
+    return (
+        <div className="group relative inline-block ml-1.5 cursor-help select-none">
+            <span className="material-symbols-outlined text-zinc-500 hover:text-zinc-300 text-xs leading-none">
+                info
+            </span>
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-zinc-950 border border-zinc-800 text-zinc-400 text-[11px] p-2 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none z-50 leading-normal font-sans text-center normal-case tracking-normal">
+                {content}
+            </div>
+        </div>
+    );
+};
+
+const AdminViewToggle = ({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) => {
+    const isFirst = !value; // Admin View active (simulateNormalUser = false)
+    return (
+        <div className="flex items-center bg-zinc-950 border border-zinc-850 rounded-xl p-0.5 relative w-[176px] h-9 select-none">
+            {/* Sliding Active Badge */}
+            <motion.div
+                className="absolute top-0.5 left-0.5 bottom-0.5 w-[84px] bg-zinc-800 rounded-[6px] shadow-inner ring-1 ring-zinc-700/50"
+                initial={false}
+                animate={{ x: isFirst ? 0 : 84 }}
+                transition={{ type: 'spring', stiffness: 480, damping: 38 }}
+            />
+            <button
+                onClick={() => onChange(false)}
+                className={`w-[84px] h-8 flex items-center justify-center rounded-lg transition-colors relative z-10 active:scale-95 text-xs font-semibold ${
+                    !value ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+            >
+                Admin
+            </button>
+            <button
+                onClick={() => onChange(true)}
+                className={`w-[84px] h-8 flex items-center justify-center rounded-lg transition-colors relative z-10 active:scale-95 text-xs font-semibold ${
+                    value ? 'text-white' : 'text-zinc-550 hover:text-zinc-300'
+                }`}
+            >
+                Preview
+            </button>
+        </div>
+    );
+};
+
 
 interface UserTelemetry {
     email: string;
@@ -272,7 +318,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
     };
 
     return (
-        <div ref={containerRef} className="h-full w-full overflow-y-auto bg-[#000000] text-zinc-200 font-display flex flex-col relative select-none">
+        <div ref={containerRef} className="h-full w-full overflow-y-auto bg-[#000000] text-zinc-200 font-display flex flex-col relative select-text">
             <Header
                 user={user}
                 onLogoClick={onLogoClick}
@@ -328,19 +374,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                         </div>
                         {isAdmin && (
                             <div className="flex-shrink-0">
-                                <button
-                                    onClick={() => setSimulateNormalUser(prev => !prev)}
-                                    className={`flex items-center gap-2 px-4 py-2 border transition-all cursor-pointer ${
-                                        simulateNormalUser 
-                                            ? 'bg-primary border-primary text-black font-semibold' 
-                                            : 'bg-zinc-900 border-zinc-700 text-zinc-300 hover:border-zinc-500'
-                                    }`}
-                                >
-                                    <span className="material-symbols-outlined text-sm">
-                                        {simulateNormalUser ? 'person' : 'admin_panel_settings'}
-                                    </span>
-                                    {simulateNormalUser ? 'Viewing: Normal User' : 'Preview Normal User'}
-                                </button>
+                                <AdminViewToggle value={simulateNormalUser} onChange={setSimulateNormalUser} />
                             </div>
                         )}
                     </div>
@@ -348,45 +382,57 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                     {/* Overview Cards (Calculations block) */}
                     {!isNormalUserView && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                            <div className="bg-zinc-900/30 border border-zinc-800 p-6 rounded-none flex flex-col justify-between">
-                                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mb-2">Recall Resonance</span>
+                            <div className="bg-zinc-900/30 border border-zinc-800 p-6 rounded-none flex flex-col justify-between relative">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Cache Recall Rate</span>
+                                    <InfoTooltip content="The percentage of music discovery queries resolved from your local browser cache instead of querying the AI, reducing response time." />
+                                </div>
                                 <div className="flex items-baseline gap-2 mt-2">
                                     <span className="text-3xl font-bold font-mono text-primary">{aggregateMetrics.overallEfficiency.toFixed(1)}%</span>
                                 </div>
-                                <span className="text-xs text-zinc-600 mt-2 font-mono">{aggregateMetrics.totalCacheHits} / {aggregateMetrics.totalLiveQueries + aggregateMetrics.totalCacheHits} curation queries recalled from local memory</span>
+                                <span className="text-xs text-zinc-600 mt-2 font-mono">{aggregateMetrics.totalCacheHits} / {aggregateMetrics.totalLiveQueries + aggregateMetrics.totalCacheHits} recalled from cache</span>
                             </div>
 
-                            <div className="bg-zinc-900/30 border border-zinc-800 p-6 rounded-none flex flex-col justify-between">
-                                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mb-2">Curated Soundscapes</span>
+                            <div className="bg-zinc-900/30 border border-zinc-800 p-6 rounded-none flex flex-col justify-between relative">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Curation Projects</span>
+                                    <InfoTooltip content="Total active music canvases and discovery paths created by users." />
+                                </div>
                                 <div className="flex items-baseline gap-2 mt-2">
                                     <span className="text-3xl font-bold font-mono text-white">{aggregateMetrics.totalProjects}</span>
                                 </div>
-                                <span className="text-xs text-zinc-600 mt-2 font-mono">Active project canvases mapped by Authors</span>
+                                <span className="text-xs text-zinc-650 mt-2 font-mono">active workspace canvases</span>
                             </div>
 
-                            <div className="bg-zinc-900/30 border border-zinc-800 p-6 rounded-none flex flex-col justify-between">
-                                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mb-2">Synthesis Overhead</span>
+                            <div className="bg-zinc-900/30 border border-zinc-800 p-6 rounded-none flex flex-col justify-between relative">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">AI Discovery Cost</span>
+                                    <InfoTooltip content="Total accumulated costs for calling the AI recommendation engine." />
+                                </div>
                                 <div className="flex items-baseline gap-2 mt-2">
                                     <span className="text-3xl font-bold font-mono text-red-400">${aggregateMetrics.totalCosts.toFixed(4)}</span>
                                 </div>
-                                <span className="text-xs text-zinc-600 mt-2 font-mono">Direct synthesis requests @ ${COST_PER_AI_CALL.toFixed(4)} / query</span>
+                                <span className="text-xs text-zinc-650 mt-2 font-mono">@ $0.0015 per recommendation</span>
                             </div>
 
-                            <div className="bg-zinc-900/30 border border-zinc-800 p-6 rounded-none flex flex-col justify-between border-l-2 border-l-primary">
-                                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary mb-2">Retained Curation Value</span>
+                            <div className="bg-zinc-900/30 border border-zinc-800 p-6 rounded-none flex flex-col justify-between border-l-2 border-l-primary relative">
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Preserved Budget</span>
+                                    <InfoTooltip content="Estimated money saved by reusing cached artist nodes instead of requesting new AI generations." />
+                                </div>
                                 <div className="flex items-baseline gap-2 mt-2">
                                     <span className="text-3xl font-bold font-mono text-primary">${aggregateMetrics.totalSavings.toFixed(4)}</span>
                                 </div>
-                                <span className="text-xs text-zinc-600 mt-2 font-mono">Value preserved through memory caching</span>
+                                <span className="text-xs text-zinc-650 mt-2 font-mono">saved via local recall</span>
                             </div>
                         </div>
                     )}
 
                     {/* Filter controls & Refresh */}
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                    <div className="flex border border-zinc-800 bg-zinc-950 divide-x divide-zinc-800 w-full h-[52px] rounded-none">
                         {!isNormalUserView && (
-                            <div className="flex-grow flex items-center gap-4 bg-zinc-950 p-4 border border-zinc-800 rounded-none">
-                                <span className="material-symbols-outlined text-zinc-500">search</span>
+                            <div className="flex-grow flex items-center gap-4 px-4 py-3">
+                                <span className="material-symbols-outlined text-zinc-500 select-none">search</span>
                                 <input
                                     type="text"
                                     value={searchTerm}
@@ -399,9 +445,11 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                         <button
                             onClick={fetchLedger}
                             disabled={isLoading}
-                            className="flex items-center justify-center gap-2 px-6 py-4 bg-zinc-900 border border-zinc-800 text-zinc-300 hover:border-zinc-500 hover:text-white transition-all cursor-pointer font-medium text-sm disabled:opacity-50"
+                            className={`flex items-center justify-center gap-2 px-6 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-all cursor-pointer font-medium text-sm disabled:opacity-50 h-full rounded-none ${
+                                isNormalUserView ? 'w-full' : 'w-auto flex-shrink-0'
+                            }`}
                         >
-                            <span className={`material-symbols-outlined text-sm ${isLoading ? 'animate-spin' : ''}`}>
+                            <span className={`material-symbols-outlined text-sm select-none ${isLoading ? 'animate-spin' : ''}`}>
                                 refresh
                             </span>
                             Sync Archives
@@ -421,11 +469,11 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                             <thead>
                                 <tr className="border-b border-zinc-800 bg-zinc-900/50">
                                     <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Author</th>
-                                    <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-center">Soundscapes</th>
-                                    <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-center">Intentions</th>
-                                    <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-center">Recall / Synthesis</th>
-                                    <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Synthesis Toll</th>
-                                    <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Conservation</th>
+                                    <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-center">Projects</th>
+                                    <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-center">Actions</th>
+                                    <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-center">Cache Recall</th>
+                                    <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">AI Cost</th>
+                                    <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Savings</th>
                                     <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 w-16"></th>
                                 </tr>
                             </thead>
@@ -493,18 +541,18 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                                                  {/* Left Column: Action & Onboarding Details */}
                                                                  <div className="space-y-6">
                                                                      <div className="space-y-4">
-                                                                         <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Curatorial Intentions</h4>
+                                                                         <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Curation Actions</h4>
                                                                          <div className="space-y-2 font-mono">
                                                                              <div className="flex justify-between border-b border-zinc-800/50 pb-1">
-                                                                                 <span className="text-zinc-400">Soundscape Creations:</span>
+                                                                                 <span className="text-zinc-400">Projects Created:</span>
                                                                                  <span className="text-white">{user.projectsCount}</span>
                                                                              </div>
                                                                              <div className="flex justify-between border-b border-zinc-800/50 pb-1">
-                                                                                 <span className="text-zinc-400">Curation Expansions:</span>
+                                                                                 <span className="text-zinc-400">Actions Executed:</span>
                                                                                  <span className="text-white">{user.actionTriggers.updateCount}</span>
                                                                              </div>
                                                                              <div className="flex justify-between">
-                                                                                 <span className="text-zinc-400">Total Intentions:</span>
+                                                                                 <span className="text-zinc-400">Total Actions:</span>
                                                                                  <span className="text-white font-bold">{totalActions}</span>
                                                                              </div>
                                                                          </div>
