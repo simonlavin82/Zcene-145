@@ -891,44 +891,6 @@ export const generateGraphData = async (artists: string, baseGraph?: GraphData, 
           links: Array.isArray(validLinks) ? validLinks : []
       });
 
-      // --- Direct Firestore Write Loop for each artist node in the returned graph ---
-      if (activeUserId) {
-        const artistNodes = finalGraph.nodes.filter(n => n.type === 'artist');
-        await Promise.all(
-          artistNodes.map(async (artistNode) => {
-            let artistId: string;
-            const artistName = String(artistNode.id || '');
-            try {
-              artistId = normalizeArtistId(artistName);
-            } catch (e) {
-              artistId = artistName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-            }
-            if (!artistId) {
-              artistId = artistName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-            }
-
-            const { nodes, links } = extractArtistSubGraph(artistNode.id, finalGraph);
-            if (nodes.length === 0) return;
-            
-            try {
-              await setDoc(doc(db, 'artists', artistId), {
-                cacheKey: artistId,
-                artistId,
-                seedArtists: artistNode.id,
-                graphData: JSON.stringify({ nodes, links }),
-                filters: filters || {},
-                cacheVersion: 2,
-                cachedAt: serverTimestamp(),
-                hitCount: 0,
-              }, { merge: true });
-              console.log(`[generateGraphData] Standalone artist cache write confirmed: ${artistId}`);
-            } catch (error: any) {
-              console.warn("Global write bypassed due to rule restrictions:", error.message);
-            }
-          })
-        );
-      }
-
       return finalGraph;
     } catch (error: any) {
       const errorMsg = error.message || '';

@@ -552,6 +552,43 @@ const applyHumanCasedLabels = (graph: GraphData, seedsStr: string): GraphData =>
   };
 };
 
+const toTitleCase = (str: string): string => {
+  if (!str) return '';
+  return str
+    .split(' ')
+    .map(word => {
+      return word
+        .split('-')
+        .map(seg => seg.charAt(0).toUpperCase() + seg.slice(1))
+        .join('-');
+    })
+    .join(' ');
+};
+
+const getNodeLabel = (node: Node, seedList: string[], detailsCache?: Map<string, NodeDetails>): string => {
+  const rawLabel = node.label || node.id || '';
+  
+  if (node.type === 'artist') {
+    const normId = normalizeArtistId(node.id);
+    const seedMatch = seedList.find(s => normalizeArtistId(s) === normId);
+    if (seedMatch) return seedMatch;
+
+    if (detailsCache) {
+      const cached = detailsCache.get(node.id) || 
+                     detailsCache.get(node.id.toLowerCase()) || 
+                     detailsCache.get(normId);
+      const cachedName = cached?.details?.artist;
+      if (cachedName) return cachedName;
+    }
+  }
+
+  if (rawLabel === rawLabel.toLowerCase()) {
+    return toTitleCase(rawLabel);
+  }
+
+  return rawLabel;
+};
+
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 interface CacheValidationResult {
@@ -1825,7 +1862,8 @@ const App: React.FC = () => {
             }
           });
 
-          let final = pruned ? mergeGraphData(pruned, parsedGraphData) : parsedGraphData;
+          // Bypass merging with pruned to preserve the full map retrieved from Firestore cache
+          let final = parsedGraphData;
           final = applyHumanCasedLabels(final, artists);
           final = filterGraphByDiscoveryFilters(final, activeDiscoveryFilters, artists);
           
@@ -2073,7 +2111,8 @@ const App: React.FC = () => {
           }
         });
 
-        let final = pruned ? mergeGraphData(pruned, parsedGraphData) : parsedGraphData;
+        // Bypass merging with pruned to preserve the full map retrieved from Firestore cache
+        let final = parsedGraphData;
         final = applyHumanCasedLabels(final, artists);
         final = filterGraphByDiscoveryFilters(final, activeDiscoveryFilters, artists);
         
@@ -2212,10 +2251,12 @@ const App: React.FC = () => {
           throw new Error("The AI returned formless data for the missing artists. Please try again.");
         }
 
-        // Write both newly fetched and enriched/upgraded artists to Firestore (fire-and-forget)
-        writeArtistCacheMany(toFetch, freshData, user?.uid, activeDiscoveryFilters)
-          .then(() => console.log(`[Music Discovery] Cache write/upgrade confirmed for: [${toFetch.join(', ')}]`))
-          .catch(e => console.error('[Music Discovery] Cache write/upgrade failed:', e));
+        // Write both newly fetched and enriched/upgraded artists to Firestore (fire-and-forget) - only for standalone queries
+        if (artistList.length === 1) {
+          writeArtistCacheMany(toFetch, freshData, user?.uid, activeDiscoveryFilters)
+            .then(() => console.log(`[Music Discovery] Cache write/upgrade confirmed for: [${toFetch.join(', ')}]`))
+            .catch(e => console.error('[Music Discovery] Cache write/upgrade failed:', e));
+        }
 
         // Assemble the cached portion and merge with the fresh Gemini data
         const cachedGraph = assembleGraphFromCache(cached);
@@ -2295,11 +2336,13 @@ const App: React.FC = () => {
       final = filterGraphByDiscoveryFilters(final, activeDiscoveryFilters, artists);
       setGraphData(final);
 
-      // Phase 02 complete — write each artist as an isolated individual doc.
-      console.log(`[Music Discovery] Full cache MISS — writing per-artist docs for: [${artistList.join(', ')}]`);
-      writeArtistCacheMany(artistList, final, user?.uid, activeDiscoveryFilters)
-        .then(() => console.log(`[Music Discovery] Per-artist cache write confirmed for: [${artistList.join(', ')}]`))
-        .catch(e => console.error('[Music Discovery] Per-artist cache write failed:', e));
+      // Phase 02 complete — write each artist as an isolated individual doc - only for standalone queries
+      if (artistList.length === 1) {
+        console.log(`[Music Discovery] Full cache MISS — writing per-artist docs for: [${artistList.join(', ')}]`);
+        writeArtistCacheMany(artistList, final, user?.uid, activeDiscoveryFilters)
+          .then(() => console.log(`[Music Discovery] Per-artist cache write confirmed for: [${artistList.join(', ')}]`))
+          .catch(e => console.error('[Music Discovery] Per-artist cache write failed:', e));
+      }
 
 
       // Update active nodes metadata from the final graph, ensuring all seeds are present
@@ -2393,6 +2436,7 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!user || !isAuthInitialized || !isFirebaseReady) {
       setProfile(null);
+      setLibraryArtists([]);
       return;
     }
 
@@ -2400,7 +2444,33 @@ const App: React.FC = () => {
     const userRef = doc(db, 'users', user.uid);
     const unsubscribe = onSnapshot(userRef, (docSnap) => {
       if (docSnap.exists()) {
-        setProfile(docSnap.data());
+        const data = docSnap.data();
+        setProfile(data);
+        if (data && data.libraryArtists) {
+          try {
+            const parsed = JSON.parse(data.libraryArtists);
+            if (Array.isArray(parsed)) {
+              const inflatedArtists = parsed.map((artist: any) => {
+                let dateObj: Date | null = null;
+                if (artist.dateAdded) {
+                  const d = new Date(artist.dateAdded);
+                  if (!isNaN(d.getTime())) {
+                    dateObj = d;
+                  }
+                }
+                return {
+                  name: artist.name || '',
+                  dateAdded: dateObj
+                };
+              });
+              setLibraryArtists(inflatedArtists);
+            }
+          } catch (e) {
+            console.error("[Profile Listener] Failed to parse libraryArtists:", e);
+          }
+        } else {
+          setLibraryArtists([]);
+        }
       } else {
         // Automatically initialize profile record on signup
         const initialProfile = {
@@ -2410,6 +2480,7 @@ const App: React.FC = () => {
         };
         setProfile(initialProfile);
         setDoc(userRef, initialProfile, { merge: true }).catch(console.error);
+        setLibraryArtists([]);
       }
     }, (err) => {
       console.error("[Profile Listener] Failed to fetch profile:", err);
@@ -3701,6 +3772,32 @@ const App: React.FC = () => {
 
   const handleCancel = useCallback(() => { if (abortControllerRef.current) { abortControllerRef.current.abort(); setIsLoading(false); abortControllerRef.current = null; } }, []);
 
+  const formattedGraphData = useMemo(() => {
+    if (!graphData) return null;
+    const seedList = seedArtists.split('::').map(s => s.trim()).filter(Boolean);
+    return {
+      ...graphData,
+      nodes: graphData.nodes.map(n => ({
+        ...n,
+        label: getNodeLabel(n, seedList, detailsCache)
+      }))
+    };
+  }, [graphData, seedArtists, detailsCache]);
+
+  const formattedSelectedNode = useMemo(() => {
+    if (!selectedNode || !formattedGraphData) return selectedNode;
+    const match = formattedGraphData.nodes.find(n => n.id === selectedNode.id);
+    return match ? { ...selectedNode, label: match.label } : selectedNode;
+  }, [selectedNode, formattedGraphData]);
+
+  const formattedActiveNodes = useMemo(() => {
+    if (!activeNodes || !formattedGraphData) return activeNodes;
+    return activeNodes.map(node => {
+      const match = formattedGraphData.nodes.find(n => n.id === node.id);
+      return match ? { ...node, label: match.label } : node;
+    });
+  }, [activeNodes, formattedGraphData]);
+
   return (
     <div className="h-[100dvh] flex flex-col overflow-hidden" key={refreshKey}>
       {/* Loading Sliver */}
@@ -3770,7 +3867,7 @@ const App: React.FC = () => {
         <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Graph ? 'z-10' : 'z-0 opacity-0 pointer-events-none'}`}>
           {graphData && (
             <GraphPage
-              data={graphData} baseGraph={baseGraph} libraryArtists={libraryArtists} seedArtists={seedArtists}
+              data={formattedGraphData || { nodes: [], links: [] }} baseGraph={baseGraph} libraryArtists={libraryArtists} seedArtists={seedArtists}
               onRegenerate={(n) => handleGenerateGraph(n, true, graphData)} isLoading={isLoading}
               onCancelGeneration={handleCancel} onFileUpload={(f) => {
                 const r = new FileReader(); r.onload = (e) => {
@@ -3789,7 +3886,7 @@ const App: React.FC = () => {
                   } catch (err: any) { setError(err.message); }
                 }; r.readAsText(f);
               }}
-              onNodeClick={handleNodeClick} selectedNode={selectedNode} activeNodes={activeNodes}
+              onNodeClick={handleNodeClick} selectedNode={formattedSelectedNode} activeNodes={formattedActiveNodes}
               detailsCache={detailsCache} loadingNodeIds={loadingNodeIds} onCloseNode={handleCloseNode}
               onRefreshNode={handleRefreshNode} detailsError={detailsError} systemError={error}
               onLogoClick={() => {
