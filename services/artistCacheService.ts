@@ -318,7 +318,7 @@ export const writeArtistCacheMany = async (
           console.log(`[ArtistCache] Created: ${artistId} (${nodes.length} nodes, ${links.length} links)`);
         } else {
           const existing = existingSnap.data();
-          if (existing && existing.cacheVersion && existing.cacheVersion >= 2) {
+          if (existing && existing.cacheVersion && existing.cacheVersion >= 2 && (!preserveFullGraph || existing.isDeep === true)) {
             // ── SKIP PATH ─────────────────────────────────────────────────────
             // Doc already exists at cacheVersion 2+. The structural graph is authoritative.
             // Do not overwrite — only the details fetcher (Phase 03) may update this doc.

@@ -198,11 +198,14 @@ service cloud.firestore {
                          request.resource.data.diff(resource.data).affectedKeys()
                            .hasOnly(['detailsCache', 'hitCount'])
                        ) || (
-                         // Case B: Upgrade a sparse/legacy cache doc (< 2 or missing version) to version 2
-                         (!('cacheVersion' in existing()) || existing().cacheVersion < 2) &&
-                         incoming().cacheVersion == 2 &&
-                         request.resource.data.diff(resource.data).affectedKeys()
-                           .hasOnly(['detailsCache', 'hitCount', 'graphData', 'cacheVersion', 'filters', 'cacheKey', 'artistId', 'seedArtists', 'cachedAt'])
+                          // Case B: Upgrade a sparse/legacy cache doc (< 2 version or skeleton layout)
+                          (
+                            (!('cacheVersion' in existing()) || existing().cacheVersion < 2) ||
+                            (!('isDeep' in existing()) || existing().isDeep != true)
+                          ) &&
+                          incoming().cacheVersion == 2 &&
+                          request.resource.data.diff(resource.data).affectedKeys()
+                            .hasOnly(['detailsCache', 'hitCount', 'graphData', 'cacheVersion', 'filters', 'cacheKey', 'artistId', 'seedArtists', 'cachedAt', 'isDeep'])
                        );
 
       // Only admins may delete cache entries (manual invalidation).
