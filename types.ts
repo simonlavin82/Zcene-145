@@ -111,6 +111,7 @@ export interface ArtistCacheEntry {
   hitCount: number;
   detailsCache?: string;   // JSON string or raw text of NodeDetails/bio
   filters?: DiscoveryFilters;
+  isDeep?: boolean;
 }
 
 export interface Project {

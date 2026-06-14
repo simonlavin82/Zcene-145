@@ -1614,7 +1614,8 @@ const App: React.FC = () => {
 
         if (cacheDoc.exists()) {
           const data = cacheDoc.data();
-          if (data && (bypassCacheValidation || isCacheEntryFullyQualified(data))) {
+          const isDeep = data?.isDeep === true;
+          if (data && (bypassCacheValidation || (isCacheEntryFullyQualified(data) && isDeep))) {
             let parsedGraph = null;
             try {
               parsedGraph = typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData;
@@ -1775,7 +1776,12 @@ const App: React.FC = () => {
         });
 
         if (allArtistsCached) {
-          const choice = bypassCacheValidation ? 'cache' : await confirmCacheChoice(artistList);
+          const allDeep = normalizedArtistList.every(name => {
+            const normName = name.toLowerCase();
+            const entry = cacheResult.cached.get(name) || cacheResult.cached.get(normName);
+            return entry && entry.isDeep === true;
+          });
+          const choice = (allDeep || bypassCacheValidation) ? 'cache' : await confirmCacheChoice(artistList);
           if (choice === 'cancel' || controller.signal.aborted) {
             setIsLoading(false);
             setActiveNodes(prevActiveNodes);
@@ -2031,7 +2037,8 @@ const App: React.FC = () => {
         // Intercept with the dual-option choice gate if it's a multi-artist or filtered query.
         // Single-artist queries without filters are already handled by the Front Gate cache check.
         // Thus, any full hit reaching Phase 2 is by definition multi-artist or filtered.
-        const choice = (bypassCacheValidation || bypassChoiceConfirmation) ? 'cache' : await confirmCacheChoice(artistList);
+        const allDeep = Array.from(cached.values()).every(entry => entry.isDeep === true);
+        const choice = (allDeep || bypassCacheValidation || bypassChoiceConfirmation) ? 'cache' : await confirmCacheChoice(artistList);
         if (choice === 'cancel' || controller.signal.aborted) {
           setIsLoading(false);
           setActiveNodes(prevActiveNodes);

@@ -313,6 +313,7 @@ export const writeArtistCacheMany = async (
             cacheVersion: 2,
             cachedAt: serverTimestamp(),
             hitCount: 0,
+            isDeep: preserveFullGraph || false,
           });
           console.log(`[ArtistCache] Created: ${artistId} (${nodes.length} nodes, ${links.length} links)`);
         } else {
@@ -334,6 +335,7 @@ export const writeArtistCacheMany = async (
               filters: filters || {},
               cacheVersion: 2,
               cachedAt: serverTimestamp(),
+              isDeep: preserveFullGraph || false,
             });
             console.log(`[ArtistCache] Upgraded legacy doc: ${artistId} → cacheVersion 2`);
           }

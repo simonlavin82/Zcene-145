@@ -884,7 +884,28 @@ export const generateGraphData = async (artists: string, baseGraph?: GraphData, 
           const targetId = targetIdRaw.trim().toLowerCase();
           
           if (sourceId === targetId) return false;
-          if (!validationNodeMap.has(sourceId) || !validationNodeMap.has(targetId)) return false;
+          // Dynamically register missing source/target nodes to prevent peripheral data loss
+          if (!validationNodeMap.has(sourceId)) {
+              const rawSource = typeof link.source === 'string' ? link.source : (link.source as Node).id;
+              const trimmedSource = rawSource.trim();
+              const newNode: Node = { id: trimmedSource, type: 'artist', group: 1, label: trimmedSource };
+              const hyphenSource = normalizeArtistId(trimmedSource);
+              
+              validationNodeMap.set(sourceId, newNode);
+              validationNodeMap.set(hyphenSource, newNode);
+              deduplicatedNodes.push(newNode);
+          }
+          if (!validationNodeMap.has(targetId)) {
+              const rawTarget = typeof link.target === 'string' ? link.target : (link.target as Node).id;
+              const trimmedTarget = rawTarget.trim();
+              const newNode: Node = { id: trimmedTarget, type: 'artist', group: 1, label: trimmedTarget };
+              const hyphenTarget = normalizeArtistId(trimmedTarget);
+              
+              validationNodeMap.set(targetId, newNode);
+              validationNodeMap.set(hyphenTarget, newNode);
+              deduplicatedNodes.push(newNode);
+          }
+
           link.source = validationNodeMap.get(sourceId)!.id;
           link.target = validationNodeMap.get(targetId)!.id;
           return true;
