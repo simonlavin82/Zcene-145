@@ -1155,7 +1155,14 @@ const App: React.FC = () => {
     }
 
     // 1. Prioritize the Local Details Map
-    const cachedDetails = detailsCache.get(node.id) || detailsCache.get(node.id.toLowerCase()) || detailsCache.get(normalizeArtistId(node.id));
+    // IMPORTANT: Read from detailsCacheRef.current (the ref), NOT the `detailsCache` state
+    // variable. The state variable is captured at callback creation time and is subject to
+    // stale closure: if the user clicks a node before the React render cycle commits a
+    // `setDetailsCache` update (e.g. immediately after batchHydrateDetailsCache resolves),
+    // the closure still holds the old empty Map and the lookup returns undefined — causing
+    // the Token Quota modal to fire even though the data is already in memory.
+    // detailsCacheRef.current is always synchronously up-to-date (synced via useEffect).
+    const cachedDetails = detailsCacheRef.current.get(node.id) || detailsCacheRef.current.get(node.id.toLowerCase()) || detailsCacheRef.current.get(normalizeArtistId(node.id));
     
     // 2. Load Locally and Block the Network
     const isPlaceholderBio = cachedDetails && cachedDetails.summary && 
@@ -1277,7 +1284,7 @@ const App: React.FC = () => {
     if (node.type !== 'founded') {
       setActiveNodes(prev => prev.some(n => n.id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node]);
     }
-  }, [detailsCache, confirmTokenUsage]);
+  }, [confirmTokenUsage]);
 
   const handleToggleStack = useCallback(async (node: Node, link?: string) => {
     if (!user) {

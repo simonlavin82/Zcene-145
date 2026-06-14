@@ -292,19 +292,55 @@ export const writeArtistCacheMany = async (
       const canonicalName = canonicalNode?.label ?? canonicalNode?.id ?? name;
 
       try {
-        await setDoc(doc(db, 'artists', artistId), {
-          cacheKey: artistId,
-          artistId,
-          seedArtists: canonicalName,
-          graphData: JSON.stringify({ nodes, links }),
-          filters: filters || {},
-          cacheVersion: 2,
-          cachedAt: serverTimestamp(),
-          hitCount: 0,
-        }, { merge: true });
-        console.log(`[ArtistCache] Written: ${artistId} (${nodes.length} nodes, ${links.length} links)`);
+        // Pre-existence check: using setDoc({ merge: true }) on an existing doc fires an UPDATE,
+        // not a CREATE. The allow update rule only permits ['detailsCache', 'hitCount'] changes
+        // (Case A) — a full structural payload would be rejected with permission-denied.
+        // Solution: check existence first and use the appropriate write operation.
+        const existingSnap = await getDoc(doc(db, 'artists', artistId));
+
+        if (!existingSnap.exists()) {
+          // ── CREATE PATH ─────────────────────────────────────────────────────
+          // Plain setDoc (no merge) = guaranteed CREATE. Passes allow create rule.
+          await setDoc(doc(db, 'artists', artistId), {
+            cacheKey: artistId,
+            artistId,
+            seedArtists: canonicalName,
+            graphData: JSON.stringify({ nodes, links }),
+            filters: filters || {},
+            cacheVersion: 2,
+            cachedAt: serverTimestamp(),
+            hitCount: 0,
+          });
+          console.log(`[ArtistCache] Created: ${artistId} (${nodes.length} nodes, ${links.length} links)`);
+        } else {
+          const existing = existingSnap.data();
+          if (existing && existing.cacheVersion && existing.cacheVersion >= 2) {
+            // ── SKIP PATH ─────────────────────────────────────────────────────
+            // Doc already exists at cacheVersion 2+. The structural graph is authoritative.
+            // Do not overwrite — only the details fetcher (Phase 03) may update this doc.
+            console.log(`[ArtistCache] Skipping write for "${artistId}" — doc already at v${existing.cacheVersion}.`);
+          } else {
+            // ── UPGRADE PATH (Case B) ─────────────────────────────────────────
+            // Legacy doc (cacheVersion < 2 or missing). Upgrade it via updateDoc so
+            // Firestore evaluates it as an UPDATE, matching the allow update Case B rule.
+            await updateDoc(doc(db, 'artists', artistId), {
+              cacheKey: artistId,
+              artistId,
+              seedArtists: canonicalName,
+              graphData: JSON.stringify({ nodes, links }),
+              filters: filters || {},
+              cacheVersion: 2,
+              cachedAt: serverTimestamp(),
+            });
+            console.log(`[ArtistCache] Upgraded legacy doc: ${artistId} → cacheVersion 2`);
+          }
+        }
       } catch (e: any) {
-        console.warn("Global write bypassed due to rule restrictions:", e.message);
+        // Log the full error so auth failures and rule rejections are visible in the console
+        // rather than being swallowed silently. A permission-denied here means the /artists doc
+        // was never created, which causes batchHydrateDetailsCache to always miss and the
+        // background details fetcher to skip its write-back (Fix 3), compounding the amnesia bug.
+        console.warn(`[ArtistCache] Write failed for "${artistId}" (${e.code ?? 'unknown'}): ${e.message}`);
       }
     })
   );
