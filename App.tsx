@@ -1575,11 +1575,14 @@ const App: React.FC = () => {
     bypassTokenConfirmation: boolean = false,
     overrideFilters?: DiscoveryFilters
   ) => {
+    isHydratingSessionRef.current = true;
+    let isLockReleasedByAutosave = false;
     const prevActiveNodes = activeNodes;
     const prevSeedArtists = seedArtists;
     const activeDiscoveryFilters = overrideFilters || discoveryFilters;
 
     if (!user && (isRegeneration || !window.location.hash.includes('?'))) {
+      isHydratingSessionRef.current = false;
       // Only gate if it's a manual action (regeneration or fresh start)
       // Imports (via deep links) are allowed for guests
       console.log(`[Lazy Registration] Queueing generateGraph for guest. User: ${!!user}`);
@@ -1589,7 +1592,11 @@ const App: React.FC = () => {
     }
 
     const artistList = artists.split('::').map(a => normalizeArtistId(a)).filter(Boolean);
-    if (artistList.length > 25) { setError(`Limit: 25 artists.`); return; }
+    if (artistList.length > 25) {
+      isHydratingSessionRef.current = false;
+      setError(`Limit: 25 artists.`);
+      return;
+    }
 
     const hasActiveFilters = !!(
       activeDiscoveryFilters.foundedAfter ||
@@ -1691,6 +1698,11 @@ const App: React.FC = () => {
               // Force all loading flags off and short-circuit the entire function
               setIsLoading(false);
               isFetchingDetailsRef.current = false;
+              if (user && isFirebaseReady && isAuthInitialized && currentProjectId && !isGuest) {
+                isLockReleasedByAutosave = true;
+              } else {
+                isHydratingSessionRef.current = false;
+              }
               showToast('⚡ Loaded from cache');
               return;
             }
@@ -1703,6 +1715,7 @@ const App: React.FC = () => {
               // Fall through to live generation logic (which will generate and write back)
             } else {
               console.log(`[Front Gate Cache] User cancelled cache upgrade. Falling back to legacy data.`);
+              isHydratingSessionRef.current = false;
               handleGenerateGraph(artists, isRegeneration, graphToEnhance, true);
               return;
             }
@@ -1783,6 +1796,7 @@ const App: React.FC = () => {
           });
           const choice = (allDeep || bypassCacheValidation) ? 'cache' : await confirmCacheChoice(artistList);
           if (choice === 'cancel' || controller.signal.aborted) {
+            isHydratingSessionRef.current = false;
             setIsLoading(false);
             setActiveNodes(prevActiveNodes);
             setSeedArtists(prevSeedArtists);
@@ -1960,6 +1974,11 @@ const App: React.FC = () => {
           isFetchingDetailsRef.current = true;
           setTimeout(() => { isFetchingDetailsRef.current = false; }, 500);
           fullCacheHit = true;
+          if (user && isFirebaseReady && isAuthInitialized && currentProjectId && !isGuest) {
+            isLockReleasedByAutosave = true;
+          } else {
+            isHydratingSessionRef.current = false;
+          }
           return;
         }
         
@@ -2040,6 +2059,7 @@ const App: React.FC = () => {
         const allDeep = Array.from(cached.values()).every(entry => entry.isDeep === true);
         const choice = (allDeep || bypassCacheValidation || bypassChoiceConfirmation) ? 'cache' : await confirmCacheChoice(artistList);
         if (choice === 'cancel' || controller.signal.aborted) {
+          isHydratingSessionRef.current = false;
           setIsLoading(false);
           setActiveNodes(prevActiveNodes);
           setSeedArtists(prevSeedArtists);
@@ -2211,6 +2231,11 @@ const App: React.FC = () => {
         isFetchingDetailsRef.current = true;
         setTimeout(() => { isFetchingDetailsRef.current = false; }, 500);
         fullCacheHit = true;
+        if (user && isFirebaseReady && isAuthInitialized && currentProjectId && !isGuest) {
+          isLockReleasedByAutosave = true;
+        } else {
+          isHydratingSessionRef.current = false;
+        }
         return;
 
       } else if (!controller.signal.aborted && (missing.length > 0 || enrichmentRequired.length > 0) && (cached.size > 0 || fullHits.length > 0)) {
@@ -2235,6 +2260,7 @@ const App: React.FC = () => {
             showToast(`Loading cached artists: ${legacyArtists.join(', ')}`);
             handleGenerateGraph(legacyArtists.join('::'), isRegeneration, graphToEnhance, true);
           } else {
+            isHydratingSessionRef.current = false;
             setActiveNodes(prevActiveNodes);
             setSeedArtists(prevSeedArtists);
           }
@@ -2299,6 +2325,11 @@ const App: React.FC = () => {
 
         setIsLoading(false);
         fullCacheHit = true;
+        if (user && isFirebaseReady && isAuthInitialized && currentProjectId && !isGuest) {
+          isLockReleasedByAutosave = true;
+        } else {
+          isHydratingSessionRef.current = false;
+        }
         return; // Partial hit complete — go to Phase 04
       }
     } catch (cacheErr) {
@@ -2311,6 +2342,7 @@ const App: React.FC = () => {
     if (!bypassTokenConfirmation) {
       const confirmed = await confirmTokenUsage('generation', [], artistList);
       if (!confirmed || controller.signal.aborted) {
+        isHydratingSessionRef.current = false;
         setIsLoading(false);
         setActiveNodes(prevActiveNodes);
         setSeedArtists(prevSeedArtists);
@@ -2381,6 +2413,11 @@ const App: React.FC = () => {
       if (primaryNode) {
         setSelectedNode(primaryNode);
       }
+      if (user && isFirebaseReady && isAuthInitialized && currentProjectId && !isGuest) {
+        isLockReleasedByAutosave = true;
+      } else {
+        isHydratingSessionRef.current = false;
+      }
     } catch (err: any) {
       if (err.name !== 'AbortError' && !controller.signal.aborted) {
         showToast(humanizeError(err));
@@ -2390,6 +2427,9 @@ const App: React.FC = () => {
     } finally {
       if (abortControllerRef.current === controller) {
         setIsLoading(false);
+      }
+      if (!isLockReleasedByAutosave) {
+        isHydratingSessionRef.current = false;
       }
     }
   }, [
