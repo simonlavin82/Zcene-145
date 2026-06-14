@@ -1723,14 +1723,15 @@ const App: React.FC = () => {
 
       let bypassChoiceConfirmation = false;
 
-      if (!isRegeneration) {
-        const cacheResult = await readArtistCacheMany(artistList, user?.uid);
+      if (!bypassTokenConfirmation) {
+        const normalizedArtistList = artistList.map(name => name.toLowerCase());
+        const cacheResult = await readArtistCacheMany(normalizedArtistList, user?.uid);
         cached = new Map<string, ArtistCacheEntry>();
         missing = [];
         enrichmentRequired = [];
         fullHits = [];
 
-        const allArtistsCached = artistList.every(name => {
+        const allArtistsCached = normalizedArtistList.every(name => {
           const normName = name.toLowerCase();
           const entry = cacheResult.cached.get(name) || cacheResult.cached.get(normName);
           return entry && isGraphDataPresent(entry);
@@ -1751,8 +1752,172 @@ const App: React.FC = () => {
             return;
           }
 
-          console.log("[Phase 02 Cache] Option A chosen: loading standard cached layout.");
-          bypassChoiceConfirmation = true;
+          console.log("[Phase 02 Cache] Option A chosen: loading standard cached layout (bypassing validation checks).");
+          
+          // Populate cached map directly from cacheResult with all entries
+          normalizedArtistList.forEach(name => {
+            const normName = name.toLowerCase();
+            const entry = cacheResult.cached.get(name) || cacheResult.cached.get(normName);
+            if (entry) {
+              cached.set(name, entry);
+              cached.set(normName, entry);
+            }
+          });
+
+          // 1. FORCE STEP 1 - Check local database cache first
+          console.log(`[Music Discovery] Full cache HIT for: ${artistList.map(n => normalizeArtistId(n)).join(', ')}`);
+          cached.forEach((_, name) => incrementCacheHit(normalizeArtistId(name), user?.uid));
+
+          // 2. FORCE STEP 2 - Immediately update the UI state from local data
+          const originalSeeds = artists.split('::').map(s => s.trim()).filter(Boolean);
+          const originalSeedMap = new Map<string, string>();
+          originalSeeds.forEach(s => {
+            originalSeedMap.set(normalizeArtistId(s), s);
+          });
+
+          const firstSlug = artistList[0];
+          const entry = cached.get(firstSlug.toLowerCase()) || cached.values().next().value;
+          let humanName = originalSeedMap.get(firstSlug.toLowerCase()) || entry?.seedArtists || entry?.artistId || firstSlug;
+
+          // A. Parse the local detailsCache JSON block safely
+          let bio = "", genre = "", origin = "", founded = "", summary = "", imageUrl = "";
+          if (entry && entry.detailsCache) {
+               try {
+                  let parsedData = typeof entry.detailsCache === 'string' ? JSON.parse(entry.detailsCache) : entry.detailsCache;
+                  if (Array.isArray(parsedData) && parsedData.length > 0) {
+                     parsedData = Array.isArray(parsedData[0]) ? parsedData[0][1] : parsedData[0];
+                  }
+                  bio = parsedData?.summary || parsedData?.bio || parsedData?.description || parsedData?.text || "";
+                  summary = bio;
+                  imageUrl = parsedData?.imageUrl || parsedData?.image || "";
+                  genre = parsedData?.details?.genre || parsedData?.genre || parsedData?.genres || "";
+                  origin = parsedData?.details?.origin || parsedData?.origin || parsedData?.location || parsedData?.country || "";
+                  founded = parsedData?.details?.founded || parsedData?.founded || parsedData?.formed || parsedData?.year || "";
+               } catch(e) {
+                  console.warn("Silent parse failure on detailsCache:", e);
+               }
+          }
+
+          // B. Construct a clean node layout object
+          const hydratedNode = {
+               id: firstSlug.toLowerCase(),
+               label: humanName,
+               name: humanName,
+               bio, summary, genre, origin, founded, imageUrl,
+               type: 'artist' as const,
+               isLibrary: true,
+               group: 0
+           };
+
+          setSelectedNode(hydratedNode);
+
+          // C. Set the pre-compiled graph array straight into setGraphData
+          let parsedGraphData = assembleGraphFromCache(cached);
+          
+          const returnedIds = new Set(parsedGraphData.nodes.map((n: Node) => n.id.toLowerCase()));
+          let maxG = parsedGraphData.nodes.reduce((m: number, n: Node) => Math.max(m, n.group || 0), 0);
+          artistList.forEach((name, idx) => {
+            const normName = name.toLowerCase();
+            if (!returnedIds.has(normName)) {
+              maxG++;
+              const rawName = originalSeeds[idx] || name;
+              parsedGraphData.nodes.push({ id: normName, type: 'artist', label: rawName, group: maxG });
+            }
+          });
+
+          let final = pruned ? mergeGraphData(pruned, parsedGraphData) : parsedGraphData;
+          final = applyHumanCasedLabels(final, artists);
+          final = filterGraphByDiscoveryFilters(final, activeDiscoveryFilters, artists);
+          
+          setGraphData(final);
+
+          setActiveNodes(prev => {
+            const currentActive = [...prev];
+            const seedMapped = artistList.map(name => {
+              const isFirst = name.toLowerCase() === firstSlug.toLowerCase();
+              const match = final.nodes.find(fn => fn.id.toLowerCase() === (isFirst ? humanName.toLowerCase() : name.toLowerCase()));
+              return (match || { id: isFirst ? humanName : name, type: 'artist' as any, group: 0 }) as Node;
+            });
+            const seedIds = new Set(seedMapped.map(s => s.id.toLowerCase()));
+            const finalActive = [...seedMapped];
+            currentActive.forEach(p => {
+              if (!seedIds.has(p.id.toLowerCase())) {
+                const match = final.nodes.find(fn => fn.id.toLowerCase() === p.id.toLowerCase());
+                finalActive.push(match || p);
+                seedIds.add(p.id.toLowerCase());
+              }
+            });
+            return finalActive;
+          });
+
+          setDetailsCache(prev => {
+            const next = new Map(prev);
+            cached.forEach((cachedEntry, key) => {
+              if (cachedEntry && cachedEntry.detailsCache) {
+                try {
+                  let parsedData = typeof cachedEntry.detailsCache === 'string' ? JSON.parse(cachedEntry.detailsCache) : cachedEntry.detailsCache;
+                  if (Array.isArray(parsedData) && parsedData.length > 0) {
+                    parsedData = Array.isArray(parsedData[0]) ? parsedData[0][1] : parsedData[0];
+                  }
+                  const entryBio = parsedData?.summary || parsedData?.bio || parsedData?.description || parsedData?.text || "";
+                  
+                  if (!entryBio || entryBio.length < 5) return;
+
+                  const entryGenre = parsedData?.details?.genre || parsedData?.genre || parsedData?.genres || "";
+                  const entryOrigin = parsedData?.details?.origin || parsedData?.origin || parsedData?.location || parsedData?.country || "";
+                  const entryFounded = parsedData?.details?.founded || parsedData?.founded || parsedData?.formed || parsedData?.year || "";
+                  const entryArtistName = parsedData?.details?.artist || parsedData?.artist || parsedData?.name || cachedEntry.seedArtists || cachedEntry.artistId || key;
+
+                  const detailsObj = {
+                    summary: entryBio,
+                    imageUrl: parsedData?.imageUrl || parsedData?.image || "",
+                    details: {
+                      genre: entryGenre,
+                      origin: entryOrigin,
+                      founded: entryFounded,
+                      artist: entryArtistName,
+                      notableArtists: parsedData?.details?.notableArtists || parsedData?.notableArtists || []
+                    },
+                    members: parsedData?.members || [],
+                    links: parsedData?.links || [],
+                    discography: parsedData?.discography || [],
+                    tourInfo: parsedData?.tourInfo || "",
+                    recommendationReason: parsedData?.recommendationReason || parsedData?.reason || "",
+                    groundingLinks: parsedData?.groundingLinks || []
+                  };
+
+                  next.set(key.toLowerCase(), detailsObj);
+                  next.set(key, detailsObj);
+                  next.set(normalizeArtistId(key), detailsObj);
+                  if (cachedEntry.artistId) {
+                    next.set(cachedEntry.artistId.toLowerCase(), detailsObj);
+                    next.set(normalizeArtistId(cachedEntry.artistId), detailsObj);
+                  }
+                  if (entryArtistName) {
+                    next.set(entryArtistName.toLowerCase(), detailsObj);
+                    next.set(entryArtistName, detailsObj);
+                    next.set(normalizeArtistId(entryArtistName), detailsObj);
+                  }
+                } catch (e) {
+                  console.warn("Silent parse failure on detailsCache in loop:", e);
+                }
+              }
+            });
+            return next;
+          });
+
+          // 3. FORCE STEP 3 - Shut down ALL loading states and force an absolute return
+          window.dispatchEvent(new CustomEvent('zcene-cache-hit-success', { 
+              detail: { artist: entry?.seedArtists || entry?.artistId || firstSlug } 
+          }));
+          
+          showToast('⚡ Loaded from cache');
+          setIsLoading(false);
+          
+          isFetchingDetailsRef.current = true;
+          setTimeout(() => { isFetchingDetailsRef.current = false; }, 500);
+          fullCacheHit = true;
+          return;
         }
         
         const currentSeeds = prevSeedArtists.split('::').map(s => normalizeArtistId(s)).filter(Boolean);
