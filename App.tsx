@@ -3578,7 +3578,7 @@ const App: React.FC = () => {
           {graphData && (
             <GraphPage
               data={graphData} baseGraph={baseGraph} libraryArtists={libraryArtists} seedArtists={seedArtists}
-              onRegenerate={(n) => handleGenerateGraph(n, false, graphData)} isLoading={isLoading}
+              onRegenerate={(n) => handleGenerateGraph(n, true, graphData)} isLoading={isLoading}
               onCancelGeneration={handleCancel} onFileUpload={(f) => {
                 const r = new FileReader(); r.onload = (e) => {
                   const t = e.target?.result as string;
@@ -3827,7 +3827,7 @@ const App: React.FC = () => {
         }}
         onAddArtist={(name) => {
           const newSeeds = seedArtists ? `${seedArtists}::${name}` : name;
-          handleGenerateGraph(newSeeds, false);
+          handleGenerateGraph(newSeeds, true, graphData);
         }}
         seedArtists={(seedArtists || "").split('::').filter(Boolean)}
       />
