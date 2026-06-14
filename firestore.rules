@@ -101,7 +101,8 @@ service cloud.firestore {
     // --- Core Rules ---
 
     match /users/{userId} {
-      allow get: if isOwner(userId);
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
       
       allow create: if isOwner(userId) && 
                       isValidUser(incoming());
@@ -112,8 +113,8 @@ service cloud.firestore {
       allow delete: if isOwner(userId) || isAdmin();
 
       match /projects/{projectId} {
-        allow get: if isOwner(userId);
-        allow list: if isOwner(userId);
+        allow get: if isOwner(userId) || isAdmin();
+        allow list: if isOwner(userId) || isAdmin();
         
         allow create: if isOwner(userId) && 
                         isValidProject(incoming());

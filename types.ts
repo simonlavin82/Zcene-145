@@ -154,3 +154,5 @@ export interface UserTaste {
   eraMax: number | null;
 }
 
+export const COST_PER_AI_CALL = 0.0015;
+

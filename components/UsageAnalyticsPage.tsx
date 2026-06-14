@@ -1,7 +1,9 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { View } from '../types';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { View, COST_PER_AI_CALL } from '../types';
 import { ZceneLogo } from './Icons';
 import Header from './Header';
+import { db } from '../services/firebase';
+import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 
 interface UserTelemetry {
     email: string;
@@ -17,6 +19,13 @@ interface UserTelemetry {
     cacheEfficiency: {
         liveQueries: number;
         cacheHits: number;
+    };
+    onboardingProgress?: {
+        step1?: boolean;
+        step2?: boolean;
+        step3?: boolean;
+        step4?: boolean;
+        step5?: boolean;
     };
 }
 
@@ -44,69 +53,78 @@ interface UsageAnalyticsPageProps {
 }
 
 // Fixed unit cost constant for calculations (e.g. $0.0015 per live API request)
-export const COST_PER_AI_CALL = 0.0015;
 
-// Mock ledger data representing platform usage database logs
-const mockLedgerData: UserTelemetry[] = [
-    {
-        email: "zcene.online@gmail.com",
-        projectsCount: 14,
-        actionTriggers: { createCount: 12, updateCount: 45 },
-        artistSearches: {
-            globalCount: 57,
-            topSearches: [
-                { artistName: "Radiohead", count: 8 },
-                { artistName: "Neutral Milk Hotel", count: 6 },
-                { artistName: "Pavement", count: 5 },
-                { artistName: "Slowdive", count: 4 }
-            ]
+const calculateTelemetryForUser = (
+    email: string,
+    onboardingProgress: any,
+    projectDocs: any[]
+): UserTelemetry => {
+    let totalUpdates = 0;
+    let totalLiveQueries = 0;
+    let totalCacheHits = 0;
+    const artistFrequencyMap: Record<string, number> = {};
+
+    projectDocs.forEach((pDoc) => {
+        const pData = pDoc.data();
+        
+        // 1. Calculate seedArtists
+        const seedStr = pData.seedArtists || '';
+        const seeds = seedStr.split('::').map((s: string) => s.trim()).filter(Boolean);
+        
+        seeds.forEach((seed: string) => {
+            artistFrequencyMap[seed] = (artistFrequencyMap[seed] || 0) + 1;
+        });
+
+        const projectLiveQueries = seeds.length;
+        
+        // 2. Parse activeNodes or graphData nodes to count active nodes
+        let activeCount = 0;
+        if (pData.activeNodes && Array.isArray(pData.activeNodes)) {
+            activeCount = pData.activeNodes.length;
+        } else if (pData.graphData) {
+            try {
+                const parsed = JSON.parse(pData.graphData);
+                if (parsed && Array.isArray(parsed.nodes)) {
+                    activeCount = parsed.nodes.length;
+                }
+            } catch (e) {
+                console.warn("Error parsing graphData for project:", pDoc.id, e);
+            }
+        }
+        
+        const projectCacheHits = Math.max(0, activeCount - projectLiveQueries);
+        
+        totalLiveQueries += projectLiveQueries;
+        totalCacheHits += projectCacheHits;
+        totalUpdates += activeCount;
+    });
+
+    // Sort frequency map to get top searches
+    const sortedSearches = Object.entries(artistFrequencyMap)
+        .map(([artistName, count]) => ({ artistName, count }))
+        .sort((a, b) => b.count - a.count);
+
+    // Get total unique artist seeds count
+    const globalCount = Object.values(artistFrequencyMap).reduce((sum, count) => sum + count, 0);
+
+    return {
+        email,
+        projectsCount: projectDocs.length,
+        actionTriggers: {
+            createCount: projectDocs.length,
+            updateCount: totalUpdates
         },
-        cacheEfficiency: { liveQueries: 23, cacheHits: 34 }
-    },
-    {
-        email: "sandbox@zcene.online",
-        projectsCount: 3,
-        actionTriggers: { createCount: 3, updateCount: 8 },
         artistSearches: {
-            globalCount: 11,
-            topSearches: [
-                { artistName: "Orange 9mm", count: 4 },
-                { artistName: "Madball", count: 3 },
-                { artistName: "H2O", count: 2 }
-            ]
+            globalCount,
+            topSearches: sortedSearches.slice(0, 4) // Show top 4 like mock data
         },
-        cacheEfficiency: { liveQueries: 4, cacheHits: 7 }
-    },
-    {
-        email: "music.critic@pitchfork.com",
-        projectsCount: 22,
-        actionTriggers: { createCount: 18, updateCount: 92 },
-        artistSearches: {
-            globalCount: 110,
-            topSearches: [
-                { artistName: "Sonic Youth", count: 15 },
-                { artistName: "My Bloody Valentine", count: 12 },
-                { artistName: "Pixies", count: 10 },
-                { artistName: "Stereolab", count: 8 }
-            ]
+        cacheEfficiency: {
+            liveQueries: totalLiveQueries,
+            cacheHits: totalCacheHits
         },
-        cacheEfficiency: { liveQueries: 35, cacheHits: 75 }
-    },
-    {
-        email: "indie.digger@gmail.com",
-        projectsCount: 8,
-        actionTriggers: { createCount: 7, updateCount: 24 },
-        artistSearches: {
-            globalCount: 31,
-            topSearches: [
-                { artistName: "Idles", count: 5 },
-                { artistName: "Fontaines D.C.", count: 4 },
-                { artistName: "Shame", count: 3 }
-            ]
-        },
-        cacheEfficiency: { liveQueries: 12, cacheHits: 19 }
-    }
-];
+        onboardingProgress: onboardingProgress || {}
+    };
+};
 
 export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({ 
     onNavigate, 
@@ -133,6 +151,9 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
     const [searchTerm, setSearchTerm] = useState('');
     const [expandedRow, setExpandedRow] = useState<string | null>(null);
     const [simulateNormalUser, setSimulateNormalUser] = useState(false);
+    const [ledgerData, setLedgerData] = useState<UserTelemetry[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
     const activeUserEmail = user?.email || 'sandbox@zcene.online';
@@ -140,30 +161,62 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
     // Compute if we are displaying in restricted Normal User Mode
     const isNormalUserView = !isAdmin || simulateNormalUser;
 
-    // Ensure any logged-in user has telemetry details generated dynamically
-    const ledgerData = useMemo(() => {
-        const hasActiveUser = mockLedgerData.some(u => u.email.toLowerCase() === activeUserEmail.toLowerCase());
-        if (!hasActiveUser && activeUserEmail) {
-            return [
-                ...mockLedgerData,
-                {
-                    email: activeUserEmail,
-                    projectsCount: 2,
-                    actionTriggers: { createCount: 1, updateCount: 5 },
-                    artistSearches: {
-                        globalCount: 6,
-                        topSearches: [
-                            { artistName: "Slowdive", count: 3 },
-                            { artistName: "Radiohead", count: 2 },
-                            { artistName: "Turnstile", count: 1 }
-                        ]
-                    },
-                    cacheEfficiency: { liveQueries: 2, cacheHits: 4 }
-                }
-            ];
+    const fetchLedger = useCallback(async () => {
+        if (!user) return;
+        setIsLoading(true);
+        setError(null);
+        try {
+            let telemetryList: UserTelemetry[] = [];
+            
+            if (isAdmin && !simulateNormalUser) {
+                // Fetch all users
+                const usersSnap = await getDocs(collection(db, 'users'));
+                const userPromises = usersSnap.docs.map(async (uDoc) => {
+                    const uData = uDoc.data();
+                    const email = uData.email || uDoc.id; // fallback
+                    
+                    // Fetch projects subcollection for this user
+                    const projectsSnap = await getDocs(collection(db, 'users', uDoc.id, 'projects'));
+                    
+                    // Parse projects to calculate telemetry
+                    return calculateTelemetryForUser(email, uData.onboardingProgress, projectsSnap.docs);
+                });
+                telemetryList = await Promise.all(userPromises);
+            } else {
+                // Fetch only active user
+                const userDocRef = doc(db, 'users', user.uid);
+                const userDocSnap = await getDoc(userDocRef);
+                const uData = userDocSnap.exists() ? userDocSnap.data() : {
+                    email: user.email || '',
+                    displayName: user.displayName || '',
+                    onboardingProgress: { step1: true, step2: true, step3: true, step4: true, step5: true }
+                };
+                
+                // Fetch projects subcollection for this user
+                const projectsSnap = await getDocs(collection(db, 'users', user.uid, 'projects'));
+                
+                const singleTelemetry = calculateTelemetryForUser(
+                    uData.email || user.email || 'sandbox@zcene.online',
+                    uData.onboardingProgress,
+                    projectsSnap.docs
+                );
+                telemetryList = [singleTelemetry];
+            }
+            
+            setLedgerData(telemetryList);
+        } catch (err: any) {
+            console.error("Error fetching ledger data:", err);
+            setError("Failed to query discovery archive: " + (err.message || String(err)));
+        } finally {
+            setIsLoading(false);
         }
-        return mockLedgerData;
-    }, [activeUserEmail]);
+    }, [user, isAdmin, simulateNormalUser]);
+
+    useEffect(() => {
+        if (isActive) {
+            fetchLedger();
+        }
+    }, [isActive, fetchLedger]);
 
     useEffect(() => {
         if (isActive && containerRef.current) {
@@ -171,24 +224,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
         }
     }, [isActive]);
 
-    // ── DATABASE INTEGRATION NOTE ─────────────────────────────────────────────
-    // To connect to the live production database in the future, replace the mockLedgerData
-    // with a Firestore query aggregator:
-    //
-    // useEffect(() => {
-    //     const fetchLedger = async () => {
-    //         const usersSnap = await getDocs(collection(db, 'users'));
-    //         const ledgerPromises = usersSnap.docs.map(async (uDoc) => {
-    //             const uData = uDoc.data();
-    //             const projectsSnap = await getDocs(collection(db, 'users', uDoc.id, 'projects'));
-    //             // Aggregate action triggers and cache hits from analytics/artist caches...
-    //         });
-    //         const results = await Promise.all(ledgerPromises);
-    //         setLedgerData(results);
-    //     };
-    //     if (isActive) fetchLedger();
-    // }, [isActive]);
-    // ──────────────────────────────────────────────────────────────────────────
+
 
     // Calculations based on the ledger state
     const filteredLedger = useMemo(() => {
@@ -346,17 +382,36 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                         </div>
                     )}
 
-                    {/* Filter controls */}
-                    {!isNormalUserView && (
-                        <div className="flex items-center gap-4 bg-zinc-950 p-4 border border-zinc-800 rounded-none">
-                            <span className="material-symbols-outlined text-zinc-500">search</span>
-                            <input
-                                type="text"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                placeholder="Search by Author identity..."
-                                className="bg-transparent text-white w-full border-none outline-none focus:ring-0 text-sm placeholder:text-zinc-600"
-                            />
+                    {/* Filter controls & Refresh */}
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                        {!isNormalUserView && (
+                            <div className="flex-grow flex items-center gap-4 bg-zinc-950 p-4 border border-zinc-800 rounded-none">
+                                <span className="material-symbols-outlined text-zinc-500">search</span>
+                                <input
+                                    type="text"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    placeholder="Search by Author identity..."
+                                    className="bg-transparent text-white w-full border-none outline-none focus:ring-0 text-sm placeholder:text-zinc-600"
+                                />
+                            </div>
+                        )}
+                        <button
+                            onClick={fetchLedger}
+                            disabled={isLoading}
+                            className="flex items-center justify-center gap-2 px-6 py-4 bg-zinc-900 border border-zinc-800 text-zinc-300 hover:border-zinc-500 hover:text-white transition-all cursor-pointer font-medium text-sm disabled:opacity-50"
+                        >
+                            <span className={`material-symbols-outlined text-sm ${isLoading ? 'animate-spin' : ''}`}>
+                                refresh
+                            </span>
+                            Sync Archives
+                        </button>
+                    </div>
+
+                    {error && (
+                        <div className="bg-red-950/20 border border-red-500/30 text-red-200 p-4 font-mono text-xs flex items-center gap-3">
+                            <span className="material-symbols-outlined text-red-400 text-sm">warning</span>
+                            <span>{error}</span>
                         </div>
                     )}
 
@@ -375,7 +430,16 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredLedger.length === 0 ? (
+                                {isLoading && filteredLedger.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={7} className="p-8 text-center text-zinc-500 text-sm italic">
+                                            <div className="flex items-center justify-center gap-3">
+                                                <span className="material-symbols-outlined animate-spin text-primary text-sm">progress_activity</span>
+                                                Querying discovery archive...
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ) : filteredLedger.length === 0 ? (
                                     <tr>
                                         <td colSpan={7} className="p-8 text-center text-zinc-500 text-sm italic">
                                             No Author records found in the discovery archive.
@@ -422,47 +486,85 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                                     </td>
                                                 </tr>
                                                 {isExpanded && (
-                                                    <tr className="bg-zinc-900/10 border-b border-zinc-900">
-                                                        <td colSpan={7} className="p-6">
-                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-sm">
-                                                                
-                                                                {/* Left Column: Action Details */}
-                                                                <div className="space-y-4">
-                                                                    <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Curatorial Intentions</h4>
-                                                                    <div className="space-y-2 font-mono">
-                                                                        <div className="flex justify-between border-b border-zinc-800/50 pb-1">
-                                                                            <span className="text-zinc-400">Soundscape Creations:</span>
-                                                                            <span className="text-white">{user.actionTriggers.createCount}</span>
-                                                                        </div>
-                                                                        <div className="flex justify-between border-b border-zinc-800/50 pb-1">
-                                                                            <span className="text-zinc-400">Curation Expansions:</span>
-                                                                            <span className="text-white">{user.actionTriggers.updateCount}</span>
-                                                                        </div>
-                                                                        <div className="flex justify-between">
-                                                                            <span className="text-zinc-400">Total Intentions:</span>
-                                                                            <span className="text-white font-bold">{totalActions}</span>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
+                                                     <tr className="bg-zinc-900/10 border-b border-zinc-900">
+                                                         <td colSpan={7} className="p-6">
+                                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-sm">
+                                                                 
+                                                                 {/* Left Column: Action & Onboarding Details */}
+                                                                 <div className="space-y-6">
+                                                                     <div className="space-y-4">
+                                                                         <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Curatorial Intentions</h4>
+                                                                         <div className="space-y-2 font-mono">
+                                                                             <div className="flex justify-between border-b border-zinc-800/50 pb-1">
+                                                                                 <span className="text-zinc-400">Soundscape Creations:</span>
+                                                                                 <span className="text-white">{user.projectsCount}</span>
+                                                                             </div>
+                                                                             <div className="flex justify-between border-b border-zinc-800/50 pb-1">
+                                                                                 <span className="text-zinc-400">Curation Expansions:</span>
+                                                                                 <span className="text-white">{user.actionTriggers.updateCount}</span>
+                                                                             </div>
+                                                                             <div className="flex justify-between">
+                                                                                 <span className="text-zinc-400">Total Intentions:</span>
+                                                                                 <span className="text-white font-bold">{totalActions}</span>
+                                                                             </div>
+                                                                         </div>
+                                                                     </div>
 
-                                                                {/* Right Column: Search Details */}
-                                                                <div className="space-y-4">
-                                                                    <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Top Artist Discoveries ({user.artistSearches.globalCount} Total)</h4>
-                                                                    <div className="space-y-2 font-mono">
-                                                                        {user.artistSearches.topSearches.map((search, i) => (
-                                                                            <div key={i} className="flex justify-between border-b border-zinc-800/50 pb-1">
-                                                                                <span className="text-zinc-300">{search.artistName}</span>
-                                                                                <span className="text-zinc-400">{search.count} digs</span>
-                                                                            </div>
-                                                                        ))}
-                                                                    </div>
-                                                                </div>
+                                                                     <div className="space-y-4 pt-4 border-t border-zinc-900">
+                                                                         <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Onboarding Progress</h4>
+                                                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
+                                                                             <div className="flex items-center gap-2">
+                                                                                 <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[10px] font-bold ${user.onboardingProgress?.step1 ? 'bg-primary text-black' : 'bg-zinc-900 text-zinc-650 border border-zinc-800'}`}>
+                                                                                     {user.onboardingProgress?.step1 ? '✓' : '•'}
+                                                                                 </span>
+                                                                                 <span className={user.onboardingProgress?.step1 ? 'text-zinc-300' : 'text-zinc-600'}>1. Library Upload</span>
+                                                                             </div>
+                                                                             <div className="flex items-center gap-2">
+                                                                                 <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[10px] font-bold ${user.onboardingProgress?.step2 ? 'bg-primary text-black' : 'bg-zinc-900 text-zinc-655 border border-zinc-800'}`}>
+                                                                                     {user.onboardingProgress?.step2 ? '✓' : '•'}
+                                                                                 </span>
+                                                                                 <span className={user.onboardingProgress?.step2 ? 'text-zinc-300' : 'text-zinc-600'}>2. Add Artist Seed</span>
+                                                                             </div>
+                                                                             <div className="flex items-center gap-2">
+                                                                                 <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[10px] font-bold ${user.onboardingProgress?.step3 ? 'bg-primary text-black' : 'bg-zinc-900 text-zinc-655 border border-zinc-800'}`}>
+                                                                                     {user.onboardingProgress?.step3 ? '✓' : '•'}
+                                                                                 </span>
+                                                                                 <span className={user.onboardingProgress?.step3 ? 'text-zinc-300' : 'text-zinc-600'}>3. Graph Interaction</span>
+                                                                             </div>
+                                                                             <div className="flex items-center gap-2">
+                                                                                 <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[10px] font-bold ${user.onboardingProgress?.step4 ? 'bg-primary text-black' : 'bg-zinc-900 text-zinc-655 border border-zinc-800'}`}>
+                                                                                     {user.onboardingProgress?.step4 ? '✓' : '•'}
+                                                                                 </span>
+                                                                                 <span className={user.onboardingProgress?.step4 ? 'text-zinc-300' : 'text-zinc-600'}>4. Detail Navigation</span>
+                                                                             </div>
+                                                                             <div className="flex items-center gap-2 col-span-1 sm:col-span-2">
+                                                                                 <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[10px] font-bold ${user.onboardingProgress?.step5 ? 'bg-primary text-black' : 'bg-zinc-900 text-zinc-655 border border-zinc-800'}`}>
+                                                                                     {user.onboardingProgress?.step5 ? '✓' : '•'}
+                                                                                 </span>
+                                                                                 <span className={user.onboardingProgress?.step5 ? 'text-zinc-300' : 'text-zinc-600'}>5. Deep Cut Summary</span>
+                                                                             </div>
+                                                                         </div>
+                                                                     </div>
+                                                                 </div>
 
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                )}
-                                            </React.Fragment>
+                                                                 {/* Right Column: Search Details */}
+                                                                 <div className="space-y-4">
+                                                                     <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Top Artist Discoveries ({user.artistSearches.globalCount} Total)</h4>
+                                                                     <div className="space-y-2 font-mono">
+                                                                         {user.artistSearches.topSearches.map((search, i) => (
+                                                                             <div key={i} className="flex justify-between border-b border-zinc-800/50 pb-1">
+                                                                                 <span className="text-zinc-300">{search.artistName}</span>
+                                                                                 <span className="text-zinc-400">{search.count} digs</span>
+                                                                             </div>
+                                                                         ))}
+                                                                     </div>
+                                                                 </div>
+
+                                                             </div>
+                                                         </td>
+                                                     </tr>
+                                                 )}
+                                             </React.Fragment>
                                         );
                                     })
                                 )}
