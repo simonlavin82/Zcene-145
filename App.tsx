@@ -610,6 +610,21 @@ const isCacheEntryFullyQualified = (data: any): boolean => {
   return validateCacheEntry(data).isFullyQualified;
 };
 
+/**
+ * Lightweight check used exclusively in handleExtendNode.
+ * A single-node sub-graph written by writeArtistCacheMany is structurally
+ * correct for canvas merging even though it contains only 1 artist node.
+ * isCacheEntryFullyQualified would reject it (peer-band check) — this
+ * function only asks: "is there usable graphData?"
+ */
+const isGraphDataPresent = (data: any): boolean => {
+  if (!data?.graphData) return false;
+  try {
+    const g = typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData;
+    return Array.isArray(g?.nodes) && g.nodes.length > 0;
+  } catch { return false; }
+};
+
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>(View.Home);
   const currentViewRef = useRef<View>(View.Home);
@@ -2975,7 +2990,7 @@ const App: React.FC = () => {
       const snap = await getDoc(doc(db, 'artists', standardizedId));
       if (snap.exists()) {
         const data = snap.data() as ArtistCacheEntry;
-        if (data && isCacheEntryFullyQualified(data)) {
+        if (data && isGraphDataPresent(data)) {
           cachedEntry = data;
         }
       }
@@ -3183,123 +3198,144 @@ const App: React.FC = () => {
           setLoadingNodeIds(prev => new Set(prev).add(node.id));
           lastProgressTimestampRef.current = Date.now();
 
-          let retries = 0, max = 3, success = false;
-          while (retries < max && !success) {
-            try {
-              if (!graphData) throw new Error("No data");
-
-              // Global Artists Fallback Read
-              let fallbackDetails: NodeDetails | null = null;
+          // Fix 2: Per-node try/finally guarantees loadingNodeIds cleanup even if an
+          // unexpected exception escapes the inner while-loop try/catch. Previously only
+          // isFetchingDetailsRef was reset (in the outer finally), leaving the spinner
+          // stranded indefinitely.
+          try {
+            let retries = 0, max = 3, success = false;
+            while (retries < max && !success) {
               try {
-                const cacheId = normalizeArtistId(node.id);
-                let cacheDoc = await getDoc(doc(db, 'artists', cacheId));
-                
-                if (cacheDoc.exists()) {
-                   const data = cacheDoc.data();
-                   if (data && data.detailsCache) {
-                      try {
-                          const parsed = typeof data.detailsCache === 'string' ? JSON.parse(data.detailsCache) : data.detailsCache;
-                          if (parsed && (parsed.bio || parsed.summary)) {
-                             const bio = parsed.summary || parsed.bio || parsed.description || parsed.text || "";
-                             const imageUrl = parsed.imageUrl || parsed.image || "";
-                             const genre = parsed.details?.genre || parsed.genre || parsed.genres || "";
-                             const origin = parsed.details?.origin || parsed.origin || parsed.location || parsed.country || "";
-                             const founded = parsed.details?.founded || parsed.founded || parsed.formed || parsed.year || "";
-                             const artistName = parsed.details?.artist || parsed.artist || parsed.name || data.seedArtists || data.artistId || node.id;
-                             const notableArtists = parsed.details?.notableArtists || parsed.notableArtists || [];
-                             const members = parsed.members || [];
-                             const links = parsed.links || [];
-                             const discography = parsed.discography || [];
-                             const tourInfo = parsed.tourInfo || "";
-                             const recommendationReason = parsed.recommendationReason || parsed.reason || "";
-                             const groundingLinks = parsed.groundingLinks || [];
+                if (!graphData) throw new Error("No data");
 
-                             fallbackDetails = {
-                                summary: bio,
-                                imageUrl,
-                                details: {
-                                    artist: artistName,
-                                    genre,
-                                    origin,
-                                    founded,
-                                    notableArtists
-                                },
-                                members,
-                                links,
-                                discography,
-                                tourInfo,
-                                recommendationReason,
-                                groundingLinks
-                             };
-                             console.log("[Global Cache] Fallback successful for:", node.id);
-                          }
-                      } catch(e) { console.warn("Failed parsing global detailsCache", e); }
-                   }
-                }
-              } catch (e) { console.warn("[Global Cache] Fallback read failed", e); }
-
-              let details: NodeDetails;
-              if (fallbackDetails) {
-                 details = fallbackDetails;
-              } else {
-                 // Individual node timeout (45s) to prevent the whole queue from hanging
-                 const nodeDetailsPromise = fetchNodeDetails(node, graphData, seedArtists, urlOriginHint);
-                 const timeoutPromise = new Promise((_, reject) =>
-                   setTimeout(() => reject(new Error("Request timed out after 45s")), 45000)
-                 );
-                 details = await Promise.race([nodeDetailsPromise, timeoutPromise]) as NodeDetails;
-              }
-
-              setDetailsCache(prev => {
-                const updated = new Map(prev);
-                updated.set(node.id, details);
-                updated.set(node.id.toLowerCase(), details);
-                updated.set(normalizeArtistId(node.id), details);
-                return updated;
-              });
-
-              if (!fallbackDetails) {
-                const cacheId = normalizeArtistId(node.id);
+                // Global Artists Fallback Read
+                let fallbackDetails: NodeDetails | null = null;
                 try {
-                  await setDoc(doc(db, 'artists', cacheId), {
-                    detailsCache: JSON.stringify(details)
-                  }, { merge: true });
-                  console.log(`[Deep Cut Queue] Saved detailsCache to global artist doc: ${cacheId}`);
-                } catch (e: any) {
-                  console.warn("Global write bypassed due to rule restrictions:", e.message);
+                  const cacheId = normalizeArtistId(node.id);
+                  let cacheDoc = await getDoc(doc(db, 'artists', cacheId));
+                  
+                  if (cacheDoc.exists()) {
+                     const data = cacheDoc.data();
+                     if (data && data.detailsCache) {
+                        try {
+                            const parsed = typeof data.detailsCache === 'string' ? JSON.parse(data.detailsCache) : data.detailsCache;
+                            if (parsed && (parsed.bio || parsed.summary)) {
+                               const bio = parsed.summary || parsed.bio || parsed.description || parsed.text || "";
+                               const imageUrl = parsed.imageUrl || parsed.image || "";
+                               const genre = parsed.details?.genre || parsed.genre || parsed.genres || "";
+                               const origin = parsed.details?.origin || parsed.origin || parsed.location || parsed.country || "";
+                               const founded = parsed.details?.founded || parsed.founded || parsed.formed || parsed.year || "";
+                               const artistName = parsed.details?.artist || parsed.artist || parsed.name || data.seedArtists || data.artistId || node.id;
+                               const notableArtists = parsed.details?.notableArtists || parsed.notableArtists || [];
+                               const members = parsed.members || [];
+                               const links = parsed.links || [];
+                               const discography = parsed.discography || [];
+                               const tourInfo = parsed.tourInfo || "";
+                               const recommendationReason = parsed.recommendationReason || parsed.reason || "";
+                               const groundingLinks = parsed.groundingLinks || [];
+
+                               fallbackDetails = {
+                                  summary: bio,
+                                  imageUrl,
+                                  details: {
+                                      artist: artistName,
+                                      genre,
+                                      origin,
+                                      founded,
+                                      notableArtists
+                                  },
+                                  members,
+                                  links,
+                                  discography,
+                                  tourInfo,
+                                  recommendationReason,
+                                  groundingLinks
+                               };
+                               console.log("[Global Cache] Fallback successful for:", node.id);
+                            }
+                        } catch(e) { console.warn("Failed parsing global detailsCache", e); }
+                     }
+                  }
+                } catch (e) { console.warn("[Global Cache] Fallback read failed", e); }
+
+                let details: NodeDetails;
+                if (fallbackDetails) {
+                   details = fallbackDetails;
+                } else {
+                   // Individual node timeout (45s) to prevent the whole queue from hanging
+                   const nodeDetailsPromise = fetchNodeDetails(node, graphData, seedArtists, urlOriginHint);
+                   const timeoutPromise = new Promise((_, reject) =>
+                     setTimeout(() => reject(new Error("Request timed out after 45s")), 45000)
+                   );
+                   details = await Promise.race([nodeDetailsPromise, timeoutPromise]) as NodeDetails;
                 }
-              }
-              
-              success = true;
-              lastProgressTimestampRef.current = Date.now();
-              await wait(1000);
 
-            } catch (err: any) {
-              const isRate = err?.message?.includes('429') || err?.message?.includes('RESOURCE_EXHAUSTED');
-              const isTimeout = err?.message?.includes('timed out');
+                setDetailsCache(prev => {
+                  const updated = new Map(prev);
+                  updated.set(node.id, details);
+                  updated.set(node.id.toLowerCase(), details);
+                  updated.set(normalizeArtistId(node.id), details);
+                  return updated;
+                });
 
-              if (isRate && retries < max - 1) {
-                retries++;
-                await wait(Math.pow(2, retries) * 1000 + Math.random() * 1000);
-              } else if (isTimeout && retries < max - 1) {
-                retries++;
-                console.warn(`[Deep Cut Queue] Node ${node.id} timed out. Retry ${retries}/${max}`);
-                await wait(1000);
-              } else {
-                console.error(`[Deep Cut Queue] Failed for node ${node.id}:`, err);
+                // Fix 3: Race-safe details write-back.
+                // Using { merge: true } on a non-existent doc is treated as a CREATE by Firestore.
+                // The `allow create` rule requires 5 structural keys — a details-only payload fails it.
+                // Solution: check doc existence first; use updateDoc (guaranteed UPDATE) if it exists,
+                // and skip silently if it doesn't (writeArtistCacheMany is responsible for the CREATE).
+                if (!fallbackDetails) {
+                  const cacheId = normalizeArtistId(node.id);
+                  try {
+                    const existingSnap = await getDoc(doc(db, 'artists', cacheId));
+                    if (existingSnap.exists()) {
+                      await updateDoc(doc(db, 'artists', cacheId), {
+                        detailsCache: JSON.stringify(details)
+                      });
+                      console.log(`[Deep Cut Queue] Saved detailsCache to global artist doc: ${cacheId}`);
+                    } else {
+                      // Structural doc not yet created (race with double-write). Skip here — the
+                      // double-write in handleExtendNode owns the CREATE responsibility.
+                      console.warn(`[Deep Cut Queue] Global doc not yet created for ${cacheId} — skipping details write`);
+                    }
+                  } catch (e: any) {
+                    console.warn("Global write bypassed due to rule restrictions:", e.message);
+                  }
+                }
                 
-                // 2. Insulate the Sidebar Lifecycle:
-                // Show a toast instead of setting detailsError to prevent the sidebar from wiping cache values
-                if (selectedNode?.id === node.id) {
-                    showToast(humanizeError(err));
+                success = true;
+                lastProgressTimestampRef.current = Date.now();
+                await wait(1000);
+
+              } catch (err: any) {
+                const isRate = err?.message?.includes('429') || err?.message?.includes('RESOURCE_EXHAUSTED');
+                const isTimeout = err?.message?.includes('timed out');
+
+                if (isRate && retries < max - 1) {
+                  retries++;
+                  await wait(Math.pow(2, retries) * 1000 + Math.random() * 1000);
+                } else if (isTimeout && retries < max - 1) {
+                  retries++;
+                  console.warn(`[Deep Cut Queue] Node ${node.id} timed out. Retry ${retries}/${max}`);
+                  await wait(1000);
+                } else {
+                  console.error(`[Deep Cut Queue] Failed for node ${node.id}:`, err);
+                  
+                  // Insulate the Sidebar Lifecycle:
+                  // Show a toast instead of setting detailsError to prevent the sidebar from wiping cache values
+                  if (selectedNode?.id === node.id) {
+                      showToast(humanizeError(err));
+                  }
+                  break;
                 }
-                break;
               }
             }
+          } finally {
+            // Guaranteed per-node cleanup — runs even if an unexpected exception escapes
+            // the while-loop's inner catch block.
+            fetchingNodeIdsRef.current.delete(node.id);
+            setLoadingNodeIds(prev => { const next = new Set(prev); next.delete(node.id); return next; });
+            lastProgressTimestampRef.current = Date.now();
           }
-          fetchingNodeIdsRef.current.delete(node.id);
-          setLoadingNodeIds(prev => { const next = new Set(prev); next.delete(node.id); return next; });
-          lastProgressTimestampRef.current = Date.now();
         }
       } finally { isFetchingDetailsRef.current = false; }
     };
