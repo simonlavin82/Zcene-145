@@ -14,7 +14,7 @@ import HelpPage from './components/HelpPage';
 import GraphPage from './components/GraphPage';
 import HomePage from './components/HomePage';
 import Dashboard from './components/Dashboard';
-import { MyStackDialog, HeaderMenu, TokenConfirmationDialog } from './components/SharedModals';
+import { MyStackDialog, HeaderMenu, TokenConfirmationDialog, CacheChoiceDialog } from './components/SharedModals';
 
 import { ShareModal } from './components/ShareModal';
 import { analyticsService } from './services/analyticsService';
@@ -686,6 +686,12 @@ const App: React.FC = () => {
     onConfirm: () => void;
     onCancel: () => void;
   } | null>(null);
+  const [cacheChoiceDialog, setCacheChoiceDialog] = useState<{
+    isOpen: boolean;
+    artists: string[];
+    cost: number;
+    onSelect: (choice: 'cache' | 'synthesis' | 'cancel') => void;
+  } | null>(null);
 
   const confirmTokenUsage = useCallback((
     type: 'generation' | 'extension' | 'deep_cut_creation' | 'partial_synthesis' | 'cache_upgrade',
@@ -708,6 +714,20 @@ const App: React.FC = () => {
         onCancel: () => {
           setTokenConfirmation(null);
           resolve(false);
+        }
+      });
+    });
+  }, []);
+
+  const confirmCacheChoice = useCallback((artists: string[]) => {
+    return new Promise<'cache' | 'synthesis' | 'cancel'>((resolve) => {
+      setCacheChoiceDialog({
+        isOpen: true,
+        artists,
+        cost: COST_PER_AI_CALL,
+        onSelect: (choice) => {
+          setCacheChoiceDialog(null);
+          resolve(choice);
         }
       });
     });
@@ -1490,7 +1510,8 @@ const App: React.FC = () => {
     artists: string,
     isRegeneration: boolean = false,
     graphToEnhance?: GraphData | null,
-    bypassCacheValidation: boolean = false
+    bypassCacheValidation: boolean = false,
+    bypassTokenConfirmation: boolean = false
   ) => {
     const prevActiveNodes = activeNodes;
     const prevSeedArtists = seedArtists;
@@ -1739,6 +1760,25 @@ const App: React.FC = () => {
       }
 
       if (!controller.signal.aborted && missing.length === 0 && enrichmentRequired.length === 0 && cached.size > 0) {
+        // Intercept with the dual-option choice gate if it's a multi-artist or filtered query.
+        // Single-artist queries without filters are already handled by the Front Gate cache check.
+        // Thus, any full hit reaching Phase 2 is by definition multi-artist or filtered.
+        const choice = await confirmCacheChoice(artistList);
+        if (choice === 'cancel' || controller.signal.aborted) {
+          setIsLoading(false);
+          setActiveNodes(prevActiveNodes);
+          setSeedArtists(prevSeedArtists);
+          return;
+        }
+
+        if (choice === 'synthesis') {
+          console.log("[Phase 02 Cache] Option B chosen: forcing net-new AI generation.");
+          handleGenerateGraph(artists, true, graphToEnhance, bypassCacheValidation, true);
+          return;
+        }
+
+        console.log("[Phase 02 Cache] Option A chosen: loading standard cached layout.");
+
         // 1. FORCE STEP 1 - Check local database cache first
         console.log(`[Music Discovery] Full cache HIT for: ${artistList.map(n => normalizeArtistId(n)).join(', ')}`);
         cached.forEach((_, name) => incrementCacheHit(normalizeArtistId(name), user?.uid));
@@ -1991,12 +2031,14 @@ const App: React.FC = () => {
 
     if (fullCacheHit) return;
 
-    const confirmed = await confirmTokenUsage('generation', [], artistList);
-    if (!confirmed || controller.signal.aborted) {
-      setIsLoading(false);
-      setActiveNodes(prevActiveNodes);
-      setSeedArtists(prevSeedArtists);
-      return;
+    if (!bypassTokenConfirmation) {
+      const confirmed = await confirmTokenUsage('generation', [], artistList);
+      if (!confirmed || controller.signal.aborted) {
+        setIsLoading(false);
+        setActiveNodes(prevActiveNodes);
+        setSeedArtists(prevSeedArtists);
+        return;
+      }
     }
 
     try {
@@ -3728,6 +3770,14 @@ const App: React.FC = () => {
         cachedArtists={tokenConfirmation?.cachedArtists || []}
         missingArtists={tokenConfirmation?.missingArtists || []}
         enrichmentArtists={tokenConfirmation?.enrichmentArtists || []}
+      />
+
+      <CacheChoiceDialog
+        isOpen={!!cacheChoiceDialog}
+        onClose={() => cacheChoiceDialog?.onSelect('cancel')}
+        onSelect={(choice) => cacheChoiceDialog?.onSelect(choice)}
+        artists={cacheChoiceDialog?.artists || []}
+        cost={cacheChoiceDialog?.cost || 0}
       />
 
       <AnimatePresence>

@@ -449,4 +449,127 @@ export const TokenConfirmationDialog: React.FC<{
   );
 };
 
+export const CacheChoiceDialog: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  onSelect: (choice: 'cache' | 'synthesis' | 'cancel') => void;
+  artists: string[];
+  cost: number;
+}> = ({ isOpen, onClose, onSelect, artists, cost }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div 
+      className="fixed inset-0 bg-black/60 z-[130] flex items-center justify-center p-4 animate-fade-in-down pointer-events-auto" 
+      style={{ animationDuration: '200ms' }}
+      onClick={() => onSelect('cancel')}
+    >
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        className="bg-background-dark border border-zinc-700 rounded-none w-full max-w-lg shadow-2xl flex flex-col overflow-hidden" 
+        onClick={e => e.stopPropagation()}
+      >
+        <header className="p-4 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary !text-[20px]">layers</span>
+            <h3 className="text-base font-semibold text-white tracking-wide">Select Spiderweb Depth</h3>
+          </div>
+          <button 
+            onClick={() => onSelect('cancel')} 
+            className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none"
+          >
+            <span className="material-symbols-outlined !text-[18px]">close</span>
+          </button>
+        </header>
+
+        <div className="p-6 space-y-4">
+          <p className="text-sm text-zinc-400 leading-relaxed">
+            Existing cached data was found for this combination. Choose how you would like to synthesize your Zcene:
+          </p>
+
+          <div className="bg-zinc-900/40 p-3 border border-zinc-800/80 rounded-none space-y-2 mb-2">
+            <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest block">
+              Requested Artists
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {artists.map(artist => (
+                <span key={artist} className="text-[10px] font-mono bg-zinc-800 text-zinc-300 px-2 py-0.5 border border-zinc-700/50 rounded-full">
+                  {artist}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {/* Option A (Instant / Free) */}
+            <button
+              onClick={() => onSelect('cache')}
+              className="w-full text-left p-4 bg-zinc-900/60 border border-zinc-800 hover:border-zinc-500 hover:bg-zinc-800/40 transition-all rounded-xl group relative overflow-hidden flex items-start gap-4 cursor-pointer"
+            >
+              <div className="w-10 h-10 rounded-xl bg-zinc-800 flex items-center justify-center text-zinc-400 group-hover:text-white group-hover:bg-zinc-700 transition-colors flex-shrink-0">
+                <span className="material-symbols-outlined !text-[22px]">bolt</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <span className="text-sm font-semibold text-white group-hover:text-primary transition-colors">
+                    Load standard cached layout
+                  </span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-zinc-800 text-zinc-400 rounded-none border border-zinc-700">
+                    Instant / Free
+                  </span>
+                </div>
+                <p className="text-xs text-zinc-400 leading-relaxed">
+                  Mounts the minimal cached spiderweb immediately from Firestore database records without burning live AI API credits.
+                </p>
+              </div>
+            </button>
+
+            {/* Option B (Recommended / Full AI Synthesis) */}
+            <button
+              onClick={() => onSelect('synthesis')}
+              className="w-full text-left p-4 bg-primary/5 border border-primary/20 hover:border-primary/50 hover:bg-primary/10 transition-all rounded-xl group relative overflow-hidden flex items-start gap-4 cursor-pointer"
+            >
+              {/* Subtle background glow */}
+              <div className="absolute inset-0 opacity-5 group-hover:opacity-10 bg-[radial-gradient(ellipse_at_top_right,var(--tw-gradient-stops))] from-primary via-transparent to-transparent pointer-events-none transition-opacity" />
+              
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary/20 transition-colors flex-shrink-0">
+                <span className="material-symbols-outlined !text-[22px]">auto_awesome</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <span className="text-sm font-semibold text-white group-hover:text-primary transition-colors">
+                    Generate deep interconnected spiderweb
+                  </span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-primary text-brand-black rounded-none">
+                    Recommended
+                  </span>
+                </div>
+                <p className="text-xs text-zinc-400 leading-relaxed mb-2">
+                  Bypasses cache, skips existing layout limits, and dispatches queries to Gemini to synthesize a full, rich interconnected node network.
+                </p>
+                <div className="flex items-center gap-1 text-[10px] font-mono text-primary font-bold">
+                  <span className="material-symbols-outlined !text-[12px]">payments</span>
+                  <span>Est. Cost: ${cost.toFixed(4)} / query</span>
+                </div>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <footer className="p-4 bg-zinc-900 border-t border-zinc-700 flex justify-end">
+          <button 
+            onClick={() => onSelect('cancel')} 
+            className="px-4 py-2 text-zinc-400 hover:text-white text-sm rounded-xl hover:bg-zinc-805 transition-colors"
+          >
+            Cancel
+          </button>
+        </footer>
+      </motion.div>
+    </div>
+  );
+};
+
+
 
