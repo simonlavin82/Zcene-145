@@ -407,6 +407,30 @@ const filterGraphByDiscoveryFilters = (data: GraphData, filters: DiscoveryFilter
   return { nodes: deduplicatedNodes, links: filteredLinks };
 };
 
+const areFiltersEqual = (f1?: any, f2?: any): boolean => {
+  const clean1 = f1 || {};
+  const clean2 = f2 || {};
+  
+  const keys = ['foundedAfter', 'foundedBefore', 'additionalInstructions'];
+  for (const key of keys) {
+    if ((clean1[key] ?? '') !== (clean2[key] ?? '')) return false;
+  }
+  
+  const arrayKeys = ['includeOrigins', 'excludeOrigins', 'includeGenres'];
+  for (const key of arrayKeys) {
+    const arr1 = Array.isArray(clean1[key]) ? clean1[key] : [];
+    const arr2 = Array.isArray(clean2[key]) ? clean2[key] : [];
+    if (arr1.length !== arr2.length) return false;
+    const sorted1 = [...arr1].sort();
+    const sorted2 = [...arr2].sort();
+    for (let i = 0; i < sorted1.length; i++) {
+      if (sorted1[i] !== sorted2[i]) return false;
+    }
+  }
+  
+  return true;
+};
+
 const mergeGraphData = (base: GraphData, enhancement: GraphData): GraphData => {
   if (!base || !base.nodes) return enhancement || { nodes: [], links: [] };
   if (!enhancement || !enhancement.nodes) return base || { nodes: [], links: [] };
@@ -1528,9 +1552,18 @@ const App: React.FC = () => {
     const artistList = artists.split('::').map(a => normalizeArtistId(a)).filter(Boolean);
     if (artistList.length > 25) { setError(`Limit: 25 artists.`); return; }
 
+    const hasActiveFilters = !!(
+      discoveryFilters.foundedAfter ||
+      discoveryFilters.foundedBefore ||
+      (discoveryFilters.includeOrigins && discoveryFilters.includeOrigins.length > 0) ||
+      (discoveryFilters.excludeOrigins && discoveryFilters.excludeOrigins.length > 0) ||
+      (discoveryFilters.includeGenres && discoveryFilters.includeGenres.length > 0) ||
+      (discoveryFilters.additionalInstructions && discoveryFilters.additionalInstructions.trim().length > 0)
+    );
+
     // --- STRICT FRONT-GATE CACHE CHECK ---
     // If this is a fresh search for a single artist without special filters, check the cache immediately
-    if (artistList.length === 1 && !isRegeneration && !discoveryFilters.foundedAfter) {
+    if (artistList.length === 1 && !isRegeneration && !hasActiveFilters) {
       const searchId = artistList[0];
       const searchIdLower = searchId.toLowerCase();
       
@@ -1701,12 +1734,15 @@ const App: React.FC = () => {
           const forceMockHit = (import.meta.env.DEV || import.meta.env.VITE_USE_MOCKS === 'true') && 
             ['sick of it all', 'h2o', 'radiohead', 'blink-182', 'orange 9mm', 'madball'].includes(normName);
 
-          const isAlreadyInGraph = currentSeeds.includes(normName) || 
-            (graphData?.nodes.some(n => n.id.toLowerCase() === normName || normalizeArtistId(n.id) === normName) ?? false);
+          const isAlreadyInGraph = !hasActiveFilters && (
+            currentSeeds.includes(normName) || 
+            (graphData?.nodes.some(n => n.id.toLowerCase() === normName || normalizeArtistId(n.id) === normName) ?? false)
+          );
 
           const validation = entry ? validateCacheEntry(entry) : null;
+          const filtersMatch = entry ? areFiltersEqual(entry.filters, discoveryFilters) : false;
 
-          if (forceMockHit || (entry && (bypassCacheValidation || validation?.isFullyQualified))) {
+          if (forceMockHit || (entry && filtersMatch && (bypassCacheValidation || validation?.isFullyQualified))) {
             fullHits.push(name);
             const finalEntry: ArtistCacheEntry = entry || {
               artistId: normalizeArtistId(name),
@@ -1726,7 +1762,7 @@ const App: React.FC = () => {
             };
             cached.set(name, finalEntry);
             cached.set(normName, finalEntry);
-          } else if (entry && (validation?.needsPeerBands || validation?.needsFutureFields)) {
+          } else if (entry && filtersMatch && (validation?.needsPeerBands || validation?.needsFutureFields)) {
             enrichmentRequired.push(name);
             cached.set(name, entry);
             cached.set(normName, entry);
@@ -1763,7 +1799,7 @@ const App: React.FC = () => {
         // Intercept with the dual-option choice gate if it's a multi-artist or filtered query.
         // Single-artist queries without filters are already handled by the Front Gate cache check.
         // Thus, any full hit reaching Phase 2 is by definition multi-artist or filtered.
-        const choice = await confirmCacheChoice(artistList);
+        const choice = bypassCacheValidation ? 'cache' : await confirmCacheChoice(artistList);
         if (choice === 'cancel' || controller.signal.aborted) {
           setIsLoading(false);
           setActiveNodes(prevActiveNodes);
@@ -2113,7 +2149,19 @@ const App: React.FC = () => {
         setIsLoading(false);
       }
     }
-  }, [user, discoveryFilters, showToast, humanizeError, handleLogin]);
+  }, [
+    user,
+    discoveryFilters,
+    showToast,
+    humanizeError,
+    handleLogin,
+    graphData,
+    activeNodes,
+    seedArtists,
+    confirmCacheChoice,
+    confirmTokenUsage,
+    detailsCache
+  ]);
 
 
 
