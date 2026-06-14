@@ -156,3 +156,11 @@ export interface UserTaste {
 
 export const COST_PER_AI_CALL = 0.0015;
 
+export const RADIUS_TOKENS = {
+  frame: "rounded-none", // Structural Brutalist Framing (0px hard borders)
+  input: "rounded-xl",   // Tactile Interactive Controls (Inputs, drop-downs)
+  button: "rounded-lg",  // Standard Interactive UI (Clickable utilities)
+  toggle: "rounded-xl",  // Segmented Component Selectors
+};
+
+

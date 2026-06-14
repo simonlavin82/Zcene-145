@@ -1,57 +1,14 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { View, COST_PER_AI_CALL } from '../types';
+import { View, COST_PER_AI_CALL, RADIUS_TOKENS } from '../types';
 import { ZceneLogo } from './Icons';
 import Header from './Header';
 import { db } from '../services/firebase';
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { motion } from 'motion/react';
+import { InfoTooltip } from './ui/InfoTooltip';
+import { AdminViewToggle } from './ui/AdminViewToggle';
 
-const InfoTooltip = ({ content }: { content: string }) => {
-    return (
-        <div className="group relative inline-block ml-1.5 cursor-help select-none">
-            <span className="material-symbols-outlined text-zinc-500 hover:text-zinc-300 text-xs leading-none">
-                info
-            </span>
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-zinc-950 border border-zinc-800 text-zinc-400 text-[11px] p-2 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none z-50 leading-normal font-sans text-center normal-case tracking-normal">
-                {content}
-            </div>
-        </div>
-    );
-};
-
-const AdminViewToggle = ({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) => {
-    const isFirst = !value; // Admin View active (simulateNormalUser = false)
-    return (
-        <div className="flex items-center bg-zinc-950 border border-zinc-850 rounded-xl p-0.5 relative w-[176px] h-9 select-none">
-            {/* Sliding Active Badge */}
-            <motion.div
-                className="absolute top-0.5 left-0.5 bottom-0.5 w-[84px] bg-zinc-800 rounded-[6px] shadow-inner ring-1 ring-zinc-700/50"
-                initial={false}
-                animate={{ x: isFirst ? 0 : 84 }}
-                transition={{ type: 'spring', stiffness: 480, damping: 38 }}
-            />
-            <button
-                onClick={() => onChange(false)}
-                className={`w-[84px] h-8 flex items-center justify-center rounded-lg transition-colors relative z-10 active:scale-95 text-xs font-semibold ${
-                    !value ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'
-                }`}
-            >
-                Admin
-            </button>
-            <button
-                onClick={() => onChange(true)}
-                className={`w-[84px] h-8 flex items-center justify-center rounded-lg transition-colors relative z-10 active:scale-95 text-xs font-semibold ${
-                    value ? 'text-white' : 'text-zinc-550 hover:text-zinc-300'
-                }`}
-            >
-                Preview
-            </button>
-        </div>
-    );
-};
-
-
-interface UserTelemetry {
+export interface UserTelemetry {
     email: string;
     projectsCount: number;
     actionTriggers: {
@@ -74,6 +31,245 @@ interface UserTelemetry {
         step5?: boolean;
     };
 }
+
+export interface TelemetryOverviewCardsProps {
+    aggregateMetrics: {
+        overallEfficiency: number;
+        totalCacheHits: number;
+        totalLiveQueries: number;
+        totalProjects: number;
+        totalCosts: number;
+        totalSavings: number;
+    };
+    isNormalUserView: boolean;
+}
+
+export const TelemetryOverviewCards: React.FC<TelemetryOverviewCardsProps> = ({
+    aggregateMetrics,
+    isNormalUserView,
+}) => {
+    if (isNormalUserView) return null;
+    return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className={`bg-zinc-900/30 border border-zinc-800 p-6 flex flex-col justify-between relative ${RADIUS_TOKENS.frame}`}>
+                <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Cache Recall Rate</span>
+                    <InfoTooltip content="The percentage of music discovery queries resolved from your local browser cache instead of querying the AI, reducing response time." />
+                </div>
+                <div className="flex items-baseline gap-2 mt-2">
+                    <span className="text-3xl font-bold font-mono text-primary">{aggregateMetrics.overallEfficiency.toFixed(1)}%</span>
+                </div>
+                <span className="text-xs text-zinc-600 mt-2 font-mono">{aggregateMetrics.totalCacheHits} / {aggregateMetrics.totalLiveQueries + aggregateMetrics.totalCacheHits} recalled from cache</span>
+            </div>
+
+            <div className={`bg-zinc-900/30 border border-zinc-800 p-6 flex flex-col justify-between relative ${RADIUS_TOKENS.frame}`}>
+                <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Curation Projects</span>
+                    <InfoTooltip content="Total active music canvases and discovery paths created by users." />
+                </div>
+                <div className="flex items-baseline gap-2 mt-2">
+                    <span className="text-3xl font-bold font-mono text-white">{aggregateMetrics.totalProjects}</span>
+                </div>
+                <span className="text-xs text-zinc-650 mt-2 font-mono">active workspace canvases</span>
+            </div>
+
+            <div className={`bg-zinc-900/30 border border-zinc-800 p-6 flex flex-col justify-between relative ${RADIUS_TOKENS.frame}`}>
+                <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">AI Discovery Cost</span>
+                    <InfoTooltip content="Total accumulated costs for calling the AI recommendation engine." />
+                </div>
+                <div className="flex items-baseline gap-2 mt-2">
+                    <span className="text-3xl font-bold font-mono text-red-400">${aggregateMetrics.totalCosts.toFixed(4)}</span>
+                </div>
+                <span className="text-xs text-zinc-650 mt-2 font-mono">@ $0.0015 per recommendation</span>
+            </div>
+
+            <div className={`bg-zinc-900/30 border border-zinc-800 p-6 flex flex-col justify-between border-l-2 border-l-primary relative ${RADIUS_TOKENS.frame}`}>
+                <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Preserved Budget</span>
+                    <InfoTooltip content="Estimated money saved by reusing cached artist nodes instead of requesting new AI generations." />
+                </div>
+                <div className="flex items-baseline gap-2 mt-2">
+                    <span className="text-3xl font-bold font-mono text-primary">${aggregateMetrics.totalSavings.toFixed(4)}</span>
+                </div>
+                <span className="text-xs text-zinc-650 mt-2 font-mono">saved via local recall</span>
+            </div>
+        </div>
+    );
+};
+
+export interface DiscoveryLedgerTableProps {
+    isLoading: boolean;
+    filteredLedger: UserTelemetry[];
+    expandedRow: string | null;
+    toggleRow: (email: string) => void;
+}
+
+export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
+    isLoading,
+    filteredLedger,
+    expandedRow,
+    toggleRow,
+}) => {
+    return (
+        <div className="border border-zinc-800 bg-zinc-950/20 overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[700px]">
+                <thead>
+                    <tr className="border-b border-zinc-800 bg-zinc-900/50">
+                        <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Author</th>
+                        <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-center">Projects</th>
+                        <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-center">Actions</th>
+                        <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-center">Cache Recall</th>
+                        <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">AI Cost</th>
+                        <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Savings</th>
+                        <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 w-16"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {isLoading && filteredLedger.length === 0 ? (
+                        <tr>
+                            <td colSpan={7} className="p-8 text-center text-zinc-500 text-sm italic">
+                                <div className="flex items-center justify-center gap-3">
+                                    <span className="material-symbols-outlined animate-spin text-primary text-sm">progress_activity</span>
+                                    Querying discovery archive...
+                                </div>
+                            </td>
+                        </tr>
+                    ) : filteredLedger.length === 0 ? (
+                        <tr>
+                            <td colSpan={7} className="p-8 text-center text-zinc-500 text-sm italic">
+                                No Author records found in the discovery archive.
+                            </td>
+                        </tr>
+                    ) : (
+                        filteredLedger.map((user) => {
+                            const totalActions = user.actionTriggers.createCount + user.actionTriggers.updateCount;
+                            const queryTotal = user.cacheEfficiency.liveQueries + user.cacheEfficiency.cacheHits;
+                            const efficiency = queryTotal > 0 ? (user.cacheEfficiency.cacheHits / queryTotal) * 100 : 0;
+                            const cost = user.cacheEfficiency.liveQueries * COST_PER_AI_CALL;
+                            const savings = user.cacheEfficiency.cacheHits * COST_PER_AI_CALL;
+                            const isExpanded = expandedRow === user.email;
+
+                            return (
+                                <React.Fragment key={user.email}>
+                                    <tr 
+                                        onClick={() => toggleRow(user.email)} 
+                                        className="border-b border-zinc-900 hover:bg-zinc-900/20 cursor-pointer transition-colors"
+                                    >
+                                        <td className="p-4">
+                                            <span className="font-medium text-white">{user.email}</span>
+                                        </td>
+                                        <td className="p-4 text-center font-mono">{user.projectsCount}</td>
+                                        <td className="p-4 text-center font-mono" title={`Create: ${user.actionTriggers.createCount} | Update: ${user.actionTriggers.updateCount}`}>
+                                            {totalActions}
+                                        </td>
+                                        <td className="p-4 text-center">
+                                            <div className="flex flex-col items-center">
+                                                <span className="font-mono text-zinc-300">
+                                                    {user.cacheEfficiency.cacheHits}/{user.cacheEfficiency.liveQueries}
+                                                </span>
+                                                <span className="text-[10px] font-mono text-primary font-bold">
+                                                    {efficiency.toFixed(0)}% Eff
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td className="p-4 text-right font-mono text-red-400/80">${cost.toFixed(4)}</td>
+                                        <td className="p-4 text-right font-mono text-primary">${savings.toFixed(4)}</td>
+                                        <td className="p-4 text-center">
+                                            <span className="material-symbols-outlined text-zinc-500">
+                                                {isExpanded ? 'expand_less' : 'expand_more'}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    {isExpanded && (
+                                         <tr className="bg-zinc-900/10 border-b border-zinc-900">
+                                             <td colSpan={7} className="p-6">
+                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-sm">
+                                                     
+                                                     {/* Left Column: Action & Onboarding Details */}
+                                                     <div className="space-y-6">
+                                                         <div className="space-y-4">
+                                                             <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Curation Actions</h4>
+                                                             <div className="space-y-2 font-mono">
+                                                                 <div className="flex justify-between border-b border-zinc-800/50 pb-1">
+                                                                     <span className="text-zinc-400">Projects Created:</span>
+                                                                     <span className="text-white">{user.projectsCount}</span>
+                                                                 </div>
+                                                                 <div className="flex justify-between border-b border-zinc-800/50 pb-1">
+                                                                     <span className="text-zinc-400">Actions Executed:</span>
+                                                                     <span className="text-white">{user.actionTriggers.updateCount}</span>
+                                                                 </div>
+                                                                 <div className="flex justify-between">
+                                                                     <span className="text-zinc-400">Total Actions:</span>
+                                                                     <span className="text-white font-bold">{totalActions}</span>
+                                                                 </div>
+                                                             </div>
+                                                         </div>
+
+                                                         <div className="space-y-4 pt-4 border-t border-zinc-900">
+                                                             <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Onboarding Progress</h4>
+                                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
+                                                                 <div className="flex items-center gap-2">
+                                                                     <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[10px] font-bold ${user.onboardingProgress?.step1 ? 'bg-primary text-black' : 'bg-zinc-900 text-zinc-650 border border-zinc-800'}`}>
+                                                                         {user.onboardingProgress?.step1 ? '✓' : '•'}
+                                                                     </span>
+                                                                     <span className={user.onboardingProgress?.step1 ? 'text-zinc-300' : 'text-zinc-600'}>1. Library Upload</span>
+                                                                 </div>
+                                                                 <div className="flex items-center gap-2">
+                                                                     <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[10px] font-bold ${user.onboardingProgress?.step2 ? 'bg-primary text-black' : 'bg-zinc-900 text-zinc-655 border border-zinc-800'}`}>
+                                                                         {user.onboardingProgress?.step2 ? '✓' : '•'}
+                                                                     </span>
+                                                                     <span className={user.onboardingProgress?.step2 ? 'text-zinc-300' : 'text-zinc-600'}>2. Add Artist Seed</span>
+                                                                 </div>
+                                                                 <div className="flex items-center gap-2">
+                                                                     <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[10px] font-bold ${user.onboardingProgress?.step3 ? 'bg-primary text-black' : 'bg-zinc-900 text-zinc-655 border border-zinc-800'}`}>
+                                                                         {user.onboardingProgress?.step3 ? '✓' : '•'}
+                                                                     </span>
+                                                                     <span className={user.onboardingProgress?.step3 ? 'text-zinc-300' : 'text-zinc-600'}>3. Graph Interaction</span>
+                                                                 </div>
+                                                                 <div className="flex items-center gap-2">
+                                                                     <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[10px] font-bold ${user.onboardingProgress?.step4 ? 'bg-primary text-black' : 'bg-zinc-900 text-zinc-655 border border-zinc-800'}`}>
+                                                                         {user.onboardingProgress?.step4 ? '✓' : '•'}
+                                                                     </span>
+                                                                     <span className={user.onboardingProgress?.step4 ? 'text-zinc-300' : 'text-zinc-600'}>4. Detail Navigation</span>
+                                                                 </div>
+                                                                 <div className="flex items-center gap-2 col-span-1 sm:col-span-2">
+                                                                     <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[10px] font-bold ${user.onboardingProgress?.step5 ? 'bg-primary text-black' : 'bg-zinc-900 text-zinc-655 border border-zinc-800'}`}>
+                                                                         {user.onboardingProgress?.step5 ? '✓' : '•'}
+                                                                     </span>
+                                                                     <span className={user.onboardingProgress?.step5 ? 'text-zinc-300' : 'text-zinc-600'}>5. Deep Cut Summary</span>
+                                                                 </div>
+                                                             </div>
+                                                         </div>
+                                                     </div>
+
+                                                     {/* Right Column: Search Details */}
+                                                     <div className="space-y-4">
+                                                         <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Top Artist Discoveries ({user.artistSearches.globalCount} Total)</h4>
+                                                         <div className="space-y-2 font-mono">
+                                                             {user.artistSearches.topSearches.map((search, i) => (
+                                                                 <div key={i} className="flex justify-between border-b border-zinc-800/50 pb-1">
+                                                                     <span className="text-zinc-300">{search.artistName}</span>
+                                                                     <span className="text-zinc-405">{search.count} digs</span>
+                                                                 </div>
+                                                             ))}
+                                                         </div>
+                                                     </div>
+
+                                                 </div>
+                                             </td>
+                                         </tr>
+                                    )}
+                                </React.Fragment>
+                            );
+                        })
+                    )}
+                </tbody>
+            </table>
+        </div>
+    );
+};
+
 
 interface UsageAnalyticsPageProps {
     onNavigate: (view: View) => void;
@@ -380,58 +576,15 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                     </div>
 
                     {/* Overview Cards (Calculations block) */}
-                    {!isNormalUserView && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                            <div className="bg-zinc-900/30 border border-zinc-800 p-6 rounded-none flex flex-col justify-between relative">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Cache Recall Rate</span>
-                                    <InfoTooltip content="The percentage of music discovery queries resolved from your local browser cache instead of querying the AI, reducing response time." />
-                                </div>
-                                <div className="flex items-baseline gap-2 mt-2">
-                                    <span className="text-3xl font-bold font-mono text-primary">{aggregateMetrics.overallEfficiency.toFixed(1)}%</span>
-                                </div>
-                                <span className="text-xs text-zinc-600 mt-2 font-mono">{aggregateMetrics.totalCacheHits} / {aggregateMetrics.totalLiveQueries + aggregateMetrics.totalCacheHits} recalled from cache</span>
-                            </div>
-
-                            <div className="bg-zinc-900/30 border border-zinc-800 p-6 rounded-none flex flex-col justify-between relative">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Curation Projects</span>
-                                    <InfoTooltip content="Total active music canvases and discovery paths created by users." />
-                                </div>
-                                <div className="flex items-baseline gap-2 mt-2">
-                                    <span className="text-3xl font-bold font-mono text-white">{aggregateMetrics.totalProjects}</span>
-                                </div>
-                                <span className="text-xs text-zinc-650 mt-2 font-mono">active workspace canvases</span>
-                            </div>
-
-                            <div className="bg-zinc-900/30 border border-zinc-800 p-6 rounded-none flex flex-col justify-between relative">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">AI Discovery Cost</span>
-                                    <InfoTooltip content="Total accumulated costs for calling the AI recommendation engine." />
-                                </div>
-                                <div className="flex items-baseline gap-2 mt-2">
-                                    <span className="text-3xl font-bold font-mono text-red-400">${aggregateMetrics.totalCosts.toFixed(4)}</span>
-                                </div>
-                                <span className="text-xs text-zinc-650 mt-2 font-mono">@ $0.0015 per recommendation</span>
-                            </div>
-
-                            <div className="bg-zinc-900/30 border border-zinc-800 p-6 rounded-none flex flex-col justify-between border-l-2 border-l-primary relative">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Preserved Budget</span>
-                                    <InfoTooltip content="Estimated money saved by reusing cached artist nodes instead of requesting new AI generations." />
-                                </div>
-                                <div className="flex items-baseline gap-2 mt-2">
-                                    <span className="text-3xl font-bold font-mono text-primary">${aggregateMetrics.totalSavings.toFixed(4)}</span>
-                                </div>
-                                <span className="text-xs text-zinc-650 mt-2 font-mono">saved via local recall</span>
-                            </div>
-                        </div>
-                    )}
+                    <TelemetryOverviewCards
+                        aggregateMetrics={aggregateMetrics}
+                        isNormalUserView={isNormalUserView}
+                    />
 
                     {/* Filter controls & Refresh */}
-                    <div className="flex border border-zinc-800 bg-zinc-950 divide-x divide-zinc-800 w-full h-[52px] rounded-none">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
                         {!isNormalUserView && (
-                            <div className="flex-grow flex items-center gap-4 px-4 py-3">
+                            <div className={`flex-grow flex items-center gap-4 bg-zinc-950 px-4 py-2 border border-zinc-800 h-[38px] ${RADIUS_TOKENS.input}`}>
                                 <span className="material-symbols-outlined text-zinc-500 select-none">search</span>
                                 <input
                                     type="text"
@@ -445,8 +598,8 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                         <button
                             onClick={fetchLedger}
                             disabled={isLoading}
-                            className={`flex items-center justify-center gap-2 px-6 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-all cursor-pointer font-medium text-sm disabled:opacity-50 h-full rounded-none ${
-                                isNormalUserView ? 'w-full' : 'w-auto flex-shrink-0'
+                            className={`flex items-center justify-center gap-2 px-6 bg-zinc-900 border border-zinc-800 text-zinc-350 hover:border-zinc-500 hover:text-white transition-all cursor-pointer font-medium text-sm disabled:opacity-50 h-[38px] ${
+                                isNormalUserView ? `w-full h-[52px] ${RADIUS_TOKENS.input}` : RADIUS_TOKENS.button
                             }`}
                         >
                             <span className={`material-symbols-outlined text-sm select-none ${isLoading ? 'animate-spin' : ''}`}>
@@ -464,161 +617,12 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                     )}
 
                     {/* Master Ledger List */}
-                    <div className="border border-zinc-800 bg-zinc-950/20 overflow-x-auto">
-                        <table className="w-full text-left border-collapse min-w-[700px]">
-                            <thead>
-                                <tr className="border-b border-zinc-800 bg-zinc-900/50">
-                                    <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Author</th>
-                                    <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-center">Projects</th>
-                                    <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-center">Actions</th>
-                                    <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-center">Cache Recall</th>
-                                    <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">AI Cost</th>
-                                    <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Savings</th>
-                                    <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 w-16"></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {isLoading && filteredLedger.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={7} className="p-8 text-center text-zinc-500 text-sm italic">
-                                            <div className="flex items-center justify-center gap-3">
-                                                <span className="material-symbols-outlined animate-spin text-primary text-sm">progress_activity</span>
-                                                Querying discovery archive...
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ) : filteredLedger.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={7} className="p-8 text-center text-zinc-500 text-sm italic">
-                                            No Author records found in the discovery archive.
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    filteredLedger.map((user) => {
-                                        const totalActions = user.actionTriggers.createCount + user.actionTriggers.updateCount;
-                                        const queryTotal = user.cacheEfficiency.liveQueries + user.cacheEfficiency.cacheHits;
-                                        const efficiency = queryTotal > 0 ? (user.cacheEfficiency.cacheHits / queryTotal) * 100 : 0;
-                                        const cost = user.cacheEfficiency.liveQueries * COST_PER_AI_CALL;
-                                        const savings = user.cacheEfficiency.cacheHits * COST_PER_AI_CALL;
-                                        const isExpanded = expandedRow === user.email;
-
-                                        return (
-                                            <React.Fragment key={user.email}>
-                                                <tr 
-                                                    onClick={() => toggleRow(user.email)} 
-                                                    className="border-b border-zinc-900 hover:bg-zinc-900/20 cursor-pointer transition-colors"
-                                                >
-                                                    <td className="p-4">
-                                                        <span className="font-medium text-white">{user.email}</span>
-                                                    </td>
-                                                    <td className="p-4 text-center font-mono">{user.projectsCount}</td>
-                                                    <td className="p-4 text-center font-mono" title={`Create: ${user.actionTriggers.createCount} | Update: ${user.actionTriggers.updateCount}`}>
-                                                        {totalActions}
-                                                    </td>
-                                                    <td className="p-4 text-center">
-                                                        <div className="flex flex-col items-center">
-                                                            <span className="font-mono text-zinc-300">
-                                                                {user.cacheEfficiency.cacheHits}/{user.cacheEfficiency.liveQueries}
-                                                            </span>
-                                                            <span className="text-[10px] font-mono text-primary font-bold">
-                                                                {efficiency.toFixed(0)}% Eff
-                                                            </span>
-                                                        </div>
-                                                    </td>
-                                                    <td className="p-4 text-right font-mono text-red-400/80">${cost.toFixed(4)}</td>
-                                                    <td className="p-4 text-right font-mono text-primary">${savings.toFixed(4)}</td>
-                                                    <td className="p-4 text-center">
-                                                        <span className="material-symbols-outlined text-zinc-500">
-                                                            {isExpanded ? 'expand_less' : 'expand_more'}
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                                {isExpanded && (
-                                                     <tr className="bg-zinc-900/10 border-b border-zinc-900">
-                                                         <td colSpan={7} className="p-6">
-                                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-sm">
-                                                                 
-                                                                 {/* Left Column: Action & Onboarding Details */}
-                                                                 <div className="space-y-6">
-                                                                     <div className="space-y-4">
-                                                                         <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Curation Actions</h4>
-                                                                         <div className="space-y-2 font-mono">
-                                                                             <div className="flex justify-between border-b border-zinc-800/50 pb-1">
-                                                                                 <span className="text-zinc-400">Projects Created:</span>
-                                                                                 <span className="text-white">{user.projectsCount}</span>
-                                                                             </div>
-                                                                             <div className="flex justify-between border-b border-zinc-800/50 pb-1">
-                                                                                 <span className="text-zinc-400">Actions Executed:</span>
-                                                                                 <span className="text-white">{user.actionTriggers.updateCount}</span>
-                                                                             </div>
-                                                                             <div className="flex justify-between">
-                                                                                 <span className="text-zinc-400">Total Actions:</span>
-                                                                                 <span className="text-white font-bold">{totalActions}</span>
-                                                                             </div>
-                                                                         </div>
-                                                                     </div>
-
-                                                                     <div className="space-y-4 pt-4 border-t border-zinc-900">
-                                                                         <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Onboarding Progress</h4>
-                                                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
-                                                                             <div className="flex items-center gap-2">
-                                                                                 <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[10px] font-bold ${user.onboardingProgress?.step1 ? 'bg-primary text-black' : 'bg-zinc-900 text-zinc-650 border border-zinc-800'}`}>
-                                                                                     {user.onboardingProgress?.step1 ? '✓' : '•'}
-                                                                                 </span>
-                                                                                 <span className={user.onboardingProgress?.step1 ? 'text-zinc-300' : 'text-zinc-600'}>1. Library Upload</span>
-                                                                             </div>
-                                                                             <div className="flex items-center gap-2">
-                                                                                 <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[10px] font-bold ${user.onboardingProgress?.step2 ? 'bg-primary text-black' : 'bg-zinc-900 text-zinc-655 border border-zinc-800'}`}>
-                                                                                     {user.onboardingProgress?.step2 ? '✓' : '•'}
-                                                                                 </span>
-                                                                                 <span className={user.onboardingProgress?.step2 ? 'text-zinc-300' : 'text-zinc-600'}>2. Add Artist Seed</span>
-                                                                             </div>
-                                                                             <div className="flex items-center gap-2">
-                                                                                 <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[10px] font-bold ${user.onboardingProgress?.step3 ? 'bg-primary text-black' : 'bg-zinc-900 text-zinc-655 border border-zinc-800'}`}>
-                                                                                     {user.onboardingProgress?.step3 ? '✓' : '•'}
-                                                                                 </span>
-                                                                                 <span className={user.onboardingProgress?.step3 ? 'text-zinc-300' : 'text-zinc-600'}>3. Graph Interaction</span>
-                                                                             </div>
-                                                                             <div className="flex items-center gap-2">
-                                                                                 <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[10px] font-bold ${user.onboardingProgress?.step4 ? 'bg-primary text-black' : 'bg-zinc-900 text-zinc-655 border border-zinc-800'}`}>
-                                                                                     {user.onboardingProgress?.step4 ? '✓' : '•'}
-                                                                                 </span>
-                                                                                 <span className={user.onboardingProgress?.step4 ? 'text-zinc-300' : 'text-zinc-600'}>4. Detail Navigation</span>
-                                                                             </div>
-                                                                             <div className="flex items-center gap-2 col-span-1 sm:col-span-2">
-                                                                                 <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[10px] font-bold ${user.onboardingProgress?.step5 ? 'bg-primary text-black' : 'bg-zinc-900 text-zinc-655 border border-zinc-800'}`}>
-                                                                                     {user.onboardingProgress?.step5 ? '✓' : '•'}
-                                                                                 </span>
-                                                                                 <span className={user.onboardingProgress?.step5 ? 'text-zinc-300' : 'text-zinc-600'}>5. Deep Cut Summary</span>
-                                                                             </div>
-                                                                         </div>
-                                                                     </div>
-                                                                 </div>
-
-                                                                 {/* Right Column: Search Details */}
-                                                                 <div className="space-y-4">
-                                                                     <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Top Artist Discoveries ({user.artistSearches.globalCount} Total)</h4>
-                                                                     <div className="space-y-2 font-mono">
-                                                                         {user.artistSearches.topSearches.map((search, i) => (
-                                                                             <div key={i} className="flex justify-between border-b border-zinc-800/50 pb-1">
-                                                                                 <span className="text-zinc-300">{search.artistName}</span>
-                                                                                 <span className="text-zinc-400">{search.count} digs</span>
-                                                                             </div>
-                                                                         ))}
-                                                                     </div>
-                                                                 </div>
-
-                                                             </div>
-                                                         </td>
-                                                     </tr>
-                                                 )}
-                                             </React.Fragment>
-                                        );
-                                    })
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                    <DiscoveryLedgerTable
+                        isLoading={isLoading}
+                        filteredLedger={filteredLedger}
+                        expandedRow={expandedRow}
+                        toggleRow={toggleRow}
+                    />
 
                 </div>
             </main>

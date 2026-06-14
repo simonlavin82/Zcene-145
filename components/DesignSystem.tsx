@@ -4,6 +4,9 @@ import * as d3 from 'd3';
 import { ZceneLogo, InstagramIcon, ZceneAbbreviatedLogo, FaviconLogo, LegendSymbol, SortControls, Spinner, HelpIcon, MicIcon, VisibilityIcon, VisibilityOffIcon, LoadingSpinner, DETAIL_THINKING_STEPS, GRAPH_THINKING_STEPS } from './Icons';
 import ViewToggle from './ViewToggle';
 import Header from './Header';
+import { AdminViewToggle } from './ui/AdminViewToggle';
+import { InfoTooltip } from './ui/InfoTooltip';
+import { TelemetryOverviewCards, DiscoveryLedgerTable, UserTelemetry } from './UsageAnalyticsPage';
 
 const ColorSwatch: React.FC<{ name: string; hex: string; className?: string; style?: React.CSSProperties; description?: string }> = ({ name, hex, className = "", style, description }) => {
     return (
@@ -159,6 +162,8 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
     onNavigateMenu
 }) => {
     const [demoFocusMode, setDemoFocusMode] = useState<'organic' | 'cluster'>('organic');
+    const [demoAdminToggle, setDemoAdminToggle] = useState(false);
+    const [demoExpandedRow, setDemoExpandedRow] = useState<string | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -199,6 +204,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
         { id: 'tone-of-voice', title: 'Tone of Voice' },
         { id: 'visuals', title: 'Visuals' },
         { id: 'discovery-filters', title: 'Discovery Filters' },
+        { id: 'telemetry-blocks', title: 'Telemetry Blocks' },
         { id: 'advertisement', title: 'Advertisement' },
     ];
 
@@ -2315,6 +2321,118 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Contextual Icons</h4>
                                             <p className="text-sm text-zinc-400">Uses <strong>material-symbols-outlined</strong> for visual anchoring (e.g., location pin) to improve scannability in dense UI environments.</p>
                                         </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* 27.5. TELEMETRY BLOCKS */}
+                    <section id="telemetry-blocks">
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Telemetry Blocks</h2>
+                        <div className="space-y-12">
+                            <p className="text-base text-zinc-400 leading-relaxed max-w-3xl">
+                                Telemetry Blocks are high-fidelity layout components designed to monitor curator and system telemetry. By separating presentational UI components from live side-effects (such as database listeners), these elements are automatically and natively rendered inside this Style Guide using static mock data, achieving a true <strong>Living Document</strong> synchronization.
+                            </p>
+
+                            {/* Admin View Toggle */}
+                            <div className="space-y-6">
+                                <h3 className="text-xl font-medium text-zinc-200">Segmented Admin Toggle</h3>
+                                <p className="text-sm text-zinc-400 max-w-2xl leading-relaxed">
+                                    An interactive segmented toggle control used to switch views. Features concentric border radiuses matching <code>RADIUS_TOKENS.toggle</code> and <code>RADIUS_TOKENS.button</code>, and snappy spring active badge animations.
+                                </p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <div className="p-8 bg-zinc-900/40 border border-zinc-800 rounded-xl flex flex-col items-center justify-center min-h-[160px] gap-4">
+                                        <AdminViewToggle value={demoAdminToggle} onChange={setDemoAdminToggle} />
+                                        <p className="text-xs text-zinc-500 font-mono">Current state: {demoAdminToggle ? 'Preview (True)' : 'Admin (False)'}</p>
+                                    </div>
+                                    <div className="p-6 bg-zinc-950 border border-zinc-800 rounded-xl space-y-4 text-xs text-zinc-500 leading-relaxed">
+                                        <h4 className="font-semibold text-zinc-400 uppercase tracking-widest">Specifications</h4>
+                                        <ul className="list-disc list-inside space-y-2">
+                                            <li><strong>Concentric Radius:</strong> Outer container radius is 12px (<code>rounded-xl</code>) and inner button radius is 8px (<code>rounded-lg</code>).</li>
+                                            <li><strong>Animation:</strong> Spring-based badge transition (<code>stiffness: 480</code>, <code>damping: 38</code>).</li>
+                                            <li><strong>Interactive Preview:</strong> Click the buttons in the panel on the left to test live physics and transitions.</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Hover-Tooltip KPI Cards */}
+                            <div className="space-y-6">
+                                <h3 className="text-xl font-medium text-zinc-200">Hover-Tooltip KPI Cards</h3>
+                                <p className="text-sm text-zinc-400 max-w-2xl leading-relaxed">
+                                    Overview summary cards illustrating aggregate telemetry metrics. Incorporates the hover-activated micro-explanation tooltips.
+                                </p>
+                                <div className="space-y-6">
+                                    <div className="p-8 bg-zinc-900/40 border border-zinc-850">
+                                        <TelemetryOverviewCards
+                                            aggregateMetrics={{
+                                                overallEfficiency: 73.3,
+                                                totalCacheHits: 88,
+                                                totalLiveQueries: 32,
+                                                totalProjects: 12,
+                                                totalCosts: 0.0480,
+                                                totalSavings: 0.1320
+                                            }}
+                                            isNormalUserView={false}
+                                        />
+                                    </div>
+                                    <div className="p-6 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-zinc-500 leading-relaxed">
+                                        <h4 className="font-semibold text-zinc-400 uppercase tracking-widest">Specifications</h4>
+                                        <p className="mt-2">
+                                            Cards render structural brutalist frames (0px borders via <code>RADIUS_TOKENS.frame</code>) and utilize inline-block triggers to reveal absolute-positioned tooltip overlay details when hovering over the info icons.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Collapsible Ledger Table */}
+                            <div className="space-y-6">
+                                <h3 className="text-xl font-medium text-zinc-200">Collapsible Ledger Table</h3>
+                                <p className="text-sm text-zinc-400 max-w-2xl leading-relaxed">
+                                    High-density tabular layout presenting author-centric metrics. Click rows to test the expanding drawer sub-grids containing curation metrics, onboarding steps, and top search frequencies.
+                                </p>
+                                <div className="space-y-6">
+                                    <div className="p-4 bg-zinc-900/40 border border-zinc-800 rounded-xl">
+                                        <DiscoveryLedgerTable
+                                            isLoading={false}
+                                            filteredLedger={[
+                                                {
+                                                    email: 'curator.alpha@zcene.online',
+                                                    projectsCount: 8,
+                                                    actionTriggers: { createCount: 8, updateCount: 24 },
+                                                    artistSearches: {
+                                                        globalCount: 32,
+                                                        topSearches: [
+                                                            { artistName: 'Sunny Day Real Estate', count: 12 },
+                                                            { artistName: 'Mineral', count: 8 },
+                                                            { artistName: 'The Promise Ring', count: 7 },
+                                                            { artistName: 'Texas Is the Reason', count: 5 }
+                                                        ]
+                                                    },
+                                                    cacheEfficiency: { liveQueries: 10, cacheHits: 22 },
+                                                    onboardingProgress: { step1: true, step2: true, step3: true, step4: true, step5: true }
+                                                },
+                                                {
+                                                    email: 'explorer.beta@zcene.online',
+                                                    projectsCount: 4,
+                                                    actionTriggers: { createCount: 4, updateCount: 12 },
+                                                    artistSearches: {
+                                                        globalCount: 16,
+                                                        topSearches: [
+                                                            { artistName: 'American Football', count: 6 },
+                                                            { artistName: 'Cap\'n Jazz', count: 4 },
+                                                            { artistName: 'Braid', count: 4 },
+                                                            { artistName: 'Joan of Arc', count: 2 }
+                                                        ]
+                                                    },
+                                                    cacheEfficiency: { liveQueries: 8, cacheHits: 8 },
+                                                    onboardingProgress: { step1: true, step2: true, step3: true, step4: false, step5: false }
+                                                }
+                                            ]}
+                                            expandedRow={demoExpandedRow}
+                                            toggleRow={(email) => setDemoExpandedRow(prev => prev === email ? null : email)}
+                                        />
                                     </div>
                                 </div>
                             </div>
