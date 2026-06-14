@@ -4,7 +4,7 @@ import { Node, NodeDetails, GraphData, View, ChatMessage, StackItem, UserTaste }
 import { streamNodeChat, fetchLiveTourData } from '../services/geminiService';
 import { normalizeArtistId } from '../services/artistCacheService';
 import { analyticsService } from '../services/analyticsService';
-import { Spinner, HelpIcon, MicIcon, LoadingSpinner, DETAIL_THINKING_STEPS } from './Icons';
+import { Spinner, HelpIcon, MicIcon, LoadingSpinner, DETAIL_THINKING_STEPS, StackIcon } from './Icons';
 
 declare global {
   interface Window {
@@ -309,9 +309,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                         className={`w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 active:scale-95 leading-none ${isInStack ? 'text-primary bg-primary/5 border-primary/30' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'}`}
                                         title={isInStack ? "Remove from My Stack" : "Save to My Stack"}
                                     >
-                                        <span className={`material-symbols-outlined !text-[18px] transition-all ${isInStack ? '!fill-1' : ''}`} style={{ fontVariationSettings: `'FILL' ${isInStack ? 1 : 0}` }}>
-                                            {isInStack ? 'bookmark' : 'bookmark_add'}
-                                        </span>
+                                        <StackIcon className="!text-[18px]" />
                                     </button>
                                 )}
                                 {isArtistNode && !isGuest && (

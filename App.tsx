@@ -2571,7 +2571,7 @@ const App: React.FC = () => {
     }
   }, [isAuthInitialized, user, isFirebaseReady, currentView]);
 
-  // Sync stack from Firestore
+  // Sync stack from Firestore (Real-Time)
   useEffect(() => {
     if (!isAuthInitialized || !isFirebaseReady) return;
 
@@ -2580,18 +2580,19 @@ const App: React.FC = () => {
       return;
     }
 
-    // Offline Sandbox Interception
-    console.log(`[Offline Sandbox] Mocking stack sync for UID: ${user.uid}`);
-    const storedStackJson = localStorage.getItem(`zcene_mock_stack_${user.uid}`);
-    let items: StackItem[] = [];
-    if (storedStackJson) {
-      try {
-        items = JSON.parse(storedStackJson);
-      } catch (e) {}
-    }
-    setStack(items);
+    const stackRef = collection(db, 'users', user.uid, 'stack');
+    const unsubscribe = onSnapshot(stackRef, (snapshot) => {
+      const items: StackItem[] = [];
+      snapshot.forEach((docSnap) => {
+        items.push({ ...docSnap.data() } as StackItem);
+      });
+      setStack(items);
+      console.log(`[Stack Listener] Synchronized ${items.length} stack items.`);
+    }, (err) => {
+      console.error('[Stack Listener] Failed to fetch stack:', err);
+    });
 
-    return () => {};
+    return () => unsubscribe();
   }, [user, isAuthInitialized, isFirebaseReady]);
 
   // Sync projects list (Dashboard)
