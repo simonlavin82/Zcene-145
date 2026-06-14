@@ -3042,19 +3042,33 @@ const App: React.FC = () => {
     try {
       const extension = await extendGraphFromNode(node, graphData);
 
-      setGraphData(prev => {
-        if (!prev) return prev;
-        // Remove loading node and link
-        const filteredNodes = prev.nodes.filter(n => n.id !== loadingNodeId);
-        const filteredLinks = prev.links.filter(l => {
-          const s = typeof l.source === 'string' ? l.source : (l.source as Node).id;
-          const t = typeof l.target === 'string' ? l.target : (l.target as Node).id;
-          return s !== loadingNodeId && t !== loadingNodeId;
-        });
+      // Identify newly discovered artists in the extension
+      const discoveredArtistNodes = extension.nodes.filter(n => n.type === 'artist');
+      const discoveredArtistNames = discoveredArtistNodes.map(n => n.id);
 
-        const base = { nodes: filteredNodes, links: filteredLinks };
-        return mergeGraphData(base, extension);
+      const filteredNodes = graphData.nodes.filter(n => n.id !== loadingNodeId);
+      const filteredLinks = graphData.links.filter(l => {
+        const s = typeof l.source === 'string' ? l.source : (l.source as Node).id;
+        const t = typeof l.target === 'string' ? l.target : (l.target as Node).id;
+        return s !== loadingNodeId && t !== loadingNodeId;
       });
+
+      const baseGraph = { nodes: filteredNodes, links: filteredLinks };
+      const mergedGraph = mergeGraphData(baseGraph, extension);
+
+      // Double-Write to Global Cache: Await global cache writes before updating canvas graphData state.
+      // This prevents the project canvas auto-save from racing ahead before the cache entries exist.
+      if (discoveredArtistNames.length > 0) {
+        showToast("Saving new artists to global cache...");
+        try {
+          await writeArtistCacheMany(discoveredArtistNames, mergedGraph, user?.uid, discoveryFilters);
+          console.log(`[Node Extension] Global cache double-write confirmed for: ${discoveredArtistNames.join(', ')}`);
+        } catch (e) {
+          console.error('[Node Extension] Global cache double-write failed:', e);
+        }
+      }
+
+      setGraphData(mergedGraph);
 
       // Show toast for the new discovery
       const newArtist = extension.nodes.find(n => n.type === 'artist');
@@ -3077,7 +3091,7 @@ const App: React.FC = () => {
         };
       });
     }
-  }, [graphData, seedArtists, showToast, humanizeError]);
+  }, [graphData, seedArtists, user, discoveryFilters, showToast, humanizeError]);
 
   const handleRemoveNode = useCallback((node: Node) => {
     setGraphData(prev => {
