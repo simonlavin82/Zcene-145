@@ -1872,9 +1872,8 @@ const App: React.FC = () => {
           setActiveNodes(prev => {
             const currentActive = [...prev];
             const seedMapped = artistList.map(name => {
-              const isFirst = name.toLowerCase() === firstSlug.toLowerCase();
-              const match = final.nodes.find(fn => fn.id.toLowerCase() === (isFirst ? humanName.toLowerCase() : name.toLowerCase()));
-              return (match || { id: isFirst ? humanName : name, type: 'artist' as any, group: 0 }) as Node;
+              const match = final.nodes.find(fn => fn.id.toLowerCase() === name.toLowerCase());
+              return (match || { id: name, type: 'artist' as any, group: 0 }) as Node;
             });
             const seedIds = new Set(seedMapped.map(s => s.id.toLowerCase()));
             const finalActive = [...seedMapped];
@@ -2121,9 +2120,8 @@ const App: React.FC = () => {
         setActiveNodes(prev => {
           const currentActive = [...prev];
           const seedMapped = artistList.map(name => {
-            const isFirst = name.toLowerCase() === firstSlug.toLowerCase();
-            const match = final.nodes.find(fn => fn.id.toLowerCase() === (isFirst ? humanName.toLowerCase() : name.toLowerCase()));
-            return (match || { id: isFirst ? humanName : name, type: 'artist' as any, group: 0 }) as Node;
+            const match = final.nodes.find(fn => fn.id.toLowerCase() === name.toLowerCase());
+            return (match || { id: name, type: 'artist' as any, group: 0 }) as Node;
           });
           const seedIds = new Set(seedMapped.map(s => s.id.toLowerCase()));
           const finalActive = [...seedMapped];

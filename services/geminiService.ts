@@ -865,8 +865,13 @@ export const generateGraphData = async (artists: string, baseGraph?: GraphData, 
       for (const node of allNodesForValidation) {
           if (!node.id) continue;
           const normalizedId = node.id.trim().toLowerCase();
+          const hyphenId = normalizeArtistId(node.id);
+          
           if (!validationNodeMap.has(normalizedId)) {
               validationNodeMap.set(normalizedId, { ...node, id: node.id.trim() });
+          }
+          if (!validationNodeMap.has(hyphenId)) {
+              validationNodeMap.set(hyphenId, { ...node, id: node.id.trim() });
           }
       }
       
