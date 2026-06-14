@@ -1721,12 +1721,39 @@ const App: React.FC = () => {
       let enrichmentRequired: string[] = [];
       let fullHits: string[] = [];
 
+      let bypassChoiceConfirmation = false;
+
       if (!isRegeneration) {
         const cacheResult = await readArtistCacheMany(artistList, user?.uid);
         cached = new Map<string, ArtistCacheEntry>();
         missing = [];
         enrichmentRequired = [];
         fullHits = [];
+
+        const allArtistsCached = artistList.every(name => {
+          const normName = name.toLowerCase();
+          const entry = cacheResult.cached.get(name) || cacheResult.cached.get(normName);
+          return entry && isGraphDataPresent(entry);
+        });
+
+        if (allArtistsCached) {
+          const choice = bypassCacheValidation ? 'cache' : await confirmCacheChoice(artistList);
+          if (choice === 'cancel' || controller.signal.aborted) {
+            setIsLoading(false);
+            setActiveNodes(prevActiveNodes);
+            setSeedArtists(prevSeedArtists);
+            return;
+          }
+
+          if (choice === 'synthesis') {
+            console.log("[Phase 02 Cache] Option B chosen: forcing net-new AI generation.");
+            handleGenerateGraph(artists, true, graphToEnhance, bypassCacheValidation, true);
+            return;
+          }
+
+          console.log("[Phase 02 Cache] Option A chosen: loading standard cached layout.");
+          bypassChoiceConfirmation = true;
+        }
         
         const currentSeeds = prevSeedArtists.split('::').map(s => normalizeArtistId(s)).filter(Boolean);
         
@@ -1742,9 +1769,10 @@ const App: React.FC = () => {
           );
 
           const validation = entry ? validateCacheEntry(entry) : null;
-          const filtersMatch = entry ? areFiltersEqual(entry.filters, activeDiscoveryFilters) : false;
+          const filtersMatch = bypassChoiceConfirmation ? true : (entry ? areFiltersEqual(entry.filters, activeDiscoveryFilters) : false);
+          const isQualified = bypassChoiceConfirmation ? true : validation?.isFullyQualified;
 
-          if (forceMockHit || (entry && filtersMatch && (bypassCacheValidation || validation?.isFullyQualified))) {
+          if (forceMockHit || (entry && filtersMatch && (bypassCacheValidation || isQualified))) {
             fullHits.push(name);
             const finalEntry: ArtistCacheEntry = entry || {
               artistId: normalizeArtistId(name),
@@ -1801,7 +1829,7 @@ const App: React.FC = () => {
         // Intercept with the dual-option choice gate if it's a multi-artist or filtered query.
         // Single-artist queries without filters are already handled by the Front Gate cache check.
         // Thus, any full hit reaching Phase 2 is by definition multi-artist or filtered.
-        const choice = bypassCacheValidation ? 'cache' : await confirmCacheChoice(artistList);
+        const choice = (bypassCacheValidation || bypassChoiceConfirmation) ? 'cache' : await confirmCacheChoice(artistList);
         if (choice === 'cancel' || controller.signal.aborted) {
           setIsLoading(false);
           setActiveNodes(prevActiveNodes);

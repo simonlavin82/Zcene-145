@@ -110,6 +110,7 @@ export interface ArtistCacheEntry {
   cachedAt: any;           // serverTimestamp()
   hitCount: number;
   detailsCache?: string;   // JSON string or raw text of NodeDetails/bio
+  filters?: DiscoveryFilters;
 }
 
 export interface Project {
