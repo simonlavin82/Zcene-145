@@ -1535,10 +1535,12 @@ const App: React.FC = () => {
     isRegeneration: boolean = false,
     graphToEnhance?: GraphData | null,
     bypassCacheValidation: boolean = false,
-    bypassTokenConfirmation: boolean = false
+    bypassTokenConfirmation: boolean = false,
+    overrideFilters?: DiscoveryFilters
   ) => {
     const prevActiveNodes = activeNodes;
     const prevSeedArtists = seedArtists;
+    const activeDiscoveryFilters = overrideFilters || discoveryFilters;
 
     if (!user && (isRegeneration || !window.location.hash.includes('?'))) {
       // Only gate if it's a manual action (regeneration or fresh start)
@@ -1553,12 +1555,12 @@ const App: React.FC = () => {
     if (artistList.length > 25) { setError(`Limit: 25 artists.`); return; }
 
     const hasActiveFilters = !!(
-      discoveryFilters.foundedAfter ||
-      discoveryFilters.foundedBefore ||
-      (discoveryFilters.includeOrigins && discoveryFilters.includeOrigins.length > 0) ||
-      (discoveryFilters.excludeOrigins && discoveryFilters.excludeOrigins.length > 0) ||
-      (discoveryFilters.includeGenres && discoveryFilters.includeGenres.length > 0) ||
-      (discoveryFilters.additionalInstructions && discoveryFilters.additionalInstructions.trim().length > 0)
+      activeDiscoveryFilters.foundedAfter ||
+      activeDiscoveryFilters.foundedBefore ||
+      (activeDiscoveryFilters.includeOrigins && activeDiscoveryFilters.includeOrigins.length > 0) ||
+      (activeDiscoveryFilters.excludeOrigins && activeDiscoveryFilters.excludeOrigins.length > 0) ||
+      (activeDiscoveryFilters.includeGenres && activeDiscoveryFilters.includeGenres.length > 0) ||
+      (activeDiscoveryFilters.additionalInstructions && activeDiscoveryFilters.additionalInstructions.trim().length > 0)
     );
 
     // --- STRICT FRONT-GATE CACHE CHECK ---
@@ -1695,7 +1697,7 @@ const App: React.FC = () => {
       pruned = pruneGraphToSeeds(graphToEnhance, seedsLower);
     }
     if (pruned) {
-      pruned = filterGraphByDiscoveryFilters(pruned, discoveryFilters, artists);
+      pruned = filterGraphByDiscoveryFilters(pruned, activeDiscoveryFilters, artists);
     }
 
 
@@ -1704,7 +1706,7 @@ const App: React.FC = () => {
     fetchingNodeIdsRef.current.clear();
     setLoadingNodeIds(new Set());
 
-    if (discoveryFilters.foundedAfter || discoveryFilters.foundedBefore || (discoveryFilters.includeOrigins && discoveryFilters.includeOrigins.length > 0) || (discoveryFilters.includeGenres && discoveryFilters.includeGenres.length > 0)) {
+    if (activeDiscoveryFilters.foundedAfter || activeDiscoveryFilters.foundedBefore || (activeDiscoveryFilters.includeOrigins && activeDiscoveryFilters.includeOrigins.length > 0) || (activeDiscoveryFilters.includeGenres && activeDiscoveryFilters.includeGenres.length > 0)) {
       showToast(`Discovery Mode: Applying advanced filters...`);
     }
 
@@ -1740,7 +1742,7 @@ const App: React.FC = () => {
           );
 
           const validation = entry ? validateCacheEntry(entry) : null;
-          const filtersMatch = entry ? areFiltersEqual(entry.filters, discoveryFilters) : false;
+          const filtersMatch = entry ? areFiltersEqual(entry.filters, activeDiscoveryFilters) : false;
 
           if (forceMockHit || (entry && filtersMatch && (bypassCacheValidation || validation?.isFullyQualified))) {
             fullHits.push(name);
@@ -1880,7 +1882,7 @@ const App: React.FC = () => {
 
         let final = pruned ? mergeGraphData(pruned, parsedGraphData) : parsedGraphData;
         final = applyHumanCasedLabels(final, artists);
-        final = filterGraphByDiscoveryFilters(final, discoveryFilters, artists);
+        final = filterGraphByDiscoveryFilters(final, activeDiscoveryFilters, artists);
         
         setGraphData(final);
 
@@ -2003,7 +2005,7 @@ const App: React.FC = () => {
         }
 
         // Call Gemini ONLY for the missing and enrichment artists
-        const partialGraphPromise = generateGraphData(toFetch.join('::'), pruned, discoveryFilters, user?.uid);
+        const partialGraphPromise = generateGraphData(toFetch.join('::'), pruned, activeDiscoveryFilters, user?.uid);
         const timeoutPromise = new Promise((_, reject) =>
           setTimeout(() => reject(new Error("The AI is taking too long to respond. The request has timed out.")), 120000)
         );
@@ -2018,7 +2020,7 @@ const App: React.FC = () => {
         }
 
         // Write both newly fetched and enriched/upgraded artists to Firestore (fire-and-forget)
-        writeArtistCacheMany(toFetch, freshData, user?.uid, discoveryFilters)
+        writeArtistCacheMany(toFetch, freshData, user?.uid, activeDiscoveryFilters)
           .then(() => console.log(`[Music Discovery] Cache write/upgrade confirmed for: [${toFetch.join(', ')}]`))
           .catch(e => console.error('[Music Discovery] Cache write/upgrade failed:', e));
 
@@ -2035,7 +2037,7 @@ const App: React.FC = () => {
           merged = mergeGraphData(pruned, merged);
         }
         merged = applyHumanCasedLabels(merged, artists);
-        merged = filterGraphByDiscoveryFilters(merged, discoveryFilters, artists);
+        merged = filterGraphByDiscoveryFilters(merged, activeDiscoveryFilters, artists);
         setGraphData(merged);
 
         setActiveNodes(prev => {
@@ -2078,7 +2080,7 @@ const App: React.FC = () => {
     }
 
     try {
-      const graphPromise = generateGraphData(artists, pruned, discoveryFilters, user?.uid);
+      const graphPromise = generateGraphData(artists, pruned, activeDiscoveryFilters, user?.uid);
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error("The AI is taking too long to respond. The request has timed out.")), 120000)
       );
@@ -2097,12 +2099,12 @@ const App: React.FC = () => {
       artistList.forEach(name => { if (!returnedIds.has(name.toLowerCase())) { maxG++; newData.nodes.push({ id: name, type: 'artist', group: maxG }); } });
       let final = pruned ? mergeGraphData(pruned, newData) : newData;
       final = applyHumanCasedLabels(final, artists);
-      final = filterGraphByDiscoveryFilters(final, discoveryFilters, artists);
+      final = filterGraphByDiscoveryFilters(final, activeDiscoveryFilters, artists);
       setGraphData(final);
 
       // Phase 02 complete — write each artist as an isolated individual doc.
       console.log(`[Music Discovery] Full cache MISS — writing per-artist docs for: [${artistList.join(', ')}]`);
-      writeArtistCacheMany(artistList, final, user?.uid, discoveryFilters)
+      writeArtistCacheMany(artistList, final, user?.uid, activeDiscoveryFilters)
         .then(() => console.log(`[Music Discovery] Per-artist cache write confirmed for: [${artistList.join(', ')}]`))
         .catch(e => console.error('[Music Discovery] Per-artist cache write failed:', e));
 
@@ -2526,6 +2528,33 @@ const App: React.FC = () => {
 
         if (!loadedFromGraphData) {
           if (data.artistIds && Array.isArray(data.artistIds) && data.artistIds.length > 0) {
+            // Check if it's a complex configuration (multi-artist or has active filters)
+            let parsedFilters: DiscoveryFilters = {};
+            if (data.discoveryFilters) {
+              try {
+                parsedFilters = typeof data.discoveryFilters === 'string' && data.discoveryFilters.startsWith('{')
+                  ? JSON.parse(data.discoveryFilters)
+                  : data.discoveryFilters;
+              } catch (e) {
+                console.warn("Failed to parse incoming discoveryFilters:", e);
+              }
+            }
+            const hasActiveFiltersIncoming = !!(
+              parsedFilters.foundedAfter ||
+              parsedFilters.foundedBefore ||
+              (parsedFilters.includeOrigins && parsedFilters.includeOrigins.length > 0) ||
+              (parsedFilters.excludeOrigins && parsedFilters.excludeOrigins.length > 0) ||
+              (parsedFilters.includeGenres && parsedFilters.includeGenres.length > 0) ||
+              (parsedFilters.additionalInstructions && parsedFilters.additionalInstructions.trim().length > 0)
+            );
+            const isMultiArtistIncoming = data.artistIds.length > 1 || (data.seedArtists && data.seedArtists.includes('::'));
+
+            if (isMultiArtistIncoming || hasActiveFiltersIncoming) {
+              console.log(`[ProjectLoader] Intercepting Phase 1 loading for complex query. Multi-artist: ${isMultiArtistIncoming}, Filtered: ${hasActiveFiltersIncoming}. Handing over to handleGenerateGraph.`);
+              handleGenerateGraph(data.seedArtists || data.artistIds.join('::'), false, null, false, false, parsedFilters);
+              return true;
+            }
+
             // --- PHASE 1 FORMAT: hydrate from individual per-artist /artists/{id} docs ---
             console.log(`[ProjectLoader] Phase 1 format. Hydrating from artistIds: [${data.artistIds.join(', ')}]`);
             const { cached, missing } = await readArtistCacheMany(
