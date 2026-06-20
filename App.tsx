@@ -3932,7 +3932,12 @@ const App: React.FC = () => {
   }, [graphData, isAdmin, user]);
 
   const handleLogoClick = useCallback(() => {
-    handleViewChange(View.Home);
+    const hash = window.location.hash;
+    if (hash === '#/dashboard') {
+      handleViewChange(View.Home);
+    } else {
+      handleViewChange(View.Dashboard);
+    }
   }, [handleViewChange]);
 
   const handleSubpageClose = useCallback(() => {
