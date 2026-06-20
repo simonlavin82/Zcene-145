@@ -818,7 +818,18 @@ const App: React.FC = () => {
   const [stack, setStack] = useState<StackItem[]>([]);
   const [lastViewedStackCount, setLastViewedStackCount] = useState<number>(0);
   const [baseGraph, setBaseGraph] = useState<GraphData | null>(null);
-  const [detailsCache, setDetailsCache] = useState<Map<string, NodeDetails>>(new Map());
+  const healedDetailsCacheRef = useRef<Map<string, NodeDetails>>(new Map());
+  const [detailsCache, setDetailsCacheState] = useState<Map<string, NodeDetails>>(new Map());
+  const setDetailsCache = useCallback((updater: Map<string, NodeDetails> | ((prev: Map<string, NodeDetails>) => Map<string, NodeDetails>)) => {
+    setDetailsCacheState(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      const merged = new Map(next);
+      healedDetailsCacheRef.current.forEach((v, k) => {
+        merged.set(k, v);
+      });
+      return merged;
+    });
+  }, []);
   const [loadingNodeIds, setLoadingNodeIds] = useState<Set<string>>(new Set());
   const [detailsError, setDetailsError] = useState<string | null>(null);
   const [urlOriginHint, setUrlOriginHint] = useState<string | null>(null);
@@ -1353,7 +1364,12 @@ const App: React.FC = () => {
     // the closure still holds the old empty Map and the lookup returns undefined — causing
     // the Token Quota modal to fire even though the data is already in memory.
     // detailsCacheRef.current is always synchronously up-to-date (synced via useEffect).
-    const cachedDetails = detailsCacheRef.current.get(node.id) || detailsCacheRef.current.get(node.id.toLowerCase()) || detailsCacheRef.current.get(normalizeArtistId(node.id));
+    const cachedDetails = detailsCacheRef.current.get(node.id) || 
+                          detailsCacheRef.current.get(node.id.toLowerCase()) || 
+                          detailsCacheRef.current.get(normalizeArtistId(node.id)) ||
+                          healedDetailsCacheRef.current.get(node.id) || 
+                          healedDetailsCacheRef.current.get(node.id.toLowerCase()) || 
+                          healedDetailsCacheRef.current.get(normalizeArtistId(node.id));
     
     // 2. Load Locally and Block the Network
     const isPlaceholderBio = cachedDetails && cachedDetails.summary && 
@@ -1371,6 +1387,10 @@ const App: React.FC = () => {
           evictedNodeIdsRef.current.add(node.id);
           evictedNodeIdsRef.current.add(node.id.toLowerCase());
           evictedNodeIdsRef.current.add(cacheId);
+
+          healedDetailsCacheRef.current.delete(node.id);
+          healedDetailsCacheRef.current.delete(node.id.toLowerCase());
+          healedDetailsCacheRef.current.delete(cacheId);
 
           setDetailsCache(prev => {
               const n = new Map(prev);
@@ -1480,6 +1500,10 @@ const App: React.FC = () => {
                         if (!confirmed) return; // Cancel: return early without rendering details
 
                         // Confirmed: Delete from Firestore cache
+                        healedDetailsCacheRef.current.delete(node.id);
+                        healedDetailsCacheRef.current.delete(node.id.toLowerCase());
+                        healedDetailsCacheRef.current.delete(standardizedId);
+
                         try {
                             await deleteDoc(doc(db, 'artists', standardizedId));
                             console.log(`[Node Click Intercept] Evicted stale Firestore cache for: ${standardizedId}`);
@@ -4014,6 +4038,10 @@ const App: React.FC = () => {
                    );
                    details = await Promise.race([nodeDetailsPromise, timeoutPromise]) as NodeDetails;
                 }
+
+                healedDetailsCacheRef.current.set(node.id, details);
+                healedDetailsCacheRef.current.set(node.id.toLowerCase(), details);
+                healedDetailsCacheRef.current.set(normalizeArtistId(node.id), details);
 
                 setDetailsCache(prev => {
                   const updated = new Map(prev);
