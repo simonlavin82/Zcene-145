@@ -636,9 +636,16 @@ const checkIsProfileIncomplete = (node: Node, details: NodeDetails | null | unde
   const isLabelLower    = isPurelyLowercase(displayTitle);
   const isArtistNameLower = isPurelyLowercase(details.details?.artist);
   
-  // Extract first bolded term from summary (e.g. "**scowl**") and check if it is purely lowercase
-  const firstBoldMatch  = details.summary ? details.summary.match(/\*\*([^*]+)\*\*/) : null;
-  const isBoldBioNameLower = firstBoldMatch ? isPurelyLowercase(firstBoldMatch[1]) : false;
+  // Find all bolded terms in summary (e.g. "**scowl**", "**alternative rock**")
+  const boldMatches     = details.summary ? Array.from(details.summary.matchAll(/\*\*([^*]+)\*\*/g)) : [];
+  
+  // Compare bolded terms to the normalized displayTitle to find the one representing the artist
+  const cleanCompare    = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const artistClean     = cleanCompare(displayTitle);
+  const matchingBold    = boldMatches.find(m => cleanCompare(m[1]) === artistClean);
+  
+  // Check if the matched bolded artist name is purely lowercase
+  const isBoldBioNameLower = matchingBold ? isPurelyLowercase(matchingBold[1]) : false;
   
   const isLowercasedMarker = isLabelLower || isArtistNameLower || isBoldBioNameLower;
 
