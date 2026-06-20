@@ -727,6 +727,15 @@ const validateCacheEntry = (data: any): CacheValidationResult => {
     if (artistNodes.length <= 1) {
       needsPeerBands = true;
     }
+
+    // Check if links exist and if any of them are missing context
+    const graphLinks = graph.links || [];
+    if (graphLinks.length > 0) {
+      const hasMissingContext = graphLinks.some((l: any) => !l.context || typeof l.context !== 'string' || l.context.trim() === '');
+      if (hasMissingContext) {
+        needsFutureFields = true;
+      }
+    }
   } catch (e) {
     return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
   }
@@ -788,7 +797,15 @@ const isGraphDataPresent = (data: any): boolean => {
   if (!data?.graphData) return false;
   try {
     const g = typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData;
-    return Array.isArray(g?.nodes) && g.nodes.length > 0;
+    if (!Array.isArray(g?.nodes) || g.nodes.length === 0) return false;
+    
+    // Reject graph cache if links are missing the context property
+    const links = g.links || [];
+    if (links.length > 0) {
+      const hasMissingContext = links.some((l: any) => !l.context || typeof l.context !== 'string' || l.context.trim() === '');
+      if (hasMissingContext) return false;
+    }
+    return true;
   } catch { return false; }
 };
 
