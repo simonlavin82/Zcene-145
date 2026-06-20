@@ -679,9 +679,9 @@ const GraphPage: React.FC<GraphPageProps> = ({
 
   const [activeTab, setActiveTab] = useState<MobileTab>(() => {
     if (typeof window !== 'undefined') {
-        const hashParts = window.location.hash.split('?');
-        const params = new URLSearchParams(window.location.search || hashParts[1] || '');
-        if (params.has('shareId') || params.has('id') || params.has('seeds')) return 'spiderweb';
+        const params = new URLSearchParams(window.location.search);
+        const path = window.location.pathname;
+        if (path.startsWith('/z/') || path.startsWith('/project/') || params.has('shareId') || params.has('id') || params.has('seeds')) return 'spiderweb';
         if (params.has('selected')) return 'details';
     }
     return 'artists';
@@ -800,9 +800,9 @@ const GraphPage: React.FC<GraphPageProps> = ({
 
   const isShareIdActive = useMemo(() => {
     if (typeof window === 'undefined') return false;
-    const hash = window.location.hash;
-    const params = new URLSearchParams(hash.split('?')[1] || '');
-    return hash.includes('#/z/') || params.has('shareId') || params.has('id');
+    const path = window.location.pathname;
+    const params = new URLSearchParams(window.location.search);
+    return path.startsWith('/z/') || path.startsWith('/project/') || params.has('shareId') || params.has('id');
   }, []);
 
   const onboardingProgress = useMemo(() => {
@@ -935,8 +935,9 @@ const GraphPage: React.FC<GraphPageProps> = ({
   }, []);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search || window.location.hash.split('?')[1] || '');
-    if (params.has('shareId') || params.has('id')) {
+    const params = new URLSearchParams(window.location.search);
+    const path = window.location.pathname;
+    if (path.startsWith('/z/') || path.startsWith('/project/') || params.has('shareId') || params.has('id')) {
       setActiveTab('spiderweb');
     }
   }, []);

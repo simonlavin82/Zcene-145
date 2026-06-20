@@ -19,6 +19,7 @@ import { MyStackDialog, HeaderMenu, TokenConfirmationDialog, CacheChoiceDialog }
 import { ShareModal } from './components/ShareModal';
 import { analyticsService } from './services/analyticsService';
 import { ZceneLogo, Spinner } from './components/Icons';
+import CookieConsent from './components/CookieConsent';
 
 declare global {
   interface Window {
@@ -589,6 +590,24 @@ const getNodeLabel = (node: Node, seedList: string[], detailsCache?: Map<string,
   return rawLabel;
 };
 
+const checkIsProfileIncomplete = (node: Node, details: NodeDetails | null | undefined): boolean => {
+  if (!details || node.type !== 'artist') return false;
+
+  const SENTINEL_INSIGHT = 'No insight provided.';
+  const genreEmpty    = !details.details?.genre   || details.details.genre   === 'Unknown';
+  const originEmpty   = !details.details?.origin  || details.details.origin  === 'Unknown';
+  const insightEmpty  = !details.recommendationReason ||
+                         details.recommendationReason.trim() === SENTINEL_INSIGHT;
+
+  const displayTitle  = node.label || node.id;
+  const isPurelyLower = !!displayTitle && displayTitle === displayTitle.toLowerCase() &&
+                         /[a-z]/.test(displayTitle);
+
+  const hasSyntaxLeak = !!(details.summary && /\*{1,2}[^*]+\*{1,2}/.test(details.summary));
+
+  return genreEmpty || originEmpty || insightEmpty || isPurelyLower || hasSyntaxLeak;
+};
+
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 interface CacheValidationResult {
@@ -689,6 +708,15 @@ const isGraphDataPresent = (data: any): boolean => {
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>(View.Home);
   const currentViewRef = useRef<View>(View.Home);
+
+  const navigate = useCallback((path: string, replace = false) => {
+    if (replace) {
+      window.history.replaceState(null, '', path);
+    } else {
+      window.history.pushState(null, '', path);
+    }
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  }, []);
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const currentProjectIdRef = useRef<string | null>(null);
@@ -739,7 +767,7 @@ const App: React.FC = () => {
   const [pendingAuthAction, setPendingAuthAction] = useState<{ type: string; payload: any } | null>(null);
   const [tokenConfirmation, setTokenConfirmation] = useState<{
     isOpen: boolean;
-    type: 'generation' | 'extension' | 'deep_cut_creation' | 'partial_synthesis' | 'cache_upgrade';
+    type: 'generation' | 'extension' | 'deep_cut_creation' | 'partial_synthesis' | 'cache_upgrade' | 'data_quality_optimization';
     cost: number;
     cachedArtists: string[];
     missingArtists: string[];
@@ -755,7 +783,7 @@ const App: React.FC = () => {
   } | null>(null);
 
   const confirmTokenUsage = useCallback((
-    type: 'generation' | 'extension' | 'deep_cut_creation' | 'partial_synthesis' | 'cache_upgrade',
+    type: 'generation' | 'extension' | 'deep_cut_creation' | 'partial_synthesis' | 'cache_upgrade' | 'data_quality_optimization',
     cachedArtists: string[],
     missingArtists: string[],
     enrichmentArtists?: string[]
@@ -913,7 +941,7 @@ const App: React.FC = () => {
     setCurrentCacheKey(null);
 
     // Update route immediately
-    window.location.hash = `#/z/${newId}`;
+    navigate(`/z/${newId}`);
     setIsCreatingProject(true);
 
     const path = `users/${user.uid}/projects/${newId}`;
@@ -941,13 +969,13 @@ const App: React.FC = () => {
 
   const handleShareZcene = useCallback(async () => {
     // 1. Robust Check for existing Share ID (Path or Params)
-    const hash = window.location.hash;
-    const params = new URLSearchParams(hash.includes('?') ? hash.split('?')[1] : '');
+    const pathname = window.location.pathname;
+    const params = new URLSearchParams(window.location.search);
     
-    // Check #/z/ID pattern (used for both projects and shares)
+    // Check /z/ID pattern (used for both projects and shares)
     let existingShareId = null;
-    if (hash.includes('#/z/')) {
-      existingShareId = hash.split('#/z/')[1].split('?')[0];
+    if (pathname.startsWith('/z/')) {
+      existingShareId = pathname.split('/z/')[1];
     }
     
     // Fallback to query params
@@ -1012,7 +1040,7 @@ const App: React.FC = () => {
 
       const docRef = await addDoc(collection(db, path), sharePayload);
 
-      const shareUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}#/app?id=${docRef.id}`;
+      const shareUrl = `${window.location.origin}/app?id=${docRef.id}`;
       try {
         await navigator.clipboard.writeText(shareUrl);
         showToast('Link copied to clipboard!');
@@ -1040,8 +1068,7 @@ const App: React.FC = () => {
   const handleTriggerShareModal = useCallback(async () => {
     const shareId = await handleShareZcene();
     if (shareId) {
-      const baseUrl = window.location.origin + window.location.pathname;
-      const deepLink = `${baseUrl}${baseUrl.endsWith('/') ? '' : '/'}#/app?shareId=${shareId}`;
+      const deepLink = `${window.location.origin}/app?shareId=${shareId}`;
       setActiveShareUrl(deepLink);
       setIsShareModalOpen(true);
     }
@@ -1055,7 +1082,7 @@ const App: React.FC = () => {
       await deleteDoc(doc(db, 'users', user.uid, 'projects', projectId));
       showToast("Zcene deleted");
       if (currentProjectId === projectId) {
-        window.location.hash = '#/dashboard';
+        navigate('/dashboard');
       }
     } catch (err) {
       handleFirestoreError(err, OperationType.DELETE, path);
@@ -1152,15 +1179,15 @@ const App: React.FC = () => {
 
   const handleMenuNavigate = useCallback((path: string) => {
     switch (path) {
-      case 'home': window.location.hash = '#/'; break;
-      case 'dashboard': window.location.hash = '#/dashboard'; break;
-      case 'help': window.location.hash = '#/help'; break;
-      case 'design': window.location.hash = '#/design'; break;
-      case 'engine': window.location.hash = '#/engine'; break;
-      case 'analytics': window.location.hash = '#/analytics'; break;
-      default: window.location.hash = '#/';
+      case 'home': navigate('/'); break;
+      case 'dashboard': navigate('/dashboard'); break;
+      case 'help': navigate('/help'); break;
+      case 'design': navigate('/design'); break;
+      case 'engine': navigate('/engine'); break;
+      case 'analytics': navigate('/analytics'); break;
+      default: navigate('/');
     }
-  }, []);
+  }, [navigate]);
 
   const handleOpenStack = useCallback(() => {
     setIsStackDialogOpen(true);
@@ -1194,10 +1221,10 @@ const App: React.FC = () => {
     setRefreshKey(prev => prev + 1);
     setIsStackDialogOpen(false);
     setIsMenuOpen(false);
-    if (window.location.hash.includes('?')) {
-      window.location.hash = window.location.hash.split('?')[0];
+    if (window.location.search) {
+      navigate(window.location.pathname);
     }
-  }, []);
+  }, [navigate]);
 
   const handleRefreshUI = useCallback(() => {
     setRefreshKey(prev => prev + 1);
@@ -1250,6 +1277,37 @@ const App: React.FC = () => {
       (cachedDetails.summary.includes('sandbox mock') || cachedDetails.summary.includes('test scenarios'));
       
     if (cachedDetails && cachedDetails.summary && cachedDetails.summary.length > 5 && !isPlaceholderBio) {
+       if (checkIsProfileIncomplete(node, cachedDetails)) {
+          console.log(`[Node Click Intercept] Incomplete local profile detected for: ${node.id}`);
+          const confirmed = await confirmTokenUsage('data_quality_optimization', [], [node.id]);
+          if (!confirmed) return; // Cancel: return early without rendering details
+
+          // Confirmed: Evict local cache immediately so the background queue will process it
+          setDetailsCache(prev => {
+              const n = new Map(prev);
+              n.delete(node.id);
+              n.delete(node.id.toLowerCase());
+              n.delete(normalizeArtistId(node.id));
+              return n;
+          });
+
+          // Delete from Firestore
+          try {
+              const cacheId = normalizeArtistId(node.id);
+              await deleteDoc(doc(db, 'artists', cacheId));
+              console.log(`[Node Click Intercept] Evicted stale Firestore cache for: ${cacheId}`);
+          } catch (error: any) {
+              console.warn("Global write bypassed due to rules/errors:", error.message);
+          }
+
+          // Select the node so the sidebar shows and queue triggers a fresh live load
+          setSelectedNode(node);
+          if (node.type !== 'founded') {
+            setActiveNodes(prev => prev.some(n => n.id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node]);
+          }
+          return;
+       }
+
        const hydratedNode = {
           ...node,
           bio: cachedDetails.summary,
@@ -1312,6 +1370,39 @@ const App: React.FC = () => {
                 
                 const isPlaceholderBio = bio.includes('sandbox mock') || bio.includes('test scenarios');
                 if (bio && bio.length > 5 && !isPlaceholderBio) {
+                    const detailsPayload: NodeDetails = {
+                        summary: bio,
+                        imageUrl,
+                        details: { artist: artistName, genre, origin, founded, notableArtists },
+                        members,
+                        links,
+                        discography,
+                        tourInfo,
+                        recommendationReason,
+                        groundingLinks
+                    };
+
+                    if (checkIsProfileIncomplete(node, detailsPayload)) {
+                        console.log(`[Node Click Intercept] Incomplete Firestore profile detected for: ${node.id}`);
+                        const confirmed = await confirmTokenUsage('data_quality_optimization', [], [node.id]);
+                        if (!confirmed) return; // Cancel: return early without rendering details
+
+                        // Confirmed: Delete from Firestore cache
+                        try {
+                            await deleteDoc(doc(db, 'artists', standardizedId));
+                            console.log(`[Node Click Intercept] Evicted stale Firestore cache for: ${standardizedId}`);
+                        } catch (error: any) {
+                            console.warn("Global write bypassed due to rules/errors:", error.message);
+                        }
+
+                        // Select the node so the sidebar shows and queue triggers a fresh live load
+                        setSelectedNode(node);
+                        if (node.type !== 'founded') {
+                            setActiveNodes(prev => prev.some(n => n.id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node]);
+                        }
+                        return;
+                    }
+
                     const hydratedNode = {
                         ...node,
                         bio,
@@ -1331,17 +1422,6 @@ const App: React.FC = () => {
                     incrementDeepCutsOpenedCount();
                     
                     // Push to detailsCache so the background queue skips this node entirely
-                    const detailsPayload: NodeDetails = {
-                        summary: bio,
-                        imageUrl,
-                        details: { artist: artistName, genre, origin, founded, notableArtists },
-                        members,
-                        links,
-                        discography,
-                        tourInfo,
-                        recommendationReason,
-                        groundingLinks
-                    };
                     setDetailsCache(prev => new Map(prev).set(node.id.toLowerCase(), detailsPayload).set(standardizedId, detailsPayload).set(node.id, detailsPayload));
 
                     if (isCacheExpired(data.cachedAt)) {
@@ -1486,13 +1566,13 @@ const App: React.FC = () => {
 
       await setDoc(newDocRef, docPayload);
       showToast('Zcene saved to your dashboard!');
-      window.location.hash = `#/z/${newId}`;
+      navigate(`/z/${newId}`);
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, path);
     } finally {
       setIsCreatingProject(false);
     }
-  }, [user, graphData, seedArtists, projectName, activeNodes, detailsCache, chatHistories, discoveryFilters, lastViewedStackCount, currentCacheKey, handleLogin, showToast]);
+  }, [user, graphData, seedArtists, projectName, activeNodes, detailsCache, chatHistories, discoveryFilters, lastViewedStackCount, currentCacheKey, handleLogin, showToast, navigate]);
 
   const handleDashboardRestartWalkthrough = useCallback(async () => {
     if (user) {
@@ -1559,7 +1639,7 @@ const App: React.FC = () => {
       setProfile(null);
       setIsDeleteAccountModalOpen(false);
       setCurrentView(View.Home);
-      window.location.hash = '#/';
+      navigate('/');
       showToast('Account deleted successfully');
     } catch (err: any) {
       console.error("Deletion error details:", err);
@@ -1587,7 +1667,7 @@ const App: React.FC = () => {
     const prevSeedArtists = seedArtists;
     const activeDiscoveryFilters = overrideFilters || discoveryFilters;
 
-    if (!user && (isRegeneration || !window.location.hash.includes('?'))) {
+    if (!user && (isRegeneration || !window.location.search)) {
       isHydratingSessionRef.current = false;
       // Only gate if it's a manual action (regeneration or fresh start)
       // Imports (via deep links) are allowed for guests
@@ -2561,21 +2641,21 @@ const App: React.FC = () => {
   // Handle post-auth redirection after connection is verified
   useEffect(() => {
     if (isAuthInitialized && user && isFirebaseReady && currentView === View.Home && !hasInitialRedirectOccurredRef.current) {
-      // If we already have a meaningful hash, don't override it with the default redirect
-      const currentHash = window.location.hash;
-      if (currentHash && currentHash !== '#/' && currentHash !== '#') {
-        console.log('[HealthCheck] Auth Ready. Preserving existing hash:', currentHash);
+      // If we already have a meaningful pathname, don't override it with the default redirect
+      const currentPath = window.location.pathname;
+      if (currentPath && currentPath !== '/' && currentPath !== '/index.html') {
+        console.log('[HealthCheck] Auth Ready. Preserving existing path:', currentPath);
         hasInitialRedirectOccurredRef.current = true;
         return;
       }
 
       console.log('[HealthCheck] Auth and Firebase Ready. Redirecting to user destination...');
-      const targetHash = authRedirectPathRef.current || '#/dashboard';
-      window.location.hash = targetHash;
+      const targetPath = authRedirectPathRef.current || '/dashboard';
+      navigate(targetPath);
       authRedirectPathRef.current = null;
       hasInitialRedirectOccurredRef.current = true;
     }
-  }, [isAuthInitialized, user, isFirebaseReady, currentView]);
+  }, [isAuthInitialized, user, isFirebaseReady, currentView, navigate]);
 
   // Sync stack from Firestore (Real-Time)
   useEffect(() => {
@@ -3212,31 +3292,53 @@ const App: React.FC = () => {
   const lastProcessedSelectedRef = useRef<string | null>(null);
   const lastProcessedSessionKeyRef = useRef<string>('');
 
+  // Gracefully clean up legacy hash routing URLs to clean pathnames on entry
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash) {
+      let legacyPath = '';
+      if (hash.startsWith('#/')) {
+        legacyPath = hash.substring(2);
+      } else if (hash.startsWith('#')) {
+        legacyPath = hash.substring(1);
+      }
+      
+      if (legacyPath && legacyPath !== '/') {
+        const [pathPart, queryPart] = legacyPath.split('?');
+        const searchStr = queryPart ? `?${queryPart}` : window.location.search;
+        const cleanPath = `/${pathPart}`;
+        
+        window.history.replaceState(null, '', cleanPath + searchStr);
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      }
+    }
+  }, []);
+
   useEffect(() => {
     const processDeepLink = async () => {
-      const hash = window.location.hash || '#/';
-      const searchParams = new URLSearchParams(window.location.search || hash.split('?')[1] || '');
+      const pathname = window.location.pathname;
+      const searchParams = new URLSearchParams(window.location.search);
       const projectIdFromQuery = searchParams.get('id') || searchParams.get('projectId');
       const shareIdFromQuery = searchParams.get('shareId');
 
-      const isAppPath = hash.startsWith('#/app');
-      const isDashboardPath = hash.startsWith('#/dashboard');
-      const isProjectPath = hash.startsWith('#/z/') || hash.startsWith('#/project/') || window.location.pathname.startsWith('/project/');
+      const isAppPath = pathname === '/app' || pathname.startsWith('/app/');
+      const isDashboardPath = pathname === '/dashboard';
+      const isProjectPath = pathname.startsWith('/z/') || pathname.startsWith('/project/');
 
       // --- ROUTING LOGIC ---
-      if (isAppPath || isDashboardPath || isProjectPath || hash.startsWith('#/help') || hash.startsWith('#/design') || hash.startsWith('#/engine') || hash.startsWith('#/analytics') || shareIdFromQuery || projectIdFromQuery) {
-        // Optimization: Pre-capture hash for redirection if auth is not ready
+      if (isAppPath || isDashboardPath || isProjectPath || pathname === '/help' || pathname.startsWith('/design') || pathname === '/engine' || pathname === '/analytics' || shareIdFromQuery || projectIdFromQuery) {
+        // Optimization: Pre-capture pathname + search for redirection if auth is not ready
         if (!isAuthInitialized) {
-          authRedirectPathRef.current = hash;
+          authRedirectPathRef.current = pathname + window.location.search;
           return;
         }
 
         // Allow access to app if we have a deep link ID, even if not logged in
         if (!user && !projectIdFromQuery && !shareIdFromQuery) {
-          authRedirectPathRef.current = hash;
+          authRedirectPathRef.current = pathname + window.location.search;
           if (currentViewRef.current !== View.Home) {
             setCurrentView(View.Home);
-            window.location.hash = '#/';
+            navigate('/', true);
           }
           return;
         }
@@ -3251,7 +3353,14 @@ const App: React.FC = () => {
             setCurrentProjectOwnerId(null);
           }
         } else if (isProjectPath || projectIdFromQuery || shareIdFromQuery) {
-          const projectId = projectIdFromQuery || shareIdFromQuery || hash.split('#/z/')[1]?.split('?')[0];
+          let projectId = projectIdFromQuery || shareIdFromQuery;
+          if (!projectId) {
+            if (pathname.startsWith('/z/')) {
+              projectId = pathname.substring(3).split('?')[0];
+            } else if (pathname.startsWith('/project/')) {
+              projectId = pathname.substring(9).split('?')[0];
+            }
+          }
           if (projectId) {
             setPreviousWorkspace({ view: View.Graph, projectId: projectId });
             if (currentViewRef.current !== View.Graph || currentProjectIdRef.current !== projectId) {
@@ -3269,23 +3378,23 @@ const App: React.FC = () => {
           }
         } else if (isAppPath) {
           // Fallback for old /app link - redirect to dashboard if logged in
-          if (user) window.location.hash = '#/dashboard';
+          if (user) navigate('/dashboard', true);
           else setCurrentView(View.Graph);
-        } else if (hash.startsWith('#/help')) {
+        } else if (pathname === '/help') {
           if (currentViewRef.current !== View.Help) setCurrentView(View.Help);
-        } else if (hash.startsWith('#/design')) {
+        } else if (pathname.startsWith('/design')) {
           if (isAdmin) {
             if (currentViewRef.current !== View.StyleGuide) setCurrentView(View.StyleGuide);
           } else {
             setCurrentView(View.Home);
           }
-        } else if (hash.startsWith('#/engine')) {
+        } else if (pathname === '/engine') {
           if (isAdmin) {
             if (currentViewRef.current !== View.Engine) setCurrentView(View.Engine);
           } else {
             setCurrentView(View.Home);
           }
-        } else if (hash.startsWith('#/analytics')) {
+        } else if (pathname === '/analytics') {
           if (user) {
             if (currentViewRef.current !== View.Analytics) setCurrentView(View.Analytics);
           } else {
@@ -3297,7 +3406,7 @@ const App: React.FC = () => {
         if (graphData === null) {
           setGraphData({ nodes: [], links: [] });
         }
-      } else if (hash.startsWith('#/source')) {
+      } else if (pathname === '/source') {
         if (currentViewRef.current !== View.Engine) setCurrentView(View.Engine);
       } else {
         if (currentViewRef.current !== View.Home) setCurrentView(View.Home);
@@ -3305,12 +3414,11 @@ const App: React.FC = () => {
 
       // --- PARAMETER PROCESSING ---
       const authKey = user ? user.uid : 'guest';
-      const sessionKey = `${hash}-${authKey}`;
+      const sessionKey = `${pathname}${window.location.search}-${authKey}`;
 
-      if (hash === lastProcessedHashRef.current && sessionKey === lastProcessedSessionKeyRef.current && isAuthInitialized) {
+      if (pathname === lastProcessedHashRef.current && sessionKey === lastProcessedSessionKeyRef.current && isAuthInitialized) {
         // Check if we still need to process 'selected' because graphData just arrived
-        const params = new URLSearchParams(hash.split('?')[1] || '');
-        const selected = params.get('selected');
+        const selected = searchParams.get('selected');
         if (selected && selected !== lastProcessedSelectedRef.current && graphData) {
           const node = graphData.nodes.find(n => n.id.toLowerCase() === selected.toLowerCase());
           if (node) {
@@ -3321,13 +3429,12 @@ const App: React.FC = () => {
         return;
       }
 
-      lastProcessedHashRef.current = hash;
+      lastProcessedHashRef.current = pathname;
       lastProcessedSessionKeyRef.current = sessionKey;
-      if (!hash.includes('?') && !window.location.search) return;
+      if (!window.location.search) return;
 
-      const params = new URLSearchParams(window.location.search || hash.split('?')[1] || '');
-      const seeds = params.get('seeds'), origin = params.get('origin'), selected = params.get('selected');
-      const shareId = params.get('shareId') || params.get('id');
+      const seeds = searchParams.get('seeds'), origin = searchParams.get('origin'), selected = searchParams.get('selected');
+      const shareId = searchParams.get('shareId') || searchParams.get('id');
 
       if (origin) setUrlOriginHint(origin);
 
@@ -3384,9 +3491,13 @@ const App: React.FC = () => {
       }
     };
     processDeepLink();
+    window.addEventListener('popstate', processDeepLink);
     window.addEventListener('hashchange', processDeepLink);
-    return () => window.removeEventListener('hashchange', processDeepLink);
-  }, [handleGenerateGraph, seedArtists, isLoading, graphData, handleNodeClick, isAuthInitialized, user, isFirebaseReady, showToast, isAdmin]);
+    return () => {
+      window.removeEventListener('popstate', processDeepLink);
+      window.removeEventListener('hashchange', processDeepLink);
+    };
+  }, [handleGenerateGraph, seedArtists, isLoading, graphData, handleNodeClick, isAuthInitialized, user, isFirebaseReady, showToast, isAdmin, navigate]);
 
   const handleCloseNode = useCallback((nodeId: string) => {
     setActiveNodes(prev => {
@@ -3399,6 +3510,13 @@ const App: React.FC = () => {
   }, [selectedNode]);
 
   const handleRefreshNode = useCallback(async (nodeId: string) => {
+    // ── Token Quota Gate ───────────────────────────────────────────────────────
+    // Must run BEFORE any cache eviction or Firestore deletion.
+    // If the curator cancels, the profile is left untouched and no AI call fires.
+    const confirmed = await confirmTokenUsage('data_quality_optimization', [], [nodeId]);
+    if (!confirmed) return;
+    // ──────────────────────────────────────────────────────────────────────────
+
     // 1. Evict from local state immediately to show loading spinner
     setDetailsCache(prev => { 
         const n = new Map(prev); 
@@ -3420,7 +3538,7 @@ const App: React.FC = () => {
     } catch (error) {
         console.error(`[Cache Eviction] Failed to delete Firestore cache for ${nodeId}:`, error);
     }
-  }, []);
+  }, [confirmTokenUsage]);
   const handleExtendNode = useCallback(async (node: Node) => {
     if (!graphData) return;
 
@@ -3919,21 +4037,23 @@ const App: React.FC = () => {
 
   const handleViewChange = useCallback((newView: View) => {
     if (newView === View.Graph && !graphData) setGraphData({ nodes: [], links: [] });
-    const h = {
-      [View.Graph]: '#/app',
-      [View.Dashboard]: '#/dashboard',
-      [View.Help]: '#/help',
-      [View.StyleGuide]: isAdmin ? '#/designsystem' : '#/',
-      [View.Engine]: isAdmin ? '#/engine' : '#/',
-      [View.Analytics]: user ? '#/analytics' : '#/',
-      [View.Home]: '#/'
+    const targetPath = {
+      [View.Graph]: '/app',
+      [View.Dashboard]: '/dashboard',
+      [View.Help]: '/help',
+      [View.StyleGuide]: isAdmin ? '/design' : '/',
+      [View.Engine]: isAdmin ? '/engine' : '/',
+      [View.Analytics]: user ? '/analytics' : '/',
+      [View.Home]: '/'
     }[newView];
-    if (window.location.hash !== h) window.location.hash = h;
-  }, [graphData, isAdmin, user]);
+    if (window.location.pathname !== targetPath) {
+      navigate(targetPath);
+    }
+  }, [graphData, isAdmin, user, navigate]);
 
   const handleLogoClick = useCallback(() => {
-    const hash = window.location.hash;
-    if (hash === '#/dashboard') {
+    const pathname = window.location.pathname;
+    if (pathname === '/dashboard') {
       handleViewChange(View.Home);
     } else {
       handleViewChange(View.Dashboard);
@@ -3944,21 +4064,21 @@ const App: React.FC = () => {
     if (previousWorkspace) {
       if (previousWorkspace.view === View.Graph && previousWorkspace.projectId) {
         setCurrentView(View.Graph);
-        window.location.hash = `#/z/${previousWorkspace.projectId}`;
+        navigate(`/z/${previousWorkspace.projectId}`);
       } else {
         setCurrentView(View.Dashboard);
-        window.location.hash = '#/dashboard';
+        navigate('/dashboard');
       }
     } else {
       if (currentProjectId) {
         setCurrentView(View.Graph);
-        window.location.hash = `#/z/${currentProjectId}`;
+        navigate(`/z/${currentProjectId}`);
       } else {
         setCurrentView(View.Dashboard);
-        window.location.hash = '#/dashboard';
+        navigate('/dashboard');
       }
     }
-  }, [previousWorkspace, currentProjectId]);
+  }, [previousWorkspace, currentProjectId, navigate]);
 
   const handleCancel = useCallback(() => { if (abortControllerRef.current) { abortControllerRef.current.abort(); setIsLoading(false); abortControllerRef.current = null; } }, []);
 
@@ -4033,7 +4153,7 @@ const App: React.FC = () => {
             projects={projects}
             stack={stack}
             isStackNew={stack.length > lastViewedStackCount}
-            onSelectProject={(id) => window.location.hash = `#/z/${id}`}
+            onSelectProject={(id) => navigate(`/z/${id}`)}
             onCreateProject={handleCreateProject}
             isCreatingProject={isCreatingProject}
             onDeleteProject={handleDeleteProject}
@@ -4083,7 +4203,7 @@ const App: React.FC = () => {
                 if (isGuest) {
                   setIsExitBlockerModalOpen(true);
                 } else {
-                  window.location.hash = '#/dashboard';
+                  navigate('/dashboard');
                 }
               }}
               onNavigate={handleMenuNavigate} onClearLibrary={handleClearLib} onClearZcene={handleClearZcene}
@@ -4300,7 +4420,7 @@ const App: React.FC = () => {
               handleNodeClick(node);
               if (currentView !== View.Graph) {
                 setCurrentView(View.Graph);
-                if (currentProjectId) window.location.hash = `#/z/${currentProjectId}`;
+                if (currentProjectId) navigate(`/z/${currentProjectId}`);
               }
             }
           }
@@ -4364,8 +4484,7 @@ const App: React.FC = () => {
                 <button
                   onClick={() => {
                     setIsExitBlockerModalOpen(false);
-                    window.location.hash = '';
-                    handleViewChange(View.Home);
+                    navigate('/');
                   }}
                   className="w-full py-4 rounded-none bg-[#ef4444] hover:bg-[#ef4444]/90 text-white font-bold transition-all active:scale-[0.98]"
                 >
@@ -4382,6 +4501,7 @@ const App: React.FC = () => {
           </div>
         )}
       </AnimatePresence>
+      <CookieConsent />
     </div>
   );
 };

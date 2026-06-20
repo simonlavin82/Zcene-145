@@ -74,7 +74,10 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
 
   useEffect(() => {
     const handleHashScroll = () => {
-      if (isActive && containerRef.current && (window.location.hash === '#/merch' || window.location.hash === '#merch')) {
+      const isMerch = window.location.pathname === '/merch' || 
+                      window.location.hash === '#/merch' || 
+                      window.location.hash === '#merch';
+      if (isActive && containerRef.current && isMerch) {
         const merchEl = document.getElementById('merch');
         if (merchEl) {
           const topPos = merchEl.offsetTop;
@@ -84,7 +87,10 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
     };
 
     if (isActive && containerRef.current) {
-      if (window.location.hash === '#/merch' || window.location.hash === '#merch') {
+      const isMerch = window.location.pathname === '/merch' || 
+                      window.location.hash === '#/merch' || 
+                      window.location.hash === '#merch';
+      if (isMerch) {
         handleHashScroll();
       } else {
         containerRef.current.scrollTo(0, 0);
@@ -92,7 +98,11 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
     }
 
     window.addEventListener('hashchange', handleHashScroll);
-    return () => window.removeEventListener('hashchange', handleHashScroll);
+    window.addEventListener('popstate', handleHashScroll);
+    return () => {
+      window.removeEventListener('hashchange', handleHashScroll);
+      window.removeEventListener('popstate', handleHashScroll);
+    };
   }, [isActive]);
 
   const scrollToTop = () => {

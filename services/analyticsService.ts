@@ -58,4 +58,18 @@ const track = (eventName: string, payload?: EventPayload): void => {
 
 export const analyticsService = {
   track,
+  updateConsent: (granted: boolean): void => {
+    const consentState = granted ? 'granted' : 'denied';
+    localStorage.setItem('zcene_cookie_consent', consentState);
+    
+    if (typeof window.gtag === 'function') {
+      window.gtag('consent', 'update', {
+        'ad_storage': consentState,
+        'analytics_storage': consentState
+      });
+      console.info(`[Analytics] Consent mode updated: ${consentState}`);
+    } else {
+      console.info(`[Analytics Fallback] Consent mode saved to localStorage: ${consentState}`);
+    }
+  }
 };

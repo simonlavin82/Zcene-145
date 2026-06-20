@@ -6,6 +6,8 @@ import { normalizeArtistId } from '../services/artistCacheService';
 import { analyticsService } from '../services/analyticsService';
 import { Spinner, HelpIcon, MicIcon, LoadingSpinner, DETAIL_THINKING_STEPS, StackIcon } from './Icons';
 
+const SENTINEL_INSIGHT = 'No insight provided.';
+
 declare global {
   interface Window {
     SpeechRecognition: any;
@@ -189,6 +191,8 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         };
     }, [userTaste, details, node.id, node.label]);
 
+
+
     useEffect(() => {
         setImageError(false);
         setImgLoaded(false);
@@ -331,17 +335,19 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             </div>
                         </div>
                         <div className="flex flex-col gap-1 min-w-0 flex-grow">
-                            <div 
-                                onClick={handleCopyId}
-                                className="group flex items-center gap-2 cursor-copy w-fit transition-all active:scale-[0.98]"
-                                title="Click to copy name"
-                            >
-                                <h3 className={`${headerSizeClass} text-white leading-[0.9] py-1 break-normal`}>
-                                    {node.label || node.id}
-                                </h3>
-                                <span className={`material-symbols-outlined !text-[16px] flex-shrink-0 transition-all duration-300 ${isIdCopied ? 'text-primary opacity-100 scale-110' : 'text-zinc-500 opacity-0 group-hover:opacity-100'}`}>
-                                    {isIdCopied ? 'check' : 'content_copy'}
-                                </span>
+                            <div className="flex items-center gap-2">
+                                <div 
+                                    onClick={handleCopyId}
+                                    className="group flex items-center gap-2 cursor-copy w-fit transition-all active:scale-[0.98] min-w-0"
+                                    title="Click to copy name"
+                                >
+                                    <h3 className={`${headerSizeClass} text-white leading-[0.9] py-1 break-normal`}>
+                                        {node.label || node.id}
+                                    </h3>
+                                    <span className={`material-symbols-outlined !text-[16px] flex-shrink-0 transition-all duration-300 ${isIdCopied ? 'text-primary opacity-100 scale-110' : 'text-zinc-500 opacity-0 group-hover:opacity-100'}`}>
+                                        {isIdCopied ? 'check' : 'content_copy'}
+                                    </span>
+                                </div>
                             </div>
                             <div className="flex flex-wrap items-center gap-2 mt-1">
                                 <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-400 bg-zinc-800/80 px-2 py-0.5 border border-zinc-700/50 rounded-md">{node.type}</span>
@@ -397,7 +403,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             )}
 
                             <div className="flex flex-col gap-3">
-                                {details.recommendationReason && (
+                                {details.recommendationReason && details.recommendationReason !== SENTINEL_INSIGHT && (
                                     <div className="pt-2">
                                         <p className="italic text-zinc-100 leading-tight font-serif tracking-tight text-2xl">
                                             "{details.recommendationReason}"

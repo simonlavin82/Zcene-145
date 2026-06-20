@@ -241,7 +241,9 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     const query = trimmedQuery.toLowerCase();
     const newHighlighted = new Set<string>();
     visibleNodes.forEach(node => {
-        if (String(node.id).toLowerCase().includes(query)) {
+        // Match against both the display label (title-cased) and the raw id slug
+        const displayName = (node.label || node.id).replace(/-/g, ' ');
+        if (displayName.toLowerCase().includes(query) || String(node.id).toLowerCase().includes(query)) {
             newHighlighted.add(String(node.id));
         }
     });
@@ -557,10 +559,20 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         }
     });
 
+    // Title-case formatter: converts raw id slugs (e.g. "buggin", "hardcore-punk")
+    // to their display form ("Buggin", "Hardcore Punk") for legacy cache docs
+    // where the .label field was not populated at write time.
+    const toDisplayLabel = (node: Node): string => {
+        const raw = node.label || String(node.id);
+        return raw
+            .replace(/-/g, ' ')
+            .replace(/\b\w/g, c => c.toUpperCase());
+    };
+
     nodeElements.select("text")
         .attr("y", 25 * sizeMult)
         .style("font-size", `${12 * sizeMult}px`)
-        .text(d => d.label || String(d.id));
+        .text(d => toDisplayLabel(d));
 
     container.select(".link-group").selectAll<SVGLineElement, Link>("line")
         .data(visibleLinks, (d: any) => {

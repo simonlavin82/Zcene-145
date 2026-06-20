@@ -51,9 +51,17 @@
 
       window.dataLayer = window.dataLayer || [];
       window.gtag = function() { dataLayer.push(arguments); };
+
+      // Default GA4 consent state based on user preference or opt-in by default
+      var consentState = localStorage.getItem('zcene_cookie_consent') || 'denied';
+      window.gtag('consent', 'default', {
+        'ad_storage': consentState,
+        'analytics_storage': consentState
+      });
+
       window.gtag('js', new Date());
       window.gtag('config', measurementId);
-      console.log('[Analytics] GA4 Initialised for production domain: ' + hostname);
+      console.log('[Analytics] GA4 Initialised with consent default (' + consentState + ') for: ' + hostname);
     } else {
       console.log('[Analytics] Sandbox Mode: Google Analytics tag G-WXSEHVYTHJ suppressed for ' + hostname + (port ? ':' + port : ''));
     }

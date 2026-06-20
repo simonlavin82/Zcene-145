@@ -320,7 +320,7 @@ export const TokenConfirmationDialog: React.FC<{
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void;
-  type: 'generation' | 'extension' | 'deep_cut_creation' | 'partial_synthesis' | 'cache_upgrade';
+  type: 'generation' | 'extension' | 'deep_cut_creation' | 'partial_synthesis' | 'cache_upgrade' | 'data_quality_optimization';
   cost: number;
   cachedArtists: string[];
   missingArtists: string[];
@@ -355,7 +355,9 @@ export const TokenConfirmationDialog: React.FC<{
           <p className="leading-relaxed">
             {type === 'cache_upgrade'
               ? 'The cached entry is out of date and needs a quick re-synthesis query to unlock the latest spiderweb layout and Deep Cut features.'
-              : 'You are initiating a net-new AI generation flow that requires contacting the live models.'}
+              : type === 'data_quality_optimization'
+                ? 'A data quality issue was detected on this profile (stale placeholders, bad casing, or unparsed formatting). A live AI optimization pass will re-synthesize and heal the cached record.'
+                : 'You are initiating a net-new AI generation flow that requires contacting the live models.'}
           </p>
           <div className="bg-zinc-900/60 p-4 border border-zinc-800 space-y-2.5">
             <div className="flex justify-between font-mono text-xs border-b border-zinc-800 pb-1.5">
@@ -369,7 +371,9 @@ export const TokenConfirmationDialog: React.FC<{
                       ? 'Partial Synthesis (Enrichment)'
                       : type === 'cache_upgrade'
                         ? 'Cache Upgrade'
-                        : 'Deep Cut Creation'}
+                        : type === 'data_quality_optimization'
+                          ? 'Profile Quality Optimization'
+                          : 'Deep Cut Creation'}
               </span>
             </div>
             <div className="flex justify-between font-mono text-xs border-b border-zinc-800 pb-1.5">
