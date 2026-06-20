@@ -20,6 +20,7 @@ export const normalizeArtistId = (name: string): string =>
   name
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
+    .replace(/['’]/g, "") // Strip straight and curly apostrophes
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
