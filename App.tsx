@@ -3729,9 +3729,34 @@ const App: React.FC = () => {
                       });
                       console.log(`[Deep Cut Queue] Saved detailsCache to global artist doc: ${cacheId}`);
                     } else {
-                      // Structural doc not yet created (race with double-write). Skip here — the
-                      // double-write in handleExtendNode owns the CREATE responsibility.
-                      console.warn(`[Deep Cut Queue] Global doc not yet created for ${cacheId} — skipping details write`);
+                      // JIT cache creation for peripheral recommendation nodes:
+                      // Since this doc does not exist, we extract its structural subgraph
+                      // and create the document with the required security keys plus detailsCache.
+                      const normalizedGraph = normalizeGraphData(graphData);
+                      let { nodes: subNodes, links: subLinks } = extractArtistSubGraph(node.id, normalizedGraph, seedArtists.split('::'));
+                      
+                      if (subNodes.length === 0) {
+                        subNodes = [{ id: node.id, label: node.label || node.id, type: 'artist', group: node.group || 1 }];
+                      }
+                      
+                      const canonicalNode = subNodes.find(
+                        n => n.type === 'artist' && (n.id.trim().toLowerCase() === node.id.trim().toLowerCase() || normalizeArtistId(n.id) === cacheId)
+                      );
+                      const canonicalName = canonicalNode?.label ?? canonicalNode?.id ?? node.id;
+                      
+                      await setDoc(doc(db, 'artists', cacheId), {
+                        cacheKey: cacheId,
+                        artistId: cacheId,
+                        seedArtists: canonicalName,
+                        graphData: JSON.stringify({ nodes: subNodes, links: subLinks }),
+                        filters: discoveryFiltersRef.current || {},
+                        cacheVersion: 2,
+                        cachedAt: serverTimestamp(),
+                        hitCount: 0,
+                        isDeep: false,
+                        detailsCache: JSON.stringify(details)
+                      });
+                      console.log(`[Deep Cut Queue] JIT cached peripheral node doc: ${cacheId}`);
                     }
                   } catch (e: any) {
                     console.warn("Global write bypassed due to rule restrictions:", e.message);
