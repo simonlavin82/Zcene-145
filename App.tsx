@@ -2952,6 +2952,27 @@ const App: React.FC = () => {
     }));
 
     if (results.size > 0) {
+      // ── Synchronous ref pre-mutation ────────────────────────────────────────
+      // handleNodeClick reads from detailsCacheRef.current (a stable ref), NOT from
+      // the `detailsCache` React state value. The state is kept in sync via a useEffect
+      // binder (line 943), but useEffect runs AFTER the render cycle commits — creating
+      // a window where a URL-driven auto-selection or fast first click finds an empty ref.
+      //
+      // Fix: write results directly into the ref HERE, before calling setDetailsCache,
+      // so any click handler that fires during the render-commit gap finds the data
+      // synchronously. React does not track mutations to .current, so this is safe and
+      // causes no extra renders. setDetailsCache still runs below to keep the state tree
+      // consistent for all rendering components.
+      results.forEach((v, k) => {
+        const existing = detailsCacheRef.current.get(k);
+        detailsCacheRef.current.set(k,
+          (existing && existing.imageUrl && !v.imageUrl)
+            ? { ...v, imageUrl: existing.imageUrl }
+            : v
+        );
+      });
+      // ────────────────────────────────────────────────────────────────────────
+
       setDetailsCache(prev => {
         const merged = new Map(prev);
         results.forEach((v, k) => {
