@@ -1363,6 +1363,24 @@ const App: React.FC = () => {
        return;
     }
 
+    if (node.id === selectedNode?.id) {
+      return;
+    }
+
+    const isTransitioning = loadingNodeIds.has(node.id) || 
+                            fetchingNodeIdsRef.current.has(node.id) || 
+                            loadingNodeIds.has(node.id.toLowerCase()) || 
+                            fetchingNodeIdsRef.current.has(node.id.toLowerCase()) ||
+                            loadingNodeIds.has(normalizeArtistId(node.id)) || 
+                            fetchingNodeIdsRef.current.has(normalizeArtistId(node.id));
+    if (isTransitioning) {
+       setSelectedNode(node);
+       if (node.type !== 'founded') {
+         setActiveNodes(prev => prev.some(n => n.id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node]);
+       }
+       return;
+    }
+
     // 1. Prioritize the Local Details Map
     // IMPORTANT: Read from detailsCacheRef.current (the ref), NOT the `detailsCache` state
     // variable. The state variable is captured at callback creation time and is subject to
@@ -1383,14 +1401,7 @@ const App: React.FC = () => {
       (cachedDetails.summary.includes('sandbox mock') || cachedDetails.summary.includes('test scenarios'));
       
     if (cachedDetails && cachedDetails.summary && cachedDetails.summary.length > 5 && !isPlaceholderBio) {
-       const isTransitioning = loadingNodeIds.has(node.id) || 
-                               fetchingNodeIdsRef.current.has(node.id) || 
-                               loadingNodeIds.has(node.id.toLowerCase()) || 
-                               fetchingNodeIdsRef.current.has(node.id.toLowerCase()) ||
-                               loadingNodeIds.has(normalizeArtistId(node.id)) || 
-                               fetchingNodeIdsRef.current.has(normalizeArtistId(node.id));
-
-       if (!isTransitioning && checkIsProfileIncomplete(node, cachedDetails)) {
+       if (checkIsProfileIncomplete(node, cachedDetails)) {
           console.log(`[Node Click Intercept] Incomplete local profile detected for: ${node.id}`);
           const displayName = cachedDetails?.details?.artist || node.label || node.id;
           const confirmed = await confirmTokenUsage('data_quality_optimization', [], [displayName]);
@@ -1406,6 +1417,13 @@ const App: React.FC = () => {
           healedDetailsCacheRef.current.delete(node.id.toLowerCase());
           healedDetailsCacheRef.current.delete(cacheId);
 
+          // Synchronously clear the stale entries from detailsCacheRef.current
+          // to prevent validation logic from hitting the stale cache
+          // during the React state propagation/re-render window.
+          detailsCacheRef.current.delete(node.id);
+          detailsCacheRef.current.delete(node.id.toLowerCase());
+          detailsCacheRef.current.delete(cacheId);
+
           setDetailsCache(prev => {
               const n = new Map(prev);
               n.delete(node.id);
@@ -1414,35 +1432,32 @@ const App: React.FC = () => {
               return n;
           });
 
-          // Attempt to evict the stale Firestore document.
+          // Attempt to evict the stale Firestore document in the background (non-blocking)
           // NOTE: The security rule `allow delete: if isAdmin()` blocks non-admin clients from deleting.
           // If deleteDoc fails, fall back to an in-place invalidation via updateDoc (permitted by Case A):
           // writing an empty detailsCache string causes the queue's `bio.length > 5` guard to
           // fail on the next read, forcing a live Gemini re-synthesis to run.
-          try {
-              await deleteDoc(doc(db, 'artists', cacheId));
-              console.log(`[Node Click Intercept] Evicted stale Firestore cache for: ${cacheId}`);
-          } catch (error: any) {
+          deleteDoc(doc(db, 'artists', cacheId))
+            .then(() => console.log(`[Node Click Intercept] Evicted stale Firestore cache for: ${cacheId}`))
+            .catch((error: any) => {
               console.error(
                   `[PERMISSIONS] deleteDoc failed for artists/${cacheId}:`,
-                  `code=${(error as any)?.code}`,
+                  `code=${error?.code}`,
                   `message=${error.message}`
               );
               // Fallback: invalidate in-place so the queue skips the stale payload on re-read.
-              try {
-                  await updateDoc(doc(db, 'artists', cacheId), {
-                      detailsCache: '',
-                      cachedAt: serverTimestamp()
-                  });
-                  console.log(`[Node Click Intercept] Fallback: Invalidated stale record in-place for: ${cacheId}`);
-              } catch (fallbackError: any) {
+              updateDoc(doc(db, 'artists', cacheId), {
+                  detailsCache: '',
+                  cachedAt: serverTimestamp()
+              }).then(() => console.log(`[Node Click Intercept] Fallback: Invalidated stale record in-place for: ${cacheId}`))
+                .catch((fallbackError: any) => {
                   console.error(
                       `[PERMISSIONS] updateDoc fallback also failed for artists/${cacheId}:`,
-                      `code=${(fallbackError as any)?.code}`,
+                      `code=${fallbackError?.code}`,
                       `message=${fallbackError.message}`
                   );
-              }
-          }
+                });
+            });
 
           // Select the node so the sidebar shows and queue triggers a fresh live load
           setSelectedNode(node);
@@ -1529,48 +1544,56 @@ const App: React.FC = () => {
                         groundingLinks
                     };
 
-                    const isTransitioning = loadingNodeIds.has(node.id) || 
-                                           fetchingNodeIdsRef.current.has(node.id) || 
-                                           loadingNodeIds.has(node.id.toLowerCase()) || 
-                                           fetchingNodeIdsRef.current.has(node.id.toLowerCase()) ||
-                                           loadingNodeIds.has(normalizeArtistId(node.id)) || 
-                                           fetchingNodeIdsRef.current.has(normalizeArtistId(node.id));
-
-                    if (!isTransitioning && checkIsProfileIncomplete(node, detailsPayload)) {
+                    if (checkIsProfileIncomplete(node, detailsPayload)) {
                         console.log(`[Node Click Intercept] Incomplete Firestore profile detected for: ${node.id}`);
                         const displayName = detailsPayload?.details?.artist || node.label || node.id;
                         const confirmed = await confirmTokenUsage('data_quality_optimization', [], [displayName]);
                         if (!confirmed) return; // Cancel: return early without rendering details
 
-                        // Confirmed: Delete from Firestore cache
+                        // Confirmed: Delete from local memory and Firestore cache
                         healedDetailsCacheRef.current.delete(node.id);
                         healedDetailsCacheRef.current.delete(node.id.toLowerCase());
                         healedDetailsCacheRef.current.delete(standardizedId);
 
-                        try {
-                            await deleteDoc(doc(db, 'artists', standardizedId));
-                            console.log(`[Node Click Intercept] Evicted stale Firestore cache for: ${standardizedId}`);
-                        } catch (error: any) {
+                        // Clear detailsCacheRef.current and detailsCache state synchronously
+                        detailsCacheRef.current.delete(node.id);
+                        detailsCacheRef.current.delete(node.id.toLowerCase());
+                        detailsCacheRef.current.delete(standardizedId);
+
+                        setDetailsCache(prev => {
+                            const n = new Map(prev);
+                            n.delete(node.id);
+                            n.delete(node.id.toLowerCase());
+                            n.delete(standardizedId);
+                            return n;
+                        });
+
+                        // Synchronously mark as evicted so the queue skips cache lookup
+                        evictedNodeIdsRef.current.add(node.id);
+                        evictedNodeIdsRef.current.add(node.id.toLowerCase());
+                        evictedNodeIdsRef.current.add(standardizedId);
+
+                        // Perform Firestore eviction in the background (non-blocking)
+                        deleteDoc(doc(db, 'artists', standardizedId))
+                          .then(() => console.log(`[Node Click Intercept] Evicted stale Firestore cache for: ${standardizedId}`))
+                          .catch((error: any) => {
                             console.error(
                                 `[PERMISSIONS] deleteDoc failed for artists/${standardizedId}:`,
-                                `code=${(error as any)?.code}`,
+                                `code=${error?.code}`,
                                 `message=${error.message}`
                             );
-                            // Fallback: invalidate in-place so the queue skips the stale payload on re-read.
-                            try {
-                                await updateDoc(doc(db, 'artists', standardizedId), {
-                                    detailsCache: '',
-                                    cachedAt: serverTimestamp()
-                                });
-                                console.log(`[Node Click Intercept] Fallback: Invalidated stale record in-place for: ${standardizedId}`);
-                            } catch (fallbackError: any) {
+                            updateDoc(doc(db, 'artists', standardizedId), {
+                                detailsCache: '',
+                                cachedAt: serverTimestamp()
+                            }).then(() => console.log(`[Node Click Intercept] Fallback: Invalidated stale record in-place for: ${standardizedId}`))
+                              .catch((fallbackError: any) => {
                                 console.error(
                                     `[PERMISSIONS] updateDoc fallback also failed for artists/${standardizedId}:`,
-                                    `code=${(fallbackError as any)?.code}`,
+                                    `code=${fallbackError?.code}`,
                                     `message=${fallbackError.message}`
                                 );
-                            }
-                        }
+                              });
+                          });
 
                         // Select the node so the sidebar shows and queue triggers a fresh live load
                         setSelectedNode(node);
@@ -1629,7 +1652,7 @@ const App: React.FC = () => {
     if (node.type !== 'founded') {
       setActiveNodes(prev => prev.some(n => n.id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node]);
     }
-  }, [confirmTokenUsage]);
+  }, [confirmTokenUsage, selectedNode, loadingNodeIds]);
 
   const handleToggleStack = useCallback(async (node: Node, link?: string) => {
     if (!user) {
