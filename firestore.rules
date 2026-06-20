@@ -197,7 +197,7 @@ service cloud.firestore {
                        (
                          // Case A: Standard metadata and telemetry updates on qualified cache docs
                          request.resource.data.diff(resource.data).affectedKeys()
-                           .hasOnly(['detailsCache', 'hitCount'])
+                           .hasOnly(['detailsCache', 'hitCount', 'cachedAt'])
                        ) || (
                           // Case B: Upgrade a sparse/legacy cache doc (< 2 version or skeleton layout)
                           (

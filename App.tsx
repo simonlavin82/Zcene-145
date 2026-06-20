@@ -1409,12 +1409,34 @@ const App: React.FC = () => {
               return n;
           });
 
-          // Delete from Firestore asynchronously, awaiting it safely
+          // Attempt to evict the stale Firestore document.
+          // NOTE: The security rule `allow delete: if isAdmin()` blocks non-admin clients from deleting.
+          // If deleteDoc fails, fall back to an in-place invalidation via updateDoc (permitted by Case A):
+          // writing an empty detailsCache string causes the queue's `bio.length > 5` guard to
+          // fail on the next read, forcing a live Gemini re-synthesis to run.
           try {
               await deleteDoc(doc(db, 'artists', cacheId));
               console.log(`[Node Click Intercept] Evicted stale Firestore cache for: ${cacheId}`);
           } catch (error: any) {
-              console.warn("Global write bypassed due to rules/errors:", error.message);
+              console.error(
+                  `[PERMISSIONS] deleteDoc failed for artists/${cacheId}:`,
+                  `code=${(error as any)?.code}`,
+                  `message=${error.message}`
+              );
+              // Fallback: invalidate in-place so the queue skips the stale payload on re-read.
+              try {
+                  await updateDoc(doc(db, 'artists', cacheId), {
+                      detailsCache: '',
+                      cachedAt: serverTimestamp()
+                  });
+                  console.log(`[Node Click Intercept] Fallback: Invalidated stale record in-place for: ${cacheId}`);
+              } catch (fallbackError: any) {
+                  console.error(
+                      `[PERMISSIONS] updateDoc fallback also failed for artists/${cacheId}:`,
+                      `code=${(fallbackError as any)?.code}`,
+                      `message=${fallbackError.message}`
+                  );
+              }
           }
 
           // Select the node so the sidebar shows and queue triggers a fresh live load
@@ -1524,7 +1546,25 @@ const App: React.FC = () => {
                             await deleteDoc(doc(db, 'artists', standardizedId));
                             console.log(`[Node Click Intercept] Evicted stale Firestore cache for: ${standardizedId}`);
                         } catch (error: any) {
-                            console.warn("Global write bypassed due to rules/errors:", error.message);
+                            console.error(
+                                `[PERMISSIONS] deleteDoc failed for artists/${standardizedId}:`,
+                                `code=${(error as any)?.code}`,
+                                `message=${error.message}`
+                            );
+                            // Fallback: invalidate in-place so the queue skips the stale payload on re-read.
+                            try {
+                                await updateDoc(doc(db, 'artists', standardizedId), {
+                                    detailsCache: '',
+                                    cachedAt: serverTimestamp()
+                                });
+                                console.log(`[Node Click Intercept] Fallback: Invalidated stale record in-place for: ${standardizedId}`);
+                            } catch (fallbackError: any) {
+                                console.error(
+                                    `[PERMISSIONS] updateDoc fallback also failed for artists/${standardizedId}:`,
+                                    `code=${(fallbackError as any)?.code}`,
+                                    `message=${fallbackError.message}`
+                                );
+                            }
                         }
 
                         // Select the node so the sidebar shows and queue triggers a fresh live load
@@ -4071,23 +4111,27 @@ const App: React.FC = () => {
                 incrementDeepCutsOpenedCount();
 
                 // Fix 3: Race-safe details write-back.
-                // Using { merge: true } on a non-existent doc is treated as a CREATE by Firestore.
-                // The `allow create` rule requires 5 structural keys — a details-only payload fails it.
-                // Solution: check doc existence first; use updateDoc (guaranteed UPDATE) if it exists,
-                // and skip silently if it doesn't (writeArtistCacheMany is responsible for the CREATE).
-                if (!fallbackDetails) {
+                // Previously guarded by `if (!fallbackDetails)`, which caused the write to be skipped
+                // entirely when the queue read a stale-but-undeletable document (delete is admin-only).
+                // Fix: always attempt updateDoc when the doc exists, so cachedAt is refreshed
+                // regardless of whether the data came from a live Gemini call or the Firestore fallback.
+                // JIT creation (setDoc) is only attempted when the document does not yet exist.
+                {
                   const cacheId = normalizeArtistId(node.id);
                   try {
                     const existingSnap = await getArtistDocWithRedirect(cacheId);
                     if (existingSnap.exists()) {
+                      // Update the existing doc with fresh detailsCache and a new cachedAt timestamp.
+                      // The security rule Case A permits: detailsCache, hitCount, and cachedAt.
                       await updateDoc(doc(db, 'artists', existingSnap.id), {
-                        detailsCache: JSON.stringify(details)
+                        detailsCache: JSON.stringify(details),
+                        cachedAt: serverTimestamp()
                       });
-                      console.log(`[Deep Cut Queue] Saved detailsCache to global artist doc: ${existingSnap.id}`);
-                    } else {
+                      console.log(`[Deep Cut Queue] Write-back: Updated detailsCache + cachedAt for: ${existingSnap.id}`);
+                    } else if (!fallbackDetails) {
                       // JIT cache creation for peripheral recommendation nodes:
-                      // Since this doc does not exist, we extract its structural subgraph
-                      // and create the document with the required security keys plus detailsCache.
+                      // Only create a new document if the node came from live Gemini synthesis
+                      // (i.e. no fallback was available). This prevents poisoning with stale data.
                       const normalizedGraph = normalizeGraphData(graphData);
                       let { nodes: subNodes, links: subLinks } = extractArtistSubGraph(node.id, normalizedGraph, seedArtists.split('::'));
                       
@@ -4136,7 +4180,11 @@ const App: React.FC = () => {
                       }
                     }
                   } catch (e: any) {
-                    console.warn("Global write bypassed due to rule restrictions:", e.message);
+                    console.error(
+                        `[PERMISSIONS] write-back failed for artists/${cacheId}:`,
+                        `code=${(e as any)?.code}`,
+                        `message=${e.message}`
+                    );
                   }
                 }
                 
