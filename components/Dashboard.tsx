@@ -5,6 +5,36 @@ import { Project, StackItem } from '../types';
 import { User } from 'firebase/auth';
 import { motion } from 'framer-motion';
 
+const formatProjectTimestamp = (updatedAt: any): string => {
+  if (!updatedAt) return 'New Project';
+  let date: Date;
+  if (typeof updatedAt.toDate === 'function') {
+    date = updatedAt.toDate();
+  } else if (updatedAt instanceof Date) {
+    date = updatedAt;
+  } else if (updatedAt.seconds) {
+    date = new Date(updatedAt.seconds * 1000);
+  } else if (typeof updatedAt === 'number' || typeof updatedAt === 'string') {
+    date = new Date(updatedAt);
+  } else {
+    return 'New Project';
+  }
+
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  const dateStr = `${day}/${month}/${year}`;
+
+  let hours = date.getHours();
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'pm' : 'am';
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  const timeStr = `${hours}:${minutes} ${ampm}`;
+
+  return `${dateStr} • ${timeStr}`;
+};
+
 interface DashboardProps {
   user: User | null;
   projects: Project[];
@@ -294,8 +324,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                           )}
                         </div>
                       </div>
-                      <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">
-                        {project.updatedAt ? `Edited ${new Date(project.updatedAt.seconds * 1000).toLocaleDateString()}` : 'New Project'}
+                      <p className="text-[10px] text-zinc-500 tracking-wider font-bold">
+                        {project.updatedAt ? `Edited ${formatProjectTimestamp(project.updatedAt)}` : 'New Project'}
                       </p>
                     </div>
                     
@@ -353,9 +383,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                   {sortedProjects.map((project) => {
                     const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
                     const displayTitle = project.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene");
-                    const formattedDate = project.updatedAt 
-                      ? new Date(project.updatedAt.seconds * 1000).toLocaleDateString()
-                      : 'New Project';
+                    const formattedDate = formatProjectTimestamp(project.updatedAt);
                     const isMapped = !!project.graphData;
                     
                     return (
