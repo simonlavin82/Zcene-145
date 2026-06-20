@@ -632,7 +632,23 @@ const checkIsProfileIncomplete = (node: Node, details: NodeDetails | null | unde
                           details.recommendationReason.trim().toLowerCase() === SENTINEL_INSIGHT.toLowerCase();
 
   // 2. Lowercase identifier validation (Check display title, details artist, and first bolded summary word)
-  const displayTitle    = details.details?.artist || node.label || node.id;
+  // Fallback chain normalization: try details field first, then node label
+  let displayTitle = details.details?.artist || node.label;
+  if (!displayTitle || displayTitle.toLowerCase() === node.id.toLowerCase()) {
+    // Extract exact casing of the artist name from the biography summary if present
+    const spacedId = node.id.replace(/[-_]+/g, ' ').trim();
+    if (details.summary) {
+      const idx = details.summary.toLowerCase().indexOf(spacedId.toLowerCase());
+      if (idx !== -1) {
+        displayTitle = details.summary.substring(idx, idx + spacedId.length);
+      }
+    }
+    // Fall back to title-casing the spaced ID if not found in the summary
+    if (!displayTitle || displayTitle.toLowerCase() === node.id.toLowerCase()) {
+      displayTitle = spacedId.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    }
+  }
+
   const isLabelLower    = isPurelyLowercase(displayTitle);
   const isArtistNameLower = isPurelyLowercase(details.details?.artist);
   
