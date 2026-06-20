@@ -632,7 +632,7 @@ const checkIsProfileIncomplete = (node: Node, details: NodeDetails | null | unde
                           details.recommendationReason.trim().toLowerCase() === SENTINEL_INSIGHT.toLowerCase();
 
   // 2. Lowercase identifier validation (Check display title, details artist, and first bolded summary word)
-  const displayTitle    = node.label || node.id;
+  const displayTitle    = details.details?.artist || node.label || node.id;
   const isLabelLower    = isPurelyLowercase(displayTitle);
   const isArtistNameLower = isPurelyLowercase(details.details?.artist);
   
@@ -1339,7 +1339,8 @@ const App: React.FC = () => {
     if (cachedDetails && cachedDetails.summary && cachedDetails.summary.length > 5 && !isPlaceholderBio) {
        if (checkIsProfileIncomplete(node, cachedDetails)) {
           console.log(`[Node Click Intercept] Incomplete local profile detected for: ${node.id}`);
-          const confirmed = await confirmTokenUsage('data_quality_optimization', [], [node.id]);
+          const displayName = cachedDetails?.details?.artist || node.label || node.id;
+          const confirmed = await confirmTokenUsage('data_quality_optimization', [], [displayName]);
           if (!confirmed) return; // Cancel: return early without rendering details
 
           // Confirmed: Evict local cache immediately so the background queue will process it
@@ -1451,7 +1452,8 @@ const App: React.FC = () => {
 
                     if (checkIsProfileIncomplete(node, detailsPayload)) {
                         console.log(`[Node Click Intercept] Incomplete Firestore profile detected for: ${node.id}`);
-                        const confirmed = await confirmTokenUsage('data_quality_optimization', [], [node.id]);
+                        const displayName = detailsPayload?.details?.artist || node.label || node.id;
+                        const confirmed = await confirmTokenUsage('data_quality_optimization', [], [displayName]);
                         if (!confirmed) return; // Cancel: return early without rendering details
 
                         // Confirmed: Delete from Firestore cache
