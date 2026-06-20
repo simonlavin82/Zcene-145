@@ -3781,46 +3781,8 @@ const App: React.FC = () => {
   const handleExtendNode = useCallback(async (node: Node) => {
     if (!graphData) return;
 
-    const standardizedId = normalizeArtistId(node.id);
-    let cachedEntry: ArtistCacheEntry | null = null;
-    
-    // Check global collection first
-    try {
-      const snap = await getArtistDocWithRedirect(standardizedId);
-      if (snap.exists()) {
-        const data = snap.data() as ArtistCacheEntry;
-        if (data && isGraphDataPresent(data)) {
-          cachedEntry = data;
-        }
-      }
-    } catch (e) {
-      console.warn("[Node Extension] Global cache check failed:", e);
-    }
-
-    if (cachedEntry) {
-      // Global cache hit! Silently merge the cached subgraph
-      console.log(`[Node Extension] Cache HIT for: ${node.id}`);
-      try {
-        let parsedGraph = typeof cachedEntry.graphData === 'string' 
-          ? JSON.parse(cachedEntry.graphData) 
-          : cachedEntry.graphData;
-        
-        if (parsedGraph && parsedGraph.nodes && parsedGraph.nodes.length > 0) {
-          const normalizedGraph = normalizeGraphData(parsedGraph);
-          
-          setGraphData(prev => {
-            if (!prev) return prev;
-            return mergeGraphData(prev, normalizedGraph);
-          });
-          
-          showToast(`⚡ Expanded from cache`);
-          incrementCacheHit(standardizedId, user?.uid);
-          return; // Skip Token Quota Warning and live Gemini fetch!
-        }
-      } catch (e) {
-        console.warn("[Node Extension] Failed to parse cached graph data:", e);
-      }
-    }
+    // Restoring Immersive Discovery Flow: Bypass the cache check on node expansions
+    // to force open the Cost Dialogue and dispatch a live API call upon user confirmation.
 
     const confirmed = await confirmTokenUsage('extension', [], [node.label || titleCaseArtistId(node.id)]);
     if (!confirmed) return;
