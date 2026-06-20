@@ -247,4 +247,17 @@ To ensure cohesive presentation of layout elements, Zcene implements a strict se
 *   **Primary Typeface (Poppins):** Used for standard UI components, buttons, navigation links, layout labels, page titles, and body paragraphs.
 *   **Data Typeface (JetBrains Mono / `font-mono`):** Certified and standardized typeface used for all high-density tabular data, transactional metrics, chronological timestamps (e.g. `20/06/2026 • 12:24 pm` on cards and list rows), ledger lists, and structural confirmation dialog currency specs. This enforces precise, tabular digit geometry (e.g. narrow zero characters) for numerical and temporal readouts.
 
+---
+
+## 6. Immersive Discovery Flow
+
+The immersive discovery flow enables real-time node expansion on the Spiderweb canvas. Clicking the yellow `+` node expansion button next to any node dynamically builds out adjacent branches and interactive relationship edge connections.
+
+### 6.1 Real-Time Expansion Lifecycle
+1. **Interactive Anchors:** The `MusicGraph.tsx` component handles rendering of contextual `+/-` anchors and coordinates node selection/expansion triggers.
+2. **Cache Bypassing:** The node expansion layer explicitly bypasses base document cache matching within `handleExtendNode` in `App.tsx`. This ensures that stale cached records do not trigger false cache hits, protecting the integrity of the graph schema (such as required link context properties).
+3. **Mandatory Token Gateway:** Before dispatching any live API calls or committing optimistic UI changes, the system routes the request through the **Token Quota Warning / Cost Estimation Gateway** (`confirmTokenUsage`). The user must explicitly approve the projected token usage before the live generative query is dispatched.
+4. **Live Synthesis & Merge:** Upon user confirmation, a live generative request is dispatched to the Gemini API proxy to synthesize fresh adjacent nodes and edge connections. These results are then normalized and merged dynamically into the active canvas without re-initializing the entire map.
+5. **Sandbox Safety:** In local/development environments, the live dispatch is short-circuited with local static JSON mock data, allowing developers to safely test the gateway lifecycle and ledger logging without incurring API costs.
+
 
