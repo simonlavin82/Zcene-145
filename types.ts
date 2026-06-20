@@ -27,6 +27,7 @@ export interface Link {
   source: string | Node;
   target: string | Node;
   value: number;
+  context?: string;
 }
 
 export interface GraphData {

@@ -138,9 +138,13 @@ export const GRAPH_RESPONSE_SCHEMA = {
           value: {
             type: Type.INTEGER,
             description: "The strength of the connection, typically a constant value like 1."
+          },
+          context: {
+            type: Type.STRING,
+            description: "A brief, 3-7 word explanation of the relationship in present tense, e.g., 'releases music on Flatspot Records' or 'formed in San Jose, California' or 'influenced musical style'."
           }
         },
-        required: ["source", "target", "value"]
+        required: ["source", "target", "value", "context"]
       }
     }
   },
@@ -221,6 +225,7 @@ export const GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = `I have an existing m
         3.  For EACH seed artist in "{{artists}}", if they do not already exist as a node, you MUST add them as an 'artist' node to the 'nodes' array. This is a mandatory requirement. After adding the artist node, attempt to find its primary genre, record label, country of origin, and the year they were formed/founded (YYYY). If you find these details, create nodes for them (if they don't already exist) and link them back to the seed artist. The 'id' for the year node must be the 4-digit year (e.g., "1998") and its type must be 'founded'. If you cannot find some or all of these details, that is acceptable, but the seed artist node itself MUST still be included in the graph.
         4.  In addition, identify and add 8-12 NEW related artists that are musically connected to the seed artists. For these NEW artists, you MUST also identify and create their respective genre, label, country, and especially their 'founded' year nodes (YYYY) to ensure the spiderweb is rich with chronological data. Assign them to the same 'group' as the seed artist they relate to, or a new group if they relate to multiple.
         5.  It is absolutely critical that each 'founded' node is linked ONLY to the correct artist node who was founded in that year.
+        6.  LINK RELATIONSHIP CONTEXT: Each link in the 'links' array MUST include a 'context' string explaining the connection concisely (e.g. 'founded in 1994' or 'is a sub-genre of' or 'signed to XL Recordings' or 'is related to'). Keep the context to a brief 3-7 words in present tense.
         
         ABSOLUTELY CRITICAL FINAL CHECK: Before you output the JSON, verify that for EVERY SINGLE OBJECT in the 'links' array, the value of its 'source' property and the value of its 'target' property perfectly match an 'id' from an object in EITHER the provided existing nodes list OR your new 'nodes' array. THERE MUST BE NO ORPHANED LINKS. If you create a link with a 'source' or 'target' ID (e.g., "Arista Records"), you MUST ALSO define a node with that exact same 'id' (e.g., { "id": "Arista Records", "type": "label", ... }). Do not invent connections to nodes you haven't defined. This is a strict, mandatory requirement.
         
@@ -241,7 +246,8 @@ Follow these rules precisely:
 2.  REUSE EXISTING IDENTITIES: For all existing nodes from the cached subgraphs (e.g. genres, labels, countries, founded years, and artists), you MUST reuse their exact 'id' and 'type' without modifying them. Do not duplicate or rename existing metadata or artist nodes.
 3.  NO DISJOINT GRAPHS: Ensure that there is a path connecting the subgraphs so that the resulting graph is fully unified rather than multiple disconnected clusters.
 4.  NEW BRIDGING BANDS: If you add new bridging bands, you must also identify and create their respective genre, label, country, and founded year nodes (YYYY) and link them to build a rich graph.
-5.  JSON SCHEMA: The output must be a single, valid JSON object with 'nodes' and 'links' arrays matching the schema.
+5.  LINK RELATIONSHIP CONTEXT: Each link in the 'links' array MUST also include a 'context' string explaining the connection (e.g. 'releases music on Epitaph Records' or 'formed in 1988'). Keep the context to a brief 3-7 words in present tense.
+6.  JSON SCHEMA: The output must be a single, valid JSON object with 'nodes' and 'links' arrays matching the schema.
 
 ABSOLUTELY CRITICAL: Ensure NO ORPHANED LINKS. Every source/target in the 'links' array must map to a node in the 'nodes' array.
 
@@ -249,14 +255,14 @@ Your entire response MUST be ONLY the raw JSON object, without any surrounding t
 
 export const GENERATE_GRAPH_PROMPT_TEMPLATE = `Given the following list of seed artists: {{artists}}. Generate a music family tree connecting them. The output must be a single, valid JSON object with two keys: 'nodes' and 'links'.
 'nodes' should be an array of objects, each with 'id', 'type', and 'group'. The 'type' can be 'artist', 'genre', 'label', 'country', or 'founded'.
-'links' should be an array of objects, each with 'source', 'target', and 'value'.
+'links' should be an array of objects, each with 'source', 'target', 'value', and 'context' string describing the nature of their relationship.
 
 Follow these rules precisely:
 1.  CANONICAL NAMING: For ALL nodes, use the canonical, professional spelling and capitalization as recognized by the music industry. For example, use "Radiohead" even if the seed provided was "radiohead", and "blink-182" with a lowercase 'b' and hyphen if that is its official name.
 2.  MANDATORY: You MUST create an 'artist' node for EVERY seed artist provided in the list: {{artists}}. Assign a unique 'group' number for each seed artist.
 3.  For each seed artist, find and add nodes for their primary genre, record label, country of origin, and the year they were formed/founded (YYYY). The 'id' for the year node must be the 4-digit year (e.g. "1994") and its type must be 'founded'.
 4.  In addition, find and add UP TO 12 NEW related artists that are musically connected to the seed artists. For these NEW artists, you MUST also identify and create their respective genre, label, country, and especially their 'founded' year nodes (YYYY) to ensure the spiderweb is rich with chronological data. ONLY include artists that strictly meet any provided discovery filters.
-5.  For all artists (seed and related), create links connecting them to their respective genre, label, country, and founded year nodes. Also create links between related artists. All direct connections of a seed artist should share their 'group' number.
+5.  For all artists (seed and related), create links connecting them to their respective genre, label, country, and founded year nodes. Also create links between related artists. All direct connections of a seed artist should share their 'group' number. Each link MUST include a 'context' string explaining the relationship (e.g., 'releases music on XL Recordings' or 'founded in 1985' or 'is a genre of'). Keep the context to a brief 3-7 words in present tense.
 6.  CRITICAL: Each 'founded' node MUST be linked ONLY to the correct artist who was founded in that year.
         
 ABSOLUTELY CRITICAL FINAL CHECK: Before you output the JSON, verify that for EVERY SINGLE OBJECT in the 'links' array, the value of its 'source' property and the value of its 'target' property perfectly match an 'id' from an object in the 'nodes' array. THERE MUST BE NO ORPHANED LINKS. If you create a link with a 'source' or 'target' ID (e.g., "Arista Records"), you MUST ALSO define a node with that exact same 'id' (e.g., { "id": "Arista Records", "type": "label", ... }). Do not invent connections to nodes you haven't defined. This is a architecture requirement.
@@ -273,7 +279,7 @@ export const EXTEND_GRAPH_PROMPT_TEMPLATE = `I have a music graph. I want to exp
         2.  DO NOT duplicate any existing nodes.
         3.  Create an 'artist' node for the new artist.
         4.  Identify and create nodes for their primary genre, record label, country, and founded year (YYYY).
-        5.  Link the new artist to these new nodes AND to the original artist "{{artistName}}".
+        5.  Link the new artist to these new nodes AND to the original artist "{{artistName}}", adding a 'context' string to each link explaining the relationship (e.g., 'formed in 1992', 'releases music on Sub Pop', 'is related to'). Keep the context to a brief 3-7 words in present tense.
         6.  The 'group' ID should be {{groupId}}.
         
         ABSOLUTELY CRITICAL: Ensure NO ORPHANED LINKS. Every source/target in 'links' must exist in 'nodes' or the existing list.
@@ -358,7 +364,7 @@ const generateMockGraphData = (artists: string, baseGraph?: GraphData, filters?:
     }
   };
 
-  const addLink = (source: string, target: string, value: number = 1) => {
+  const addLink = (source: string, target: string, value: number = 1, context?: string) => {
     const s = source.toLowerCase();
     const t = target.toLowerCase();
     if (s === t) return;
@@ -368,7 +374,7 @@ const generateMockGraphData = (artists: string, baseGraph?: GraphData, filters?:
       return (ls === s && lt === t) || (ls === t && lt === s);
     });
     if (!exists) {
-      links.push({ source, target, value });
+      links.push({ source, target, value, context: context || "is musically related to" });
     }
   };
 
@@ -459,19 +465,19 @@ const generateMockGraphData = (artists: string, baseGraph?: GraphData, filters?:
 
     genresToUse.forEach(g => {
       addNode({ id: g, type: 'genre', group: 1000, label: g });
-      addLink(artistName, g);
+      addLink(artistName, g, 1, "performs style");
     });
 
     preset.labels.forEach(l => {
       addNode({ id: l, type: 'label', group: 2000, label: l });
-      addLink(artistName, l);
+      addLink(artistName, l, 1, "releases music via");
     });
 
     addNode({ id: country, type: 'country', group: 3000, label: country });
-    addLink(artistName, country);
+    addLink(artistName, country, 1, "hails from");
 
     addNode({ id: foundedYear, type: 'founded', group: 4000, label: foundedYear });
-    addLink(artistName, foundedYear);
+    addLink(artistName, foundedYear, 1, "was founded in");
 
     preset.related.forEach(relName => {
       let relFounded = (Number(foundedYear) + Math.floor(Math.random() * 8) - 4).toString();
@@ -483,24 +489,24 @@ const generateMockGraphData = (artists: string, baseGraph?: GraphData, filters?:
       }
 
       addNode({ id: relName, type: 'artist', group, label: relName });
-      addLink(artistName, relName);
+      addLink(artistName, relName, 1, "is related to");
 
       const relGenre = genresToUse[0];
-      addLink(relName, relGenre);
+      addLink(relName, relGenre, 1, "performs style");
 
       const relLabel = preset.labels[0];
-      addLink(relName, relLabel);
+      addLink(relName, relLabel, 1, "releases music via");
 
-      addLink(relName, country);
+      addLink(relName, country, 1, "hails from");
 
       addNode({ id: relFounded, type: 'founded', group: 4000, label: relFounded });
-      addLink(relName, relFounded);
+      addLink(relName, relFounded, 1, "was founded in");
     });
   });
 
   if (artistList.length > 1) {
     for (let i = 0; i < artistList.length - 1; i++) {
-      addLink(artistList[i], artistList[i+1], 2);
+      addLink(artistList[i], artistList[i+1], 2, "is connected to");
     }
   }
 

@@ -142,7 +142,7 @@ const parseAppleMusicXml = (xmlString: string): ParsedResult => {
     const trimmedSource = source.trim();
     const trimmedTarget = target.trim();
     if (!links.some(l => (l.source === trimmedSource && l.target === trimmedTarget) || (l.source === trimmedTarget && l.target === trimmedSource))) {
-      links.push({ source: trimmedSource, target: trimmedTarget, value: 1 });
+      links.push({ source: trimmedSource, target: trimmedTarget, value: 1, context: "performs style" });
     }
   };
   const getArtistGroupId = (artistName: string): number => {
@@ -231,7 +231,7 @@ const parseCsvData = (csvString: string): ParsedResult => {
     const trimmedSource = source.trim();
     const trimmedTarget = target.trim();
     if (!links.some(l => (l.source === trimmedSource && l.target === trimmedTarget) || (l.source === trimmedTarget && l.target === trimmedSource))) {
-      links.push({ source: trimmedSource, target: trimmedTarget, value: 1 });
+      links.push({ source: trimmedSource, target: trimmedTarget, value: 1, context: "performs style" });
     }
   };
   const getArtistGroupId = (artistName: string): number => {

@@ -51,6 +51,14 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   const [isLegendExpanded, setIsLegendExpanded] = useState(false);
   const [isCompactMode, setIsCompactMode] = useState(false);
   const [selectedNodePos, setSelectedNodePos] = useState<{ x: number, y: number } | null>(null);
+  const [hoveredLink, setHoveredLink] = useState<{
+    sourceId: string;
+    targetId: string;
+    context: string;
+    x: number;
+    y: number;
+  } | null>(null);
+  const activeHoveredLinkRef = useRef<{ link: Link } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Detect if legend needs to be in compact mode based on container width
@@ -232,6 +240,16 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     return highlighted;
   }, [selectedNode, visibleLinks, visibleNodes]);
 
+  const selectionHighlightIdsRef = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    selectionHighlightIdsRef.current = selectionHighlightIds;
+  }, [selectionHighlightIds]);
+
+  const highlightedNodesRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    highlightedNodesRef.current = highlightedNodes;
+  }, [highlightedNodes]);
+
   useEffect(() => {
     const trimmedQuery = searchQuery.trim();
     if (!trimmedQuery) { 
@@ -313,7 +331,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 const currentContainer = d3.select(svgRef.current).select(".main-container");
                 if (currentContainer.empty()) return;
 
-                currentContainer.select(".link-group").selectAll<SVGLineElement, Link>("line")
+                 currentContainer.select(".link-group").selectAll<SVGLineElement, Link>("line.visual-line")
                     .attr("x1", (d: any) => {
                         const val = (d.source as any).x;
                         return isNaN(val) ? 0 : val;
@@ -330,6 +348,43 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                         const val = (d.target as any).y;
                         return isNaN(val) ? 0 : val;
                     });
+
+                 currentContainer.select(".link-group").selectAll<SVGLineElement, Link>("line.interactive-link")
+                    .attr("x1", (d: any) => {
+                        const val = (d.source as any).x;
+                        return isNaN(val) ? 0 : val;
+                    })
+                    .attr("y1", (d: any) => {
+                        const val = (d.source as any).y;
+                        return isNaN(val) ? 0 : val;
+                    })
+                    .attr("x2", (d: any) => {
+                        const val = (d.target as any).x;
+                        return isNaN(val) ? 0 : val;
+                    })
+                    .attr("y2", (d: any) => {
+                        const val = (d.target as any).y;
+                        return isNaN(val) ? 0 : val;
+                    });
+
+                 // Update active hovered link midpoint coordinates
+                 if (activeHoveredLinkRef.current && svgRef.current) {
+                     const d = activeHoveredLinkRef.current.link;
+                     const x1 = (d.source as any).x;
+                     const y1 = (d.source as any).y;
+                     const x2 = (d.target as any).x;
+                     const y2 = (d.target as any).y;
+                     if (!isNaN(x1) && !isNaN(y1) && !isNaN(x2) && !isNaN(y2)) {
+                         const midX = (x1 + x2) / 2;
+                         const midY = (y1 + y2) / 2;
+                         const transform = d3.zoomTransform(svgRef.current);
+                         setHoveredLink(prev => prev ? {
+                             ...prev,
+                             x: transform.applyX(midX),
+                             y: transform.applyY(midY)
+                         } : null);
+                     }
+                 }
                 
                 currentContainer.select(".node-group").selectAll<SVGGElement, Node>("g.node-element")
                     .attr("transform", (d: any) => {
@@ -574,17 +629,88 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         .style("font-size", `${12 * sizeMult}px`)
         .text(d => toDisplayLabel(d));
 
-    container.select(".link-group").selectAll<SVGLineElement, Link>("line")
-        .data(visibleLinks, (d: any) => {
-            const s = String(typeof d.source === 'string' ? d.source : (d.source as Node).id);
-            const t = String(typeof d.target === 'string' ? d.target : (d.target as Node).id);
-            return `${s}-${t}`;
-        })
+    const nodeId = (n: any) => String(typeof n === 'string' ? n : n.id);
+
+    container.select(".link-group").selectAll<SVGLineElement, Link>("line.visual-line")
+        .data(visibleLinks, (d: any) => `${nodeId(d.source)}-${nodeId(d.target)}`)
         .join("line")
+        .attr("class", "visual-line")
         .attr("stroke", "#a1a1aa")
         .attr("stroke-width", 1)
         .attr("stroke-opacity", 0.4)
         .attr("stroke-dasharray", "3,3");
+
+    container.select(".link-group").selectAll<SVGLineElement, Link>("line.interactive-link")
+        .data(visibleLinks, (d: any) => `${nodeId(d.source)}-${nodeId(d.target)}`)
+        .join("line")
+        .attr("class", "interactive-link")
+        .attr("stroke", "transparent")
+        .attr("stroke-width", 12)
+        .style("cursor", "pointer")
+        .on("mouseenter", (event, d) => {
+            const sId = nodeId(d.source);
+            const tId = nodeId(d.target);
+
+            const formatName = (id: string) => {
+                const foundNode = visibleNodes.find(n => String(n.id).toLowerCase() === id.toLowerCase());
+                if (foundNode && foundNode.label) return foundNode.label;
+                return id.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            };
+
+            const displaySource = formatName(sId);
+            const displayTarget = formatName(tId);
+
+            activeHoveredLinkRef.current = { link: d };
+
+            const x1 = (d.source as any).x ?? 0;
+            const y1 = (d.source as any).y ?? 0;
+            const x2 = (d.target as any).x ?? 0;
+            const y2 = (d.target as any).y ?? 0;
+            const midX = (x1 + x2) / 2;
+            const midY = (y1 + y2) / 2;
+
+            if (svgRef.current) {
+                const transform = d3.zoomTransform(svgRef.current);
+                setHoveredLink({
+                    sourceId: displaySource,
+                    targetId: displayTarget,
+                    context: d.context || "is connected to",
+                    x: transform.applyX(midX),
+                    y: transform.applyY(midY)
+                });
+
+                // Highlight corresponding visual line
+                d3.select(svgRef.current)
+                    .selectAll<SVGLineElement, Link>("line.visual-line")
+                    .filter((l: any) => nodeId(l.source) === sId && nodeId(l.target) === tId)
+                    .attr("stroke", "#F6E468")
+                    .attr("stroke-opacity", 0.9);
+            }
+        })
+        .on("mouseleave", (event, d) => {
+            const sId = nodeId(d.source);
+            const tId = nodeId(d.target);
+
+            // Revert style for this specific visual line
+            if (svgRef.current) {
+                d3.select(svgRef.current)
+                    .selectAll<SVGLineElement, Link>("line.visual-line")
+                    .filter((l: any) => nodeId(l.source) === sId && nodeId(l.target) === tId)
+                    .attr("stroke", "#a1a1aa")
+                    .attr("stroke-opacity", (l: any) => {
+                        const s = typeof l.source === 'string' ? l.source : l.source.id;
+                        const t = typeof l.target === 'string' ? l.target : l.target.id;
+                        const selHighlight = selectionHighlightIdsRef.current;
+                        const hlNodes = highlightedNodesRef.current;
+                        if (selHighlight) return (selHighlight.has(s) && selHighlight.has(t)) ? 0.6 : 0.05;
+                        if (hlNodes.size > 0) return (hlNodes.has(s) && hlNodes.has(t)) ? 0.6 : 0.05;
+                        return 0.3;
+                    });
+            }
+
+            activeHoveredLinkRef.current = null;
+            setHoveredLink(null);
+        });
 
     // Use a lower alpha for restarts to prevent "explosive" movement on interaction
     simulation.alpha(0.15).alphaTarget(0).restart();
@@ -638,7 +764,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             return isSeed ? '#F6E468' : '#1F1F1E';
         })
         .attr("filter", d => selectedNode?.id === d.id ? "url(#node-glow)" : null);
-    container.select(".link-group").selectAll<SVGLineElement, Link>("line")
+    container.select(".link-group").selectAll<SVGLineElement, Link>("line.visual-line")
         .transition().duration(300)
         .attr("stroke-opacity", (d: any) => {
             const s = typeof d.source === 'string' ? d.source : d.source.id;
@@ -709,6 +835,27 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 </motion.div>
             )}
         </AnimatePresence>
+
+        {hoveredLink && (
+            <div 
+                style={{ 
+                    position: 'absolute',
+                    left: hoveredLink.x, 
+                    top: hoveredLink.y,
+                    transform: 'translate(-50%, -100%)',
+                    pointerEvents: 'none',
+                    zIndex: 50
+                }}
+                className="mb-3 bg-zinc-950/95 border border-zinc-700/80 px-3.5 py-2.5 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md rounded-xl flex flex-col gap-1 text-center min-w-[120px] max-w-[280px]"
+            >
+                <span className="font-mono text-[9px] text-zinc-500 uppercase tracking-widest">Relationship</span>
+                <div className="text-xs font-medium text-zinc-200 leading-normal">
+                    <span className="font-semibold text-primary">{hoveredLink.sourceId}</span> 
+                    <span className="text-zinc-400"> {hoveredLink.context} </span>
+                    <span className="font-semibold text-primary">{hoveredLink.targetId}</span>
+                </div>
+            </div>
+        )}
 
         <div className="absolute bottom-6 right-6 flex flex-col gap-3 z-30">
             <button onClick={handleCenter} className="w-12 h-12 bg-zinc-900/80 border border-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center backdrop-blur-md shadow-xl transition-all active:scale-90 rounded-xl">
