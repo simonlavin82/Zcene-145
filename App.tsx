@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { AlertCircle, X, CheckCircle2, Key } from 'lucide-react';
 import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project, ArtistCacheEntry, COST_PER_AI_CALL } from './types';
 import { generateGraphData, fetchNodeDetails, extendGraphFromNode } from './services/geminiService';
-import { normalizeArtistId, readArtistCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired } from './services/artistCacheService';
+import { normalizeArtistId, readArtistCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect } from './services/artistCacheService';
 import { auth, signInWithGoogle, logout, onAuthStateChanged, User, db, handleFirestoreError, OperationType } from './services/firebase';
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, getDocFromServer, serverTimestamp, addDoc, getDoc, getDocs, orderBy, where, writeBatch, getDocFromCache, updateDoc, increment } from 'firebase/firestore';
 const StyleGuidePage = React.lazy(() => import('./components/DesignSystem').then(m => ({ default: m.StyleGuidePage })));
@@ -1279,7 +1279,7 @@ const App: React.FC = () => {
     try {
         const standardizedId = normalizeArtistId(node.id);
         
-        let globalDoc = await getDoc(doc(db, 'artists', standardizedId));
+        let globalDoc = await getArtistDocWithRedirect(standardizedId);
         
         if (globalDoc.exists()) {
             const data = globalDoc.data();
@@ -1620,9 +1620,9 @@ const App: React.FC = () => {
       const searchIdLower = searchId.toLowerCase();
       
       try {
-        let cacheDoc = await getDoc(doc(db, 'artists', searchId));
+        let cacheDoc = await getArtistDocWithRedirect(searchId);
         if (!cacheDoc.exists()) {
-          cacheDoc = await getDoc(doc(db, 'artists', searchIdLower));
+          cacheDoc = await getArtistDocWithRedirect(searchIdLower);
         }
 
         if (cacheDoc.exists()) {
@@ -2642,7 +2642,7 @@ const App: React.FC = () => {
       const standardizedId = normalizeArtistId(n.id);
       
       try {
-        let snap = await getDoc(doc(db, 'artists', standardizedId));
+        let snap = await getArtistDocWithRedirect(standardizedId);
         if (!snap.exists()) return;
 
         const data = snap.data();
@@ -3429,7 +3429,7 @@ const App: React.FC = () => {
     
     // Check global collection first
     try {
-      const snap = await getDoc(doc(db, 'artists', standardizedId));
+      const snap = await getArtistDocWithRedirect(standardizedId);
       if (snap.exists()) {
         const data = snap.data() as ArtistCacheEntry;
         if (data && isGraphDataPresent(data)) {
@@ -3733,7 +3733,7 @@ const App: React.FC = () => {
                 let isStale = false;
                 try {
                   const cacheId = normalizeArtistId(node.id);
-                  let cacheDoc = await getDoc(doc(db, 'artists', cacheId));
+                  let cacheDoc = await getArtistDocWithRedirect(cacheId);
                   
                   if (cacheDoc.exists()) {
                      const data = cacheDoc.data();
@@ -3815,12 +3815,12 @@ const App: React.FC = () => {
                 if (!fallbackDetails) {
                   const cacheId = normalizeArtistId(node.id);
                   try {
-                    const existingSnap = await getDoc(doc(db, 'artists', cacheId));
+                    const existingSnap = await getArtistDocWithRedirect(cacheId);
                     if (existingSnap.exists()) {
-                      await updateDoc(doc(db, 'artists', cacheId), {
+                      await updateDoc(doc(db, 'artists', existingSnap.id), {
                         detailsCache: JSON.stringify(details)
                       });
-                      console.log(`[Deep Cut Queue] Saved detailsCache to global artist doc: ${cacheId}`);
+                      console.log(`[Deep Cut Queue] Saved detailsCache to global artist doc: ${existingSnap.id}`);
                     } else {
                       // JIT cache creation for peripheral recommendation nodes:
                       // Since this doc does not exist, we extract its structural subgraph
@@ -3837,10 +3837,15 @@ const App: React.FC = () => {
                       );
                       const canonicalName = canonicalNode?.label ?? canonicalNode?.id ?? node.id;
                       
-                      await setDoc(doc(db, 'artists', cacheId), {
-                        cacheKey: cacheId,
-                        artistId: cacheId,
-                        seedArtists: canonicalName,
+                      const canonicalNameFromDetails = details.details?.artist;
+                      const canonicalId = canonicalNameFromDetails ? normalizeArtistId(canonicalNameFromDetails) : cacheId;
+                      const isAlias = canonicalId !== cacheId;
+                      
+                      const canonicalDocRef = doc(db, 'artists', canonicalId);
+                      await setDoc(canonicalDocRef, {
+                        cacheKey: canonicalId,
+                        artistId: canonicalId,
+                        seedArtists: canonicalNameFromDetails || canonicalName,
                         graphData: JSON.stringify({ nodes: subNodes, links: subLinks }),
                         filters: discoveryFiltersRef.current || {},
                         cacheVersion: 2,
@@ -3849,7 +3854,23 @@ const App: React.FC = () => {
                         isDeep: false,
                         detailsCache: JSON.stringify(details)
                       });
-                      console.log(`[Deep Cut Queue] JIT cached peripheral node doc: ${cacheId}`);
+                      console.log(`[Deep Cut Queue] JIT cached Canonical node: ${canonicalId}`);
+                      
+                      if (isAlias) {
+                        const aliasDocRef = doc(db, 'artists', cacheId);
+                        await setDoc(aliasDocRef, {
+                          cacheKey: cacheId,
+                          artistId: cacheId,
+                          seedArtists: node.id,
+                          graphData: JSON.stringify({ nodes: [], links: [] }),
+                          filters: {},
+                          cacheVersion: 2,
+                          cachedAt: serverTimestamp(),
+                          hitCount: 0,
+                          redirectTo: canonicalId
+                        });
+                        console.log(`[Deep Cut Queue] Created Alias Redirect: ${cacheId} -> ${canonicalId}`);
+                      }
                     }
                   } catch (e: any) {
                     console.warn("Global write bypassed due to rule restrictions:", e.message);

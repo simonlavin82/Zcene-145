@@ -6,6 +6,7 @@ import {
   updateDoc,
   increment,
   serverTimestamp,
+  DocumentSnapshot,
 } from 'firebase/firestore';
 import { GraphData, Node, Link, ArtistCacheEntry } from '../types';
 
@@ -227,9 +228,9 @@ export const readArtistCacheMany = async (
     artistNames.map(async name => {
       const artistId = normalizeArtistId(name);
       try {
-        const snap = await getDoc(doc(db, 'artists', artistId));
+        const snap = await getArtistDocWithRedirect(artistId);
         if (snap.exists()) {
-          console.log(`[ArtistCache] HIT: ${artistId}`);
+          console.log(`[ArtistCache] HIT (Resolved): ${artistId}`);
           return { name, entry: snap.data() as ArtistCacheEntry };
         } else {
           console.log(`[ArtistCache] MISS: ${artistId}`);
@@ -247,6 +248,11 @@ export const readArtistCacheMany = async (
       const { name, entry } = result.value;
       if (entry) {
         cached.set(name, entry);
+        cached.set(name.toLowerCase(), entry);
+        if (entry.artistId) {
+          cached.set(entry.artistId, entry);
+          cached.set(entry.artistId.toLowerCase(), entry);
+        }
       } else {
         missing.push(name);
       }
@@ -279,34 +285,32 @@ export const writeArtistCacheMany = async (
   await Promise.allSettled(
     artistNames.map(async name => {
       const artistId = normalizeArtistId(name);
+      
+      // Find the canonical node in the full returned graph
+      const canonicalNode = findCanonicalNodeForArtist(name, normalizedGraph.nodes);
+      const canonicalId = canonicalNode ? normalizeArtistId(canonicalNode.id) : artistId;
+      const canonicalName = canonicalNode?.label ?? canonicalNode?.id ?? name;
+      
+      const isAlias = canonicalId !== artistId;
+
       const { nodes, links } = preserveFullGraph
         ? { nodes: normalizedGraph.nodes, links: normalizedGraph.links }
-        : extractArtistSubGraph(name, normalizedGraph, artistNames);
+        : extractArtistSubGraph(canonicalNode ? canonicalNode.id : name, normalizedGraph, artistNames);
 
       if (nodes.length === 0) {
-        console.warn(`[ArtistCache] Skipping write for "${name}" — artist node not found in graph.`);
+        console.warn(`[ArtistCache] Skipping write for "${name}" (canonical: "${canonicalId}") — artist node not found in graph.`);
         return;
       }
 
-      // Find the canonical name from the artist node itself (preserves AI casing in label)
-      const canonicalNode = nodes.find(
-        n => n.type === 'artist' && (n.id.trim().toLowerCase() === name.trim().toLowerCase() || normalizeArtistId(n.id) === artistId)
-      );
-      const canonicalName = canonicalNode?.label ?? canonicalNode?.id ?? name;
-
       try {
-        // Pre-existence check: using setDoc({ merge: true }) on an existing doc fires an UPDATE,
-        // not a CREATE. The allow update rule only permits ['detailsCache', 'hitCount'] changes
-        // (Case A) — a full structural payload would be rejected with permission-denied.
-        // Solution: check existence first and use the appropriate write operation.
-        const existingSnap = await getDoc(doc(db, 'artists', artistId));
+        const canonicalDocRef = doc(db, 'artists', canonicalId);
+        const canonicalSnap = await getDoc(canonicalDocRef);
 
-        if (!existingSnap.exists()) {
+        if (!canonicalSnap.exists()) {
           // ── CREATE PATH ─────────────────────────────────────────────────────
-          // Plain setDoc (no merge) = guaranteed CREATE. Passes allow create rule.
-          await setDoc(doc(db, 'artists', artistId), {
-            cacheKey: artistId,
-            artistId,
+          await setDoc(canonicalDocRef, {
+            cacheKey: canonicalId,
+            artistId: canonicalId,
             seedArtists: canonicalName,
             graphData: JSON.stringify({ nodes, links }),
             filters: filters || {},
@@ -315,21 +319,14 @@ export const writeArtistCacheMany = async (
             hitCount: 0,
             isDeep: preserveFullGraph || false,
           });
-          console.log(`[ArtistCache] Created: ${artistId} (${nodes.length} nodes, ${links.length} links)`);
+          console.log(`[ArtistCache] Created Canonical: ${canonicalId} (${nodes.length} nodes, ${links.length} links)`);
         } else {
-          const existing = existingSnap.data();
-          if (existing && existing.cacheVersion && existing.cacheVersion >= 2 && (!preserveFullGraph || existing.isDeep === true)) {
-            // ── SKIP PATH ─────────────────────────────────────────────────────
-            // Doc already exists at cacheVersion 2+. The structural graph is authoritative.
-            // Do not overwrite — only the details fetcher (Phase 03) may update this doc.
-            console.log(`[ArtistCache] Skipping write for "${artistId}" — doc already at v${existing.cacheVersion}.`);
-          } else {
+          const existing = canonicalSnap.data();
+          if (existing && (!existing.cacheVersion || existing.cacheVersion < 2 || (preserveFullGraph && existing.isDeep !== true))) {
             // ── UPGRADE PATH (Case B) ─────────────────────────────────────────
-            // Legacy doc (cacheVersion < 2 or missing). Upgrade it via updateDoc so
-            // Firestore evaluates it as an UPDATE, matching the allow update Case B rule.
-            await updateDoc(doc(db, 'artists', artistId), {
-              cacheKey: artistId,
-              artistId,
+            await updateDoc(canonicalDocRef, {
+              cacheKey: canonicalId,
+              artistId: canonicalId,
               seedArtists: canonicalName,
               graphData: JSON.stringify({ nodes, links }),
               filters: filters || {},
@@ -337,14 +334,32 @@ export const writeArtistCacheMany = async (
               cachedAt: serverTimestamp(),
               isDeep: preserveFullGraph || false,
             });
-            console.log(`[ArtistCache] Upgraded legacy doc: ${artistId} → cacheVersion 2`);
+            console.log(`[ArtistCache] Upgraded Canonical legacy doc: ${canonicalId} → cacheVersion 2`);
+          } else {
+            console.log(`[ArtistCache] Skipping write for Canonical "${canonicalId}" — doc already at v${existing?.cacheVersion || 2}.`);
+          }
+        }
+
+        if (isAlias) {
+          const aliasDocRef = doc(db, 'artists', artistId);
+          const aliasSnap = await getDoc(aliasDocRef);
+          
+          if (!aliasSnap.exists()) {
+            await setDoc(aliasDocRef, {
+              cacheKey: artistId,
+              artistId: artistId,
+              seedArtists: name,
+              graphData: JSON.stringify({ nodes: [], links: [] }),
+              filters: {},
+              cacheVersion: 2,
+              cachedAt: serverTimestamp(),
+              hitCount: 0,
+              redirectTo: canonicalId
+            });
+            console.log(`[ArtistCache] Created Alias Redirect: ${artistId} -> ${canonicalId}`);
           }
         }
       } catch (e: any) {
-        // Log the full error so auth failures and rule rejections are visible in the console
-        // rather than being swallowed silently. A permission-denied here means the /artists doc
-        // was never created, which causes batchHydrateDetailsCache to always miss and the
-        // background details fetcher to skip its write-back (Fix 3), compounding the amnesia bug.
         console.warn(`[ArtistCache] Write failed for "${artistId}" (${e.code ?? 'unknown'}): ${e.message}`);
       }
     })
@@ -432,9 +447,12 @@ export const assembleGraphFromCache = (
  */
 export const incrementCacheHit = async (artistId: string, activeUserId?: string | null): Promise<void> => {
   try {
-    await updateDoc(doc(db, 'artists', artistId), {
-      hitCount: increment(1),
-    });
+    const snap = await getArtistDocWithRedirect(artistId);
+    if (snap.exists()) {
+      await updateDoc(doc(db, 'artists', snap.id), {
+        hitCount: increment(1),
+      });
+    }
   } catch (error: any) {
     console.warn("Global write bypassed due to rule restrictions:", error.message);
   }
@@ -495,3 +513,56 @@ export const isCacheExpired = (cachedAt: any): boolean => {
   const oneYearMs = 365 * 24 * 60 * 60 * 1000;
   return (Date.now() - date.getTime()) > oneYearMs;
 };
+
+/**
+ * Reads a document from the global artist cache, resolving redirects.
+ * If the doc has a `redirectTo` field, fetches and returns the canonical doc snapshot instead.
+ * Supports up to 3 levels of redirects to prevent infinite loops.
+ */
+export const getArtistDocWithRedirect = async (
+  artistId: string,
+  depth = 0
+): Promise<DocumentSnapshot> => {
+  const docRef = doc(db, 'artists', artistId);
+  const snap = await getDoc(docRef);
+  
+  if (depth < 3 && snap.exists()) {
+    const data = snap.data();
+    if (data && typeof data.redirectTo === 'string' && data.redirectTo.trim().length > 0) {
+      const canonicalId = data.redirectTo.trim();
+      console.log(`[ArtistCache] Redirecting read: ${artistId} -> ${canonicalId} (depth: ${depth})`);
+      return getArtistDocWithRedirect(canonicalId, depth + 1);
+    }
+  }
+  
+  return snap;
+};
+
+/**
+ * Helper to identify the canonical/matching node in the returned graph data.
+ */
+export const findCanonicalNodeForArtist = (name: string, nodes: Node[]): Node | undefined => {
+  const normSearch = normalizeArtistId(name);
+  const artistNodes = nodes.filter(n => n.type === 'artist');
+  
+  // 1. Try exact normalized match on ID
+  let found = artistNodes.find(n => normalizeArtistId(n.id) === normSearch);
+  if (found) return found;
+  
+  // 2. Try exact normalized match on Label
+  found = artistNodes.find(n => n.label && normalizeArtistId(n.label) === normSearch);
+  if (found) return found;
+  
+  // 3. Try partial/fuzzy match (strip punctuation and spaces)
+  const cleanString = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const cleanSearch = cleanString(name);
+  
+  found = artistNodes.find(n => cleanString(n.id) === cleanSearch);
+  if (found) return found;
+  
+  found = artistNodes.find(n => n.label && cleanString(n.label) === cleanSearch);
+  if (found) return found;
+
+  return undefined;
+};
+
