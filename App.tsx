@@ -964,6 +964,8 @@ const App: React.FC = () => {
   const abortControllerRef = useRef<AbortController | null>(null);
   const lastProcessedSeedsRef = useRef<string | null>(null);
   const isFetchingDetailsRef = useRef<boolean>(false);
+  const fetchingNodeIdsRef = useRef<Set<string>>(new Set());
+  const lastProgressTimestampRef = useRef<number>(Date.now());
 
   const showToast = useCallback((message: string) => setToast({ message, id: Date.now() }), []);
 
@@ -1376,7 +1378,14 @@ const App: React.FC = () => {
       (cachedDetails.summary.includes('sandbox mock') || cachedDetails.summary.includes('test scenarios'));
       
     if (cachedDetails && cachedDetails.summary && cachedDetails.summary.length > 5 && !isPlaceholderBio) {
-       if (checkIsProfileIncomplete(node, cachedDetails)) {
+       const isTransitioning = loadingNodeIds.has(node.id) || 
+                               fetchingNodeIdsRef.current.has(node.id) || 
+                               loadingNodeIds.has(node.id.toLowerCase()) || 
+                               fetchingNodeIdsRef.current.has(node.id.toLowerCase()) ||
+                               loadingNodeIds.has(normalizeArtistId(node.id)) || 
+                               fetchingNodeIdsRef.current.has(normalizeArtistId(node.id));
+
+       if (!isTransitioning && checkIsProfileIncomplete(node, cachedDetails)) {
           console.log(`[Node Click Intercept] Incomplete local profile detected for: ${node.id}`);
           const displayName = cachedDetails?.details?.artist || node.label || node.id;
           const confirmed = await confirmTokenUsage('data_quality_optimization', [], [displayName]);
@@ -1493,7 +1502,14 @@ const App: React.FC = () => {
                         groundingLinks
                     };
 
-                    if (checkIsProfileIncomplete(node, detailsPayload)) {
+                    const isTransitioning = loadingNodeIds.has(node.id) || 
+                                           fetchingNodeIdsRef.current.has(node.id) || 
+                                           loadingNodeIds.has(node.id.toLowerCase()) || 
+                                           fetchingNodeIdsRef.current.has(node.id.toLowerCase()) ||
+                                           loadingNodeIds.has(normalizeArtistId(node.id)) || 
+                                           fetchingNodeIdsRef.current.has(normalizeArtistId(node.id));
+
+                    if (!isTransitioning && checkIsProfileIncomplete(node, detailsPayload)) {
                         console.log(`[Node Click Intercept] Incomplete Firestore profile detected for: ${node.id}`);
                         const displayName = detailsPayload?.details?.artist || node.label || node.id;
                         const confirmed = await confirmTokenUsage('data_quality_optimization', [], [displayName]);
@@ -3889,9 +3905,6 @@ const App: React.FC = () => {
       console.warn("[Revalidation] Background refresh failed for: " + cacheId, e.message);
     }
   }, [graphData, seedArtists, urlOriginHint]);
-
-  const fetchingNodeIdsRef = useRef<Set<string>>(new Set());
-  const lastProgressTimestampRef = useRef<number>(Date.now());
 
   // Watchdog to prevent stuck queue
   useEffect(() => {
