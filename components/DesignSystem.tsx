@@ -499,6 +499,21 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <li><strong>Curator Summary Quote:</strong> Standardized to <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">text-2xl font-serif italic text-zinc-100</code> (24px static). Placed tightly beneath metadata tags to eliminate empty layout spacers.</li>
                                 </ul>
                             </div>
+
+                            {/* Data & Transactional Typography Guidelines */}
+                            <div className="mt-6 p-6 bg-zinc-900/40 border border-zinc-800 rounded-xl space-y-4">
+                                <div className="flex items-center gap-3">
+                                    <span className="material-symbols-outlined text-primary">data_object</span>
+                                    <h3 className="text-lg font-medium text-white">Data & Transactional Typography Guidelines</h3>
+                                </div>
+                                <p className="text-sm text-zinc-400 leading-relaxed">
+                                    To ensure strict visual alignment and consistent number geometry across all dashboards, chronological and monetary metrics are standardized to use the monospace typeface:
+                                </p>
+                                <ul className="space-y-2 text-sm text-zinc-400 list-disc pl-5">
+                                    <li><strong>Primary Typography (Poppins):</strong> Standard UI text, labels, page titles, and interactive actions.</li>
+                                    <li><strong>Data Typography (JetBrains Mono / font-mono):</strong> Standardized for chronological timestamps, currencies, metric summaries, and ledger arrays. This ensures exact, tabular digit alignment (e.g. narrow vs. round &apos;0&apos; characters).</li>
+                                </ul>
+                            </div>
                         </div>
                     </section>
 

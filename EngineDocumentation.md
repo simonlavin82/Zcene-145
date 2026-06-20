@@ -214,3 +214,10 @@ To ensure that historical cache documents do not become permanently stale, Zcene
 *   **Asynchronous Background Refresh (Revalidate):** In the background, the client asynchronously fetches fresh biographical details from the Gemini Flash model. Once hydrated, the local details cache is updated, the active selected node state is refreshed in-place, and the global Firestore document is overwritten with the fresh data and a new `cachedAt` timestamp.
 *   **Sandbox Safety & Key Protection:** During revalidation, local development testing (such as on `localhost`, `127.0.0.1`, or port `3000`) completely bypasses live database updates and Gemini proxy requests, logging a console override statement instead. This prevents local development from polluting live production data or triggering unintended API quota usage.
 
+## 4. Typography & UI Design Standards
+
+To ensure cohesive presentation of layout elements, Zcene implements a strict separation of typography domains across the client interface:
+*   **Primary Typeface (Poppins):** Used for standard UI components, buttons, navigation links, layout labels, page titles, and body paragraphs.
+*   **Data Typeface (JetBrains Mono / `font-mono`):** Certified and standardized typeface used for all high-density tabular data, transactional metrics, chronological timestamps (e.g. `20/06/2026 • 12:24 pm` on cards and list rows), ledger lists, and structural confirmation dialog currency specs. This enforces precise, tabular digit geometry (e.g. narrow zero characters) for numerical and temporal readouts.
+
+

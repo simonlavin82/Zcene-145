@@ -324,7 +324,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                           )}
                         </div>
                       </div>
-                      <p className="font-poppins text-xs text-zinc-300 font-normal">
+                      <p className="font-mono text-xs text-zinc-300 font-normal">
                         {project.updatedAt ? `Edited ${formatProjectTimestamp(project.updatedAt)}` : 'New Project'}
                       </p>
                     </div>
