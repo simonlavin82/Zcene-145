@@ -591,21 +591,80 @@ const getNodeLabel = (node: Node, seedList: string[], detailsCache?: Map<string,
 };
 
 const checkIsProfileIncomplete = (node: Node, details: NodeDetails | null | undefined): boolean => {
-  if (!details || node.type !== 'artist') return false;
+  // Hardened artist node check: treat as artist if type matches OR if type is missing but we have artist details
+  const isArtist = node.type === 'artist' || !node.type || details?.details?.artist !== undefined;
+  if (!details || !isArtist) return false;
 
   const SENTINEL_INSIGHT = 'No insight provided.';
-  const genreEmpty    = !details.details?.genre   || details.details.genre   === 'Unknown';
-  const originEmpty   = !details.details?.origin  || details.details.origin  === 'Unknown';
-  const insightEmpty  = !details.recommendationReason ||
-                         details.recommendationReason.trim() === SENTINEL_INSIGHT;
 
-  const displayTitle  = node.label || node.id;
-  const isPurelyLower = !!displayTitle && displayTitle === displayTitle.toLowerCase() &&
-                         /[a-z]/.test(displayTitle);
+  // Hardened check for missing, null, or any "Unknown" variant
+  const isInvalidOrUnknown = (val: any): boolean => {
+    if (val === null || val === undefined) return true;
+    if (typeof val === 'string') {
+      const clean = val.trim().toLowerCase();
+      return (
+        clean === '' ||
+        clean.includes('unknown') ||
+        clean === 'n/a' ||
+        clean === 'none' ||
+        clean === 'null' ||
+        clean === 'undefined' ||
+        clean.includes('not available') ||
+        clean.includes('placeholder')
+      );
+    }
+    return false;
+  };
 
-  const hasSyntaxLeak = !!(details.summary && /\*{1,2}[^*]+\*{1,2}/.test(details.summary));
+  // Hardened check for purely lowercase string values
+  const isPurelyLowercase = (str: any): boolean => {
+    if (!str || typeof str !== 'string') return false;
+    const trimmed = str.trim();
+    return trimmed.length > 0 && trimmed === trimmed.toLowerCase() && /[a-z]/.test(trimmed);
+  };
 
-  return genreEmpty || originEmpty || insightEmpty || isPurelyLower || hasSyntaxLeak;
+  // 1. Core structural property validation (All fields must exist and be valid)
+  const genreEmpty      = isInvalidOrUnknown(details.details?.genre);
+  const originEmpty     = isInvalidOrUnknown(details.details?.origin);
+  const foundedEmpty    = isInvalidOrUnknown(details.details?.founded);
+  const artistNameEmpty  = isInvalidOrUnknown(details.details?.artist);
+  const insightEmpty    = isInvalidOrUnknown(details.recommendationReason) ||
+                          details.recommendationReason.trim().toLowerCase() === SENTINEL_INSIGHT.toLowerCase();
+
+  // 2. Lowercase identifier validation (Check display title, details artist, and first bolded summary word)
+  const displayTitle    = node.label || node.id;
+  const isLabelLower    = isPurelyLowercase(displayTitle);
+  const isArtistNameLower = isPurelyLowercase(details.details?.artist);
+  
+  // Extract first bolded term from summary (e.g. "**scowl**") and check if it is purely lowercase
+  const firstBoldMatch  = details.summary ? details.summary.match(/\*\*([^*]+)\*\*/) : null;
+  const isBoldBioNameLower = firstBoldMatch ? isPurelyLowercase(firstBoldMatch[1]) : false;
+  
+  const isLowercasedMarker = isLabelLower || isArtistNameLower || isBoldBioNameLower;
+
+  // 3. Syntax leak check
+  const hasSyntaxLeak   = !!(details.summary && /\*{1,2}[^*]+\*{1,2}/.test(details.summary) && isBoldBioNameLower);
+
+  // 4. Repeating generic template/placeholder pattern check
+  const PLACEHOLDER_PHRASES = [
+    "is a notable music entity",
+    "stylistic contributions, helping shape the sonic evolution",
+    "sandbox mock",
+    "test scenarios"
+  ];
+  const hasPlaceholderPattern = !!(details.summary && PLACEHOLDER_PHRASES.some(phrase => 
+    details.summary.toLowerCase().includes(phrase.toLowerCase())
+  ));
+
+  return (
+    genreEmpty ||
+    originEmpty ||
+    foundedEmpty ||
+    artistNameEmpty ||
+    insightEmpty ||
+    isLowercasedMarker ||
+    hasPlaceholderPattern
+  );
 };
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
