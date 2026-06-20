@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import Markdown from 'react-markdown';
 import { Node, NodeDetails, GraphData, View, ChatMessage, StackItem, UserTaste } from '../types';
 import { streamNodeChat, fetchLiveTourData } from '../services/geminiService';
-import { normalizeArtistId } from '../services/artistCacheService';
+import { normalizeArtistId, titleCaseArtistId } from '../services/artistCacheService';
 import { analyticsService } from '../services/analyticsService';
 import { Spinner, HelpIcon, MicIcon, LoadingSpinner, DETAIL_THINKING_STEPS, StackIcon } from './Icons';
 
@@ -342,7 +342,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     title="Click to copy name"
                                 >
                                     <h3 className={`${headerSizeClass} text-white leading-[0.9] py-1 break-normal`}>
-                                        {node.label || node.id}
+                                        {details?.details?.artist || node.label || titleCaseArtistId(node.id)}
                                     </h3>
                                     <span className={`material-symbols-outlined !text-[16px] flex-shrink-0 transition-all duration-300 ${isIdCopied ? 'text-primary opacity-100 scale-110' : 'text-zinc-500 opacity-0 group-hover:opacity-100'}`}>
                                         {isIdCopied ? 'check' : 'content_copy'}
@@ -394,7 +394,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     <img 
                                         ref={imgRef}
                                         src={details.imageUrl} 
-                                        alt={node.label || node.id} 
+                                        alt={details?.details?.artist || node.label || titleCaseArtistId(node.id)} 
                                         className="w-full h-full object-cover scale-105 hover:scale-100 transition-transform duration-1000"
                                         onLoad={() => setImgLoaded(true)}
                                         onError={() => setImageError(true)}
@@ -909,7 +909,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
             result = result.filter(node => {
                 const details = detailsCache.get(node.id) || detailsCache.get(node.id.toLowerCase()) || detailsCache.get(normalizeArtistId(node.id));
                 return (
-                    (node.label || node.id).toLowerCase().includes(query) ||
+                    (details?.details?.artist || node.label || titleCaseArtistId(node.id)).toLowerCase().includes(query) ||
                     details?.details?.genre?.toLowerCase().includes(query) ||
                     details?.details?.origin?.toLowerCase().includes(query) ||
                     details?.summary?.toLowerCase().includes(query)
@@ -1108,7 +1108,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                         key={node.id} 
                                         onClick={() => { setViewedIndex(i); onNodeClick(node); }}
                                         className={`h-1 transition-all cursor-pointer ${i === viewedIndex ? 'w-4 bg-primary' : 'w-1 bg-zinc-600 active:bg-zinc-400'}`}
-                                        title={node.label || node.id}
+                                        title={node.label || titleCaseArtistId(node.id)}
                                     />
                                 ))}
                             </div>

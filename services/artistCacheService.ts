@@ -26,6 +26,20 @@ export const normalizeArtistId = (name: string): string =>
     .replace(/^-+|-+$/g, '')
     .substring(0, 256);
 
+/**
+ * Title cases a raw kebab-case or snake-case artist ID string.
+ * e.g. "mindforce" -> "Mindforce", "drug-church" -> "Drug Church"
+ */
+export const titleCaseArtistId = (id: string): string => {
+  if (!id) return '';
+  const spacedId = id.replace(/[-_]+/g, ' ').trim();
+  return spacedId
+    .split(' ')
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+};
+
+
 
 /**
  * Standardizes a graph's node IDs and links to ensure consistency:

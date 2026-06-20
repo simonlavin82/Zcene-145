@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { AlertCircle, X, CheckCircle2, Key } from 'lucide-react';
 import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project, ArtistCacheEntry, COST_PER_AI_CALL } from './types';
 import { generateGraphData, fetchNodeDetails, extendGraphFromNode } from './services/geminiService';
-import { normalizeArtistId, readArtistCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect } from './services/artistCacheService';
+import { normalizeArtistId, readArtistCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, titleCaseArtistId } from './services/artistCacheService';
 import { auth, signInWithGoogle, logout, onAuthStateChanged, User, db, handleFirestoreError, OperationType } from './services/firebase';
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, getDocFromServer, serverTimestamp, addDoc, getDoc, getDocs, orderBy, where, writeBatch, getDocFromCache, updateDoc, increment } from 'firebase/firestore';
 const StyleGuidePage = React.lazy(() => import('./components/DesignSystem').then(m => ({ default: m.StyleGuidePage })));
@@ -566,9 +566,14 @@ const toTitleCase = (str: string): string => {
     .join(' ');
 };
 
+// Hardened check for purely lowercase string values
+const isPurelyLowercase = (str: any): boolean => {
+  if (!str || typeof str !== 'string') return false;
+  const trimmed = str.trim();
+  return trimmed.length > 0 && trimmed === trimmed.toLowerCase() && /[a-z]/.test(trimmed);
+};
+
 const getNodeLabel = (node: Node, seedList: string[], detailsCache?: Map<string, NodeDetails>): string => {
-  const rawLabel = node.label || node.id || '';
-  
   if (node.type === 'artist') {
     const normId = normalizeArtistId(node.id);
     const seedMatch = seedList.find(s => normalizeArtistId(s) === normId);
@@ -582,6 +587,8 @@ const getNodeLabel = (node: Node, seedList: string[], detailsCache?: Map<string,
       if (cachedName) return cachedName;
     }
   }
+
+  const rawLabel = node.label || titleCaseArtistId(node.id) || '';
 
   if (rawLabel === rawLabel.toLowerCase()) {
     return toTitleCase(rawLabel);
@@ -616,27 +623,6 @@ const checkIsProfileIncomplete = (node: Node, details: NodeDetails | null | unde
     return false;
   };
 
-  // Hardened check for purely lowercase string values
-  const isPurelyLowercase = (str: any): boolean => {
-    if (!str || typeof str !== 'string') return false;
-    const trimmed = str.trim();
-    return trimmed.length > 0 && trimmed === trimmed.toLowerCase() && /[a-z]/.test(trimmed);
-  };
-
-  // 1. Core structural property validation (All fields must exist and be valid)
-  const genreEmpty      = isInvalidOrUnknown(details.details?.genre);
-  const originEmpty     = isInvalidOrUnknown(details.details?.origin);
-  const foundedEmpty    = isInvalidOrUnknown(details.details?.founded);
-  const artistNameEmpty  = isInvalidOrUnknown(details.details?.artist);
-  // Only flag insightEmpty if the field was explicitly synthesized with a sentinel/low-quality value.
-  // Absent (undefined) or empty ("") fields — legacy Firestore records pre-dating this schema field —
-  // are non-blocking and must not trigger a re-synthesis loop.
-  // Truth table: undefined → false, "" → false, "No insight provided." → true, real content → false.
-  const insightEmpty    = typeof details.recommendationReason === 'string' &&
-                          details.recommendationReason.trim().length > 0 &&
-                          details.recommendationReason.trim().toLowerCase() === SENTINEL_INSIGHT.toLowerCase();
-
-  // 2. Lowercase identifier validation (Check display title, details artist, and first bolded summary word)
   // Fallback chain normalization: try details field first, then node label
   let displayTitle = details.details?.artist || node.label;
   if (!displayTitle || displayTitle.toLowerCase() === node.id.toLowerCase()) {
@@ -650,12 +636,26 @@ const checkIsProfileIncomplete = (node: Node, details: NodeDetails | null | unde
     }
     // Fall back to title-casing the spaced ID if not found in the summary
     if (!displayTitle || displayTitle.toLowerCase() === node.id.toLowerCase()) {
-      displayTitle = spacedId.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+      displayTitle = titleCaseArtistId(node.id);
     }
   }
 
+  // 1. Core structural property validation (All fields must exist and be valid)
+  const genreEmpty      = isInvalidOrUnknown(details.details?.genre);
+  const originEmpty     = isInvalidOrUnknown(details.details?.origin);
+  const foundedEmpty    = isInvalidOrUnknown(details.details?.founded);
+  const artistNameEmpty  = isInvalidOrUnknown(details.details?.artist || displayTitle);
+  // Only flag insightEmpty if the field was explicitly synthesized with a sentinel/low-quality value.
+  // Absent (undefined) or empty ("") fields — legacy Firestore records pre-dating this schema field —
+  // are non-blocking and must not trigger a re-synthesis loop.
+  // Truth table: undefined → false, "" → false, "No insight provided." → true, real content → false.
+  const insightEmpty    = typeof details.recommendationReason === 'string' &&
+                          details.recommendationReason.trim().length > 0 &&
+                          details.recommendationReason.trim().toLowerCase() === SENTINEL_INSIGHT.toLowerCase();
+
+  // 2. Lowercase identifier validation (Check display title, details artist, and first bolded summary word)
   const isLabelLower    = isPurelyLowercase(displayTitle);
-  const isArtistNameLower = isPurelyLowercase(details.details?.artist);
+  const isArtistNameLower = isPurelyLowercase(details.details?.artist || displayTitle);
   
   // Find all bolded terms in summary (e.g. "**scowl**", "**alternative rock**")
   const boldMatches     = details.summary ? Array.from(details.summary.matchAll(/\*\*([^*]+)\*\*/g)) : [];
@@ -1403,7 +1403,7 @@ const App: React.FC = () => {
     if (cachedDetails && cachedDetails.summary && cachedDetails.summary.length > 5 && !isPlaceholderBio) {
        if (checkIsProfileIncomplete(node, cachedDetails)) {
           console.log(`[Node Click Intercept] Incomplete local profile detected for: ${node.id}`);
-          const displayName = cachedDetails?.details?.artist || node.label || node.id;
+          const displayName = cachedDetails?.details?.artist || node.label || titleCaseArtistId(node.id);
           const confirmed = await confirmTokenUsage('data_quality_optimization', [], [displayName]);
           if (!confirmed) return; // Cancel: return early without rendering details
 
@@ -1521,7 +1521,7 @@ const App: React.FC = () => {
                 const genre = parsed?.details?.genre || parsed?.genre || parsed?.genres || "";
                 const origin = parsed?.details?.origin || parsed?.origin || parsed?.location || parsed?.country || "";
                 const founded = parsed?.details?.founded || parsed?.founded || parsed?.formed || parsed?.year || "";
-                const artistName = parsed?.details?.artist || parsed?.artist || parsed?.name || data.seedArtists || data.artistId || node.id;
+                const artistName = parsed?.details?.artist || parsed?.artist || parsed?.name || data.seedArtists || data.artistId || titleCaseArtistId(node.id);
                 const notableArtists = parsed?.details?.notableArtists || parsed?.notableArtists || [];
                 const members = parsed?.members || [];
                 const links = parsed?.links || [];
@@ -1546,7 +1546,7 @@ const App: React.FC = () => {
 
                     if (checkIsProfileIncomplete(node, detailsPayload)) {
                         console.log(`[Node Click Intercept] Incomplete Firestore profile detected for: ${node.id}`);
-                        const displayName = detailsPayload?.details?.artist || node.label || node.id;
+                        const displayName = detailsPayload?.details?.artist || node.label || titleCaseArtistId(node.id);
                         const confirmed = await confirmTokenUsage('data_quality_optimization', [], [displayName]);
                         if (!confirmed) return; // Cancel: return early without rendering details
 
@@ -1643,7 +1643,7 @@ const App: React.FC = () => {
   }
 
     // 3. Fallback Only if Empty
-    const confirmed = await confirmTokenUsage('deep_cut_creation', [], [node.id]);
+    const confirmed = await confirmTokenUsage('deep_cut_creation', [], [node.label || titleCaseArtistId(node.id)]);
     if (!confirmed) {
       return;
     }
@@ -3735,7 +3735,7 @@ const App: React.FC = () => {
     // ── Token Quota Gate ───────────────────────────────────────────────────────
     // Must run BEFORE any cache eviction or Firestore deletion.
     // If the curator cancels, the profile is left untouched and no AI call fires.
-    const confirmed = await confirmTokenUsage('data_quality_optimization', [], [nodeId]);
+    const confirmed = await confirmTokenUsage('data_quality_optimization', [], [titleCaseArtistId(nodeId)]);
     if (!confirmed) return;
     // ──────────────────────────────────────────────────────────────────────────
 
@@ -3805,7 +3805,7 @@ const App: React.FC = () => {
       }
     }
 
-    const confirmed = await confirmTokenUsage('extension', [], [node.id]);
+    const confirmed = await confirmTokenUsage('extension', [], [node.label || titleCaseArtistId(node.id)]);
     if (!confirmed) return;
 
     // 1. Mark the parent node as a seed if it's an artist

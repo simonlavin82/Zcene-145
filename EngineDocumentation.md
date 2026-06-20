@@ -189,9 +189,33 @@ User (Browser)          Frontend UI          Firestore DB          Cloud Storage
 
 ---
 
-## 3.0 Cost Estimation Architecture
+## 3. Core Refactoring & Synchronization Enhancements (Sprint Audit)
 
-### 3.1 Platform Cost Metrics Ledger
+This section details the critical stability enhancements made to resolve timing race conditions, blocking UI states, and validation loop traps across the cache and UI boundary layers.
+
+### 3.1 Synchronous Memory Pre-Mutation Lifecycle
+*   **The Issue:** On hard browser refreshes, popstate routing or direct deep-link routing would select a node immediately during page initialization. At this moment, the details cache was being hydrated from Firestore asynchronously (`batchHydrateDetailsCache`), which queued a React state update (`setDetailsCache`). However, because React state updates are batched and asynchronous, `handleNodeClick` would query `detailsCacheRef.current` during the brief render-commit window (0 ms) and find it empty, falling back to a duplicate live network query and triggering token usage warnings.
+*   **The Solution:** `batchHydrateDetailsCache` was refactored to eagerly and synchronously mutate the `detailsCacheRef.current` lookup table *before* dispatching the React state update `setDetailsCache`. This guarantees that the ref is synchronously up-to-date and populated when the subsequent node selection handler queries it during the active render frame, completely eliminating the mount-time routing race condition.
+
+### 3.2 Non-Blocking Eviction & Immediate Loading Intercepts
+*   **The Issue:** When a user clicked "Confirm" on the Token Quota Warning modal to heal a stale profile, the click handler awaited the Cloud Firestore `deleteDoc` and `updateDoc` operations before selecting the node and closing the modal. In slow network conditions, the UI would lock and feel frozen. Additionally, clicking a node that was already selected or currently fetching in the background would fall through to duplicate token confirmation prompts.
+*   **The Solution:**
+    *   **Non-Blocking Firestore Operations:** Removed the `await` keyword from `deleteDoc` and `updateDoc` cleanup operations inside the modal confirmation handlers. Eviction requests are now executed as background promises with dedicated error handling, letting the UI transition instantly.
+    *   **Loading State Short-Circuiting:** Added a guard at the top of `handleNodeClick` to immediately select the node and return if the node is already selected or currently transitioning/loading in the background (`loadingNodeIds` or `fetchingNodeIdsRef.current`), preventing redundant token warnings.
+    *   **Synchronous Frame Clearing:** Deletes evicted artist keys synchronously from all three local cache frames (`detailsCacheRef.current`, `detailsCache` state Map, and `healedDetailsCacheRef.current`) during eviction, ensuring subsequent routing checks never read stale cached data.
+
+### 3.3 Boundary Fallback Hardening Utility (`titleCaseArtistId`)
+*   **The Issue:** If a newly synthesized Gemini biography contains a high-quality summary but lacks the nested `details.artist` JSON key on Firestore, the UI header fallback chain falls back to the raw document ID string, which is a lowercase slug (e.g. `"mindforce"`, `"drug-church"`). In the validation engine, evaluating a lowercase display title or missing `details.artist` key tripped `isLowercasedMarker` and `artistNameEmpty`, forcing the client into an infinite re-synthesis loop.
+*   **The Solution:**
+    *   **Centralized Helper (`titleCaseArtistId`):** Introduced a helper function in `artistCacheService.ts` to convert kebab-case or snake-case IDs into capitalized titles (e.g., `"drug-church"` -> `"Drug Church"`).
+    *   **Validation Gate Integration:** Moved `isPurelyLowercase` to module scope in `App.tsx` and refactored `checkIsProfileIncomplete` to compute the `displayTitle` at the very beginning of the gate lifecycle, utilizing `titleCaseArtistId(node.id)` as the final fallback. Validation checks (`artistNameEmpty` and `isArtistNameLower`) now evaluate `details.details?.artist || displayTitle`, shielding the engine from missing nested keys.
+    *   **UI Alignment:** Integrated `titleCaseArtistId` across `DetailsPanel.tsx` (card header, image alt attribute, pagination dot titles, and search queries) and `App.tsx` (getNodeLabel and click intercepts) to ensure raw lowercase IDs are never displayed in the UI or evaluated in validation gates.
+
+---
+
+## 4. Cost Estimation Architecture
+
+### 4.1 Platform Cost Metrics Ledger
 Usage cost metrics are mapped directly from the platform Usage Analytics ledger. The platform has a base rate defined as:
 *   `COST_PER_AI_CALL = 0.0015` ($0.0015 per query / AI invocation).
 
@@ -200,7 +224,7 @@ This rate applies uniformly across all three primary AI invocation entry-points:
 2.  **Node Expansion (Graph Extension):** Initiated when extending the graph from a specific node to fetch new connections.
 3.  **Deep Cut Creation (Node Click):** Initiated when clicking a node whose biography has not been generated and cached in Firestore.
 
-### 3.2 Cache-Gating Principles & Rationales
+### 4.2 Cache-Gating Principles & Rationales
 Every outbound request to the Gemini API incurs real-world usage costs. To manage billing consumption efficiently, Zcene applies a strict cache-first strategy before triggering confirmations:
 *   **Zero-Cost Cache Hits:** If requested data (full sub-graphs or biography details) is found in local memory or within the global `/artists` collection in Firestore, it is returned instantly and for free.
 *   **Gated AI Invocations:** If a query requires net-new model synthesis, the user is warned of the token cost before any network requests or optimistic UI changes are committed.
@@ -208,14 +232,16 @@ Every outbound request to the Gemini API incurs real-world usage costs. To manag
 *   **Smart Fallback Routing:** On mixed queries, the cancel warning acts as an intelligent routing mechanism. Rather than discarding the entire search, the app strips the uncached bands on the fly and re-routes the process using only cached (free) bands.
 *   **Sandbox Safety Gates:** In sandbox/development environments, the local application forces `isLocal = true` in the services layer. This short-circuits live outbound dispatches with local static JSON mock data, completely protecting billing limits while still allowing developers to test the warning flows and ledger logging logic.
 
-### 3.3 Stale-While-Revalidate Freshness Policy
+### 4.3 Stale-While-Revalidate Freshness Policy
 To ensure that historical cache documents do not become permanently stale, Zcene implements an automated **Stale-While-Revalidate (SWR)** freshness policy inside the JIT node selection hydration flow:
 *   **Expiration Threshold:** Cache documents are considered stale if their `cachedAt` timestamp is older than 365 days (1 year).
 *   **Zero-Latency Hydration (Stale-While):** When a user clicks a node that is cached but expired, the stale biography and detail payload are loaded instantly into the UI, ensuring zero perception latency for the user.
 *   **Asynchronous Background Refresh (Revalidate):** In the background, the client asynchronously fetches fresh biographical details from the Gemini Flash model. Once hydrated, the local details cache is updated, the active selected node state is refreshed in-place, and the global Firestore document is overwritten with the fresh data and a new `cachedAt` timestamp.
 *   **Sandbox Safety & Key Protection:** During revalidation, local development testing (such as on `localhost`, `127.0.0.1`, or port `3000`) completely bypasses live database updates and Gemini proxy requests, logging a console override statement instead. This prevents local development from polluting live production data or triggering unintended API quota usage.
 
-## 4. Typography & UI Design Standards
+---
+
+## 5. Typography & UI Design Standards
 
 To ensure cohesive presentation of layout elements, Zcene implements a strict separation of typography domains across the client interface:
 *   **Primary Typeface (Poppins):** Used for standard UI components, buttons, navigation links, layout labels, page titles, and body paragraphs.
