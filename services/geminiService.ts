@@ -1133,7 +1133,7 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
         links: sanitisedLinks,
         discography: details.discography || [],
         members: details.members || [],
-        recommendationReason: details.recommendationReason || "No insight provided.",
+        recommendationReason: details.recommendationReason || "",
     };
 
     if (!hydratedDetails.details) hydratedDetails.details = {};

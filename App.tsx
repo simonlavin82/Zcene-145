@@ -628,7 +628,12 @@ const checkIsProfileIncomplete = (node: Node, details: NodeDetails | null | unde
   const originEmpty     = isInvalidOrUnknown(details.details?.origin);
   const foundedEmpty    = isInvalidOrUnknown(details.details?.founded);
   const artistNameEmpty  = isInvalidOrUnknown(details.details?.artist);
-  const insightEmpty    = isInvalidOrUnknown(details.recommendationReason) ||
+  // Only flag insightEmpty if the field was explicitly synthesized with a sentinel/low-quality value.
+  // Absent (undefined) or empty ("") fields — legacy Firestore records pre-dating this schema field —
+  // are non-blocking and must not trigger a re-synthesis loop.
+  // Truth table: undefined → false, "" → false, "No insight provided." → true, real content → false.
+  const insightEmpty    = typeof details.recommendationReason === 'string' &&
+                          details.recommendationReason.trim().length > 0 &&
                           details.recommendationReason.trim().toLowerCase() === SENTINEL_INSIGHT.toLowerCase();
 
   // 2. Lowercase identifier validation (Check display title, details artist, and first bolded summary word)
