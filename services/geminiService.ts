@@ -554,12 +554,14 @@ const generateMockNodeDetails = (node: Node): NodeDetails => {
     ]
   };
 
-  const defaultSummary = `**${node.id}** is a notable music entity in the scene. They are highly recognized for their stylistic contributions, helping shape the sonic evolution and community around alternative music.`;
-  const defaultMembers = ['Lead Artist / Musician', 'Session Players'];
+  const displayTitle = node.label || node.id;
+  const capitalizedName = displayTitle.charAt(0).toUpperCase() + displayTitle.slice(1);
+  const defaultSummary = `**${capitalizedName}** is a highly influential band known for their explosive live shows and distinct musical style. They have built a dedicated fan base and continue to inspire modern underground acts.`;
+  const defaultMembers = ['Lead Artist / Musician', 'Collaborating Players'];
   const defaultAlbums = [
-    { albumName: 'Self-Titled Debut', releaseYear: '2015' },
-    { albumName: 'Breakthrough Album', releaseYear: '2018' },
-    { albumName: 'Latest Release', releaseYear: '2022' }
+    { albumName: 'Self-Titled Debut', releaseYear: '2016' },
+    { albumName: 'Breakthrough Album', releaseYear: '2019' },
+    { albumName: 'Latest Release', releaseYear: '2023' }
   ];
 
   return {
@@ -567,15 +569,16 @@ const generateMockNodeDetails = (node: Node): NodeDetails => {
     imageUrl: 'https://en.wikipedia.org/wiki/Special:FilePath/Record_icon.svg',
     members: members[norm] || defaultMembers,
     details: {
-      genre: 'Alternative / Hardcore',
-      origin: 'New York, USA',
-      founded: '1995'
+      genre: 'Hardcore Punk',
+      origin: 'California, USA',
+      founded: '2015',
+      artist: capitalizedName
     },
     links: [
       { site: 'Wikipedia', url: `https://en.wikipedia.org/wiki/${encodeURIComponent(node.id)}` }
     ],
     discography: albums[norm] || defaultAlbums,
-    recommendationReason: `Essential artist that defines the roots and branchings of the ${node.id} scene.`
+    recommendationReason: `Essential artist that defines the roots and branchings of the ${capitalizedName} scene.`
   };
 };
 

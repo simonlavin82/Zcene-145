@@ -894,6 +894,7 @@ const App: React.FC = () => {
   const discoveryFiltersRef = useRef<DiscoveryFilters>({});
   const lastViewedStackCountRef = useRef<number>(0);
   const currentCacheKeyRef = useRef<string | null>(null);
+  const evictedNodeIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => { currentProjectOwnerIdRef.current = currentProjectOwnerId; }, [currentProjectOwnerId]);
   useEffect(() => { projectNameRef.current = projectName; }, [projectName]);
@@ -1342,17 +1343,21 @@ const App: React.FC = () => {
           if (!confirmed) return; // Cancel: return early without rendering details
 
           // Confirmed: Evict local cache immediately so the background queue will process it
+          const cacheId = normalizeArtistId(node.id);
+          evictedNodeIdsRef.current.add(node.id);
+          evictedNodeIdsRef.current.add(node.id.toLowerCase());
+          evictedNodeIdsRef.current.add(cacheId);
+
           setDetailsCache(prev => {
               const n = new Map(prev);
               n.delete(node.id);
               n.delete(node.id.toLowerCase());
-              n.delete(normalizeArtistId(node.id));
+              n.delete(cacheId);
               return n;
           });
 
-          // Delete from Firestore
+          // Delete from Firestore asynchronously, awaiting it safely
           try {
-              const cacheId = normalizeArtistId(node.id);
               await deleteDoc(doc(db, 'artists', cacheId));
               console.log(`[Node Click Intercept] Evicted stale Firestore cache for: ${cacheId}`);
           } catch (error: any) {
@@ -1393,10 +1398,13 @@ const App: React.FC = () => {
     // 2.5 GLOBAL ARTISTS FALLBACK
     // If the local detailsCache is empty (e.g. freshly loaded project), query the root artists collection directly.
     // Firestore stores detailsCache as a JSON string — parse it and unwrap any array wrapper layers.
-    try {
-        const standardizedId = normalizeArtistId(node.id);
-        
-        let globalDoc = await getArtistDocWithRedirect(standardizedId);
+    const isEvicted = evictedNodeIdsRef.current.has(node.id) || 
+                      evictedNodeIdsRef.current.has(node.id.toLowerCase()) || 
+                      evictedNodeIdsRef.current.has(normalizeArtistId(node.id));
+    if (!isEvicted) {
+        try {
+            const standardizedId = normalizeArtistId(node.id);
+            let globalDoc = await getArtistDocWithRedirect(standardizedId);
         
         if (globalDoc.exists()) {
             const data = globalDoc.data();
@@ -1499,6 +1507,7 @@ const App: React.FC = () => {
     } catch(err) {
         console.warn("[Node Click] Global fallback read failed:", err);
     }
+  }
 
     // 3. Fallback Only if Empty
     const confirmed = await confirmTokenUsage('deep_cut_creation', [], [node.id]);
@@ -3908,12 +3917,17 @@ const App: React.FC = () => {
                 // Global Artists Fallback Read
                 let fallbackDetails: NodeDetails | null = null;
                 let isStale = false;
-                try {
-                  const cacheId = normalizeArtistId(node.id);
-                  let cacheDoc = await getArtistDocWithRedirect(cacheId);
-                  
-                  if (cacheDoc.exists()) {
-                     const data = cacheDoc.data();
+                
+                const isEvicted = evictedNodeIdsRef.current.has(node.id) || 
+                                  evictedNodeIdsRef.current.has(node.id.toLowerCase()) || 
+                                  evictedNodeIdsRef.current.has(normalizeArtistId(node.id));
+                if (!isEvicted) {
+                  try {
+                    const cacheId = normalizeArtistId(node.id);
+                    let cacheDoc = await getArtistDocWithRedirect(cacheId);
+                    
+                    if (cacheDoc.exists()) {
+                       const data = cacheDoc.data();
                      if (data) {
                         isStale = isCacheExpired(data.cachedAt);
                      }
@@ -3958,6 +3972,7 @@ const App: React.FC = () => {
                      }
                   }
                 } catch (e) { console.warn("[Global Cache] Fallback read failed", e); }
+                }
 
                 let details: NodeDetails;
                 if (fallbackDetails) {
@@ -3982,6 +3997,11 @@ const App: React.FC = () => {
                   updated.set(normalizeArtistId(node.id), details);
                   return updated;
                 });
+                
+                evictedNodeIdsRef.current.delete(node.id);
+                evictedNodeIdsRef.current.delete(node.id.toLowerCase());
+                evictedNodeIdsRef.current.delete(normalizeArtistId(node.id));
+
                 incrementDeepCutsOpenedCount();
 
                 // Fix 3: Race-safe details write-back.
