@@ -6,7 +6,7 @@ import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, St
 import { generateGraphData, fetchNodeDetails, extendGraphFromNode } from './services/geminiService';
 import { normalizeArtistId, readArtistCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph } from './services/artistCacheService';
 import { auth, signInWithGoogle, logout, onAuthStateChanged, User, db, handleFirestoreError, OperationType } from './services/firebase';
-import { collection, doc, setDoc, deleteDoc, onSnapshot, query, getDocFromServer, serverTimestamp, addDoc, getDoc, getDocs, orderBy, where, writeBatch, getDocFromCache, updateDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, onSnapshot, query, getDocFromServer, serverTimestamp, addDoc, getDoc, getDocs, orderBy, where, writeBatch, getDocFromCache, updateDoc, increment } from 'firebase/firestore';
 const StyleGuidePage = React.lazy(() => import('./components/DesignSystem').then(m => ({ default: m.StyleGuidePage })));
 const EnginePage = React.lazy(() => import('./components/EnginePage').then(m => ({ default: m.EnginePage })));
 const UsageAnalyticsPage = React.lazy(() => import('./components/UsageAnalyticsPage').then(m => ({ default: m.UsageAnalyticsPage })));
@@ -1265,6 +1265,7 @@ const App: React.FC = () => {
        if (node.type !== 'founded') {
          setActiveNodes(prev => prev.some(n => n.id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node]);
        }
+       incrementDeepCutsOpenedCount();
        
        // Force stop all loading indicators for this node
        fetchingNodeIdsRef.current.delete(node.id);
@@ -1327,6 +1328,7 @@ const App: React.FC = () => {
                     if (node.type !== 'founded') {
                         setActiveNodes(prev => prev.some(n => n.id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node]);
                     }
+                    incrementDeepCutsOpenedCount();
                     
                     // Push to detailsCache so the background queue skips this node entirely
                     const detailsPayload: NodeDetails = {
@@ -3571,6 +3573,31 @@ const App: React.FC = () => {
     showToast(`Removed ${node.label || node.id}`);
   }, [selectedNode, showToast]);
 
+  const incrementDeepCutsOpenedCount = useCallback(async () => {
+    // Guardrail: Sandbox Safety & Key Protection
+    const isLocal = typeof window !== 'undefined' && 
+      (window.location.hostname === 'localhost' || 
+       window.location.hostname === '127.0.0.1' ||
+       window.location.port === '3000');
+    
+    if (isLocal || import.meta.env.DEV) {
+      console.log("[Analytics] Sandbox Mode: Suppressed JIT increment of Deep Cuts Opened counter.");
+      return;
+    }
+
+    if (!user) return;
+
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      await updateDoc(userRef, {
+        deepCutsOpened: increment(1)
+      });
+      console.log("[Analytics] JIT incremented Deep Cuts Opened counter.");
+    } catch (e: any) {
+      console.warn("[Analytics] Bypassed incrementing Deep Cuts Opened count:", e.message);
+    }
+  }, [user]);
+
   const fetchingNodeIdsRef = useRef<Set<string>>(new Set());
   const lastProgressTimestampRef = useRef<number>(Date.now());
 
@@ -3713,6 +3740,7 @@ const App: React.FC = () => {
                   updated.set(normalizeArtistId(node.id), details);
                   return updated;
                 });
+                incrementDeepCutsOpenedCount();
 
                 // Fix 3: Race-safe details write-back.
                 // Using { merge: true } on a non-existent doc is treated as a CREATE by Firestore.
@@ -3801,7 +3829,7 @@ const App: React.FC = () => {
       } finally { isFetchingDetailsRef.current = false; }
     };
     fetch();
-  }, [activeNodes, detailsCache, graphData, seedArtists, selectedNode, urlOriginHint, humanizeError, user, isLoading]);
+  }, [activeNodes, detailsCache, graphData, seedArtists, selectedNode, urlOriginHint, humanizeError, user, isLoading, incrementDeepCutsOpenedCount]);
 
   const handleViewChange = useCallback((newView: View) => {
     if (newView === View.Graph && !graphData) setGraphData({ nodes: [], links: [] });

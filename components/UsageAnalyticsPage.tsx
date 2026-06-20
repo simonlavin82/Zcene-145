@@ -23,6 +23,7 @@ export interface UserTelemetry {
         liveQueries: number;
         cacheHits: number;
     };
+    deepCutsOpened: number;
     onboardingProgress?: {
         step1?: boolean;
         step2?: boolean;
@@ -199,6 +200,10 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
                                                                      <span className="text-zinc-400">Actions Executed:</span>
                                                                      <span className="text-white">{user.actionTriggers.updateCount}</span>
                                                                  </div>
+                                                                 <div className="flex justify-between border-b border-zinc-800/50 pb-1">
+                                                                     <span className="text-zinc-400">Deep Cuts Opened:</span>
+                                                                     <span className="text-white">{user.deepCutsOpened}</span>
+                                                                 </div>
                                                                  <div className="flex justify-between">
                                                                      <span className="text-zinc-400">Total Actions:</span>
                                                                      <span className="text-white font-bold">{totalActions}</span>
@@ -299,7 +304,8 @@ interface UsageAnalyticsPageProps {
 const calculateTelemetryForUser = (
     email: string,
     onboardingProgress: any,
-    projectDocs: any[]
+    projectDocs: any[],
+    deepCutsOpened?: number
 ): UserTelemetry => {
     let totalUpdates = 0;
     let totalLiveQueries = 0;
@@ -364,6 +370,7 @@ const calculateTelemetryForUser = (
             liveQueries: totalLiveQueries,
             cacheHits: totalCacheHits
         },
+        deepCutsOpened: deepCutsOpened || 0,
         onboardingProgress: onboardingProgress || {}
     };
 };
@@ -421,7 +428,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                     const projectsSnap = await getDocs(collection(db, 'users', uDoc.id, 'projects'));
                     
                     // Parse projects to calculate telemetry
-                    return calculateTelemetryForUser(email, uData.onboardingProgress, projectsSnap.docs);
+                    return calculateTelemetryForUser(email, uData.onboardingProgress, projectsSnap.docs, uData.deepCutsOpened);
                 });
                 telemetryList = await Promise.all(userPromises);
             } else {
@@ -440,7 +447,8 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                 const singleTelemetry = calculateTelemetryForUser(
                     uData.email || user.email || 'sandbox@zcene.online',
                     uData.onboardingProgress,
-                    projectsSnap.docs
+                    projectsSnap.docs,
+                    uData.deepCutsOpened
                 );
                 telemetryList = [singleTelemetry];
             }

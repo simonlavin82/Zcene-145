@@ -50,6 +50,7 @@ service cloud.firestore {
              (!('updatedAt' in data) || (data.updatedAt is timestamp)) &&
              (!('libraryArtists' in data) || (data.libraryArtists is string)) &&
              (!('onboardingProgress' in data) || data.onboardingProgress is map) &&
+             (!('deepCutsOpened' in data) || (data.deepCutsOpened is int)) &&
              (!('pageAuth' in data) || data.pageAuth is map);
     }
 

@@ -2411,6 +2411,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                         ]
                                                     },
                                                     cacheEfficiency: { liveQueries: 10, cacheHits: 22 },
+                                                    deepCutsOpened: 15,
                                                     onboardingProgress: { step1: true, step2: true, step3: true, step4: true, step5: true }
                                                 },
                                                 {
@@ -2427,6 +2428,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                         ]
                                                     },
                                                     cacheEfficiency: { liveQueries: 8, cacheHits: 8 },
+                                                    deepCutsOpened: 5,
                                                     onboardingProgress: { step1: true, step2: true, step3: true, step4: false, step5: false }
                                                 }
                                             ]}

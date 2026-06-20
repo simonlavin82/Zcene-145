@@ -31,13 +31,33 @@
 }
 </script>
 <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-79JGPHLSG8"></script>
 <script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
+  (function() {
+    var hostname = window.location.hostname;
+    var port = window.location.port;
 
-  gtag('config', 'G-79JGPHLSG8');
+    // Production Domain Guardrail: ONLY load on zcene.online, completely bypass local development.
+    if (
+      hostname === 'zcene.online' &&
+      hostname !== 'localhost' &&
+      hostname !== '127.0.0.1' &&
+      port !== '3000'
+    ) {
+      var measurementId = 'G-WXSEHVYTHJ';
+      var script = document.createElement('script');
+      script.async = true;
+      script.src = 'https://www.googletagmanager.com/gtag/js?id=' + measurementId;
+      document.head.appendChild(script);
+
+      window.dataLayer = window.dataLayer || [];
+      window.gtag = function() { dataLayer.push(arguments); };
+      window.gtag('js', new Date());
+      window.gtag('config', measurementId);
+      console.log('[Analytics] GA4 Initialised for production domain: ' + hostname);
+    } else {
+      console.log('[Analytics] Sandbox Mode: Google Analytics tag G-WXSEHVYTHJ suppressed for ' + hostname + (port ? ':' + port : ''));
+    }
+  })();
 </script>
 </head>
   <body class="dark">
