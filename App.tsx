@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { AlertCircle, X, CheckCircle2, Key } from 'lucide-react';
 import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project, ArtistCacheEntry, COST_PER_AI_CALL } from './types';
 import { generateGraphData, fetchNodeDetails, extendGraphFromNode } from './services/geminiService';
-import { normalizeArtistId, readArtistCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph } from './services/artistCacheService';
+import { normalizeArtistId, readArtistCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired } from './services/artistCacheService';
 import { auth, signInWithGoogle, logout, onAuthStateChanged, User, db, handleFirestoreError, OperationType } from './services/firebase';
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, getDocFromServer, serverTimestamp, addDoc, getDoc, getDocs, orderBy, where, writeBatch, getDocFromCache, updateDoc, increment } from 'firebase/firestore';
 const StyleGuidePage = React.lazy(() => import('./components/DesignSystem').then(m => ({ default: m.StyleGuidePage })));
@@ -1343,6 +1343,10 @@ const App: React.FC = () => {
                         groundingLinks
                     };
                     setDetailsCache(prev => new Map(prev).set(node.id.toLowerCase(), detailsPayload).set(standardizedId, detailsPayload).set(node.id, detailsPayload));
+
+                    if (isCacheExpired(data.cachedAt)) {
+                        triggerBackgroundRevalidation(node, standardizedId);
+                    }
 
                     // Air-gap: clear all loading flags and hard-stop before any network call
                     fetchingNodeIdsRef.current.delete(node.id);
@@ -3598,6 +3602,59 @@ const App: React.FC = () => {
     }
   }, [user]);
 
+  const triggerBackgroundRevalidation = useCallback(async (node: Node, cacheId: string) => {
+    // Guardrail: Sandbox Safety & Key Protection
+    const isLocal = typeof window !== 'undefined' && 
+      (window.location.hostname === 'localhost' || 
+       window.location.hostname === '127.0.0.1' ||
+       window.location.port === '3000');
+    
+    if (isLocal || import.meta.env.DEV) {
+      console.log("[Revalidation] Sandbox Mode: Suppressed background refresh for: " + node.id);
+      return;
+    }
+
+    console.log("[Revalidation] Silently refreshing stale cache in background for: " + node.id);
+    try {
+      const freshDetails = await fetchNodeDetails(node, graphData, seedArtists, urlOriginHint);
+      
+      // Update local state details cache
+      setDetailsCache(prev => {
+        const updated = new Map(prev);
+        updated.set(node.id, freshDetails);
+        updated.set(node.id.toLowerCase(), freshDetails);
+        updated.set(normalizeArtistId(node.id), freshDetails);
+        return updated;
+      });
+
+      // Update selectedNode UI state if the user is still actively viewing it
+      setSelectedNode(prev => {
+        if (prev && normalizeArtistId(prev.id) === cacheId) {
+          return {
+            ...prev,
+            bio: freshDetails.summary,
+            summary: freshDetails.summary,
+            genre: freshDetails.details?.genre || "",
+            origin: freshDetails.details?.origin || "",
+            founded: freshDetails.details?.founded || "",
+            name: freshDetails.details?.artist || prev.id,
+            imageUrl: freshDetails.imageUrl || (prev as any).imageUrl
+          };
+        }
+        return prev;
+      });
+
+      // Overwrite the global cache doc with fresh data and a new cachedAt timestamp
+      await updateDoc(doc(db, 'artists', cacheId), {
+        detailsCache: JSON.stringify(freshDetails),
+        cachedAt: serverTimestamp()
+      });
+      console.log("[Revalidation] Successfully updated stale cache in Firestore for: " + cacheId);
+    } catch (e: any) {
+      console.warn("[Revalidation] Background refresh failed for: " + cacheId, e.message);
+    }
+  }, [graphData, seedArtists, urlOriginHint]);
+
   const fetchingNodeIdsRef = useRef<Set<string>>(new Set());
   const lastProgressTimestampRef = useRef<number>(Date.now());
 
@@ -3673,12 +3730,16 @@ const App: React.FC = () => {
 
                 // Global Artists Fallback Read
                 let fallbackDetails: NodeDetails | null = null;
+                let isStale = false;
                 try {
                   const cacheId = normalizeArtistId(node.id);
                   let cacheDoc = await getDoc(doc(db, 'artists', cacheId));
                   
                   if (cacheDoc.exists()) {
                      const data = cacheDoc.data();
+                     if (data) {
+                        isStale = isCacheExpired(data.cachedAt);
+                     }
                      if (data && data.detailsCache) {
                         try {
                             const parsed = typeof data.detailsCache === 'string' ? JSON.parse(data.detailsCache) : data.detailsCache;
@@ -3724,6 +3785,10 @@ const App: React.FC = () => {
                 let details: NodeDetails;
                 if (fallbackDetails) {
                    details = fallbackDetails;
+                   if (isStale) {
+                     const cacheId = normalizeArtistId(node.id);
+                     triggerBackgroundRevalidation(node, cacheId);
+                   }
                 } else {
                    // Individual node timeout (45s) to prevent the whole queue from hanging
                    const nodeDetailsPromise = fetchNodeDetails(node, graphData, seedArtists, urlOriginHint);
@@ -3829,7 +3894,7 @@ const App: React.FC = () => {
       } finally { isFetchingDetailsRef.current = false; }
     };
     fetch();
-  }, [activeNodes, detailsCache, graphData, seedArtists, selectedNode, urlOriginHint, humanizeError, user, isLoading, incrementDeepCutsOpenedCount]);
+  }, [activeNodes, detailsCache, graphData, seedArtists, selectedNode, urlOriginHint, humanizeError, user, isLoading, incrementDeepCutsOpenedCount, triggerBackgroundRevalidation]);
 
   const handleViewChange = useCallback((newView: View) => {
     if (newView === View.Graph && !graphData) setGraphData({ nodes: [], links: [] });

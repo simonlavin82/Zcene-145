@@ -469,3 +469,29 @@ export const readLegacyArtistCache = async (
     return null;
   }
 };
+
+/**
+ * Checks if the cachedAt timestamp is older than 365 days (1 year).
+ */
+export const isCacheExpired = (cachedAt: any): boolean => {
+  if (!cachedAt) return true;
+  let date: Date;
+  if (typeof cachedAt.toDate === 'function') {
+    date = cachedAt.toDate();
+  } else if (cachedAt instanceof Date) {
+    date = cachedAt;
+  } else if (typeof cachedAt === 'string') {
+    date = new Date(cachedAt);
+  } else if (cachedAt.seconds) {
+    date = new Date(cachedAt.seconds * 1000);
+  } else if (typeof cachedAt === 'number') {
+    date = new Date(cachedAt);
+  } else if (cachedAt.nanoseconds && typeof cachedAt.seconds === 'number') {
+    date = new Date(cachedAt.seconds * 1000);
+  } else {
+    return true;
+  }
+  
+  const oneYearMs = 365 * 24 * 60 * 60 * 1000;
+  return (Date.now() - date.getTime()) > oneYearMs;
+};
