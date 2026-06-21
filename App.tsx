@@ -1592,6 +1592,9 @@ const App: React.FC = () => {
                 const tourInfo = parsed?.tourInfo || "";
                 const recommendationReason = parsed?.recommendationReason || parsed?.reason || "";
                 const groundingLinks = parsed?.groundingLinks || [];
+                const youtubeVideoId = typeof parsed?.youtubeVideoId === 'string' && parsed.youtubeVideoId.trim().length === 11
+                    ? parsed.youtubeVideoId.trim()
+                    : undefined;
                 
                 const isPlaceholderBio = bio.includes('sandbox mock') || bio.includes('test scenarios');
                 const isBioTooShort = !bio || bio.trim().length < 5;
@@ -1604,7 +1607,8 @@ const App: React.FC = () => {
                     discography,
                     tourInfo,
                     recommendationReason,
-                    groundingLinks
+                    groundingLinks,
+                    youtubeVideoId
                 };
 
                 const isIncomplete = checkIsProfileIncomplete(node, detailsPayload) || isBioTooShort || isPlaceholderBio;
@@ -1629,6 +1633,7 @@ const App: React.FC = () => {
                     incrementDeepCutsOpenedCount();
                     
                     // Push to detailsCache so the background queue skips this node entirely
+                    console.log("[Phase 3 Cache Payload]", node.id, JSON.stringify({ youtubeVideoId: detailsPayload.youtubeVideoId, summary: detailsPayload.summary?.substring(0, 40) }));
                     setDetailsCache(prev => new Map(prev).set(node.id.toLowerCase(), detailsPayload).set(standardizedId, detailsPayload).set(node.id, detailsPayload));
 
                     if (isCacheExpired(data.cachedAt)) {
@@ -2021,8 +2026,12 @@ const App: React.FC = () => {
                             discography: parsedDetails?.discography || [],
                             tourInfo: parsedDetails?.tourInfo || "",
                             recommendationReason: parsedDetails?.recommendationReason || parsedDetails?.reason || "",
-                            groundingLinks: parsedDetails?.groundingLinks || []
+                            groundingLinks: parsedDetails?.groundingLinks || [],
+                            youtubeVideoId: typeof parsedDetails?.youtubeVideoId === 'string' && parsedDetails.youtubeVideoId.trim().length === 11
+                                ? parsedDetails.youtubeVideoId.trim()
+                                : undefined
                          };
+                          console.log("[Phase 3 Cache Payload – Front Gate]", searchId, JSON.stringify({ youtubeVideoId: detailsPayload.youtubeVideoId }));
                           setDetailsCache(prev => new Map(prev).set(searchIdLower, detailsPayload).set(searchId, detailsPayload).set(normalizeArtistId(searchId), detailsPayload));
                       }
                   } catch(e) { console.warn("Failed to parse detailsCache", e); }
