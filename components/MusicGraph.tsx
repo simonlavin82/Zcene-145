@@ -640,14 +640,23 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         .attr("stroke-opacity", 0.4)
         .attr("stroke-dasharray", "3,3");
 
+    const isArtistToArtistLink = (d: Link) => {
+        const sId = nodeId(d.source);
+        const tId = nodeId(d.target);
+        const sourceNode = visibleNodes.find(n => String(n.id).toLowerCase() === sId.toLowerCase());
+        const targetNode = visibleNodes.find(n => String(n.id).toLowerCase() === tId.toLowerCase());
+        return sourceNode?.type === 'artist' && targetNode?.type === 'artist';
+    };
+
     container.select(".link-group").selectAll<SVGLineElement, Link>("line.interactive-link")
         .data(visibleLinks, (d: any) => `${nodeId(d.source)}-${nodeId(d.target)}`)
         .join("line")
         .attr("class", "interactive-link")
         .attr("stroke", "transparent")
         .attr("stroke-width", 12)
-        .style("cursor", "pointer")
+        .style("cursor", d => isArtistToArtistLink(d) ? "pointer" : "default")
         .on("mouseenter", (event, d) => {
+            if (!isArtistToArtistLink(d)) return;
             const sId = nodeId(d.source);
             const tId = nodeId(d.target);
 
@@ -688,6 +697,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             }
         })
         .on("mouseleave", (event, d) => {
+            if (!isArtistToArtistLink(d)) return;
             const sId = nodeId(d.source);
             const tId = nodeId(d.target);
 
@@ -848,7 +858,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 }}
                 className="mb-3 bg-zinc-950/95 border border-zinc-700/80 px-3.5 py-2.5 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md rounded-xl flex flex-col gap-1 text-center min-w-[120px] max-w-[280px]"
             >
-                <span className="font-mono text-[9px] text-zinc-500 uppercase tracking-widest">Relationship</span>
+                <span className="font-mono text-[9px] text-zinc-500 uppercase tracking-widest">Connection</span>
                 <div className="text-xs font-medium text-zinc-200 leading-normal">
                     <span className="font-semibold text-primary">{hoveredLink.sourceId}</span> 
                     <span className="text-zinc-400"> {hoveredLink.context} </span>

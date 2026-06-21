@@ -728,11 +728,19 @@ const validateCacheEntry = (data: any): CacheValidationResult => {
       needsPeerBands = true;
     }
 
-    // Check if links exist and if any of them are missing context
+    // Check if links exist and if any of them are missing context or use low-value literal fallbacks
     const graphLinks = graph.links || [];
     if (graphLinks.length > 0) {
-      const hasMissingContext = graphLinks.some((l: any) => !l.context || typeof l.context !== 'string' || l.context.trim() === '');
-      if (hasMissingContext) {
+      const hasInvalidContext = graphLinks.some((l: any) => {
+        if (!l.context || typeof l.context !== 'string') return true;
+        const normalizedContext = l.context.trim().toLowerCase();
+        return (
+          normalizedContext === '' ||
+          normalizedContext.includes('is connected to') ||
+          normalizedContext.includes('is musically related to')
+        );
+      });
+      if (hasInvalidContext) {
         needsFutureFields = true;
       }
     }

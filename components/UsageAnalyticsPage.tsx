@@ -60,7 +60,7 @@ export const TelemetryOverviewCards: React.FC<TelemetryOverviewCardsProps> = ({
                 <div className="flex items-baseline gap-2 mt-2">
                     <span className="text-3xl font-bold font-mono text-primary">{aggregateMetrics.overallEfficiency.toFixed(1)}%</span>
                 </div>
-                <span className="text-xs text-zinc-600 mt-2 font-mono">{aggregateMetrics.totalCacheHits} / {aggregateMetrics.totalLiveQueries + aggregateMetrics.totalCacheHits} recalled from cache</span>
+                <span className="text-xs text-zinc-600 mt-2"><span className="font-mono">{aggregateMetrics.totalCacheHits} / {aggregateMetrics.totalLiveQueries + aggregateMetrics.totalCacheHits}</span> recalled from cache</span>
             </div>
 
             <div className={`bg-zinc-900/30 border border-zinc-800 p-6 flex flex-col justify-between relative ${RADIUS_TOKENS.frame}`}>
@@ -71,7 +71,7 @@ export const TelemetryOverviewCards: React.FC<TelemetryOverviewCardsProps> = ({
                 <div className="flex items-baseline gap-2 mt-2">
                     <span className="text-3xl font-bold font-mono text-white">{aggregateMetrics.totalProjects}</span>
                 </div>
-                <span className="text-xs text-zinc-650 mt-2 font-mono">active workspace canvases</span>
+                <span className="text-xs text-zinc-650 mt-2">active workspace canvases</span>
             </div>
 
             <div className={`bg-zinc-900/30 border border-zinc-800 p-6 flex flex-col justify-between relative ${RADIUS_TOKENS.frame}`}>
@@ -82,7 +82,7 @@ export const TelemetryOverviewCards: React.FC<TelemetryOverviewCardsProps> = ({
                 <div className="flex items-baseline gap-2 mt-2">
                     <span className="text-3xl font-bold font-mono text-red-400">${aggregateMetrics.totalCosts.toFixed(4)}</span>
                 </div>
-                <span className="text-xs text-zinc-650 mt-2 font-mono">@ $0.0015 per recommendation</span>
+                <span className="text-xs text-zinc-650 mt-2">@ <span className="font-mono">$0.0015</span> per recommendation</span>
             </div>
 
             <div className={`bg-zinc-900/30 border border-zinc-800 p-6 flex flex-col justify-between border-l-2 border-l-primary relative ${RADIUS_TOKENS.frame}`}>
@@ -93,7 +93,7 @@ export const TelemetryOverviewCards: React.FC<TelemetryOverviewCardsProps> = ({
                 <div className="flex items-baseline gap-2 mt-2">
                     <span className="text-3xl font-bold font-mono text-primary">${aggregateMetrics.totalSavings.toFixed(4)}</span>
                 </div>
-                <span className="text-xs text-zinc-650 mt-2 font-mono">saved via local recall</span>
+                <span className="text-xs text-zinc-650 mt-2">saved via local recall</span>
             </div>
         </div>
     );
@@ -169,8 +169,8 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
                                                 <span className="font-mono text-zinc-300">
                                                     {user.cacheEfficiency.cacheHits}/{user.cacheEfficiency.liveQueries}
                                                 </span>
-                                                <span className="text-[10px] font-mono text-primary font-bold">
-                                                    {efficiency.toFixed(0)}% Eff
+                                                <span className="text-[10px] text-primary font-bold">
+                                                    <span className="font-mono">{efficiency.toFixed(0)}%</span> Eff
                                                 </span>
                                             </div>
                                         </td>
@@ -191,29 +191,29 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
                                                      <div className="space-y-6">
                                                          <div className="space-y-4">
                                                              <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Curation Actions</h4>
-                                                             <div className="space-y-2 font-mono">
+                                                             <div className="space-y-2">
                                                                  <div className="flex justify-between border-b border-zinc-800/50 pb-1">
                                                                      <span className="text-zinc-400">Projects Created:</span>
-                                                                     <span className="text-white">{user.projectsCount}</span>
+                                                                     <span className="text-white font-mono">{user.projectsCount}</span>
                                                                  </div>
                                                                  <div className="flex justify-between border-b border-zinc-800/50 pb-1">
                                                                      <span className="text-zinc-400">Actions Executed:</span>
-                                                                     <span className="text-white">{user.actionTriggers.updateCount}</span>
+                                                                     <span className="text-white font-mono">{user.actionTriggers.updateCount}</span>
                                                                  </div>
                                                                  <div className="flex justify-between border-b border-zinc-800/50 pb-1">
                                                                      <span className="text-zinc-400">Deep Cuts Opened:</span>
-                                                                     <span className="text-white">{user.deepCutsOpened}</span>
+                                                                     <span className="text-white font-mono">{user.deepCutsOpened}</span>
                                                                  </div>
                                                                  <div className="flex justify-between">
                                                                      <span className="text-zinc-400">Total Actions:</span>
-                                                                     <span className="text-white font-bold">{totalActions}</span>
+                                                                     <span className="text-white font-mono font-bold">{totalActions}</span>
                                                                  </div>
                                                              </div>
                                                          </div>
 
                                                          <div className="space-y-4 pt-4 border-t border-zinc-900">
                                                              <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Onboarding Progress</h4>
-                                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
+                                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                                                                  <div className="flex items-center gap-2">
                                                                      <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[10px] font-bold ${user.onboardingProgress?.step1 ? 'bg-primary text-black' : 'bg-zinc-900 text-zinc-650 border border-zinc-800'}`}>
                                                                          {user.onboardingProgress?.step1 ? '✓' : '•'}
@@ -250,12 +250,12 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
 
                                                      {/* Right Column: Search Details */}
                                                      <div className="space-y-4">
-                                                         <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Top Artist Discoveries ({user.artistSearches.globalCount} Total)</h4>
-                                                         <div className="space-y-2 font-mono">
+                                                         <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Top Artist Discoveries (<span className="font-mono">{user.artistSearches.globalCount}</span> Total)</h4>
+                                                         <div className="space-y-2">
                                                              {user.artistSearches.topSearches.map((search, i) => (
                                                                  <div key={i} className="flex justify-between border-b border-zinc-800/50 pb-1">
                                                                      <span className="text-zinc-300">{search.artistName}</span>
-                                                                     <span className="text-zinc-405">{search.count} digs</span>
+                                                                     <span className="text-zinc-405"><span className="font-mono">{search.count}</span> digs</span>
                                                                  </div>
                                                              ))}
                                                          </div>
