@@ -449,15 +449,15 @@ const mergeGraphData = (base: GraphData, enhancement: GraphData): GraphData => {
         const oldId = existingNode.id, newId = newNode.id;
         combinedLinks.forEach(link => {
           if (typeof link.source === 'string') {
-            if (link.source === oldId) link.source = newId;
+            if (link.source.toLowerCase() === oldId.toLowerCase()) link.source = newId;
           } else if (typeof link.source === 'object' && link.source !== null) {
-            if ((link.source as Node).id === oldId) (link.source as Node).id = newId;
+            if ((link.source as Node).id.toLowerCase() === oldId.toLowerCase()) (link.source as Node).id = newId;
           }
 
           if (typeof link.target === 'string') {
-            if (link.target === oldId) link.target = newId;
+            if (link.target.toLowerCase() === oldId.toLowerCase()) link.target = newId;
           } else if (typeof link.target === 'object' && link.target !== null) {
-            if ((link.target as Node).id === oldId) (link.target as Node).id = newId;
+            if ((link.target as Node).id.toLowerCase() === oldId.toLowerCase()) (link.target as Node).id = newId;
           }
         });
         existingNode.id = newId;
@@ -2664,6 +2664,12 @@ const App: React.FC = () => {
         merged = filterGraphByDiscoveryFilters(merged, activeDiscoveryFilters, artists);
         setGraphData(merged);
 
+        setSelectedNode(prev => {
+          if (!prev) return null;
+          const match = merged.nodes.find(n => n.id.toLowerCase() === prev.id.toLowerCase());
+          return match ? { ...prev, id: match.id, label: match.label || prev.label } : prev;
+        });
+
         setActiveNodes(prev => {
           const currentActive = [...prev];
           const seedMapped = artistList.map(name => {
@@ -2731,6 +2737,12 @@ const App: React.FC = () => {
       final = applyHumanCasedLabels(final, artists);
       final = filterGraphByDiscoveryFilters(final, activeDiscoveryFilters, artists);
       setGraphData(final);
+
+      setSelectedNode(prev => {
+        if (!prev) return null;
+        const match = final.nodes.find(n => n.id.toLowerCase() === prev.id.toLowerCase());
+        return match ? { ...prev, id: match.id, label: match.label || prev.label } : prev;
+      });
 
       // Phase 02 complete — write each artist as an isolated individual doc - only for standalone queries
       if (artistList.length === 1) {

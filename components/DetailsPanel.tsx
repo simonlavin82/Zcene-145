@@ -388,6 +388,58 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
                     {details && (
                         <div className="space-y-10 text-zinc-300 pb-16">
+                            {/* Compatibility Meter */}
+                            <div className="flex flex-col gap-1.5 w-full">
+                                <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">
+                                    <span>MY TASTE</span>
+                                    {tasteCompatibility.hasTasteData ? (
+                                        <span className="font-mono text-[#a855f7] font-bold">
+                                            {tasteCompatibility.matches}/{tasteCompatibility.totalActive} Hits
+                                        </span>
+                                    ) : (
+                                        <span className="text-zinc-500 normal-case font-medium">Empty Taste Profile</span>
+                                    )}
+                                </div>
+                                <div className="grid grid-cols-3 gap-1.5 w-full">
+                                    {tasteCompatibility.criteria.map((c) => {
+                                        let bgClass = '';
+                                        let borderClass = '';
+                                        if (c.active) {
+                                            if (c.matched) {
+                                                bgClass = 'bg-[#a855f7]';
+                                                borderClass = 'border-[#a855f7]';
+                                            } else {
+                                                bgClass = 'bg-transparent';
+                                                borderClass = 'border-[#52525b] border-solid';
+                                            }
+                                        } else {
+                                            bgClass = 'bg-transparent';
+                                            borderClass = 'border-[#52525b] border-dashed';
+                                        }
+                                        return (
+                                            <div 
+                                                key={c.id} 
+                                                className={`h-2 border transition-all duration-300 ${bgClass} ${borderClass}`}
+                                                title={`${c.name}: ${c.active ? (c.matched ? 'Matched' : 'Unmatched') : 'Not Configured'}`}
+                                            />
+                                        );
+                                    })}
+                                </div>
+                                <div className="flex justify-between text-[8px] font-mono tracking-widest text-zinc-500 uppercase select-none">
+                                    {tasteCompatibility.criteria.map((c) => {
+                                        let textClass = 'text-zinc-600';
+                                        if (c.active) {
+                                            textClass = c.matched ? 'text-[#a855f7] font-bold' : 'text-zinc-400';
+                                        }
+                                        return (
+                                            <span key={c.id} className={textClass}>
+                                                {c.name}
+                                            </span>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
                             {details.imageUrl && !imageError && (
                                 <div className={`aspect-video w-full bg-zinc-800 overflow-hidden relative border border-zinc-800/50 shadow-2xl transition-opacity duration-700 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}>
                                     <img 
@@ -401,67 +453,13 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 </div>
                             )}
 
-                            <div className="flex flex-col gap-3">
-                                {details.recommendationReason && details.recommendationReason !== SENTINEL_INSIGHT && (
-                                    <div className="pt-2">
-                                        <p className="italic text-zinc-100 leading-tight font-serif tracking-tight text-2xl">
-                                            "{details.recommendationReason}"
-                                        </p>
-                                    </div>
-                                )}
-
-                                {/* Compatibility Meter */}
-                                <div className="flex flex-col gap-1.5 w-full">
-                                    <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">
-                                        <span>MY TASTE</span>
-                                        {tasteCompatibility.hasTasteData ? (
-                                            <span className="font-mono text-[#a855f7] font-bold">
-                                                {tasteCompatibility.matches}/{tasteCompatibility.totalActive} Hits
-                                            </span>
-                                        ) : (
-                                            <span className="text-zinc-500 normal-case font-medium">Empty Taste Profile</span>
-                                        )}
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-1.5 w-full">
-                                        {tasteCompatibility.criteria.map((c) => {
-                                            let bgClass = '';
-                                            let borderClass = '';
-                                            if (c.active) {
-                                                if (c.matched) {
-                                                    bgClass = 'bg-[#a855f7]';
-                                                    borderClass = 'border-[#a855f7]';
-                                                } else {
-                                                    bgClass = 'bg-transparent';
-                                                    borderClass = 'border-[#52525b] border-solid';
-                                                }
-                                            } else {
-                                                bgClass = 'bg-transparent';
-                                                borderClass = 'border-[#52525b] border-dashed';
-                                            }
-                                            return (
-                                                <div 
-                                                    key={c.id} 
-                                                    className={`h-2 border transition-all duration-300 ${bgClass} ${borderClass}`}
-                                                    title={`${c.name}: ${c.active ? (c.matched ? 'Matched' : 'Unmatched') : 'Not Configured'}`}
-                                                />
-                                            );
-                                        })}
-                                    </div>
-                                    <div className="flex justify-between text-[8px] font-mono tracking-widest text-zinc-500 uppercase select-none">
-                                        {tasteCompatibility.criteria.map((c) => {
-                                            let textClass = 'text-zinc-600';
-                                            if (c.active) {
-                                                textClass = c.matched ? 'text-[#a855f7] font-bold' : 'text-zinc-400';
-                                            }
-                                            return (
-                                                <span key={c.id} className={textClass}>
-                                                    {c.name}
-                                                </span>
-                                            );
-                                        })}
-                                    </div>
+                            {details.recommendationReason && details.recommendationReason !== SENTINEL_INSIGHT && (
+                                <div className="pt-2">
+                                    <p className="italic text-zinc-100 leading-tight font-serif tracking-tight text-2xl">
+                                        "{details.recommendationReason}"
+                                    </p>
                                 </div>
-                            </div>
+                            )}
 
                             <div className={`grid ${isHero ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2'} gap-8 py-4 border-b border-zinc-800/50`}>
                                 <div>
