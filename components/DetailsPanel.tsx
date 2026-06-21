@@ -455,13 +455,23 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 </div>
                             )}
 
-                            {details.recommendationReason && details.recommendationReason !== SENTINEL_INSIGHT && (
-                                <div className="pt-2">
-                                    <p className="italic text-zinc-100 leading-tight font-serif tracking-tight text-2xl">
-                                        "{details.recommendationReason}"
-                                    </p>
-                                </div>
-                            )}
+                            {(() => {
+                                const hasInsight = details.recommendationReason &&
+                                    details.recommendationReason !== SENTINEL_INSIGHT &&
+                                    details.recommendationReason.trim().length > 0;
+                                // Fallback: strip markdown bold markers from summary and use first 120 chars
+                                const summaryFallback = details.summary
+                                    ? details.summary.replace(/\*\*/g, '').trim().substring(0, 120) + (details.summary.length > 120 ? '...' : '')
+                                    : null;
+                                const quoteText = hasInsight ? details.recommendationReason : summaryFallback;
+                                return quoteText ? (
+                                    <div className="pt-2">
+                                        <p className="italic text-zinc-100 leading-tight font-serif tracking-tight text-2xl">
+                                            "{quoteText}"
+                                        </p>
+                                    </div>
+                                ) : null;
+                            })()}
 
                             <div className={`grid ${isHero ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2'} gap-8 py-4 border-b border-zinc-800/50`}>
                                 <div>
@@ -581,15 +591,15 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 </div>
                             )}
 
-                            {isArtistNode && details && (() => {
+                            {(isArtistNode || (node.type === undefined && details)) && details && (() => {
                                 // Always sanitise the display name — node.label may be a raw kebab slug
                                 const rawLabel = node.label || '';
                                 const sanitisedLabel = rawLabel && /^[a-z]/.test(rawLabel) ? titleCaseArtistId(rawLabel) : rawLabel;
                                 const artistDisplay = details?.details?.artist || sanitisedLabel || titleCaseArtistId(node.id);
                                 const genre = details?.details?.genre || '';
-                                // Build a guaranteed search query: prefer AI-provided, else derive from artist + genre
+                                // Build a guaranteed search query: prefer AI-provided, else derive from artist + genre + 'live'
                                 const searchQuery = details.youtubeSearchQuery
-                                    || `${artistDisplay}${genre ? ' ' + genre : ''} official music video`;
+                                    || `${artistDisplay}${genre ? ' ' + genre : ''} live`;
                                 const ytSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(searchQuery)}`;
 
                                 return (

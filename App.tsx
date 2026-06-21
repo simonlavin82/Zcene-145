@@ -699,8 +699,11 @@ const checkIsProfileIncomplete = (node: Node, details: NodeDetails | null | unde
                           details.recommendationReason.trim().toLowerCase() === SENTINEL_INSIGHT.toLowerCase();
 
   // 2. Lowercase identifier validation (Check display title, details artist, and first bolded summary word)
-  const isLabelLower    = isPurelyLowercase(displayTitle);
-  const isArtistNameLower = isPurelyLowercase(details.details?.artist || displayTitle);
+  // Guard: single-word artist names with no spaces or hyphens (e.g. "buggin", "zulu", "scowl") are
+  // legitimate all-lowercase names, NOT corruption signals. Only flag multi-word or hyphenated names.
+  const isSingleWordName = !displayTitle.includes(' ') && !displayTitle.includes('-');
+  const isLabelLower    = !isSingleWordName && isPurelyLowercase(displayTitle);
+  const isArtistNameLower = !isSingleWordName && isPurelyLowercase(details.details?.artist || displayTitle);
   
   // Find all bolded terms in summary (e.g. "**scowl**", "**alternative rock**")
   const boldMatches     = details.summary ? Array.from(details.summary.matchAll(/\*\*([^*]+)\*\*/g)) : [];
@@ -710,8 +713,9 @@ const checkIsProfileIncomplete = (node: Node, details: NodeDetails | null | unde
   const artistClean     = cleanCompare(displayTitle);
   const matchingBold    = boldMatches.find(m => cleanCompare(m[1]) === artistClean);
   
-  // Check if the matched bolded artist name is purely lowercase
-  const isBoldBioNameLower = matchingBold ? isPurelyLowercase(matchingBold[1]) : false;
+  // Check if the matched bolded artist name is purely lowercase.
+  // Single-word names are exempt here too — only multi-word bold leaks are meaningful.
+  const isBoldBioNameLower = matchingBold && !isSingleWordName ? isPurelyLowercase(matchingBold[1]) : false;
   
   const isLowercasedMarker = isLabelLower || isArtistNameLower || isBoldBioNameLower;
 
@@ -3041,7 +3045,13 @@ const App: React.FC = () => {
         const genre = parsed?.details?.genre || parsed?.genre || parsed?.genres || '';
         const origin = parsed?.details?.origin || parsed?.origin || parsed?.location || parsed?.country || '';
         const founded = parsed?.details?.founded || parsed?.founded || parsed?.formed || parsed?.year || '';
-        const artistName = parsed?.details?.artist || parsed?.artist || parsed?.name || data.seedArtists || data.artistId || n.id;
+        // Fix C: Heal all-lowercase legacy artist names in-place — avoids quality gate firing on
+        // every refresh for artists like 'buggin', 'zulu', 'scowl' whose old cache entries stored
+        // the artist name without title casing.
+        const rawArtistName = parsed?.details?.artist || parsed?.artist || parsed?.name || data.seedArtists || data.artistId || n.id;
+        const artistName = rawArtistName && typeof rawArtistName === 'string' && rawArtistName === rawArtistName.toLowerCase()
+            ? titleCaseArtistId(rawArtistName)
+            : rawArtistName;
         const notableArtists = parsed?.details?.notableArtists || parsed?.notableArtists || [];
         const members = parsed?.members || [];
         const links = parsed?.links || [];
@@ -3049,6 +3059,11 @@ const App: React.FC = () => {
         const tourInfo = parsed?.tourInfo || '';
         const recommendationReason = parsed?.recommendationReason || parsed?.reason || '';
         const groundingLinks = parsed?.groundingLinks || [];
+        // Fix A: Extract YouTube media fields with same guards as handleNodeClick hydration paths
+        const youtubeVideoId = typeof parsed?.youtubeVideoId === 'string' && parsed.youtubeVideoId.trim().length === 11
+            ? parsed.youtubeVideoId.trim() : undefined;
+        const youtubeSearchQuery = typeof parsed?.youtubeSearchQuery === 'string' && parsed.youtubeSearchQuery.trim().length > 0
+            ? parsed.youtubeSearchQuery.trim() : undefined;
 
         if (!bio || bio.length < 5) return;
 
@@ -3061,7 +3076,9 @@ const App: React.FC = () => {
           discography,
           tourInfo,
           recommendationReason,
-          groundingLinks
+          groundingLinks,
+          youtubeVideoId,
+          youtubeSearchQuery
         };
 
         // Register under all lookup key variants

@@ -429,9 +429,11 @@ export const TokenConfirmationDialog: React.FC<{
               </div>
             )}
           </div>
-          <p className="text-xs text-zinc-500 leading-relaxed">
-            Note: All live outbound API dispatches are completely short-circuited with a static JSON payload in sandbox mode to protect billing limits.
-          </p>
+          {import.meta.env.DEV && (
+            <p className="text-xs text-zinc-500 leading-relaxed">
+              Note: All live outbound API dispatches are completely short-circuited with a static JSON payload in sandbox mode to protect billing limits.
+            </p>
+          )}
         </div>
 
         <footer className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2">
