@@ -18,6 +18,13 @@
         }
       },
       {
+        "source": "/api/artist/**",
+        "run": {
+          "serviceId": "zcene-backend-proxy",
+          "region": "us-central1"
+        }
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

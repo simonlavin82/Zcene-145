@@ -539,19 +539,32 @@ export const getArtistDocWithRedirect = async (
   artistId: string,
   depth = 0
 ): Promise<DocumentSnapshot> => {
-  const docRef = doc(db, 'artists', artistId);
-  const snap = await getDoc(docRef);
-  
-  if (depth < 3 && snap.exists()) {
-    const data = snap.data();
-    if (data && typeof data.redirectTo === 'string' && data.redirectTo.trim().length > 0) {
-      const canonicalId = data.redirectTo.trim();
-      console.log(`[ArtistCache] Redirecting read: ${artistId} -> ${canonicalId} (depth: ${depth})`);
-      return getArtistDocWithRedirect(canonicalId, depth + 1);
+  try {
+    const url = `/api/artist/${artistId}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      // Fallback to client-side direct read if proxy endpoint fails or returns 404
+      const docRef = doc(db, 'artists', artistId);
+      const snap = await getDoc(docRef);
+      return snap;
     }
+    
+    const data = await response.json();
+    
+    // Return a mocked DocumentSnapshot to maintain type compatibility
+    return {
+      exists: () => true,
+      data: () => data,
+      id: artistId,
+      metadata: {} as any,
+      ref: {} as any,
+      get: (fieldPath: string) => (data as any)[fieldPath],
+    } as unknown as DocumentSnapshot;
+  } catch (error) {
+    console.warn(`[Proxy Fetch] Failed for ${artistId}, falling back to direct Firestore read:`, error);
+    const docRef = doc(db, 'artists', artistId);
+    return getDoc(docRef);
   }
-  
-  return snap;
 };
 
 /**
