@@ -1493,7 +1493,10 @@ const App: React.FC = () => {
        setLoadingNodeIds(prev => { const next = new Set(prev); next.delete(node.id); return next; });
        return; // BLOCK network queue entirely
     } else if (cachedDetails) {
-       console.log(`[Node Click Intercept] Incomplete/broken local profile detected for: ${node.id}. Triggering silent re-synthesis...`);
+       console.log(`[Node Click Intercept] Incomplete/broken local profile detected for: ${node.id}`);
+       const displayName = cachedDetails?.details?.artist || node.label || titleCaseArtistId(node.id);
+       const confirmed = await confirmTokenUsage('data_quality_optimization', [], [displayName]);
+       if (!confirmed) return; // Cancel: return early without rendering details
        
        const cacheId = normalizeArtistId(node.id);
        evictedNodeIdsRef.current.add(node.id);
@@ -1639,8 +1642,11 @@ const App: React.FC = () => {
                     console.log("[Node Click] Hydrated from global artists collection:", node.id, "→", standardizedId);
                     return;
                 } else {
-                    console.log(`[Node Click Intercept] Incomplete global Firestore profile detected for: ${node.id}. Triggering silent re-synthesis...`);
-                    
+                    console.log(`[Node Click Intercept] Incomplete global Firestore profile detected for: ${node.id}`);
+                    const displayName = detailsPayload?.details?.artist || node.label || titleCaseArtistId(node.id);
+                    const confirmed = await confirmTokenUsage('data_quality_optimization', [], [displayName]);
+                    if (!confirmed) return; // Cancel: return early without rendering details
+
                     // Delete from local memory and Firestore cache
                     healedDetailsCacheRef.current.delete(node.id);
                     healedDetailsCacheRef.current.delete(node.id.toLowerCase());
@@ -1704,7 +1710,10 @@ const App: React.FC = () => {
     }
 
     // 3. Fallback Only if Empty
-    console.log(`[Node Click Intercept] Cache miss for: ${node.id}. Triggering silent deep-cut synthesis...`);
+    const confirmed = await confirmTokenUsage('deep_cut_creation', [], [node.label || titleCaseArtistId(node.id)]);
+    if (!confirmed) {
+      return;
+    }
     
     // Trigger spinner immediately
     setLoadingNodeIds(prev => new Set(prev).add(node.id));
@@ -1713,7 +1722,7 @@ const App: React.FC = () => {
     if (node.type !== 'founded') {
       setActiveNodes(prev => prev.some(n => n.id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node]);
     }
-  }, [selectedNode]);
+  }, [confirmTokenUsage, selectedNode, loadingNodeIds]);
 
   const handleToggleStack = useCallback(async (node: Node, link?: string) => {
     if (!user) {
