@@ -604,43 +604,17 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 return (
                                      <div>
                                          <h4 className="font-semibold text-zinc-500 mb-3 text-[10px] uppercase tracking-widest">Watch</h4>
-                                         {details.youtubeVideoId ? (
-                                             <>
-                                                 <div className="w-full aspect-video overflow-hidden border border-zinc-800 bg-zinc-950">
-                                                     <iframe
-                                                         key={details.youtubeVideoId}
-                                                         src={`https://www.youtube-nocookie.com/embed/${details.youtubeVideoId}?rel=0&modestbranding=1&color=white`}
-                                                         title={`${artistDisplay} – Official Video`}
-                                                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                                                         allowFullScreen
-                                                         className="w-full h-full border-0"
-                                                         loading="lazy"
-                                                     />
-                                                 </div>
-                                                 <div className="pt-2 text-center">
-                                                     <a 
-                                                         href={`https://www.youtube.com/results?search_query=${encodeURIComponent(details.details?.artist || '')}+live`}
-                                                         target="_blank"
-                                                         rel="noopener noreferrer"
-                                                         className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors underline decoration-dotted"
-                                                     >
-                                                         Video glitching? Search "{details.details?.artist || 'Artist'} live" directly on YouTube ↗
-                                                     </a>
-                                                 </div>
-                                             </>
-                                         ) : (
-                                             <div className="w-full aspect-video overflow-hidden border border-zinc-800 bg-zinc-950">
-                                                 <iframe
-                                                     key={searchQuery}
-                                                     src={`https://www.youtube-nocookie.com/embed?listType=search&list=${encodeURIComponent(searchQuery)}`}
-                                                     title={`${artistDisplay} – Search Stream`}
-                                                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                                                     allowFullScreen
-                                                     className="w-full h-full border-0"
-                                                     loading="lazy"
-                                                 />
-                                             </div>
-                                         )}
+                                         <div className="w-full aspect-video overflow-hidden border border-zinc-800 bg-zinc-950">
+                                             <iframe
+                                                 key={searchQuery}
+                                                 src={`https://www.youtube-nocookie.com/embed?listType=search&list=${encodeURIComponent(searchQuery)}`}
+                                                 title={`${artistDisplay} – Search Stream`}
+                                                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                                 allowFullScreen
+                                                 className="w-full h-full border-0"
+                                                 loading="lazy"
+                                             />
+                                         </div>
                                      </div>
                                  );
                             })()}
