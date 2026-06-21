@@ -733,6 +733,15 @@ const checkIsProfileIncomplete = (node: Node, details: NodeDetails | null | unde
     details.summary.toLowerCase().includes(phrase.toLowerCase())
   ));
 
+  // 🚨 Self-Healing Check: Catch legacy entries missing core Phase 3 schema fields
+  const hasNoCuratorQuote = !details.recommendationReason || details.recommendationReason.trim() === "";
+  const hasNoMediaSearchQuery = !details.youtubeSearchQuery || details.youtubeSearchQuery.trim() === "";
+
+  if (hasNoCuratorQuote || hasNoMediaSearchQuery) {
+    console.log(`[Self-Healing Alarm] Triggering update pass for legacy profile fields.`);
+    return true; // Force validation failure to open the API optimization modal
+  }
+
   return (
     genreEmpty ||
     originEmpty ||
