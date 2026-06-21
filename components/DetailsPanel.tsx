@@ -1257,7 +1257,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                 )
             )}
 
-            {isCollapsed && !isSmallScreen ? (
+            {isCollapsed && !isSmallScreen && !isMagazineViewOpen ? (
                 <div className="flex-grow flex flex-col items-center justify-between py-6 relative text-zinc-400">
                     <div className="flex-grow flex flex-col items-center justify-center gap-y-6">
                     </div>

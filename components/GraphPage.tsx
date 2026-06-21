@@ -984,6 +984,12 @@ const GraphPage: React.FC<GraphPageProps> = ({
   }, [selectedNode]);
 
   useEffect(() => {
+    if (isMagazineViewOpen && isDetailsPanelCollapsed) {
+      setIsDetailsPanelCollapsed(false);
+    }
+  }, [isMagazineViewOpen, isDetailsPanelCollapsed]);
+
+  useEffect(() => {
     if (isMagazineViewOpen && activeNodes.length > 0) {
       setReadNodeIds(prev => {
         const next = new Set(prev);

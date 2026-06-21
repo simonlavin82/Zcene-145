@@ -58,6 +58,7 @@ const ExampleMusicGraph: React.FC = () => {
     const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
     const [isLegendExpanded, setIsLegendExpanded] = useState(false);
     const [isCompactMode, setIsCompactMode] = useState(false);
+    const legendContainerRef = useRef<HTMLDivElement | null>(null);
     const [graphData, setGraphData] = useState<GraphData>(() => JSON.parse(JSON.stringify(exampleGraphData)));
     const [animatingNode, setAnimatingNode] = useState<string | null>(null);
     const [showDiscoveryUI, setShowDiscoveryUI] = useState(false);
@@ -82,6 +83,17 @@ const ExampleMusicGraph: React.FC = () => {
         observer.observe(containerRef.current);
         return () => observer.disconnect();
     }, []);
+
+    useEffect(() => {
+        if (!isLegendExpanded) return;
+        const handleClickOutside = (event: MouseEvent) => {
+            if (legendContainerRef.current && !legendContainerRef.current.contains(event.target as any)) {
+                setIsLegendExpanded(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside, true);
+        return () => document.removeEventListener('mousedown', handleClickOutside, true);
+    }, [isLegendExpanded]);
 
     const legendConfig: Record<string, { label: string; shape: React.ReactNode }> = {
         seed: { label: 'Seed Artist', shape: <LegendSymbol symbol={d3.symbolCircle} size={260} className="text-zinc-400 stroke-zinc-400 stroke-2 fill-zinc-700"/> },
@@ -636,7 +648,7 @@ const ExampleMusicGraph: React.FC = () => {
                         )}
                         
                         {/* Legend Positioning (Matching MusicGraph Legend) */}
-                        <div className={`absolute z-30 pointer-events-auto flex flex-col ${isCompactMode ? 'bottom-12 sm:bottom-16 left-8 sm:left-10 items-start' : 'top-6 left-1/2 -translate-x-1/2 items-center w-full max-w-[95%]'}`}>
+                        <div ref={legendContainerRef} className={`absolute z-30 pointer-events-auto flex flex-col ${isCompactMode ? 'bottom-12 sm:bottom-16 left-8 sm:left-10 items-start' : 'top-6 left-1/2 -translate-x-1/2 items-center w-full max-w-[95%]'}`}>
                             {!isCompactMode ? (
                                 <div className="flex flex-wrap justify-center border border-zinc-700 bg-zinc-900/90 backdrop-blur-md px-6 py-3 items-center gap-3 sm:gap-4 shadow-2xl rounded-none">
                                     {legendOrder.map(f => (

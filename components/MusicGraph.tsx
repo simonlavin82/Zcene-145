@@ -60,6 +60,18 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   } | null>(null);
   const activeHoveredLinkRef = useRef<{ link: Link } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const localLegendRef = useRef<HTMLDivElement | null>(null);
+
+  const setLegendRef = useCallback((node: HTMLDivElement | null) => {
+    localLegendRef.current = node;
+    if (legendRef) {
+      if (typeof legendRef === 'function') {
+        (legendRef as any)(node);
+      } else {
+        (legendRef as any).current = node;
+      }
+    }
+  }, [legendRef]);
 
   // Detect if legend needs to be in compact mode based on container width
   useEffect(() => {
@@ -116,15 +128,15 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   const sizeMult = Math.max(0.1, graphSettings.nodeSize / 3);
 
   useEffect(() => {
-    if (!isLegendExpanded || !legendRef?.current) return;
+    if (!isLegendExpanded || !localLegendRef.current) return;
     const handleClickOutside = (event: MouseEvent) => {
-      if (legendRef.current && !legendRef.current.contains(event.target as any)) {
+      if (localLegendRef.current && !localLegendRef.current.contains(event.target as any)) {
         setIsLegendExpanded(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isLegendExpanded, legendRef]);
+    document.addEventListener('mousedown', handleClickOutside, true);
+    return () => document.removeEventListener('mousedown', handleClickOutside, true);
+  }, [isLegendExpanded]);
 
   const handleZoomIn = () => {
     if (svgRef.current && zoomRef.current) {
@@ -878,7 +890,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 <span className="material-symbols-outlined !text-[20px]">remove</span>
             </button>
         </div>
-        <div className={`absolute z-30 pointer-events-none flex flex-col ${isCompactMode ? 'bottom-6 left-6 items-start' : 'top-6 left-1/2 -translate-x-1/2 items-center w-full max-w-[95%]'}`}>
+        <div ref={setLegendRef} className={`absolute z-30 pointer-events-none flex flex-col ${isCompactMode ? 'bottom-6 left-6 items-start' : 'top-6 left-1/2 -translate-x-1/2 items-center w-full max-w-[95%]'}`}>
             {!isCompactMode ? (
                 <div className="flex flex-wrap justify-center border border-zinc-700 bg-zinc-900/90 backdrop-blur-md px-6 py-3 items-center gap-3 sm:gap-4 pointer-events-auto shadow-2xl rounded-none">
                     {legendOrder.map(f => (
