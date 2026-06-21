@@ -210,6 +210,11 @@ export const NODE_DETAILS_SCHEMA = {
     recommendationReason: {
       type: Type.STRING,
       description: "Curator insight."
+    },
+    youtubeVideoId: {
+      type: Type.STRING,
+      nullable: true,
+      description: "The YouTube video ID (11-character string) for the best available official video. Priority order: (1) most iconic/popular official music video, (2) high-profile professional full live set on an official channel. MUST NOT be a lyric video, fan-cam bootleg, low-quality upload, or non-musical interview clip. Return null if no high-quality official video can be confirmed."
     }
   },
   required: ["summary", "details", "discography", "recommendationReason"]
@@ -326,8 +331,16 @@ export const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed infor
         {"site": "Wikipedia", "url": "https://en.wikipedia.org/wiki/..."}
       ],
       "discography": [{"albumName": "Name", "releaseYear": "YYYY"}],
-      "recommendationReason": "Curator insight about their role in this scene."
+      "recommendationReason": "Curator insight about their role in this scene.",
+      "youtubeVideoId": "dQw4w9WgXcQ"
     }
+
+    YOUTUBE VIDEO SELECTION RULES (CRITICAL):
+    - Use Google Search to find the best official YouTube video for this artist.
+    - Priority: (1) Most iconic/popular official music video from their official YouTube channel, (2) high-profile full professional live set on an official or reputable label channel.
+    - ABSOLUTELY FORBIDDEN: lyric videos, fan-cam bootlegs, low-resolution uploads, non-musical interview clips, or unofficial re-uploads.
+    - The value must be ONLY the 11-character YouTube video ID (e.g. "dQw4w9WgXcQ"), NOT a full URL.
+    - Set to null if no high-quality, officially-sourced video can be confirmed via search.
 
     WIKIPEDIA ORDERING RULE (MANDATORY):
     If a Wikipedia link is found, it MUST be the very first item (index 0) in the links array.
@@ -1146,6 +1159,9 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
         discography: details.discography || [],
         members: details.members || [],
         recommendationReason: details.recommendationReason || "",
+        youtubeVideoId: typeof details.youtubeVideoId === 'string' && details.youtubeVideoId.trim().length === 11
+            ? details.youtubeVideoId.trim()
+            : undefined,
     };
 
     if (!hydratedDetails.details) hydratedDetails.details = {};

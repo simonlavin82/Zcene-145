@@ -579,6 +579,23 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 </div>
                             )}
 
+                            {details.youtubeVideoId && (
+                                <div>
+                                    <h4 className="font-semibold text-zinc-500 mb-3 text-[10px] uppercase tracking-widest">Watch</h4>
+                                    <div className="w-full aspect-video rounded-none overflow-hidden border border-zinc-800 bg-zinc-950 relative group">
+                                        <iframe
+                                            key={details.youtubeVideoId}
+                                            src={`https://www.youtube-nocookie.com/embed/${details.youtubeVideoId}?rel=0&modestbranding=1&color=white`}
+                                            title={`${details?.details?.artist || node.label || node.id} – Official Video`}
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                            allowFullScreen
+                                            className="w-full h-full border-0"
+                                            loading="lazy"
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
                             {links.purchase.length > 0 && (
                                 <div className="p-5 bg-primary/5 border-2 border-primary/20 relative">
                                     <div className="absolute -top-3 left-4 bg-zinc-900 px-2 text-[10px] font-semibold uppercase tracking-widest text-primary rounded-none">

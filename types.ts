@@ -61,6 +61,7 @@ export interface NodeDetails {
     releaseYear: string;
   }>;
   recommendationReason?: string;
+  youtubeVideoId?: string;
   groundingLinks?: Array<{
     title: string;
     url: string;
