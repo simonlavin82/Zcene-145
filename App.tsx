@@ -1595,6 +1595,9 @@ const App: React.FC = () => {
                 const youtubeVideoId = typeof parsed?.youtubeVideoId === 'string' && parsed.youtubeVideoId.trim().length === 11
                     ? parsed.youtubeVideoId.trim()
                     : undefined;
+                const youtubeSearchQuery = typeof parsed?.youtubeSearchQuery === 'string' && parsed.youtubeSearchQuery.trim().length > 0
+                    ? parsed.youtubeSearchQuery.trim()
+                    : undefined;
                 
                 const isPlaceholderBio = bio.includes('sandbox mock') || bio.includes('test scenarios');
                 const isBioTooShort = !bio || bio.trim().length < 5;
@@ -1608,7 +1611,8 @@ const App: React.FC = () => {
                     tourInfo,
                     recommendationReason,
                     groundingLinks,
-                    youtubeVideoId
+                    youtubeVideoId,
+                    youtubeSearchQuery
                 };
 
                 const isIncomplete = checkIsProfileIncomplete(node, detailsPayload) || isBioTooShort || isPlaceholderBio;
@@ -2029,9 +2033,12 @@ const App: React.FC = () => {
                             groundingLinks: parsedDetails?.groundingLinks || [],
                             youtubeVideoId: typeof parsedDetails?.youtubeVideoId === 'string' && parsedDetails.youtubeVideoId.trim().length === 11
                                 ? parsedDetails.youtubeVideoId.trim()
+                                : undefined,
+                            youtubeSearchQuery: typeof parsedDetails?.youtubeSearchQuery === 'string' && parsedDetails.youtubeSearchQuery.trim().length > 0
+                                ? parsedDetails.youtubeSearchQuery.trim()
                                 : undefined
                          };
-                          console.log("[Phase 3 Cache Payload – Front Gate]", searchId, JSON.stringify({ youtubeVideoId: detailsPayload.youtubeVideoId }));
+                          console.log("[Phase 3 Cache Payload – Front Gate]", searchId, JSON.stringify({ youtubeVideoId: detailsPayload.youtubeVideoId, youtubeSearchQuery: detailsPayload.youtubeSearchQuery }));
                           setDetailsCache(prev => new Map(prev).set(searchIdLower, detailsPayload).set(searchId, detailsPayload).set(normalizeArtistId(searchId), detailsPayload));
                       }
                   } catch(e) { console.warn("Failed to parse detailsCache", e); }

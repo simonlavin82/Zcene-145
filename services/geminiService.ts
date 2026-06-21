@@ -215,9 +215,13 @@ export const NODE_DETAILS_SCHEMA = {
       type: Type.STRING,
       nullable: true,
       description: "The YouTube video ID (11-character string) for the best available official video. Priority order: (1) most iconic/popular official music video, (2) high-profile professional full live set on an official channel. MUST NOT be a lyric video, fan-cam bootleg, low-quality upload, or non-musical interview clip. Return null if no high-quality official video can be confirmed."
+    },
+    youtubeSearchQuery: {
+      type: Type.STRING,
+      description: "A guaranteed-non-null YouTube search query string to use as a fallback when youtubeVideoId cannot be confirmed. Format: '[Artist Name] [genre] [live OR official video]'. Example: 'Turnstile hardcore punk official music video'. Always populate this field."
     }
   },
-  required: ["summary", "details", "discography", "recommendationReason"]
+  required: ["summary", "details", "discography", "recommendationReason", "youtubeSearchQuery"]
 };
 
 export const GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = `I have an existing music graph. The user wants to enhance it by adding connections for these seed artists: {{artists}}.
@@ -332,15 +336,17 @@ export const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed infor
       ],
       "discography": [{"albumName": "Name", "releaseYear": "YYYY"}],
       "recommendationReason": "Curator insight about their role in this scene.",
-      "youtubeVideoId": "dQw4w9WgXcQ"
+      "youtubeVideoId": "dQw4w9WgXcQ",
+      "youtubeSearchQuery": "Turnstile hardcore punk official music video"
     }
 
     YOUTUBE VIDEO SELECTION RULES (CRITICAL):
     - Use Google Search to find the best official YouTube video for this artist.
     - Priority: (1) Most iconic/popular official music video from their official YouTube channel, (2) high-profile full professional live set on an official or reputable label channel.
     - ABSOLUTELY FORBIDDEN: lyric videos, fan-cam bootlegs, low-resolution uploads, non-musical interview clips, or unofficial re-uploads.
-    - The value must be ONLY the 11-character YouTube video ID (e.g. "dQw4w9WgXcQ"), NOT a full URL.
-    - Set to null if no high-quality, officially-sourced video can be confirmed via search.
+    - The youtubeVideoId value must be ONLY the 11-character YouTube video ID (e.g. "dQw4w9WgXcQ"), NOT a full URL.
+    - Set youtubeVideoId to null if no high-quality, officially-sourced video can be confirmed via search.
+    - youtubeSearchQuery MUST always be populated as a non-null fallback. Format: "[Artist Name] [genre] [live OR official video]". This is MANDATORY.
 
     WIKIPEDIA ORDERING RULE (MANDATORY):
     If a Wikipedia link is found, it MUST be the very first item (index 0) in the links array.
@@ -1161,6 +1167,9 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
         recommendationReason: details.recommendationReason || "",
         youtubeVideoId: typeof details.youtubeVideoId === 'string' && details.youtubeVideoId.trim().length === 11
             ? details.youtubeVideoId.trim()
+            : undefined,
+        youtubeSearchQuery: typeof details.youtubeSearchQuery === 'string' && details.youtubeSearchQuery.trim().length > 0
+            ? details.youtubeSearchQuery.trim()
             : undefined,
     };
 

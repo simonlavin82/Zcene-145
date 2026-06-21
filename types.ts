@@ -62,6 +62,7 @@ export interface NodeDetails {
   }>;
   recommendationReason?: string;
   youtubeVideoId?: string;
+  youtubeSearchQuery?: string;
   groundingLinks?: Array<{
     title: string;
     url: string;
