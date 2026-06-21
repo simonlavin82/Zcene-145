@@ -341,7 +341,9 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     title="Click to copy name"
                                 >
                                     <h3 className={`${headerSizeClass} text-white leading-[0.9] py-1 break-normal`}>
-                                        {details?.details?.artist || node.label || titleCaseArtistId(node.id)}
+                                        {details?.details?.artist
+                                            || (node.label && /^[a-z]/.test(node.label) ? titleCaseArtistId(node.label) : node.label)
+                                            || titleCaseArtistId(node.id)}
                                     </h3>
                                     <span className={`material-symbols-outlined !text-[16px] flex-shrink-0 transition-all duration-300 ${isIdCopied ? 'text-primary opacity-100 scale-110' : 'text-zinc-500 opacity-0 group-hover:opacity-100'}`}>
                                         {isIdCopied ? 'check' : 'content_copy'}
@@ -579,8 +581,11 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 </div>
                             )}
 
-                            {(details.youtubeVideoId || details.youtubeSearchQuery || details?.details?.artist || node.label) && (() => {
-                                const artistDisplay = details?.details?.artist || node.label || titleCaseArtistId(node.id);
+                            {isArtistNode && details && (() => {
+                                // Always sanitise the display name — node.label may be a raw kebab slug
+                                const rawLabel = node.label || '';
+                                const sanitisedLabel = rawLabel && /^[a-z]/.test(rawLabel) ? titleCaseArtistId(rawLabel) : rawLabel;
+                                const artistDisplay = details?.details?.artist || sanitisedLabel || titleCaseArtistId(node.id);
                                 const genre = details?.details?.genre || '';
                                 // Build a guaranteed search query: prefer AI-provided, else derive from artist + genre
                                 const searchQuery = details.youtubeSearchQuery
