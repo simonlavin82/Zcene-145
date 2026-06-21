@@ -1358,7 +1358,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                         <div 
                                             key={node.id} 
                                             className={`transition-all duration-700 ${isMagazineViewOpen 
-                                                ? 'inline-block w-full' 
+                                                ? 'inline-block w-full max-w-2xl text-left' 
                                                 : 'w-full h-full flex-shrink-0 overflow-hidden'}`}
                                         >
                                             <NodeDetailsCard
