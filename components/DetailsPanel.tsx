@@ -439,40 +439,31 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
             <div className="flex flex-col min-h-full">
                 <div className={`px-4 pt-3 pb-3 border-b border-zinc-800/50 bg-zinc-900 z-20 flex-shrink-0 ${isFullScreenMode ? 'md:px-6' : ''}`}>
                     <div className="flex flex-col gap-2 mb-2">
-                        <div className="flex items-center justify-between gap-1 flex-shrink-0">
-                            <button
-                                onClick={onToggleMagazineView}
-                                className={`w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 active:scale-95 leading-none ${isFullScreenMode ? 'text-primary bg-primary/5 border-primary/30' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'}`}
-                                title={isFullScreenMode ? "Exit Magazine View" : "Enter Magazine View"}
-                            >
-                                <span className="material-symbols-outlined !text-[18px]">auto_stories</span>
-                            </button>
-                            <div className="flex items-center justify-end gap-1 flex-shrink-0">
-                                {(isArtistNode || isLabelNode) && (
-                                    <button
-                                        onClick={() => onToggleStack(node, links.purchase?.[0]?.url)}
-                                        className={`w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 active:scale-95 leading-none ${isInStack ? 'text-primary bg-primary/5 border-primary/30' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'}`}
-                                        title={isInStack ? "Remove from My Stack" : "Save to My Stack"}
-                                    >
-                                        <StackIcon className="!text-[18px]" />
-                                    </button>
-                                )}
-                                {isArtistNode && !isGuest && (
-                                    <button
-                                        onClick={() => onAddArtist(normalizeArtistId(node.id))}
-                                        className={`w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 active:scale-95 leading-none ${isSeedArtist ? 'text-primary bg-primary/5 border-primary/30' : 'text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-primary'}`}
-                                        title={isSeedArtist ? "Remove from Seeds" : "Add to Seeds"}
-                                    >
-                                        <span className="material-symbols-outlined !text-[18px]">
-                                            {isSeedArtist ? 'check_circle' : 'add_circle'}
-                                        </span>
-                                    </button>
-                                )}
-
-                                <button onClick={onClose} className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-700 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none" title="Remove Card">
-                                        <span className="material-symbols-outlined !text-[18px]">remove</span>
+                        <div className="flex items-center justify-end gap-1 flex-shrink-0">
+                            {(isArtistNode || isLabelNode) && (
+                                <button
+                                    onClick={() => onToggleStack(node, links.purchase?.[0]?.url)}
+                                    className={`w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 active:scale-95 leading-none ${isInStack ? 'text-primary bg-primary/5 border-primary/30' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'}`}
+                                    title={isInStack ? "Remove from My Stack" : "Save to My Stack"}
+                                >
+                                    <StackIcon className="!text-[18px]" />
                                 </button>
-                            </div>
+                            )}
+                            {isArtistNode && !isGuest && (
+                                <button
+                                    onClick={() => onAddArtist(normalizeArtistId(node.id))}
+                                    className={`w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 active:scale-95 leading-none ${isSeedArtist ? 'text-primary bg-primary/5 border-primary/30' : 'text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-primary'}`}
+                                    title={isSeedArtist ? "Remove from Seeds" : "Add to Seeds"}
+                                >
+                                    <span className="material-symbols-outlined !text-[18px]">
+                                        {isSeedArtist ? 'check_circle' : 'add_circle'}
+                                    </span>
+                                </button>
+                            )}
+
+                            <button onClick={onClose} className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-700 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none" title="Remove Card">
+                                    <span className="material-symbols-outlined !text-[18px]">remove</span>
+                            </button>
                         </div>
                         <div className="flex flex-col gap-1 min-w-0 flex-grow">
                             <div className="flex items-center gap-2">
@@ -1141,9 +1132,11 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                             </div>
                             <button 
                                 onClick={() => onMagazineViewToggle(false)}
-                                className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 active:scale-95 transition-all leading-none border border-zinc-800"
+                                className="flex items-center gap-1.5 px-3 py-1.5 border border-zinc-700/80 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 active:scale-95 transition-all text-xs font-medium shrink-0 leading-none"
+                                title="Exit Magazine View"
                             >
-                                <span className="material-symbols-outlined !text-[18px]">close</span>
+                                <span>Exit Magazine</span>
+                                <span className="material-symbols-outlined !text-[14px]">close</span>
                             </button>
                         </div>
                         
@@ -1223,10 +1216,11 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                             <div className="flex items-center gap-0.5 ml-4 shrink-0">
                                 <button 
                                     onClick={() => onMagazineViewToggle(false)}
-                                    className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 active:scale-95 transition-all leading-none border border-zinc-800"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 border border-zinc-700/80 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 active:scale-95 transition-all text-xs font-medium shrink-0 leading-none"
                                     title="Exit Magazine View"
                                 >
-                                    <span className="material-symbols-outlined !text-[18px]">close</span>
+                                    <span>Exit Magazine</span>
+                                    <span className="material-symbols-outlined !text-[14px]">close</span>
                                 </button>
                             </div>
                         </div>
@@ -1271,32 +1265,50 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                 </div>
             ) : (
                 <div className="flex-grow flex flex-col min-h-0 h-full overflow-hidden">
-                    {!isMagazineViewOpen && activeNodes.length > 1 && (
-                        <div className="flex items-center justify-between px-4 py-2 border-b border-zinc-700/50 bg-zinc-900 flex-shrink-0 gap-3">
-                            <button 
-                                onClick={handlePrev} 
-                                disabled={viewedIndex <= 0}
-                                className="w-8 h-8 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 rounded-xl transition-colors disabled:opacity-20 disabled:pointer-events-none leading-none"
-                            >
-                                <span className="material-symbols-outlined !text-[18px]">chevron_left</span>
-                            </button>
-                            
-                            <div className="flex items-center justify-center gap-1 flex-wrap px-1">
-                                {activeNodes.map((node, i) => (
-                                    <div 
-                                        key={node.id} 
-                                        onClick={() => { setViewedIndex(i); onNodeClick(node); }}
-                                        className={`h-1 transition-all cursor-pointer ${i === viewedIndex ? 'w-4 bg-primary' : 'w-1 bg-zinc-600 active:bg-zinc-400'}`}
-                                        title={node.label || titleCaseArtistId(node.id)}
-                                    />
-                                ))}
+                    {!isMagazineViewOpen && activeNodes.length > 0 && (
+                        <div className="flex justify-between items-center w-full px-4 py-2 border-b border-zinc-700/50 bg-zinc-900 flex-shrink-0 gap-3">
+                            <div className="flex items-center space-x-3 overflow-hidden">
+                                {activeNodes.length > 1 && (
+                                    <>
+                                        <button 
+                                            onClick={handlePrev} 
+                                            disabled={viewedIndex <= 0}
+                                            className="w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 rounded-xl transition-colors disabled:opacity-20 disabled:pointer-events-none leading-none"
+                                        >
+                                            <span className="material-symbols-outlined !text-[18px]">chevron_left</span>
+                                        </button>
+                                        <button 
+                                            onClick={handleNext} 
+                                            disabled={viewedIndex === activeNodes.length - 1}
+                                            className="w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 rounded-xl transition-colors disabled:opacity-20 disabled:pointer-events-none leading-none"
+                                        >
+                                            <span className="material-symbols-outlined !text-[18px]">chevron_right</span>
+                                        </button>
+                                        
+                                        <div className="relative flex items-center max-w-[80px] sm:max-w-[120px] overflow-hidden flex-shrink-0">
+                                            <div className="flex items-center gap-1 flex-nowrap pr-4 overflow-hidden">
+                                                {activeNodes.map((node, i) => (
+                                                    <div 
+                                                        key={node.id} 
+                                                        onClick={() => { setViewedIndex(i); onNodeClick(node); }}
+                                                        className={`h-1 transition-all cursor-pointer flex-shrink-0 rounded-full ${i === viewedIndex ? 'w-4 bg-primary' : 'w-1 bg-zinc-600 active:bg-zinc-400'}`}
+                                                        title={node.label || titleCaseArtistId(node.id)}
+                                                    />
+                                                ))}
+                                            </div>
+                                            <div className="absolute right-0 top-0 bottom-0 w-4 bg-gradient-to-r from-transparent to-zinc-900 pointer-events-none" />
+                                        </div>
+                                    </>
+                                )}
                             </div>
-                            <button 
-                                onClick={handleNext} 
-                                disabled={viewedIndex === activeNodes.length - 1}
-                                className="w-8 h-8 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 rounded-xl transition-colors disabled:opacity-20 disabled:pointer-events-none leading-none"
+
+                            <button
+                                onClick={() => onMagazineViewToggle(!isMagazineViewOpen)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 active:scale-95 transition-all text-xs font-medium shrink-0 leading-none"
+                                title="Enter Magazine View"
                             >
-                                <span className="material-symbols-outlined !text-[18px]">chevron_right</span>
+                                <span className="material-symbols-outlined !text-[16px]">auto_stories</span>
+                                <span>Magazine View</span>
                             </button>
                         </div>
                     )}

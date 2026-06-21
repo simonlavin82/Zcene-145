@@ -1686,18 +1686,35 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="space-y-6">
                                     <h3 className="text-xl font-medium text-zinc-200">Visual Anatomy</h3>
                                     <div className="p-8 bg-zinc-950 rounded-xl border border-zinc-800 flex flex-col items-center justify-center gap-6">
-                                        <div className="flex items-center justify-between w-full max-w-xs px-4 py-2 border border-zinc-700/50 bg-zinc-900 rounded-xl gap-3">
-                                            <button className="w-8 h-8 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-xl transition-colors">
-                                                <span className="material-symbols-outlined !text-[18px]">chevron_left</span>
-                                            </button>
-                                            <div className="flex items-center justify-center gap-1 flex-wrap px-1">
-                                                <div className="h-1 w-4 bg-primary transition-all rounded-full" />
-                                                <div className="h-1 w-1 bg-zinc-600 transition-all rounded-full" />
-                                                <div className="h-1 w-1 bg-zinc-600 transition-all rounded-full" />
-                                                <div className="h-1 w-1 bg-zinc-600 transition-all rounded-full" />
+                                        <div className="flex justify-between items-center w-full max-w-sm px-4 py-2 border border-zinc-700/50 bg-zinc-900 rounded-xl gap-3">
+                                            {/* Left-Aligned Cluster */}
+                                            <div className="flex items-center space-x-3 overflow-hidden">
+                                                <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-xl transition-colors">
+                                                    <span className="material-symbols-outlined !text-[18px]">chevron_left</span>
+                                                </button>
+                                                <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-xl transition-colors">
+                                                    <span className="material-symbols-outlined !text-[18px]">chevron_right</span>
+                                                </button>
+                                                
+                                                {/* Dots Track Wrapper with Clamped Width and Right Edge Fade */}
+                                                <div className="relative flex items-center max-w-[80px] overflow-hidden flex-shrink-0">
+                                                    <div className="flex items-center gap-1 flex-nowrap pr-4 overflow-hidden">
+                                                        <div className="h-1 w-4 bg-primary transition-all rounded-full flex-shrink-0" />
+                                                        <div className="h-1 w-1 bg-zinc-600 transition-all rounded-full flex-shrink-0" />
+                                                        <div className="h-1 w-1 bg-zinc-600 transition-all rounded-full flex-shrink-0" />
+                                                        <div className="h-1 w-1 bg-zinc-600 transition-all rounded-full flex-shrink-0" />
+                                                        <div className="h-1 w-1 bg-zinc-600 transition-all rounded-full flex-shrink-0" />
+                                                        <div className="h-1 w-1 bg-zinc-600 transition-all rounded-full flex-shrink-0" />
+                                                    </div>
+                                                    {/* Fade Overlay */}
+                                                    <div className="absolute right-0 top-0 bottom-0 w-4 bg-gradient-to-r from-transparent to-zinc-900 pointer-events-none" />
+                                                </div>
                                             </div>
-                                            <button className="w-8 h-8 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-xl transition-colors">
-                                                <span className="material-symbols-outlined !text-[18px]">chevron_right</span>
+
+                                            {/* Right-Aligned Magazine Trigger Mock */}
+                                            <button className="flex items-center gap-1.5 px-3 py-1.5 border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all text-xs font-medium shrink-0 leading-none">
+                                                <span className="material-symbols-outlined !text-[16px]">auto_stories</span>
+                                                <span>Magazine View</span>
                                             </button>
                                         </div>
                                     </div>
@@ -1706,16 +1723,16 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <h3 className="text-xl font-medium text-zinc-200">Design Standards</h3>
                                     <div className="space-y-4">
                                         <div className="space-y-1">
-                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Alignment & Padding</h4>
-                                            <p className="text-sm text-zinc-400">The container uses <strong>px-4</strong> horizontal padding to ensure vertical alignment with the panel header and content blocks. Vertical padding is <strong>py-2</strong>.</p>
+                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Alignment & Layout</h4>
+                                            <p className="text-sm text-zinc-400">Uses a split-flex row with <strong>flex justify-between items-center w-full px-4 py-2 bg-zinc-900</strong>. Left cluster groups navigation chevrons and indicators; right cluster pins the Magazine toggle.</p>
                                         </div>
                                         <div className="space-y-1">
-                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Indicator States</h4>
-                                            <p className="text-sm text-zinc-400">Active state: <strong>w-4 bg-primary</strong>. Passive state: <strong>w-1 bg-zinc-600</strong>. All indicators have a height of <strong>1px (h-1)</strong>.</p>
+                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Responsive Clamping & Edge Fade</h4>
+                                            <p className="text-sm text-zinc-400">The dot track is clamped to <strong>max-w-[80px] sm:max-w-[120px]</strong>. A right-aligned gradient overlay (<strong>bg-gradient-to-r from-transparent to-zinc-900</strong>) smoothly fades out overflowing dots without wrapping.</p>
                                         </div>
                                         <div className="space-y-1">
-                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Control Buttons</h4>
-                                            <p className="text-sm text-zinc-400">Uses <strong>w-8 h-8</strong> icon buttons with <strong>18px</strong> chevrons. Disabled states use <strong>opacity-20</strong> and suppress interactions.</p>
+                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Control Elements</h4>
+                                            <p className="text-sm text-zinc-400">Active indicator: <strong>w-4 bg-primary</strong>. Control buttons use <strong>w-8 h-8</strong> dimensions. The Magazine button is styled with a subtle border and <strong>auto_stories</strong> icon.</p>
                                         </div>
                                     </div>
                                 </div>
