@@ -647,110 +647,12 @@ const checkIsProfileIncomplete = (node: Node, details: NodeDetails | null | unde
   const isArtist = node.type === 'artist' || !node.type || details?.details?.artist !== undefined;
   if (!details || !isArtist) return false;
 
-  const SENTINEL_INSIGHT = 'No insight provided.';
-
-  // Hardened check for missing, null, or any "Unknown" variant
-  const isInvalidOrUnknown = (val: any): boolean => {
-    if (val === null || val === undefined) return true;
-    if (typeof val === 'string') {
-      const clean = val.trim().toLowerCase();
-      return (
-        clean === '' ||
-        clean.includes('unknown') ||
-        clean === 'n/a' ||
-        clean === 'none' ||
-        clean === 'null' ||
-        clean === 'undefined' ||
-        clean.includes('not available') ||
-        clean.includes('placeholder')
-      );
-    }
-    return false;
-  };
-
-  // Fallback chain normalization: try details field first, then node label
-  let displayTitle = details.details?.artist || node.label;
-  if (!displayTitle || displayTitle.toLowerCase() === node.id.toLowerCase()) {
-    // Extract exact casing of the artist name from the biography summary if present
-    const spacedId = node.id.replace(/[-_]+/g, ' ').trim();
-    if (details.summary) {
-      const idx = details.summary.toLowerCase().indexOf(spacedId.toLowerCase());
-      if (idx !== -1) {
-        displayTitle = details.summary.substring(idx, idx + spacedId.length);
-      }
-    }
-    // Fall back to title-casing the spaced ID if not found in the summary
-    if (!displayTitle || displayTitle.toLowerCase() === node.id.toLowerCase()) {
-      displayTitle = titleCaseArtistId(node.id);
-    }
+  // Change the validation gate to only fail if core data properties are missing (!details.summary or empty strings).
+  // If an artist text bio exists, return false silently.
+  if (!details.summary || details.summary.trim() === "") {
+    return true;
   }
-
-  // 1. Core structural property validation (All fields must exist and be valid)
-  const genreEmpty      = isInvalidOrUnknown(details.details?.genre);
-  const originEmpty     = isInvalidOrUnknown(details.details?.origin);
-  const foundedEmpty    = isInvalidOrUnknown(details.details?.founded);
-  const artistNameEmpty  = isInvalidOrUnknown(details.details?.artist || displayTitle);
-  // Only flag insightEmpty if the field was explicitly synthesized with a sentinel/low-quality value.
-  // Absent (undefined) or empty ("") fields — legacy Firestore records pre-dating this schema field —
-  // are non-blocking and must not trigger a re-synthesis loop.
-  // Truth table: undefined → false, "" → false, "No insight provided." → true, real content → false.
-  const insightEmpty    = typeof details.recommendationReason === 'string' &&
-                          details.recommendationReason.trim().length > 0 &&
-                          details.recommendationReason.trim().toLowerCase() === SENTINEL_INSIGHT.toLowerCase();
-
-  // 2. Lowercase identifier validation (Check display title, details artist, and first bolded summary word)
-  // Guard: single-word artist names with no spaces or hyphens (e.g. "buggin", "zulu", "scowl") are
-  // legitimate all-lowercase names, NOT corruption signals. Only flag multi-word or hyphenated names.
-  const isSingleWordName = !displayTitle.includes(' ') && !displayTitle.includes('-');
-  const isLabelLower    = !isSingleWordName && isPurelyLowercase(displayTitle);
-  const isArtistNameLower = !isSingleWordName && isPurelyLowercase(details.details?.artist || displayTitle);
-  
-  // Find all bolded terms in summary (e.g. "**scowl**", "**alternative rock**")
-  const boldMatches     = details.summary ? Array.from(details.summary.matchAll(/\*\*([^*]+)\*\*/g)) : [];
-  
-  // Compare bolded terms to the normalized displayTitle to find the one representing the artist
-  const cleanCompare    = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
-  const artistClean     = cleanCompare(displayTitle);
-  const matchingBold    = boldMatches.find(m => cleanCompare(m[1]) === artistClean);
-  
-  // Check if the matched bolded artist name is purely lowercase.
-  // Single-word names are exempt here too — only multi-word bold leaks are meaningful.
-  const isBoldBioNameLower = matchingBold && !isSingleWordName ? isPurelyLowercase(matchingBold[1]) : false;
-  
-  const isLowercasedMarker = isLabelLower || isArtistNameLower || isBoldBioNameLower;
-
-  // 3. Syntax leak check
-  const hasSyntaxLeak   = !!(details.summary && /\*{1,2}[^*]+\*{1,2}/.test(details.summary) && isBoldBioNameLower);
-
-  // 4. Repeating generic template/placeholder pattern check
-  const PLACEHOLDER_PHRASES = [
-    "is a notable music entity",
-    "stylistic contributions, helping shape the sonic evolution",
-    "sandbox mock",
-    "test scenarios"
-  ];
-  const hasPlaceholderPattern = !!(details.summary && PLACEHOLDER_PHRASES.some(phrase => 
-    details.summary.toLowerCase().includes(phrase.toLowerCase())
-  ));
-
-  // 🚨 Self-Healing Check: Catch legacy entries missing core Phase 3 schema fields
-  const hasNoCuratorQuote = !details.recommendationReason || details.recommendationReason.trim() === "";
-  const hasNoMediaSearchQuery = !details.youtubeSearchQuery || details.youtubeSearchQuery.trim() === "";
-
-  if (hasNoCuratorQuote || hasNoMediaSearchQuery) {
-    console.log(`[Self-Healing Alarm] Triggering update pass for legacy profile fields.`);
-    return true; // Force validation failure to open the API optimization modal
-  }
-
-  return (
-    genreEmpty ||
-    originEmpty ||
-    foundedEmpty ||
-    artistNameEmpty ||
-    insightEmpty ||
-    isLowercasedMarker ||
-    hasPlaceholderPattern
-  );
+  return false;
 };
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
