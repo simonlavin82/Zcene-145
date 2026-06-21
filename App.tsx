@@ -439,6 +439,8 @@ const mergeGraphData = (base: GraphData, enhancement: GraphData): GraphData => {
   const combinedNodes = [...base.nodes];
   const combinedLinks = [...(base.links || [])];
   const nodeMap = new Map<string, Node>(combinedNodes.map(n => [n.id.toLowerCase(), n]));
+
+  // Update existing nodes or add new ones
   enhancement.nodes.forEach(newNode => {
     const normalizedId = newNode.id.toLowerCase();
     const existingNode = nodeMap.get(normalizedId);
@@ -446,8 +448,17 @@ const mergeGraphData = (base: GraphData, enhancement: GraphData): GraphData => {
       if (existingNode.id !== newNode.id) {
         const oldId = existingNode.id, newId = newNode.id;
         combinedLinks.forEach(link => {
-          if (typeof link.source === 'string' && link.source === oldId) link.source = newId;
-          if (typeof link.target === 'string' && link.target === oldId) link.target = newId;
+          if (typeof link.source === 'string') {
+            if (link.source === oldId) link.source = newId;
+          } else if (typeof link.source === 'object' && link.source !== null) {
+            if ((link.source as Node).id === oldId) (link.source as Node).id = newId;
+          }
+
+          if (typeof link.target === 'string') {
+            if (link.target === oldId) link.target = newId;
+          } else if (typeof link.target === 'object' && link.target !== null) {
+            if ((link.target as Node).id === oldId) (link.target as Node).id = newId;
+          }
         });
         existingNode.id = newId;
       }
@@ -458,21 +469,55 @@ const mergeGraphData = (base: GraphData, enhancement: GraphData): GraphData => {
       nodeMap.set(normalizedId, newNode);
     }
   });
-  const linkIdSet = new Set(combinedLinks.map(l => {
-    const ids = [(typeof l.source === 'string' ? l.source : (l.source as Node).id).toLowerCase(), (typeof l.target === 'string' ? l.target : (l.target as Node).id).toLowerCase()].sort();
-    return ids.join('--');
-  }));
+
+  // Track existing links in a Map for fast lookup and property overwriting
+  const linkMap = new Map<string, Link>();
+  combinedLinks.forEach(l => {
+    const sId = (typeof l.source === 'string' ? l.source : (l.source as Node).id).toLowerCase();
+    const tId = (typeof l.target === 'string' ? l.target : (l.target as Node).id).toLowerCase();
+    const linkId = [sId, tId].sort().join('--');
+    linkMap.set(linkId, l);
+  });
+
   enhancement.links.forEach(newLink => {
     const sourceId = (typeof newLink.source === 'string' ? newLink.source : (newLink.source as Node).id).toLowerCase();
     const targetId = (typeof newLink.target === 'string' ? newLink.target : (newLink.target as Node).id).toLowerCase();
     if (nodeMap.has(sourceId) && nodeMap.has(targetId)) {
       const linkId = [sourceId, targetId].sort().join('--');
-      if (!linkIdSet.has(linkId)) {
-        combinedLinks.push({ ...newLink, source: nodeMap.get(sourceId)!.id, target: nodeMap.get(targetId)!.id });
-        linkIdSet.add(linkId);
+      const existingLink = linkMap.get(linkId);
+      const correctSource = nodeMap.get(sourceId)!.id;
+      const correctTarget = nodeMap.get(targetId)!.id;
+
+      if (existingLink) {
+        // Casing and property updates: Ensure the link points to the nodeMap's canonical cased ID
+        if (typeof existingLink.source === 'string') {
+          existingLink.source = correctSource;
+        } else if (typeof existingLink.source === 'object' && existingLink.source !== null) {
+          (existingLink.source as Node).id = correctSource;
+        }
+
+        if (typeof existingLink.target === 'string') {
+          existingLink.target = correctTarget;
+        } else if (typeof existingLink.target === 'object' && existingLink.target !== null) {
+          (existingLink.target as Node).id = correctTarget;
+        }
+
+        // Overwrite existing properties with new ones, specifically the context string
+        if (newLink.context) {
+          existingLink.context = newLink.context;
+        }
+      } else {
+        const linkToPush: Link = {
+          ...newLink,
+          source: correctSource,
+          target: correctTarget
+        };
+        combinedLinks.push(linkToPush);
+        linkMap.set(linkId, linkToPush);
       }
     }
   });
+
   return { nodes: combinedNodes, links: combinedLinks };
 };
 
@@ -1889,6 +1934,7 @@ const App: React.FC = () => {
   ) => {
     isHydratingSessionRef.current = true;
     let isLockReleasedByAutosave = false;
+    let bypassToken = bypassTokenConfirmation;
     const prevActiveNodes = activeNodes;
     const prevSeedArtists = seedArtists;
     const activeDiscoveryFilters = overrideFilters || discoveryFilters;
@@ -2024,6 +2070,7 @@ const App: React.FC = () => {
             const confirmed = await confirmTokenUsage('cache_upgrade', [], [searchId], []);
             if (confirmed) {
               console.log(`[Front Gate Cache] User confirmed cache upgrade. Overwriting old entry.`);
+              bypassToken = true;
               // Fall through to live generation logic (which will generate and write back)
             } else {
               console.log(`[Front Gate Cache] User cancelled cache upgrade. Falling back to legacy data.`);
@@ -2086,7 +2133,7 @@ const App: React.FC = () => {
 
       let bypassChoiceConfirmation = false;
 
-      if (!bypassTokenConfirmation) {
+      if (!bypassToken) {
         const normalizedArtistList = artistList.map(name => name.toLowerCase());
         const cacheResult = await readArtistCacheMany(normalizedArtistList, user?.uid);
         cached = new Map<string, ArtistCacheEntry>();
@@ -2596,7 +2643,7 @@ const App: React.FC = () => {
 
         // Write both newly fetched and enriched/upgraded artists to Firestore (fire-and-forget) - only for standalone queries
         if (artistList.length === 1) {
-          writeArtistCacheMany(toFetch, freshData, user?.uid, activeDiscoveryFilters, true)
+          writeArtistCacheMany(toFetch, freshData, user?.uid, activeDiscoveryFilters, true, true)
             .then(() => console.log(`[Music Discovery] Cache write/upgrade confirmed for: [${toFetch.join(', ')}]`))
             .catch(e => console.error('[Music Discovery] Cache write/upgrade failed:', e));
         }
@@ -2651,7 +2698,7 @@ const App: React.FC = () => {
 
     if (fullCacheHit) return;
 
-    if (!bypassTokenConfirmation) {
+    if (!bypassToken) {
       const confirmed = await confirmTokenUsage('generation', [], artistList);
       if (!confirmed || controller.signal.aborted) {
         isHydratingSessionRef.current = false;
@@ -2688,7 +2735,7 @@ const App: React.FC = () => {
       // Phase 02 complete — write each artist as an isolated individual doc - only for standalone queries
       if (artistList.length === 1) {
         console.log(`[Music Discovery] Full cache MISS — writing per-artist docs for: [${artistList.join(', ')}]`);
-        writeArtistCacheMany(artistList, final, user?.uid, activeDiscoveryFilters, true)
+        writeArtistCacheMany(artistList, final, user?.uid, activeDiscoveryFilters, true, true)
           .then(() => console.log(`[Music Discovery] Per-artist cache write confirmed for: [${artistList.join(', ')}]`))
           .catch(e => console.error('[Music Discovery] Per-artist cache write failed:', e));
       }

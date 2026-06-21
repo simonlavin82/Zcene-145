@@ -294,7 +294,8 @@ export const writeArtistCacheMany = async (
   fullGraph: GraphData,
   activeUserId?: string | null,
   filters?: any,
-  preserveFullGraph?: boolean
+  preserveFullGraph?: boolean,
+  forceOverwrite?: boolean
 ): Promise<void> => {
   const normalizedGraph = normalizeGraphData(fullGraph);
   await Promise.allSettled(
@@ -337,7 +338,7 @@ export const writeArtistCacheMany = async (
           console.log(`[ArtistCache] Created Canonical: ${canonicalId} (${nodes.length} nodes, ${links.length} links)`);
         } else {
           const existing = canonicalSnap.data();
-          if (existing && (!existing.cacheVersion || existing.cacheVersion < 2 || (preserveFullGraph && existing.isDeep !== true))) {
+          if (forceOverwrite || (existing && (!existing.cacheVersion || existing.cacheVersion < 2 || (preserveFullGraph && existing.isDeep !== true)))) {
             // ── UPGRADE PATH (Case B) ─────────────────────────────────────────
             await updateDoc(canonicalDocRef, {
               cacheKey: canonicalId,
@@ -349,7 +350,7 @@ export const writeArtistCacheMany = async (
               cachedAt: serverTimestamp(),
               isDeep: preserveFullGraph || false,
             });
-            console.log(`[ArtistCache] Upgraded Canonical legacy doc: ${canonicalId} → cacheVersion 2`);
+            console.log(`[ArtistCache] Upgraded/Overwritten Canonical doc: ${canonicalId} → cacheVersion 2`);
           } else {
             console.log(`[ArtistCache] Skipping write for Canonical "${canonicalId}" — doc already at v${existing?.cacheVersion || 2}.`);
           }
