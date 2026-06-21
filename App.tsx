@@ -4151,6 +4151,36 @@ const App: React.FC = () => {
                    );
                    details = await Promise.race([nodeDetailsPromise, timeoutPromise]) as NodeDetails;
 
+                    // Dedicated Scraper Hook to override metadata prompt lookup
+                    try {
+                      const artistDisplay = details.details?.artist || node.label || titleCaseArtistId(node.id);
+                      console.log(`[Scraper Hook] Fetching video ID for ${artistDisplay} from scraper...`);
+                      const scrapeRes = await window.fetch('/api/artist/scrape-video-id', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          artistName: artistDisplay,
+                          artistId: normalizeArtistId(node.id)
+                        })
+                      });
+                      if (scrapeRes.ok) {
+                        const scrapeData = await scrapeRes.json();
+                        if (scrapeData.youtubeVideoId) {
+                          console.log(`[Scraper Hook] Scraper returned video ID: ${scrapeData.youtubeVideoId}`);
+                          details.youtubeVideoId = scrapeData.youtubeVideoId;
+                        } else {
+                          console.log(`[Scraper Hook] Scraper returned null`);
+                          details.youtubeVideoId = null;
+                        }
+                      } else {
+                        console.warn('[Scraper Hook] Scraper API returned error status:', scrapeRes.status);
+                        details.youtubeVideoId = null;
+                      }
+                    } catch (scrapeErr) {
+                      console.error('[Scraper Hook] Scraper API dispatch failed:', scrapeErr);
+                      details.youtubeVideoId = null;
+                    }
+
                    // JIT Playability Check
                    if (details && details.youtubeVideoId) {
                      const playable = await checkVideoPlayabilityOnServer(details.youtubeVideoId);

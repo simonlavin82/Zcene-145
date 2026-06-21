@@ -456,6 +456,171 @@ app.get('/api/artist/validate-video/:videoId', async (req, res) => {
   }
 });
 
+// Dedicated backend validation endpoint to execute an isolated web crawl task for video asset IDs.
+app.post('/api/artist/scrape-video-id', express.json(), async (req, res) => {
+  const { artistName, artistId } = req.body;
+  if (!artistName || !artistId) {
+    return res.status(400).json({ error: 'artistName and artistId are required' });
+  }
+
+  if (!GEMINI_API_KEY) {
+    console.error(`[Scraper API] GEMINI_API_KEY is not defined.`);
+    return res.json({ youtubeVideoId: null });
+  }
+
+  console.log(`[Scraper API] Running isolated search for artist: "${artistName}" (${artistId})`);
+
+  // Step A (The Fetch): Make a standard HTTP request to the live Google search results page
+  const searchUrl = `https://www.google.com/search?q=youtube+${encodeURIComponent(artistName)}+official+music+video`;
+  let html = '';
+  try {
+    const fetchResponse = await fetch(searchUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    });
+    if (fetchResponse.ok) {
+      html = await fetchResponse.text();
+    } else {
+      console.warn(`[Scraper API] Google Search fetch failed with status: ${fetchResponse.status}`);
+    }
+  } catch (err) {
+    console.error(`[Scraper API] Error fetching Google search HTML:`, err);
+  }
+
+  // Step B & C: Pass the raw HTML payload and prompt the model for strict string extraction
+  const prompt = `You are a strict string extraction utility. Analyze this raw HTML source code. Locate the very first organic YouTube watch link (matching the format '/watch?v=XXXXXXXXXXX' or 'url?q=https://www.youtube.com/watch%3Fv%3DXXXXXXXXXXX'). Extract the 11-character ID immediately following the 'v=' or 'v%3D'. Return ONLY those 11 characters as a plain string, or return 'null' if absolutely no YouTube link exists.
+
+Raw HTML source code:
+---
+${html}
+---
+
+Your response must be a JSON object with a single property 'youtubeVideoId' containing the extracted 11-character ID, or null if absolutely no YouTube link exists.`;
+
+  const requestBody = {
+    contents: [
+      {
+        role: "user",
+        parts: [{ text: prompt }]
+      }
+    ],
+    generationConfig: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: "OBJECT",
+        properties: {
+          youtubeVideoId: {
+            type: "STRING",
+            nullable: true,
+            description: "The 11-character YouTube video ID parsed from the HTML source code, or null if none is found."
+          }
+        },
+        required: ["youtubeVideoId"]
+      },
+      maxOutputTokens: 200,
+    }
+  };
+
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody)
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error(`[Scraper API] Gemini API returned status ${response.status}: ${errText}`);
+      return res.json({ youtubeVideoId: null });
+    }
+
+    const resJson = await response.json();
+    const candidateText = resJson.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!candidateText) {
+      console.error("[Scraper API] No text candidate returned from Gemini");
+      return res.json({ youtubeVideoId: null });
+    }
+
+    const scraped = JSON.parse(candidateText.trim());
+    const videoId = scraped.youtubeVideoId;
+
+    if (videoId && videoId.length === 11) {
+      console.log(`[Scraper API] Found video ID "${videoId}" for artist "${artistName}". Updating Firestore...`);
+
+      // Write directly to Firestore
+      const docRef = db.collection('artists').doc(artistId);
+      const docSnap = await docRef.get();
+      if (docSnap.exists) {
+        const docData = docSnap.data();
+        let details = {};
+        if (docData.detailsCache) {
+          try {
+            details = JSON.parse(docData.detailsCache);
+          } catch (e) {
+            console.warn(`[Scraper API] Failed to parse detailsCache:`, e.message);
+          }
+        }
+        details.youtubeVideoId = videoId;
+        
+        await docRef.set({
+          ...docData,
+          youtubeVideoId: videoId,
+          detailsCache: JSON.stringify(details),
+          cachedAt: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        console.log(`[Scraper API] Successfully updated Firestore doc "${artistId}" with video ID "${videoId}"`);
+      } else {
+        const details = { youtubeVideoId: videoId };
+        await docRef.set({
+          artistId,
+          youtubeVideoId: videoId,
+          detailsCache: JSON.stringify(details),
+          cachedAt: admin.firestore.FieldValue.serverTimestamp(),
+          cacheVersion: 2,
+          hitCount: 1
+        });
+        console.log(`[Scraper API] Successfully created new Firestore doc "${artistId}" with video ID "${videoId}"`);
+      }
+
+      return res.json({ youtubeVideoId: videoId });
+    } else {
+      console.log(`[Scraper API] No video ID found for artist "${artistName}".`);
+      
+      const docRef = db.collection('artists').doc(artistId);
+      const docSnap = await docRef.get();
+      if (docSnap.exists) {
+        const docData = docSnap.data();
+        let details = {};
+        if (docData.detailsCache) {
+          try {
+            details = JSON.parse(docData.detailsCache);
+          } catch (e) {
+            console.warn(`[Scraper API] Failed to parse detailsCache:`, e.message);
+          }
+        }
+        details.youtubeVideoId = null;
+        
+        await docRef.set({
+          ...docData,
+          youtubeVideoId: null,
+          detailsCache: JSON.stringify(details),
+          cachedAt: admin.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
+        console.log(`[Scraper API] Updated Firestore doc "${artistId}" with youtubeVideoId = null`);
+      }
+
+      return res.json({ youtubeVideoId: null });
+    }
+
+  } catch (error) {
+    console.error(`[Scraper API] Error scraping video ID for ${artistName}:`, error);
+    return res.json({ youtubeVideoId: null });
+  }
+});
+
+
 // Serve the static files from the React/Vite build output
 app.use(express.static(path.join(__dirname, 'dist')));
 
