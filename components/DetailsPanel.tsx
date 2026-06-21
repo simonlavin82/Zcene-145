@@ -1250,7 +1250,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                 className="relative z-[70] w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 rounded-xl transition-colors leading-none pointer-events-auto" 
                                 title={isCollapsed ? "Expand Deep Cut" : "Collapse Deep Cut"}
                             >
-                                <span className="material-symbols-outlined !text-[18px]">{isCollapsed ? 'first_page' : 'last_page'}</span>
+                                <span className="material-symbols-outlined !text-[18px]">{isCollapsed ? 'right_panel_open' : 'right_panel_close'}</span>
                             </button>
                         </div>
                     </div>

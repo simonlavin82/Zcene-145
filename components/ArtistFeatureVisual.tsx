@@ -23,7 +23,7 @@ const ArtistFeatureVisual: React.FC<{ className?: string }> = ({ className }) =>
                         </span>
                     </div>
                     <button className="relative z-[70] w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none pointer-events-auto">
-                        <span className="material-symbols-outlined !text-[18px]">first_page</span>
+                        <span className="material-symbols-outlined !text-[18px]">left_panel_close</span>
                     </button>
                 </div>
                 

@@ -26,7 +26,7 @@ const CollectionIntelligenceVisual: React.FC<{ className?: string }> = ({ classN
                     
                     <div className="flex items-center gap-0.5 w-8 justify-center">
                         <button className="relative z-[70] w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-xl transition-colors leading-none">
-                            <span className="material-symbols-outlined !text-[18px]">last_page</span>
+                            <span className="material-symbols-outlined !text-[18px]">right_panel_close</span>
                         </button>
                     </div>
                 </div>
