@@ -470,39 +470,25 @@ app.post('/api/artist/scrape-video-id', express.json(), async (req, res) => {
 
   console.log(`[Scraper API] Running isolated search for artist: "${artistName}" (${artistId})`);
 
-  // Step A (The Fetch): Make a standard HTTP request to the live Google search results page
-  const searchUrl = `https://www.google.com/search?q=youtube+${encodeURIComponent(artistName)}+official+music+video`;
-  let html = '';
-  try {
-    const fetchResponse = await fetch(searchUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-      }
-    });
-    if (fetchResponse.ok) {
-      html = await fetchResponse.text();
-    } else {
-      console.warn(`[Scraper API] Google Search fetch failed with status: ${fetchResponse.status}`);
-    }
-  } catch (err) {
-    console.error(`[Scraper API] Error fetching Google search HTML:`, err);
-  }
-
-  // Step B & C: Pass the raw HTML payload and prompt the model for strict string extraction
-  const prompt = `You are a strict string extraction utility. Analyze this raw HTML source code. Locate the very first organic YouTube watch link (matching the format '/watch?v=XXXXXXXXXXX' or 'url?q=https://www.youtube.com/watch%3Fv%3DXXXXXXXXXXX'). Extract the 11-character ID immediately following the 'v=' or 'v%3D'. Return ONLY those 11 characters as a plain string, or return 'null' if absolutely no YouTube link exists.
-
-Raw HTML source code:
----
-${html}
----
-
-Your response must be a JSON object with a single property 'youtubeVideoId' containing the extracted 11-character ID, or null if absolutely no YouTube link exists.`;
+  const prompt = `Perform a Google Search for: '${artistName} official music video youtube'. 
+Look at the very first organic YouTube result on the page. 
+What is the exact 11-character YouTube video ID (the string after v=) for that top video?
+Return your answer in this strict JSON format:
+{
+  "youtubeVideoId": "11-character-id"
+}
+If you cannot find a clear YouTube video ID for this artist, return null for the value.`;
 
   const requestBody = {
     contents: [
       {
         role: "user",
         parts: [{ text: prompt }]
+      }
+    ],
+    tools: [
+      {
+        googleSearch: {}
       }
     ],
     generationConfig: {
@@ -513,7 +499,7 @@ Your response must be a JSON object with a single property 'youtubeVideoId' cont
           youtubeVideoId: {
             type: "STRING",
             nullable: true,
-            description: "The 11-character YouTube video ID parsed from the HTML source code, or null if none is found."
+            description: "The 11-character YouTube video ID parsed from the search results, or null if none is found."
           }
         },
         required: ["youtubeVideoId"]

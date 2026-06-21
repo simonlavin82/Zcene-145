@@ -732,25 +732,6 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 </div>
                             )}
 
-                            {(isArtistNode || (node.type === undefined && details)) && details && (() => {
-                                // Always sanitise the display name — node.label may be a raw kebab slug
-                                const rawLabel = node.label || '';
-                                const sanitisedLabel = rawLabel && /^[a-z]/.test(rawLabel) ? titleCaseArtistId(rawLabel) : rawLabel;
-                                const artistDisplay = details?.details?.artist || sanitisedLabel || titleCaseArtistId(node.id);
-
-                                return (
-                                     <div>
-                                         <h4 className="font-semibold text-zinc-500 mb-3 text-[10px] uppercase tracking-widest">Watch</h4>
-                                         <div className="w-full aspect-video overflow-hidden border border-zinc-800 bg-zinc-950">
-                                             <SafeYoutubePlayer 
-                                                 videoId={details.youtubeVideoId}
-                                                 artistDisplay={artistDisplay}
-                                             />
-                                         </div>
-                                     </div>
-                                );
-                            })()}
-
                             {links.purchase.length > 0 && (
                                 <div className="p-5 bg-primary/5 border-2 border-primary/20 relative">
                                     <div className="absolute -top-3 left-4 bg-zinc-900 px-2 text-[10px] font-semibold uppercase tracking-widest text-primary rounded-none">
@@ -782,6 +763,35 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                 </a>
                                             );
                                         })}
+
+                                        {/* Watch on YouTube button styled identically to Official Website */}
+                                        {(() => {
+                                            const rawLabel = node.label || '';
+                                            const sanitisedLabel = rawLabel && /^[a-z]/.test(rawLabel) ? titleCaseArtistId(rawLabel) : rawLabel;
+                                            const artistDisplay = details?.details?.artist || sanitisedLabel || titleCaseArtistId(node.id);
+                                            const youtubeVideoId = details.youtubeVideoId;
+                                            const youtubeUrl = youtubeVideoId && youtubeVideoId.length === 11
+                                                ? `https://www.youtube.com/watch?v=${youtubeVideoId}`
+                                                : `https://www.youtube.com/results?search_query=${encodeURIComponent(artistDisplay)}+official+music+video`;
+
+                                            return (
+                                                <a 
+                                                    href={youtubeUrl} 
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer" 
+                                                    className="flex items-center justify-center px-4 py-2 rounded-xl transition-all active:scale-[0.98] bg-zinc-800 text-white active:bg-zinc-700 border border-zinc-600"
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="material-symbols-outlined !text-[18px]">
+                                                            play_circle
+                                                        </span>
+                                                        <span className="font-semibold uppercase px-0.5 tracking-normal text-sm">
+                                                            WATCH ON YOUTUBE
+                                                        </span>
+                                                    </div>
+                                                </a>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
                             )}
