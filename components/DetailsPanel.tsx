@@ -43,7 +43,7 @@ const ZceneEmptyState: React.FC<{ onNavigate: (view: View) => void }> = ({ onNav
 
 // --- Sub-component: Safe YouTube Player with Error Detection ---
 interface SafeYoutubePlayerProps {
-  videoId: string;
+  videoId?: string | null;
   artistDisplay: string;
 }
 
@@ -53,6 +53,8 @@ const SafeYoutubePlayer: React.FC<SafeYoutubePlayerProps> = ({ videoId, artistDi
   const playerRef = useRef<any>(null);
 
   useEffect(() => {
+    if (!videoId) return;
+
     setHasError(false);
 
     // Dynamic injection of the YouTube IFrame API script (only if not already injected)
@@ -126,6 +128,18 @@ const SafeYoutubePlayer: React.FC<SafeYoutubePlayerProps> = ({ videoId, artistDi
       }
     };
   }, [videoId]);
+
+  if (!videoId) {
+    const src = `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(artistDisplay + ' official music video')}`;
+    return (
+      <iframe
+        src={src}
+        className="w-full h-full aspect-video border-0 bg-zinc-950"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        allowFullScreen
+      />
+    );
+  }
 
   if (hasError) {
     return (
@@ -723,45 +737,18 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 const rawLabel = node.label || '';
                                 const sanitisedLabel = rawLabel && /^[a-z]/.test(rawLabel) ? titleCaseArtistId(rawLabel) : rawLabel;
                                 const artistDisplay = details?.details?.artist || sanitisedLabel || titleCaseArtistId(node.id);
-                                const genre = details?.details?.genre || '';
-                                // Build a guaranteed search query: prefer AI-provided, else derive from artist + genre + 'live'
-                                const searchQuery = details.youtubeSearchQuery
-                                    || `${artistDisplay}${genre ? ' ' + genre : ''} live`;
-                                const ytSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(searchQuery)}`;
 
                                 return (
                                      <div>
                                          <h4 className="font-semibold text-zinc-500 mb-3 text-[10px] uppercase tracking-widest">Watch</h4>
-                                         {details.youtubeVideoId ? (
-                                             <div className="w-full aspect-video overflow-hidden border border-zinc-800 bg-zinc-950">
-                                                 <SafeYoutubePlayer 
-                                                     videoId={details.youtubeVideoId}
-                                                     artistDisplay={artistDisplay}
-                                                 />
-                                             </div>
-                                         ) : (
-                                             <a
-                                                 href={ytSearchUrl}
-                                                 target="_blank"
-                                                 rel="noopener noreferrer"
-                                                 className="group flex w-full aspect-video items-center justify-center border border-zinc-800 bg-zinc-950 hover:border-zinc-600 hover:bg-zinc-900 transition-all duration-300 relative overflow-hidden"
-                                             >
-                                                 {/* Subtle scanline texture */}
-                                                 <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.5) 2px, rgba(255,255,255,0.5) 3px)' }} />
-                                                 {/* Play button ring */}
-                                                 <div className="flex flex-col items-center gap-3 z-10">
-                                                     <div className="w-14 h-14 rounded-full border-2 border-zinc-700 group-hover:border-primary group-hover:bg-primary/10 flex items-center justify-center transition-all duration-300 group-hover:scale-110">
-                                                         <span className="material-symbols-outlined !text-[28px] text-zinc-500 group-hover:text-primary transition-colors duration-300 translate-x-0.5">play_arrow</span>
-                                                     </div>
-                                                     <div className="text-center px-4">
-                                                         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400 group-hover:text-white transition-colors duration-300">Search on YouTube</p>
-                                                         <p className="text-[9px] font-mono text-zinc-600 mt-1 truncate max-w-[180px] group-hover:text-zinc-400 transition-colors duration-300">{searchQuery}</p>
-                                                     </div>
-                                                 </div>
-                                             </a>
-                                         )}
+                                         <div className="w-full aspect-video overflow-hidden border border-zinc-800 bg-zinc-950">
+                                             <SafeYoutubePlayer 
+                                                 videoId={details.youtubeVideoId}
+                                                 artistDisplay={artistDisplay}
+                                             />
+                                         </div>
                                      </div>
-                                 );
+                                );
                             })()}
 
                             {links.purchase.length > 0 && (
