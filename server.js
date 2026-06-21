@@ -3,12 +3,13 @@ import { createProxyMiddleware } from 'http-proxy-middleware';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import admin from 'firebase-admin';
+import { getFirestore } from 'firebase-admin/firestore';
 
 // Initialize Firebase Admin SDK
 let db;
 try {
   admin.initializeApp();
-  db = admin.firestore();
+  db = getFirestore();
   console.log("Firebase Admin initialized successfully.");
 } catch (error) {
   console.error("Firebase Admin initialization error (check local credentials):", error);
@@ -264,8 +265,18 @@ async function triggerReSynthesis(artistId, originalData) {
     return;
   }
   
-  const artistName = originalData.details?.artist || artistId;
-  const genre = originalData.details?.genre || '';
+  // Parse detailsCache
+  let details = null;
+  if (originalData && originalData.detailsCache) {
+    try {
+      details = JSON.parse(originalData.detailsCache);
+    } catch (e) {
+      console.warn(`[Re-Synthesis] Failed to parse detailsCache:`, e.message);
+    }
+  }
+
+  const artistName = details?.details?.artist || originalData.seedArtists || artistId;
+  const genre = details?.details?.genre || '';
   const seedArtists = artistName;
   const contextNodes = '';
   const currentDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -330,11 +341,16 @@ async function triggerReSynthesis(artistId, originalData) {
       isPlayable = await checkVideoPlayability(synthesizedDetails.youtubeVideoId);
     }
     
-    // Construct database payload
+    // Construct database payload inside detailsCache JSON string
+    const updatedDetails = {
+      ...details,
+      ...synthesizedDetails,
+      youtubeVideoId: isPlayable ? synthesizedDetails.youtubeVideoId : null,
+    };
+
     const finalPayload = {
       ...originalData, // preserve original properties
-      ...synthesizedDetails, // overwrite synthesized details
-      youtubeVideoId: isPlayable ? synthesizedDetails.youtubeVideoId : null,
+      detailsCache: JSON.stringify(updatedDetails),
       cachedAt: admin.firestore.FieldValue.serverTimestamp(),
       cacheVersion: 2 // Match standard cacheVersion
     };
@@ -385,13 +401,28 @@ app.get('/api/artist/:id', async (req, res) => {
     }
 
     // Evaluate youtube video ID playability
-    const videoId = data.youtubeVideoId;
+    let details = null;
+    if (data && typeof data.detailsCache === 'string' && data.detailsCache.trim().length > 0) {
+      try {
+        details = JSON.parse(data.detailsCache);
+      } catch (e) {
+        console.warn(`[Proxy] Failed to parse detailsCache JSON for ${artistId}:`, e.message);
+      }
+    }
+
+    const videoId = details?.youtubeVideoId || data.youtubeVideoId;
     if (videoId) {
       const playable = await checkVideoPlayability(videoId);
       if (!playable) {
         console.warn(`[Edge Proxy] Unplayable YouTube Video ID: "${videoId}" for artist "${artistId}". Pruning and triggering re-synthesis...`);
         // Prune the video ID on-the-fly from the payload returned to the client
-        data.youtubeVideoId = null;
+        if (details) {
+          details.youtubeVideoId = null;
+          data.detailsCache = JSON.stringify(details);
+        }
+        if (data.youtubeVideoId) {
+          data.youtubeVideoId = null;
+        }
         
         // Trigger async re-synthesis task (non-blocking)
         triggerReSynthesis(artistId, data).catch(err => {
@@ -404,6 +435,21 @@ app.get('/api/artist/:id', async (req, res) => {
   } catch (error) {
     console.error(`[Proxy] Error retrieving artist ${artistId}:`, error);
     return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// REST route to check video playability for client JIT verification
+app.get('/api/artist/validate-video/:videoId', async (req, res) => {
+  const videoId = req.params.videoId;
+  if (!videoId || videoId.length !== 11) {
+    return res.json({ playable: false });
+  }
+  try {
+    const playable = await checkVideoPlayability(videoId);
+    return res.json({ playable });
+  } catch (err) {
+    console.error(`[Proxy] Error validating video ${videoId}:`, err);
+    return res.json({ playable: false });
   }
 });
 

@@ -21,6 +21,20 @@ import { analyticsService } from './services/analyticsService';
 import { ZceneLogo, Spinner } from './components/Icons';
 import CookieConsent from './components/CookieConsent';
 
+const checkVideoPlayabilityOnServer = async (videoId: string): Promise<boolean> => {
+  if (!videoId || videoId.length !== 11) return false;
+  try {
+    const response = await fetch(`/api/artist/validate-video/${videoId}`);
+    if (response.ok) {
+      const data = await response.json();
+      return !!data.playable;
+    }
+  } catch (e) {
+    console.warn(`[Playability] Client fetch check failed for ${videoId}:`, e);
+  }
+  return false;
+};
+
 declare global {
   interface Window {
     // aistudio is globally defined by the environment
@@ -3948,6 +3962,15 @@ const App: React.FC = () => {
     try {
       const freshDetails = await fetchNodeDetails(node, graphData, seedArtists, urlOriginHint);
       
+      // JIT Playability Check
+      if (freshDetails && freshDetails.youtubeVideoId) {
+        const playable = await checkVideoPlayabilityOnServer(freshDetails.youtubeVideoId);
+        if (!playable) {
+          console.warn(`[Revalidation] Pruned unplayable video ID JIT on client: ${freshDetails.youtubeVideoId}`);
+          freshDetails.youtubeVideoId = null;
+        }
+      }
+      
       // Update local state details cache
       setDetailsCache(prev => {
         const updated = new Map(prev);
@@ -4127,6 +4150,15 @@ const App: React.FC = () => {
                      setTimeout(() => reject(new Error("Request timed out after 45s")), 45000)
                    );
                    details = await Promise.race([nodeDetailsPromise, timeoutPromise]) as NodeDetails;
+
+                   // JIT Playability Check
+                   if (details && details.youtubeVideoId) {
+                     const playable = await checkVideoPlayabilityOnServer(details.youtubeVideoId);
+                     if (!playable) {
+                       console.warn(`[Deep Cut Queue] Pruned unplayable video ID JIT on client: ${details.youtubeVideoId}`);
+                       details.youtubeVideoId = null;
+                     }
+                   }
                 }
 
                 healedDetailsCacheRef.current.set(node.id, details);
