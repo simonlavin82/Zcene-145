@@ -320,7 +320,7 @@ export const TokenConfirmationDialog: React.FC<{
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void;
-  type: 'generation' | 'extension' | 'deep_cut_creation' | 'partial_synthesis' | 'cache_upgrade' | 'data_quality_optimization';
+  type: 'generation' | 'extension' | 'deep_cut_creation' | 'partial_synthesis' | 'cache_upgrade' | 'data_quality_optimization' | 'live_tour_search';
   cost: number;
   cachedArtists: string[];
   missingArtists: string[];
@@ -357,7 +357,9 @@ export const TokenConfirmationDialog: React.FC<{
               ? 'The cached entry is out of date and needs a quick re-synthesis query to unlock the latest spiderweb layout and Deep Cut features.'
               : type === 'data_quality_optimization'
                 ? 'A data quality issue was detected on this profile (stale placeholders, bad casing, or unparsed formatting). A live AI optimization pass will re-synthesize and heal the cached record.'
-                : 'You are initiating a net-new AI generation flow that requires contacting the live models.'}
+                : type === 'live_tour_search'
+                  ? 'You are initiating a live search agent lookup to check the latest real-time tour schedules for this artist.'
+                  : 'You are initiating a net-new AI generation flow that requires contacting the live models.'}
           </p>
           <div className="bg-zinc-900/60 p-4 border border-zinc-800 space-y-2.5">
             <div className="flex justify-between font-mono text-xs border-b border-zinc-800 pb-1.5">
@@ -373,7 +375,9 @@ export const TokenConfirmationDialog: React.FC<{
                         ? 'Cache Upgrade'
                         : type === 'data_quality_optimization'
                           ? 'Profile Quality Optimization'
-                          : 'Deep Cut Creation'}
+                          : type === 'live_tour_search'
+                            ? 'Live Tour Agent Search'
+                            : 'Deep Cut Creation'}
               </span>
             </div>
             <div className="flex justify-between font-mono text-xs border-b border-zinc-800 pb-1.5">
@@ -568,12 +572,66 @@ export const CacheChoiceDialog: React.FC<{
         <footer className="p-4 bg-zinc-900 border-t border-zinc-700 flex justify-end">
           <button 
             onClick={() => onSelect('cancel')} 
-            className="px-4 py-2 text-zinc-400 hover:text-white text-sm rounded-xl hover:bg-zinc-805 transition-colors"
+            className="px-4 py-2 text-zinc-400 hover:text-white text-sm rounded-xl hover:bg-zinc-800 transition-colors"
           >
             Cancel
           </button>
         </footer>
       </motion.div>
+    </div>
+  );
+};
+
+// --- Full Itinerary Dialog Component ---
+export const FullItineraryDialog: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  artistName: string;
+  tourDates: string[];
+}> = ({ isOpen, onClose, artistName, tourDates }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div 
+      className="fixed inset-0 bg-black/60 z-[130] flex items-center justify-center p-4 animate-fade-in-down pointer-events-auto"
+      style={{ animationDuration: '200ms' }}
+      onClick={onClose}
+    >
+      <div 
+        className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-hidden animate-fade-in-down"
+        style={{ animationDuration: '200ms' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary !text-[18px]">calendar_month</span>
+            <h3 className="text-base font-medium text-white">Full Itinerary: {artistName}</h3>
+          </div>
+          <button 
+            onClick={onClose}
+            className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none"
+          >
+            <span className="material-symbols-outlined !text-[18px]">close</span>
+          </button>
+        </header>
+
+        <div className="flex-grow overflow-y-auto p-5 space-y-2 max-h-[60vh]">
+          {tourDates.map((date, idx) => (
+            <p key={idx} className="text-sm font-normal text-zinc-300 py-1.5 border-b border-zinc-800/40 last:border-0">
+              • {date}
+            </p>
+          ))}
+        </div>
+
+        <footer className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end">
+          <button 
+            onClick={onClose}
+            className="px-5 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90"
+          >
+            Close
+          </button>
+        </footer>
+      </div>
     </div>
   );
 };

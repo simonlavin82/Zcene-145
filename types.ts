@@ -67,6 +67,8 @@ export interface NodeDetails {
     title: string;
     url: string;
   }>;
+  tourDates?: string[];
+  tourCachedAt?: string;
 }
 
 export interface ParsedArtist {

@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import Markdown from 'react-markdown';
-import { Node, NodeDetails, GraphData, View, ChatMessage, StackItem, UserTaste } from '../types';
+import { Node, NodeDetails, GraphData, View, ChatMessage, StackItem, UserTaste, COST_PER_AI_CALL } from '../types';
 import { streamNodeChat, fetchLiveTourData } from '../services/geminiService';
-import { normalizeArtistId, titleCaseArtistId } from '../services/artistCacheService';
+import { normalizeArtistId, titleCaseArtistId, getArtistDocWithRedirect } from '../services/artistCacheService';
 import { analyticsService } from '../services/analyticsService';
 import { Spinner, HelpIcon, MicIcon, LoadingSpinner, DETAIL_THINKING_STEPS, StackIcon } from './Icons';
+import { TokenConfirmationDialog, FullItineraryDialog } from './SharedModals';
+import { db } from '../services/firebase';
+import { doc, updateDoc } from 'firebase/firestore';
 
 const SENTINEL_INSIGHT = 'No insight provided.';
 
@@ -209,6 +213,47 @@ interface NodeDetailsCardProps {
   userTaste?: UserTaste;
 }
 
+const parseTourDates = (text: string): { isTouring: boolean; dates: string[] } => {
+    const cleaned = text.trim();
+    if (!cleaned) {
+        return { isTouring: false, dates: [] };
+    }
+    const lower = cleaned.toLowerCase();
+    if (
+        lower.includes("no active tour dates found") || 
+        lower.includes("not touring") || 
+        lower.includes("no upcoming events") || 
+        lower.includes("no tour dates")
+    ) {
+        return { isTouring: false, dates: [] };
+    }
+
+    const lines = cleaned.split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 0)
+        .map(line => {
+            let processed = line.replace(/^[•\-\*\d\.\s\u2022\u2013\u2014]+/, '').trim();
+            processed = processed.replace(/\s*[\-\u2013\u2014]\s*/, ' — ');
+            return processed;
+        })
+        .filter(line => line.length > 0 && line.includes('—'));
+
+    if (lines.length === 0) {
+        return { isTouring: false, dates: [] };
+    }
+
+    return { isTouring: true, dates: lines };
+};
+
+const isTourCacheStale = (tourCachedAtString: string | undefined): boolean => {
+    if (!tourCachedAtString) return true;
+    const cachedDate = new Date(tourCachedAtString);
+    if (isNaN(cachedDate.getTime())) return true;
+    
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+    return (Date.now() - cachedDate.getTime()) >= sevenDaysMs;
+};
+
 const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     node, details, isLoading, isGlobalLoading, graphData, libraryArtists, seedArtists, onAddArtist, isSmallScreen, onRefresh, onClose, onNodeClick, onNavigate,
     chatHistory, onSendMessage, isChatLoading, isFullScreenMode = false, isHero = false, isInStack, onToggleStack, onToggleMagazineView, isGuest = false, onAuthRequest, user,
@@ -221,18 +266,75 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     const [isIdCopied, setIsIdCopied] = useState(false);
     const imgRef = useRef<HTMLImageElement>(null);
     
-    const [liveTourData, setLiveTourData] = useState<string | null>(null);
-    const [isFetchingTour, setIsFetchingTour] = useState(false);
+    const [tourStatus, setTourStatus] = useState<'idle' | 'cost_warning' | 'fetching' | 'resolved_summary' | 'full_itinerary_modal'>('idle');
+    const [tourDates, setTourDates] = useState<string[]>([]);
+    const [tourError, setTourError] = useState<string | null>(null);
+
+    useEffect(() => {
+        const cachedDates = details?.tourDates;
+        const cachedTimestamp = details?.tourCachedAt;
+
+        if (cachedTimestamp && !isTourCacheStale(cachedTimestamp)) {
+            setTourDates(cachedDates || []);
+            setTourStatus('resolved_summary');
+        } else {
+            setTourStatus('idle');
+            setTourDates([]);
+        }
+        setTourError(null);
+    }, [node.id, details]);
 
     const handleFetchTourData = async () => {
-        setIsFetchingTour(true);
+        setTourStatus('fetching');
+        setTourError(null);
         try {
             const data = await fetchLiveTourData(node.id);
-            setLiveTourData(data);
+            const parsed = parseTourDates(data);
+            const freshDates = parsed.isTouring ? parsed.dates : [];
+            const freshCachedAt = new Date().toISOString();
+
+            setTourDates(freshDates);
+            setTourStatus('resolved_summary');
+
+            // Mutate local memory details object to persist it during active session
+            if (details) {
+                details.tourDates = freshDates;
+                details.tourCachedAt = freshCachedAt;
+            }
+
+            // Sync to global Firestore document under detailsCache JSON
+            const cacheId = normalizeArtistId(node.id);
+            (async () => {
+                try {
+                    const existingSnap = await getArtistDocWithRedirect(cacheId);
+                    if (existingSnap.exists()) {
+                        const snapData = existingSnap.data();
+                        let existingDetailsCache: any = {};
+                        if (snapData && snapData.detailsCache) {
+                            existingDetailsCache = typeof snapData.detailsCache === 'string'
+                                ? JSON.parse(snapData.detailsCache)
+                                : snapData.detailsCache;
+                        }
+
+                        const updatedDetails = {
+                            ...existingDetailsCache,
+                            tourDates: freshDates,
+                            tourCachedAt: freshCachedAt
+                        };
+
+                        await updateDoc(doc(db, 'artists', existingSnap.id), {
+                            detailsCache: JSON.stringify(updatedDetails)
+                        });
+                        console.log(`[Tour Cache] Successfully synced tour data to Firestore for: ${existingSnap.id}`);
+                    }
+                } catch (dbErr) {
+                    console.warn("[Tour Cache] Failed to sync tour data back to Firestore:", dbErr);
+                }
+            })();
         } catch (err) {
-            setLiveTourData("Failed to fetch live tour data. Please try again.");
-        } finally {
-            setIsFetchingTour(false);
+            console.error("Failed to fetch live tour data:", err);
+            setTourError("Failed to fetch live tour data. Please try again.");
+            setTourStatus('idle');
         }
     };
 
@@ -621,38 +723,56 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     </div>
                                 )}
                                 {(() => {
-                                    // 1. Add Safe Fallback Protection for Tour Properties
-                                    const tours = details?.tourInfo || [];
                                     return (
                                         <div>
                                             <h4 className="font-bold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">
                                                 Status
                                             </h4>
                                             <div className="flex flex-col gap-1">
-                                                {!liveTourData && !isFetchingTour && (
-                                                    <button 
-                                                        onClick={handleFetchTourData}
-                                                        className="text-zinc-400 hover:text-primary transition-colors text-sm font-normal underline underline-offset-4 decoration-zinc-700 text-left w-fit"
-                                                    >
-                                                        Check tours
-                                                    </button>
+                                                {tourStatus === 'idle' && (
+                                                    <div className="flex flex-col gap-1">
+                                                        <button 
+                                                            onClick={() => {
+                                                                setTourError(null);
+                                                                setTourStatus('cost_warning');
+                                                            }}
+                                                            className="text-zinc-400 hover:text-primary transition-colors text-sm font-normal underline underline-offset-4 decoration-zinc-700 text-left w-fit"
+                                                        >
+                                                            Check tours
+                                                        </button>
+                                                        {tourError && (
+                                                            <p className="text-xs text-red-400 mt-1">{tourError}</p>
+                                                        )}
+                                                    </div>
                                                 )}
                                                 
-                                                {isFetchingTour && (
+                                                {tourStatus === 'fetching' && (
                                                     <div className="flex items-center gap-2 text-sm font-normal text-zinc-200 animate-pulse">
                                                         Checking...
                                                     </div>
                                                 )}
-
-                                                {liveTourData && (
-                                                    <p className="text-sm font-normal text-zinc-200 leading-relaxed animate-in fade-in slide-in-from-top-1 duration-300 mt-1">
-                                                        {liveTourData}
-                                                    </p>
+ 
+                                                {(tourStatus === 'resolved_summary' || tourStatus === 'full_itinerary_modal') && (
+                                                    <div className="space-y-1">
+                                                        {tourDates.length > 0 ? (
+                                                            <>
+                                                                <p className="text-sm font-normal text-zinc-200">
+                                                                    • {tourDates[0]}
+                                                                </p>
+                                                                <button 
+                                                                    onClick={() => setTourStatus('full_itinerary_modal')}
+                                                                    className="text-primary hover:underline text-xs font-semibold mt-1 text-left block"
+                                                                >
+                                                                    view tour
+                                                                </button>
+                                                            </>
+                                                        ) : (
+                                                            <p className="text-sm font-normal text-zinc-400">
+                                                                No active tour dates found for 2026.
+                                                            </p>
+                                                        )}
+                                                    </div>
                                                 )}
-
-                                                {Array.isArray(tours) && tours.length > 0 && tours.map((tour: any, idx: number) => (
-                                                    <p key={idx} className="text-sm font-normal text-zinc-200">{String(tour)}</p>
-                                                ))}
                                             </div>
                                         </div>
                                     );
@@ -922,6 +1042,31 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                     )}
                 </div>
             </div>
+
+            {/* Token Confirmation Dialog */}
+            {tourStatus === 'cost_warning' && createPortal(
+                <TokenConfirmationDialog
+                    isOpen={true}
+                    onClose={() => setTourStatus('idle')}
+                    onConfirm={handleFetchTourData}
+                    type="live_tour_search"
+                    cost={COST_PER_AI_CALL}
+                    cachedArtists={[]}
+                    missingArtists={[details?.details?.artist || node.label || titleCaseArtistId(node.id)]}
+                />,
+                document.body
+            )}
+
+            {/* Full Itinerary Modal Container */}
+            {tourStatus === 'full_itinerary_modal' && createPortal(
+                <FullItineraryDialog
+                    isOpen={true}
+                    onClose={() => setTourStatus('resolved_summary')}
+                    artistName={details?.details?.artist || node.label || titleCaseArtistId(node.id)}
+                    tourDates={tourDates}
+                />,
+                document.body
+            )}
         </div>
     );
 };

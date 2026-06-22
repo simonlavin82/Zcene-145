@@ -1278,14 +1278,24 @@ export const streamNodeChat = async (
  */
 export const fetchLiveTourData = async (artistName: string): Promise<string> => {
     if (isLocal) {
-        return `[Offline Sandbox] Upcoming live tour dates for ${artistName}: Scheduled events in London, New York, and Berlin. Check official site for tickets.`;
+        if (artistName.toLowerCase().includes('notour') || artistName.toLowerCase().includes('notouring') || artistName === 'NonTouringBand') {
+            return `No active tour dates found for 2026.`;
+        }
+        return `• London, UK — July 12, 2026
+• New York, USA — August 5, 2026
+• Berlin, Germany — September 1, 2026
+• Tokyo, Japan — October 15, 2026
+• Los Angeles, USA — November 20, 2026`;
     }
     const proxyKey = 'backend-proxy-key';
     const baseUrl = typeof window !== 'undefined' ? window.location.origin + '/api/gemini' : 'http://localhost:8080/api/gemini';
 
-    const prompt = `Search the web for the latest real-time tour, concert, and festival schedules for the music artist "${artistName}". 
-    Provide a very concise, scannable summary (max 3 sentences) of their upcoming live events. 
-    If they are not touring, explicitly state that there are no upcoming events found.`;
+    const prompt = `Search the web for the latest real-time tour, concert, and festival schedules for the music artist "${artistName}" in 2026.
+    If they are actively touring, return ONLY a chronological list of their upcoming dates. Each date must be on its own line and formatted exactly as:
+    • City, Country — Date
+    Do not include any introductory or concluding text. Return as many dates as you can find.
+    If they are not touring, return exactly:
+    No active tour dates found for 2026.`;
 
     const requestBody = {
       contents: [

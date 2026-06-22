@@ -1527,6 +1527,8 @@ const App: React.FC = () => {
                 const youtubeSearchQuery = typeof parsed?.youtubeSearchQuery === 'string' && parsed.youtubeSearchQuery.trim().length > 0
                     ? parsed.youtubeSearchQuery.trim()
                     : undefined;
+                const tourDates = parsed?.tourDates || [];
+                const tourCachedAt = parsed?.tourCachedAt || "";
                 
                 const isPlaceholderBio = bio.includes('sandbox mock') || bio.includes('test scenarios');
                 const isBioTooShort = !bio || bio.trim().length < 5;
@@ -1541,7 +1543,9 @@ const App: React.FC = () => {
                     recommendationReason,
                     groundingLinks,
                     youtubeVideoId,
-                    youtubeSearchQuery
+                    youtubeSearchQuery,
+                    tourDates,
+                    tourCachedAt
                 };
 
                 const isIncomplete = checkIsProfileIncomplete(node, detailsPayload) || isBioTooShort || isPlaceholderBio;
@@ -1965,7 +1969,9 @@ const App: React.FC = () => {
                                 : undefined,
                             youtubeSearchQuery: typeof parsedDetails?.youtubeSearchQuery === 'string' && parsedDetails.youtubeSearchQuery.trim().length > 0
                                 ? parsedDetails.youtubeSearchQuery.trim()
-                                : undefined
+                                : undefined,
+                            tourDates: parsedDetails?.tourDates || [],
+                            tourCachedAt: parsedDetails?.tourCachedAt || ""
                          };
                           console.log("[Phase 3 Cache Payload – Front Gate]", searchId, JSON.stringify({ youtubeVideoId: detailsPayload.youtubeVideoId, youtubeSearchQuery: detailsPayload.youtubeSearchQuery }));
                           setDetailsCache(prev => new Map(prev).set(searchIdLower, detailsPayload).set(searchId, detailsPayload).set(normalizeArtistId(searchId), detailsPayload));
@@ -2244,7 +2250,9 @@ const App: React.FC = () => {
                     discography: parsedData?.discography || [],
                     tourInfo: parsedData?.tourInfo || "",
                     recommendationReason: parsedData?.recommendationReason || parsedData?.reason || "",
-                    groundingLinks: parsedData?.groundingLinks || []
+                    groundingLinks: parsedData?.groundingLinks || [],
+                    tourDates: parsedData?.tourDates || [],
+                    tourCachedAt: parsedData?.tourCachedAt || ""
                   };
 
                   next.set(key.toLowerCase(), detailsObj);
@@ -4110,6 +4118,8 @@ const App: React.FC = () => {
                                const tourInfo = parsed.tourInfo || "";
                                const recommendationReason = parsed.recommendationReason || parsed.reason || "";
                                const groundingLinks = parsed.groundingLinks || [];
+                               const tourDates = parsed.tourDates || [];
+                               const tourCachedAt = parsed.tourCachedAt || "";
 
                                fallbackDetails = {
                                   summary: bio,
@@ -4126,7 +4136,9 @@ const App: React.FC = () => {
                                   discography,
                                   tourInfo,
                                   recommendationReason,
-                                  groundingLinks
+                                  groundingLinks,
+                                  tourDates,
+                                  tourCachedAt
                                };
                                console.log("[Global Cache] Fallback successful for:", node.id);
                             }
