@@ -432,7 +432,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                      <TypographyScaleRow role="Lead / Subtitle" sample="Combine the power of AI..." className="text-2xl font-medium" classSpec="text-2xl font-medium" pixelSize="24px" weight="Medium (500)" usage="Introductory text." />
                                      <TypographyScaleRow role="Panel Title (H3)" sample="Deep Cut" className="text-lg font-bold" classSpec="text-lg font-bold" pixelSize="18px" weight="Bold (700)" usage="Panel headers. Retains heavy weight for thematic character." />
                                      <TypographyScaleRow role="Body (Content)" sample="The quick brown fox jumps over the lazy dog." className="text-base text-zinc-300 leading-relaxed font-normal" classSpec="text-base font-normal" pixelSize="16px" weight="Regular (400)" usage="Standard Body Copy, bios, and descriptions." />
-                                     <TypographyScaleRow role="Data Value" sample="Emo / Indie Rock" className="text-sm font-normal text-zinc-200 sm:text-xs sm:font-medium" classSpec="text-sm / sm:text-xs" pixelSize="14px - 12px" weight="Regular / Medium" usage="Key artist metadata values. Dynamically scales between text-sm on mobile and text-xs on desktop to insulate compressed multi-column layouts from text overflow and word fracturing." />
+                                     <TypographyScaleRow role="Data Value" sample="Emo / Indie Rock" className="text-sm font-normal text-zinc-200" classSpec="text-sm font-normal" pixelSize="14px" weight="Regular" usage="Key data points within cards and details panels. Kept static at 14px across all breakpoints to ensure optimum scannability without layout fracturing." />
                                      <TypographyScaleRow role="Body (Small)" sample="The quick brown fox jumps over the lazy dog." className="text-sm text-zinc-400 font-normal" classSpec="text-sm font-normal" pixelSize="14px" weight="Regular (400)" usage="Compact UI Elements." />
                                      <TypographyScaleRow role="Body (Tiny)" sample="The quick brown fox jumps over the lazy dog." className="text-xs text-zinc-500 font-normal" classSpec="text-xs font-normal" pixelSize="12px" weight="Regular (400)" usage="Metadata and secondary labels." />
                                 </div>
@@ -581,14 +581,14 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         {/* Active State */}
                                         <div className="space-y-2">
                                             <h5 className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Active (Summary)</h5>
-                                            <p className="text-sm font-normal text-zinc-200 sm:text-xs sm:font-medium underline underline-offset-4 decoration-primary/30 cursor-pointer hover:decoration-primary transition-all w-fit">Active events</p>
+                                            <p className="text-sm font-normal text-zinc-200 underline underline-offset-4 decoration-primary/30 cursor-pointer hover:decoration-primary transition-all w-fit">Active events</p>
                                         </div>
 
                                         {/* Expanded State */}
                                         <div className="space-y-2">
                                             <h5 className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Active (Expanded)</h5>
                                             <div className="space-y-2">
-                                                <p className="text-sm font-normal text-zinc-200 sm:text-xs sm:font-medium underline underline-offset-4 decoration-primary/30 cursor-pointer hover:decoration-primary transition-all w-fit">Active events</p>
+                                                <p className="text-sm font-normal text-zinc-200 underline underline-offset-4 decoration-primary/30 cursor-pointer hover:decoration-primary transition-all w-fit">Active events</p>
                                                 <p className="text-sm text-zinc-400 leading-relaxed max-w-xs">
                                                     Currently on a North American tour through Summer 2026. European dates announced for Fall.
                                                 </p>
@@ -598,7 +598,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         {/* Inactive State */}
                                         <div className="space-y-2">
                                             <h5 className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Inactive</h5>
-                                            <p className="text-sm font-normal text-zinc-200 sm:text-xs sm:font-medium italic">No upcoming events</p>
+                                            <p className="text-sm font-normal text-zinc-200 italic">No upcoming events</p>
                                         </div>
                                     </div>
                                 </div>
@@ -612,7 +612,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         The "Active events" label itself acts as a toggle link, using <strong>underline-offset-4</strong> and <strong>decoration-primary/30</strong> to signal interactivity without adding extra visual noise like "Show more" labels.
                                     </p>
                                     <p className="text-sm text-zinc-400 leading-relaxed">
-                                        To insulate compressed multi-column layouts from text overflow and word fracturing, metadata values dynamically scale between <strong>text-sm</strong> (Body (Small) token: <code className="text-zinc-300">text-sm font-normal text-zinc-200</code>) on mobile and <strong>text-xs</strong> (Caption / Tiny token: <code className="text-zinc-300">sm:text-xs sm:font-medium</code>) on desktop viewports.
+                                        To ensure optimum scannability without layout fracturing, metadata values are kept static at <strong>14px</strong> (using <code className="text-zinc-300">text-sm font-normal text-zinc-200</code>) across all breakpoints.
                                     </p>
                                 </div>
                             </div>
