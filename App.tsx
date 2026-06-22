@@ -2492,6 +2492,8 @@ const App: React.FC = () => {
                 const entryOrigin = parsedData?.details?.origin || parsedData?.origin || parsedData?.location || parsedData?.country || "";
                 const entryFounded = parsedData?.details?.founded || parsedData?.founded || parsedData?.formed || parsedData?.year || "";
                 const entryArtistName = parsedData?.details?.artist || parsedData?.artist || parsedData?.name || cachedEntry.seedArtists || cachedEntry.artistId || key;
+                const entryTourDates = parsedData?.tourDates || [];
+                const entryTourCachedAt = parsedData?.tourCachedAt || "";
 
                 const detailsObj = {
                   summary: entryBio,
@@ -2508,7 +2510,9 @@ const App: React.FC = () => {
                   discography: parsedData?.discography || [],
                   tourInfo: parsedData?.tourInfo || "",
                   recommendationReason: parsedData?.recommendationReason || parsedData?.reason || "",
-                  groundingLinks: parsedData?.groundingLinks || []
+                  groundingLinks: parsedData?.groundingLinks || [],
+                  tourDates: entryTourDates,
+                  tourCachedAt: entryTourCachedAt
                 };
 
                 next.set(key.toLowerCase(), detailsObj);
@@ -2997,6 +3001,8 @@ const App: React.FC = () => {
             ? parsed.youtubeVideoId.trim() : undefined;
         const youtubeSearchQuery = typeof parsed?.youtubeSearchQuery === 'string' && parsed.youtubeSearchQuery.trim().length > 0
             ? parsed.youtubeSearchQuery.trim() : undefined;
+        const tourDates = parsed?.tourDates || [];
+        const tourCachedAt = parsed?.tourCachedAt || '';
 
         if (!bio || bio.length < 5) return;
 
@@ -3011,7 +3017,9 @@ const App: React.FC = () => {
           recommendationReason,
           groundingLinks,
           youtubeVideoId,
-          youtubeSearchQuery
+          youtubeSearchQuery,
+          tourDates,
+          tourCachedAt
         };
 
         // Register under all lookup key variants
