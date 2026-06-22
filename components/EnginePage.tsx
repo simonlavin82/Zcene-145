@@ -416,7 +416,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                 <div className="px-6 py-4 rounded-xl border-2 border-primary bg-zinc-900/50 text-center w-full max-w-md shadow-[0_0_15px_rgba(255,255,255,0.03)]">
                     <div className="text-primary text-[10px] font-mono mb-1 uppercase tracking-tighter">Phase 02: Orchestration</div>
                     <div className="text-white font-medium">Global Cache Check → Gemini 1.5</div>
-                    <div className="text-[11px] text-zinc-500 mt-1">Probes the global 'artists' cache first. <span className="text-primary font-semibold">⚡ Cache Hit</span> skips directly to Phase 04. Cache Miss calls Gemini to map relational bridges, then writes the result to the global cache.</div>
+                    <div className="text-[11px] text-zinc-500 mt-1">Probes the global 'artists' cache first, evaluating our dual-layer cache windows: Core Artist Metadata features a 1-year persistence window before triggering a structural background refresh, while Live Tour Data uses a strict 7-day Time-To-Live (TTL) cache window before the UI automatically resets to an 'idle' state. <span className="text-primary font-semibold">⚡ Cache Hit</span> skips directly to Phase 04. Cache Miss calls Gemini to map relational bridges, then writes the result to the global cache.</div>
                 </div>
                 <div className="h-8 w-0.5 bg-zinc-800 my-2" />
             </div>
@@ -451,7 +451,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                 <div className="px-6 py-4 rounded-xl border border-primary/20 bg-primary/5 text-center w-full max-w-md">
                     <div className="text-primary text-[10px] font-mono mb-1 uppercase tracking-tighter">Phase 05: Persistence</div>
                     <div className="text-white font-medium">Lightweight Firestore Commit</div>
-                    <div className="text-[11px] text-zinc-400 mt-1">Project record stores seed list inputs + artist <span className="text-primary font-mono">canvasLayout</span> positions. Heavy graph data lives in the global artists cache.</div>
+                    <div className="text-[11px] text-zinc-400 mt-1">Project record stores seed list inputs + artist <span className="text-primary font-mono">canvasLayout</span> positions. Heavy graph data lives in the global artists cache, structured with our dual-layer cache windows (1-year persistence for core metadata, 7-day TTL for live tour data).</div>
                 </div>
             </div>
         </div>
