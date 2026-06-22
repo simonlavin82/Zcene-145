@@ -650,7 +650,8 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         .attr("stroke", "#a1a1aa")
         .attr("stroke-width", 1)
         .attr("stroke-opacity", 0.4)
-        .attr("stroke-dasharray", "3,3");
+        .attr("stroke-dasharray", "3,3")
+        .style("pointer-events", "none");
 
     const isArtistToArtistLink = (d: Link) => {
         const sId = nodeId(d.source);
@@ -665,7 +666,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         .join("line")
         .attr("class", "interactive-link")
         .attr("stroke", "transparent")
-        .attr("stroke-width", 12)
+        .attr("stroke-width", 16)
         .style("cursor", d => isArtistToArtistLink(d) ? "pointer" : "default")
         .on("mouseenter", (event, d) => {
             if (!isArtistToArtistLink(d)) return;
