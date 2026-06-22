@@ -608,16 +608,16 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             <div className={`grid ${isHero ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2'} gap-8 py-4 border-b border-zinc-800/50`}>
                                 <div>
                                     <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Genre</h4>
-                                    <p className="text-base font-medium text-zinc-200">{details.details?.genre || 'Unknown'}</p>
+                                    <p className="text-sm font-normal text-zinc-200 sm:text-xs sm:font-medium">{details.details?.genre || 'Unknown'}</p>
                                 </div>
                                 <div>
                                     <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Origin</h4>
-                                    <p className="text-base font-medium text-zinc-200">{details.details?.origin || 'Unknown'}</p>
+                                    <p className="text-sm font-normal text-zinc-200 sm:text-xs sm:font-medium">{details.details?.origin || 'Unknown'}</p>
                                 </div>
                                 {details.details?.founded && (
                                     <div>
                                         <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Founded</h4>
-                                        <p className="text-base font-medium text-zinc-200">{details.details.founded}</p>
+                                        <p className="text-sm font-normal text-zinc-200 sm:text-xs sm:font-medium">{details.details.founded}</p>
                                     </div>
                                 )}
                                 {(() => {
@@ -632,26 +632,26 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                 {!liveTourData && !isFetchingTour && (
                                                     <button 
                                                         onClick={handleFetchTourData}
-                                                        className="text-zinc-400 hover:text-primary transition-colors text-sm underline underline-offset-4 decoration-zinc-700 font-medium text-left w-fit"
+                                                        className="text-zinc-400 hover:text-primary transition-colors text-sm font-normal sm:text-xs sm:font-medium underline underline-offset-4 decoration-zinc-700 text-left w-fit"
                                                     >
                                                         Check tours
                                                     </button>
                                                 )}
                                                 
                                                 {isFetchingTour && (
-                                                    <div className="flex items-center gap-2 text-sm font-medium text-zinc-500 animate-pulse">
+                                                    <div className="flex items-center gap-2 text-sm font-normal text-zinc-200 sm:text-xs sm:font-medium animate-pulse">
                                                         Checking...
                                                     </div>
                                                 )}
 
                                                 {liveTourData && (
-                                                    <p className="text-sm text-zinc-400 leading-relaxed animate-in fade-in slide-in-from-top-1 duration-300 mt-1">
+                                                    <p className="text-sm font-normal text-zinc-200 sm:text-xs sm:font-medium leading-relaxed animate-in fade-in slide-in-from-top-1 duration-300 mt-1">
                                                         {liveTourData}
                                                     </p>
                                                 )}
 
                                                 {Array.isArray(tours) && tours.length > 0 && tours.map((tour: any, idx: number) => (
-                                                    <p key={idx} className="text-sm text-zinc-400">{String(tour)}</p>
+                                                    <p key={idx} className="text-sm font-normal text-zinc-200 sm:text-xs sm:font-medium">{String(tour)}</p>
                                                 ))}
                                             </div>
                                         </div>
