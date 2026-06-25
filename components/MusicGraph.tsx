@@ -881,6 +881,21 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         .style("font-size", `${12 * sizeMult}px`)
         .text(d => toDisplayLabel(d));
 
+    nodeElements
+        .style("opacity", d => {
+            const nodeType = d.type as FilterKeys;
+            const isFilteredOut = d.type !== 'artist' && 
+                                  Object.prototype.hasOwnProperty.call(activeFilters, nodeType) && 
+                                  !activeFilters[nodeType];
+            if (isFilteredOut) return 0.1;
+
+            const selHighlight = selectionHighlightIdsRef.current;
+            const hlNodes = highlightedNodesRef.current;
+            if (selHighlight) return selHighlight.has(d.id) ? 1 : 0.1;
+            if (hlNodes.size > 0) return hlNodes.has(d.id) ? 1 : 0.1;
+            return 1;
+        });
+
     const nodeId = (n: any) => String(typeof n === 'string' ? n : n.id);
 
     container.select(".link-group").selectAll<SVGLineElement, Link>("line.visual-line")
@@ -900,6 +915,11 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 return Object.prototype.hasOwnProperty.call(activeFilters, nodeType) && !activeFilters[nodeType];
             };
             if (isLinkFilteredOut(sNode) || isLinkFilteredOut(tNode)) return 0.05;
+
+            const selHighlight = selectionHighlightIdsRef.current;
+            const hlNodes = highlightedNodesRef.current;
+            if (selHighlight) return (selHighlight.has(s) && selHighlight.has(t)) ? 0.6 : 0.05;
+            if (hlNodes.size > 0) return (hlNodes.has(s) && hlNodes.has(t)) ? 0.6 : 0.05;
             return 0.4;
         })
         .attr("stroke-dasharray", "3,3")
