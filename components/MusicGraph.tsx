@@ -196,11 +196,6 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         let isVisible = true;
         if (node.type === 'artist') {
           isVisible = visibleArtistIds.has(nodeIdStrLower);
-        } else {
-          const nodeType = node.type as FilterKeys;
-          if (Object.prototype.hasOwnProperty.call(activeFilters, nodeType)) {
-            isVisible = activeFilters[nodeType];
-          }
         }
 
         if (isVisible && !acc.has(nodeIdStrLower)) {
@@ -416,7 +411,14 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             // Spotlight constellation nodes and dim others
             svg.selectAll<SVGGElement, Node>("g.node-element")
                 .transition().duration(200)
-                .style("opacity", (n: any) => neighborNodeIds.has(n.id) ? 1 : 0.15);
+                .style("opacity", (n: any) => {
+                    const nodeType = n.type as FilterKeys;
+                    const isFilteredOut = n.type !== 'artist' && 
+                                          Object.prototype.hasOwnProperty.call(activeFilters, nodeType) && 
+                                          !activeFilters[nodeType];
+                    if (isFilteredOut) return 0.1;
+                    return neighborNodeIds.has(n.id) ? 1 : 0.15;
+                });
 
             // Aggregate all artist connections and group them
             const connectionsByArtist = new Map<string, { node: Node; contexts: string[] }>();
@@ -471,6 +473,12 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             svg.selectAll<SVGGElement, Node>("g.node-element")
                 .transition().duration(200)
                 .style("opacity", (n: any) => {
+                    const nodeType = n.type as FilterKeys;
+                    const isFilteredOut = n.type !== 'artist' && 
+                                          Object.prototype.hasOwnProperty.call(activeFilters, nodeType) && 
+                                          !activeFilters[nodeType];
+                    if (isFilteredOut) return 0.1;
+
                     const selHighlight = selectionHighlightIdsRef.current;
                     const hlNodes = highlightedNodesRef.current;
                     if (selHighlight) return selHighlight.has(n.id) ? 1 : 0.1;
@@ -485,6 +493,16 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 .attr("stroke-opacity", (l: any) => {
                     const s = typeof l.source === 'string' ? l.source : l.source.id;
                     const t = typeof l.target === 'string' ? l.target : l.target.id;
+                    
+                    const sNode = visibleNodes.find(n => n.id === s);
+                    const tNode = visibleNodes.find(n => n.id === t);
+                    const isLinkFilteredOut = (node: Node | undefined) => {
+                        if (!node || node.type === 'artist') return false;
+                        const nodeType = node.type as FilterKeys;
+                        return Object.prototype.hasOwnProperty.call(activeFilters, nodeType) && !activeFilters[nodeType];
+                    };
+                    if (isLinkFilteredOut(sNode) || isLinkFilteredOut(tNode)) return 0.05;
+
                     const selHighlight = selectionHighlightIdsRef.current;
                     const hlNodes = highlightedNodesRef.current;
                     if (selHighlight) return (selHighlight.has(s) && selHighlight.has(t)) ? 0.6 : 0.05;
@@ -871,7 +889,19 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         .attr("class", "visual-line")
         .attr("stroke", "#a1a1aa")
         .attr("stroke-width", 1)
-        .attr("stroke-opacity", 0.4)
+        .attr("stroke-opacity", (d: any) => {
+            const s = nodeId(d.source);
+            const t = nodeId(d.target);
+            const sNode = visibleNodes.find(n => n.id === s);
+            const tNode = visibleNodes.find(n => n.id === t);
+            const isLinkFilteredOut = (node: Node | undefined) => {
+                if (!node || node.type === 'artist') return false;
+                const nodeType = node.type as FilterKeys;
+                return Object.prototype.hasOwnProperty.call(activeFilters, nodeType) && !activeFilters[nodeType];
+            };
+            if (isLinkFilteredOut(sNode) || isLinkFilteredOut(tNode)) return 0.05;
+            return 0.4;
+        })
         .attr("stroke-dasharray", "3,3")
         .style("pointer-events", "none");
 
@@ -885,7 +915,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
     // Use a lower alpha for restarts to prevent "explosive" movement on interaction
     simulation.alpha(0.15).alphaTarget(0).restart();
-  }, [dimensions, visibleNodes, visibleLinks, focusOn, distMult, sizeMult, seedArtists]);
+  }, [dimensions, visibleNodes, visibleLinks, focusOn, distMult, sizeMult, seedArtists, activeFilters]);
 
   // Ensure selectedNodePos is updated when selection changes, even if simulation is idle
   useEffect(() => {
@@ -915,6 +945,12 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     nodeElements
         .transition().duration(300)
         .style("opacity", d => {
+            const nodeType = d.type as FilterKeys;
+            const isFilteredOut = d.type !== 'artist' && 
+                                  Object.prototype.hasOwnProperty.call(activeFilters, nodeType) && 
+                                  !activeFilters[nodeType];
+            if (isFilteredOut) return 0.1;
+
             if (selectionHighlightIds) return selectionHighlightIds.has(d.id) ? 1 : 0.1;
             if (highlightedNodes.size > 0) return highlightedNodes.has(d.id) ? 1 : 0.1;
             return 1;
@@ -940,11 +976,21 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         .attr("stroke-opacity", (d: any) => {
             const s = typeof d.source === 'string' ? d.source : d.source.id;
             const t = typeof d.target === 'string' ? d.target : d.target.id;
+            
+            const sNode = visibleNodes.find(n => n.id === s);
+            const tNode = visibleNodes.find(n => n.id === t);
+            const isLinkFilteredOut = (node: Node | undefined) => {
+                if (!node || node.type === 'artist') return false;
+                const nodeType = node.type as FilterKeys;
+                return Object.prototype.hasOwnProperty.call(activeFilters, nodeType) && !activeFilters[nodeType];
+            };
+            if (isLinkFilteredOut(sNode) || isLinkFilteredOut(tNode)) return 0.05;
+
             if (selectionHighlightIds) return (selectionHighlightIds.has(s) && selectionHighlightIds.has(t)) ? 0.6 : 0.05;
             if (highlightedNodes.size > 0) return (highlightedNodes.has(s) && highlightedNodes.has(t)) ? 0.6 : 0.05;
             return 0.3;
         });
-  }, [selectionHighlightIds, highlightedNodes]);
+  }, [selectionHighlightIds, highlightedNodes, activeFilters, visibleNodes]);
 
   return (
     <div 
@@ -1021,7 +1067,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             >
                 {hoveredLink.connections ? (
                     <>
-                        <span className="font-mono text-[9px] text-zinc-400 uppercase tracking-widest border-b border-zinc-800 pb-1 mb-1 font-semibold">{hoveredLink.sourceId}</span>
+                        <span className="font-sans text-[9px] text-zinc-400 uppercase tracking-widest border-b border-zinc-800 pb-1 mb-1 font-semibold">{hoveredLink.sourceId}</span>
                         <div className="flex flex-col gap-1 max-h-[200px] overflow-y-auto pr-1">
                             {hoveredLink.connections.map((c, i) => (
                                 <div key={i} className="text-xs font-medium text-zinc-300 leading-tight">
@@ -1033,7 +1079,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     </>
                 ) : (
                     <>
-                        <span className="font-mono text-[9px] text-zinc-400 uppercase tracking-widest text-center border-b border-zinc-800 pb-1 mb-1 font-semibold">Connection</span>
+                        <span className="font-sans text-[9px] text-zinc-400 uppercase tracking-widest text-center border-b border-zinc-800 pb-1 mb-1 font-semibold">Connection</span>
                         <div className="text-xs text-zinc-300 leading-normal text-center">
                             <span className="text-primary font-normal">{hoveredLink.sourceId}</span> 
                             <span className="text-zinc-400 font-normal"> {hoveredLink.context} </span>
