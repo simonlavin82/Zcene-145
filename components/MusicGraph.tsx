@@ -53,12 +53,20 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   const [selectedNodePos, setSelectedNodePos] = useState<{ x: number, y: number } | null>(null);
   const [hoveredLink, setHoveredLink] = useState<{
     sourceId: string;
-    targetId: string;
-    context: string;
+    targetId?: string;
+    context?: string;
+    connections?: { context: string; targetName: string }[];
     x: number;
     y: number;
   } | null>(null);
   const activeHoveredLinkRef = useRef<{ link: Link } | null>(null);
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+  const hoveredNodeIdRef = useRef<string | null>(null);
+  const activeHoveredNodeRef = useRef<Node | null>(null);
+
+  useEffect(() => {
+    hoveredNodeIdRef.current = hoveredNodeId;
+  }, [hoveredNodeId]);
   const containerRef = useRef<HTMLDivElement>(null);
   const localLegendRef = useRef<HTMLDivElement | null>(null);
 
@@ -296,6 +304,132 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     const svg = d3.select(svgRef.current);
     const seedArtistSet = new Set(seedArtists.map(a => normalizeArtistId(a)));
     const { width, height } = dimensions;
+
+    // Title-case formatter: converts raw id slugs (e.g. "buggin", "hardcore-punk")
+    // to their display form ("Buggin", "Hardcore Punk") for legacy cache docs
+    // where the .label field was not populated at write time.
+    const toDisplayLabel = (node: Node): string => {
+        const raw = node.label || String(node.id);
+        return raw
+            .replace(/-/g, ' ')
+            .replace(/\b\w/g, c => c.toUpperCase());
+    };
+
+    const triggerNodeHover = (d: Node) => {
+        setHoveredNodeId(d.id);
+        activeHoveredNodeRef.current = d;
+
+        const connectedLinks = visibleLinks.filter(l => {
+            const sId = nodeId(l.source);
+            const tId = nodeId(l.target);
+            return sId === d.id || tId === d.id;
+        });
+
+        const neighborNodeIds = new Set<string>();
+        neighborNodeIds.add(d.id);
+        connectedLinks.forEach(l => {
+            neighborNodeIds.add(nodeId(l.source));
+            neighborNodeIds.add(nodeId(l.target));
+        });
+
+        if (svgRef.current) {
+            const svg = d3.select(svgRef.current);
+
+            // Highlight connected visual lines and dim others
+            svg.selectAll<SVGLineElement, Link>("line.visual-line")
+                .transition().duration(200)
+                .attr("stroke", (l: any) => {
+                    const sId = nodeId(l.source);
+                    const tId = nodeId(l.target);
+                    return (sId === d.id || tId === d.id) ? "#F6E468" : "#a1a1aa";
+                })
+                .attr("stroke-opacity", (l: any) => {
+                    const sId = nodeId(l.source);
+                    const tId = nodeId(l.target);
+                    return (sId === d.id || tId === d.id) ? 0.9 : 0.05;
+                });
+
+            // Spotlight constellation nodes and dim others
+            svg.selectAll<SVGGElement, Node>("g.node-element")
+                .transition().duration(200)
+                .style("opacity", (n: any) => neighborNodeIds.has(n.id) ? 1 : 0.15);
+
+            // Aggregate all connections tied to the hovered node
+            const connections = connectedLinks.map(l => {
+                const sId = nodeId(l.source);
+                const tId = nodeId(l.target);
+                const otherId = sId === d.id ? tId : sId;
+                const otherNode = visibleNodes.find(n => String(n.id).toLowerCase() === otherId.toLowerCase());
+                if (!otherNode) return null;
+
+                let contextStr = l.context || "";
+                if (!contextStr) {
+                    if (otherNode.type === 'genre') contextStr = "Genre:";
+                    else if (otherNode.type === 'label') contextStr = "Label:";
+                    else if (otherNode.type === 'country') contextStr = "Country:";
+                    else if (otherNode.type === 'founded') contextStr = "Founded:";
+                    else contextStr = "is connected to";
+                }
+
+                const capitalize = (str: string) => {
+                    if (!str) return "";
+                    return str.charAt(0).toUpperCase() + str.slice(1);
+                };
+
+                return {
+                    context: capitalize(contextStr),
+                    targetName: toDisplayLabel(otherNode)
+                };
+            }).filter(Boolean) as { context: string; targetName: string }[];
+
+            if (connections.length > 0) {
+                const transform = d3.zoomTransform(svgRef.current);
+                setHoveredLink({
+                    sourceId: toDisplayLabel(d),
+                    connections: connections,
+                    x: transform.applyX(d.x ?? 0),
+                    y: transform.applyY(d.y ?? 0)
+                });
+            } else {
+                setHoveredLink(null);
+            }
+        }
+    };
+
+    const clearNodeHover = () => {
+        setHoveredNodeId(null);
+        activeHoveredNodeRef.current = null;
+        setHoveredLink(null);
+
+        if (svgRef.current) {
+            const svg = d3.select(svgRef.current);
+
+            // Restore node opacities
+            svg.selectAll<SVGGElement, Node>("g.node-element")
+                .transition().duration(200)
+                .style("opacity", (n: any) => {
+                    const selHighlight = selectionHighlightIdsRef.current;
+                    const hlNodes = highlightedNodesRef.current;
+                    if (selHighlight) return selHighlight.has(n.id) ? 1 : 0.1;
+                    if (hlNodes.size > 0) return hlNodes.has(n.id) ? 1 : 0.1;
+                    return 1;
+                });
+
+            // Restore visual line strokes and opacities
+            svg.selectAll<SVGLineElement, Link>("line.visual-line")
+                .transition().duration(200)
+                .attr("stroke", "#a1a1aa")
+                .attr("stroke-opacity", (l: any) => {
+                    const s = typeof l.source === 'string' ? l.source : l.source.id;
+                    const t = typeof l.target === 'string' ? l.target : l.target.id;
+                    const selHighlight = selectionHighlightIdsRef.current;
+                    const hlNodes = highlightedNodesRef.current;
+                    if (selHighlight) return (selHighlight.has(s) && selHighlight.has(t)) ? 0.6 : 0.05;
+                    if (hlNodes.size > 0) return (hlNodes.has(s) && hlNodes.has(t)) ? 0.6 : 0.05;
+                    return 0.3;
+                });
+        }
+    };
     
     let container = svg.select<SVGGElement>("g.main-container");
     if (container.empty()) {
@@ -318,7 +452,12 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         feMerge.append("feMergeNode").attr("in", "blur");
         feMerge.append("feMergeNode").attr("in", "SourceGraphic");
 
-        svg.on("click", (event) => { if (event.target === svgRef.current) onNodeClickRef.current(null); });
+        svg.on("click", (event) => { 
+            if (event.target === svgRef.current) {
+                onNodeClickRef.current(null);
+                clearNodeHover();
+            }
+        });
         container = svg.append("g").attr("class", "main-container");
         container.append("g").attr("class", "link-group").attr("stroke", "#a1a1aa");
         container.append("g").attr("class", "node-group");
@@ -379,24 +518,34 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                         return isNaN(val) ? 0 : val;
                     });
 
-                 // Update active hovered link midpoint coordinates
-                 if (activeHoveredLinkRef.current && svgRef.current) {
-                     const d = activeHoveredLinkRef.current.link;
-                     const x1 = (d.source as any).x;
-                     const y1 = (d.source as any).y;
-                     const x2 = (d.target as any).x;
-                     const y2 = (d.target as any).y;
-                     if (!isNaN(x1) && !isNaN(y1) && !isNaN(x2) && !isNaN(y2)) {
-                         const midX = (x1 + x2) / 2;
-                         const midY = (y1 + y2) / 2;
-                         const transform = d3.zoomTransform(svgRef.current);
-                         setHoveredLink(prev => prev ? {
-                             ...prev,
-                             x: transform.applyX(midX),
-                             y: transform.applyY(midY)
-                         } : null);
-                     }
-                 }
+                  // Update active hovered link/node coordinates
+                  if (activeHoveredLinkRef.current && svgRef.current) {
+                      const d = activeHoveredLinkRef.current.link;
+                      const x1 = (d.source as any).x;
+                      const y1 = (d.source as any).y;
+                      const x2 = (d.target as any).x;
+                      const y2 = (d.target as any).y;
+                      if (!isNaN(x1) && !isNaN(y1) && !isNaN(x2) && !isNaN(y2)) {
+                          const midX = (x1 + x2) / 2;
+                          const midY = (y1 + y2) / 2;
+                          const transform = d3.zoomTransform(svgRef.current);
+                          setHoveredLink(prev => prev ? {
+                              ...prev,
+                              x: transform.applyX(midX),
+                              y: transform.applyY(midY)
+                          } : null);
+                      }
+                  } else if (activeHoveredNodeRef.current && svgRef.current) {
+                      const n = activeHoveredNodeRef.current;
+                      if (!isNaN(n.x!) && !isNaN(n.y!)) {
+                          const transform = d3.zoomTransform(svgRef.current);
+                          setHoveredLink(prev => prev ? {
+                              ...prev,
+                              x: transform.applyX(n.x!),
+                              y: transform.applyY(n.y!)
+                          } : null);
+                      }
+                  }
                 
                 currentContainer.select(".node-group").selectAll<SVGGElement, Node>("g.node-element")
                     .attr("transform", (d: any) => {
@@ -561,8 +710,26 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                             window.navigator.vibrate(10);
                         }
                         
+                        if (isSmallScreen) {
+                            if (hoveredNodeIdRef.current !== d.id) {
+                                triggerNodeHover(d);
+                                onInteractionRef.current?.();
+                                return;
+                            }
+                        }
+                        
                         onNodeClickRef.current(d);
                         onInteractionRef.current?.();
+                    })
+                    .on("mouseenter", (event, d) => {
+                        if (!isSmallScreen) {
+                            triggerNodeHover(d);
+                        }
+                    })
+                    .on("mouseleave", (event, d) => {
+                        if (!isSmallScreen) {
+                            clearNodeHover();
+                        }
                     })
                     .call(d3.drag<SVGGElement, Node>()
                         .on("start", (event, d) => {
@@ -626,15 +793,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         }
     });
 
-    // Title-case formatter: converts raw id slugs (e.g. "buggin", "hardcore-punk")
-    // to their display form ("Buggin", "Hardcore Punk") for legacy cache docs
-    // where the .label field was not populated at write time.
-    const toDisplayLabel = (node: Node): string => {
-        const raw = node.label || String(node.id);
-        return raw
-            .replace(/-/g, ' ')
-            .replace(/\b\w/g, c => c.toUpperCase());
-    };
+
 
     nodeElements.select("text")
         .attr("y", 25 * sizeMult)
@@ -675,7 +834,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
             const formatName = (id: string) => {
                 const foundNode = visibleNodes.find(n => String(n.id).toLowerCase() === id.toLowerCase());
-                if (foundNode && foundNode.label) return foundNode.label;
+                if (foundNode) return toDisplayLabel(foundNode);
                 return id.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
             };
 
@@ -869,14 +1028,30 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     pointerEvents: 'none',
                     zIndex: 50
                 }}
-                className="mb-3 bg-zinc-950/95 border border-zinc-700/80 px-3.5 py-2.5 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md rounded-xl flex flex-col gap-1 text-center min-w-[120px] max-w-[280px]"
+                className="mb-3 bg-zinc-950/95 border border-zinc-700/80 px-3.5 py-2.5 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md rounded-xl flex flex-col gap-1 text-left min-w-[160px] max-w-[320px]"
             >
-                <span className="font-mono text-[9px] text-zinc-500 uppercase tracking-widest">Connection</span>
-                <div className="text-xs font-medium text-zinc-200 leading-normal">
-                    <span className="font-semibold text-primary">{hoveredLink.sourceId}</span> 
-                    <span className="text-zinc-400"> {hoveredLink.context} </span>
-                    <span className="font-semibold text-primary">{hoveredLink.targetId}</span>
-                </div>
+                {hoveredLink.connections ? (
+                    <>
+                        <span className="font-mono text-[9px] text-zinc-400 uppercase tracking-widest border-b border-zinc-800 pb-1 mb-1 font-semibold">{hoveredLink.sourceId}</span>
+                        <div className="flex flex-col gap-1 max-h-[200px] overflow-y-auto pr-1">
+                            {hoveredLink.connections.map((c, i) => (
+                                <div key={i} className="text-xs font-medium text-zinc-300 leading-tight">
+                                    <span className="text-zinc-400 font-normal">{c.context}</span>{" "}
+                                    <span className="text-primary font-normal">{c.targetName}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <span className="font-mono text-[9px] text-zinc-400 uppercase tracking-widest text-center border-b border-zinc-800 pb-1 mb-1 font-semibold">Connection</span>
+                        <div className="text-xs text-zinc-300 leading-normal text-center">
+                            <span className="text-primary font-normal">{hoveredLink.sourceId}</span> 
+                            <span className="text-zinc-400 font-normal"> {hoveredLink.context} </span>
+                            <span className="text-primary font-normal">{hoveredLink.targetId}</span>
+                        </div>
+                    </>
+                )}
             </div>
         )}
 
