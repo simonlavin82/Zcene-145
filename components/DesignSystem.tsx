@@ -842,37 +842,37 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 </p>
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-none border border-zinc-800">
                                      <div className="flex items-center gap-3 group cursor-pointer">
-                                         <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center text-primary group-hover:bg-zinc-700 transition-colors">
+                                         <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center text-[#F6E468] group-hover:bg-zinc-700 transition-colors">
                                              <LegendSymbol symbol={d3.symbolCircle} size={260} />
                                          </div>
                                          <span className="text-sm font-medium">Seed Artist</span>
                                      </div>
                                      <div className="flex items-center gap-3 group cursor-pointer">
-                                         <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center text-primary group-hover:bg-zinc-700 transition-colors">
+                                         <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center text-[#A855F7] group-hover:bg-zinc-700 transition-colors">
                                              <LegendSymbol symbol={d3.symbolStar} size={400} />
                                          </div>
                                          <span className="text-sm font-medium">AI Artist</span>
                                      </div>
                                      <div className="flex items-center gap-3 group cursor-pointer">
-                                         <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center text-primary group-hover:bg-zinc-700 transition-colors">
+                                         <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center text-[#10B981] group-hover:bg-zinc-700 transition-colors">
                                              <LegendSymbol symbol={d3.symbolDiamond} size={320} />
                                          </div>
                                          <span className="text-sm font-medium">Label</span>
                                      </div>
                                      <div className="flex items-center gap-3 group cursor-pointer">
-                                         <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center text-primary group-hover:bg-zinc-700 transition-colors">
+                                         <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center text-[#3B82F6] group-hover:bg-zinc-700 transition-colors">
                                              <LegendSymbol symbol={d3.symbolSquare} size={260} />
                                          </div>
                                          <span className="text-sm font-medium">Genre</span>
                                      </div>
                                      <div className="flex items-center gap-3 group cursor-pointer">
-                                         <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center text-primary group-hover:bg-zinc-700 transition-colors">
+                                         <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center text-[#F59E0B] group-hover:bg-zinc-700 transition-colors">
                                              <LegendSymbol symbol={d3.symbolTriangle} size={260} />
                                          </div>
                                          <span className="text-sm font-medium">Origin</span>
                                      </div>
                                      <div className="flex items-center gap-3 group cursor-pointer">
-                                         <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center text-primary group-hover:bg-zinc-700 transition-colors">
+                                         <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center text-[#EC4899] group-hover:bg-zinc-700 transition-colors">
                                              <LegendSymbol symbol={d3.symbolCross} size={320} />
                                          </div>
                                          <span className="text-sm font-medium">Founded</span>
@@ -895,18 +895,18 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     Interactive legend items are contained within <code className="text-primary">rounded-xl</code> boxes to signal clickability. The symbols themselves maintain their geometric integrity.
                                 </p>
 
-                                {/* Aggregated Connection Tooltip Component Documentation */}
+                                {/* Spiderweb Hover Container Component Documentation */}
                                 <div className="mt-12 space-y-6">
-                                    <h3 className="text-xl font-medium text-zinc-200">Aggregated Connection Tooltips</h3>
+                                    <h3 className="text-xl font-medium text-zinc-200">Spiderweb Hover Container</h3>
                                     <p className="text-sm text-zinc-400 max-w-2xl leading-relaxed">
-                                        A contextual tooltip component displayed over the graph nodes on hover. It lists all active connections (both artist-to-artist relationships and core attributes like genre/label) associated with the hovered node.
+                                        A contextual container displayed over the graph nodes on hover. It renders high-contrast, real-time relational information organized into direct metadata connections and core 'Spiderweb DNA' background recommendations.
                                     </p>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                                         <div className="space-y-6">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Visual Component Preview</h4>
-                                            <div className="p-8 bg-zinc-900/30 border border-zinc-800 flex items-center justify-center min-h-[220px]">
-                                                 <div className="w-[320px] bg-zinc-950/95 border border-zinc-700/80 px-3.5 py-2.5 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md rounded-xl flex flex-col gap-1 text-left">
-                                                     <span className="font-mono text-[9px] text-zinc-400 uppercase tracking-widest border-b border-zinc-800 pb-1 mb-1 font-semibold">NEVER ENDING GAME</span>
+                                            <div className="p-8 bg-zinc-900/30 border border-zinc-800 flex items-center justify-center min-h-[260px]">
+                                                 <div className="w-[320px] bg-zinc-950/95 border border-zinc-700/80 px-3.5 py-2.5 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md rounded-xl flex flex-col gap-2 text-left">
+                                                     <span className="font-poppins text-sm text-white border-b border-zinc-800 pb-1 mb-1 font-medium">Never Ending Game</span>
                                                      <div className="flex flex-col gap-1">
                                                          <div className="text-xs font-medium text-zinc-300 leading-tight">
                                                              <span className="text-zinc-400 font-normal">Performs in the genre of</span>{" "}
@@ -917,16 +917,21 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                              <span className="text-primary font-normal">Triple B Records</span>
                                                          </div>
                                                      </div>
+                                                     <div className="mt-1 pt-1.5 border-t border-zinc-800/60 text-[11px] text-zinc-400 leading-normal">
+                                                         <span className="font-semibold text-zinc-500 uppercase tracking-wider text-[8px] block mb-0.5">Spiderweb DNA</span>
+                                                         <span className="font-normal">A defining force in modern beatdown hardcore, originating from Michigan.</span>
+                                                     </div>
                                                  </div>
                                             </div>
                                         </div>
                                         <div className="space-y-6">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Specifications & Class Tokens</h4>
                                             <ul className="space-y-3 text-sm text-zinc-400">
-                                                <li><strong>Container:</strong> <code>bg-zinc-950/95 border border-zinc-700/80 px-3.5 py-2.5 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md rounded-xl</code></li>
-                                                <li><strong>Header Label:</strong> <code>font-mono text-[9px] text-zinc-400 uppercase tracking-widest border-b border-zinc-800 pb-1 mb-1 font-semibold</code></li>
-                                                <li><strong>Context Description:</strong> Uses <code>text-zinc-400 font-normal</code> for high readability against the dark background.</li>
-                                                <li><strong>Highlighted Value:</strong> Uses <code>text-primary font-normal</code> (yellow) with regular weight to prevent over-saturation and visual clutter.</li>
+                                                <li><strong>Background Architecture:</strong> <code>bg-zinc-950/95 border border-zinc-700/80 px-3.5 py-2.5 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md</code></li>
+                                                <li><strong>Border Radius:</strong> <code>rounded-xl</code> (12px) for consistent, modern container framing.</li>
+                                                <li><strong>Title Typography:</strong> <code>font-poppins font-medium text-sm text-white</code> for sharp, readable Title Case presentation.</li>
+                                                <li><strong>Relational Contexts:</strong> Uses <code>text-zinc-400 font-normal</code> for structural descriptions and <code>text-primary font-normal</code> for highlighted details.</li>
+                                                <li><strong>Spiderweb DNA:</strong> Rendered in a sub-section at <code>text-[11px] text-zinc-400</code> with a `text-[8px]` uppercase tracker label.</li>
                                             </ul>
                                         </div>
                                     </div>

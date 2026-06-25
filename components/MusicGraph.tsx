@@ -1117,7 +1117,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 }}
                 className="mb-3 bg-zinc-950/95 border border-zinc-700/80 px-3.5 py-2.5 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md rounded-xl flex flex-col gap-2 text-left min-w-[200px] max-w-[320px]"
             >
-                <span className="font-sans text-[9px] text-white tracking-widest border-b border-zinc-800 pb-1 mb-1 font-medium">{hoveredLink.sourceId}</span>
+                <span className="font-poppins text-sm text-white border-b border-zinc-800 pb-1 mb-1 font-medium">{hoveredLink.sourceId}</span>
                 
                 {/* Zone 1: Direct Connections / Fallback */}
                 {hoveredLink.connections && hoveredLink.connections.length > 0 ? (
