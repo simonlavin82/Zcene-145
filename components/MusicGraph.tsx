@@ -315,20 +315,71 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             .replace(/\b\w/g, c => c.toUpperCase());
     };
 
+    const formatRelationContext = (contexts: string[]): string => {
+        if (contexts.length === 0) {
+            return "is connected to";
+        }
+        if (contexts.length === 1) {
+            return contexts[0].trim();
+        }
+
+        const parts = contexts.map(c => {
+            const trimmed = c.trim();
+            const words = trimmed.split(/\s+/);
+            if (words.length > 1) {
+                const lastWord = words[words.length - 1].toLowerCase();
+                if (['with', 'by', 'to', 'for', 'of', 'from'].includes(lastWord)) {
+                    return {
+                        base: words.slice(0, -1).join(' '),
+                        prep: lastWord
+                    };
+                }
+            }
+            return {
+                base: trimmed,
+                prep: ''
+            };
+        });
+
+        const firstPrep = parts[0].prep;
+        const allSamePrep = firstPrep !== '' && parts.every(p => p.prep === firstPrep);
+
+        if (allSamePrep) {
+            const bases = parts.map(p => p.base);
+            let joinedBases = '';
+            if (bases.length === 2) {
+                joinedBases = `${bases[0]} and ${bases[1]}`;
+            } else {
+                joinedBases = `${bases.slice(0, -1).join(', ')}, and ${bases[bases.length - 1]}`;
+            }
+            return `${joinedBases} ${firstPrep}`;
+        } else {
+            const fullPhrases = parts.map(p => p.prep ? `${p.base} ${p.prep}` : p.base);
+            if (fullPhrases.length === 2) {
+                return `${fullPhrases[0]} and ${fullPhrases[1]}`;
+            } else {
+                return `${fullPhrases.slice(0, -1).join(', ')}, and ${fullPhrases[fullPhrases.length - 1]}`;
+            }
+        }
+    };
+
     const triggerNodeHover = (d: Node) => {
         if (d.type !== 'artist') return;
         setHoveredNodeId(d.id);
         activeHoveredNodeRef.current = d;
 
-        const connectedLinks = visibleLinks.filter(l => {
+        const directArtistLinks = visibleLinks.filter(l => {
             const sId = nodeId(l.source);
             const tId = nodeId(l.target);
-            return sId === d.id || tId === d.id;
+            if (sId !== d.id && tId !== d.id) return false;
+            const otherId = sId === d.id ? tId : sId;
+            const otherNode = visibleNodes.find(n => String(n.id).toLowerCase() === otherId.toLowerCase());
+            return otherNode?.type === 'artist';
         });
 
         const neighborNodeIds = new Set<string>();
         neighborNodeIds.add(d.id);
-        connectedLinks.forEach(l => {
+        directArtistLinks.forEach(l => {
             neighborNodeIds.add(nodeId(l.source));
             neighborNodeIds.add(nodeId(l.target));
         });
@@ -342,12 +393,24 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 .attr("stroke", (l: any) => {
                     const sId = nodeId(l.source);
                     const tId = nodeId(l.target);
-                    return (sId === d.id || tId === d.id) ? "#F6E468" : "#a1a1aa";
+                    const isDirectArtistLink = (sId === d.id || tId === d.id) &&
+                        directArtistLinks.some(dal => {
+                            const dalS = nodeId(dal.source);
+                            const dalT = nodeId(dal.target);
+                            return (dalS === sId && dalT === tId) || (dalS === tId && dalT === sId);
+                        });
+                    return isDirectArtistLink ? "#F6E468" : "#a1a1aa";
                 })
                 .attr("stroke-opacity", (l: any) => {
                     const sId = nodeId(l.source);
                     const tId = nodeId(l.target);
-                    return (sId === d.id || tId === d.id) ? 0.9 : 0.05;
+                    const isDirectArtistLink = (sId === d.id || tId === d.id) &&
+                        directArtistLinks.some(dal => {
+                            const dalS = nodeId(dal.source);
+                            const dalT = nodeId(dal.target);
+                            return (dalS === sId && dalT === tId) || (dalS === tId && dalT === sId);
+                        });
+                    return isDirectArtistLink ? 0.9 : 0.05;
                 });
 
             // Spotlight constellation nodes and dim others
@@ -355,33 +418,32 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 .transition().duration(200)
                 .style("opacity", (n: any) => neighborNodeIds.has(n.id) ? 1 : 0.15);
 
-            // Aggregate all connections tied to the hovered node
-            const connections = connectedLinks.map(l => {
+            // Aggregate all artist connections and group them
+            const connectionsByArtist = new Map<string, { node: Node; contexts: string[] }>();
+            directArtistLinks.forEach(l => {
                 const sId = nodeId(l.source);
                 const tId = nodeId(l.target);
                 const otherId = sId === d.id ? tId : sId;
                 const otherNode = visibleNodes.find(n => String(n.id).toLowerCase() === otherId.toLowerCase());
-                if (!otherNode) return null;
-
-                let contextStr = l.context || "";
-                if (!contextStr) {
-                    if (otherNode.type === 'genre') contextStr = "Genre:";
-                    else if (otherNode.type === 'label') contextStr = "Label:";
-                    else if (otherNode.type === 'country') contextStr = "Country:";
-                    else if (otherNode.type === 'founded') contextStr = "Founded:";
-                    else contextStr = "is connected to";
+                if (!otherNode) return;
+                
+                const normOtherId = otherNode.id;
+                if (!connectionsByArtist.has(normOtherId)) {
+                    connectionsByArtist.set(normOtherId, { node: otherNode, contexts: [] });
                 }
+                if (l.context) {
+                    connectionsByArtist.get(normOtherId)!.contexts.push(l.context);
+                }
+            });
 
-                const capitalize = (str: string) => {
-                    if (!str) return "";
-                    return str.charAt(0).toUpperCase() + str.slice(1);
-                };
-
+            const connections = Array.from(connectionsByArtist.values()).map(({ node, contexts }) => {
+                const rawContext = formatRelationContext(contexts);
+                const capitalizedContext = rawContext.charAt(0).toUpperCase() + rawContext.slice(1);
                 return {
-                    context: capitalize(contextStr),
-                    targetName: toDisplayLabel(otherNode)
+                    context: capitalizedContext,
+                    targetName: toDisplayLabel(node)
                 };
-            }).filter(Boolean) as { context: string; targetName: string }[];
+            });
 
             if (connections.length > 0) {
                 const transform = d3.zoomTransform(svgRef.current);
@@ -813,87 +875,13 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         .attr("stroke-dasharray", "3,3")
         .style("pointer-events", "none");
 
-    const isArtistToArtistLink = (d: Link) => {
-        const sId = nodeId(d.source);
-        const tId = nodeId(d.target);
-        const sourceNode = visibleNodes.find(n => String(n.id).toLowerCase() === sId.toLowerCase());
-        const targetNode = visibleNodes.find(n => String(n.id).toLowerCase() === tId.toLowerCase());
-        return sourceNode?.type === 'artist' && targetNode?.type === 'artist';
-    };
-
     container.select(".link-group").selectAll<SVGLineElement, Link>("line.interactive-link")
         .data(visibleLinks, (d: any) => `${nodeId(d.source)}-${nodeId(d.target)}`)
         .join("line")
         .attr("class", "interactive-link")
         .attr("stroke", "transparent")
         .attr("stroke-width", 16)
-        .style("cursor", d => isArtistToArtistLink(d) ? "pointer" : "default")
-        .on("mouseenter", (event, d) => {
-            if (!isArtistToArtistLink(d)) return;
-            const sId = nodeId(d.source);
-            const tId = nodeId(d.target);
-
-            const formatName = (id: string) => {
-                const foundNode = visibleNodes.find(n => String(n.id).toLowerCase() === id.toLowerCase());
-                if (foundNode) return toDisplayLabel(foundNode);
-                return id.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-            };
-
-            const displaySource = formatName(sId);
-            const displayTarget = formatName(tId);
-
-            activeHoveredLinkRef.current = { link: d };
-
-            const x1 = (d.source as any).x ?? 0;
-            const y1 = (d.source as any).y ?? 0;
-            const x2 = (d.target as any).x ?? 0;
-            const y2 = (d.target as any).y ?? 0;
-            const midX = (x1 + x2) / 2;
-            const midY = (y1 + y2) / 2;
-
-            if (svgRef.current) {
-                const transform = d3.zoomTransform(svgRef.current);
-                setHoveredLink({
-                    sourceId: displaySource,
-                    targetId: displayTarget,
-                    context: d.context || "is connected to",
-                    x: transform.applyX(midX),
-                    y: transform.applyY(midY)
-                });
-
-                // Highlight corresponding visual line
-                d3.select(svgRef.current)
-                    .selectAll<SVGLineElement, Link>("line.visual-line")
-                    .filter((l: any) => nodeId(l.source) === sId && nodeId(l.target) === tId)
-                    .attr("stroke", "#F6E468")
-                    .attr("stroke-opacity", 0.9);
-            }
-        })
-        .on("mouseleave", (event, d) => {
-            if (!isArtistToArtistLink(d)) return;
-            const sId = nodeId(d.source);
-            const tId = nodeId(d.target);
-
-            // Revert style for this specific visual line
-            if (svgRef.current) {
-                d3.select(svgRef.current)
-                    .selectAll<SVGLineElement, Link>("line.visual-line")
-                    .filter((l: any) => nodeId(l.source) === sId && nodeId(l.target) === tId)
-                    .attr("stroke", "#a1a1aa")
-                    .attr("stroke-opacity", (l: any) => {
-                        const s = typeof l.source === 'string' ? l.source : l.source.id;
-                        const t = typeof l.target === 'string' ? l.target : l.target.id;
-                        const selHighlight = selectionHighlightIdsRef.current;
-                        const hlNodes = highlightedNodesRef.current;
-                        if (selHighlight) return (selHighlight.has(s) && selHighlight.has(t)) ? 0.6 : 0.05;
-                        if (hlNodes.size > 0) return (hlNodes.has(s) && hlNodes.has(t)) ? 0.6 : 0.05;
-                        return 0.3;
-                    });
-            }
-
-            activeHoveredLinkRef.current = null;
-            setHoveredLink(null);
-        });
+        .style("cursor", "default");
 
     // Use a lower alpha for restarts to prevent "explosive" movement on interaction
     simulation.alpha(0.15).alphaTarget(0).restart();
