@@ -1413,12 +1413,12 @@ const GraphPage: React.FC<GraphPageProps> = ({
   }, [activeTab]);
 
   const legendConfig: Record<FilterKeys, { label: string; shape: React.ReactNode }> = {
-    seed: { label: 'Seed Artist', shape: <LegendSymbol symbol={d3.symbolCircle} size={260} className="text-zinc-400 stroke-zinc-400 stroke-2 fill-zinc-700"/> },
-    recommended: { label: 'AI Artist', shape: <LegendSymbol symbol={d3.symbolStar} size={400} className="text-primary/70 -mt-0.5"/> },
-    founded: { label: 'Founded', shape: <LegendSymbol symbol={d3.symbolCross} size={320} className="text-primary/70" /> },
-    label: { label: 'Label', shape: <LegendSymbol symbol={d3.symbolDiamond} size={320} className="text-primary/70" /> },
-    genre: { label: 'Genre', shape: <LegendSymbol symbol={d3.symbolSquare} size={260} className="text-primary/70" /> },
-    country: { label: 'Origin', shape: <LegendSymbol symbol={d3.symbolTriangle} size={260} className="text-primary/70" /> },
+    seed: { label: 'Seed Artist', shape: <LegendSymbol symbol={d3.symbolCircle} size={260} className="text-[#F6E468] stroke-[#F6E468] stroke-1 fill-zinc-700"/> },
+    recommended: { label: 'AI Artist', shape: <LegendSymbol symbol={d3.symbolStar} size={400} className="text-[#A855F7] -mt-0.5"/> },
+    founded: { label: 'Founded', shape: <LegendSymbol symbol={d3.symbolCross} size={320} className="text-[#EC4899]" /> },
+    label: { label: 'Label', shape: <LegendSymbol symbol={d3.symbolDiamond} size={320} className="text-[#10B981]" /> },
+    genre: { label: 'Genre', shape: <LegendSymbol symbol={d3.symbolSquare} size={260} className="text-[#3B82F6]" /> },
+    country: { label: 'Origin', shape: <LegendSymbol symbol={d3.symbolTriangle} size={260} className="text-[#F59E0B]" /> },
   };
   const legendOrder: FilterKeys[] = ['seed', 'recommended', 'label', 'genre', 'country', 'founded'];
   const focusConfig: { id: FocusMode, label: string }[] = [

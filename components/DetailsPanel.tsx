@@ -805,7 +805,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                     key={artistName} 
                                                     className="border border-zinc-800 bg-zinc-900/50 text-zinc-500 py-1.5 px-4 text-sm rounded-xl"
                                                 >
-                                                    <span className="truncate uppercase font-semibold px-0.5 tracking-normal">{artistName}</span>
+                                                    <span className="truncate px-0.5 tracking-normal">{artistName}</span>
                                                 </div>
                                               );
                                             }
@@ -820,7 +820,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                             : 'border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:text-white hover:bg-zinc-800 hover:border-zinc-700 active:scale-95'
                                                     }`}
                                                 >
-                                                    <span className="truncate uppercase font-semibold tracking-normal">{artistName}</span>
+                                                    <span className="truncate tracking-normal">{artistName}</span>
                                                     {!isAlreadySeed && <span className="material-symbols-outlined !text-[14px]">add_circle</span>}
                                                 </button>
                                             );
@@ -835,7 +835,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     <div className="grid grid-cols-1 gap-2">
                                         {details.discography.map((album, i) => (
                                             <div key={i} className="flex justify-between items-baseline border-b border-zinc-800/50 pb-1">
-                                                <span className="font-semibold text-zinc-200 uppercase px-0.5 tracking-normal text-sm">{album.albumName}</span>
+                                                <span className="text-zinc-200 px-0.5 tracking-normal text-sm">{album.albumName}</span>
                                                 <span className="text-zinc-500 flex-shrink-0 font-mono text-[10px]">{album.releaseYear}</span>
                                             </div>
                                         ))}
@@ -857,17 +857,17 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                     href={link.url} 
                                                     target="_blank" 
                                                     rel="noopener noreferrer" 
-                                                    className={`flex items-center justify-center px-4 py-2 rounded-xl transition-all active:scale-[0.98] ${
+                                                    className={`flex items-center justify-center px-4 py-2 rounded-xl font-medium transition-all active:scale-[0.98] ${
                                                         isBandcamp 
-                                                            ? 'bg-primary text-brand-black active:bg-white shadow-[4px_4px_0px_#000]' 
-                                                            : 'bg-zinc-800 text-white active:bg-zinc-700 border border-zinc-600'
+                                                            ? 'bg-primary text-brand-black hover:opacity-90' 
+                                                            : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white border border-zinc-700'
                                                     }`}
                                                 >
                                                     <div className="flex items-center gap-3">
                                                         <span className="material-symbols-outlined !text-[18px]">
                                                             {isBandcamp ? 'shopping_bag' : 'public'}
                                                         </span>
-                                                        <span className="font-semibold uppercase px-0.5 tracking-normal text-sm">
+                                                        <span className="px-0.5 tracking-normal text-sm">
                                                             {isBandcamp ? `Shop on ${link.site}` : link.site}
                                                         </span>
                                                     </div>
@@ -890,14 +890,14 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                     href={youtubeUrl} 
                                                     target="_blank" 
                                                     rel="noopener noreferrer" 
-                                                    className="flex items-center justify-center px-4 py-2 rounded-xl transition-all active:scale-[0.98] bg-zinc-800 text-white active:bg-zinc-700 border border-zinc-600"
+                                                    className="flex items-center justify-center px-4 py-2 rounded-xl font-medium transition-all active:scale-[0.98] bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white border border-zinc-700"
                                                 >
                                                     <div className="flex items-center gap-3">
                                                         <span className="material-symbols-outlined !text-[18px]">
                                                             play_circle
                                                         </span>
-                                                        <span className="font-semibold uppercase px-0.5 tracking-normal text-sm">
-                                                            WATCH ON YOUTUBE
+                                                        <span className="px-0.5 tracking-normal text-sm">
+                                                            Watch on YouTube
                                                         </span>
                                                     </div>
                                                 </a>

@@ -1074,19 +1074,19 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                 </div>
                                 <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
-                                    Used exclusively within the Deep Cut panel for artist catalog links. These feature a distinct 8px radius and a "hard" 4px shadow to mimic a physical card or badge.
+                                    Used exclusively within the Deep Cut panel for artist catalog links. These feature a distinct 'rounded-xl' (12px) radius.
                                 </p>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
                                      <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Default Status</p>
-                                        <div className="flex items-center justify-center px-4 py-2 bg-primary text-brand-black shadow-[4px_4px_0px_#000] rounded-xl font-semibold uppercase tracking-tighter text-sm gap-3">
+                                        <div className="flex items-center justify-center px-4 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm gap-3">
                                             <span className="material-symbols-outlined !text-[18px]">shopping_bag</span>
                                             <span>Shop on Bandcamp</span>
                                         </div>
                                     </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Active / Press Status</p>
-                                        <div className="flex items-center justify-center px-4 py-2 bg-white text-brand-black shadow-[2px_2px_0px_#000] translate-x-[2px] translate-y-[2px] rounded-xl font-semibold uppercase tracking-tighter text-sm gap-3">
+                                        <div className="flex items-center justify-center px-4 py-2 bg-white text-brand-black rounded-xl font-medium text-sm gap-3">
                                             <span className="material-symbols-outlined !text-[18px]">shopping_bag</span>
                                             <span>Shop on Bandcamp</span>
                                         </div>

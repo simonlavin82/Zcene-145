@@ -64,6 +64,9 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   const hoveredNodeIdRef = useRef<string | null>(null);
   const activeHoveredNodeRef = useRef<Node | null>(null);
 
+  const triggerNodeHoverRef = useRef<(d: Node) => void>(() => {});
+  const clearNodeHoverRef = useRef<() => void>(() => {});
+
   useEffect(() => {
     hoveredNodeIdRef.current = hoveredNodeId;
   }, [hoveredNodeId]);
@@ -447,11 +450,33 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 };
             });
 
-            if (connections.length > 0) {
+            // Fetch DNA/Recommendation Reason
+            const normId = normalizeArtistId(d.id);
+            const nodeDna = detailsCache?.get(d.id)?.recommendationReason ||
+                            detailsCache?.get(d.id.toLowerCase())?.recommendationReason ||
+                            detailsCache?.get(normId)?.recommendationReason;
+
+            // Check raw connections for fallback type
+            const hasRawConnections = data.links.some(l => {
+                const sId = nodeId(l.source);
+                const tId = nodeId(l.target);
+                return sId === d.id || tId === d.id;
+            });
+
+            let fallbackMessage = "";
+            if (directArtistLinks.length === 0) {
+                fallbackMessage = hasRawConnections 
+                    ? "[Direct connections filtered out]" 
+                    : "[Indirect recommendation]";
+            }
+
+            if (connections.length > 0 || nodeDna || fallbackMessage) {
                 const transform = d3.zoomTransform(svgRef.current);
                 setHoveredLink({
                     sourceId: toDisplayLabel(d),
-                    connections: connections,
+                    connections: connections.length > 0 ? connections : undefined,
+                    fallbackMessage: fallbackMessage || undefined,
+                    dna: nodeDna || undefined,
                     x: transform.applyX(d.x ?? 0),
                     y: transform.applyY(d.y ?? 0)
                 });
@@ -511,6 +536,9 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 });
         }
     };
+
+    triggerNodeHoverRef.current = triggerNodeHover;
+    clearNodeHoverRef.current = clearNodeHover;
     
     let container = svg.select<SVGGElement>("g.main-container");
     if (container.empty()) {
@@ -786,33 +814,6 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 const g = enter.append("g")
                     .attr("class", "node-element")
                     .attr("cursor", "pointer")
-                    .on("click", (event, d) => {
-                        event.stopPropagation();
-                        if (window.navigator && window.navigator.vibrate) {
-                            window.navigator.vibrate(10);
-                        }
-                        
-                        if (isSmallScreen && d.type === 'artist') {
-                            if (hoveredNodeIdRef.current !== d.id) {
-                                triggerNodeHover(d);
-                                onInteractionRef.current?.();
-                                return;
-                            }
-                        }
-                        
-                        onNodeClickRef.current(d);
-                        onInteractionRef.current?.();
-                    })
-                    .on("mouseenter", (event, d) => {
-                        if (!isSmallScreen && d.type === 'artist') {
-                            triggerNodeHover(d);
-                        }
-                    })
-                    .on("mouseleave", (event, d) => {
-                        if (!isSmallScreen) {
-                            clearNodeHover();
-                        }
-                    })
                     .call(d3.drag<SVGGElement, Node>()
                         .on("start", (event, d) => {
                             if (!event.active) simulation.alphaTarget(0.3).restart();
@@ -835,6 +836,36 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 return g;
             }
         );
+
+    // Bind event handlers on the merged selection so they always have the latest closures
+    nodeElements
+        .on("click", (event, d) => {
+            event.stopPropagation();
+            if (window.navigator && window.navigator.vibrate) {
+                window.navigator.vibrate(10);
+            }
+            
+            if (isSmallScreen && d.type === 'artist') {
+                if (hoveredNodeIdRef.current !== d.id) {
+                    triggerNodeHoverRef.current(d);
+                    onInteractionRef.current?.();
+                    return;
+                }
+            }
+            
+            onNodeClickRef.current(d);
+            onInteractionRef.current?.();
+        })
+        .on("mouseenter", (event, d) => {
+            if (!isSmallScreen && d.type === 'artist') {
+                triggerNodeHoverRef.current(d);
+            }
+        })
+        .on("mouseleave", (event, d) => {
+            if (!isSmallScreen) {
+                clearNodeHoverRef.current();
+            }
+        });
 
     nodeElements.select("path")
         .attr("stroke-width", d => seedArtistSet.has(d.id.toLowerCase()) ? 3 : 2)
@@ -1084,29 +1115,32 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     pointerEvents: 'none',
                     zIndex: 50
                 }}
-                className="mb-3 bg-zinc-950/95 border border-zinc-700/80 px-3.5 py-2.5 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md rounded-xl flex flex-col gap-1 text-left min-w-[160px] max-w-[320px]"
+                className="mb-3 bg-zinc-950/95 border border-zinc-700/80 px-3.5 py-2.5 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md rounded-xl flex flex-col gap-2 text-left min-w-[200px] max-w-[320px]"
             >
-                {hoveredLink.connections ? (
-                    <>
-                        <span className="font-sans text-[9px] text-zinc-400 uppercase tracking-widest border-b border-zinc-800 pb-1 mb-1 font-semibold">{hoveredLink.sourceId}</span>
-                        <div className="flex flex-col gap-1 max-h-[200px] overflow-y-auto pr-1">
-                            {hoveredLink.connections.map((c, i) => (
-                                <div key={i} className="text-xs font-medium text-zinc-300 leading-tight">
-                                    <span className="text-zinc-400 font-normal">{c.context}</span>{" "}
-                                    <span className="text-primary font-normal">{c.targetName}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </>
-                ) : (
-                    <>
-                        <span className="font-sans text-[9px] text-zinc-400 uppercase tracking-widest text-center border-b border-zinc-800 pb-1 mb-1 font-semibold">Connection</span>
-                        <div className="text-xs text-zinc-300 leading-normal text-center">
-                            <span className="text-primary font-normal">{hoveredLink.sourceId}</span> 
-                            <span className="text-zinc-400 font-normal"> {hoveredLink.context} </span>
-                            <span className="text-primary font-normal">{hoveredLink.targetId}</span>
-                        </div>
-                    </>
+                <span className="font-sans text-[9px] text-white tracking-widest border-b border-zinc-800 pb-1 mb-1 font-medium">{hoveredLink.sourceId}</span>
+                
+                {/* Zone 1: Direct Connections / Fallback */}
+                {hoveredLink.connections && hoveredLink.connections.length > 0 ? (
+                    <div className="flex flex-col gap-1 max-h-[120px] overflow-y-auto pr-1">
+                        {hoveredLink.connections.map((c, i) => (
+                            <div key={i} className="text-xs font-medium text-zinc-300 leading-tight">
+                                <span className="text-zinc-400 font-normal">{c.context}</span>{" "}
+                                <span className="text-primary font-normal">{c.targetName}</span>
+                            </div>
+                        ))}
+                    </div>
+                ) : hoveredLink.fallbackMessage ? (
+                    <div className="text-xs italic text-zinc-500 font-normal leading-normal">
+                        {hoveredLink.fallbackMessage}
+                    </div>
+                ) : null}
+
+                {/* Zone 2: Spiderweb DNA */}
+                {hoveredLink.dna && (
+                    <div className="mt-1 pt-1.5 border-t border-zinc-800/60 text-[11px] text-zinc-400 leading-normal">
+                        <span className="font-semibold text-zinc-500 uppercase tracking-wider text-[8px] block mb-0.5">Spiderweb DNA</span>
+                        <span className="font-normal">{hoveredLink.dna}</span>
+                    </div>
                 )}
             </div>
         )}
