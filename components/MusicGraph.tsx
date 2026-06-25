@@ -316,6 +316,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     };
 
     const triggerNodeHover = (d: Node) => {
+        if (d.type !== 'artist') return;
         setHoveredNodeId(d.id);
         activeHoveredNodeRef.current = d;
 
@@ -710,7 +711,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                             window.navigator.vibrate(10);
                         }
                         
-                        if (isSmallScreen) {
+                        if (isSmallScreen && d.type === 'artist') {
                             if (hoveredNodeIdRef.current !== d.id) {
                                 triggerNodeHover(d);
                                 onInteractionRef.current?.();
@@ -722,7 +723,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                         onInteractionRef.current?.();
                     })
                     .on("mouseenter", (event, d) => {
-                        if (!isSmallScreen) {
+                        if (!isSmallScreen && d.type === 'artist') {
                             triggerNodeHover(d);
                         }
                     })
