@@ -394,7 +394,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                             const dalT = nodeId(dal.target);
                             return (dalS === sId && dalT === tId) || (dalS === tId && dalT === sId);
                         });
-                    return isDirectArtistLink ? "#F6E468" : "#a1a1aa";
+                    return isDirectArtistLink ? "#F6E468" : "#e4e4e7";
                 })
                 .attr("stroke-opacity", (l: any) => {
                     const sId = nodeId(l.source);
@@ -489,7 +489,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             // Restore visual line strokes and opacities
             svg.selectAll<SVGLineElement, Link>("line.visual-line")
                 .transition().duration(200)
-                .attr("stroke", "#a1a1aa")
+                .attr("stroke", "#e4e4e7")
                 .attr("stroke-opacity", (l: any) => {
                     const s = typeof l.source === 'string' ? l.source : l.source.id;
                     const t = typeof l.target === 'string' ? l.target : l.target.id;
@@ -533,14 +533,8 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         feMerge.append("feMergeNode").attr("in", "blur");
         feMerge.append("feMergeNode").attr("in", "SourceGraphic");
 
-        svg.on("click", (event) => { 
-            if (event.target === svgRef.current) {
-                onNodeClickRef.current(null);
-                clearNodeHover();
-            }
-        });
         container = svg.append("g").attr("class", "main-container");
-        container.append("g").attr("class", "link-group").attr("stroke", "#a1a1aa");
+        container.append("g").attr("class", "link-group").attr("stroke", "#e4e4e7");
         container.append("g").attr("class", "node-group");
         const zoom = d3.zoom<SVGSVGElement, unknown>()
             .scaleExtent([0.1, 4])
@@ -549,6 +543,13 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         zoomRef.current = zoom;
         svg.call(zoom.transform, d3.zoomIdentity.translate(dimensions.width/4, dimensions.height/4).scale(0.5));
     }
+
+    svg.on("click", (event) => { 
+        if (event.target === svgRef.current) {
+            onNodeClickRef.current(null);
+            clearNodeHover();
+        }
+    });
 
     if (!simulationRef.current) {
         const simulation = d3.forceSimulation<Node, Link>()
@@ -902,7 +903,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         .data(visibleLinks, (d: any) => `${nodeId(d.source)}-${nodeId(d.target)}`)
         .join("line")
         .attr("class", "visual-line")
-        .attr("stroke", "#a1a1aa")
+        .attr("stroke", "#e4e4e7")
         .attr("stroke-width", 1)
         .attr("stroke-opacity", (d: any) => {
             const s = nodeId(d.source);
