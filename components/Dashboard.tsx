@@ -4,6 +4,8 @@ import ViewToggle from './ViewToggle';
 import { Project, StackItem } from '../types';
 import { User } from 'firebase/auth';
 import { motion } from 'framer-motion';
+import { normalizeArtistId } from '../services/artistCacheService';
+
 
 const formatProjectTimestamp = (updatedAt: any): string => {
   if (!updatedAt) return 'New Project';
@@ -275,6 +277,22 @@ const Dashboard: React.FC<DashboardProps> = ({
                 const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
                 const displayTitle = project.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene");
                 
+                const deepCutsCount = (project.activeNodes || []).length;
+                
+                let recommendedCount = 0;
+                if (project.graphData) {
+                  try {
+                    const parsedGraph = typeof project.graphData === 'string' ? JSON.parse(project.graphData) : project.graphData;
+                    if (parsedGraph && Array.isArray(parsedGraph.nodes)) {
+                      const seedSet = new Set(seedList.map(s => normalizeArtistId(s)));
+                      const artistNodes = parsedGraph.nodes.filter((n: any) => n.type === 'artist' || !n.type);
+                      recommendedCount = artistNodes.filter((n: any) => !seedSet.has(normalizeArtistId(n.id))).length;
+                    }
+                  } catch (e) {
+                    console.warn(`Failed to parse graphData for project ${project.id}:`, e);
+                  }
+                }
+                
                 return (
                   <motion.div
                     key={project.id}
@@ -329,20 +347,25 @@ const Dashboard: React.FC<DashboardProps> = ({
                       </p>
                     </div>
                     
-                    <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[9px] uppercase tracking-widest text-zinc-400 font-bold px-2 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono">
-                          {seedList.length} Seeds
+                    <div className="mt-4 pt-4 border-t border-white/5 flex items-center">
+                      <div className="flex items-center flex-wrap gap-x-1.5 gap-y-1.5">
+                        <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                          SEED: {seedList.length}
                         </span>
                         {project.graphData && (
-                          <span className="text-[9px] uppercase tracking-widest text-primary/60 font-bold px-2 py-0.5 bg-primary/10 rounded-md border border-primary/10">
-                            Mapped
-                          </span>
+                          <>
+                            <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                              AI ARTISTS: {recommendedCount}
+                            </span>
+                            <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                              DEEP CUTS: {deepCutsCount}
+                            </span>
+                            <span className="text-[9px] uppercase tracking-wide text-primary/60 font-bold px-1.5 py-0.5 bg-primary/10 rounded-md border border-primary/10 whitespace-nowrap">
+                              Mapped
+                            </span>
+                          </>
                         )}
                       </div>
-                      <span className="material-symbols-outlined text-zinc-750 group-hover:text-primary transition-all !text-xl transform group-hover:translate-x-1 duration-300">
-                        arrow_forward
-                      </span>
                     </div>
                   </motion.div>
                 );
@@ -375,6 +398,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                     <th className="py-4 px-6 font-semibold">Title</th>
                     <th className="py-4 px-6 font-semibold">Modified Date</th>
                     <th className="py-4 px-6 font-semibold">Seeds</th>
+                    <th className="py-4 px-6 font-semibold">AI Artists</th>
+                    <th className="py-4 px-6 font-semibold">Deep Cuts</th>
                     <th className="py-4 px-6 font-semibold">Status</th>
                     <th className="py-4 px-6 font-semibold text-right">Actions</th>
                   </tr>
@@ -386,6 +411,22 @@ const Dashboard: React.FC<DashboardProps> = ({
                     const formattedDate = formatProjectTimestamp(project.updatedAt);
                     const isMapped = !!project.graphData;
                     
+                    const deepCutsCount = (project.activeNodes || []).length;
+                    
+                    let recommendedCount = 0;
+                    if (project.graphData) {
+                      try {
+                        const parsedGraph = typeof project.graphData === 'string' ? JSON.parse(project.graphData) : project.graphData;
+                        if (parsedGraph && Array.isArray(parsedGraph.nodes)) {
+                          const seedSet = new Set(seedList.map(s => normalizeArtistId(s)));
+                          const artistNodes = parsedGraph.nodes.filter((n: any) => n.type === 'artist' || !n.type);
+                          recommendedCount = artistNodes.filter((n: any) => !seedSet.has(normalizeArtistId(n.id))).length;
+                        }
+                      } catch (e) {
+                        console.warn(`Failed to parse graphData for project ${project.id}:`, e);
+                      }
+                    }
+                    
                     return (
                       <tr 
                         key={project.id}
@@ -394,7 +435,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                       >
                         <td className="py-4 px-6 font-medium text-white group-hover:text-primary transition-colors">
                           <div className="flex items-center gap-3">
-                            <span className="material-symbols-outlined text-zinc-500 !text-lg group-hover:text-primary transition-colors">folder</span>
+                            <span className="material-symbols-outlined text-zinc-555 !text-lg group-hover:text-primary transition-colors">folder</span>
                             <span className="truncate max-w-[240px]">{displayTitle}</span>
                           </div>
                         </td>
@@ -402,17 +443,27 @@ const Dashboard: React.FC<DashboardProps> = ({
                           {formattedDate}
                         </td>
                         <td className="py-4 px-6 font-normal">
-                          <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono">
-                            {seedList.length} Seeds
+                          <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                            SEED: {seedList.length}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6 font-normal">
+                          <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                            AI ARTISTS: {recommendedCount}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6 font-normal">
+                          <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                            DEEP CUTS: {deepCutsCount}
                           </span>
                         </td>
                         <td className="py-4 px-6 font-normal">
                           {isMapped ? (
-                            <span className="text-[10px] uppercase tracking-widest text-primary/70 font-bold px-2 py-0.5 bg-primary/10 rounded-md border border-primary/20">
+                            <span className="text-[10px] uppercase tracking-widest text-primary/70 font-bold px-2 py-0.5 bg-primary/10 rounded-md border border-primary/20 whitespace-nowrap">
                               Mapped
                             </span>
                           ) : (
-                            <span className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold px-2 py-0.5 bg-zinc-800 rounded-md border border-zinc-800">
+                            <span className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold px-2 py-0.5 bg-zinc-800 rounded-md border border-zinc-800 whitespace-nowrap">
                               Unmapped
                             </span>
                           )}
