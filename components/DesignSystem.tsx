@@ -164,6 +164,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
     const [demoFocusMode, setDemoFocusMode] = useState<'organic' | 'cluster'>('organic');
     const [demoAdminToggle, setDemoAdminToggle] = useState(false);
     const [demoExpandedRow, setDemoExpandedRow] = useState<string | null>(null);
+    const [selectedOnboardingStep, setSelectedOnboardingStep] = useState<string>('step1');
     const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -2215,22 +2216,158 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             <p className="text-base text-zinc-400 leading-relaxed max-w-3xl">
                                 Zcene uses a contextual tooltip system to guide new users through the seed-to-graph exploration cycle. Tooltips are designed for high visual urgency to contrast with the dark atmospheric UI.
                             </p>
-                            
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                                <div className="space-y-6">
-                                    <h3 className="text-xl font-medium text-zinc-200">Visual Anatomy</h3>
-                                    <div className="bg-zinc-900 p-12 rounded-xl border border-zinc-800 flex items-center justify-center">
-                                        <div className="relative w-64 bg-primary text-brand-black p-4 rounded-xl shadow-2xl">
-                                            <div className="text-sm font-medium leading-relaxed">
-                                                Add your seed artists to start your Zcene.
+
+                            {/* Interactive Step Explorer */}
+                            {(() => {
+                                const onboardingSteps = [
+                                    {
+                                        id: 'step1',
+                                        number: '01',
+                                        title: 'Add Artists',
+                                        trigger: 'On Entry',
+                                        position: 'bottom',
+                                        anchor: 'artistInputRef (Add Seed Artists Input)',
+                                        content: 'Add your seed artists to start your Zcene. These are your starting points, you can type them or select from your library.',
+                                        description: 'Instructs the user where to enter seed artists to start the visualization workflow.'
+                                    },
+                                    {
+                                        id: 'step2',
+                                        number: '02',
+                                        title: 'Generation',
+                                        trigger: 'Post-Seed',
+                                        position: 'top',
+                                        anchor: 'createZceneBtnRef (Create Zcene Button)',
+                                        content: 'Click here to create your Zcene from your selected artists and see the connections visually.',
+                                        description: 'Appears once the user adds at least one seed artist, drawing their attention to the primary CTA button for graph generation.'
+                                    },
+                                    {
+                                        id: 'step3',
+                                        number: '03',
+                                        title: 'Filtering',
+                                        trigger: 'Post-Graph',
+                                        position: 'bottom (or top on mobile)',
+                                        anchor: 'desktopLegendAreaRef / mobileLegendAreaRef (Spiderweb Legend Area)',
+                                        content: 'Drag, zoom and toggle node types to focus on what matters most: Seed Artists, AI Artists, Genres, Labels, Origins, Founded.',
+                                        description: 'Introduces interactive navigation (pan/zoom) and node filtering capabilities in the central graph canvas.'
+                                    },
+                                    {
+                                        id: 'step4',
+                                        number: '04',
+                                        title: 'Layout',
+                                        trigger: 'Active Graph',
+                                        position: 'bottom',
+                                        anchor: 'layoutDropdownRef (Layout Style Selector Dropdown)',
+                                        content: 'Change how your Zcene is organised',
+                                        description: 'Draws attention to the layout structure switcher (e.g., Organic vs. Cluster) to reorganize the graph.'
+                                    },
+                                    {
+                                        id: 'step5',
+                                        number: '05',
+                                        title: 'Deep Cut',
+                                        trigger: 'Node Select',
+                                        position: 'left (or bottom on mobile)',
+                                        anchor: 'detailsCollapseBtnRef / deepCutTabRef (Deep Cut Panel Toggles)',
+                                        content: 'This is the Deep Cut, explore bios, connections, and insights.',
+                                        description: 'Guides the user to the interactive metadata pane once a node has been clicked to view detailed biographies and metrics.'
+                                    }
+                                ];
+
+                                const step = onboardingSteps.find(s => s.id === selectedOnboardingStep) || onboardingSteps[0];
+                                
+                                // Map positions to preview arrow styling
+                                let arrowClass = '';
+                                if (step.position.startsWith('bottom')) {
+                                    // Tooltip below the anchor, so arrow is on top pointing up
+                                    arrowClass = '-top-3 left-1/2 -translate-x-1/2 border-b-primary';
+                                } else if (step.position.startsWith('top')) {
+                                    // Tooltip above the anchor, so arrow is on bottom pointing down
+                                    arrowClass = '-bottom-3 left-1/2 -translate-x-1/2 border-t-primary';
+                                } else if (step.position.startsWith('left')) {
+                                    // Tooltip left of the anchor, so arrow is on right pointing right
+                                    arrowClass = '-right-3 top-1/2 -translate-y-1/2 border-l-primary';
+                                } else if (step.position.startsWith('right')) {
+                                    // Tooltip right of the anchor, so arrow is on left pointing left
+                                    arrowClass = '-left-3 top-1/2 -translate-y-1/2 border-r-primary';
+                                }
+
+                                return (
+                                    <div className="bg-zinc-900/30 border border-zinc-800 rounded-none p-8 space-y-8">
+                                        <div className="flex flex-col lg:flex-row lg:items-center justify-between border-b border-zinc-800 pb-6 gap-4">
+                                            <div>
+                                                <h3 className="text-xl font-medium text-zinc-200">Interactive Flow Showcase</h3>
+                                                <p className="text-xs text-zinc-400 mt-1">Select a step below to inspect its specifications and live visual rendering.</p>
                                             </div>
-                                            <div className="absolute -top-2 -right-2 w-6 h-6 flex items-center justify-center rounded-xl bg-zinc-800 text-white shadow-lg border border-zinc-700">
-                                                <span className="material-symbols-outlined !text-[14px]">close</span>
+                                            <div className="flex flex-wrap gap-2">
+                                                {onboardingSteps.map((s) => (
+                                                    <button
+                                                        key={s.id}
+                                                        onClick={() => setSelectedOnboardingStep(s.id)}
+                                                        className={`px-4 py-2 rounded-none text-xs font-mono transition-all border ${
+                                                            selectedOnboardingStep === s.id
+                                                                ? 'bg-primary text-brand-black border-primary font-medium'
+                                                                : 'bg-zinc-950 text-zinc-400 border-zinc-800 hover:text-white hover:border-zinc-700'
+                                                        }`}
+                                                    >
+                                                        Step {s.number}: {s.title}
+                                                    </button>
+                                                ))}
                                             </div>
-                                            <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 w-0 h-0 border-[6px] border-transparent border-t-primary"></div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+                                            {/* Visual Mockup Container (7 cols) */}
+                                            <div className="lg:col-span-7 bg-zinc-950 rounded-none border border-zinc-800 p-8 min-h-[260px] flex items-center justify-center relative overflow-hidden">
+                                                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(246,228,104,0.03),transparent_60%)]"></div>
+                                                <div className="relative w-72 bg-primary text-brand-black p-4 rounded-xl shadow-2xl z-10 transition-all duration-300">
+                                                    <div className="text-sm font-medium leading-relaxed">
+                                                        {step.content}
+                                                    </div>
+                                                    <div className="absolute -top-2 -right-2 w-6 h-6 flex items-center justify-center rounded-xl bg-zinc-800 text-white shadow-lg border border-zinc-700">
+                                                        <span className="material-symbols-outlined !text-[14px]">close</span>
+                                                    </div>
+                                                    <div className={`absolute w-0 h-0 border-[6px] border-transparent ${arrowClass}`}></div>
+                                                </div>
+                                            </div>
+
+                                            {/* Spec Sheet Container (5 cols) */}
+                                            <div className="lg:col-span-5 flex flex-col justify-between bg-zinc-900/50 border border-zinc-800 p-6 space-y-6">
+                                                <div className="space-y-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="text-2xl font-mono text-primary font-bold">{step.number}</span>
+                                                        <h4 className="text-xl font-medium text-white">{step.title}</h4>
+                                                    </div>
+
+                                                    <div className="grid grid-cols-1 gap-4 text-sm border-t border-zinc-800 pt-4">
+                                                        <div>
+                                                            <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest block">Step Identifier</span>
+                                                            <code className="text-xs text-primary font-mono bg-zinc-950 px-2 py-0.5 border border-zinc-800 inline-block mt-1">{step.id}</code>
+                                                        </div>
+                                                        <div>
+                                                            <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest block">Trigger State / Event</span>
+                                                            <span className="text-zinc-300 font-medium inline-block mt-1">{step.trigger}</span>
+                                                        </div>
+                                                        <div>
+                                                            <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest block">Standard UI Anchor Ref</span>
+                                                            <code className="text-xs text-zinc-400 font-mono bg-zinc-950 px-2 py-0.5 border border-zinc-800 inline-block mt-1 w-fit truncate max-w-full">{step.anchor}</code>
+                                                        </div>
+                                                        <div>
+                                                            <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest block">Default Canvas Position</span>
+                                                            <span className="text-zinc-300 capitalize inline-block mt-1">{step.position}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-1 pt-4 border-t border-zinc-800/50">
+                                                    <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest block">Behavioral Spec</span>
+                                                    <p className="text-sm text-zinc-400 leading-relaxed">{step.description}</p>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
+                                );
+                            })()}
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                                 <div className="space-y-6">
                                     <h3 className="text-xl font-medium text-zinc-200">System Specs</h3>
                                     <div className="space-y-4">
@@ -2248,24 +2385,25 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-
-                            <div className="space-y-6">
-                                <h3 className="text-xl font-medium text-zinc-200">The 5-Step Sequence</h3>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                                    {[
-                                        { step: "01", title: "Add Artists", trigger: "On Entry" },
-                                        { step: "02", title: "Generation", trigger: "Post-Seed" },
-                                        { step: "03", title: "Filtering", trigger: "Post-Graph" },
-                                        { step: "04", title: "Layout", trigger: "Active Graph" },
-                                        { step: "05", title: "Deep Cut", trigger: "Node Select" }
-                                    ].map(s => (
-                                        <div key={s.step} className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-xl">
-                                            <div className="text-primary font-mono text-xs mb-1">{s.step}</div>
-                                            <div className="text-white font-medium mb-2">{s.title}</div>
-                                            <div className="text-[10px] text-zinc-500 uppercase font-semibold tracking-widest">{s.trigger}</div>
-                                        </div>
-                                    ))}
+                                <div className="space-y-6">
+                                    <h3 className="text-xl font-medium text-zinc-200">Static Step Overview</h3>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        {[
+                                            { step: "01", title: "Add Artists", trigger: "On Entry" },
+                                            { step: "02", title: "Generation", trigger: "Post-Seed" },
+                                            { step: "03", title: "Filtering", trigger: "Post-Graph" },
+                                            { step: "04", title: "Layout", trigger: "Active Graph" },
+                                            { step: "05", title: "Deep Cut", trigger: "Node Select" }
+                                        ].map(s => (
+                                            <div key={s.step} className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-none flex items-center justify-between">
+                                                <div>
+                                                    <div className="text-primary font-mono text-[10px] mb-0.5">{s.step}</div>
+                                                    <div className="text-white text-sm font-medium">{s.title}</div>
+                                                </div>
+                                                <div className="text-[9px] bg-zinc-800 text-zinc-400 px-2 py-1 rounded border border-zinc-700 uppercase font-semibold tracking-wider">{s.trigger}</div>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
                         </div>
