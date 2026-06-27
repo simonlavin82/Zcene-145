@@ -609,8 +609,8 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 />
                             ) : (
                                 <LoadingSpinner 
-                                    steps={["Queued for the Deep Cut...", "Waiting for turn...", "Details are fetched one-by-one."]}
-                                    subtext="Serial fetching ensures high accuracy and detail."
+                                    steps={["Queued for background synthesis...", "Awaiting active slot in worker queue...", "Serialised processing active..."]}
+                                    subtext="Serialised processing preserves synthesis integrity."
                                 />
                             )}
                             <button 

@@ -4027,7 +4027,7 @@ const App: React.FC = () => {
   // Watchdog to prevent stuck queue
   useEffect(() => {
     const checkStuck = setInterval(() => {
-      if (isFetchingDetailsRef.current && (Date.now() - lastProgressTimestampRef.current > 15000)) {
+      if (isFetchingDetailsRef.current && (Date.now() - lastProgressTimestampRef.current > 60000)) {
         console.warn("[Deep Cut Queue] Watchdog detected stuck loop. Resetting.");
         isFetchingDetailsRef.current = false;
         // Also clear any loading IDs that have been there too long

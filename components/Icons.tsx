@@ -74,15 +74,13 @@ export const GRAPH_THINKING_STEPS = [
 ];
 
 export const DETAIL_THINKING_STEPS = [
-    "Fetching artist profile...",
-    "Analysing musical style...",
-    "Finding canonical imagery...",
-    "Retrieving discography...",
-    "Locating tour dates...",
-    "Compiling deep insights...",
-    "Cross-referencing label history...",
-    "Synthesising cultural impact...",
-    "Assembling Deep Cut details...",
+    "Contacting live model orchestration...",
+    "Scanning live cultural archives...",
+    "Synthesising musical profile and discography...",
+    "Indexing audio-visual fragments...",
+    "Validating media player synchronisation...",
+    "Archiving node relationships...",
+    "Finalising deep insights...",
 ];
 
 interface LoadingSpinnerProps {
