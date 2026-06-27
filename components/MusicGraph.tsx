@@ -1159,7 +1159,11 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
                 {/* Zone 2: Spiderweb DNA */}
                 {hoveredLink.dna && (
-                    <div className="mt-1 pt-1.5 border-t border-zinc-800/60">
+                    <div className={
+                        (hoveredLink.connections && hoveredLink.connections.length > 0) || hoveredLink.fallbackMessage
+                            ? "mt-1 pt-1.5 border-t border-zinc-800/60"
+                            : ""
+                    }>
                         <p className="text-xs leading-4 font-normal text-zinc-400 m-0">{hoveredLink.dna
                             ?.replace(/\btechnicolor\b/gi, 'technicolour')
                             .replace(/\bcolors\b/gi, 'colours')
