@@ -12,6 +12,23 @@ import { doc, updateDoc } from 'firebase/firestore';
 
 const SENTINEL_INSIGHT = 'No insight provided.';
 
+const checkIsProfileIncomplete = (node: Node, details: NodeDetails | null | undefined): boolean => {
+  const isArtist = node.type === 'artist' || !node.type || details?.details?.artist !== undefined;
+  if (!details || !isArtist) return false;
+
+  if (!details.summary || details.summary.trim() === "") {
+    return true;
+  }
+
+  const genre = details.details?.genre?.trim().toLowerCase();
+  const origin = details.details?.origin?.trim().toLowerCase();
+  if (genre === 'unknown' || origin === 'unknown') {
+    return true;
+  }
+
+  return false;
+};
+
 declare global {
   interface Window {
     SpeechRecognition: any;
@@ -563,6 +580,16 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 </button>
                             )}
 
+                            {isArtistNode && details && checkIsProfileIncomplete(node, details) && (
+                                <button
+                                    onClick={onRefresh}
+                                    className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-yellow-500/50 rounded-xl text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20 active:scale-95 transition-all duration-200 leading-none animate-pulse"
+                                    title="Heal Corrupted Cache (Force Refresh)"
+                                >
+                                    <span className="material-symbols-outlined !text-[18px]">healing</span>
+                                </button>
+                            )}
+
                             <button onClick={onClose} className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-700 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none" title="Remove Card">
                                     <span className="material-symbols-outlined !text-[18px]">remove</span>
                             </button>
@@ -706,6 +733,25 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     </div>
                                 ) : null;
                             })()}
+
+                            {checkIsProfileIncomplete(node, details) && (
+                                <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg flex flex-col gap-2 my-2">
+                                    <div className="flex items-center gap-2 text-yellow-500">
+                                        <span className="material-symbols-outlined !text-[18px]">warning</span>
+                                        <span className="text-xs font-bold uppercase tracking-wider">Cache Incomplete</span>
+                                    </div>
+                                    <p className="text-xs text-zinc-400">
+                                        This artist profile contains corrupt or missing metadata labels (Genre/Origin). You can trigger self-healing to refresh and fetch clean data.
+                                    </p>
+                                    <button 
+                                        onClick={onRefresh}
+                                        className="mt-1 flex items-center justify-center gap-2 w-full py-2 bg-yellow-500 hover:bg-yellow-600 active:scale-95 text-zinc-950 font-semibold text-xs rounded-md transition-all duration-200"
+                                    >
+                                        <span className="material-symbols-outlined !text-[16px]">healing</span>
+                                        Heal Cache (Force Refresh)
+                                    </button>
+                                </div>
+                            )}
 
                             <div className={`grid ${isHero ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2'} gap-8 py-4 border-b border-zinc-800/50`}>
                                 <div>

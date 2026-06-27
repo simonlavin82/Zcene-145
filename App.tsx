@@ -666,6 +666,14 @@ const checkIsProfileIncomplete = (node: Node, details: NodeDetails | null | unde
   if (!details.summary || details.summary.trim() === "") {
     return true;
   }
+
+  // Intercept precise "Unknown" string states for self-healing
+  const genre = details.details?.genre?.trim().toLowerCase();
+  const origin = details.details?.origin?.trim().toLowerCase();
+  if (genre === 'unknown' || origin === 'unknown') {
+    return true;
+  }
+
   return false;
 };
 
@@ -742,6 +750,16 @@ const validateCacheEntry = (data: any): CacheValidationResult => {
 
     const bio = targetObj?.summary || targetObj?.bio || targetObj?.description || targetObj?.text || '';
     if (!bio || bio.trim().length <= 5 || bio.includes('sandbox mock') || bio.includes('test scenarios')) {
+      return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
+    }
+
+    // Intercept precise "Unknown" string states in genre or origin
+    const genre = targetObj?.details?.genre || targetObj?.genre || '';
+    const origin = targetObj?.details?.origin || targetObj?.origin || '';
+    if (
+      (typeof genre === 'string' && genre.trim().toLowerCase() === 'unknown') ||
+      (typeof origin === 'string' && origin.trim().toLowerCase() === 'unknown')
+    ) {
       return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
     }
 
@@ -1922,7 +1940,9 @@ const App: React.FC = () => {
         if (cacheDoc.exists()) {
           const data = cacheDoc.data();
           const isDeep = data?.isDeep === true;
-          if (data && (bypassCacheValidation || (isCacheEntryFullyQualified(data) && isDeep))) {
+          const validation = validateCacheEntry(data);
+          const isQualified = validation.isFullyQualified && isDeep;
+          if (data && (bypassCacheValidation || isQualified)) {
             let parsedGraph = null;
             try {
               parsedGraph = typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData;
@@ -2012,7 +2032,11 @@ const App: React.FC = () => {
               } else {
                 isHydratingSessionRef.current = false;
               }
-              showToast('⚡ Loaded from cache');
+              if (bypassCacheValidation && !isQualified) {
+                showToast('⚠️ Cache Incomplete');
+              } else {
+                showToast('⚡ Loaded from cache');
+              }
               return;
             }
           } else {
@@ -2280,7 +2304,12 @@ const App: React.FC = () => {
               detail: { artist: entry?.seedArtists || entry?.artistId || firstSlug } 
           }));
           
-          showToast('⚡ Loaded from cache');
+          const allQualified = Array.from(cached.values()).every(e => validateCacheEntry(e).isFullyQualified);
+          if (bypassCacheValidation && !allQualified) {
+            showToast('⚠️ Cache Incomplete');
+          } else {
+            showToast('⚡ Loaded from cache');
+          }
           setIsLoading(false);
           
           isFetchingDetailsRef.current = true;
@@ -2540,7 +2569,12 @@ const App: React.FC = () => {
             detail: { artist: entry?.seedArtists || entry?.artistId || firstSlug } 
         }));
         
-        showToast('⚡ Loaded from cache');
+        const allQualified = Array.from(cached.values()).every(e => validateCacheEntry(e).isFullyQualified);
+        if (bypassCacheValidation && !allQualified) {
+          showToast('⚠️ Cache Incomplete');
+        } else {
+          showToast('⚡ Loaded from cache');
+        }
         setIsLoading(false);
         
         // Lock the deep cut queue momentarily to let React's async detailsCache commit settle
@@ -3160,6 +3194,7 @@ const App: React.FC = () => {
 
       try {
         let loadedFromGraphData = false;
+        let hydratedNodes: Node[] = [];
         if (data.graphData && typeof data.graphData === 'string' && data.graphData.trim().length > 20) {
           try {
             console.log('[ProjectLoader] Hydrating directly from project graphData');
@@ -3186,6 +3221,7 @@ const App: React.FC = () => {
 
             // ── FIRESTORE-FIRST: batch-load all node biographies before marking load complete
             await batchHydrateDetailsCache(g.nodes);
+            hydratedNodes = g.nodes;
 
             // Restore active nodes
             if (data.activeNodes && Array.isArray(data.activeNodes)) {
@@ -3261,6 +3297,7 @@ const App: React.FC = () => {
 
               // ── FIRESTORE-FIRST: batch-load all node biographies before marking load complete
               await batchHydrateDetailsCache(g.nodes);
+              hydratedNodes = g.nodes;
 
               if (missing.length > 0) {
                 console.warn(`[ProjectLoader] ${missing.length} artist doc(s) missing from cache: [${missing.join(', ')}]. They will be re-fetched on next graph generation.`);
@@ -3309,6 +3346,7 @@ const App: React.FC = () => {
 
               // ── FIRESTORE-FIRST: batch-load biographies from global collection
               await batchHydrateDetailsCache(g.nodes);
+              hydratedNodes = g.nodes;
 
 
               if (legacyEntry.detailsCache) {
@@ -3347,6 +3385,7 @@ const App: React.FC = () => {
                 g.nodes.forEach((n: any) => { n.fx = null; n.fy = null; });
                 if (g.nodes.length > 0) {
                   setGraphData((prev: any) => isGraphEqual(prev, g) ? prev : g);
+                  hydratedNodes = g.nodes;
                   if (data.activeNodes && Array.isArray(data.activeNodes)) {
                     const nextActive = restoreActiveNodesHelper(data.activeNodes, g.nodes);
                     setActiveNodes((prev: any) => {
@@ -3372,6 +3411,7 @@ const App: React.FC = () => {
 
             // ── FIRESTORE-FIRST: batch-load biographies from global collection
             await batchHydrateDetailsCache(g.nodes);
+            hydratedNodes = g.nodes;
 
             if (data.detailsCache) {
               try {
@@ -3396,6 +3436,27 @@ const App: React.FC = () => {
                 return JSON.stringify(prev.map((n: any) => n.id)) === JSON.stringify(nextActive.map((n: any) => n.id)) ? prev : nextActive;
               });
             }
+          }
+        }
+
+        // Cache alignment self-healing verification check on hydrated nodes
+        if (hydratedNodes.length > 0) {
+          let hasIncomplete = false;
+          for (const n of hydratedNodes) {
+            if (n.type === 'artist' || !n.type) {
+              const details = detailsCacheRef.current.get(n.id) ||
+                              detailsCacheRef.current.get(n.id.toLowerCase()) ||
+                              detailsCacheRef.current.get(normalizeArtistId(n.id));
+              if (details && checkIsProfileIncomplete(n, details)) {
+                hasIncomplete = true;
+                break;
+              }
+            }
+          }
+          if (hasIncomplete) {
+            showToast('⚠️ Cache Incomplete');
+          } else {
+            showToast('⚡ Loaded from cache');
           }
         }
       } catch (err) {

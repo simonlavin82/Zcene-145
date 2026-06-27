@@ -239,6 +239,15 @@ To ensure that historical cache documents do not become permanently stale, Zcene
 *   **Asynchronous Background Refresh (Revalidate):** In the background, the client asynchronously fetches fresh biographical details from the Gemini Flash model. Once hydrated, the local details cache is updated, the active selected node state is refreshed in-place, and the global Firestore document is overwritten with the fresh data and a new `cachedAt` timestamp.
 *   **Sandbox Safety & Key Protection:** During revalidation, local development testing (such as on `localhost`, `127.0.0.1`, or port `3000`) completely bypasses live database updates and Gemini proxy requests, logging a console override statement instead. This prevents local development from polluting live production data or triggering unintended API quota usage.
 
+### 4.4 Cache Override & Self-Healing Validation Lifecycle
+To prevent corrupt or incomplete metadata from silently polluting the graph canvas, Zcene implements a robust "Cache Override & Self-Healing" routine that intercepts incomplete states during Firestore hydration:
+*   **Evaluation Criteria:** During initial Firestore hydration (both project loads in `handleSnap` and individual artist queries in `handleGenerateGraph`), the client scans the loaded details cache. If any core properties (such as genre or origin) resolve to the literal string `"Unknown"` (case-insensitive checks), the cache entry is flagged as incomplete.
+*   **Incompleteness Fallback Alerts:** Upon detecting an incomplete cache state, the client replaces the standard `Loaded from cache` message with a warning toast alert (`⚠️ Cache Incomplete`).
+*   **Surfacing the Self-Healing Pathway:**
+    *   **Warning Box:** If the active selected artist card contains incomplete metadata, a yellow-themed warning block is rendered directly above the metadata grid inside the Deep Cut details panel. This warning describes the corrupt state and provides an interactive "Heal Cache (Force Refresh)" button.
+    *   **Card Header Quick-Action:** An animated `healing` quick-action button (wrench/healing symbol) is added to the details card header to draw the user's attention.
+    *   **Execution Flow:** Clicking either self-healing trigger opens the Token Confirmation Dialog for cache optimization. Upon user confirmation, it evicts the corrupted local cache, deletes the invalid Firestore entry, and executes a net-new Gemini API request to rebuild the artist's structural sub-graph and details.
+
 ---
 
 ## 5. Typography & UI Design Standards
