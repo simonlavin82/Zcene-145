@@ -56,6 +56,8 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     targetId?: string;
     context?: string;
     connections?: { context: string; targetName: string }[];
+    fallbackMessage?: string;
+    dna?: string;
     x: number;
     y: number;
   } | null>(null);
@@ -464,10 +466,8 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             });
 
             let fallbackMessage = "";
-            if (directArtistLinks.length === 0) {
-                fallbackMessage = hasRawConnections 
-                    ? "[Direct connections filtered out]" 
-                    : "[Indirect recommendation]";
+            if (directArtistLinks.length === 0 && !hasRawConnections) {
+                fallbackMessage = "[Indirect recommendation]";
             }
 
             if (connections.length > 0 || nodeDna || fallbackMessage) {
@@ -1106,16 +1106,38 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         </AnimatePresence>
 
         {hoveredLink && (
-            <div 
-                style={{ 
-                    position: 'absolute',
-                    left: hoveredLink.x, 
-                    top: hoveredLink.y,
-                    transform: 'translate(-50%, -100%)',
-                    pointerEvents: 'none',
-                    zIndex: 50
-                }}
-                className="mb-3 bg-zinc-950/95 border border-zinc-700/80 px-3.5 py-2.5 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md rounded-xl flex flex-col gap-2 text-left min-w-[200px] max-w-[320px]"
+            <div
+                style={
+                    typeof window !== 'undefined' && window.innerWidth >= 1024
+                        /* Desktop: float above or below the hovered node depending on proximity to top edge */
+                        ? (() => {
+                            const nearTop = hoveredLink.y < 140;
+                            return {
+                                position: 'absolute' as const,
+                                left: hoveredLink.x,
+                                top: hoveredLink.y,
+                                transform: nearTop ? 'translate(-50%, 20px)' : 'translate(-50%, -100%)',
+                                pointerEvents: 'none' as const,
+                                zIndex: 50
+                            };
+                          })()
+                        /* Mobile: absolute top-drop banner within the canvas container */
+                        : {
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            pointerEvents: 'none',
+                            zIndex: 50
+                        }
+                }
+                className={
+                    typeof window !== 'undefined' && window.innerWidth >= 1024
+                        /* Desktop visual tokens */
+                        ? 'bg-zinc-950/95 border border-zinc-700/80 px-3.5 py-2.5 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md rounded-xl flex flex-col gap-2 text-left min-w-[200px] max-w-[320px]'
+                        /* Mobile visual tokens — full-width top-drop banner */
+                        : 'bg-zinc-950/95 border-b border-zinc-700/80 px-4 py-3 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md w-full flex flex-col gap-2 text-left'
+                }
             >
                 <span className="font-poppins text-sm text-white border-b border-zinc-800 pb-1 mb-1 font-medium">{hoveredLink.sourceId}</span>
                 
@@ -1137,9 +1159,15 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
                 {/* Zone 2: Spiderweb DNA */}
                 {hoveredLink.dna && (
-                    <div className="mt-1 pt-1.5 border-t border-zinc-800/60 text-[11px] text-zinc-400 leading-normal">
-                        <span className="font-semibold text-zinc-500 uppercase tracking-wider text-[8px] block mb-0.5">Spiderweb DNA</span>
-                        <span className="font-normal">{hoveredLink.dna}</span>
+                    <div className="mt-1 pt-1.5 border-t border-zinc-800/60">
+                        <p className="text-xs leading-4 font-normal text-zinc-400 m-0">{hoveredLink.dna
+                            ?.replace(/\btechnicolor\b/gi, 'technicolour')
+                            .replace(/\bcolors\b/gi, 'colours')
+                            .replace(/\bcolorful\b/gi, 'colourful')
+                            .replace(/\bcoloring\b/gi, 'colouring')
+                            .replace(/\bcolorize\b/gi, 'colourise')
+                            .replace(/\bcolor\b/gi, 'colour')
+                        }</p>
                     </div>
                 )}
             </div>

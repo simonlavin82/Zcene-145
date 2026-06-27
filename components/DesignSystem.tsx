@@ -1348,12 +1348,143 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 implementation="bg-sky-500/20 text-sky-300"
                             />
                         </div>
+
+                        {/* ── Discovery Network Metric Badges ── */}
+                        <div className="mt-16 space-y-8">
+                            <div className="border-b border-zinc-800 pb-4">
+                                <h3 className="text-xl font-medium text-zinc-200">Discovery Network Metric Badges</h3>
+                                <p className="text-sm text-zinc-400 mt-2 leading-relaxed max-w-3xl">
+                                    Displayed in the card footer and table list of the project dashboard. Each badge exposes a live discovery-network count directly inside its label, using a <strong>label-first</strong> syntax that mirrors the spiderweb filter legends. The four badges always render in a fixed sequence.
+                                </p>
+                            </div>
+
+                            {/* Token Spec Grid */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                {/* SEED */}
+                                <div className="flex flex-col p-5 border border-zinc-700/50 rounded-none hover:border-zinc-500 transition-colors bg-zinc-900/20">
+                                    <div className="mb-4">
+                                        <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                                            SEED: 3
+                                        </span>
+                                    </div>
+                                    <h4 className="font-medium text-white mb-1">SEED</h4>
+                                    <p className="text-sm text-zinc-400 leading-relaxed mb-4 flex-grow">Count of seed artists the user manually anchored the Zcene around. Always visible — present even before the graph is mapped.</p>
+                                    <div className="space-y-1 mt-auto">
+                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block">Copy: SEED: {'{'}seedList.length{'}'}</p>
+                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block mt-1">Style: text-zinc-400 bg-zinc-800</p>
+                                    </div>
+                                </div>
+
+                                {/* AI ARTISTS */}
+                                <div className="flex flex-col p-5 border border-zinc-700/50 rounded-none hover:border-zinc-500 transition-colors bg-zinc-900/20">
+                                    <div className="mb-4">
+                                        <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                                            AI ARTISTS: 24
+                                        </span>
+                                    </div>
+                                    <h4 className="font-medium text-white mb-1">AI ARTISTS</h4>
+                                    <p className="text-sm text-zinc-400 leading-relaxed mb-4 flex-grow">Count of non-seed artist nodes in the graph — i.e. all artists recommended by the AI engine. Only rendered when <code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.graphData</code> is present.</p>
+                                    <div className="space-y-1 mt-auto">
+                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block">Copy: AI ARTISTS: {'{'}recommendedCount{'}'}</p>
+                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block mt-1">Style: text-zinc-400 bg-zinc-800</p>
+                                    </div>
+                                </div>
+
+                                {/* DEEP CUTS */}
+                                <div className="flex flex-col p-5 border border-zinc-700/50 rounded-none hover:border-zinc-500 transition-colors bg-zinc-900/20">
+                                    <div className="mb-4">
+                                        <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                                            DEEP CUTS: 7
+                                        </span>
+                                    </div>
+                                    <h4 className="font-medium text-white mb-1">DEEP CUTS</h4>
+                                    <p className="text-sm text-zinc-400 leading-relaxed mb-4 flex-grow">Count of artists the user has promoted to their active Deep Cut stack (<code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.activeNodes</code>). Only rendered when <code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.graphData</code> is present.</p>
+                                    <div className="space-y-1 mt-auto">
+                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block">Copy: DEEP CUTS: {'{'}deepCutsCount{'}'}</p>
+                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block mt-1">Style: text-zinc-400 bg-zinc-800</p>
+                                    </div>
+                                </div>
+
+                                {/* MAPPED / STATUS */}
+                                <div className="flex flex-col p-5 border border-zinc-700/50 rounded-none hover:border-zinc-500 transition-colors bg-zinc-900/20">
+                                    <div className="mb-4 flex gap-2">
+                                        <span className="text-[9px] uppercase tracking-wide text-primary/60 font-bold px-1.5 py-0.5 bg-primary/10 rounded-md border border-primary/10 font-mono whitespace-nowrap">
+                                            Mapped
+                                        </span>
+                                        <span className="text-[9px] uppercase tracking-wide text-zinc-500 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-zinc-800 font-mono whitespace-nowrap">
+                                            Unmapped
+                                        </span>
+                                    </div>
+                                    <h4 className="font-medium text-white mb-1">MAPPED / STATUS</h4>
+                                    <p className="text-sm text-zinc-400 leading-relaxed mb-4 flex-grow">Binary mapping state. <strong>Mapped</strong> (accent colour) renders when <code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.graphData</code> is truthy. <strong>Unmapped</strong> (muted) renders otherwise. Table list exposes both states; card footer only shows Mapped.</p>
+                                    <div className="space-y-1 mt-auto">
+                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block">Mapped: text-primary/60 bg-primary/10</p>
+                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block mt-1">Unmapped: text-zinc-500 bg-zinc-800</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Copy Format Rule */}
+                            <div className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-xl space-y-4">
+                                <div className="flex items-center gap-3">
+                                    <span className="material-symbols-outlined text-primary">format_quote</span>
+                                    <h4 className="text-base font-medium text-white">Label-First Copy Format</h4>
+                                </div>
+                                <p className="text-sm text-zinc-400 leading-relaxed max-w-3xl">
+                                    All discovery metric badges use a <strong>label-first</strong> syntax — the descriptive label appears before the numeric value, separated by a colon and space. This mirrors the language used in the spiderweb filter legends and creates instant visual alignment across the product.
+                                </p>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                                    <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 font-mono text-sm text-primary">"SEED: X"</div>
+                                    <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 font-mono text-sm text-primary">"AI ARTISTS: X"</div>
+                                    <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 font-mono text-sm text-primary">"DEEP CUTS: X"</div>
+                                </div>
+                                <p className="text-sm text-zinc-50 leading-relaxed max-w-3xl pt-1">
+                                    Because the count is always a plain integer, this format <strong>removes the need for conditional plural string formatting</strong> (e.g. "1 Seed" vs "2 Seeds"). The label is always singular and the number speaks for itself.
+                                </p>
+                            </div>
+
+                            {/* Mobile Safety Rule */}
+                            <div className="p-6 bg-zinc-900/40 border border-primary/10 rounded-xl space-y-4">
+                                <div className="flex items-center gap-3">
+                                    <span className="material-symbols-outlined text-primary">smartphone</span>
+                                    <h4 className="text-base font-medium text-white">Mobile Safety — <code className="text-sm text-primary font-mono">whitespace-nowrap</code></h4>
+                                </div>
+                                <p className="text-sm text-zinc-400 leading-relaxed max-w-3xl">
+                                    Individual badge labels <strong>must</strong> carry <code className="text-xs text-primary bg-zinc-800 px-1.5 py-0.5 rounded font-mono">whitespace-nowrap</code>. Without it, a badge like <em>"AI ARTISTS: 24"</em> can split across two lines on narrow viewports, breaking the data token into an unreadable fragment. The class ensures each badge renders as a solid, locked visual unit regardless of screen width.
+                                </p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                                    <div className="space-y-2">
+                                        <p className="text-[10px] font-semibold text-emerald-400 uppercase tracking-widest">✓ Correct</p>
+                                        <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3">
+                                            <code className="text-xs text-zinc-300 font-mono leading-relaxed">className="... whitespace-nowrap"</code>
+                                        </div>
+                                        <div className="flex gap-1.5 flex-wrap p-3 bg-zinc-900 rounded-lg border border-zinc-800">
+                                            <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">SEED: 3</span>
+                                            <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">AI ARTISTS: 24</span>
+                                            <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">DEEP CUTS: 7</span>
+                                            <span className="text-[9px] uppercase tracking-wide text-primary/60 font-bold px-1.5 py-0.5 bg-primary/10 rounded-md border border-primary/10 font-mono whitespace-nowrap">Mapped</span>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <p className="text-[10px] font-semibold text-red-400 uppercase tracking-widest">✗ Avoid</p>
+                                        <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3">
+                                            <code className="text-xs text-zinc-300 font-mono leading-relaxed">className="..." {/* no whitespace-nowrap */}</code>
+                                        </div>
+                                        <div className="p-3 bg-zinc-900 rounded-lg border border-zinc-800">
+                                            <p className="text-xs text-zinc-500 leading-relaxed italic">Labels may break mid-token ("AI ARTISTS:" / "24") on narrow mobile viewports, destroying scannability.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </section>
 
                     {/* 10. LISTS */}
                     <section id="lists">
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Lists</h2>
                         <div className="space-y-16">
+
+                            {/* Metadata Key-Value List (unchanged) */}
                             <div>
                                 <h3 className="text-xl font-medium text-zinc-200 mb-6">Metadata Key-Value List</h3>
                                 <div className="bg-zinc-950 p-8 border border-zinc-800 max-w-md">
@@ -1367,6 +1498,207 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                 </div>
                             </div>
+
+                            {/* ── Card Footer Badge Layout Rules ── */}
+                            <div className="space-y-8">
+                                <div className="border-b border-zinc-800 pb-4">
+                                    <h3 className="text-xl font-medium text-zinc-200">Project Card &amp; Table List — Discovery Metric Layout</h3>
+                                    <p className="text-sm text-zinc-400 mt-2 leading-relaxed max-w-3xl">
+                                        The project card footer and table list both surface the four discovery metric badges in a fixed production sequence. The layout system changed from a rigid no-wrap row to a responsive wrapping grid to accommodate variable badge widths on mobile.
+                                    </p>
+                                </div>
+
+                                {/* Layout Rule Callout */}
+                                <div className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-xl space-y-6">
+                                    <div className="flex items-center gap-3">
+                                        <span className="material-symbols-outlined text-primary">grid_view</span>
+                                        <h4 className="text-base font-medium text-white">Card Footer Badge Wrapper — Layout Rules</h4>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                        {/* Before */}
+                                        <div className="space-y-3">
+                                            <p className="text-[10px] font-semibold text-red-400 uppercase tracking-widest">✗ Old — Removed</p>
+                                            <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4 space-y-2">
+                                                <code className="text-xs font-mono text-zinc-400 block">
+                                                    <span className="text-red-400">flex-nowrap</span>
+                                                </code>
+                                                <p className="text-xs text-zinc-500 leading-relaxed">Rigid single-line row. Overflowed or truncated on narrow viewports when multiple badges were present.</p>
+                                            </div>
+                                        </div>
+                                        {/* After */}
+                                        <div className="space-y-3">
+                                            <p className="text-[10px] font-semibold text-emerald-400 uppercase tracking-widest">✓ New — Production</p>
+                                            <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4 space-y-2">
+                                                <code className="text-xs font-mono text-zinc-400 block">
+                                                    flex-wrap <span className="text-emerald-400">gap-x-1.5 gap-y-1.5</span>
+                                                </code>
+                                                <p className="text-xs text-zinc-500 leading-relaxed">Badges wrap naturally when space is tight, with consistent 6px horizontal and vertical gutters. Each badge still remains a solid unit via <code className="text-[10px] text-primary bg-zinc-900 px-1 rounded">whitespace-nowrap</code> on the label itself.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="pt-2 border-t border-zinc-800 space-y-1">
+                                        <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Full wrapper class string</p>
+                                        <code className="text-xs font-mono text-primary bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-3 block">
+                                            flex items-center flex-wrap gap-x-1.5 gap-y-1.5
+                                        </code>
+                                    </div>
+                                </div>
+
+                                {/* ── Project Card Preview ── */}
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-3">
+                                        <span className="material-symbols-outlined text-zinc-400">grid_view</span>
+                                        <h4 className="text-base font-medium text-zinc-200">Project Card — Grid View Preview</h4>
+                                    </div>
+                                    <p className="text-sm text-zinc-400 leading-relaxed max-w-2xl">
+                                        Badges sit in the card footer, separated from the title/timestamp block by a <code className="text-xs text-primary bg-zinc-800 px-1 rounded">border-t border-white/5</code> rule. The <code className="text-xs text-primary bg-zinc-800 px-1 rounded">AI ARTISTS</code> and <code className="text-xs text-primary bg-zinc-800 px-1 rounded">DEEP CUTS</code> badges are conditionally rendered only when <code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.graphData</code> is present.
+                                    </p>
+
+                                    {/* Mock Card */}
+                                    <div className="max-w-xs">
+                                        <div className="bg-zinc-900 border border-zinc-700/50 rounded-none p-5 flex flex-col justify-between min-h-[160px] shadow-xl">
+                                            {/* Card Header */}
+                                            <div className="space-y-4">
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <h3 className="text-base font-medium text-white truncate">Midwest Emo Roots</h3>
+                                                    <div className="p-1.5 rounded-lg text-zinc-600 flex items-center justify-center">
+                                                        <span className="material-symbols-outlined !text-xl">more_vert</span>
+                                                    </div>
+                                                </div>
+                                                <p className="font-mono text-xs text-zinc-300 font-normal">Edited 27/06/2026 • 8:09 am</p>
+                                            </div>
+                                            {/* Card Footer — production badge sequence */}
+                                            <div className="mt-4 pt-4 border-t border-white/5 flex items-center">
+                                                <div className="flex items-center flex-wrap gap-x-1.5 gap-y-1.5">
+                                                    {/* 1. SEED */}
+                                                    <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                                                        SEED: 3
+                                                    </span>
+                                                    {/* 2. AI ARTISTS */}
+                                                    <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                                                        AI ARTISTS: 24
+                                                    </span>
+                                                    {/* 3. DEEP CUTS */}
+                                                    <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                                                        DEEP CUTS: 7
+                                                    </span>
+                                                    {/* 4. MAPPED */}
+                                                    <span className="text-[9px] uppercase tracking-wide text-primary/60 font-bold px-1.5 py-0.5 bg-primary/10 rounded-md border border-primary/10 font-mono whitespace-nowrap">
+                                                        Mapped
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <p className="text-[10px] text-zinc-500 font-mono mt-2">
+                                            Sequence: SEED → AI ARTISTS → DEEP CUTS → MAPPED
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* ── Table Row Preview ── */}
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-3">
+                                        <span className="material-symbols-outlined text-zinc-400">list</span>
+                                        <h4 className="text-base font-medium text-zinc-200">Project List — Table View Preview</h4>
+                                    </div>
+                                    <p className="text-sm text-zinc-400 leading-relaxed max-w-2xl">
+                                        In table view the same four tokens each occupy a dedicated column cell. The <strong>Status</strong> column renders <strong>Mapped</strong> (accent) or <strong>Unmapped</strong> (muted) depending on whether <code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.graphData</code> is truthy.
+                                    </p>
+
+                                    {/* Mock Table */}
+                                    <div className="w-full overflow-x-auto border border-zinc-800 bg-zinc-900 rounded-none">
+                                        <table className="w-full text-left border-collapse min-w-[640px]">
+                                            <thead>
+                                                <tr className="border-b border-zinc-800 text-[10px] text-zinc-400 uppercase tracking-widest font-bold bg-zinc-950">
+                                                    <th className="py-4 px-6 font-semibold">Title</th>
+                                                    <th className="py-4 px-6 font-semibold">Modified Date</th>
+                                                    <th className="py-4 px-6 font-semibold">Seeds</th>
+                                                    <th className="py-4 px-6 font-semibold">AI Artists</th>
+                                                    <th className="py-4 px-6 font-semibold">Deep Cuts</th>
+                                                    <th className="py-4 px-6 font-semibold">Status</th>
+                                                    <th className="py-4 px-6 font-semibold text-right">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-zinc-800/50 bg-zinc-900">
+                                                {/* Mapped row */}
+                                                <tr className="hover:bg-zinc-800 cursor-pointer transition-colors bg-zinc-900">
+                                                    <td className="py-4 px-6 font-medium text-white">
+                                                        <div className="flex items-center gap-3">
+                                                            <span className="material-symbols-outlined text-zinc-500 !text-lg">folder</span>
+                                                            <span className="truncate max-w-[180px]">Midwest Emo Roots</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-4 px-6 text-zinc-400 text-sm font-mono font-normal">27/06/2026 • 8:09 am</td>
+                                                    {/* 1. SEED */}
+                                                    <td className="py-4 px-6 font-normal">
+                                                        <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                                                            SEED: 3
+                                                        </span>
+                                                    </td>
+                                                    {/* 2. AI ARTISTS */}
+                                                    <td className="py-4 px-6 font-normal">
+                                                        <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                                                            AI ARTISTS: 24
+                                                        </span>
+                                                    </td>
+                                                    {/* 3. DEEP CUTS */}
+                                                    <td className="py-4 px-6 font-normal">
+                                                        <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                                                            DEEP CUTS: 7
+                                                        </span>
+                                                    </td>
+                                                    {/* 4. MAPPED */}
+                                                    <td className="py-4 px-6 font-normal">
+                                                        <span className="text-[10px] uppercase tracking-widest text-primary/70 font-bold px-2 py-0.5 bg-primary/10 rounded-md border border-primary/20 whitespace-nowrap">
+                                                            Mapped
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-4 px-6 text-right">
+                                                        <span className="material-symbols-outlined text-zinc-600 !text-xl">more_vert</span>
+                                                    </td>
+                                                </tr>
+                                                {/* Unmapped row */}
+                                                <tr className="hover:bg-zinc-800 cursor-pointer transition-colors bg-zinc-900">
+                                                    <td className="py-4 px-6 font-medium text-zinc-300">
+                                                        <div className="flex items-center gap-3">
+                                                            <span className="material-symbols-outlined text-zinc-600 !text-lg">folder</span>
+                                                            <span className="truncate max-w-[180px]">New Zcene Draft</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-4 px-6 text-zinc-400 text-sm font-mono font-normal">New Project</td>
+                                                    {/* 1. SEED */}
+                                                    <td className="py-4 px-6 font-normal">
+                                                        <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                                                            SEED: 1
+                                                        </span>
+                                                    </td>
+                                                    {/* 2–3: hidden when unmapped */}
+                                                    <td className="py-4 px-6 font-normal">
+                                                        <span className="text-[10px] text-zinc-600 font-mono">—</span>
+                                                    </td>
+                                                    <td className="py-4 px-6 font-normal">
+                                                        <span className="text-[10px] text-zinc-600 font-mono">—</span>
+                                                    </td>
+                                                    {/* 4. UNMAPPED */}
+                                                    <td className="py-4 px-6 font-normal">
+                                                        <span className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold px-2 py-0.5 bg-zinc-800 rounded-md border border-zinc-800 whitespace-nowrap">
+                                                            Unmapped
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-4 px-6 text-right">
+                                                        <span className="material-symbols-outlined text-zinc-600 !text-xl">more_vert</span>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <p className="text-[10px] text-zinc-500 font-mono">
+                                        Row 1: fully mapped — all 4 badges present. Row 2: unmapped — AI ARTISTS &amp; DEEP CUTS columns suppressed (—).
+                                    </p>
+                                </div>
+
+                            </div>{/* end discovery metric layout block */}
+
                         </div>
                     </section>
 
