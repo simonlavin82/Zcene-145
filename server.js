@@ -220,6 +220,22 @@ const NODE_DETAILS_SCHEMA_SERVER = {
   required: ["summary", "details", "discography", "recommendationReason", "youtubeSearchQuery"]
 };
 
+/**
+ * Produces a stable, Firestore-safe document ID for a single artist name.
+ */
+function normalizeArtistId(name) {
+  if (!name) return "";
+  return name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/['’]/g, "") // Strip straight and curly apostrophes
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .substring(0, 256);
+}
+
 // Playability memory cache (videoId -> { playable: boolean, expiresAt: number })
 const playabilityCache = new Map();
 
@@ -272,13 +288,26 @@ async function triggerReSynthesis(artistId, originalData) {
   let details = null;
   if (originalData && originalData.detailsCache) {
     try {
-      details = JSON.parse(originalData.detailsCache);
+      let parsed = typeof originalData.detailsCache === 'string' ? JSON.parse(originalData.detailsCache) : originalData.detailsCache;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        parsed = Array.isArray(parsed[0]) ? parsed[0][1] : parsed[0];
+      }
+      if (typeof parsed === 'string') {
+        try {
+          parsed = JSON.parse(parsed);
+        } catch (e) {
+          console.warn(`[Re-Synthesis] Failed to parse double-stringified detailsCache:`, e.message);
+        }
+      }
+      details = parsed;
     } catch (e) {
       console.warn(`[Re-Synthesis] Failed to parse detailsCache:`, e.message);
     }
   }
 
   const artistName = details?.details?.artist || originalData.seedArtists || artistId;
+  const canonicalId = normalizeArtistId(artistName);
+  const isAlias = canonicalId !== artistId;
   const genre = details?.details?.genre || '';
   const seedArtists = artistName;
   const contextNodes = '';
@@ -344,7 +373,7 @@ async function triggerReSynthesis(artistId, originalData) {
       isPlayable = await checkVideoPlayability(synthesizedDetails.youtubeVideoId);
     }
     
-    // Construct database payload inside detailsCache JSON string
+    // Construct database payload inside detailsCache object
     const updatedDetails = {
       ...details,
       ...synthesizedDetails,
@@ -353,14 +382,33 @@ async function triggerReSynthesis(artistId, originalData) {
 
     const finalPayload = {
       ...originalData, // preserve original properties
-      detailsCache: JSON.stringify(updatedDetails),
+      artistId: canonicalId,
+      cacheKey: canonicalId,
+      seedArtists: artistName,
+      detailsCache: updatedDetails,
       cachedAt: admin.firestore.FieldValue.serverTimestamp(),
       cacheVersion: 2 // Match standard cacheVersion
     };
 
-    // Update Firestore using Admin SDK
-    await db.collection('artists').doc(artistId).set(finalPayload, { merge: true });
-    console.log(`[Re-Synthesis] Successfully healed profile for artist: ${artistId}`);
+    // Update Firestore at canonicalId using Admin SDK
+    await db.collection('artists').doc(canonicalId).set(finalPayload, { merge: true });
+    console.log(`[Re-Synthesis] Successfully healed profile for canonical artist: ${canonicalId}`);
+
+    if (isAlias) {
+      // Write alias redirect doc
+      await db.collection('artists').doc(artistId).set({
+        cacheKey: artistId,
+        artistId: artistId,
+        seedArtists: originalData.seedArtists || artistId,
+        graphData: JSON.stringify({ nodes: [], links: [] }),
+        filters: {},
+        cacheVersion: 2,
+        cachedAt: admin.firestore.FieldValue.serverTimestamp(),
+        hitCount: 0,
+        redirectTo: canonicalId
+      });
+      console.log(`[Re-Synthesis] Created Alias Redirect: ${artistId} -> ${canonicalId}`);
+    }
 
   } catch (error) {
     console.error(`[Re-Synthesis] Failed for artist ${artistId}:`, error);
@@ -532,18 +580,54 @@ If you cannot find a clear YouTube video ID for this artist, return null for the
     const scraped = JSON.parse(candidateText.trim());
     const videoId = scraped.youtubeVideoId;
 
+    // Resolve redirect if present (up to 3 redirects)
+    let targetId = artistId;
+    let docRef = db.collection('artists').doc(targetId);
+    let docSnap = await docRef.get();
+    let docData = null;
+
+    if (docSnap.exists) {
+      docData = docSnap.data();
+      if (docData && typeof docData.redirectTo === 'string' && docData.redirectTo.trim().length > 0) {
+        let currentId = docData.redirectTo.trim();
+        let depth = 0;
+        while (depth < 3) {
+          const canonicalRef = db.collection('artists').doc(currentId);
+          const nextSnap = await canonicalRef.get();
+          if (!nextSnap.exists) break;
+          targetId = currentId;
+          docRef = canonicalRef;
+          docSnap = nextSnap;
+          docData = nextSnap.data();
+          if (docData && typeof docData.redirectTo === 'string' && docData.redirectTo.trim().length > 0) {
+            currentId = docData.redirectTo.trim();
+            depth++;
+          } else {
+            break;
+          }
+        }
+      }
+    }
+
     if (videoId && videoId.length === 11) {
       console.log(`[Scraper API] Found video ID "${videoId}" for artist "${artistName}". Updating Firestore...`);
 
-      // Write directly to Firestore
-      const docRef = db.collection('artists').doc(artistId);
-      const docSnap = await docRef.get();
       if (docSnap.exists) {
-        const docData = docSnap.data();
         let details = {};
-        if (docData.detailsCache) {
+        if (docData && docData.detailsCache) {
           try {
-            details = JSON.parse(docData.detailsCache);
+            let parsed = typeof docData.detailsCache === 'string' ? JSON.parse(docData.detailsCache) : docData.detailsCache;
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              parsed = Array.isArray(parsed[0]) ? parsed[0][1] : parsed[0];
+            }
+            if (typeof parsed === 'string') {
+              try {
+                parsed = JSON.parse(parsed);
+              } catch (e) {
+                console.warn(`[Scraper API] Failed to parse double-stringified detailsCache:`, e.message);
+              }
+            }
+            details = parsed || {};
           } catch (e) {
             console.warn(`[Scraper API] Failed to parse detailsCache:`, e.message);
           }
@@ -553,35 +637,43 @@ If you cannot find a clear YouTube video ID for this artist, return null for the
         await docRef.set({
           ...docData,
           youtubeVideoId: videoId,
-          detailsCache: JSON.stringify(details),
+          detailsCache: details,
           cachedAt: admin.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
-        console.log(`[Scraper API] Successfully updated Firestore doc "${artistId}" with video ID "${videoId}"`);
+        console.log(`[Scraper API] Successfully updated Firestore doc "${targetId}" with video ID "${videoId}"`);
       } else {
         const details = { youtubeVideoId: videoId };
         await docRef.set({
-          artistId,
+          artistId: targetId,
           youtubeVideoId: videoId,
-          detailsCache: JSON.stringify(details),
+          detailsCache: details,
           cachedAt: admin.firestore.FieldValue.serverTimestamp(),
           cacheVersion: 2,
           hitCount: 1
         });
-        console.log(`[Scraper API] Successfully created new Firestore doc "${artistId}" with video ID "${videoId}"`);
+        console.log(`[Scraper API] Successfully created new Firestore doc "${targetId}" with video ID "${videoId}"`);
       }
 
       return res.json({ youtubeVideoId: videoId });
     } else {
       console.log(`[Scraper API] No video ID found for artist "${artistName}".`);
       
-      const docRef = db.collection('artists').doc(artistId);
-      const docSnap = await docRef.get();
       if (docSnap.exists) {
-        const docData = docSnap.data();
         let details = {};
-        if (docData.detailsCache) {
+        if (docData && docData.detailsCache) {
           try {
-            details = JSON.parse(docData.detailsCache);
+            let parsed = typeof docData.detailsCache === 'string' ? JSON.parse(docData.detailsCache) : docData.detailsCache;
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              parsed = Array.isArray(parsed[0]) ? parsed[0][1] : parsed[0];
+            }
+            if (typeof parsed === 'string') {
+              try {
+                parsed = JSON.parse(parsed);
+              } catch (e) {
+                console.warn(`[Scraper API] Failed to parse double-stringified detailsCache:`, e.message);
+              }
+            }
+            details = parsed || {};
           } catch (e) {
             console.warn(`[Scraper API] Failed to parse detailsCache:`, e.message);
           }
@@ -591,10 +683,10 @@ If you cannot find a clear YouTube video ID for this artist, return null for the
         await docRef.set({
           ...docData,
           youtubeVideoId: null,
-          detailsCache: JSON.stringify(details),
+          detailsCache: details,
           cachedAt: admin.firestore.FieldValue.serverTimestamp()
         }, { merge: true });
-        console.log(`[Scraper API] Updated Firestore doc "${artistId}" with youtubeVideoId = null`);
+        console.log(`[Scraper API] Updated Firestore doc "${targetId}" with youtubeVideoId = null`);
       }
 
       return res.json({ youtubeVideoId: null });

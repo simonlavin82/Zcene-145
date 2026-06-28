@@ -685,6 +685,29 @@ interface CacheValidationResult {
   needsFutureFields: boolean;
 }
 
+/**
+ * Safely parses the detailsCache field from Firestore which might be stored as
+ * a native Map/Object, a stringified JSON object, or a double-stringified JSON array of string.
+ */
+export const parseDetailsCacheSafely = (field: any): any => {
+  if (!field) return null;
+  try {
+    let parsed = typeof field === 'string' ? JSON.parse(field) : field;
+    // Unwrap array wrapper layer [{ ... }] or [ [ "name", { ... } ] ]
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      parsed = Array.isArray(parsed[0]) ? parsed[0][1] : parsed[0];
+    }
+    // If still string (double-stringified case)
+    if (typeof parsed === 'string') {
+      parsed = JSON.parse(parsed);
+    }
+    return parsed;
+  } catch (e) {
+    console.warn("Failed to parse detailsCache safely:", e);
+    return null;
+  }
+};
+
 const validateCacheEntry = (data: any): CacheValidationResult => {
   if (!data) {
     return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
@@ -736,14 +759,10 @@ const validateCacheEntry = (data: any): CacheValidationResult => {
   }
 
   try {
-    const parsed = typeof data.detailsCache === 'string' ? JSON.parse(data.detailsCache) : data.detailsCache;
+    const parsed = parseDetailsCacheSafely(data.detailsCache);
     let entries: any[] = [];
     if (Array.isArray(parsed)) {
-      if (parsed.length > 0 && Array.isArray(parsed[0]) && parsed[0].length === 2) {
-        entries = parsed.map(entry => entry[1]);
-      } else {
-        entries = parsed;
-      }
+      entries = parsed;
     } else if (parsed) {
       entries = [parsed];
     }
@@ -1520,16 +1539,7 @@ const App: React.FC = () => {
         if (globalDoc.exists()) {
             const data = globalDoc.data();
             if (data && data.detailsCache) {
-                // Step 1: Parse the raw JSON string
-                let parsed: any = data.detailsCache;
-                try {
-                    if (typeof parsed === 'string') parsed = JSON.parse(parsed);
-                } catch(e) { console.warn("[Node Click] detailsCache JSON.parse failed", e); }
-                
-                // Step 2: Unwrap array wrapper if the schema is [{...}] instead of {...}
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                    parsed = parsed[0];
-                }
+                let parsed: any = parseDetailsCacheSafely(data.detailsCache);
                 
                 // Step 3: Extract text values, checking multiple field name variants
                 const bio = parsed?.summary || parsed?.bio || parsed?.description || parsed?.text || "";
@@ -1974,12 +1984,7 @@ const App: React.FC = () => {
               let parsedDetails: any = null;
               if (data.detailsCache) {
                   try {
-                      parsedDetails = typeof data.detailsCache === 'string' ? JSON.parse(data.detailsCache) : data.detailsCache;
-                      
-                      // Unwrap array wrapper layer [{ ... }] or [ [ "name", { ... } ] ]
-                      if (Array.isArray(parsedDetails) && parsedDetails.length > 0) {
-                          parsedDetails = Array.isArray(parsedDetails[0]) ? parsedDetails[0][1] : parsedDetails[0];
-                      }
+                      parsedDetails = parseDetailsCacheSafely(data.detailsCache);
                       
                       const bio = parsedDetails?.summary || parsedDetails?.bio || parsedDetails?.description || parsedDetails?.text || "";
                       if (bio && bio.length > 5) {
@@ -2212,10 +2217,7 @@ const App: React.FC = () => {
           let bio = "", genre = "", origin = "", founded = "", summary = "", imageUrl = "";
           if (entry && entry.detailsCache) {
                try {
-                  let parsedData = typeof entry.detailsCache === 'string' ? JSON.parse(entry.detailsCache) : entry.detailsCache;
-                  if (Array.isArray(parsedData) && parsedData.length > 0) {
-                     parsedData = Array.isArray(parsedData[0]) ? parsedData[0][1] : parsedData[0];
-                  }
+                  let parsedData = parseDetailsCacheSafely(entry.detailsCache);
                   bio = parsedData?.summary || parsedData?.bio || parsedData?.description || parsedData?.text || "";
                   summary = bio;
                   imageUrl = parsedData?.imageUrl || parsedData?.image || "";
@@ -2284,10 +2286,7 @@ const App: React.FC = () => {
             cached.forEach((cachedEntry, key) => {
               if (cachedEntry && cachedEntry.detailsCache) {
                 try {
-                  let parsedData = typeof cachedEntry.detailsCache === 'string' ? JSON.parse(cachedEntry.detailsCache) : cachedEntry.detailsCache;
-                  if (Array.isArray(parsedData) && parsedData.length > 0) {
-                    parsedData = Array.isArray(parsedData[0]) ? parsedData[0][1] : parsedData[0];
-                  }
+                  let parsedData = parseDetailsCacheSafely(cachedEntry.detailsCache);
                   const entryBio = parsedData?.summary || parsedData?.bio || parsedData?.description || parsedData?.text || "";
                   
                   if (!entryBio || entryBio.length < 5) return;
@@ -2472,10 +2471,7 @@ const App: React.FC = () => {
         let bio = "", genre = "", origin = "", founded = "", summary = "", imageUrl = "";
         if (entry && entry.detailsCache) {
              try {
-                let parsedData = typeof entry.detailsCache === 'string' ? JSON.parse(entry.detailsCache) : entry.detailsCache;
-                if (Array.isArray(parsedData) && parsedData.length > 0) {
-                   parsedData = Array.isArray(parsedData[0]) ? parsedData[0][1] : parsedData[0];
-                }
+                let parsedData = parseDetailsCacheSafely(entry.detailsCache);
                 bio = parsedData?.summary || parsedData?.bio || parsedData?.description || parsedData?.text || "";
                 summary = bio;
                 imageUrl = parsedData?.imageUrl || parsedData?.image || "";
@@ -2546,10 +2542,7 @@ const App: React.FC = () => {
           cached.forEach((cachedEntry, key) => {
             if (cachedEntry && cachedEntry.detailsCache) {
               try {
-                let parsedData = typeof cachedEntry.detailsCache === 'string' ? JSON.parse(cachedEntry.detailsCache) : cachedEntry.detailsCache;
-                if (Array.isArray(parsedData) && parsedData.length > 0) {
-                  parsedData = Array.isArray(parsedData[0]) ? parsedData[0][1] : parsedData[0];
-                }
+                let parsedData = parseDetailsCacheSafely(cachedEntry.detailsCache);
                 const entryBio = parsedData?.summary || parsedData?.bio || parsedData?.description || parsedData?.text || "";
                 
                 // Guard: Only add to detailsCache if bio is present and has length > 5
@@ -3061,12 +3054,8 @@ const App: React.FC = () => {
         const data = snap.data();
         if (!data?.detailsCache) return;
 
-        // Parse the raw JSON string
-        let parsed: any = data.detailsCache;
-        if (typeof parsed === 'string') parsed = JSON.parse(parsed);
-
-        // Unwrap array wrapper layer [{ ... }] → { ... }
-        if (Array.isArray(parsed) && parsed.length > 0) parsed = parsed[0];
+        // Parse the detailsCache safely
+        let parsed: any = parseDetailsCacheSafely(data.detailsCache);
 
         const bio = parsed?.summary || parsed?.bio || parsed?.description || parsed?.text || '';
         const imageUrl = parsed?.imageUrl || parsed?.image || '';
@@ -4157,7 +4146,7 @@ const App: React.FC = () => {
 
       // Overwrite the global cache doc with fresh data and a new cachedAt timestamp
       await updateDoc(doc(db, 'artists', cacheId), {
-        detailsCache: JSON.stringify(freshDetails),
+        detailsCache: freshDetails,
         cachedAt: serverTimestamp()
       });
       console.log("[Revalidation] Successfully updated stale cache in Firestore for: " + cacheId);
@@ -4253,7 +4242,7 @@ const App: React.FC = () => {
                      }
                      if (data && data.detailsCache) {
                         try {
-                            const parsed = typeof data.detailsCache === 'string' ? JSON.parse(data.detailsCache) : data.detailsCache;
+                            const parsed = parseDetailsCacheSafely(data.detailsCache);
                             if (parsed && (parsed.bio || parsed.summary)) {
                                const bio = parsed.summary || parsed.bio || parsed.description || parsed.text || "";
                                const imageUrl = parsed.imageUrl || parsed.image || "";
@@ -4385,7 +4374,7 @@ const App: React.FC = () => {
                       // Update the existing doc with fresh detailsCache and a new cachedAt timestamp.
                       // The security rule Case A permits: detailsCache, hitCount, and cachedAt.
                       await updateDoc(doc(db, 'artists', existingSnap.id), {
-                        detailsCache: JSON.stringify(details),
+                        detailsCache: details,
                         cachedAt: serverTimestamp()
                       });
                       console.log(`[Deep Cut Queue] Write-back: Updated detailsCache + cachedAt for: ${existingSnap.id}`);
@@ -4420,7 +4409,7 @@ const App: React.FC = () => {
                         cachedAt: serverTimestamp(),
                         hitCount: 0,
                         isDeep: false,
-                        detailsCache: JSON.stringify(details)
+                        detailsCache: details
                       });
                       console.log(`[Deep Cut Queue] JIT cached Canonical node: ${canonicalId}`);
                       
