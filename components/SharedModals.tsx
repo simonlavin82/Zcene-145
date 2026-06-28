@@ -320,7 +320,7 @@ export const TokenConfirmationDialog: React.FC<{
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void;
-  type: 'generation' | 'extension' | 'deep_cut_creation' | 'partial_synthesis' | 'cache_upgrade' | 'data_quality_optimization' | 'live_tour_search';
+  type: 'generation' | 'extension' | 'deep_cut_creation' | 'partial_synthesis' | 'cache_upgrade' | 'data_quality_optimization' | 'live_tour_search' | 'live_synthesis';
   cost: number;
   cachedArtists: string[];
   missingArtists: string[];
@@ -341,7 +341,9 @@ export const TokenConfirmationDialog: React.FC<{
         <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary !text-[18px]">info</span>
-            <h3 className="text-base font-medium text-white">Token Quota Warning</h3>
+            <h3 className="text-base font-medium text-white">
+              {type === 'live_synthesis' ? 'Confirm Live Synthesis' : 'Token Quota Warning'}
+            </h3>
           </div>
           <button 
             onClick={onClose} 
@@ -359,7 +361,9 @@ export const TokenConfirmationDialog: React.FC<{
                 ? 'A data quality issue was detected on this profile (stale placeholders, bad casing, or unparsed formatting). A live AI optimization pass will re-synthesize and heal the cached record.'
                 : type === 'live_tour_search'
                   ? 'You are initiating a live search agent lookup to check the latest real-time tour schedules for this artist.'
-                  : 'You are initiating a net-new AI generation flow that requires contacting the live models.'}
+                  : type === 'live_synthesis'
+                    ? 'You are initiating a live music graph synthesis constrained by custom filters. This requires a fresh AI synthesis pass and cannot use standard cached entries.'
+                    : 'You are initiating a net-new AI generation flow that requires contacting the live models.'}
           </p>
           <div className="bg-zinc-900/60 p-4 border border-zinc-800 space-y-2.5">
             <div className="flex justify-between font-mono text-xs border-b border-zinc-800 pb-1.5">
@@ -377,7 +381,9 @@ export const TokenConfirmationDialog: React.FC<{
                           ? 'Profile Quality Optimization'
                           : type === 'live_tour_search'
                             ? 'Live Tour Agent Search'
-                            : 'Deep Cut Creation'}
+                            : type === 'live_synthesis'
+                              ? 'Filtered Live Synthesis'
+                              : 'Deep Cut Creation'}
               </span>
             </div>
             <div className="flex justify-between font-mono text-xs border-b border-zinc-800 pb-1.5">

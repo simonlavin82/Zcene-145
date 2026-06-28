@@ -270,6 +270,19 @@ export const readArtistCacheMany = async (
   activeUserId?: string | null,
   filters?: DiscoveryFilters
 ): Promise<{ cached: Map<string, ArtistCacheEntry>; missing: string[] }> => {
+  const hasActiveFilters = !!(filters && (
+    filters.foundedAfter ||
+    filters.foundedBefore ||
+    (filters.includeOrigins && filters.includeOrigins.length > 0) ||
+    (filters.excludeOrigins && filters.excludeOrigins.length > 0) ||
+    (filters.includeGenres && filters.includeGenres.length > 0)
+  ));
+
+  if (hasActiveFilters) {
+    console.log("[ArtistCache] Bypassing cache read because active filters are present.");
+    return { cached: new Map<string, ArtistCacheEntry>(), missing: artistNames };
+  }
+
   const cached = new Map<string, ArtistCacheEntry>();
   const missing: string[] = [];
 
@@ -332,6 +345,19 @@ export const writeArtistCacheMany = async (
   preserveFullGraph?: boolean,
   forceOverwrite?: boolean
 ): Promise<void> => {
+  const hasActiveFilters = !!(filters && (
+    filters.foundedAfter ||
+    filters.foundedBefore ||
+    (filters.includeOrigins && filters.includeOrigins.length > 0) ||
+    (filters.excludeOrigins && filters.excludeOrigins.length > 0) ||
+    (filters.includeGenres && filters.includeGenres.length > 0)
+  ));
+
+  if (hasActiveFilters) {
+    console.log("[ArtistCache] Bypassing cache write because active filters are present.");
+    return;
+  }
+
   const normalizedGraph = normalizeGraphData(fullGraph);
   await Promise.allSettled(
     artistNames.map(async name => {

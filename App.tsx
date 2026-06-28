@@ -1014,7 +1014,7 @@ const App: React.FC = () => {
   const [pendingAuthAction, setPendingAuthAction] = useState<{ type: string; payload: any } | null>(null);
   const [tokenConfirmation, setTokenConfirmation] = useState<{
     isOpen: boolean;
-    type: 'generation' | 'extension' | 'deep_cut_creation' | 'partial_synthesis' | 'cache_upgrade' | 'data_quality_optimization';
+    type: 'generation' | 'extension' | 'deep_cut_creation' | 'partial_synthesis' | 'cache_upgrade' | 'data_quality_optimization' | 'live_tour_search' | 'live_synthesis';
     cost: number;
     cachedArtists: string[];
     missingArtists: string[];
@@ -1036,7 +1036,7 @@ const App: React.FC = () => {
   } | null>(null);
 
   const confirmTokenUsage = useCallback((
-    type: 'generation' | 'extension' | 'deep_cut_creation' | 'partial_synthesis' | 'cache_upgrade' | 'data_quality_optimization',
+    type: 'generation' | 'extension' | 'deep_cut_creation' | 'partial_synthesis' | 'cache_upgrade' | 'data_quality_optimization' | 'live_tour_search' | 'live_synthesis',
     cachedArtists: string[],
     missingArtists: string[],
     enrichmentArtists?: string[]
@@ -2144,6 +2144,8 @@ const App: React.FC = () => {
         (activeDiscoveryFilters.additionalInstructions && activeDiscoveryFilters.additionalInstructions.trim().length > 0)
       );
 
+      const isLiveSynthesis = hasActiveFilters || artistList.length > 1;
+
     // --- STRICT FRONT-GATE CACHE CHECK ---
     // If this is a fresh search for a single artist without special filters, check the cache immediately
     if (artistList.length === 1 && !isRegeneration && !hasActiveFilters) {
@@ -2334,7 +2336,7 @@ const App: React.FC = () => {
 
       let bypassChoiceConfirmation = false;
 
-      if (!bypassToken) {
+      if (!bypassToken && !isLiveSynthesis) {
         const normalizedArtistList = artistList.map(name => name.toLowerCase());
         const compositeCacheResult = await readArtistCacheMany(normalizedArtistList, user?.uid, activeDiscoveryFilters);
         const baseCacheResult = await readArtistCacheMany(normalizedArtistList, user?.uid);
@@ -2959,7 +2961,7 @@ const App: React.FC = () => {
     if (fullCacheHit) return;
 
     if (!bypassToken) {
-      const confirmed = await confirmTokenUsage('generation', [], artistList);
+      const confirmed = await confirmTokenUsage(isLiveSynthesis ? 'live_synthesis' : 'generation', [], artistList);
       if (!confirmed || (controller && controller.signal.aborted)) {
         isHydratingSessionRef.current = false;
         setIsLoading(false);
