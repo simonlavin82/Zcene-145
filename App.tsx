@@ -1107,6 +1107,7 @@ const App: React.FC = () => {
 
   const authRedirectPathRef = useRef<string | null>(null);
   const isHydratingSessionRef = useRef(false);
+  const isProjectLoadingRef = useRef(false);
 
   const currentProjectOwnerIdRef = useRef<string | null>(null);
   const projectNameRef = useRef<string>('');
@@ -1537,6 +1538,12 @@ const App: React.FC = () => {
       const matchedNode = normalizedGraphNodeMap.get(asArtistNorm) || normalizedGraphNodeMap.get(asMetaNorm);
       if (matchedNode) {
         activeNodesToRestore.push(matchedNode);
+      } else {
+        // FALLBACK: Preserve the node details from the incoming list to prevent deletion during hydration
+        const rawNode = typeof item === 'string' 
+          ? { id: item, type: 'artist' as const, group: 0 } 
+          : { id: item.id, type: item.type || 'artist', group: item.group || 0, label: item.label };
+        activeNodesToRestore.push(rawNode);
       }
     });
     return activeNodesToRestore;
@@ -2058,6 +2065,7 @@ const App: React.FC = () => {
     overrideFilters?: DiscoveryFilters
   ) => {
     isHydratingSessionRef.current = true;
+    isProjectLoadingRef.current = true;
     setIsLoading(true);
     let controller: AbortController | null = null;
     let isLockReleasedByAutosave = false;
@@ -2073,6 +2081,7 @@ const App: React.FC = () => {
 
     if (!user && (isRegeneration || !window.location.search)) {
       isHydratingSessionRef.current = false;
+      isProjectLoadingRef.current = false;
       setIsLoading(false);
       // Only gate if it's a manual action (regeneration or fresh start)
       // Imports (via deep links) are allowed for guests
@@ -2085,6 +2094,7 @@ const App: React.FC = () => {
     const artistList = artists.split('::').map(a => normalizeArtistId(a)).filter(Boolean);
     if (artistList.length > 25) {
       isHydratingSessionRef.current = false;
+      isProjectLoadingRef.current = false;
       setIsLoading(false);
       setError(`Limit: 25 artists.`);
       return;
@@ -2097,6 +2107,7 @@ const App: React.FC = () => {
       if (matches.length > 1) {
         setIsLoading(false);
         isHydratingSessionRef.current = false;
+        isProjectLoadingRef.current = false;
         
         const choice = await new Promise<string | 'synthesis' | 'cancel'>((resolve) => {
           setDisambiguationDialog({
@@ -3086,6 +3097,7 @@ const App: React.FC = () => {
       if (!isLockReleasedByAutosave) {
         isHydratingSessionRef.current = false;
       }
+      isProjectLoadingRef.current = false;
     }
   }, [
     user,
@@ -3433,7 +3445,10 @@ const App: React.FC = () => {
         console.log('[ProjectLoader] Bypassing snapshot handle because local session is saving/hydrating');
         return false;
       }
-      if (!isMounted || !snap.exists()) return false;
+      if (!isMounted || !snap.exists()) {
+        isProjectLoadingRef.current = false;
+        return false;
+      }
 
       const data = snap.data();
 
@@ -3456,6 +3471,7 @@ const App: React.FC = () => {
 
       if (localGraphPopulated && incomingGraphEmpty) {
         console.log('[ProjectLoader] Bypassing snapshot handle because local state is populated but incoming database state is empty/blank');
+        isProjectLoadingRef.current = false;
         return false;
       }
       setCurrentProjectOwnerId(data.authorId || null);
@@ -3576,6 +3592,14 @@ const App: React.FC = () => {
 
             if (isMultiArtistIncoming || hasActiveFiltersIncoming) {
               console.log(`[ProjectLoader] Intercepting Phase 1 loading for complex query. Multi-artist: ${isMultiArtistIncoming}, Filtered: ${hasActiveFiltersIncoming}. Handing over to handleGenerateGraph.`);
+              if (data.activeNodes && Array.isArray(data.activeNodes)) {
+                const rawActive = data.activeNodes.map((item: any) => {
+                  return typeof item === 'string'
+                    ? { id: item, type: 'artist' as const, group: 0 }
+                    : { id: item.id, type: item.type || 'artist', group: item.group || 0, label: item.label };
+                });
+                setActiveNodes(rawActive);
+              }
               handleGenerateGraph(data.seedArtists || data.artistIds.join('::'), false, null, false, false, parsedFilters);
               return true;
             }
@@ -3786,12 +3810,14 @@ const App: React.FC = () => {
         console.error("Failed to parse project data:", err);
       }
 
+      isProjectLoadingRef.current = false;
       return true; // Found
     };
 
 
     const loadProject = async () => {
       try {
+        isProjectLoadingRef.current = true;
         console.log(`[ProjectLoader] Attempting to load project: ${currentProjectId}`);
 
         // Offline Sandbox Interception
@@ -3812,6 +3838,7 @@ const App: React.FC = () => {
           setSeedArtists('Orange 9mm::Madball::H2O');
           const fallbackName = localStorage.getItem('zcene_project_name_sandbox-project-1') || 'Offline Zcene Project';
           setProjectName(fallbackName);
+          isProjectLoadingRef.current = false;
           return;
         }
 
@@ -3870,10 +3897,12 @@ const App: React.FC = () => {
           setProjectName(fallbackName);
           console.log(`[ProjectLoader] [Offline Sandbox] Hydrated project name from fallback: ${fallbackName}`);
         }
+        isProjectLoadingRef.current = false;
       } catch (err) {
         if (isMounted) {
           console.error(`[ProjectLoader] Failure loading ${currentProjectId}:`, err);
         }
+        isProjectLoadingRef.current = false;
       }
     };
 
@@ -3890,7 +3919,7 @@ const App: React.FC = () => {
   // Save Current Project to Firestore (Silent background task)
   useEffect(() => {
     if (!user || !isFirebaseReady || !isAuthInitialized || !currentProjectId || isGuest) return;
-    if (!graphData) return;
+    if (!graphData || isProjectLoadingRef.current) return;
 
     const timer = setTimeout(async () => {
       const projectPath = `users/${user.uid}/projects/${currentProjectId}`;
@@ -4029,6 +4058,7 @@ const App: React.FC = () => {
             setPreviousWorkspace({ view: View.Graph, projectId: projectId });
             if (currentViewRef.current !== View.Graph || currentProjectIdRef.current !== projectId) {
               if (currentProjectIdRef.current !== projectId) {
+                isProjectLoadingRef.current = true;
                 setGraphData({ nodes: [], links: [] });
                 setSeedArtists('');
                 setActiveNodes([]);
