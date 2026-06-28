@@ -22,7 +22,7 @@ const checkIsProfileIncomplete = (node: Node, details: NodeDetails | null | unde
 
   const genre = details.details?.genre?.trim().toLowerCase();
   const origin = details.details?.origin?.trim().toLowerCase();
-  if (genre === 'unknown' || origin === 'unknown') {
+  if (!genre || genre === 'unknown' || !origin || origin === 'unknown') {
     return true;
   }
 

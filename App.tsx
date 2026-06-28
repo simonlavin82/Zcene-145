@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { AlertCircle, X, CheckCircle2, Key } from 'lucide-react';
 import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project, ArtistCacheEntry, COST_PER_AI_CALL } from './types';
 import { generateGraphData, fetchNodeDetails, extendGraphFromNode } from './services/geminiService';
-import { normalizeArtistId, readArtistCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, titleCaseArtistId } from './services/artistCacheService';
+import { normalizeArtistId, readArtistCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, titleCaseArtistId, findCanonicalNodeForArtist } from './services/artistCacheService';
 import { auth, signInWithGoogle, logout, onAuthStateChanged, User, db, handleFirestoreError, OperationType } from './services/firebase';
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, getDocFromServer, serverTimestamp, addDoc, getDoc, getDocs, orderBy, where, writeBatch, getDocFromCache, updateDoc, increment } from 'firebase/firestore';
 const StyleGuidePage = React.lazy(() => import('./components/DesignSystem').then(m => ({ default: m.StyleGuidePage })));
@@ -667,10 +667,10 @@ const checkIsProfileIncomplete = (node: Node, details: NodeDetails | null | unde
     return true;
   }
 
-  // Intercept precise "Unknown" string states for self-healing
+  // Intercept precise "Unknown" or missing/empty string states for self-healing
   const genre = details.details?.genre?.trim().toLowerCase();
   const origin = details.details?.origin?.trim().toLowerCase();
-  if (genre === 'unknown' || origin === 'unknown') {
+  if (!genre || genre === 'unknown' || !origin || origin === 'unknown') {
     return true;
   }
 
@@ -737,36 +737,42 @@ const validateCacheEntry = (data: any): CacheValidationResult => {
 
   try {
     const parsed = typeof data.detailsCache === 'string' ? JSON.parse(data.detailsCache) : data.detailsCache;
-    let targetObj = parsed;
-    
-    // Support legacy Map serialization format: Array of [key, value] pairs
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      if (Array.isArray(parsed[0]) && parsed[0].length === 2) {
-        targetObj = parsed[0][1];
+    let entries: any[] = [];
+    if (Array.isArray(parsed)) {
+      if (parsed.length > 0 && Array.isArray(parsed[0]) && parsed[0].length === 2) {
+        entries = parsed.map(entry => entry[1]);
       } else {
-        targetObj = parsed[0];
+        entries = parsed;
       }
+    } else if (parsed) {
+      entries = [parsed];
     }
 
-    const bio = targetObj?.summary || targetObj?.bio || targetObj?.description || targetObj?.text || '';
-    if (!bio || bio.trim().length <= 5 || bio.includes('sandbox mock') || bio.includes('test scenarios')) {
+    if (entries.length === 0) {
       return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
     }
 
-    // Intercept precise "Unknown" string states in genre or origin
-    const genre = targetObj?.details?.genre || targetObj?.genre || '';
-    const origin = targetObj?.details?.origin || targetObj?.origin || '';
-    if (
-      (typeof genre === 'string' && genre.trim().toLowerCase() === 'unknown') ||
-      (typeof origin === 'string' && origin.trim().toLowerCase() === 'unknown')
-    ) {
-      return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
-    }
+    for (const targetObj of entries) {
+      const bio = targetObj?.summary || targetObj?.bio || targetObj?.description || targetObj?.text || '';
+      if (!bio || bio.trim().length <= 5 || bio.includes('sandbox mock') || bio.includes('test scenarios')) {
+        return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
+      }
 
-    // Future-proof placeholder: check if there's any links array (as an example of future properties)
-    const links = targetObj?.links || [];
-    if (!links || links.length === 0) {
-      needsFutureFields = true;
+      // Intercept precise "Unknown" or missing/empty string states in genre or origin
+      const genre = targetObj?.details?.genre || targetObj?.genre;
+      const origin = targetObj?.details?.origin || targetObj?.origin;
+      if (
+        !genre || (typeof genre === 'string' && (genre.trim() === '' || genre.trim().toLowerCase() === 'unknown')) ||
+        !origin || (typeof origin === 'string' && (origin.trim() === '' || origin.trim().toLowerCase() === 'unknown'))
+      ) {
+        return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
+      }
+
+      // Future-proof placeholder: check if there's any links array (as an example of future properties)
+      const links = targetObj?.links || [];
+      if (!links || links.length === 0) {
+        needsFutureFields = true;
+      }
     }
   } catch (e) {
     return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
@@ -1936,9 +1942,18 @@ const App: React.FC = () => {
         if (!cacheDoc.exists()) {
           cacheDoc = await getArtistDocWithRedirect(searchIdLower);
         }
-
         if (cacheDoc.exists()) {
           const data = cacheDoc.data();
+          const canonicalArtistId = data?.artistId || data?.cacheKey;
+          const canonicalArtistName = data?.seedArtists;
+          if (canonicalArtistId && canonicalArtistId.toLowerCase() !== searchIdLower) {
+            console.log(`[Front Gate Cache] Redirect/disambiguation detected: ${searchIdLower} -> ${canonicalArtistId}`);
+            showToast(`Did you mean ${canonicalArtistName}? Resolved '${artists}' to '${canonicalArtistName}'.`);
+            setSeedArtists(canonicalArtistName);
+            handleGenerateGraph(canonicalArtistName, isRegeneration, graphToEnhance, bypassCacheValidation, bypassTokenConfirmation, overrideFilters);
+            return;
+          }
+
           const isDeep = data?.isDeep === true;
           const validation = validateCacheEntry(data);
           const isQualified = validation.isFullyQualified && isDeep;
@@ -2111,6 +2126,29 @@ const App: React.FC = () => {
       if (!bypassToken) {
         const normalizedArtistList = artistList.map(name => name.toLowerCase());
         const cacheResult = await readArtistCacheMany(normalizedArtistList, user?.uid);
+
+        // Intercept redirects/disambiguations in Phase 02 Cache Hit
+        let seedUpdated = false;
+        const mappedSeeds = artists.split('::').map(a => {
+          const trimmed = a.trim();
+          const norm = normalizeArtistId(trimmed);
+          const entry = cacheResult.cached.get(norm) || cacheResult.cached.get(norm.toLowerCase());
+          if (entry && entry.artistId && entry.artistId.toLowerCase() !== norm.toLowerCase()) {
+            seedUpdated = true;
+            showToast(`Did you mean ${entry.seedArtists}? Resolved '${trimmed}' to '${entry.seedArtists}'.`);
+            return entry.seedArtists;
+          }
+          return trimmed;
+        });
+
+        if (seedUpdated) {
+          const resolvedArtists = mappedSeeds.join('::');
+          setSeedArtists(resolvedArtists);
+          console.log(`[Phase 02 Cache] Redirect detected, restarting generation with: ${resolvedArtists}`);
+          handleGenerateGraph(resolvedArtists, isRegeneration, graphToEnhance, bypassCacheValidation, bypassTokenConfirmation, overrideFilters);
+          return;
+        }
+
         cached = new Map<string, ArtistCacheEntry>();
         missing = [];
         enrichmentRequired = [];
@@ -2721,12 +2759,32 @@ const App: React.FC = () => {
         throw new Error("The AI returned formless data. Please try again with different artists.");
       }
 
+      let seedUpdated = false;
+      const mappedSeeds = artists.split('::').map(a => {
+        const trimmed = a.trim();
+        const canonicalNode = findCanonicalNodeForArtist(trimmed, newData.nodes);
+        if (canonicalNode && normalizeArtistId(canonicalNode.id) !== normalizeArtistId(trimmed)) {
+          seedUpdated = true;
+          showToast(`Did you mean ${canonicalNode.label || canonicalNode.id}? Resolved '${trimmed}' to '${canonicalNode.label || canonicalNode.id}'.`);
+          return canonicalNode.label || canonicalNode.id;
+        }
+        return trimmed;
+      });
+
+      let resolvedArtists = artists;
+      let resolvedArtistList = artistList;
+      if (seedUpdated) {
+        resolvedArtists = mappedSeeds.join('::');
+        resolvedArtistList = mappedSeeds.map(a => normalizeArtistId(a));
+        setSeedArtists(resolvedArtists);
+      }
+
       const returnedIds = new Set(newData.nodes.map(n => n.id.toLowerCase()));
       let maxG = newData.nodes.reduce((m, n) => Math.max(m, n.group || 0), 0);
-      artistList.forEach(name => { if (!returnedIds.has(name.toLowerCase())) { maxG++; newData.nodes.push({ id: name, type: 'artist', group: maxG }); } });
+      resolvedArtistList.forEach(name => { if (!returnedIds.has(name.toLowerCase())) { maxG++; newData.nodes.push({ id: name, type: 'artist', group: maxG }); } });
       let final = pruned ? mergeGraphData(pruned, newData) : newData;
-      final = applyHumanCasedLabels(final, artists);
-      final = filterGraphByDiscoveryFilters(final, activeDiscoveryFilters, artists);
+      final = applyHumanCasedLabels(final, resolvedArtists);
+      final = filterGraphByDiscoveryFilters(final, activeDiscoveryFilters, resolvedArtists);
       setGraphData(final);
 
       setSelectedNode(prev => {
@@ -2743,13 +2801,12 @@ const App: React.FC = () => {
           .catch(e => console.error('[Music Discovery] Per-artist cache write failed:', e));
       }
 
-
       // Update active nodes metadata from the final graph, ensuring all seeds are present
       setActiveNodes(prev => {
         const currentActive = [...prev];
 
         // Map current seeds first to maintain their presence and update them
-        const seedMapped = artistList.map(name => {
+        const seedMapped = resolvedArtistList.map(name => {
           const match = final.nodes.find(fn => fn.id.toLowerCase() === name.toLowerCase());
           return (match || { id: name, type: 'artist' as any, group: 0 }) as Node;
         });
@@ -2770,7 +2827,7 @@ const App: React.FC = () => {
       });
 
       // Find the primary/seed node in the final graph and select it to paint the sidebar immediately
-      const firstSlug = artistList[0];
+      const firstSlug = resolvedArtistList[0];
       const primaryNode = final.nodes.find(n => n.id.toLowerCase() === firstSlug.toLowerCase()) || final.nodes[0];
       if (primaryNode) {
         setSelectedNode(primaryNode);
@@ -3218,6 +3275,30 @@ const App: React.FC = () => {
 
             g.nodes.forEach((n: any) => { n.fx = n.fx ?? null; n.fy = n.fy ?? null; });
             setGraphData((prev: any) => isGraphEqual(prev, g) ? prev : g);
+
+            if (data.detailsCache) {
+              try {
+                const rawMap = new Map<string, NodeDetails>(JSON.parse(data.detailsCache));
+                const newCacheMap = new Map<string, NodeDetails>();
+                rawMap.forEach((v, k) => {
+                  newCacheMap.set(k, v);
+                  newCacheMap.set(k.toLowerCase(), v);
+                  newCacheMap.set(normalizeArtistId(k), v);
+                  
+                  // Synchronously write to detailsCacheRef.current so immediate selection is safe
+                  detailsCacheRef.current.set(k, v);
+                  detailsCacheRef.current.set(k.toLowerCase(), v);
+                  detailsCacheRef.current.set(normalizeArtistId(k), v);
+                });
+                setDetailsCache((prev) => {
+                  const merged = new Map(prev);
+                  newCacheMap.forEach((v, k) => merged.set(k, v));
+                  return merged;
+                });
+              } catch (e) {
+                console.error("[ProjectLoader] Details cache parse fail", e);
+              }
+            }
 
             // ── FIRESTORE-FIRST: batch-load all node biographies before marking load complete
             await batchHydrateDetailsCache(g.nodes);

@@ -444,6 +444,13 @@ const generateMockGraphData = (artists: string, baseGraph?: GraphData, filters?:
       country: 'United States',
       founded: '1994',
       related: ['Madball', 'Sick of It All', 'Bane', 'Saves the Day', 'Gorilla Biscuits', 'Shelter']
+    },
+    'marvin gaye': {
+      genres: ['Soul', 'R&B', 'Funk'],
+      labels: ['Tamla', 'Motown'],
+      country: 'United States',
+      founded: '1959',
+      related: ['Tammi Terrell', 'Al Green', 'Stevie Wonder', 'Smokey Robinson']
     }
   };
 
@@ -452,7 +459,11 @@ const generateMockGraphData = (artists: string, baseGraph?: GraphData, filters?:
   const genericLabels = ['Sub Pop', 'Matador Records', 'Merge Records', 'Warp Records', 'Domino'];
 
   artistList.forEach((artistName, index) => {
-    const norm = artistName.toLowerCase();
+    let resolvedName = artistName;
+    if (artistName.toLowerCase() === 'gaye') {
+      resolvedName = 'Marvin Gaye';
+    }
+    const norm = resolvedName.toLowerCase();
     const group = index + 1;
     const preset = presets[norm] || {
       genres: [genericGenres[Math.floor(Math.random() * genericGenres.length)]],
@@ -460,11 +471,11 @@ const generateMockGraphData = (artists: string, baseGraph?: GraphData, filters?:
       country: countries[Math.floor(Math.random() * countries.length)],
       founded: (1990 + Math.floor(Math.random() * 28)).toString(),
       related: [
-        `${artistName} Wave`,
-        `${artistName} Project`,
-        `The ${artistName}s`,
-        `Club ${artistName.split(' ')[0] || 'Music'}`,
-        `Echo ${artistName.split(' ')[0] || 'Sound'}`
+        `${resolvedName} Wave`,
+        `${resolvedName} Project`,
+        `The ${resolvedName}s`,
+        `Club ${resolvedName.split(' ')[0] || 'Music'}`,
+        `Echo ${resolvedName.split(' ')[0] || 'Sound'}`
       ]
     };
 
@@ -487,7 +498,7 @@ const generateMockGraphData = (artists: string, baseGraph?: GraphData, filters?:
       country = filters.includeOrigins[0];
     }
 
-    addNode({ id: artistName, type: 'artist', group, label: artistName });
+    addNode({ id: resolvedName, type: 'artist', group, label: resolvedName });
 
     const genresToUse = [...preset.genres];
     if (filters?.includeGenres && filters.includeGenres.length > 0) {
@@ -496,19 +507,19 @@ const generateMockGraphData = (artists: string, baseGraph?: GraphData, filters?:
 
     genresToUse.forEach(g => {
       addNode({ id: g, type: 'genre', group: 1000, label: g });
-      addLink(artistName, g, 1, "performs style");
+      addLink(resolvedName, g, 1, "performs style");
     });
 
     preset.labels.forEach(l => {
       addNode({ id: l, type: 'label', group: 2000, label: l });
-      addLink(artistName, l, 1, "releases music via");
+      addLink(resolvedName, l, 1, "releases music via");
     });
 
     addNode({ id: country, type: 'country', group: 3000, label: country });
-    addLink(artistName, country, 1, "hails from");
+    addLink(resolvedName, country, 1, "hails from");
 
     addNode({ id: foundedYear, type: 'founded', group: 4000, label: foundedYear });
-    addLink(artistName, foundedYear, 1, "was founded in");
+    addLink(resolvedName, foundedYear, 1, "was founded in");
 
     preset.related.forEach(relName => {
       let relFounded = (Number(foundedYear) + Math.floor(Math.random() * 8) - 4).toString();
@@ -520,7 +531,7 @@ const generateMockGraphData = (artists: string, baseGraph?: GraphData, filters?:
       }
 
       addNode({ id: relName, type: 'artist', group, label: relName });
-      addLink(artistName, relName, 1, "is related to");
+      addLink(resolvedName, relName, 1, "is related to");
 
       const relGenre = genresToUse[0];
       addLink(relName, relGenre, 1, "performs style");
@@ -537,7 +548,9 @@ const generateMockGraphData = (artists: string, baseGraph?: GraphData, filters?:
 
   if (artistList.length > 1) {
     for (let i = 0; i < artistList.length - 1; i++) {
-      addLink(artistList[i], artistList[i+1], 2, "is connected to");
+      const parentName = artistList[i].toLowerCase() === 'gaye' ? 'Marvin Gaye' : artistList[i];
+      const childName = artistList[i+1].toLowerCase() === 'gaye' ? 'Marvin Gaye' : artistList[i+1];
+      addLink(parentName, childName, 2, "is connected to");
     }
   }
 
@@ -552,7 +565,9 @@ const generateMockNodeDetails = (node: Node): NodeDetails => {
     'blink-182': '**blink-182** is an American pop punk band formed in Poway, California, in 1992. They are considered a key group in the development and mainstream popularity of pop punk, selling over 50 million records worldwide.',
     'orange 9mm': '**Orange 9mm** was an American post-hardcore band formed in New York City in 1995. They blended metal, hardcore, and rap influences into a highly aggressive, groove-heavy sound that defined the mid-90s underground scene.',
     'madball': '**Madball** is an American hardcore punk band formed in New York City in 1988. Led by Freddy Cricien, they are one of the cornerstone bands of the New York Hardcore (NYHC) scene, famous for their street-level intensity.',
-    'h2o': '**H2O** is an American melodic hardcore band formed in New York City in 1994. They combined the speed and PMA (Positive Mental Attitude) of DC hardcore with catchy, melodic punk choruses, gaining a dedicated international following.'
+    'h2o': '**H2O** is an American melodic hardcore band formed in New York City in 1994. They combined the speed and PMA (Positive Mental Attitude) of DC hardcore with catchy, melodic punk choruses, gaining a dedicated international following.',
+    'marvin gaye': '**Marvin Gaye** was an American singer, songwriter, and record producer. He helped to shape the sound of Motown in the 1960s, first as an in-house session player and later as a solo artist with a string of hits, earning him the nicknames "Prince of Motown" and "Prince of Soul".',
+    'gaye': '**Marvin Gaye** was an American singer, songwriter, and record producer. He helped to shape the sound of Motown in the 1960s, first as an in-house session player and later as a solo artist with a string of hits, earning him the nicknames "Prince of Motown" and "Prince of Soul".'
   };
 
   const members: Record<string, string[]> = {
@@ -560,7 +575,9 @@ const generateMockNodeDetails = (node: Node): NodeDetails => {
     'blink-182': ['Mark Hoppus (Bass/Vocals)', 'Travis Barker (Drums)', 'Tom DeLonge (Guitar/Vocals)'],
     'orange 9mm': ['Chaka Malik (Vocals)', 'Chris Traynor (Guitar)', 'Davide Gentile (Bass)', 'Matthew Cross (Drums)'],
     'madball': ['Freddy Cricien (Vocals)', 'Mitt Ginetto (Guitar)', 'Hoya Roc (Bass)', 'Mike Justian (Drums)'],
-    'h2o': ['Toby Morse (Vocals)', 'Rusty Pistachio (Guitar)', 'Todd Friend (Drums)', 'Adam Blake (Bass)', 'Colin McGinniss (Guitar)']
+    'h2o': ['Toby Morse (Vocals)', 'Rusty Pistachio (Guitar)', 'Todd Friend (Drums)', 'Adam Blake (Bass)', 'Colin McGinniss (Guitar)'],
+    'marvin gaye': ['Marvin Gaye (Vocals/Keyboards/Drums)'],
+    'gaye': ['Marvin Gaye (Vocals/Keyboards/Drums)']
   };
 
   const albums: Record<string, { albumName: string, releaseYear: string }[]> = {
@@ -588,6 +605,16 @@ const generateMockNodeDetails = (node: Node): NodeDetails => {
       { albumName: 'H2O', releaseYear: '1996' },
       { albumName: 'Thicker Than Water', releaseYear: '1997' },
       { albumName: 'Nothing to Prove', releaseYear: '2008' }
+    ],
+    'marvin gaye': [
+      { albumName: 'Whats Going On', releaseYear: '1971' },
+      { albumName: 'Lets Get It On', releaseYear: '1973' },
+      { albumName: 'I Want You', releaseYear: '1976' }
+    ],
+    'gaye': [
+      { albumName: 'Whats Going On', releaseYear: '1971' },
+      { albumName: 'Lets Get It On', releaseYear: '1973' },
+      { albumName: 'I Want You', releaseYear: '1976' }
     ]
   };
 
@@ -601,21 +628,23 @@ const generateMockNodeDetails = (node: Node): NodeDetails => {
     { albumName: 'Latest Release', releaseYear: '2023' }
   ];
 
+  const isGaye = norm === 'gaye' || norm === 'marvin gaye';
+
   return {
     summary: summaries[norm] || defaultSummary,
     imageUrl: 'https://en.wikipedia.org/wiki/Special:FilePath/Record_icon.svg',
     members: members[norm] || defaultMembers,
     details: {
-      genre: 'Hardcore Punk',
-      origin: 'California, USA',
-      founded: '2015',
-      artist: capitalizedName
+      genre: isGaye ? 'Soul / R&B' : 'Hardcore Punk',
+      origin: isGaye ? 'Washington, D.C., USA' : 'California, USA',
+      founded: isGaye ? '1959' : '2015',
+      artist: isGaye ? 'Marvin Gaye' : capitalizedName
     },
     links: [
-      { site: 'Wikipedia', url: `https://en.wikipedia.org/wiki/${encodeURIComponent(node.id)}` }
+      { site: 'Wikipedia', url: `https://en.wikipedia.org/wiki/${encodeURIComponent(isGaye ? 'Marvin_Gaye' : node.id)}` }
     ],
     discography: albums[norm] || defaultAlbums,
-    recommendationReason: `Essential artist that defines the roots and branchings of the ${capitalizedName} scene.`
+    recommendationReason: `Essential artist that defines the roots and branchings of the ${isGaye ? 'Marvin Gaye' : capitalizedName} scene.`
   };
 };
 

@@ -582,14 +582,30 @@ export const findCanonicalNodeForArtist = (name: string, nodes: Node[]): Node | 
   found = artistNodes.find(n => n.label && normalizeArtistId(n.label) === normSearch);
   if (found) return found;
   
-  // 3. Try partial/fuzzy match (strip punctuation and spaces)
-  const cleanString = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
-  const cleanSearch = cleanString(name);
-  
-  found = artistNodes.find(n => cleanString(n.id) === cleanSearch);
+  // 3. Try partial/fuzzy match (surnames or word boundaries)
+  const isFuzzyPartialMatch = (search: string, target: string) => {
+    const searchClean = search.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+    const targetClean = target.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim();
+    if (!searchClean || !targetClean) return false;
+    
+    const searchWords = searchClean.split(/\s+/);
+    const targetWords = targetClean.split(/\s+/);
+    
+    // If search is a single word (e.g. "Gaye"), it must be one of the words in the target name
+    if (searchWords.length === 1) {
+      return targetWords.includes(searchWords[0]);
+    }
+    
+    // If search has multiple words (e.g. "Marvin G"), check if target contains it as a substring
+    return targetClean.includes(searchClean);
+  };
+
+  // Try matching ID fuzzy first
+  found = artistNodes.find(n => isFuzzyPartialMatch(name, n.id));
   if (found) return found;
-  
-  found = artistNodes.find(n => n.label && cleanString(n.label) === cleanSearch);
+
+  // Try matching Label fuzzy next
+  found = artistNodes.find(n => n.label && isFuzzyPartialMatch(name, n.label));
   if (found) return found;
 
   return undefined;
