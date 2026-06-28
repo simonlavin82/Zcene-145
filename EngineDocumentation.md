@@ -338,7 +338,8 @@ stateDiagram-v2
 3. **Graph Commit and Database Write-Back:**
    * The returned graph undergoes **Nuclear Filtering** (pruning nodes and links that violate constraints).
    * If Seed Filters are active, write-back to Firestore is completely bypassed to prevent saving custom-filtered sub-graphs. If filters are not active, the baseline sub-graph is written to `/artists/{artistId}`.
-   * D3 simulations are initialized, loading flags are cleared, and the primary seed node is selected.
+   * The D3 physics simulations are initialized, `setIsLoading(false)` and `isProjectLoadingRef.current = false` are set, and `selectedNode` is set to the primary seed node.
+   * **Biography Preservation:** To prevent clearing stable seed biographies or triggering redundant background AI worker tasks during custom-filtered live synthesis loops, the client concurrently fetches seed biographies from the baseline cache in the background and merges them into both the active and selected nodes upon synthesis completion.
 4. **Autosave Lock Lifecycle:**
    * Because `selectedNode` and `graphData` updated, the autosave `useEffect` triggers. It sets `isHydratingSessionRef.current = true` and schedules a 3-second debounced write to the user's `/projects/{projectId}` path.
    * Once the project document is saved, a 1-second timeout clears the lock: `isHydratingSessionRef.current = false`.

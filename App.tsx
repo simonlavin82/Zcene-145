@@ -2146,6 +2146,55 @@ const App: React.FC = () => {
 
       const isLiveSynthesis = hasActiveFilters || artistList.length > 1;
 
+      if (isLiveSynthesis) {
+        // Concurrently fetch baseline cache to populate detailsCache and preserve biographies
+        const normalizedArtistList = artistList.map(name => name.toLowerCase());
+        readArtistCacheMany(normalizedArtistList, user?.uid).then(baseCacheResult => {
+          baseCacheResult.cached.forEach((entry, key) => {
+            if (entry && entry.detailsCache) {
+              try {
+                let parsedData = parseDetailsCacheSafely(entry.detailsCache);
+                const entryBio = parsedData?.summary || parsedData?.bio || parsedData?.description || parsedData?.text || "";
+                if (entryBio && entryBio.length > 5) {
+                  const detailsObj = {
+                    summary: entryBio,
+                    imageUrl: parsedData?.imageUrl || parsedData?.image || "",
+                    details: {
+                      genre: parsedData?.details?.genre || parsedData?.genre || "",
+                      origin: parsedData?.details?.origin || parsedData?.origin || "",
+                      founded: parsedData?.details?.founded || parsedData?.founded || "",
+                      artist: parsedData?.details?.artist || entry.seedArtists || key,
+                      notableArtists: parsedData?.details?.notableArtists || []
+                    },
+                    members: parsedData?.members || [],
+                    links: parsedData?.links || [],
+                    discography: parsedData?.discography || [],
+                    tourInfo: parsedData?.tourInfo || "",
+                    recommendationReason: parsedData?.recommendationReason || "",
+                    groundingLinks: parsedData?.groundingLinks || [],
+                    tourDates: parsedData?.tourDates || [],
+                    tourCachedAt: parsedData?.tourCachedAt || ""
+                  };
+                  setDetailsCache(prev => {
+                    const updated = new Map(prev);
+                    updated.set(key.toLowerCase(), detailsObj);
+                    updated.set(key, detailsObj);
+                    updated.set(normalizeArtistId(key), detailsObj);
+                    if (entry.artistId) {
+                      updated.set(entry.artistId.toLowerCase(), detailsObj);
+                      updated.set(normalizeArtistId(entry.artistId), detailsObj);
+                    }
+                    return updated;
+                  });
+                }
+              } catch (e) {
+                console.warn("[DetailsCache] Failed to parse baseline detailsCache:", e);
+              }
+            }
+          });
+        }).catch(e => console.warn("[DetailsCache] Failed to fetch baseline cache:", e));
+      }
+
     // --- STRICT FRONT-GATE CACHE CHECK ---
     // If this is a fresh search for a single artist without special filters, check the cache immediately
     if (artistList.length === 1 && !isRegeneration && !hasActiveFilters) {
@@ -2319,9 +2368,7 @@ const App: React.FC = () => {
     fetchingNodeIdsRef.current.clear();
     setLoadingNodeIds(new Set());
 
-    if (activeDiscoveryFilters.foundedAfter || activeDiscoveryFilters.foundedBefore || (activeDiscoveryFilters.includeOrigins && activeDiscoveryFilters.includeOrigins.length > 0) || (activeDiscoveryFilters.includeGenres && activeDiscoveryFilters.includeGenres.length > 0)) {
-      showToast(`Discovery Mode: Applying advanced filters...`);
-    }
+
 
     // --- PHASE 02: PER-ARTIST CACHE CHECK ---
     // Concurrently read one Firestore doc per artist. Determine exactly which are
@@ -2929,7 +2976,21 @@ const App: React.FC = () => {
           const currentActive = [...prev];
           const seedMapped = artistList.map(name => {
             const match = merged.nodes.find(fn => fn.id.toLowerCase() === name.toLowerCase());
-            return (match || { id: name, type: 'artist' as any, group: 0 }) as Node;
+            const baseNode = (match || { id: name, type: 'artist' as any, group: 0 }) as Node;
+            const normId = normalizeArtistId(baseNode.id);
+            const cachedDetails = detailsCache.get(normId) || detailsCache.get(baseNode.id.toLowerCase());
+            if (cachedDetails && cachedDetails.summary) {
+              return {
+                ...baseNode,
+                bio: cachedDetails.summary,
+                summary: cachedDetails.summary,
+                genre: cachedDetails.details?.genre || "",
+                origin: cachedDetails.details?.origin || "",
+                founded: cachedDetails.details?.founded || "",
+                imageUrl: cachedDetails.imageUrl || (baseNode as any).imageUrl || ""
+              };
+            }
+            return baseNode;
           });
           const seedIds = new Set(seedMapped.map(s => s.id.toLowerCase()));
           const finalActive = [...seedMapped];
@@ -3084,7 +3145,21 @@ const App: React.FC = () => {
         // Map current seeds first to maintain their presence and update them
         const seedMapped = resolvedArtistList.map(name => {
           const match = final.nodes.find(fn => fn.id.toLowerCase() === name.toLowerCase());
-          return (match || { id: name, type: 'artist' as any, group: 0 }) as Node;
+          const baseNode = (match || { id: name, type: 'artist' as any, group: 0 }) as Node;
+          const normId = normalizeArtistId(baseNode.id);
+          const cachedDetails = detailsCache.get(normId) || detailsCache.get(baseNode.id.toLowerCase());
+          if (cachedDetails && cachedDetails.summary) {
+            return {
+              ...baseNode,
+              bio: cachedDetails.summary,
+              summary: cachedDetails.summary,
+              genre: cachedDetails.details?.genre || "",
+              origin: cachedDetails.details?.origin || "",
+              founded: cachedDetails.details?.founded || "",
+              imageUrl: cachedDetails.imageUrl || (baseNode as any).imageUrl || ""
+            };
+          }
+          return baseNode;
         });
 
         const seedIds = new Set(seedMapped.map(s => s.id.toLowerCase()));
@@ -3106,7 +3181,21 @@ const App: React.FC = () => {
       const firstSlug = resolvedArtistList[0];
       const primaryNode = final.nodes.find(n => n.id.toLowerCase() === firstSlug.toLowerCase()) || final.nodes[0];
       if (primaryNode) {
-        setSelectedNode(primaryNode);
+        const normId = normalizeArtistId(primaryNode.id);
+        const cachedDetails = detailsCache.get(normId) || detailsCache.get(primaryNode.id.toLowerCase());
+        if (cachedDetails && cachedDetails.summary) {
+          setSelectedNode({
+            ...primaryNode,
+            bio: cachedDetails.summary,
+            summary: cachedDetails.summary,
+            genre: cachedDetails.details?.genre || "",
+            origin: cachedDetails.details?.origin || "",
+            founded: cachedDetails.details?.founded || "",
+            imageUrl: cachedDetails.imageUrl || (primaryNode as any).imageUrl || ""
+          } as any);
+        } else {
+          setSelectedNode(primaryNode);
+        }
       }
       setLastAppliedFilters(activeDiscoveryFilters);
       if (user && isFirebaseReady && isAuthInitialized && currentProjectId && !isGuest) {
