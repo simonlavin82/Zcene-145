@@ -284,4 +284,55 @@ The immersive discovery flow enables real-time node expansion on the Spiderweb c
 4. **Live Synthesis & Merge:** Upon user confirmation, a live generative request is dispatched to the Gemini API proxy to synthesize fresh adjacent nodes and edge connections. These results are then normalized and merged dynamically into the active canvas without re-initializing the entire map.
 5. **Sandbox Safety:** In local/development environments, the live dispatch is short-circuited with local static JSON mock data, allowing developers to safely test the gateway lifecycle and ledger logging without incurring API costs.
 
+---
 
+## 7. Zcene Creation State Machine
+
+To prevent deadlocks and loading-state loop traps during project creation, the platform adheres to a strict multi-stage creation and detail-hydration state machine.
+
+### 7.1 Detailed Creation State Transitions
+
+```mermaid
+stateDiagram-v2
+    [*] --> Idle: User enters query
+    Idle --> TokenWarning: User clicks Search / Add & Create
+    TokenWarning --> Canceled: User clicks Cancel
+    Canceled --> Idle: Rollback active states
+    TokenWarning --> GraphGeneration: User clicks Confirm
+    GraphGeneration --> PostProcessing: Gemini Pro returns raw graph
+    PostProcessing --> GraphCommit: Nuclear filtering & cache writes
+    GraphCommit --> AutosaveScheduled: setIsLoading(false) & select primaryNode
+    AutosaveScheduled --> DetailsFetchTriggered: useEffect detects isLoading = false
+    DetailsFetchTriggered --> ScraperCall: fetchNodeDetails starts (Gemini Flash)
+    ScraperCall --> PlayabilityCheck: Scrape YouTube video ID
+    PlayabilityCheck --> DetailsCommit: Verify playback & parse NodeDetails
+    DetailsCommit --> Finished: setDetailsCache & update selectedNode metadata
+    
+    state AutosaveScheduled {
+        [*] --> LockSession: isHydratingSessionRef = true
+        LockSession --> DatabaseWrite: 3s debounce timeout
+        DatabaseWrite --> UnlockSession: isHydratingSessionRef = false (after 1s delay)
+    }
+```
+
+### 7.2 Core Orchestration Stages
+
+1. **User Initiation & Warning Intercept:**
+   * When the user commits seed artist inputs, the client intercepts the search. If there's an uncached artist (cache miss), it triggers the **Token Confirmation Dialog** displaying cost metrics.
+2. **AI Graph Generation (Gemini Pro):**
+   * Upon confirmation, the loading flags are set: `setIsLoading(true)`, `isProjectLoadingRef.current = true`, and `isHydratingSessionRef.current = true`.
+   * A call is dispatched to `/api/gemini` using `gemini-3.1-pro-preview` to generate the relational network.
+3. **Graph Commit and Database Write-Back:**
+   * The returned graph undergoes **Nuclear Filtering** (pruning nodes and links that violate constraints).
+   * A fire-and-forget promise calls `writeArtistCacheMany` to save the structural sub-graph to the `/artists/{slug}` Firestore path (without biography details, which are fetched JIT).
+   * The D3 physics simulations are initialized, `setIsLoading(false)` and `isProjectLoadingRef.current = false` are set, and `selectedNode` is set to the primary seed node.
+4. **Autosave Lock Lifecycle:**
+   * Because `selectedNode` and `graphData` updated, the autosave `useEffect` triggers. It sets `isHydratingSessionRef.current = true` and schedules a 3-second debounced write to the user's `/projects/{projectId}` path.
+   * Once the project document is saved, a 1-second timeout clears the lock: `isHydratingSessionRef.current = false`.
+5. **JIT Details Fetch & Enrichment (Gemini Flash):**
+   * The details-fetching `useEffect` triggers immediately when graph generation completes (`isLoading` changes to `false`).
+   * The effect is **not** blocked by `isHydratingSessionRef.current` (which is still held by the autosave timer). This prevents a deadlock since ref mutations do not trigger React re-renders.
+   * The effect runs `fetchNodeDetails` on `gemini-3-flash-preview` to obtain the artist biography, genre, origin, and founded fields.
+   * Concurrently, it queries `/api/artist/scrape-video-id` and validates YouTube playability on the server.
+   * Once details resolve, it calls `setDetailsCache` and updates `selectedNode` with the biography. The loading spinner is cleared (`loadingNodeIds` is cleared).
+   * The newly written metadata triggers a final autosave to capture the enriched details in the project document.

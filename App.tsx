@@ -4498,7 +4498,7 @@ const App: React.FC = () => {
   }, [currentProjectId]);
 
   useEffect(() => {
-    if (isLoading || isHydratingSessionRef.current) return;
+    if (isLoading) return;
     const fetch = async () => {
       // 1. Block Automated Background Fetches: ✦
       // ONLY process the actively selected node to prevent neighbor chain-fetching
