@@ -2978,6 +2978,15 @@ const App: React.FC = () => {
               mutatedPruned = mutateGraphArtistId(mutatedPruned, oldSeed, newSeedId, newSeedLabel);
             }
             
+            // Clean up old unmutated seed IDs from loadingNodeIds to prevent loader leaks
+            setLoadingNodeIds(prev => {
+              const next = new Set(prev);
+              next.delete(oldSeed);
+              next.delete(oldSeedId);
+              next.delete(oldSeed.toLowerCase());
+              return next;
+            });
+            
             // Also mutate selectedNode and activeNodes if they matched the old seed ID
             setSelectedNode(prev => {
               if (prev && normalizeArtistId(prev.id) === oldSeedId) {
@@ -4153,27 +4162,61 @@ const App: React.FC = () => {
     if (!confirmed) return;
     // ──────────────────────────────────────────────────────────────────────────
 
+    const cacheId = normalizeArtistId(nodeId);
+
     // 1. Evict from local state immediately to show loading spinner
     setDetailsCache(prev => { 
         const n = new Map(prev); 
         n.delete(nodeId); 
         n.delete(nodeId.toLowerCase());
-        n.delete(normalizeArtistId(nodeId));
+        n.delete(cacheId);
         return n; 
     });
-    
-    // 2. Hard-delete the Firestore cache document to bypass cache
-    try {
-        const cacheId = normalizeArtistId(nodeId);
-        try {
-            await deleteDoc(doc(db, 'artists', cacheId));
-            console.log(`[Cache Eviction] Deleted Firestore cache for: ${cacheId}`);
-        } catch (error: any) {
-            console.warn("Global write bypassed due to rule restrictions:", error.message);
-        }
-    } catch (error) {
-        console.error(`[Cache Eviction] Failed to delete Firestore cache for ${nodeId}:`, error);
-    }
+
+    detailsCacheRef.current.delete(nodeId);
+    detailsCacheRef.current.delete(nodeId.toLowerCase());
+    detailsCacheRef.current.delete(cacheId);
+
+    healedDetailsCacheRef.current.delete(nodeId);
+    healedDetailsCacheRef.current.delete(nodeId.toLowerCase());
+    healedDetailsCacheRef.current.delete(cacheId);
+
+    // 2. Clear bio/details from selectedNode so that the details queue runs and does not hit hasHydratedBio
+    setSelectedNode(prev => {
+      if (prev && (normalizeArtistId(prev.id) === cacheId || prev.id.toLowerCase() === nodeId.toLowerCase())) {
+        return {
+          ...prev,
+          bio: undefined,
+          summary: undefined,
+          genre: undefined,
+          origin: undefined,
+          founded: undefined
+        };
+      }
+      return prev;
+    });
+
+    // 3. Mark as evicted so the details queue skips cache lookup
+    evictedNodeIdsRef.current.add(nodeId);
+    evictedNodeIdsRef.current.add(nodeId.toLowerCase());
+    evictedNodeIdsRef.current.add(cacheId);
+
+    // 4. Trigger spinner immediately
+    setLoadingNodeIds(prev => new Set(prev).add(nodeId));
+
+    // 5. Evict from global Firestore cache
+    deleteDoc(doc(db, 'artists', cacheId))
+      .then(() => console.log(`[Cache Eviction] Deleted Firestore cache for: ${cacheId}`))
+      .catch((error: any) => {
+        console.warn("[Cache Eviction] deleteDoc failed, invalidating in-place:", error.message);
+        updateDoc(doc(db, 'artists', cacheId), {
+            detailsCache: '',
+            cachedAt: serverTimestamp()
+        }).then(() => console.log(`[Cache Eviction] Fallback: Invalidated stale record in-place for: ${cacheId}`))
+          .catch((fallbackError: any) => {
+            console.error(`[Cache Eviction] Fallback updateDoc also failed for ${nodeId}:`, fallbackError);
+          });
+      });
   }, [confirmTokenUsage]);
   const handleExtendNode = useCallback(async (node: Node) => {
     if (!graphData) return;
@@ -4567,6 +4610,13 @@ const App: React.FC = () => {
                    }
                 }
 
+                if (details) {
+                  if (!details.details) {
+                    details.details = { genre: "", origin: "", founded: "", notableArtists: [] };
+                  }
+                  details.details.artist = details.details.artist || node.label || titleCaseArtistId(node.id);
+                }
+
                 healedDetailsCacheRef.current.set(node.id, details);
                 healedDetailsCacheRef.current.set(node.id.toLowerCase(), details);
                 healedDetailsCacheRef.current.set(normalizeArtistId(node.id), details);
@@ -4628,24 +4678,27 @@ const App: React.FC = () => {
                         });
                       });
 
-                      // 4. Mutate selectedNode
-                      setSelectedNode(prev => {
-                        if (prev && normalizeArtistId(prev.id) === cacheId) {
-                          return {
-                            ...prev,
-                            id: canonicalId,
-                            label: canonicalName,
-                            name: canonicalName,
-                            bio: details.summary,
-                            summary: details.summary,
-                            genre: details.details?.genre || "",
-                            origin: details.details?.origin || "",
-                            founded: details.details?.founded || "",
-                          };
-                        }
-                        return prev;
-                      });
                     }
+
+                    // 4. Mutate selectedNode (always run to ensure fresh metadata is painted to the active sidebar)
+                    setSelectedNode(prev => {
+                      if (prev && (normalizeArtistId(prev.id) === cacheId || prev.id.toLowerCase() === node.id.toLowerCase())) {
+                        const canonicalName = details.details?.artist || prev.label || prev.id;
+                        const canonicalId = normalizeArtistId(canonicalName);
+                        return {
+                          ...prev,
+                          id: canonicalId,
+                          label: canonicalName,
+                          name: canonicalName,
+                          bio: details.summary,
+                          summary: details.summary,
+                          genre: details.details?.genre || "",
+                          origin: details.details?.origin || "",
+                          founded: details.details?.founded || "",
+                        };
+                      }
+                      return prev;
+                    });
 
                     if (existingSnap.exists()) {
                       // Update the existing doc with fresh detailsCache and a new cachedAt timestamp.
@@ -4742,7 +4795,15 @@ const App: React.FC = () => {
             // Guaranteed per-node cleanup — runs even if an unexpected exception escapes
             // the while-loop's inner catch block.
             fetchingNodeIdsRef.current.delete(node.id);
-            setLoadingNodeIds(prev => { const next = new Set(prev); next.delete(node.id); return next; });
+            fetchingNodeIdsRef.current.delete(node.id.toLowerCase());
+            fetchingNodeIdsRef.current.delete(normalizeArtistId(node.id));
+            setLoadingNodeIds(prev => {
+              const next = new Set(prev);
+              next.delete(node.id);
+              next.delete(node.id.toLowerCase());
+              next.delete(normalizeArtistId(node.id));
+              return next;
+            });
             lastProgressTimestampRef.current = Date.now();
           }
         }

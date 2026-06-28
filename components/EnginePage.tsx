@@ -226,6 +226,11 @@ Serial Fetch & Backoff Strategy in App.tsx and OS-level stability logic.
    are applied. The query is labeled as "DEEP CUT CREATION" at a cost of $0.0015. 
    If canceled, the operation aborts cleanly and the screen remains unchanged. 
    If confirmed, the sidebar opens and detail generation proceeds.
+
+7. HEAL CACHE & LOADER STATE OPTIMIZATION (App.tsx):
+   - Heal Cache & Invalidation Fallback: Manual force-refresh evicts the node from local cache, clears bio/metadata properties on selectedNode to allow re-fetching (bypassing hasHydratedBio), and populates evictedNodeIdsRef. If deleteDoc fails due to security restrictions, the system falls back to updateDoc to invalidate the Firestore document cache in-place (detailsCache = '').
+   - Outer Try/Catch/Finally Loader Gate: The entire graph generation pipeline is wrapped in a comprehensive outer try/catch/finally block to guarantee isLoading is cleared.
+   - Mutated Seed ID Cleanups: Mutation from a partial query to a canonical node (e.g. 'Gaye' -> 'Marvin Gaye') clears the old unmutated seed ID from loadingNodeIds, and the JIT details queue finally block removes all variation formats case-insensitively.
 `;
 
 const SHARING_FLOW_DOCUMENTATION = `
