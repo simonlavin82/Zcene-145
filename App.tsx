@@ -1110,6 +1110,7 @@ const App: React.FC = () => {
   const lastViewedStackCountRef = useRef<number>(0);
   const currentCacheKeyRef = useRef<string | null>(null);
   const evictedNodeIdsRef = useRef<Set<string>>(new Set());
+  const approvedSeedsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => { currentProjectOwnerIdRef.current = currentProjectOwnerId; }, [currentProjectOwnerId]);
   useEffect(() => { projectNameRef.current = projectName; }, [projectName]);
@@ -1601,7 +1602,9 @@ const App: React.FC = () => {
     } else if (cachedDetails) {
        console.log(`[Node Click Intercept] Incomplete/broken local profile detected for: ${node.id}`);
        const displayName = cachedDetails?.details?.artist || node.label || titleCaseArtistId(node.id);
-       const confirmed = await confirmTokenUsage('data_quality_optimization', [], [displayName]);
+       const isApprovedSeed = approvedSeedsRef.current.has(normalizeArtistId(node.id)) || 
+                              approvedSeedsRef.current.has(node.id.toLowerCase());
+       const confirmed = isApprovedSeed ? true : await confirmTokenUsage('data_quality_optimization', [], [displayName]);
        if (!confirmed) return; // Cancel: return early without rendering details
        
        const cacheId = normalizeArtistId(node.id);
@@ -1754,7 +1757,9 @@ const App: React.FC = () => {
                 } else {
                     console.log(`[Node Click Intercept] Incomplete global Firestore profile detected for: ${node.id}`);
                     const displayName = detailsPayload?.details?.artist || node.label || titleCaseArtistId(node.id);
-                    const confirmed = await confirmTokenUsage('data_quality_optimization', [], [displayName]);
+                    const isApprovedSeed = approvedSeedsRef.current.has(normalizeArtistId(node.id)) || 
+                                           approvedSeedsRef.current.has(node.id.toLowerCase());
+                    const confirmed = isApprovedSeed ? true : await confirmTokenUsage('data_quality_optimization', [], [displayName]);
                     if (!confirmed) return; // Cancel: return early without rendering details
 
                     // Delete from local memory and Firestore cache
@@ -1819,8 +1824,9 @@ const App: React.FC = () => {
         }
     }
 
-    // 3. Fallback Only if Empty
-    const confirmed = await confirmTokenUsage('deep_cut_creation', [], [node.label || titleCaseArtistId(node.id)]);
+    const isApprovedSeed = approvedSeedsRef.current.has(normalizeArtistId(node.id)) || 
+                           approvedSeedsRef.current.has(node.id.toLowerCase());
+    const confirmed = isApprovedSeed ? true : await confirmTokenUsage('deep_cut_creation', [], [node.label || titleCaseArtistId(node.id)]);
     if (!confirmed) {
       return;
     }
@@ -2044,11 +2050,17 @@ const App: React.FC = () => {
   ) => {
     isHydratingSessionRef.current = true;
     setIsLoading(true);
+    let controller: AbortController | null = null;
     let isLockReleasedByAutosave = false;
     let bypassToken = bypassTokenConfirmation;
     const prevActiveNodes = activeNodes;
     const prevSeedArtists = seedArtists;
     const activeDiscoveryFilters = overrideFilters || discoveryFilters;
+
+    // Clear previously approved seeds on fresh project generation
+    if (!isRegeneration && !graphToEnhance) {
+      approvedSeedsRef.current.clear();
+    }
 
     if (!user && (isRegeneration || !window.location.search)) {
       isHydratingSessionRef.current = false;
@@ -2101,14 +2113,15 @@ const App: React.FC = () => {
       }
     }
 
-    const hasActiveFilters = !!(
-      activeDiscoveryFilters.foundedAfter ||
-      activeDiscoveryFilters.foundedBefore ||
-      (activeDiscoveryFilters.includeOrigins && activeDiscoveryFilters.includeOrigins.length > 0) ||
-      (activeDiscoveryFilters.excludeOrigins && activeDiscoveryFilters.excludeOrigins.length > 0) ||
-      (activeDiscoveryFilters.includeGenres && activeDiscoveryFilters.includeGenres.length > 0) ||
-      (activeDiscoveryFilters.additionalInstructions && activeDiscoveryFilters.additionalInstructions.trim().length > 0)
-    );
+    try {
+      const hasActiveFilters = !!(
+        activeDiscoveryFilters.foundedAfter ||
+        activeDiscoveryFilters.foundedBefore ||
+        (activeDiscoveryFilters.includeOrigins && activeDiscoveryFilters.includeOrigins.length > 0) ||
+        (activeDiscoveryFilters.excludeOrigins && activeDiscoveryFilters.excludeOrigins.length > 0) ||
+        (activeDiscoveryFilters.includeGenres && activeDiscoveryFilters.includeGenres.length > 0) ||
+        (activeDiscoveryFilters.additionalInstructions && activeDiscoveryFilters.additionalInstructions.trim().length > 0)
+      );
 
     // --- STRICT FRONT-GATE CACHE CHECK ---
     // If this is a fresh search for a single artist without special filters, check the cache immediately
@@ -2213,6 +2226,9 @@ const App: React.FC = () => {
               }
               
               setSeedArtists(artists);
+              artistList.forEach(name => {
+                approvedSeedsRef.current.add(normalizeArtistId(name));
+              });
               // Force all loading flags off and short-circuit the entire function
               setIsLoading(false);
               isFetchingDetailsRef.current = false;
@@ -2249,7 +2265,7 @@ const App: React.FC = () => {
       }
     }
     if (abortControllerRef.current) abortControllerRef.current.abort();
-    const controller = new AbortController();
+    controller = new AbortController();
     abortControllerRef.current = controller;
 
     setActiveNodes(prev => {
@@ -2897,7 +2913,7 @@ const App: React.FC = () => {
 
     if (!bypassToken) {
       const confirmed = await confirmTokenUsage('generation', [], artistList);
-      if (!confirmed || controller.signal.aborted) {
+      if (!confirmed || (controller && controller.signal.aborted)) {
         isHydratingSessionRef.current = false;
         setIsLoading(false);
         setActiveNodes(prevActiveNodes);
@@ -2906,7 +2922,11 @@ const App: React.FC = () => {
       }
     }
 
-    try {
+    artistList.forEach(name => {
+      approvedSeedsRef.current.add(normalizeArtistId(name));
+    });
+
+
       const graphPromise = generateGraphData(artists, pruned, activeDiscoveryFilters, user?.uid);
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error("The AI is taking too long to respond. The request has timed out.")), 120000)
@@ -2916,7 +2936,7 @@ const App: React.FC = () => {
       const newData = await Promise.race([graphPromise, timeoutPromise]) as GraphData;
       console.log(`[Music Discovery] AI generated graph in ${((Date.now() - startTime) / 1000).toFixed(1)}s`);
 
-      if (controller.signal.aborted) return;
+      if (controller && controller.signal.aborted) return;
       if (!newData || !newData.nodes || !newData.links) {
         throw new Error("The AI returned formless data. Please try again with different artists.");
       }
@@ -2942,6 +2962,10 @@ const App: React.FC = () => {
         resolvedArtists = mappedSeeds.join('::');
         resolvedArtistList = mappedSeeds.map(a => normalizeArtistId(a));
         setSeedArtists(resolvedArtists);
+
+        resolvedArtistList.forEach(name => {
+          approvedSeedsRef.current.add(normalizeArtistId(name));
+        });
 
         // Mutate seed IDs in-place on both newData and pruned
         artists.split('::').forEach((oldSeed, idx) => {
@@ -3032,13 +3056,13 @@ const App: React.FC = () => {
         isHydratingSessionRef.current = false;
       }
     } catch (err: any) {
-      if (err.name !== 'AbortError' && !controller.signal.aborted) {
+      if (err.name !== 'AbortError' && !(controller && controller.signal.aborted)) {
         showToast(humanizeError(err));
         setIsLoading(false);
         isFetchingDetailsRef.current = false;
       }
     } finally {
-      if (abortControllerRef.current === controller) {
+      if (controller && abortControllerRef.current === controller) {
         setIsLoading(false);
       }
       if (!isLockReleasedByAutosave) {
