@@ -1,7 +1,7 @@
 
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { AlertCircle, X, CheckCircle2, Key } from 'lucide-react';
+import { AlertCircle, AlertTriangle, X, CheckCircle2, Key } from 'lucide-react';
 import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project, ArtistCacheEntry, COST_PER_AI_CALL } from './types';
 import { generateGraphData, fetchNodeDetails, extendGraphFromNode } from './services/geminiService';
 import { normalizeArtistId, readArtistCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, titleCaseArtistId, findCanonicalNodeForArtist } from './services/artistCacheService';
@@ -187,16 +187,27 @@ const Toast: React.FC<{ message: string; onClose: () => void }> = ({ message, on
     return () => clearTimeout(timer);
   }, [onClose]);
 
+  const isWarning = message.startsWith('⚠️');
+  // Strip leading status emoji so it isn't rendered twice alongside the icon
+  const cleanMessage = message.replace(/^[⚠️⚡✅]\s?/, '').trim();
+
   return (
     <div className="fixed bottom-24 sm:bottom-12 left-1/2 -translate-x-1/2 z-[1000] pointer-events-none px-4 w-full max-w-sm">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 20 }}
-        className="bg-brand-black text-primary px-6 py-3 rounded-none shadow-2xl flex items-center justify-center gap-3 pointer-events-auto border border-primary/50 backdrop-blur-md"
+        className={`px-6 py-3 rounded-none shadow-2xl flex items-center justify-center gap-3 pointer-events-auto backdrop-blur-md border ${
+          isWarning
+            ? 'bg-yellow-950/90 border-yellow-500/50 text-yellow-400'
+            : 'bg-brand-black border-primary/50 text-primary'
+        }`}
       >
-        <CheckCircle2 className="w-5 h-5" />
-        <span className="text-sm font-medium">{message}</span>
+        {isWarning
+          ? <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+          : <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+        }
+        <span className="text-sm font-medium">{cleanMessage}</span>
       </motion.div>
     </div>
   );
@@ -884,11 +895,9 @@ const validateCacheEntry = (data: any): CacheValidationResult => {
         return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
       }
 
-      // Future-proof placeholder: check if there's any links array (as an example of future properties)
-      const links = targetObj?.links || [];
-      if (!links || links.length === 0) {
-        needsFutureFields = true;
-      }
+      // NOTE: The former 'links array' future-proof placeholder was removed.
+      // It set needsFutureFields=true for every record that lacked a links array,
+      // which made isFullyQualified permanently false for all cached entries.
     }
   } catch (e) {
     return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
@@ -2237,7 +2246,7 @@ const App: React.FC = () => {
               } else {
                 isHydratingSessionRef.current = false;
               }
-              if (bypassCacheValidation && !isQualified) {
+              if (!isQualified) {
                 showToast('⚠️ Cache Incomplete');
               } else {
                 showToast('⚡ Loaded from cache');
@@ -2527,7 +2536,7 @@ const App: React.FC = () => {
           }));
           
           const allQualified = Array.from(cached.values()).every(e => validateCacheEntry(e).isFullyQualified);
-          if (bypassCacheValidation && !allQualified) {
+          if (!allQualified) {
             showToast('⚠️ Cache Incomplete');
           } else {
             showToast('⚡ Loaded from cache');
@@ -2786,7 +2795,7 @@ const App: React.FC = () => {
         }));
         
         const allQualified = Array.from(cached.values()).every(e => validateCacheEntry(e).isFullyQualified);
-        if (bypassCacheValidation && !allQualified) {
+        if (!allQualified) {
           showToast('⚠️ Cache Incomplete');
         } else {
           showToast('⚡ Loaded from cache');
@@ -3743,18 +3752,28 @@ const App: React.FC = () => {
           }
         }
 
-        // Cache alignment self-healing verification check on hydrated nodes
+        // Cache completeness check — scoped to seed artists only (not peer-band nodes).
+        // Peer bands may have shallow/incomplete docs; only the user's seeded artists
+        // should gate the toast. This mirrors the validation scope used by
+        // handleGenerateGraph's Front Gate Cache path (validateCacheEntry on seed doc only).
         if (hydratedNodes.length > 0) {
+          const seedIds = new Set(
+            (data.seedArtists ? data.seedArtists.split('::') : (data.artistIds || []))
+              .map((s: string) => normalizeArtistId(s.trim()))
+              .filter(Boolean)
+          );
+          const seedNodes = hydratedNodes.filter((n: any) => seedIds.has(normalizeArtistId(n.id)));
+          // Graceful fallback: if no seed IDs matched (old project format), check only the first node
+          const nodesToCheck = seedNodes.length > 0 ? seedNodes : hydratedNodes.slice(0, 1);
+
           let hasIncomplete = false;
-          for (const n of hydratedNodes) {
-            if (n.type === 'artist' || !n.type) {
-              const details = detailsCacheRef.current.get(n.id) ||
-                              detailsCacheRef.current.get(n.id.toLowerCase()) ||
-                              detailsCacheRef.current.get(normalizeArtistId(n.id));
-              if (details && checkIsProfileIncomplete(n, details)) {
-                hasIncomplete = true;
-                break;
-              }
+          for (const n of nodesToCheck) {
+            const details = detailsCacheRef.current.get(n.id) ||
+                            detailsCacheRef.current.get(n.id.toLowerCase()) ||
+                            detailsCacheRef.current.get(normalizeArtistId(n.id));
+            if (details && details.summary && details.summary.trim().length > 5 && checkIsProfileIncomplete(n, details)) {
+              hasIncomplete = true;
+              break;
             }
           }
           if (hasIncomplete) {
