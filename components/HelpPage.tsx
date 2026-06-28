@@ -184,9 +184,9 @@ const LegendItem: React.FC<LegendItemProps> = ({ symbol, symbolSize, title, desc
     </div>
 );
 
-const HelpSection: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
-    <section className="py-12 sm:py-16 first:pt-0">
-        <h2 className="text-3xl sm:text-4xl lg:text-5xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 sm:mb-12">{title}</h2>
+const HelpSection: React.FC<{ title: string; id?: string; children: React.ReactNode }> = ({ title, id, children }) => (
+    <section id={id}>
+        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">{title}</h2>
         {children}
     </section>
 );
@@ -283,6 +283,42 @@ const HelpPage: React.FC<HelpPageProps> = ({
         }
     ];
 
+    const sections = [
+        { id: 'choose-artists', title: 'Choosing artists' },
+        { id: 'getting-around', title: 'Getting around' },
+        { id: 'digging-details', title: 'Digging for details' },
+        { id: 'magazine-view', title: 'Magazine View' },
+        { id: 'curating-stack', title: 'Curating your Stack' },
+        { id: 'sharing-settings', title: 'Sharing & Settings' },
+        { id: 'private-persistent', title: 'Private & Persistent' },
+        { id: 'legend-glossary', title: 'Legend Glossary' },
+        { id: 'troubleshooting', title: 'Troubleshooting' }
+    ];
+
+    const scrollToSection = (sectionId: string, offset: number = 80) => {
+        const element = document.getElementById(sectionId);
+        const container = containerRef.current;
+        if (element && container) {
+            const containerRect = container.getBoundingClientRect();
+            const elementRect = element.getBoundingClientRect();
+            const relativeTop = elementRect.top - containerRect.top;
+            const targetScrollTop = container.scrollTop + relativeTop - offset;
+            container.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
+        }
+    };
+
+    const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, sectionId: string) => {
+        e.preventDefault();
+        scrollToSection(sectionId, 80);
+    };
+
+    const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const sectionId = e.target.value;
+        if (!sectionId) return;
+        scrollToSection(sectionId, 160);
+        e.target.value = "";
+    };
+
     return (
         <div ref={containerRef} className="h-full w-full overflow-y-auto bg-background-dark text-zinc-200 font-display flex flex-col relative">
             <Header
@@ -307,8 +343,25 @@ const HelpPage: React.FC<HelpPageProps> = ({
                 onRestartWalkthrough={onRestartWalkthrough}
             />
 
-            <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-20 flex-grow">
-                <div className="max-w-4xl mx-auto">
+            <div className="lg:hidden p-4 sticky top-0 bg-background-dark z-[90] border-b border-zinc-700">
+                <div className="relative">
+                    <select
+                        id="help-nav"
+                        className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900 text-zinc-300 py-2.5 pl-4 pr-8 font-medium focus:ring-1 focus:ring-primary focus:outline-none"
+                        onChange={handleSelectChange}
+                        defaultValue=""
+                    >
+                        <option value="" disabled>Jump to section...</option>
+                        {sections.map(section => (
+                            <option key={section.id} value={section.id}>{section.title}</option>
+                        ))}
+                    </select>
+                    <span className="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400">arrow_drop_down</span>
+                </div>
+            </div>
+
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex gap-12 flex-grow">
+                <aside className="w-56 flex-shrink-0 sticky top-28 self-start h-[calc(100vh-8rem)] hidden lg:block overflow-y-auto overflow-x-hidden pl-4 scrollbar-thin scrollbar-thumb-zinc-800">
                     <div className="pt-6 pb-2">
                         <button 
                             onClick={() => onClose ? onClose() : (window.history.length > 1 ? window.history.back() : onNavigate(View.Home))} 
@@ -318,14 +371,41 @@ const HelpPage: React.FC<HelpPageProps> = ({
                             Back
                         </button>
                     </div>
-                    
-                    {/* Intro Section */}
-                    <section className="text-center space-y-6 mb-24">
-                        <h1 className="text-4xl sm:text-5xl md:text-7xl font-medium text-white tracking-tighter">Becoming Zcene</h1>
-                        <p className="text-xl md:text-2xl text-zinc-400 max-w-2xl mx-auto leading-relaxed">Here's how to navigate the spiderweb and master the tools for deep musical exploration.</p>
-                    </section>
+                    <nav className="space-y-1">
+                        {sections.map(section => (
+                            <a 
+                                key={section.id} 
+                                href={`#${section.id}`} 
+                                onClick={(e) => handleNavClick(e, section.id)} 
+                                className="block text-zinc-400 hover:text-primary hover:bg-zinc-800/50 py-1.5 px-2 rounded-xl transition-colors text-sm"
+                            >
+                                {section.title}
+                            </a>
+                        ))}
+                    </nav>
+                </aside>
 
-                    <HelpSection title="1. Choosing your artists">
+                <main className="flex-1 py-10 space-y-24 min-w-0">
+                    <div className="lg:hidden pt-6 pb-2">
+                        <button 
+                            onClick={() => onClose ? onClose() : (window.history.length > 1 ? window.history.back() : onNavigate(View.Home))} 
+                            className="inline-flex items-center gap-2 text-zinc-400 hover:text-white transition-colors bg-transparent border-0 p-0 cursor-pointer text-sm font-medium"
+                        >
+                            <span className="material-symbols-outlined text-sm">arrow_back</span>
+                            Back
+                        </button>
+                    </div>
+                    
+                    {/* ── CHOOSING ARTISTS ── */}
+                    <section id="choose-artists">
+                        <div className="mb-10 border-b border-zinc-700 pb-8">
+                            <h1 className="text-3xl font-medium text-white mb-4">Help</h1>
+                            <p className="text-zinc-400 leading-relaxed max-w-3xl text-base">
+                                Here's how to navigate the spiderweb and master the tools for deep musical exploration.
+                            </p>
+                        </div>
+
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Choosing your artists</h2>
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
                             <div className="space-y-8">
                                 <p className="text-zinc-400 text-base leading-relaxed">
@@ -352,9 +432,9 @@ const HelpPage: React.FC<HelpPageProps> = ({
                                 <ArtistManagementMock />
                             </MockUIContainer>
                         </div>
-                    </HelpSection>
+                    </section>
 
-                    <HelpSection title="2. Getting around the map">
+                    <HelpSection id="getting-around" title="Getting around the map">
                         <p className="text-zinc-400 max-w-3xl mb-12 text-base leading-relaxed">
                             The Spiderweb is meant to be explored organically. Pan and zoom to find interesting clusters.
                         </p>
@@ -383,7 +463,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
                         </div>
                     </HelpSection>
 
-                    <HelpSection title="3. Digging for details">
+                    <HelpSection id="digging-details" title="Digging for details">
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
                              <MockUIContainer title="Deep Cut Panel">
                                 <DeepCutMock />
@@ -416,7 +496,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
                         </div>
                     </HelpSection>
 
-                    <HelpSection title="4. Immersive Magazine View">
+                    <HelpSection id="magazine-view" title="Immersive Magazine View">
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
                             <div className="space-y-8">
                                 <p className="text-zinc-400 text-base leading-relaxed">
@@ -438,7 +518,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
                         </div>
                     </HelpSection>
 
-                    <HelpSection title="5. Curating your Stack">
+                    <HelpSection id="curating-stack" title="Curating your Stack">
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
                              <MockUIContainer title="My Stack Interface">
                                 <MyStackMock />
@@ -465,7 +545,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
                         </div>
                     </HelpSection>
 
-                    <HelpSection title="6. Sharing & Settings">
+                    <HelpSection id="sharing-settings" title="Sharing & Settings">
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
                             <div className="space-y-8">
                                 <p className="text-zinc-400 text-base leading-relaxed">
@@ -492,7 +572,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
                         </div>
                     </HelpSection>
 
-                    <HelpSection title="7. Private & Persistent">
+                    <HelpSection id="private-persistent" title="Private & Persistent">
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
                              <div className="order-2 lg:order-1">
                                 <MockUIContainer title="Safe Storage">
@@ -521,7 +601,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
                         </div>
                     </HelpSection>
 
-                    <HelpSection title="Legend Glossary">
+                    <HelpSection id="legend-glossary" title="Legend Glossary">
                         <p className="text-zinc-400 max-w-3xl mb-12 text-base leading-relaxed">
                             The Legend is your interactive filter. Hide or show different relationship types to focus your exploration.
                         </p>
@@ -532,7 +612,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
                         </div>
                     </HelpSection>
 
-                    <HelpSection title="Troubleshooting">
+                    <HelpSection id="troubleshooting" title="Troubleshooting">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                              <div className="p-8 bg-zinc-900/40 border border-zinc-800 rounded-xl space-y-4">
                                 <h4 className="text-primary font-medium text-lg flex items-center gap-3">
@@ -554,8 +634,8 @@ const HelpPage: React.FC<HelpPageProps> = ({
                              </div>
                         </div>
                     </HelpSection>
-                </div>
-            </main>
+                </main>
+            </div>
 
             <footer className="w-full p-12 text-zinc-400 text-sm z-10 relative bg-neutral-900 flex-shrink-0 border-t border-neutral-800">
                 <div className="container mx-auto">

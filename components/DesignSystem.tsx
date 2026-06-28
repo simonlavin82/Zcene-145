@@ -259,7 +259,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                 onRestartWalkthrough={onRestartWalkthrough}
             />
             
-            <div className="lg:hidden p-4 sticky top-16 bg-background-dark z-[90] border-b border-zinc-700">
+            <div className="lg:hidden p-4 sticky top-0 bg-background-dark z-[90] border-b border-zinc-700">
                 <div className="relative">
                     <select
                         id="styleguide-nav"
@@ -286,7 +286,6 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                         </button>
                     </div>
                     <nav className="space-y-1">
-                        <h3 className="font-medium text-white text-lg mb-4">Jump to section</h3>
                         {sections.map(section => (
                             <a key={section.id} href={`#${section.id}`} onClick={(e) => handleNavClick(e, section.id)} className="block text-zinc-400 hover:text-primary hover:bg-zinc-800/50 py-1.5 px-2 rounded-xl transition-colors text-sm">{section.title}</a>
                         ))}
@@ -305,6 +304,12 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                     </div>
                     {/* 0. INTRODUCTION */}
                     <section id="introduction">
+                        <div className="mb-10 border-b border-zinc-700 pb-8">
+                            <h1 className="text-3xl font-medium text-white mb-4">Design System</h1>
+                            <p className="text-zinc-400 leading-relaxed max-w-3xl text-base">
+                                This style guide documents the layout patterns, visual tokens, and UI components that form the Zcene experience. It is our unified language for blending brutalist structure with premium interaction.
+                            </p>
+                        </div>
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Introduction</h2>
                         <div className="space-y-8">
                             <div className="bg-zinc-900/50 border border-zinc-800 p-8 rounded-xl">

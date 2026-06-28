@@ -570,6 +570,44 @@ export const EnginePage: React.FC<SourcePageProps> = ({
         </div>
     );
 
+    const sections = [
+        { id: 'site-map', title: 'Site Map' },
+        { id: 'architecture', title: 'Architecture' },
+        { id: 'graph-intelligence', title: 'Graph Intelligence' },
+        { id: 'visualization-engine', title: 'Visualization Engine' },
+        { id: 'sharing-flow', title: 'Sharing & Collaboration' },
+        { id: 'system-resilience', title: 'System Resilience' },
+        { id: 'cost-estimation', title: 'Cost & Caching' },
+        { id: 'graph-generation', title: 'Graph Generation' },
+        { id: 'deep-cut-details', title: 'Deep Cut Details' },
+        { id: 'conversational-ai', title: 'Conversational AI' },
+        { id: 'access-management', title: 'Access Management' },
+    ];
+
+    const scrollToSection = (sectionId: string, offset: number = 80) => {
+        const element = document.getElementById(sectionId);
+        const container = containerRef.current;
+        if (element && container) {
+            const containerRect = container.getBoundingClientRect();
+            const elementRect = element.getBoundingClientRect();
+            const relativeTop = elementRect.top - containerRect.top;
+            const targetScrollTop = container.scrollTop + relativeTop - offset;
+            container.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
+        }
+    };
+
+    const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, sectionId: string) => {
+        e.preventDefault();
+        scrollToSection(sectionId, 80);
+    };
+
+    const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const sectionId = e.target.value;
+        if (!sectionId) return;
+        scrollToSection(sectionId, 160);
+        e.target.value = "";
+    };
+
     return (
         <div ref={containerRef} className="h-full w-full overflow-y-auto bg-background-dark text-zinc-200 font-display flex flex-col relative">
             <Header
@@ -594,8 +632,25 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                 onRestartWalkthrough={onRestartWalkthrough}
             />
 
-            <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-12 flex-grow">
-                <div className="max-w-5xl mx-auto">
+            <div className="lg:hidden p-4 sticky top-0 bg-background-dark z-[90] border-b border-zinc-700">
+                <div className="relative">
+                    <select
+                        id="engine-nav"
+                        className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900 text-zinc-300 py-2.5 pl-4 pr-8 font-medium focus:ring-1 focus:ring-primary focus:outline-none"
+                        onChange={handleSelectChange}
+                        defaultValue=""
+                    >
+                        <option value="" disabled>Jump to section...</option>
+                        {sections.map(section => (
+                            <option key={section.id} value={section.id}>{section.title}</option>
+                        ))}
+                    </select>
+                    <span className="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400">arrow_drop_down</span>
+                </div>
+            </div>
+
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex gap-12 flex-grow">
+                <aside className="w-56 flex-shrink-0 sticky top-28 self-start h-[calc(100vh-8rem)] hidden lg:block overflow-y-auto overflow-x-hidden pl-4 scrollbar-thin scrollbar-thumb-zinc-800">
                     <div className="pt-6 pb-2">
                         <button 
                             onClick={() => onClose ? onClose() : (window.history.length > 1 ? window.history.back() : onNavigate(View.Home))} 
@@ -605,17 +660,42 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                             Back
                         </button>
                     </div>
+                    <nav className="space-y-1">
+                        {sections.map(section => (
+                            <a 
+                                key={section.id} 
+                                href={`#${section.id}`} 
+                                onClick={(e) => handleNavClick(e, section.id)} 
+                                className="block text-zinc-400 hover:text-primary hover:bg-zinc-800/50 py-1.5 px-2 rounded-xl transition-colors text-sm"
+                            >
+                                {section.title}
+                            </a>
+                        ))}
+                    </nav>
+                </aside>
 
-                    <div className="mb-10 border-b border-zinc-700 pb-8">
-                        <h1 className="text-3xl font-medium text-white mb-4">The Zcene Engine</h1>
-                        <p className="text-zinc-400 leading-relaxed max-w-3xl text-base">
-                            This page documents the structural architecture, prompt templates, and discovery logic that drive Zcene. 
-                            It is the underlying system that allows the Author to map the unknown.
-                        </p>
+                <main className="flex-1 py-10 space-y-24 min-w-0">
+                    <div className="lg:hidden pt-6 pb-2">
+                        <button 
+                            onClick={() => onClose ? onClose() : (window.history.length > 1 ? window.history.back() : onNavigate(View.Home))} 
+                            className="inline-flex items-center gap-2 text-zinc-400 hover:text-white transition-colors bg-transparent border-0 p-0 cursor-pointer text-sm font-medium"
+                        >
+                            <span className="material-symbols-outlined text-sm">arrow_back</span>
+                            Back
+                        </button>
                     </div>
 
-                    <div className="space-y-4">
-                        <h2 className="text-xl font-medium text-primary mb-6">Site Map</h2>
+                    {/* ── SITE MAP ── */}
+                    <section id="site-map">
+                        <div className="mb-10 border-b border-zinc-700 pb-8">
+                            <h1 className="text-3xl font-medium text-white mb-4">Engine</h1>
+                            <p className="text-zinc-400 leading-relaxed max-w-3xl text-base">
+                                This page documents the structural architecture, prompt templates, and discovery logic that drive Zcene. 
+                                It is the underlying system that allows the Author to map the unknown.
+                            </p>
+                        </div>
+
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Site Map</h2>
                         <div className="bg-zinc-900/30 p-8 rounded-xl border border-zinc-700/50 mb-12">
                             <ul className="space-y-6 max-w-2xl">
                                 <SitemapNode 
@@ -661,39 +741,72 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                                 />
                             </ul>
                         </div>
+                    </section>
 
-                        <h2 className="text-xl font-medium text-primary mb-6 pt-8 border-t border-zinc-700">Architecture</h2>
+                    {/* ── ARCHITECTURE ── */}
+                    <section id="architecture">
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">Architecture</h2>
                         <ArchitectureDiagram />
                         <CodeBlock title="Cloud Infrastructure & Orchestration" content={ARCHITECTURE_DOCUMENTATION} />
+                    </section>
 
-                        <h2 className="text-xl font-medium text-primary mb-6 pt-8 border-t border-zinc-700">Graph Intelligence</h2>
+                    {/* ── GRAPH INTELLIGENCE ── */}
+                    <section id="graph-intelligence">
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">Graph Intelligence</h2>
                         <DiscoveryFlowDiagram />
                         <CodeBlock title="State Maintenance & lifecycle" content={GRAPH_INTELLIGENCE_DOCUMENTATION} />
+                    </section>
 
-                        <h2 className="text-xl font-medium text-primary mb-6 pt-8 border-t border-zinc-700">Visualization Engine</h2>
+                    {/* ── VISUALIZATION ENGINE ── */}
+                    <section id="visualization-engine">
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">Visualization Engine</h2>
                         <CodeBlock title="Physics & D3 Constants" content={PHYSICS_ENGINE_DOCUMENTATION} />
+                    </section>
 
-                        <h2 className="text-xl font-medium text-primary mb-6 pt-8 border-t border-zinc-700">Collaboration & Sharing Flow</h2>
+                    {/* ── SHARING FLOW ── */}
+                    <section id="sharing-flow">
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">Collaboration & Sharing Flow</h2>
                         <SharingFlowDiagram />
                         <CodeBlock title="Guest Preview & Project Cloning" content={SHARING_FLOW_DOCUMENTATION} />
+                    </section>
 
-                        <h2 className="text-xl font-medium text-primary mb-6 pt-8 border-t border-zinc-700">System Resilience</h2>
+                    {/* ── SYSTEM RESILIENCE ── */}
+                    <section id="system-resilience">
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">System Resilience</h2>
                         <CodeBlock title="Network Logic & Selection strategy" content={RESILIENCE_DOCUMENTATION} />
+                    </section>
 
-                        <h2 className="text-xl font-medium text-primary mb-6 pt-8 border-t border-zinc-700">Cost Estimation Architecture</h2>
+                    {/* ── COST ESTIMATION ── */}
+                    <section id="cost-estimation">
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">Cost Estimation Architecture</h2>
                         <CodeBlock title="Ledger Rules & Caching Strategy" content={COST_ESTIMATION_DOCUMENTATION} />
+                    </section>
 
-                        <h2 className="text-xl font-medium text-primary mb-6 pt-8 border-t border-zinc-700">Graph Generation</h2>
+                    {/* ── GRAPH GENERATION ── */}
+                    <section id="graph-generation">
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">Graph Generation</h2>
                         <CodeBlock title="Initial Graph Prompt" content={GENERATE_GRAPH_PROMPT_TEMPLATE} />
                         <CodeBlock title="Enhance Graph (Context) Prompt" content={GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE} />
                         <CodeBlock title="Graph Response Schema" content={GRAPH_RESPONSE_SCHEMA} isJson />
-                        
-                        <h2 className="text-xl font-medium text-primary mb-6 pt-8 border-t border-zinc-700">Deep Cut Details</h2>
+                    </section>
+
+                    {/* ── DEEP CUT DETAILS ── */}
+                    <section id="deep-cut-details">
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">Deep Cut Details</h2>
                         <CodeBlock title="Lexical Hardening & Persona" content={DEEP_CUT_INTELLIGENCE_DOCUMENTATION} />
                         <CodeBlock title="Fetch Details Prompt" content={FETCH_NODE_DETAILS_PROMPT_TEMPLATE} />
                         <CodeBlock title="Node Details Schema" content={NODE_DETAILS_SCHEMA} isJson />
+                    </section>
 
-                        <h2 className="text-xl font-medium text-primary mb-6 pt-8 border-t border-zinc-700">Access Management</h2>
+                    {/* ── CONVERSATIONAL AI ── */}
+                    <section id="conversational-ai">
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">Conversational Intelligence</h2>
+                        <CodeBlock title="Consult AI Logic" content={CONVERSATIONAL_INTELLIGENCE_DOCUMENTATION} />
+                    </section>
+
+                    {/* ── ACCESS MANAGEMENT ── */}
+                    <section id="access-management">
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">Access Management</h2>
                         <div className="space-y-6">
                             <CodeBlock 
                                 title="Fortress Approach Implementation" 
@@ -724,12 +837,10 @@ const StyleGuidePage = React.lazy(() => import('./StyleGuidePage'));
 // are conditionally hidden from non-admin authenticated sessions.`} 
                             />
                         </div>
+                    </section>
 
-                        <h2 className="text-xl font-medium text-primary mb-6 pt-8 border-t border-zinc-700">Conversational Intelligence</h2>
-                        <CodeBlock title="Consult AI Logic" content={CONVERSATIONAL_INTELLIGENCE_DOCUMENTATION} />
-                    </div>
-                </div>
-            </main>
+                </main>
+            </div>
 
             <footer className="w-full p-8 text-zinc-400 text-sm z-10 relative bg-neutral-900 flex-shrink-0 border-t border-neutral-800">
                 <div className="container mx-auto text-center">
