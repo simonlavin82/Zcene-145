@@ -6,7 +6,7 @@ import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, St
 import { generateGraphData, fetchNodeDetails, extendGraphFromNode } from './services/geminiService';
 import { normalizeArtistId, readArtistCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, titleCaseArtistId, findCanonicalNodeForArtist } from './services/artistCacheService';
 import { auth, signInWithGoogle, logout, onAuthStateChanged, User, db, handleFirestoreError, OperationType } from './services/firebase';
-import { collection, doc, setDoc, deleteDoc, onSnapshot, query, getDocFromServer, serverTimestamp, addDoc, getDoc, getDocs, orderBy, where, writeBatch, getDocFromCache, updateDoc, increment } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, onSnapshot, query, getDocFromServer, serverTimestamp, addDoc, getDoc, getDocs, orderBy, where, writeBatch, getDocFromCache, updateDoc, increment, limit } from 'firebase/firestore';
 const StyleGuidePage = React.lazy(() => import('./components/DesignSystem').then(m => ({ default: m.StyleGuidePage })));
 const EnginePage = React.lazy(() => import('./components/EnginePage').then(m => ({ default: m.EnginePage })));
 const UsageAnalyticsPage = React.lazy(() => import('./components/UsageAnalyticsPage').then(m => ({ default: m.UsageAnalyticsPage })));
@@ -33,6 +33,73 @@ const checkVideoPlayabilityOnServer = async (videoId: string): Promise<boolean> 
     console.warn(`[Playability] Client fetch check failed for ${videoId}:`, e);
   }
   return false;
+};
+
+interface DisambiguationDialogProps {
+  isOpen: boolean;
+  query: string;
+  options: string[];
+  onSelect: (choice: string | 'synthesis' | 'cancel') => void;
+}
+
+const DisambiguationDialog: React.FC<DisambiguationDialogProps> = ({
+  isOpen,
+  query,
+  options,
+  onSelect
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+      <div className="w-full max-w-md rounded-none bg-zinc-900 border border-zinc-800 p-8 shadow-2xl relative overflow-hidden flex flex-col gap-6">
+        {/* Border glow accent */}
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-yellow-500/30 via-yellow-500 to-yellow-500/30" />
+        
+        <div className="flex flex-col gap-2">
+          <h3 className="text-xl font-bold text-zinc-100 uppercase tracking-wider flex items-center gap-2">
+            <span className="material-symbols-outlined text-yellow-500">psychology</span>
+            Disambiguation
+          </h3>
+          <p className="text-sm text-zinc-400">
+            We found multiple canonical artists in our index matching <span className="text-yellow-500 font-semibold">"{query}"</span>. Which one did you mean?
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-3 max-h-[250px] overflow-y-auto pr-1">
+          {options.map((opt) => (
+            <button
+              key={opt}
+              onClick={() => onSelect(opt)}
+              className="w-full text-left p-4 bg-zinc-800/40 hover:bg-zinc-800 border border-zinc-700/50 hover:border-yellow-500 transition-all duration-200 flex items-center justify-between group"
+            >
+              <span className="text-zinc-200 group-hover:text-yellow-500 font-medium transition-colors">
+                {opt}
+              </span>
+              <span className="material-symbols-outlined text-zinc-600 group-hover:text-yellow-500 transition-colors text-sm">
+                arrow_forward_ios
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div className="flex flex-col gap-2 pt-2 border-t border-zinc-800/80">
+          <button
+            onClick={() => onSelect('synthesis')}
+            className="w-full py-3 px-4 bg-zinc-800/30 hover:bg-zinc-800 text-zinc-300 hover:text-zinc-100 font-semibold border border-zinc-700/30 hover:border-zinc-700 transition-all text-sm uppercase tracking-wider"
+          >
+            Create New Graph for "{query}"
+          </button>
+          <button
+            onClick={() => onSelect('cancel')}
+            className="w-full py-3 px-4 bg-transparent hover:bg-zinc-800/20 text-zinc-500 hover:text-zinc-400 font-medium transition-all text-sm uppercase tracking-wider"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 declare global {
@@ -951,6 +1018,12 @@ const App: React.FC = () => {
     cost: number;
     onSelect: (choice: 'cache' | 'synthesis' | 'cancel') => void;
   } | null>(null);
+  const [disambiguationDialog, setDisambiguationDialog] = useState<{
+    isOpen: boolean;
+    query: string;
+    options: string[];
+    onSelect: (choice: string | 'synthesis' | 'cancel') => void;
+  } | null>(null);
 
   const confirmTokenUsage = useCallback((
     type: 'generation' | 'extension' | 'deep_cut_creation' | 'partial_synthesis' | 'cache_upgrade' | 'data_quality_optimization',
@@ -990,6 +1063,37 @@ const App: React.FC = () => {
         }
       });
     });
+  }, []);
+
+  const searchMatchingArtistsInCache = useCallback(async (queryStr: string): Promise<string[]> => {
+    const normQuery = normalizeArtistId(queryStr);
+    if (normQuery.length < 2) return [];
+
+    try {
+      const q = query(
+        collection(db, 'artists'),
+        where('cacheKey', '>=', normQuery),
+        where('cacheKey', '<=', normQuery + '\uf8ff'),
+        limit(10)
+      );
+
+      const snapshot = await getDocs(q);
+      const matches = new Set<string>();
+
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        if (data.redirectTo) {
+          matches.add(data.redirectTo);
+        } else {
+          matches.add(docSnap.id);
+        }
+      });
+
+      return Array.from(matches).map(id => titleCaseArtistId(id));
+    } catch (err) {
+      console.warn("[Disambiguation] Prefix match lookup failed:", err);
+      return [];
+    }
   }, []);
 
   const authRedirectPathRef = useRef<string | null>(null);
@@ -1939,6 +2043,7 @@ const App: React.FC = () => {
     overrideFilters?: DiscoveryFilters
   ) => {
     isHydratingSessionRef.current = true;
+    setIsLoading(true);
     let isLockReleasedByAutosave = false;
     let bypassToken = bypassTokenConfirmation;
     const prevActiveNodes = activeNodes;
@@ -1947,6 +2052,7 @@ const App: React.FC = () => {
 
     if (!user && (isRegeneration || !window.location.search)) {
       isHydratingSessionRef.current = false;
+      setIsLoading(false);
       // Only gate if it's a manual action (regeneration or fresh start)
       // Imports (via deep links) are allowed for guests
       console.log(`[Lazy Registration] Queueing generateGraph for guest. User: ${!!user}`);
@@ -1958,8 +2064,41 @@ const App: React.FC = () => {
     const artistList = artists.split('::').map(a => normalizeArtistId(a)).filter(Boolean);
     if (artistList.length > 25) {
       isHydratingSessionRef.current = false;
+      setIsLoading(false);
       setError(`Limit: 25 artists.`);
       return;
+    }
+
+    // --- STAGE 0: DISAMBIGUATION CHECK ---
+    if (artistList.length === 1 && !isRegeneration && !overrideFilters && !bypassToken) {
+      const searchId = artistList[0];
+      const matches = await searchMatchingArtistsInCache(searchId);
+      if (matches.length > 1) {
+        setIsLoading(false);
+        isHydratingSessionRef.current = false;
+        
+        const choice = await new Promise<string | 'synthesis' | 'cancel'>((resolve) => {
+          setDisambiguationDialog({
+            isOpen: true,
+            query: artists,
+            options: matches,
+            onSelect: (c) => {
+              setDisambiguationDialog(null);
+              resolve(c);
+            }
+          });
+        });
+
+        if (choice === 'cancel') {
+          return;
+        }
+        if (choice === 'synthesis') {
+          bypassToken = true;
+        } else {
+          handleGenerateGraph(choice, false, graphToEnhance, bypassCacheValidation, false, overrideFilters);
+          return;
+        }
+      }
     }
 
     const hasActiveFilters = !!(
@@ -4243,7 +4382,7 @@ const App: React.FC = () => {
   }, [currentProjectId]);
 
   useEffect(() => {
-    if (isLoading) return;
+    if (isLoading || isHydratingSessionRef.current) return;
     const fetch = async () => {
       // 1. Block Automated Background Fetches: ✦
       // ONLY process the actively selected node to prevent neighbor chain-fetching
@@ -5018,6 +5157,13 @@ const App: React.FC = () => {
         onSelect={(choice) => cacheChoiceDialog?.onSelect(choice)}
         artists={cacheChoiceDialog?.artists || []}
         cost={cacheChoiceDialog?.cost || 0}
+      />
+
+      <DisambiguationDialog
+        isOpen={!!disambiguationDialog}
+        query={disambiguationDialog?.query || ''}
+        options={disambiguationDialog?.options || []}
+        onSelect={(c) => disambiguationDialog?.onSelect(c)}
       />
 
       <AnimatePresence>
