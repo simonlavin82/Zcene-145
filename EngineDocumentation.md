@@ -239,6 +239,7 @@ Every outbound request to the Gemini API incurs real-world usage costs. To manag
 *   **Data Quality Interception:** On node click, the frontend runs `checkIsProfileIncomplete` on cached details. If any heuristics fail (such as case-insensitive substring checks for missing field indicators like `unknown`, `n/a`, `none`, `null`, `undefined`, `placeholder`, `not available` across all core fields; purely lowercase identifier markers on labels, details, or inside the bio's first bolded markdown token like `**scowl**`; syntax leaks; or repeating template placeholder paragraphs like `"is a notable music entity"`), it intercepts selection immediately with a `data_quality_optimization` warning. Cancel aborts the timeline (no UI selection change), whereas Confirm evicts the stale cache (locally and Firestore) and loads the node using a fresh, live AI synthesis.
 *   **Smart Fallback Routing:** On mixed queries, the cancel warning acts as an intelligent routing mechanism. Rather than discarding the entire search, the app strips the uncached bands on the fly and re-routes the process using only cached (free) bands.
 *   **Sandbox Safety Gates:** In sandbox/development environments, the local application forces `isLocal = true` in the services layer. This short-circuits live outbound dispatches with local static JSON mock data, completely protecting billing limits while still allowing developers to test the warning flows and ledger logging logic.
+*   **Composite Caching with Generative Constraints (Seed Filters):** Seed Filters (temporal limits, geographic inclusions/exclusions, genres) are elevated from client-side visual toggles to Generative Constraints. They are deterministically serialized alongside the normalized artist IDs using `buildCompositeCacheKey` to form composite Firestore cache keys (e.g. `/artists/mindforce-after:2015-inc_origins:usa`). Changing any Seed Filter triggers a cache miss on the composite key, ensuring filter parameters actively shape cache partitioning.
 
 ### 4.3 Stale-While-Revalidate Freshness Policy
 To ensure that historical cache documents do not become permanently stale, Zcene implements an automated **Stale-While-Revalidate (SWR)** freshness policy inside the JIT node selection hydration flow:
@@ -294,13 +295,20 @@ To prevent deadlocks and loading-state loop traps during project creation, the p
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Idle: User enters query
-    Idle --> TokenWarning: User clicks Search / Add & Create
-    TokenWarning --> Canceled: User clicks Cancel
-    Canceled --> Idle: Rollback active states
-    TokenWarning --> GraphGeneration: User clicks Confirm
-    GraphGeneration --> PostProcessing: Gemini Pro returns raw graph
-    PostProcessing --> GraphCommit: Nuclear filtering & cache writes
+    [*] --> Idle: User enters query & sets Seed Filters
+    Idle --> CacheCheck: User clicks Search / Add & Update
+    CacheCheck --> PerfectHit: Composite cache hit (all seeds + filters match)
+    PerfectHit --> LoadCache: Load composite cached layout
+    CacheCheck --> BaseHit: Composite miss but Base cache hit (seeds exist with other/no filters)
+    BaseHit --> ChoiceDialog: Prompt "Select Spiderweb Depth" Choice Modal
+    ChoiceDialog --> LoadCache: Option A (Load standard cache, reset filters)
+    ChoiceDialog --> AISynthesis: Option B (Fresh AI Synthesis with custom filters)
+    CacheCheck --> TotalMiss: Complete cache miss (seeds not in database)
+    TotalMiss --> TokenWarning: Prompt cost warnings
+    TokenWarning --> AISynthesis: Confirm
+    TokenWarning --> Canceled: Cancel (rollback states)
+    AISynthesis --> PostProcessing: Gemini Pro returns raw graph
+    PostProcessing --> GraphCommit: Nuclear filtering & write back to composite key (/artists/{compositeKey})
     GraphCommit --> AutosaveScheduled: setIsLoading(false) & select primaryNode
     AutosaveScheduled --> DetailsFetchTriggered: useEffect detects isLoading = false
     DetailsFetchTriggered --> ScraperCall: fetchNodeDetails starts (Gemini Flash)
@@ -318,13 +326,15 @@ stateDiagram-v2
 ### 7.2 Core Orchestration Stages
 
 1. **User Initiation & Warning Intercept:**
-   * When the user commits seed artist inputs, the client intercepts the search. If there's an uncached artist (cache miss), it triggers the **Token Confirmation Dialog** displaying cost metrics.
+   * When the user commits seed artist inputs and sets Seed Filters, the client executes a double-cache lookup: checking `/artists/{compositeKey}` (using `buildCompositeCacheKey` with current filters) and falling back to `/artists/{artistId}` (base document).
+   * If there is a composite miss but a base hit, it prompts the **Select Spiderweb Depth** choice modal. The user can either load the standard cached layout (Option A, which resets active filters) or dispatch a fresh generative synthesis (Option B).
+   * If there is a complete cache miss on both composite and base keys, it triggers the standard **Token Confirmation Dialog** displaying cost metrics.
 2. **AI Graph Generation (Gemini Pro):**
-   * Upon confirmation, the loading flags are set: `setIsLoading(true)`, `isProjectLoadingRef.current = true`, and `isHydratingSessionRef.current = true`.
-   * A call is dispatched to `/api/gemini` using `gemini-3.1-pro-preview` to generate the relational network.
+   * Upon confirmation of a miss or Option B, loading flags are set: `setIsLoading(true)`, `isProjectLoadingRef.current = true`, and `isHydratingSessionRef.current = true`.
+   * A call is dispatched to `/api/gemini` using `gemini-3.1-pro-preview` with custom Seed Filters passed as active generative constraints.
 3. **Graph Commit and Database Write-Back:**
    * The returned graph undergoes **Nuclear Filtering** (pruning nodes and links that violate constraints).
-   * A fire-and-forget promise calls `writeArtistCacheMany` to save the structural sub-graph to the `/artists/{slug}` Firestore path (without biography details, which are fetched JIT).
+   * A fire-and-forget promise calls `writeArtistCacheMany` to save the structural sub-graph to Firestore under the composite cache key `/artists/{compositeKey}` (e.g. `mindforce-after:2015`) to isolate this custom generation.
    * The D3 physics simulations are initialized, `setIsLoading(false)` and `isProjectLoadingRef.current = false` are set, and `selectedNode` is set to the primary seed node.
 4. **Autosave Lock Lifecycle:**
    * Because `selectedNode` and `graphData` updated, the autosave `useEffect` triggers. It sets `isHydratingSessionRef.current = true` and schedules a 3-second debounced write to the user's `/projects/{projectId}` path.

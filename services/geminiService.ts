@@ -657,6 +657,8 @@ const generateMockNodeDetails = (node: Node): NodeDetails => {
 
 export const generateGraphData = async (artists: string, baseGraph?: GraphData, filters?: DiscoveryFilters, activeUserId?: string | null): Promise<GraphData> => {
   if (isLocal) {
+    // Add artificial delay to simulate network latency and show loading states during local testing
+    await new Promise(resolve => setTimeout(resolve, 1500));
     return generateMockGraphData(artists, baseGraph, filters);
   }
   const proxyKey = 'backend-proxy-key'; // Actual key is securely injected by the proxy

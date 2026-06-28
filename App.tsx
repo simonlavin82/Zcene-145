@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { AlertCircle, AlertTriangle, X, CheckCircle2, Key } from 'lucide-react';
 import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project, ArtistCacheEntry, COST_PER_AI_CALL } from './types';
 import { generateGraphData, fetchNodeDetails, extendGraphFromNode } from './services/geminiService';
-import { normalizeArtistId, readArtistCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, titleCaseArtistId, findCanonicalNodeForArtist } from './services/artistCacheService';
+import { normalizeArtistId, readArtistCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, titleCaseArtistId, findCanonicalNodeForArtist, buildCompositeCacheKey } from './services/artistCacheService';
 import { auth, signInWithGoogle, logout, onAuthStateChanged, User, db, handleFirestoreError, OperationType } from './services/firebase';
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, getDocFromServer, serverTimestamp, addDoc, getDoc, getDocs, orderBy, where, writeBatch, getDocFromCache, updateDoc, increment, limit } from 'firebase/firestore';
 const StyleGuidePage = React.lazy(() => import('./components/DesignSystem').then(m => ({ default: m.StyleGuidePage })));
@@ -988,6 +988,7 @@ const App: React.FC = () => {
   const [urlOriginHint, setUrlOriginHint] = useState<string | null>(null);
   const [chatHistories, setChatHistories] = useState<Map<string, ChatMessage[]>>(new Map());
   const [discoveryFilters, setDiscoveryFilters] = useState<DiscoveryFilters>({});
+  const [lastAppliedFilters, setLastAppliedFilters] = useState<DiscoveryFilters>({});
   const [isMagazineViewOpen, setIsMagazineViewOpen] = useState(false);
   const [profile, setProfile] = useState<any>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -2335,14 +2336,18 @@ const App: React.FC = () => {
 
       if (!bypassToken) {
         const normalizedArtistList = artistList.map(name => name.toLowerCase());
-        const cacheResult = await readArtistCacheMany(normalizedArtistList, user?.uid);
+        const compositeCacheResult = await readArtistCacheMany(normalizedArtistList, user?.uid, activeDiscoveryFilters);
+        const baseCacheResult = await readArtistCacheMany(normalizedArtistList, user?.uid);
 
         // Intercept redirects/disambiguations in Phase 02 Cache Hit
         let seedUpdated = false;
         const mappedSeeds = artists.split('::').map(a => {
           const trimmed = a.trim();
           const norm = normalizeArtistId(trimmed);
-          const entry = cacheResult.cached.get(norm) || cacheResult.cached.get(norm.toLowerCase());
+          const entry = compositeCacheResult.cached.get(norm) || 
+                        compositeCacheResult.cached.get(norm.toLowerCase()) ||
+                        baseCacheResult.cached.get(norm) ||
+                        baseCacheResult.cached.get(norm.toLowerCase());
           if (entry && entry.artistId && entry.artistId.toLowerCase() !== norm.toLowerCase()) {
             seedUpdated = true;
             showToast(`Did you mean ${entry.seedArtists}? Resolved '${trimmed}' to '${entry.seedArtists}'.`);
@@ -2366,17 +2371,23 @@ const App: React.FC = () => {
 
         const allArtistsCached = normalizedArtistList.every(name => {
           const normName = name.toLowerCase();
-          const entry = cacheResult.cached.get(name) || cacheResult.cached.get(normName);
+          const entry = baseCacheResult.cached.get(name) || baseCacheResult.cached.get(normName);
+          return entry && isGraphDataPresent(entry);
+        });
+
+        const allCompositeCached = normalizedArtistList.every(name => {
+          const normName = name.toLowerCase();
+          const entry = compositeCacheResult.cached.get(name) || compositeCacheResult.cached.get(normName);
           return entry && isGraphDataPresent(entry);
         });
 
         if (allArtistsCached) {
           const allDeep = normalizedArtistList.every(name => {
             const normName = name.toLowerCase();
-            const entry = cacheResult.cached.get(name) || cacheResult.cached.get(normName);
+            const entry = baseCacheResult.cached.get(name) || baseCacheResult.cached.get(normName);
             return entry && entry.isDeep === true;
           });
-          const choice = (allDeep || bypassCacheValidation) ? 'cache' : await confirmCacheChoice(artistList);
+          const choice = (allCompositeCached || bypassCacheValidation) ? 'cache' : await confirmCacheChoice(artistList);
           if (choice === 'cancel' || controller.signal.aborted) {
             isHydratingSessionRef.current = false;
             setIsLoading(false);
@@ -2387,16 +2398,31 @@ const App: React.FC = () => {
 
           if (choice === 'synthesis') {
             console.log("[Phase 02 Cache] Option B chosen: forcing net-new AI generation.");
-            handleGenerateGraph(artists, true, graphToEnhance, bypassCacheValidation, true);
+            handleGenerateGraph(artists, true, null, bypassCacheValidation, true);
             return;
           }
 
           console.log("[Phase 02 Cache] Option A chosen: loading standard cached layout (bypassing validation checks).");
           
-          // Populate cached map directly from cacheResult with all entries
+          let finalCacheResult = allCompositeCached ? compositeCacheResult : baseCacheResult;
+          let workingFilters = activeDiscoveryFilters;
+
+          if (!allCompositeCached) {
+            // Option A chosen on a filter mismatch: load base cache, align filters to the loaded cache doc
+            const firstSlug = artistList[0];
+            const entry = baseCacheResult.cached.get(firstSlug) || baseCacheResult.cached.get(firstSlug.toLowerCase()) || baseCacheResult.cached.values().next().value;
+            const entryFilters = entry?.filters || {};
+            setDiscoveryFilters(entryFilters);
+            setLastAppliedFilters(entryFilters);
+            workingFilters = entryFilters;
+          } else {
+            setLastAppliedFilters(activeDiscoveryFilters);
+          }
+
+          // Populate cached map directly from finalCacheResult with all entries
           normalizedArtistList.forEach(name => {
             const normName = name.toLowerCase();
-            const entry = cacheResult.cached.get(name) || cacheResult.cached.get(normName);
+            const entry = finalCacheResult.cached.get(name) || finalCacheResult.cached.get(normName);
             if (entry) {
               cached.set(name, entry);
               cached.set(normName, entry);
@@ -2464,7 +2490,7 @@ const App: React.FC = () => {
           // Bypass merging with pruned to preserve the full map retrieved from Firestore cache
           let final = parsedGraphData;
           final = applyHumanCasedLabels(final, artists);
-          final = filterGraphByDiscoveryFilters(final, activeDiscoveryFilters, artists);
+          final = filterGraphByDiscoveryFilters(final, workingFilters, artists);
           
           setGraphData(final);
 
@@ -2569,7 +2595,7 @@ const App: React.FC = () => {
         
         artistList.forEach(name => {
           const normName = name.toLowerCase();
-          const entry = cacheResult.cached.get(name) || cacheResult.cached.get(normName);
+          const entry = compositeCacheResult.cached.get(name) || compositeCacheResult.cached.get(normName);
           const forceMockHit = (import.meta.env.DEV || import.meta.env.VITE_USE_MOCKS === 'true') && 
             ['sick of it all', 'h2o', 'radiohead', 'blink-182', 'orange 9mm', 'madball'].includes(normName);
 
@@ -2651,7 +2677,7 @@ const App: React.FC = () => {
 
         if (choice === 'synthesis') {
           console.log("[Phase 02 Cache] Option B chosen: forcing net-new AI generation.");
-          handleGenerateGraph(artists, true, graphToEnhance, bypassCacheValidation, true);
+          handleGenerateGraph(artists, true, null, bypassCacheValidation, true);
           return;
         }
 
@@ -2917,6 +2943,7 @@ const App: React.FC = () => {
 
         setIsLoading(false);
         fullCacheHit = true;
+        setLastAppliedFilters(activeDiscoveryFilters);
         if (user && isFirebaseReady && isAuthInitialized && currentProjectId && !isGuest) {
           isLockReleasedByAutosave = true;
         } else {
@@ -3079,6 +3106,7 @@ const App: React.FC = () => {
       if (primaryNode) {
         setSelectedNode(primaryNode);
       }
+      setLastAppliedFilters(activeDiscoveryFilters);
       if (user && isFirebaseReady && isAuthInitialized && currentProjectId && !isGuest) {
         isLockReleasedByAutosave = true;
       } else {
@@ -3481,7 +3509,10 @@ const App: React.FC = () => {
       if (data.seedArtists) setSeedArtists((prev: any) => prev === data.seedArtists ? prev : data.seedArtists);
       if (data.discoveryFilters) {
         const parsedFilters = typeof data.discoveryFilters === 'string' && data.discoveryFilters.startsWith('{') ? JSON.parse(data.discoveryFilters) : null;
-        if (parsedFilters) setDiscoveryFilters((prev: any) => JSON.stringify(prev) === JSON.stringify(parsedFilters) ? prev : parsedFilters);
+        if (parsedFilters) {
+          setDiscoveryFilters((prev: any) => JSON.stringify(prev) === JSON.stringify(parsedFilters) ? prev : parsedFilters);
+          setLastAppliedFilters(parsedFilters);
+        }
       }
       if (data.lastViewedStackCount !== undefined) setLastViewedStackCount((prev: any) => prev === data.lastViewedStackCount ? prev : data.lastViewedStackCount);
       if (data.chatHistories) {
@@ -4939,6 +4970,10 @@ const App: React.FC = () => {
     });
   }, [activeNodes, formattedGraphData]);
 
+  const areFiltersChanged = useMemo(() => {
+    return !areFiltersEqual(discoveryFilters, lastAppliedFilters);
+  }, [discoveryFilters, lastAppliedFilters]);
+
   return (
     <div className="h-[100dvh] flex flex-col overflow-hidden" key={refreshKey}>
       {/* Loading Sliver */}
@@ -5008,6 +5043,7 @@ const App: React.FC = () => {
         <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Graph ? 'z-10' : 'z-0 opacity-0 pointer-events-none'}`}>
           {graphData && (
             <GraphPage
+              areFiltersChanged={areFiltersChanged}
               data={formattedGraphData || { nodes: [], links: [] }} baseGraph={baseGraph} libraryArtists={libraryArtists} seedArtists={seedArtists}
               onRegenerate={(n) => handleGenerateGraph(n, true, graphData)} isLoading={isLoading}
               onCancelGeneration={handleCancel} onFileUpload={(f) => {

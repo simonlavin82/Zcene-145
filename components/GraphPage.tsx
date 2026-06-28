@@ -80,6 +80,7 @@ interface GraphPageProps {
   onUpdateLastViewedStackCount: (count: number) => void;
   discoveryFilters: DiscoveryFilters;
   onUpdateDiscoveryFilters: (filters: DiscoveryFilters) => void;
+  areFiltersChanged?: boolean;
   isMagazineViewOpen: boolean;
   onUpdateIsMagazineViewOpen: (isOpen: boolean) => void;
   onExtendNode?: (node: Node) => void;
@@ -169,7 +170,7 @@ const DiscoveryFiltersPanel: React.FC<{
         <span className={`material-symbols-outlined !text-sm transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
           expand_more
         </span>
-        Advanced Discovery Filters
+        Seed Filters
         {hasActiveFilters && !isExpanded && (
           <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
         )}
@@ -608,7 +609,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
   activeNodes, detailsCache, loadingNodeIds, onCloseNode, onRefreshNode, detailsError, systemError, onLogoClick, onNavigate, onClearLibrary, onClearZcene, isActive,
   chatHistories, onUpdateChatHistories, onShowToast, onRefreshUI, stack, onToggleStack,
   lastViewedStackCount, onUpdateLastViewedStackCount,
-  discoveryFilters, onUpdateDiscoveryFilters,
+  discoveryFilters, onUpdateDiscoveryFilters, areFiltersChanged = false,
   isMagazineViewOpen, onUpdateIsMagazineViewOpen,
   onExtendNode, onRemoveNode,
   user, profile, onUpdateProfile, isAuthInitialized, onLogin, onLogout,
@@ -1049,8 +1050,8 @@ const GraphPage: React.FC<GraphPageProps> = ({
     const currentEnabled = selectedSeedArtists.filter(a => a.enabled).map(a => normalizeArtistId(a.name)).sort().join('::');
     const lastGenerated = seedArtists.split('::').map(s => normalizeArtistId(s)).filter(Boolean).sort().join('::');
     const hasSearchTerm = searchTerm.trim().length > 0;
-    return (currentEnabled !== lastGenerated && currentEnabled.length > 0) || hasSearchTerm;
-  }, [selectedSeedArtists, seedArtists, searchTerm]);
+    return (currentEnabled !== lastGenerated && currentEnabled.length > 0) || hasSearchTerm || areFiltersChanged;
+  }, [selectedSeedArtists, seedArtists, searchTerm, areFiltersChanged]);
 
   const memoizedLibraryArtists = useMemo(() => libraryArtists.map(a => a.name), [libraryArtists]);
   const memoizedSeedArtists = useMemo(() => selectedSeedArtists.filter(a => a.enabled).map(a => a.name), [selectedSeedArtists]);
@@ -1306,7 +1307,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
           </div>
           {selectedSeedArtists.length > 0 && (
             <div className="px-4 pt-2 pb-4">
-                <h3 className="text-[10px] font-bold mb-2 uppercase tracking-widest text-zinc-500">Your seed artists</h3>
+                <h3 className="text-[10px] font-bold mb-2 uppercase tracking-widest text-zinc-500">Seed Artists</h3>
               <div className="space-y-1">
                 {selectedSeedArtists.map(artist => (
                   <div key={artist.name} className="flex items-center gap-1 group">

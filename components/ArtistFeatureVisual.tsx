@@ -58,7 +58,7 @@ const ArtistFeatureVisual: React.FC<{ className?: string }> = ({ className }) =>
                         </div>
 
                         <div className="px-4 pt-2 pb-4">
-                            <h3 className="text-[10px] font-bold mb-2 uppercase tracking-widest text-zinc-500">Your seed artists</h3>
+                            <h3 className="text-[10px] font-bold mb-2 uppercase tracking-widest text-zinc-500">Seed Artists</h3>
                             <div className="space-y-1">
                                 <div className="flex items-center gap-1 group">
                                     <div className="flex items-center gap-3 flex-grow overflow-hidden text-left p-2 rounded-xl bg-zinc-700/60 text-white backdrop-blur-sm transition-all border border-transparent">
@@ -84,7 +84,7 @@ const ArtistFeatureVisual: React.FC<{ className?: string }> = ({ className }) =>
                         <div className="px-4 mb-2">
                              <button className="flex items-center gap-2 text-[10px] font-bold text-zinc-500 hover:text-zinc-300 transition-colors uppercase tracking-widest">
                                 <span className="material-symbols-outlined !text-sm">expand_more</span>
-                                Advanced Discovery Filters
+                                Seed Filters
                              </button>
                         </div>
 
