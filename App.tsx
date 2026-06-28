@@ -611,6 +611,36 @@ const applyHumanCasedLabels = (graph: GraphData, seedsStr: string): GraphData =>
     nodes: updatedNodes
   };
 };
+const mutateGraphArtistId = (graph: GraphData, oldId: string, newId: string, newLabel: string): GraphData => {
+  if (!graph || !graph.nodes) return graph;
+  const normOld = normalizeArtistId(oldId);
+  
+  const updatedNodes = graph.nodes.map(n => {
+    if (normalizeArtistId(n.id) === normOld) {
+      return { ...n, id: newId, label: newLabel };
+    }
+    return n;
+  });
+
+  const updatedLinks = (graph.links || []).map(l => {
+    const sourceId = typeof l.source === 'object' ? (l.source as any).id : l.source;
+    const targetId = typeof l.target === 'object' ? (l.target as any).id : l.target;
+    
+    let nextSource = l.source;
+    let nextTarget = l.target;
+    
+    if (normalizeArtistId(sourceId) === normOld) {
+      nextSource = typeof l.source === 'object' ? { ...l.source, id: newId } : newId;
+    }
+    if (normalizeArtistId(targetId) === normOld) {
+      nextTarget = typeof l.target === 'object' ? { ...l.target, id: newId } : newId;
+    }
+    
+    return { ...l, source: nextSource, target: nextTarget };
+  });
+
+  return { nodes: updatedNodes, links: updatedLinks };
+};
 
 const toTitleCase = (str: string): string => {
   if (!str) return '';
@@ -2766,16 +2796,48 @@ const App: React.FC = () => {
 
       let resolvedArtists = artists;
       let resolvedArtistList = artistList;
+      let mutatedNewData = { ...newData };
+      let mutatedPruned = pruned ? { ...pruned } : null;
+
       if (seedUpdated) {
         resolvedArtists = mappedSeeds.join('::');
         resolvedArtistList = mappedSeeds.map(a => normalizeArtistId(a));
         setSeedArtists(resolvedArtists);
+
+        // Mutate seed IDs in-place on both newData and pruned
+        artists.split('::').forEach((oldSeed, idx) => {
+          const newSeedLabel = mappedSeeds[idx];
+          const oldSeedId = normalizeArtistId(oldSeed);
+          const newSeedId = normalizeArtistId(newSeedLabel);
+          if (oldSeedId !== newSeedId) {
+            mutatedNewData = mutateGraphArtistId(mutatedNewData, oldSeed, newSeedId, newSeedLabel);
+            if (mutatedPruned) {
+              mutatedPruned = mutateGraphArtistId(mutatedPruned, oldSeed, newSeedId, newSeedLabel);
+            }
+            
+            // Also mutate selectedNode and activeNodes if they matched the old seed ID
+            setSelectedNode(prev => {
+              if (prev && normalizeArtistId(prev.id) === oldSeedId) {
+                return { ...prev, id: newSeedId, label: newSeedLabel, name: newSeedLabel };
+              }
+              return prev;
+            });
+            setActiveNodes(prev => {
+              return prev.map(an => {
+                if (normalizeArtistId(an.id) === oldSeedId) {
+                  return { ...an, id: newSeedId, label: newSeedLabel, name: newSeedLabel };
+                }
+                return an;
+              });
+            });
+          }
+        });
       }
 
-      const returnedIds = new Set(newData.nodes.map(n => n.id.toLowerCase()));
-      let maxG = newData.nodes.reduce((m, n) => Math.max(m, n.group || 0), 0);
-      resolvedArtistList.forEach(name => { if (!returnedIds.has(name.toLowerCase())) { maxG++; newData.nodes.push({ id: name, type: 'artist', group: maxG }); } });
-      let final = pruned ? mergeGraphData(pruned, newData) : newData;
+      const returnedIds = new Set(mutatedNewData.nodes.map(n => n.id.toLowerCase()));
+      let maxG = mutatedNewData.nodes.reduce((m, n) => Math.max(m, n.group || 0), 0);
+      resolvedArtistList.forEach(name => { if (!returnedIds.has(name.toLowerCase())) { maxG++; mutatedNewData.nodes.push({ id: name, type: 'artist', group: maxG }); } });
+      let final = mutatedPruned ? mergeGraphData(mutatedPruned, mutatedNewData) : mutatedNewData;
       final = applyHumanCasedLabels(final, resolvedArtists);
       final = filterGraphByDiscoveryFilters(final, activeDiscoveryFilters, resolvedArtists);
       setGraphData(final);
@@ -4370,6 +4432,58 @@ const App: React.FC = () => {
                   const cacheId = normalizeArtistId(node.id);
                   try {
                     const existingSnap = await getArtistDocWithRedirect(cacheId);
+                    
+                    const canonicalNameFromDetails = details.details?.artist;
+                    const canonicalId = canonicalNameFromDetails ? normalizeArtistId(canonicalNameFromDetails) : cacheId;
+                    const isAlias = canonicalId !== cacheId;
+
+                    if (isAlias) {
+                      const canonicalName = canonicalNameFromDetails;
+                      
+                      // 1. Mutate seedArtists
+                      setSeedArtists(prev => {
+                        const seeds = prev.split('::').map(s => {
+                          if (normalizeArtistId(s) === cacheId) return canonicalName;
+                          return s;
+                        });
+                        return seeds.join('::');
+                      });
+
+                      // 2. Mutate graphData
+                      setGraphData(prev => {
+                        if (!prev) return prev;
+                        return mutateGraphArtistId(prev, node.id, canonicalId, canonicalName);
+                      });
+
+                      // 3. Mutate activeNodes
+                      setActiveNodes(prev => {
+                        return prev.map(n => {
+                          if (normalizeArtistId(n.id) === cacheId) {
+                            return { ...n, id: canonicalId, label: canonicalName, name: canonicalName };
+                          }
+                          return n;
+                        });
+                      });
+
+                      // 4. Mutate selectedNode
+                      setSelectedNode(prev => {
+                        if (prev && normalizeArtistId(prev.id) === cacheId) {
+                          return {
+                            ...prev,
+                            id: canonicalId,
+                            label: canonicalName,
+                            name: canonicalName,
+                            bio: details.summary,
+                            summary: details.summary,
+                            genre: details.details?.genre || "",
+                            origin: details.details?.origin || "",
+                            founded: details.details?.founded || "",
+                          };
+                        }
+                        return prev;
+                      });
+                    }
+
                     if (existingSnap.exists()) {
                       // Update the existing doc with fresh detailsCache and a new cachedAt timestamp.
                       // The security rule Case A permits: detailsCache, hitCount, and cachedAt.
@@ -4393,10 +4507,6 @@ const App: React.FC = () => {
                         n => n.type === 'artist' && (n.id.trim().toLowerCase() === node.id.trim().toLowerCase() || normalizeArtistId(n.id) === cacheId)
                       );
                       const canonicalName = canonicalNode?.label ?? canonicalNode?.id ?? node.id;
-                      
-                      const canonicalNameFromDetails = details.details?.artist;
-                      const canonicalId = canonicalNameFromDetails ? normalizeArtistId(canonicalNameFromDetails) : cacheId;
-                      const isAlias = canonicalId !== cacheId;
                       
                       const canonicalDocRef = doc(db, 'artists', canonicalId);
                       await setDoc(canonicalDocRef, {
