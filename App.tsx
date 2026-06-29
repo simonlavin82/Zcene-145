@@ -2947,9 +2947,9 @@ const App: React.FC = () => {
         }
 
         // Call Gemini ONLY for the missing and enrichment artists
-        const partialGraphPromise = generateGraphData(toFetch.join('::'), pruned, activeDiscoveryFilters, user?.uid);
+        const partialGraphPromise = generateGraphData(toFetch.join('::'), pruned, activeDiscoveryFilters, user?.uid, controller?.signal);
         const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("The AI is taking too long to respond. The request has timed out.")), 120000)
+          setTimeout(() => reject(new Error("The AI is taking too long to respond. The request has timed out.")), 180000)
         );
 
         const startTime = Date.now();
@@ -3055,9 +3055,9 @@ const App: React.FC = () => {
     });
 
 
-      const graphPromise = generateGraphData(artists, pruned, activeDiscoveryFilters, user?.uid);
+      const graphPromise = generateGraphData(artists, pruned, activeDiscoveryFilters, user?.uid, controller?.signal);
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("The AI is taking too long to respond. The request has timed out.")), 120000)
+        setTimeout(() => reject(new Error("The AI is taking too long to respond. The request has timed out.")), 180000)
       );
 
       const startTime = Date.now();

@@ -689,7 +689,13 @@ const generateMockNodeDetails = (node: Node): NodeDetails => {
   };
 };
 
-export const generateGraphData = async (artists: string, baseGraph?: GraphData, filters?: DiscoveryFilters, activeUserId?: string | null): Promise<GraphData> => {
+export const generateGraphData = async (
+  artists: string,
+  baseGraph?: GraphData,
+  filters?: DiscoveryFilters,
+  activeUserId?: string | null,
+  signal?: AbortSignal
+): Promise<GraphData> => {
   if (isLocal) {
     // Add artificial delay to simulate network latency and show loading states during local testing
     await new Promise(resolve => setTimeout(resolve, 1500));
@@ -847,7 +853,8 @@ export const generateGraphData = async (artists: string, baseGraph?: GraphData, 
           'Content-Type': 'application/json',
           'x-goog-api-key': proxyKey
         },
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify(requestBody),
+        signal
       });
 
       if (!response.ok) {
@@ -1036,12 +1043,22 @@ export const generateGraphData = async (artists: string, baseGraph?: GraphData, 
       return finalGraph;
     } catch (error: any) {
       const errorMsg = error.message || '';
-      const isTransient = errorMsg.includes('Proxying failed') || 
+      const isAbort = error.name === 'AbortError' || errorMsg.includes('aborted');
+      if (isAbort) {
+        throw error; // Propagate abort/cancel immediately
+      }
+
+      const isTimeout = errorMsg.includes('deadline exceeded') || 
+                        errorMsg.includes('504') || 
+                        errorMsg.includes('timeout');
+      
+      const isTransient = !isTimeout && (
+                          errorMsg.includes('Proxying failed') || 
                           errorMsg.includes('RESOURCE_EXHAUSTED') || 
                           errorMsg.includes('NetworkError') ||
                           errorMsg.includes('500') ||
-                          errorMsg.includes('deadline exceeded') ||
-                          errorMsg.includes('fetch failed');
+                          errorMsg.includes('fetch failed')
+      );
 
       if (isTransient && retriesLeft > 0) {
         console.warn(`Transient AI error detected. Retrying... (${retriesLeft} left). Error: ${errorMsg}`);
