@@ -219,6 +219,15 @@ This section details the critical stability enhancements made to resolve timing 
     *   **Seed-Scoped Project Loader Check:** The project loader's completeness check (Site 4) now builds a set of normalised seed IDs from `data.seedArtists` / `data.artistIds` and filters `hydratedNodes` to only those seeds before calling `checkIsProfileIncomplete`. A graceful fallback checks only the first node if no seed IDs match (old project format). This aligns the project-entry path with the `handleGenerateGraph` path which only validates the seed artist's own Firestore document.
     *   **Programmatic Icon Selection:** The `Toast` React component now detects whether the message string starts with `⚠️` (warning) or another prefix (success). Warning messages render an amber `AlertTriangle` icon with a dark amber background; all other messages render the standard `CheckCircle2` icon with the existing success styling. The leading emoji is stripped from the displayed text before rendering, eliminating the double-icon artefact entirely.
 
+### 3.5 Roots Breakdown Lifecycle & Universal Rationale
+*   **Graph State Lifecycle Update:** The state graph data schema now universally propagates `synthesisRationale` as an optional string. This field captures the AI's step-by-step reasoning chain (acoustic, geographic, and chronological cross-analyses of seed inputs).
+*   **Mutator Pipelines Integration:** To prevent rationale data loss on active layout transformations, all 5 graph mutation utilities preserve and copy the `synthesisRationale` property:
+    1.  `filterGraphByDiscoveryFilters`: Restricts graph elements to specified filter boundaries while forwarding the associated rationale metadata.
+    2.  `mergeGraphData`: Combines base and enhancement subgraphs, prioritizing the rationale of the enhanced/fresh graph.
+    3.  `pruneGraphToSeeds`: Slices sub-graphs to selected seed neighborhoods while retaining their rationale context.
+    4.  `mutateGraphArtistId`: Modifies and matches seed identifiers without stripping the parent rationale property.
+    5.  `assembleGraphFromCache`: Aggregates, parses, and joins non-empty rationale texts from all resolved cache entries.
+
 ---
 
 ## 4. Cost Estimation Architecture
@@ -256,6 +265,7 @@ To prevent corrupt or incomplete metadata from silently polluting the graph canv
     2.  Graph edge `context` strings are meaningful (not generic fallbacks like `"is connected to"` or `"is musically related to"`).
     3.  `detailsCache` exists, parses cleanly, and contains a non-trivial biography (>5 characters, no sandbox mock strings).
     4.  `genre` and `origin` fields are non-empty and not the literal string `"unknown"`.
+    5.  `synthesisRationale` exists on the cache document or inside its stringified `graphData`. Any legacy caches lacking a valid rationale are treated as partial data gaps (`needsFutureFields: true`).
     If all criteria pass, `isFullyQualified` is `true` and the standard `⚡ Loaded from cache` success toast is shown. If any criterion fails, `⚠️ Cache Incomplete` is shown.
 *   **Incompleteness Fallback Alerts:** Upon detecting an incomplete cache state for the seed artist's own profile, the client replaces the standard `Loaded from cache` message with a warning toast alert (`⚠️ Cache Incomplete`). The check is **scoped to the user's seed artist(s) only** — peer-band nodes discovered as graph connections are intentionally excluded, as they may be shallowly generated and lack full metadata without implying the user's project is incomplete.
 *   **Project Loader Seed-Scoped Check:** When loading a project by URL, the project loader calls `batchHydrateDetailsCache` on all graph nodes, then checks completeness only against the seed artist IDs stored in `data.seedArtists` / `data.artistIds`. This aligns the project-entry path's validation scope with the `handleGenerateGraph` path, preventing peer-band docs with missing `genre`/`origin` from triggering a false-negative toast.
@@ -271,6 +281,9 @@ To prevent corrupt or incomplete metadata from silently polluting the graph canv
 To ensure cohesive presentation of layout elements, Zcene implements a strict separation of typography domains across the client interface:
 *   **Primary Typeface (Poppins):** Used for standard UI components, buttons, navigation links, layout labels, page titles, and body paragraphs.
 *   **Data Typeface (JetBrains Mono / `font-mono`):** Certified and standardized typeface used for all high-density tabular data, transactional metrics, chronological timestamps (e.g. `20/06/2026 • 12:24 pm` on cards and list rows), ledger lists, and structural confirmation dialog currency specs. This enforces precise, tabular digit geometry (e.g. narrow zero characters) for numerical and temporal readouts.
+*   **Canvas Header Slot:** A secondary monochrome control icon slot (`w-9 h-9`, styled identically to the adjacent `tune` settings toggle) is integrated within the Spiderweb Search Control Dock framework to trigger context-aware map metadata.
+*   **Typography Rules & UX Copy:** Codifies the standard lowercase/sentence-case strings across the header blocks (no uppercase tracking on AI summary titles). Standardizes "Roots breakdown" as the unified brand pattern for displaying AI graph synthesis summaries or contextual mapping explanations.
+*   **Client-Side Fallback Pattern:** The UI resilience layer inside `GenerativeRationaleModal` intercepts empty or undefined rationale values (e.g. legacy cache entries) and renders a structured client-side layout overview of single-artist analysis categories, preventing empty or error states from reaching the user.
 
 ---
 
