@@ -231,6 +231,11 @@ Serial Fetch & Backoff Strategy in App.tsx and OS-level stability logic.
    - Heal Cache & Invalidation Fallback: Manual force-refresh evicts the node from local cache, clears bio/metadata properties on selectedNode to allow re-fetching (bypassing hasHydratedBio), and populates evictedNodeIdsRef. If deleteDoc fails due to security restrictions, the system falls back to updateDoc to invalidate the Firestore document cache in-place (detailsCache = '').
    - Outer Try/Catch/Finally Loader Gate: The entire graph generation pipeline is wrapped in a comprehensive outer try/catch/finally block to guarantee isLoading is cleared.
    - Mutated Seed ID Cleanups: Mutation from a partial query to a canonical node (e.g. 'Gaye' -> 'Marvin Gaye') clears the old unmutated seed ID from loadingNodeIds, and the JIT details queue finally block removes all variation formats case-insensitively.
+
+8. LIVE SYNTHESIS TIMEOUTS & ABORT DELEGATION (App.tsx / geminiService.ts):
+   - 180s Execution Timeout Ceiling: The main graph generation timeout ceiling is extended to 180 seconds (3 minutes) to accommodate heavy multi-seed co-equal synthesis passes.
+   - AbortSignal Propagation: The client-side AbortController's signal is propagated directly down to the outbound fetch wrappers. If the query times out or is manually canceled by the user, the network request is immediately aborted to prevent leaking queries.
+   - Quota-Rinsing Retry Mitigation: The network layer explicitly catches AbortErrors and excludes gateway timeouts/504 errors from automated transient retries, ensuring that aborted or timed-out requests do not rinse the API key's token quota.
 `;
 
 const SHARING_FLOW_DOCUMENTATION = `
@@ -411,7 +416,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                 <div className="px-6 py-4 rounded-xl border border-zinc-700 bg-zinc-900 text-center w-full max-w-sm">
                     <div className="text-primary text-[10px] font-mono mb-1 uppercase tracking-tighter">Phase 01: Formulation</div>
                     <div className="text-white font-medium">Artist Selection & Filters</div>
-                    <div className="text-[11px] text-zinc-500 mt-1">Up to 25 Seed Artists + Year/Origin Logic</div>
+                    <div className="text-[11px] text-zinc-500 mt-1">Up to 5 Seed Artists + Year/Origin Logic</div>
                 </div>
                 <div className="h-8 w-0.5 bg-zinc-800 my-2" />
             </div>
