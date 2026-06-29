@@ -643,4 +643,81 @@ export const FullItineraryDialog: React.FC<{
 };
 
 
+// --- Generative Rationale Modal Component ---
+export const GenerativeRationaleModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  rationale?: string;
+}> = ({ isOpen, onClose, rationale }) => {
+  if (!isOpen) return null;
+
+  // Format paragraphs/points for clean display
+  const formattedRationale = rationale
+    ? rationale.split('\n').map((line, idx) => {
+        if (line.trim().startsWith('-')) {
+          return (
+            <li key={idx} className="text-zinc-300 text-sm leading-relaxed ml-4 list-disc mt-1.5">
+              {line.trim().substring(1).trim()}
+            </li>
+          );
+        }
+        return (
+          <p key={idx} className={`text-zinc-300 text-sm leading-relaxed mt-2 ${line.startsWith('[') ? 'font-semibold text-primary' : ''}`}>
+            {line}
+          </p>
+        );
+      })
+    : <p className="text-zinc-500 text-sm">No reasoning chain captures available.</p>;
+
+  return (
+    <div 
+      className="fixed inset-0 bg-black/70 z-[130] flex items-center justify-center p-4 animate-fade-in-down pointer-events-auto"
+      style={{ animationDuration: '200ms' }}
+      onClick={onClose}
+    >
+      <div 
+        className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-lg shadow-2xl flex flex-col overflow-hidden animate-fade-in-down max-h-[85vh]"
+        style={{ animationDuration: '200ms' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary !text-[18px]">info</span>
+            <h3 className="text-base font-medium text-white uppercase tracking-wider">Generative Synthesis Rationale</h3>
+          </div>
+          <button 
+            onClick={onClose}
+            className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none"
+            title="Close modal"
+          >
+            <span className="material-symbols-outlined !text-[18px]">close</span>
+          </button>
+        </header>
+
+        <div className="flex-grow overflow-y-auto p-5 space-y-2">
+          <div className="bg-zinc-950/60 border border-zinc-800/80 p-4 rounded-xl font-mono text-xs text-zinc-400 whitespace-pre-wrap leading-relaxed max-h-[50vh] overflow-y-auto mb-4">
+            {rationale || "No raw chain-of-thought logged."}
+          </div>
+          <div className="space-y-1">
+            <h4 className="text-xs font-semibold text-zinc-400 uppercase tracking-widest">Synthesis Audit Insights</h4>
+            <div className="space-y-1.5 pt-1">
+              {formattedRationale}
+            </div>
+          </div>
+        </div>
+
+        <footer className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end">
+          <button 
+            onClick={onClose}
+            className="px-5 py-1.5 bg-primary text-brand-black rounded-xl font-semibold text-xs uppercase tracking-wider transition-opacity hover:opacity-90 active:scale-95 transition-all duration-200"
+          >
+            Acknowledge
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
+};
+
+
 

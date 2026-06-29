@@ -146,6 +146,10 @@ export const GRAPH_RESPONSE_SCHEMA = {
         },
         required: ["source", "target", "value", "context"]
       }
+    },
+    synthesis_rationale: {
+      type: Type.STRING,
+      description: "Step-by-step reasoning chain explaining how the multi-seed co-equal synthesis co-analyzed the acoustic, geographic, and chronological dimensions of all input seeds to establish cross-connections."
     }
   },
   required: ["nodes", "links"]
@@ -244,23 +248,29 @@ export const GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = `I have an existing m
 
 export const GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = `Given the following list of seed artists: {{artists}}.
 We already have cached, independent music graphs for these seed artists.
-Your primary task is to act as the "connective tissue" and stitch these independent graphs together into a unified, cohesive, and sprawling interconnected spiderweb graph.
+Your task is to perform a true co-equal "melting pot" traversal where all input seeds act as simultaneous structural foundations, avoiding any attention bias toward a single anchor artist.
 
 The existing, cached nodes and connections are provided below as context:
 {{cachedSubgraphsContext}}
 
 Follow these rules precisely:
-1.  CONNECTIVE STITCHING: Discover or generate the overlap bridges between the independent seed artist graphs. These bridges can be:
+1.  CO-EQUAL TRAVERSAL & CROSS-ANALYSIS: Before selecting recommendation branches, perform a concurrent, multi-dimensional cross-analysis of ALL seed artists across:
+    - Acoustic/Sonics: Shared styles, instruments, tempos, tones, production styles.
+    - Geographic: Scene locations, tours, regional interactions.
+    - Chronological: Overlapping time periods, eras, shared sub-culture epochs.
+    Synthesize connections treating every seed as a co-equal anchor. If any seed artist has active filters, do not label them as "[Indirect recommendation]" or isolate them. They must serve as base anchors.
+2.  CONNECTIVE STITCHING: Discover or generate the overlap bridges between the independent seed artist graphs. These bridges can be:
     - Direct musical links/connections between the seed artists or their related bands.
     - Shared metadata nodes (e.g. sharing a record label like "Victory Records", a genre like "Alternative Rock", or country of origin/founded year).
     - UP TO 6 NEW "bridging" artists/bands that musically bridge the gap or are related to multiple seeds, helping connect the separate subgraphs.
-2.  REUSE EXISTING IDENTITIES: For all existing nodes from the cached subgraphs (e.g. genres, labels, countries, founded years, and artists), you MUST reuse their exact 'id' and 'type' without modifying them. Do not duplicate or rename existing metadata or artist nodes.
-3.  NO DISJOINT GRAPHS: Ensure that there is a path connecting the subgraphs so that the resulting graph is fully unified rather than multiple disconnected clusters.
-4.  NEW BRIDGING BANDS: If you add new bridging bands, you must also identify and create their respective genre, label, country, and founded year nodes (YYYY) and link them to build a rich graph.
-5.  LINK RELATIONSHIP CONTEXT: Each link in the 'links' array MUST also include a 'context' string explaining the connection (e.g. 'releases music on Epitaph Records' or 'formed in 1988'). Keep the context to a brief 3-7 words in present tense.
-6.  JSON SCHEMA: The output must be a single, valid JSON object with 'nodes' and 'links' arrays matching the schema.
+3.  REUSE EXISTING IDENTITIES: For all existing nodes from the cached subgraphs (e.g. genres, labels, countries, founded years, and artists), you MUST reuse their exact 'id' and 'type' without modifying them. Do not duplicate or rename existing metadata or artist nodes.
+4.  NO DISJOINT GRAPHS: Ensure that there is a path connecting the subgraphs so that the resulting graph is fully unified rather than multiple disconnected clusters.
+5.  NEW BRIDGING BANDS: If you add new bridging bands, you must also identify and create their respective genre, label, country, and founded year nodes (YYYY) and link them to build a rich graph.
+6.  LINK RELATIONSHIP CONTEXT: Each link in the 'links' array MUST also include a 'context' string explaining the connection (e.g. 'releases music on Epitaph Records' or 'formed in 1988'). Keep the context to a brief 3-7 words in present tense.
+7.  SYNTHESIS RATIONALE (MANDATORY): You MUST output the step-by-step reasoning chain of your co-equal cross-analysis in the 'synthesis_rationale' field of the JSON object. Explain in detail how the seeds acoustic, geographic, and chronological dimensions intersect to yield the generated connections.
+8.  JSON SCHEMA: The output must be a single, valid JSON object with 'nodes', 'links' arrays and a 'synthesis_rationale' string matching the schema.
 
-STRUCTURAL ONLY: You MUST NOT generate or include any biographies, summaries, member lists, discographies, or detailed profile metadata for the artists. The response must strictly contain only structural layout nodes (id, type, group) and connection links (source, target, value, context).
+STRUCTURAL ONLY: You MUST NOT generate or include any biographies, summaries, member lists, discographies, or detailed profile metadata for the artists. The response must strictly contain only structural layout nodes (id, type, group), connection links (source, target, value, context), and the synthesis_rationale string.
 
 ABSOLUTELY CRITICAL: Ensure NO ORPHANED LINKS. Every source/target in the 'links' array must map to a node in the 'nodes' array.
 
@@ -561,7 +571,21 @@ const generateMockGraphData = (artists: string, baseGraph?: GraphData, filters?:
     }
   }
 
-  return normalizeGraphData({ nodes, links });
+  const baseResult = normalizeGraphData({ nodes, links });
+  
+  if (artistList.length > 1) {
+    const seedA = artistList[0];
+    const seedB = artistList[1];
+    baseResult.synthesisRationale = `[Co-Equal Multi-Seed Synthesis Analysis]
+- Acoustic & Sonics: Cross-analyzing the guitar production and songwriting styles of "${seedA}" and "${seedB}". Found shared lineage in mid-tempo groove structures, dual-guitar lead harmonies, and vintage tube-amplifier distortion profiles.
+- Geographic Overlap: Mapping the Swedish rock scene axis. Identified Göteborg (Gothenburg) and Stockholm tours as shared live circuit hubs where related support bands performed.
+- Chronological Intersection: Pinpointed the 2010s retro-rock and vintage revival era. Found that both projects active years overlap during this revival period, showing common aesthetic choices and retro label interest.
+- Connective Route: Formulating co-equal links between "${seedA}" and "${seedB}" via shared metadata nodes like "Sweden" (origin), "Hard Rock" / "Retro Rock" (genre), and adding bridging artists like Heavy Feather and Children of the Sun to stitch the graphs without anchor artist bias.`;
+  } else {
+    baseResult.synthesisRationale = `[Single-Seed Analysis] Analyzed single seed "${artistList[0]}". Resolved its core metadata: genre, label, country, and founding year. Added related acts based on direct influences and scene context.`;
+  }
+
+  return baseResult;
 };
 
 const generateMockNodeDetails = (node: Node): NodeDetails => {
@@ -994,6 +1018,10 @@ export const generateGraphData = async (artists: string, baseGraph?: GraphData, 
           nodes: Array.isArray(deduplicatedNodes) ? deduplicatedNodes : [],
           links: Array.isArray(validLinks) ? validLinks : []
       });
+
+      if (data && (data as any).synthesis_rationale) {
+          finalGraph.synthesisRationale = (data as any).synthesis_rationale;
+      }
 
       return finalGraph;
     } catch (error: any) {

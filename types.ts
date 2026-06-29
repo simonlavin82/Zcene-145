@@ -33,6 +33,7 @@ export interface Link {
 export interface GraphData {
   nodes: Node[];
   links: Link[];
+  synthesisRationale?: string;
 }
 
 export interface ChatMessage {

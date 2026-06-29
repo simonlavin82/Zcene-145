@@ -117,6 +117,8 @@ const COLLAPSED_WIDTH = 64;
 const MIN_GRAPH_WIDTH = 400;
 
 // --- Components ---
+import { GenerativeRationaleModal } from './SharedModals';
+
 
 const DiscoveryFiltersPanel: React.FC<{
   filters: DiscoveryFilters;
@@ -697,6 +699,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
   });
   const [leftPanelWidth, setLeftPanelWidth] = useState(DEFAULT_LEFT_PANEL_WIDTH);
   const [rightPanelWidth, setRightPanelWidth] = useState(DEFAULT_RIGHT_PANEL_WIDTH);
+  const [isRationaleModalOpen, setIsRationaleModalOpen] = useState(false);
   const leftPanelPreCollapseWidth = useRef(DEFAULT_LEFT_PANEL_WIDTH);
   const rightPanelPreCollapseWidth = useRef(DEFAULT_RIGHT_PANEL_WIDTH);
   const resizingPanelRef = useRef<'left' | 'right' | null>(null);
@@ -1451,6 +1454,16 @@ const GraphPage: React.FC<GraphPageProps> = ({
             
             {LayoutControl}
 
+            {data.synthesisRationale && (
+                <button 
+                    onClick={() => setIsRationaleModalOpen(true)} 
+                    className="w-9 h-9 flex flex-shrink-0 items-center justify-center border border-zinc-700 bg-zinc-900/60 rounded-xl text-primary hover:text-primary-light hover:border-primary/50 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none backdrop-blur-sm" 
+                    title="View Synthesis Rationale"
+                >
+                    <span className="material-symbols-outlined !text-[18px]">info</span>
+                </button>
+            )}
+
             <button 
                 onClick={() => setIsGraphSettingsOpen(true)} 
                 className="w-9 h-9 flex flex-shrink-0 items-center justify-center border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none backdrop-blur-sm" 
@@ -1460,7 +1473,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
             </button>
         </div>
     );
-  }, [searchQuery, isListeningForGraph, LayoutControl]);
+  }, [searchQuery, isListeningForGraph, LayoutControl, data.synthesisRationale]);
 
   const displayBadgeCount = systemError ? 0 : activeNodes.length;
 
@@ -1556,6 +1569,15 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                                     <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">{!searchQuery && (<button onClick={() => handleSpeechToText('graph')} className={`w-8 h-8 flex items-center justify-center rounded-[10px] transition-colors leading-none ${isListeningForGraph ? 'text-primary animate-pulse' : 'text-zinc-500 hover:text-white'}`} title="Search by voice"><MicIcon className="!text-[18px]" /></button>)}{searchQuery && (<button onClick={() => setSearchQuery('')} className="w-8 h-8 flex items-center justify-center rounded-[10px] text-zinc-400 hover:text-white transition-colors leading-none" aria-label="Clear search"><span className="material-symbols-outlined !text-[18px]">close</span></button>)}</div>
                                                 </div>
                                                 {LayoutControl}
+                                                {data.synthesisRationale && (
+                                                    <button 
+                                                        onClick={() => setIsRationaleModalOpen(true)} 
+                                                        className="w-9 h-9 flex flex-shrink-0 items-center justify-center border border-zinc-700 bg-zinc-900/60 rounded-xl text-primary hover:text-primary-light hover:border-primary/50 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none backdrop-blur-sm" 
+                                                        title="View Synthesis Rationale"
+                                                    >
+                                                        <span className="material-symbols-outlined !text-[18px]">info</span>
+                                                    </button>
+                                                )}
                                                 <button 
                                                     onClick={() => setIsGraphSettingsOpen(true)} 
                                                     className="w-9 h-9 flex flex-shrink-0 items-center justify-center border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none backdrop-blur-sm" 
@@ -1729,6 +1751,11 @@ const GraphPage: React.FC<GraphPageProps> = ({
                 </aside>
             </main>
         )}
+        <GenerativeRationaleModal 
+          isOpen={isRationaleModalOpen} 
+          onClose={() => setIsRationaleModalOpen(false)} 
+          rationale={data.synthesisRationale} 
+        />
     </div>
   );
 };
