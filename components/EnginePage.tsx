@@ -236,6 +236,9 @@ Serial Fetch & Backoff Strategy in App.tsx and OS-level stability logic.
    - 180s Execution Timeout Ceiling: The main graph generation timeout ceiling is extended to 180 seconds (3 minutes) to accommodate heavy multi-seed co-equal synthesis passes.
    - AbortSignal Propagation: The client-side AbortController's signal is propagated directly down to the outbound fetch wrappers. If the query times out or is manually canceled by the user, the network request is immediately aborted to prevent leaking queries.
    - Quota-Rinsing Retry Mitigation: The network layer explicitly catches AbortErrors and excludes gateway timeouts/504 errors from automated transient retries, ensuring that aborted or timed-out requests do not rinse the API key's token quota.
+
+9. ROOTS BREAKDOWN SCANNABILITY FORMATTING (SharedModals.tsx / index.css):
+   - Markdown Bio Styling Parity: The synthesis rationale payload is parsed and rendered natively via standard Markdown components using the .markdown-bio design guidelines. This ensures bullet points, paragraph spacing, and bold key term highlighting maintain consistent scannability aesthetics with the Deep Cut biographies.
 `;
 
 const SHARING_FLOW_DOCUMENTATION = `

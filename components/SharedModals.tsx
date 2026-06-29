@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { StackItem, Node, UserTaste } from '../types';
 import { StackIcon } from './Icons';
+import Markdown from 'react-markdown';
 
 // --- My Stack Dialog Component ---
 export const MyStackDialog: React.FC<{
@@ -671,20 +672,7 @@ export const GenerativeRationaleModal: React.FC<{
     return true;
   });
 
-  const formattedRationale = cleanRationaleLines.map((line, idx) => {
-    if (line.trim().startsWith('-')) {
-      return (
-        <li key={idx} className="text-zinc-300 text-sm leading-relaxed ml-4 list-disc mt-1.5">
-          {line.trim().substring(1).trim()}
-        </li>
-      );
-    }
-    return (
-      <p key={idx} className="text-zinc-300 text-sm leading-relaxed mt-2">
-        {line}
-      </p>
-    );
-  });
+  const cleanRationaleMarkdown = cleanRationaleLines.join('\n');
 
   return (
     <div 
@@ -713,8 +701,8 @@ export const GenerativeRationaleModal: React.FC<{
 
         <div className="flex-grow overflow-y-auto p-5 space-y-4">
           <div className="space-y-1">
-            <div className="space-y-1.5">
-              {formattedRationale}
+            <div className="markdown-bio text-sm leading-relaxed text-zinc-300">
+              <Markdown>{cleanRationaleMarkdown}</Markdown>
             </div>
           </div>
         </div>

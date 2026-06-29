@@ -149,7 +149,7 @@ export const GRAPH_RESPONSE_SCHEMA = {
     },
     synthesis_rationale: {
       type: Type.STRING,
-      description: "Step-by-step reasoning chain explaining how the multi-seed co-equal synthesis co-analyzed the acoustic, geographic, and chronological dimensions of all input seeds to establish cross-connections."
+      description: "A scannable reasoning chain (approx. 100-150 words) using Markdown: short paragraphs (separated by double newlines), bolding for key terms, and bullet points for lists. Detail how the seeds' acoustic, geographic, and chronological dimensions intersect to yield the generated connections."
     }
   },
   required: ["nodes", "links"]
@@ -239,7 +239,7 @@ export const GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = `I have an existing m
         4.  In addition, identify and add 8-12 NEW related artists that are musically connected to the seed artists. For these NEW artists, you MUST also identify and create their respective genre, label, country, and especially their 'founded' year nodes (YYYY) to ensure the spiderweb is rich with chronological data. Assign them to the same 'group' as the seed artist they relate to, or a new group if they relate to multiple.
         5.  It is absolutely critical that each 'founded' node is linked ONLY to the correct artist node who was founded in that year.
         6.  LINK RELATIONSHIP CONTEXT: Each link in the 'links' array MUST include a 'context' string explaining the connection concisely (e.g. 'founded in 1994' or 'is a sub-genre of' or 'signed to XL Recordings' or 'is related to'). Keep the context to a brief 3-7 words in present tense.
-        7.  SYNTHESIS RATIONALE (MANDATORY): You MUST output the step-by-step reasoning chain of your analysis in the 'synthesis_rationale' field of the JSON object. Explain in detail how the seeds acoustic, geographic, and chronological dimensions intersect to yield the generated connections.
+        7.  SYNTHESIS RATIONALE (MANDATORY): You MUST output the step-by-step reasoning chain of your analysis in the 'synthesis_rationale' field of the JSON object. The text MUST be scannable and formatted using Markdown: use short paragraphs (separated by double newlines), bolding for key terms, and bullet points for lists. Explain in detail how the seeds' acoustic, geographic, and chronological dimensions intersect to yield the generated connections.
         8.  JSON SCHEMA: The output must be a single, valid JSON object with 'nodes', 'links' arrays and a 'synthesis_rationale' string matching the schema.
         
         STRUCTURAL ONLY: You MUST NOT generate or include any biographies, summaries, member lists, discographies, or detailed profile metadata for the artists. The response must strictly contain only structural layout nodes (id, type, group), connection links (source, target, value, context), and the synthesis_rationale string.
@@ -269,7 +269,7 @@ Follow these rules precisely:
 4.  NO DISJOINT GRAPHS: Ensure that there is a path connecting the subgraphs so that the resulting graph is fully unified rather than multiple disconnected clusters.
 5.  NEW BRIDGING BANDS: If you add new bridging bands, you must also identify and create their respective genre, label, country, and founded year nodes (YYYY) and link them to build a rich graph.
 6.  LINK RELATIONSHIP CONTEXT: Each link in the 'links' array MUST also include a 'context' string explaining the connection (e.g. 'releases music on Epitaph Records' or 'formed in 1988'). Keep the context to a brief 3-7 words in present tense.
-7.  SYNTHESIS RATIONALE (MANDATORY): You MUST output the step-by-step reasoning chain of your co-equal cross-analysis in the 'synthesis_rationale' field of the JSON object. Explain in detail how the seeds acoustic, geographic, and chronological dimensions intersect to yield the generated connections.
+7.  SYNTHESIS RATIONALE (MANDATORY): You MUST output the step-by-step reasoning chain of your co-equal cross-analysis in the 'synthesis_rationale' field of the JSON object. The text MUST be scannable and formatted using Markdown: use short paragraphs (separated by double newlines), bolding for key terms, and bullet points for lists. Explain in detail how the seeds' acoustic, geographic, and chronological dimensions intersect to yield the generated connections.
 8.  JSON SCHEMA: The output must be a single, valid JSON object with 'nodes', 'links' arrays and a 'synthesis_rationale' string matching the schema.
 
 STRUCTURAL ONLY: You MUST NOT generate or include any biographies, summaries, member lists, discographies, or detailed profile metadata for the artists. The response must strictly contain only structural layout nodes (id, type, group), connection links (source, target, value, context), and the synthesis_rationale string.
@@ -289,7 +289,7 @@ Follow these rules precisely:
 4.  In addition, find and add UP TO 12 NEW related artists that are musically connected to the seed artists. For these NEW artists, you MUST also identify and create their respective genre, label, country, and especially their 'founded' year nodes (YYYY) to ensure the spiderweb is rich with chronological data. ONLY include artists that strictly meet any provided discovery filters.
 5.  For all artists (seed and related), create links connecting them to their respective genre, label, country, and founded year nodes. Also create links between related artists. All direct connections of a seed artist should share their 'group' number. Each link MUST include a 'context' string explaining the relationship (e.g., 'releases music on XL Recordings' or 'founded in 1985' or 'is a genre of'). Keep the context to a brief 3-7 words in present tense.
 6.  CRITICAL: Each 'founded' node MUST be linked ONLY to the correct artist who was founded in that year.
-7.  SYNTHESIS RATIONALE (MANDATORY): You MUST output the step-by-step reasoning chain of your analysis in the 'synthesis_rationale' field of the JSON object. Explain in detail how the seeds acoustic, geographic, and chronological dimensions intersect to yield the generated connections.
+7.  SYNTHESIS RATIONALE (MANDATORY): You MUST output the step-by-step reasoning chain of your analysis in the 'synthesis_rationale' field of the JSON object. The text MUST be scannable and formatted using Markdown: use short paragraphs (separated by double newlines), bolding for key terms, and bullet points for lists. Explain in detail how the seeds' acoustic, geographic, and chronological dimensions intersect to yield the generated connections.
 8.  JSON SCHEMA: The output must be a single, valid JSON object with 'nodes', 'links' arrays and a 'synthesis_rationale' string matching the schema.
 
 STRUCTURAL ONLY: You MUST NOT generate or include any biographies, summaries, member lists, discographies, or detailed profile metadata for the artists. The response must strictly contain only structural layout nodes (id, type, group), connection links (source, target, value, context), and the synthesis_rationale string.
@@ -310,7 +310,7 @@ export const EXTEND_GRAPH_PROMPT_TEMPLATE = `I have a music graph. I want to exp
         4.  Identify and create nodes for their primary genre, record label, country, and founded year (YYYY).
         5.  Link the new artist to these new nodes AND to the original artist "{{artistName}}", adding a 'context' string to each link explaining the relationship (e.g., 'formed in 1992', 'releases music on Sub Pop', 'is related to'). Keep the context to a brief 3-7 words in present tense.
         6.  The 'group' ID should be {{groupId}}.
-        7.  SYNTHESIS RATIONALE (MANDATORY): You MUST output the step-by-step reasoning chain of your analysis in the 'synthesis_rationale' field of the JSON object. Explain in detail how this extended artist was chosen and how they relate musically to the anchor.
+        7.  SYNTHESIS RATIONALE (MANDATORY): You MUST output the step-by-step reasoning chain of your analysis in the 'synthesis_rationale' field of the JSON object. The text MUST be scannable and formatted using Markdown: use short paragraphs (separated by double newlines), bolding for key terms, and bullet points for lists. Explain in detail how this extended artist was chosen and how they relate musically to the anchor.
         8.  JSON SCHEMA: The output must be a single, valid JSON object with 'nodes', 'links' arrays and a 'synthesis_rationale' string matching the schema.
         
         ABSOLUTELY CRITICAL: Ensure NO ORPHANED LINKS. Every source/target in 'links' must exist in 'nodes' or the existing list.
