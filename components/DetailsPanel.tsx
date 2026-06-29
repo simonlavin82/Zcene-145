@@ -53,7 +53,7 @@ const ZceneEmptyState: React.FC<{ onNavigate: (view: View) => void }> = ({ onNav
             <div className="text-left bg-zinc-800/30 p-5 rounded-none border border-zinc-700/50 mx-4 text-xs">
                 <p className="font-medium text-zinc-200 mb-2">How it works</p>
                 <ol className="list-decimal list-inside space-y-1 text-zinc-400">
-                    <li>Add 1–25 artists (or import your library).</li>
+                    <li>Add 1–5 artists (or import your library).</li>
                     <li>Create your Zcene.</li>
                     <li>Drag, filter, and explore the spiderweb.</li>
                 </ol>

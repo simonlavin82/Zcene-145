@@ -35,7 +35,7 @@ declare global {
 
 // --- Types and Constants ---
 
-const MAX_SEED_ARTISTS = 25;
+const MAX_SEED_ARTISTS = 5;
 
 type FilterKeys = 'genre' | 'label' | 'country' | 'founded' | 'seed' | 'recommended';
 type FocusMode = 'organic' | 'cluster';
@@ -288,7 +288,7 @@ const ZceneEmptyState: React.FC<{ onNavigate: (view: View) => void }> = ({ onNav
         <div className="text-left bg-zinc-800/30 p-5 rounded-none border border-zinc-700/50 mx-4 text-xs">
             <p className="font-medium text-zinc-200 mb-2">How it works</p>
             <ol className="list-decimal list-inside space-y-1 text-zinc-400">
-                <li>Add 1–25 artists (or import your library).</li>
+                <li>Add 1–5 artists (or import your library).</li>
                 <li>Create your Zcene.</li>
                 <li>Drag, filter, and explore the spiderweb.</li>
             </ol>
@@ -398,7 +398,7 @@ const LimitReachedDialog: React.FC<{ isOpen: boolean; onClose: () => void; }> = 
                     <span className="material-symbols-outlined !text-3xl">warning</span>
                  </div>
                  <h3 className="text-xl font-medium text-white">Artist Limit Reached</h3>
-                 <p className="text-zinc-400 text-sm leading-relaxed">To ensure the best performance and graph quality, you can only add up to 25 seed artists.</p>
+                 <p className="text-zinc-400 text-sm leading-relaxed">To ensure the best performance and graph quality, you can only add up to 5 seed artists.</p>
                  <button onClick={onClose} className="w-full rounded-xl bg-primary px-4 py-1.5 text-sm font-medium text-brand-black transition-colors hover:bg-primary/90">
                     Got it
                  </button>
@@ -1253,6 +1253,10 @@ const GraphPage: React.FC<GraphPageProps> = ({
 
   const enabledArtistsCount = selectedSeedArtists.filter(a => a.enabled).length;
 
+  const loadingSubtext = enabledArtistsCount <= 1
+    ? "Typically takes 30–45 seconds to map connections."
+    : "Typically takes 1–3 minutes to synthesize heavy multi-seed connections.";
+
   const totalPendingCount = useMemo(() => {
     if (!searchTerm.trim()) return enabledArtistsCount;
     const newArtists = searchTerm.split(',').map(a => a.trim()).filter(Boolean);
@@ -1591,7 +1595,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                         </div>
                                         <div className="mt-4 w-full h-px bg-zinc-700" />
                                     </div>
-                                    <div className="flex-grow relative min-h-0 bg-zinc-900" ref={mobileGraphAreaRef}>{isLoading && (<div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-md z-[90] flex flex-col items-center justify-center gap-4 pointer-events-auto"><LoadingSpinner /><button onClick={(e) => { e.stopPropagation(); onCancelGeneration(); }} className="rounded-xl border border-zinc-600 px-6 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800 pointer-events-auto">Cancel</button></div>)}{isFirstGeneration && !isLoading && (<div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none"><ZceneEmptyState onNavigate={onNavigate} /></div>)}{data.nodes.length > 0 && (<MusicGraph data={data} libraryArtists={memoizedLibraryArtists} seedArtists={memoizedSeedArtists} onNodeClick={handleNodeClickInternal} selectedNode={selectedNode} isSmallScreen={isSmallScreen} activeFilters={activeFilters} focusOn={focusOn} searchQuery={searchQuery} setSearchQuery={setSearchQuery} toggleFilter={toggleFilterInternal} focusConfig={focusConfig} legendConfig={legendConfig} legendOrder={legendOrder} graphSettings={graphSettings} legendRef={desktopLegendAreaRef} onInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onLegendInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onExtendNode={onExtendNode} onRemoveNode={onRemoveNode} isGuest={isGuest} detailsCache={detailsCache} isActive={isActive} />)}</div>
+                                    <div className="flex-grow relative min-h-0 bg-zinc-900" ref={mobileGraphAreaRef}>{isLoading && (<div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-md z-[90] flex flex-col items-center justify-center gap-4 pointer-events-auto"><LoadingSpinner subtext={loadingSubtext} /><button onClick={(e) => { e.stopPropagation(); onCancelGeneration(); }} className="rounded-xl border border-zinc-600 px-6 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800 pointer-events-auto">Cancel</button></div>)}{isFirstGeneration && !isLoading && (<div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none"><ZceneEmptyState onNavigate={onNavigate} /></div>)}{data.nodes.length > 0 && (<MusicGraph data={data} libraryArtists={memoizedLibraryArtists} seedArtists={memoizedSeedArtists} onNodeClick={handleNodeClickInternal} selectedNode={selectedNode} isSmallScreen={isSmallScreen} activeFilters={activeFilters} focusOn={focusOn} searchQuery={searchQuery} setSearchQuery={setSearchQuery} toggleFilter={toggleFilterInternal} focusConfig={focusConfig} legendConfig={legendConfig} legendOrder={legendOrder} graphSettings={graphSettings} legendRef={desktopLegendAreaRef} onInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onLegendInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onExtendNode={onExtendNode} onRemoveNode={onRemoveNode} isGuest={isGuest} detailsCache={detailsCache} isActive={isActive} />)}</div>
                                 </div>
                             </div>
                             <div className={`w-full flex-shrink-0 h-full flex flex-col min-h-0 overflow-hidden relative ${isMagazineViewOpen ? 'fixed inset-0 z-[1000] pt-0 md:pt-4' : ''}`}>
@@ -1671,7 +1675,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                 <div ref={centerColumnRef} className={`flex-1 min-w-0 flex flex-col gap-4 relative z-10 transition-opacity duration-300 ${isMagazineViewOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                     <div className="flex-1 relative min-h-0 flex flex-col bg-zinc-900 border border-zinc-600/50 overflow-hidden">
                         <div className="h-12 px-4 flex-shrink-0 border-b border-zinc-600/50 flex items-center justify-between overflow-hidden"><h2 className="text-base text-white font-bold uppercase tracking-widest whitespace-nowrap">Spiderweb</h2>{!isSmallScreen && (<div className="flex items-center gap-1.5 flex-shrink-0">{SearchControl}</div>)}</div>
-                        <div className="flex-grow relative min-h-0" ref={desktopGraphAreaRef}>{isLoading && (<div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-md z-[90] flex flex-col items-center justify-center gap-4 pointer-events-auto"><LoadingSpinner /><button onClick={(e) => { e.stopPropagation(); onCancelGeneration(); }} className="rounded-xl border border-zinc-600 px-6 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800 pointer-events-auto">Cancel</button></div>)}{isFirstGeneration && !isLoading && (<div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none"><ZceneEmptyState onNavigate={onNavigate} /></div>)}{data.nodes.length > 0 && (<MusicGraph data={data} libraryArtists={memoizedLibraryArtists} seedArtists={memoizedSeedArtists} onNodeClick={handleNodeClickInternal} selectedNode={selectedNode} isSmallScreen={isSmallScreen} activeFilters={activeFilters} focusOn={focusOn} searchQuery={searchQuery} setSearchQuery={setSearchQuery} toggleFilter={toggleFilterInternal} focusConfig={focusConfig} legendConfig={legendConfig} legendOrder={legendOrder} graphSettings={graphSettings} legendRef={desktopLegendAreaRef} onInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onLegendInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onExtendNode={onExtendNode} onRemoveNode={onRemoveNode} isGuest={isGuest} detailsCache={detailsCache} isActive={isActive} />)}</div>
+                        <div className="flex-grow relative min-h-0" ref={desktopGraphAreaRef}>{isLoading && (<div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-md z-[90] flex flex-col items-center justify-center gap-4 pointer-events-auto"><LoadingSpinner subtext={loadingSubtext} /><button onClick={(e) => { e.stopPropagation(); onCancelGeneration(); }} className="rounded-xl border border-zinc-600 px-6 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800 pointer-events-auto">Cancel</button></div>)}{isFirstGeneration && !isLoading && (<div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none"><ZceneEmptyState onNavigate={onNavigate} /></div>)}{data.nodes.length > 0 && (<MusicGraph data={data} libraryArtists={memoizedLibraryArtists} seedArtists={memoizedSeedArtists} onNodeClick={handleNodeClickInternal} selectedNode={selectedNode} isSmallScreen={isSmallScreen} activeFilters={activeFilters} focusOn={focusOn} searchQuery={searchQuery} setSearchQuery={setSearchQuery} toggleFilter={toggleFilterInternal} focusConfig={focusConfig} legendConfig={legendConfig} legendOrder={legendOrder} graphSettings={graphSettings} legendRef={desktopLegendAreaRef} onInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onLegendInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onExtendNode={onExtendNode} onRemoveNode={onRemoveNode} isGuest={isGuest} detailsCache={detailsCache} isActive={isActive} />)}</div>
                     </div>
                     <div key={`ad-container-${adSize}`} className="flex-shrink-0 bg-zinc-900 border border-zinc-600/50 p-2 flex justify-center items-center overflow-hidden">
                         <div className="text-zinc-500 text-[10px] text-center max-w-full">
