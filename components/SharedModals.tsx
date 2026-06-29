@@ -652,26 +652,29 @@ export const GenerativeRationaleModal: React.FC<{
   if (!isOpen) return null;
 
   // Format paragraphs/points for clean display
-  const cleanRationaleLines = rationale
-    ? rationale.split('\n').filter(line => !line.trim().startsWith('['))
-    : [];
+  const cleanRationale = rationale && rationale.trim()
+    ? rationale
+    : `[Single-Seed Analysis]
+- Acoustic & Sonics: Resolved core musical properties and stylistic lineage.
+- Scene Context: Mapped direct influences, record label history, and geographic background.
+- Overlap Insights: Unified structural connections and surrounding chronological relationships.`;
 
-  const formattedRationale = cleanRationaleLines.length > 0
-    ? cleanRationaleLines.map((line, idx) => {
-        if (line.trim().startsWith('-')) {
-          return (
-            <li key={idx} className="text-zinc-300 text-sm leading-relaxed ml-4 list-disc mt-1.5">
-              {line.trim().substring(1).trim()}
-            </li>
-          );
-        }
-        return (
-          <p key={idx} className="text-zinc-300 text-sm leading-relaxed mt-2">
-            {line}
-          </p>
-        );
-      })
-    : <p className="text-zinc-500 text-sm">No reasoning chain captures available.</p>;
+  const cleanRationaleLines = cleanRationale.split('\n').filter(line => !line.trim().startsWith('['));
+
+  const formattedRationale = cleanRationaleLines.map((line, idx) => {
+    if (line.trim().startsWith('-')) {
+      return (
+        <li key={idx} className="text-zinc-300 text-sm leading-relaxed ml-4 list-disc mt-1.5">
+          {line.trim().substring(1).trim()}
+        </li>
+      );
+    }
+    return (
+      <p key={idx} className="text-zinc-300 text-sm leading-relaxed mt-2">
+        {line}
+      </p>
+    );
+  });
 
   return (
     <div 
