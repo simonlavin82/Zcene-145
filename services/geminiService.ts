@@ -239,8 +239,10 @@ export const GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = `I have an existing m
         4.  In addition, identify and add 8-12 NEW related artists that are musically connected to the seed artists. For these NEW artists, you MUST also identify and create their respective genre, label, country, and especially their 'founded' year nodes (YYYY) to ensure the spiderweb is rich with chronological data. Assign them to the same 'group' as the seed artist they relate to, or a new group if they relate to multiple.
         5.  It is absolutely critical that each 'founded' node is linked ONLY to the correct artist node who was founded in that year.
         6.  LINK RELATIONSHIP CONTEXT: Each link in the 'links' array MUST include a 'context' string explaining the connection concisely (e.g. 'founded in 1994' or 'is a sub-genre of' or 'signed to XL Recordings' or 'is related to'). Keep the context to a brief 3-7 words in present tense.
+        7.  SYNTHESIS RATIONALE (MANDATORY): You MUST output the step-by-step reasoning chain of your analysis in the 'synthesis_rationale' field of the JSON object. Explain in detail how the seeds acoustic, geographic, and chronological dimensions intersect to yield the generated connections.
+        8.  JSON SCHEMA: The output must be a single, valid JSON object with 'nodes', 'links' arrays and a 'synthesis_rationale' string matching the schema.
         
-        STRUCTURAL ONLY: You MUST NOT generate or include any biographies, summaries, member lists, discographies, or detailed profile metadata for the artists. The response must strictly contain only structural layout nodes (id, type, group) and connection links (source, target, value, context).
+        STRUCTURAL ONLY: You MUST NOT generate or include any biographies, summaries, member lists, discographies, or detailed profile metadata for the artists. The response must strictly contain only structural layout nodes (id, type, group), connection links (source, target, value, context), and the synthesis_rationale string.
         
         ABSOLUTELY CRITICAL FINAL CHECK: Before you output the JSON, verify that for EVERY SINGLE OBJECT in the 'links' array, the value of its 'source' property and the value of its 'target' property perfectly match an 'id' from an object in EITHER the provided existing nodes list OR your new 'nodes' array. THERE MUST BE NO ORPHANED LINKS. If you create a link with a 'source' or 'target' ID (e.g., "Arista Records"), you MUST ALSO define a node with that exact same 'id' (e.g., { "id": "Arista Records", "type": "label", ... }). Do not invent connections to nodes you haven't defined. This is a strict, mandatory requirement.
         
@@ -276,7 +278,7 @@ ABSOLUTELY CRITICAL: Ensure NO ORPHANED LINKS. Every source/target in the 'links
 
 Your entire response MUST be ONLY the raw JSON object, without any surrounding text or markdown code fences.`;
 
-export const GENERATE_GRAPH_PROMPT_TEMPLATE = `Given the following list of seed artists: {{artists}}. Generate a music family tree connecting them. The output must be a single, valid JSON object with two keys: 'nodes' and 'links'.
+export const GENERATE_GRAPH_PROMPT_TEMPLATE = `Given the following list of seed artists: {{artists}}. Generate a music family tree connecting them. The output must be a single, valid JSON object with keys: 'nodes', 'links', and 'synthesis_rationale'.
 'nodes' should be an array of objects, each with 'id', 'type', and 'group'. The 'type' can be 'artist', 'genre', 'label', 'country', or 'founded'.
 'links' should be an array of objects, each with 'source', 'target', 'value', and 'context' string describing the nature of their relationship.
 
@@ -287,8 +289,10 @@ Follow these rules precisely:
 4.  In addition, find and add UP TO 12 NEW related artists that are musically connected to the seed artists. For these NEW artists, you MUST also identify and create their respective genre, label, country, and especially their 'founded' year nodes (YYYY) to ensure the spiderweb is rich with chronological data. ONLY include artists that strictly meet any provided discovery filters.
 5.  For all artists (seed and related), create links connecting them to their respective genre, label, country, and founded year nodes. Also create links between related artists. All direct connections of a seed artist should share their 'group' number. Each link MUST include a 'context' string explaining the relationship (e.g., 'releases music on XL Recordings' or 'founded in 1985' or 'is a genre of'). Keep the context to a brief 3-7 words in present tense.
 6.  CRITICAL: Each 'founded' node MUST be linked ONLY to the correct artist who was founded in that year.
+7.  SYNTHESIS RATIONALE (MANDATORY): You MUST output the step-by-step reasoning chain of your analysis in the 'synthesis_rationale' field of the JSON object. Explain in detail how the seeds acoustic, geographic, and chronological dimensions intersect to yield the generated connections.
+8.  JSON SCHEMA: The output must be a single, valid JSON object with 'nodes', 'links' arrays and a 'synthesis_rationale' string matching the schema.
 
-STRUCTURAL ONLY: You MUST NOT generate or include any biographies, summaries, member lists, discographies, or detailed profile metadata for the artists. The response must strictly contain only structural layout nodes (id, type, group) and connection links (source, target, value, context).
+STRUCTURAL ONLY: You MUST NOT generate or include any biographies, summaries, member lists, discographies, or detailed profile metadata for the artists. The response must strictly contain only structural layout nodes (id, type, group), connection links (source, target, value, context), and the synthesis_rationale string.
         
 ABSOLUTELY CRITICAL FINAL CHECK: Before you output the JSON, verify that for EVERY SINGLE OBJECT in the 'links' array, the value of its 'source' property and the value of its 'target' property perfectly match an 'id' from an object in the 'nodes' array. THERE MUST BE NO ORPHANED LINKS. If you create a link with a 'source' or 'target' ID (e.g., "Arista Records"), you MUST ALSO define a node with that exact same 'id' (e.g., { "id": "Arista Records", "type": "label", ... }). Do not invent connections to nodes you haven't defined. This is a architecture requirement.
 
@@ -306,6 +310,8 @@ export const EXTEND_GRAPH_PROMPT_TEMPLATE = `I have a music graph. I want to exp
         4.  Identify and create nodes for their primary genre, record label, country, and founded year (YYYY).
         5.  Link the new artist to these new nodes AND to the original artist "{{artistName}}", adding a 'context' string to each link explaining the relationship (e.g., 'formed in 1992', 'releases music on Sub Pop', 'is related to'). Keep the context to a brief 3-7 words in present tense.
         6.  The 'group' ID should be {{groupId}}.
+        7.  SYNTHESIS RATIONALE (MANDATORY): You MUST output the step-by-step reasoning chain of your analysis in the 'synthesis_rationale' field of the JSON object. Explain in detail how this extended artist was chosen and how they relate musically to the anchor.
+        8.  JSON SCHEMA: The output must be a single, valid JSON object with 'nodes', 'links' arrays and a 'synthesis_rationale' string matching the schema.
         
         ABSOLUTELY CRITICAL: Ensure NO ORPHANED LINKS. Every source/target in 'links' must exist in 'nodes' or the existing list.
         
@@ -572,20 +578,24 @@ const generateMockGraphData = (artists: string, baseGraph?: GraphData, filters?:
   }
 
   const baseResult = normalizeGraphData({ nodes, links });
+  let rationale = "";
   
   if (artistList.length > 1) {
     const seedA = artistList[0];
     const seedB = artistList[1];
-    baseResult.synthesisRationale = `[Co-Equal Multi-Seed Synthesis Analysis]
+    rationale = `[Co-Equal Multi-Seed Synthesis Analysis]
 - Acoustic & Sonics: Cross-analyzing the guitar production and songwriting styles of "${seedA}" and "${seedB}". Found shared lineage in mid-tempo groove structures, dual-guitar lead harmonies, and vintage tube-amplifier distortion profiles.
 - Geographic Overlap: Mapping the Swedish rock scene axis. Identified Göteborg (Gothenburg) and Stockholm tours as shared live circuit hubs where related support bands performed.
 - Chronological Intersection: Pinpointed the 2010s retro-rock and vintage revival era. Found that both projects active years overlap during this revival period, showing common aesthetic choices and retro label interest.
 - Connective Route: Formulating co-equal links between "${seedA}" and "${seedB}" via shared metadata nodes like "Sweden" (origin), "Hard Rock" / "Retro Rock" (genre), and adding bridging artists like Heavy Feather and Children of the Sun to stitch the graphs without anchor artist bias.`;
   } else {
-    baseResult.synthesisRationale = `[Single-Seed Analysis] Analyzed single seed "${artistList[0]}". Resolved its core metadata: genre, label, country, and founding year. Added related acts based on direct influences and scene context.`;
+    rationale = `[Single-Seed Analysis] Analyzed single seed "${artistList[0]}". Resolved its core metadata: genre, label, country, and founding year. Added related acts based on direct influences and scene context.`;
   }
 
-  return baseResult;
+  return {
+    ...baseResult,
+    synthesisRationale: rationale
+  };
 };
 
 const generateMockNodeDetails = (node: Node): NodeDetails => {

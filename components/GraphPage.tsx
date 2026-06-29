@@ -1342,6 +1342,19 @@ const GraphPage: React.FC<GraphPageProps> = ({
 
           {/* New Inline Action Button: Moving from absolute footer to inline flow */}
           <div className="px-4 pt-4 pb-12">
+            {data.synthesisRationale && (
+              <div className="mb-3">
+                <button 
+                  type="button"
+                  onClick={() => setIsRationaleModalOpen(true)} 
+                  className="w-full flex items-center justify-center gap-2 rounded-xl border border-zinc-600 px-4 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800"
+                >
+                  <span className="material-symbols-outlined !text-[18px]">info</span>
+                  <span>View roots breakdown</span>
+                </button>
+              </div>
+            )}
+
             {!isGuest ? (
               <button 
                   ref={createZceneBtnRef} 
@@ -1454,16 +1467,6 @@ const GraphPage: React.FC<GraphPageProps> = ({
             
             {LayoutControl}
 
-            {data.synthesisRationale && (
-                <button 
-                    onClick={() => setIsRationaleModalOpen(true)} 
-                    className="w-9 h-9 flex flex-shrink-0 items-center justify-center border border-zinc-700 bg-zinc-900/60 rounded-xl text-primary hover:text-primary-light hover:border-primary/50 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none backdrop-blur-sm" 
-                    title="View Synthesis Rationale"
-                >
-                    <span className="material-symbols-outlined !text-[18px]">info</span>
-                </button>
-            )}
-
             <button 
                 onClick={() => setIsGraphSettingsOpen(true)} 
                 className="w-9 h-9 flex flex-shrink-0 items-center justify-center border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none backdrop-blur-sm" 
@@ -1473,7 +1476,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
             </button>
         </div>
     );
-  }, [searchQuery, isListeningForGraph, LayoutControl, data.synthesisRationale]);
+  }, [searchQuery, isListeningForGraph, LayoutControl]);
 
   const displayBadgeCount = systemError ? 0 : activeNodes.length;
 
@@ -1569,15 +1572,6 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                                     <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">{!searchQuery && (<button onClick={() => handleSpeechToText('graph')} className={`w-8 h-8 flex items-center justify-center rounded-[10px] transition-colors leading-none ${isListeningForGraph ? 'text-primary animate-pulse' : 'text-zinc-500 hover:text-white'}`} title="Search by voice"><MicIcon className="!text-[18px]" /></button>)}{searchQuery && (<button onClick={() => setSearchQuery('')} className="w-8 h-8 flex items-center justify-center rounded-[10px] text-zinc-400 hover:text-white transition-colors leading-none" aria-label="Clear search"><span className="material-symbols-outlined !text-[18px]">close</span></button>)}</div>
                                                 </div>
                                                 {LayoutControl}
-                                                {data.synthesisRationale && (
-                                                    <button 
-                                                        onClick={() => setIsRationaleModalOpen(true)} 
-                                                        className="w-9 h-9 flex flex-shrink-0 items-center justify-center border border-zinc-700 bg-zinc-900/60 rounded-xl text-primary hover:text-primary-light hover:border-primary/50 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none backdrop-blur-sm" 
-                                                        title="View Synthesis Rationale"
-                                                    >
-                                                        <span className="material-symbols-outlined !text-[18px]">info</span>
-                                                    </button>
-                                                )}
                                                 <button 
                                                     onClick={() => setIsGraphSettingsOpen(true)} 
                                                     className="w-9 h-9 flex flex-shrink-0 items-center justify-center border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none backdrop-blur-sm" 

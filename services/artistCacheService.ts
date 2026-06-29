@@ -129,7 +129,8 @@ export const normalizeGraphData = (graph: GraphData): GraphData => {
 
   return {
     nodes: normalizedNodes,
-    links: normalizedLinks
+    links: normalizedLinks,
+    synthesisRationale: graph.synthesisRationale
   };
 };
 
@@ -391,7 +392,8 @@ export const writeArtistCacheMany = async (
             cacheKey: compositeCanonicalId,
             artistId: canonicalId,
             seedArtists: canonicalName,
-            graphData: JSON.stringify({ nodes, links }),
+            graphData: JSON.stringify({ nodes, links, synthesisRationale: normalizedGraph.synthesisRationale }),
+            synthesisRationale: normalizedGraph.synthesisRationale || null,
             filters: filters || {},
             cacheVersion: 2,
             cachedAt: serverTimestamp(),
@@ -407,7 +409,8 @@ export const writeArtistCacheMany = async (
               cacheKey: compositeCanonicalId,
               artistId: canonicalId,
               seedArtists: canonicalName,
-              graphData: JSON.stringify({ nodes, links }),
+              graphData: JSON.stringify({ nodes, links, synthesisRationale: normalizedGraph.synthesisRationale }),
+              synthesisRationale: normalizedGraph.synthesisRationale || null,
               filters: filters || {},
               cacheVersion: 2,
               cachedAt: serverTimestamp(),
@@ -512,9 +515,29 @@ export const assembleGraphFromCache = (
     }
   });
 
+  let aggregatedRationale = "";
+  const rationales: string[] = [];
+  cached.forEach(entry => {
+    let entryRationale = entry.synthesisRationale;
+    if (!entryRationale && entry.graphData) {
+      try {
+        const parsed = JSON.parse(entry.graphData);
+        if (parsed.synthesisRationale) entryRationale = parsed.synthesisRationale;
+      } catch (e) {}
+    }
+    if (entryRationale && entryRationale.trim()) {
+      rationales.push(entryRationale.trim());
+    }
+  });
+
+  if (rationales.length > 0) {
+    aggregatedRationale = Array.from(new Set(rationales)).join('\n\n');
+  }
+
   return {
     nodes: Array.from(nodeMap.values()),
     links,
+    synthesisRationale: aggregatedRationale || undefined
   };
 };
 

@@ -118,6 +118,7 @@ export interface ArtistCacheEntry {
   detailsCache?: string;   // JSON string or raw text of NodeDetails/bio
   filters?: DiscoveryFilters;
   isDeep?: boolean;
+  synthesisRationale?: string;
 }
 
 export interface Project {

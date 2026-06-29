@@ -497,7 +497,7 @@ const filterGraphByDiscoveryFilters = (data: GraphData, filters: DiscoveryFilter
     return finalNodeIds.has(s) && finalNodeIds.has(t);
   });
 
-  return { nodes: deduplicatedNodes, links: filteredLinks };
+  return { nodes: deduplicatedNodes, links: filteredLinks, synthesisRationale: data.synthesisRationale };
 };
 
 const areFiltersEqual = (f1?: any, f2?: any): boolean => {
@@ -610,7 +610,11 @@ const mergeGraphData = (base: GraphData, enhancement: GraphData): GraphData => {
     }
   });
 
-  return { nodes: combinedNodes, links: combinedLinks };
+  return { 
+    nodes: combinedNodes, 
+    links: combinedLinks, 
+    synthesisRationale: enhancement.synthesisRationale || base.synthesisRationale 
+  };
 };
 
 const pruneGraphToSeeds = (graph: GraphData, seedNamesLower: Set<string>): GraphData => {
@@ -662,7 +666,7 @@ const pruneGraphToSeeds = (graph: GraphData, seedNamesLower: Set<string>): Graph
     return visited.has(s) && visited.has(t);
   });
 
-  return { nodes: prunedNodes, links: prunedLinks };
+  return { nodes: prunedNodes, links: prunedLinks, synthesisRationale: graph.synthesisRationale };
 };
 
 const applyHumanCasedLabels = (graph: GraphData, seedsStr: string): GraphData => {
@@ -717,7 +721,7 @@ const mutateGraphArtistId = (graph: GraphData, oldId: string, newId: string, new
     return { ...l, source: nextSource, target: nextTarget };
   });
 
-  return { nodes: updatedNodes, links: updatedLinks };
+  return { nodes: updatedNodes, links: updatedLinks, synthesisRationale: graph.synthesisRationale };
 };
 
 const toTitleCase = (str: string): string => {
@@ -901,6 +905,17 @@ const validateCacheEntry = (data: any): CacheValidationResult => {
     }
   } catch (e) {
     return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
+  }
+
+  // 3. Verify synthesisRationale is present (demand for new melting pot/context)
+  let parsedGraph: any = null;
+  try {
+    parsedGraph = typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData;
+  } catch (e) {}
+  
+  const hasRationale = !!(data.synthesisRationale || (parsedGraph && parsedGraph.synthesisRationale));
+  if (!hasRationale) {
+    needsFutureFields = true;
   }
 
   // A document is fully qualified if it has no deficiencies
@@ -2228,8 +2243,11 @@ const App: React.FC = () => {
             } catch (e) {
               console.warn("Failed to parse cached graphData");
             }
-            
             if (parsedGraph && parsedGraph.nodes && parsedGraph.nodes.length > 0) {
+              const rationaleVal = data.synthesisRationale || parsedGraph.synthesisRationale;
+              if (rationaleVal) {
+                parsedGraph.synthesisRationale = rationaleVal;
+              }
               const normalizedGraph = applyHumanCasedLabels(normalizeGraphData(parsedGraph), artists);
               console.log("[Front Gate Cache] Hit! Bypassing all generation logic for:", searchId);
               setGraphData(normalizedGraph);
@@ -4421,6 +4439,7 @@ const App: React.FC = () => {
     setGraphData(prev => {
       if (!prev) return prev;
       return {
+        ...prev,
         nodes: [...prev.nodes, loadingNode],
         links: [...prev.links, { source: node.id, target: loadingNodeId, value: 1 }]
       };
@@ -4440,7 +4459,7 @@ const App: React.FC = () => {
         return s !== loadingNodeId && t !== loadingNodeId;
       });
 
-      const baseGraph = { nodes: filteredNodes, links: filteredLinks };
+      const baseGraph = { nodes: filteredNodes, links: filteredLinks, synthesisRationale: graphData.synthesisRationale };
       const mergedGraph = mergeGraphData(baseGraph, extension);
 
       // Double-Write to Global Cache: Await global cache writes before updating canvas graphData state.
@@ -4469,6 +4488,7 @@ const App: React.FC = () => {
       setGraphData(prev => {
         if (!prev) return prev;
         return {
+          ...prev,
           nodes: prev.nodes.filter(n => n.id !== loadingNodeId),
           links: prev.links.filter(l => {
             const s = typeof l.source === 'string' ? l.source : (l.source as Node).id;
@@ -4497,7 +4517,7 @@ const App: React.FC = () => {
       // 3. Optional: Cleanup orphaned attribute nodes (genre, label, etc.)
       // We'll keep them for now as they might be connected to other artists
 
-      return { nodes: filteredNodes, links: filteredLinks };
+      return { ...prev, nodes: filteredNodes, links: filteredLinks };
     });
 
     if (selectedNode?.id === node.id) {
