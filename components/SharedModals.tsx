@@ -652,14 +652,24 @@ export const GenerativeRationaleModal: React.FC<{
   if (!isOpen) return null;
 
   // Format paragraphs/points for clean display
-  const cleanRationale = rationale && rationale.trim()
-    ? rationale
+  const trimmed = rationale ? rationale.trim() : '';
+  const isFallback = !trimmed || 
+                     trimmed === '[]' || 
+                     trimmed === '{}' || 
+                     trimmed === 'null' || 
+                     trimmed === 'undefined';
+
+  const cleanRationale = !isFallback
+    ? rationale!
     : `[Single-Seed Analysis]
 - Acoustic & Sonics: Resolved core musical properties and stylistic lineage.
 - Scene Context: Mapped direct influences, record label history, and geographic background.
 - Overlap Insights: Unified structural connections and surrounding chronological relationships.`;
 
-  const cleanRationaleLines = cleanRationale.split('\n').filter(line => !line.trim().startsWith('['));
+  const cleanRationaleLines = cleanRationale.split('\n').filter(line => {
+    if (isFallback && line.trim().startsWith('[')) return false;
+    return true;
+  });
 
   const formattedRationale = cleanRationaleLines.map((line, idx) => {
     if (line.trim().startsWith('-')) {

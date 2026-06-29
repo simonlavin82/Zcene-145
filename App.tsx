@@ -2439,13 +2439,13 @@ const App: React.FC = () => {
         const allArtistsCached = normalizedArtistList.every(name => {
           const normName = name.toLowerCase();
           const entry = baseCacheResult.cached.get(name) || baseCacheResult.cached.get(normName);
-          return entry && isGraphDataPresent(entry);
+          return entry && isGraphDataPresent(entry) && isCacheEntryFullyQualified(entry);
         });
 
         const allCompositeCached = normalizedArtistList.every(name => {
           const normName = name.toLowerCase();
           const entry = compositeCacheResult.cached.get(name) || compositeCacheResult.cached.get(normName);
-          return entry && isGraphDataPresent(entry);
+          return entry && isGraphDataPresent(entry) && isCacheEntryFullyQualified(entry);
         });
 
         if (allArtistsCached) {

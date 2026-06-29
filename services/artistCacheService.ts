@@ -130,7 +130,7 @@ export const normalizeGraphData = (graph: GraphData): GraphData => {
   return {
     nodes: normalizedNodes,
     links: normalizedLinks,
-    synthesisRationale: graph.synthesisRationale
+    synthesisRationale: graph.synthesisRationale || (graph as any).synthesis_rationale
   };
 };
 
