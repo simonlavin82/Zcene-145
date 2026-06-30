@@ -2208,6 +2208,10 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Animation</h4>
                                             <p className="text-sm text-zinc-400">Applies <strong>animate-fade-in-down</strong> with a duration of <strong>200ms</strong> for a responsive, high-end feel.</p>
                                         </div>
+                                        <div className="space-y-1">
+                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Destructive Alerts</h4>
+                                            <p className="text-sm text-zinc-400">For destructive or irreversible user actions (e.g., Clear Library, Remove Node), the header icon changes to warning and is colored <code className="text-red-400">text-red-400</code>, and the confirm action button uses <code className="text-white bg-red-500 font-medium">bg-red-500</code>.</p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -2562,7 +2566,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
 
                             <div className="space-y-6">
                                 <h3 className="text-xl font-medium text-white">Graph Interaction Logic</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                                     <div className="p-6 bg-zinc-900/50 border border-zinc-800 rounded-xl space-y-3">
                                         <h4 className="text-base font-semibold text-zinc-500 uppercase tracking-widest">Hover (Nodes)</h4>
                                         <p className="text-sm text-zinc-400 leading-relaxed">
@@ -2579,6 +2583,12 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <h4 className="text-base font-semibold text-zinc-500 uppercase tracking-widest">Zoom & Pan</h4>
                                         <p className="text-sm text-zinc-400 leading-relaxed">
                                             <strong>D3 Zoom Behavior:</strong> Extent [0.1, 4]. Smooth transitions (750ms) for center/auto-fit action.
+                                        </p>
+                                    </div>
+                                    <div className="p-6 bg-zinc-900/50 border border-zinc-800 rounded-xl space-y-3">
+                                        <h4 className="text-base font-semibold text-zinc-500 uppercase tracking-widest">Node Action Overlay</h4>
+                                        <p className="text-sm text-zinc-400 leading-relaxed">
+                                            <strong>Positioning:</strong> Dynamically anchors and tracks active node vectors in real-time. Translates and scales seamlessly alongside the node during graph drag, pan, or zoom operations.
                                         </p>
                                     </div>
                                 </div>

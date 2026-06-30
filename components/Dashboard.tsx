@@ -332,7 +332,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                     setActiveMenuId(null);
                                     setProjectToDelete(project.id);
                                   }}
-                                  className="w-full px-4 py-2.5 text-xs font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all flex items-center gap-2"
+                                  className="w-full px-4 py-2.5 text-xs font-medium text-red-500 hover:bg-red-500/10 hover:text-red-400 transition-all flex items-center gap-2"
                                 >
                                   <span className="material-symbols-outlined !text-sm">delete</span>
                                   Delete
@@ -496,7 +496,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                       setActiveMenuId(null);
                                       setProjectToDelete(project.id);
                                     }}
-                                    className="w-full px-4 py-2.5 text-xs font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all flex items-center gap-2"
+                                    className="w-full px-4 py-2.5 text-xs font-medium text-red-500 hover:bg-red-500/10 hover:text-red-400 transition-all flex items-center gap-2"
                                   >
                                     <span className="material-symbols-outlined !text-sm">delete</span>
                                     Delete
@@ -518,23 +518,42 @@ const Dashboard: React.FC<DashboardProps> = ({
 
       {/* Custom Delete Confirmation Modal */}
       {projectToDelete && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
+        <div 
+          className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 animate-fade-in-down"
+          style={{ animationDuration: '200ms' }}
+          onClick={() => setProjectToDelete(null)}
+        >
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-zinc-900 border border-zinc-800 rounded-none p-8 max-w-sm w-full space-y-6 shadow-2xl"
+            className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-hidden text-left"
+            onClick={e => e.stopPropagation()}
           >
-            <div className="space-y-2 text-center">
-              <div className="w-16 h-16 bg-red-500/10 rounded-none flex items-center justify-center text-red-500 mx-auto mb-4">
-                <span className="material-symbols-outlined !text-3xl">delete_forever</span>
+            <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-red-500 !text-[18px]">warning</span>
+                <h3 className="text-base font-medium text-white">
+                  Confirm Deletion
+                </h3>
               </div>
-              <h3 className="text-xl font-medium text-white">Delete Zcene?</h3>
-              <p className="text-zinc-400 text-sm">This action cannot be undone. All mapping and chat history for this Zcene will be permanently removed.</p>
-            </div>
-            <div className="flex gap-3">
               <button 
-                onClick={() => setProjectToDelete(null)}
-                className="flex-1 px-6 py-3 bg-zinc-800 text-white rounded-xl font-medium hover:bg-zinc-700 transition-all"
+                onClick={() => setProjectToDelete(null)} 
+                className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none"
+              >
+                <span className="material-symbols-outlined !text-[18px]">close</span>
+              </button>
+            </header>
+
+            <div className="p-5 space-y-4 text-sm text-zinc-400">
+              <p className="leading-relaxed">
+                Are you sure you want to delete <span className="font-semibold text-white">{projectToDelete.name}</span>? This action cannot be undone. All mapping and chat history for this Zcene will be permanently removed.
+              </p>
+            </div>
+
+            <footer className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2">
+              <button 
+                onClick={() => setProjectToDelete(null)} 
+                className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors"
               >
                 Cancel
               </button>
@@ -542,12 +561,12 @@ const Dashboard: React.FC<DashboardProps> = ({
                 onClick={() => {
                   onDeleteProject(projectToDelete);
                   setProjectToDelete(null);
-                }}
-                className="flex-1 px-6 py-3 bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 transition-all shadow-lg shadow-red-500/20"
+                }} 
+                className="px-4 py-1.5 bg-red-500 text-white rounded-xl font-medium text-sm transition-opacity hover:opacity-90"
               >
-                Delete
+                Confirm
               </button>
-            </div>
+            </footer>
           </motion.div>
         </div>
       )}

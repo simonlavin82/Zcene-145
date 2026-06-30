@@ -566,7 +566,48 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         container.append("g").attr("class", "node-group");
         const zoom = d3.zoom<SVGSVGElement, unknown>()
             .scaleExtent([0.1, 4])
-            .on("zoom", (event) => { container.attr("transform", event.transform); });
+            .on("zoom", (event) => { 
+                container.attr("transform", event.transform); 
+                
+                // 1. Update selected node pos during zoom/pan
+                const currentSelected = selectedNodeRef.current;
+                if (currentSelected && svgRef.current) {
+                    const node = visibleNodesRef.current.find(n => String(n.id).toLowerCase() === String(currentSelected.id).toLowerCase());
+                    if (node && !isNaN(node.x!) && !isNaN(node.y!)) {
+                        setSelectedNodePos({
+                            x: event.transform.applyX(node.x!),
+                            y: event.transform.applyY(node.y!)
+                        });
+                    }
+                }
+                
+                // 2. Update hovered link/node coordinates during zoom/pan
+                if (activeHoveredLinkRef.current && svgRef.current) {
+                    const d = activeHoveredLinkRef.current.link;
+                    const x1 = (d.source as any).x;
+                    const y1 = (d.source as any).y;
+                    const x2 = (d.target as any).x;
+                    const y2 = (d.target as any).y;
+                    if (!isNaN(x1) && !isNaN(y1) && !isNaN(x2) && !isNaN(y2)) {
+                        const midX = (x1 + x2) / 2;
+                        const midY = (y1 + y2) / 2;
+                        setHoveredLink(prev => prev ? {
+                            ...prev,
+                            x: event.transform.applyX(midX),
+                            y: event.transform.applyY(midY)
+                        } : null);
+                    }
+                } else if (activeHoveredNodeRef.current && svgRef.current) {
+                    const n = activeHoveredNodeRef.current;
+                    if (!isNaN(n.x!) && !isNaN(n.y!)) {
+                        setHoveredLink(prev => prev ? {
+                            ...prev,
+                            x: event.transform.applyX(n.x!),
+                            y: event.transform.applyY(n.y!)
+                        } : null);
+                    }
+                }
+            });
         svg.call(zoom);
         zoomRef.current = zoom;
         svg.call(zoom.transform, d3.zoomIdentity.translate(dimensions.width/4, dimensions.height/4).scale(0.5));
