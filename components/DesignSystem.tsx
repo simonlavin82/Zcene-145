@@ -3003,7 +3003,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             <div className="p-8 bg-zinc-900/50 rounded-xl border border-zinc-800">
                                 <h3 className="text-2xl font-medium text-primary mb-4">Responsive Ad Strategy</h3>
                                 <p className="text-base text-zinc-300 leading-relaxed max-w-3xl">
-                                    Zcene implements a <strong>Dual-Instance Responsive Ad Strategy</strong>. Because the platform uses dynamic sidebars that can be expanded or collapsed, window-width alone is insufficient for ad sizing. We use a <strong>Container-Aware</strong> approach using ResizeObserver and React keys for hard-reset on transition to ensure ad units never overflow their boundaries.
+                                    Zcene implements a <strong>Dual-Instance Responsive Ad Strategy</strong>. While the standalone landing pages scale between mobile slim and desktop leaderboard banners using standard CSS queries, the interactive dashboard view exclusively uses the compact 320x50 size standard to maximize vertical canvas space.
                                 </p>
                             </div>
 
@@ -3011,7 +3011,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="p-6 bg-zinc-900/50 border border-zinc-800 rounded-xl space-y-4">
                                     <h4 className="text-lg font-medium text-white">Logic: ResizeObserver & Key Reset</h4>
                                     <p className="text-sm text-zinc-400 leading-relaxed">
-                                        The center column in the application view is tracked by a ResizeObserver. If the column width drops below <strong>760px</strong> (due to window resizing or sidebar expansion), the system triggers a <strong>Force Rebuild</strong> on the AdSenseUnit by updating its React key, forcing a clean re-initialization of the Large Mobile Banner.
+                                        The interactive dashboard view enforces the compact ad size variant across all viewports to maximize visual real estate for the node canvas. The dynamic container-aware ResizeObserver size-switching logic has been retired in the application dashboard to optimize workspace layout stability and rendering efficiency.
                                     </p>
                                     <div className="grid grid-cols-2 gap-4 pt-2">
                                         <div className="bg-zinc-950 p-3 rounded-xl border border-zinc-800">
@@ -3049,7 +3049,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <div className="space-y-4">
                                         <h4 className="text-base font-semibold text-zinc-500 uppercase tracking-widest">Desktop Placement</h4>
                                         <p className="text-sm text-zinc-400 leading-relaxed">
-                                            On Desktop, the advertisement container is anchored to the bottom of the central column (Spiderweb view). It is separated from the interactive map by a 2-pixel gap and is contained within its own <strong>bg-zinc-900 rounded-xl</strong> box.
+                                            On Desktop, the advertisement container is anchored to the bottom of the central column (Spiderweb view). It is separated from the interactive map by a 2-pixel gap and is contained within its own <strong>bg-zinc-900 rounded-none</strong> box.
                                         </p>
                                         <ul className="list-disc list-inside text-xs text-zinc-500 space-y-1">
                                             <li>Resizing sidebars triggers an immediate ad swap if width cross-threshold occurs.</li>
@@ -3078,7 +3078,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <p className="text-[10px] font-mono text-zinc-600">728 x 90 Leaderboard</p>
                                         </div>
                                         <div className="w-full bg-zinc-950 border border-zinc-800 rounded-xl flex flex-col items-center justify-center p-4">
-                                            <div className="w-full max-w-[728px] h-[90px] bg-zinc-900 border border-dashed border-zinc-700 rounded-xl flex items-center justify-center text-zinc-700 text-xs font-mono">
+                                            <div className="w-full max-w-[728px] h-[90px] bg-zinc-900 border border-dashed border-zinc-700 rounded-none flex items-center justify-center text-zinc-700 text-xs font-mono">
                                                 728 x 90
                                             </div>
                                         </div>
@@ -3089,7 +3089,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <p className="text-[10px] font-mono text-zinc-600">320 x 50 Slim Banner</p>
                                         </div>
                                         <div className="w-full bg-zinc-950 border border-zinc-800 rounded-xl flex flex-col items-center justify-center p-4">
-                                            <div className="w-[320px] h-[50px] bg-zinc-900 border border-dashed border-zinc-700 rounded-xl flex items-center justify-center text-zinc-700 text-xs font-mono">
+                                            <div className="w-[320px] h-[50px] bg-zinc-900 border border-dashed border-zinc-700 rounded-none flex items-center justify-center text-zinc-700 text-xs font-mono">
                                                 320 x 50
                                             </div>
                                         </div>
@@ -3137,7 +3137,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             <div className="p-8 bg-zinc-900/50 rounded-xl border border-zinc-800">
                                 <h3 className="text-lg font-medium text-white mb-4">Technical Implementation Details</h3>
                                 <p className="text-sm text-zinc-400 leading-relaxed mb-6">
-                                    To prevent <strong>Cumulative Layout Shift (CLS)</strong>, all mobile ad containers are assigned a <strong>min-height: 66px</strong> and wrapped in a high-contrast <strong>bg-[#18181b]</strong> footer container with a z-index safety layer. Desktop units are constrained to <strong>min-height: 90px</strong> inside their respective containers. This ensures the page layout remains stable while the ad script fetches content from the Google AdSense network, and that the ad labels remain visible across all interactive tabs.
+                                    To prevent <strong>Cumulative Layout Shift (CLS)</strong>, all mobile ad containers are assigned a <strong>min-height: 50px</strong> (matching the custom slim mobile banner height) and wrapped in a high-contrast <strong>bg-[#18181b]</strong> footer container with a z-index safety layer and zero vertical padding to sit flush and squared against the graphic asset. In the interactive dashboard view, all ad units (regardless of desktop width) are locked to this compact <strong>50px</strong> height standard to maximize vertical real estate, while public landing page units scale up to a <strong>min-height: 90px</strong> on wide viewports. This ensures layout stability and visibility across all platform contexts.
                                 </p>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                     <div className="space-y-1">

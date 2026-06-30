@@ -678,7 +678,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
   const mobileTabContainerRef = useRef<HTMLDivElement>(null);
   
   const centerColumnRef = useRef<HTMLDivElement>(null);
-  const [adSize, setAdSize] = useState<'small' | 'large'>('large');
+  const [adSize, setAdSize] = useState<'small' | 'large'>('small');
 
   const [activeTab, setActiveTab] = useState<MobileTab>(() => {
     if (typeof window !== 'undefined') {
@@ -775,19 +775,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
     }
   }, [isMagazineViewOpen, isSmallScreen, activeTab]);
 
-  useEffect(() => {
-      const target = centerColumnRef.current;
-      if (!target || isSmallScreen) return;
-      
-      const observer = new ResizeObserver((entries) => {
-        for (const entry of entries) {
-            const width = entry.contentRect.width;
-            setAdSize(width < 760 ? 'small' : 'large');
-        }
-      });
-      observer.observe(target);
-      return () => observer.disconnect();
-  }, [isSmallScreen]);
+
 
   // Local state for guest onboarding
   const [localOnboarding, setLocalOnboarding] = useState<{ [key: string]: boolean }>(() => {
@@ -1649,9 +1637,9 @@ const GraphPage: React.FC<GraphPageProps> = ({
                     </div>
                 </div>
                 {!isMagazineViewOpen && (
-                    <div className="flex-shrink-0 border-t border-zinc-700/50 bg-zinc-900 py-1.5 px-2 text-center relative z-50">
+                    <div className="flex-shrink-0 border-t border-zinc-700/50 bg-zinc-900 py-0 px-2 text-center relative z-50">
                         <div className="text-zinc-500 text-[10px] sm:text-xs">
-                            <div className="mx-auto flex justify-center items-center" style={{ minHeight: '66px' }}>
+                            <div className="mx-auto flex justify-center items-center" style={{ minHeight: '50px' }}>
                                 <AdSenseUnit 
                                     adClient="ca-pub-9665950244000141" 
                                     adSlot="3666473373" 
@@ -1677,10 +1665,10 @@ const GraphPage: React.FC<GraphPageProps> = ({
                         <div className="h-12 px-4 flex-shrink-0 border-b border-zinc-600/50 flex items-center justify-between overflow-hidden"><h2 className="text-base text-white font-bold uppercase tracking-widest whitespace-nowrap">Spiderweb</h2>{!isSmallScreen && (<div className="flex items-center gap-1.5 flex-shrink-0">{SearchControl}</div>)}</div>
                         <div className="flex-grow relative min-h-0" ref={desktopGraphAreaRef}>{isLoading && (<div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-md z-[90] flex flex-col items-center justify-center gap-4 pointer-events-auto"><LoadingSpinner subtext={loadingSubtext} /><button onClick={(e) => { e.stopPropagation(); onCancelGeneration(); }} className="rounded-xl border border-zinc-600 px-6 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800 pointer-events-auto">Cancel</button></div>)}{isFirstGeneration && !isLoading && (<div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none"><ZceneEmptyState onNavigate={onNavigate} /></div>)}{data.nodes.length > 0 && (<MusicGraph data={data} libraryArtists={memoizedLibraryArtists} seedArtists={memoizedSeedArtists} onNodeClick={handleNodeClickInternal} selectedNode={selectedNode} isSmallScreen={isSmallScreen} activeFilters={activeFilters} focusOn={focusOn} searchQuery={searchQuery} setSearchQuery={setSearchQuery} toggleFilter={toggleFilterInternal} focusConfig={focusConfig} legendConfig={legendConfig} legendOrder={legendOrder} graphSettings={graphSettings} legendRef={desktopLegendAreaRef} onInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onLegendInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onExtendNode={onExtendNode} onRemoveNode={onRemoveNode} isGuest={isGuest} detailsCache={detailsCache} isActive={isActive} />)}</div>
                     </div>
-                    <div key={`ad-container-${adSize}`} className="flex-shrink-0 bg-zinc-900 border border-zinc-600/50 p-2 flex justify-center items-center overflow-hidden">
+                    <div key={`ad-container-${adSize}`} className="flex-shrink-0 bg-zinc-900 border border-zinc-600/50 px-2 py-0 flex justify-center items-center overflow-hidden">
                         <div className="text-zinc-500 text-[10px] text-center max-w-full">
                             {adSize === 'small' ? (
-                                <div className="mx-auto flex justify-center items-center" style={{ minHeight: '66px', width: '320px' }}>
+                                <div className="mx-auto flex justify-center items-center" style={{ minHeight: '50px', width: '320px' }}>
                                     <AdSenseUnit 
                                         adClient="ca-pub-9665950244000141" 
                                         adSlot="3666473373" 

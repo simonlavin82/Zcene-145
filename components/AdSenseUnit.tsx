@@ -46,7 +46,7 @@ const AdSenseUnit: React.FC<AdSenseUnitProps> = ({
         img.src = customImageUrl;
         img.alt = 'Advertisement';
         img.referrerPolicy = 'no-referrer';
-        img.className = 'w-full h-full object-contain rounded-xl';
+        img.className = 'w-full h-full object-contain rounded-none';
         
         if (style) {
           Object.assign(img.style, style);
