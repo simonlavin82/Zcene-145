@@ -122,7 +122,7 @@ the entire dataset, the app evolves existing visual structures.
    - Permanent cache by design: music histories, genre bridges, and Deep Cut 
      metadata rarely change. Admin manual deletion handles edge cases.
 
-6. IMMERSIVE DISCOVERY FLOW (MusicGraph.tsx / ExampleMusicGraph.tsx):
+6. IMMERSIVE DISCOVERY FLOW & VIEWPORT OPTIMIZATIONS (MusicGraph.tsx / GraphPage.tsx):
    Zcene features a "Spiderweb" discovery interface that allows users to 
    interactively expand the graph in real-time.
    - Discovery UI: Contextual action buttons (+/-) emerge directly from 
@@ -133,6 +133,10 @@ the entire dataset, the app evolves existing visual structures.
    - Seamless Evolution: The transition from "Loading" to "Real Node" 
      preserves object identity and physics state, ensuring the narrative 
      flow is never interrupted by hard resets.
+   - Desktop Sidebar Auto-Collapse: Selecting a node in the D3 graph automatically 
+     collapses the left 'ARTISTS' sidebar to yield horizontal space to the canvas.
+   - Mobile Dynamic Landing Routing: Initializes the mobile viewport directly on the 
+     'SPIDERWEB' canvas tab if the loaded project contains seed artists.
 `;
 
 const PHYSICS_ENGINE_DOCUMENTATION = `

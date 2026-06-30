@@ -2505,7 +2505,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <div className="w-1/4 h-full bg-zinc-900 border border-zinc-800 rounded-xl flex items-center justify-center text-[10px] text-zinc-600 font-semibold uppercase tracking-widest">Deep Cut</div>
                                     </div>
                                     <p className="text-sm text-zinc-400 leading-relaxed">
-                                        Three-column flexible layout. Panels support custom width dragging via manual handlers. Central column adapts its width for responsive ad placement using ResizeObserver.
+                                        Three-column flexible layout. Panels support custom width dragging via manual handlers. Central column adapts its width for responsive ad placement using ResizeObserver. Left panel automatically collapses when a node is selected on the D3 graph to yield space to the canvas.
                                     </p>
                                 </div>
 
@@ -2521,7 +2521,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <div className="h-6 bg-zinc-800 border-t border-zinc-700 mt-2 rounded-xl flex items-center justify-center text-[8px] text-zinc-500">Fixed Footer Ad</div>
                                     </div>
                                     <p className="text-sm text-zinc-400 leading-relaxed">
-                                        Stacked navigation using a high-fidelity tab system. Panels occupy 100% of the viewport width with a persistent flex-shrink ad footer pinned to the bottom.
+                                        Stacked navigation using a high-fidelity tab system. Panels occupy 100% of the viewport width with a persistent flex-shrink ad footer pinned to the bottom. Dynamic landing routing defaults to the 'SPIDERWEB' tab if project seeds exist.
                                     </p>
                                 </div>
                             </div>

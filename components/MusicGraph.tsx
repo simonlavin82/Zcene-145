@@ -61,6 +61,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     x: number;
     y: number;
   } | null>(null);
+  const [hoverQuadrant, setHoverQuadrant] = useState<'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'>('top-right');
   const activeHoveredLinkRef = useRef<{ link: Link } | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const hoveredNodeIdRef = useRef<string | null>(null);
@@ -899,7 +900,47 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         })
         .on("mouseenter", (event, d) => {
             if (!isSmallScreen && d.type === 'artist') {
+                if (containerRef.current) {
+                    const rect = containerRef.current.getBoundingClientRect();
+                    const x = event.clientX - rect.left;
+                    const y = event.clientY - rect.top;
+                    const isLeft = x < rect.width / 2;
+                    const isTop = y < rect.height / 2;
+                    let quadrant: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' = 'top-right';
+                    if (isLeft && isTop) {
+                        quadrant = 'bottom-right';
+                    } else if (!isLeft && isTop) {
+                        quadrant = 'bottom-left';
+                    } else if (isLeft && !isTop) {
+                        quadrant = 'top-right';
+                    } else if (!isLeft && !isTop) {
+                        quadrant = 'top-left';
+                    }
+                    setHoverQuadrant(quadrant);
+                }
                 triggerNodeHoverRef.current(d);
+            }
+        })
+        .on("mousemove", (event, d) => {
+            if (!isSmallScreen && d.type === 'artist') {
+                if (containerRef.current) {
+                    const rect = containerRef.current.getBoundingClientRect();
+                    const x = event.clientX - rect.left;
+                    const y = event.clientY - rect.top;
+                    const isLeft = x < rect.width / 2;
+                    const isTop = y < rect.height / 2;
+                    let quadrant: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' = 'top-right';
+                    if (isLeft && isTop) {
+                        quadrant = 'bottom-right';
+                    } else if (!isLeft && isTop) {
+                        quadrant = 'bottom-left';
+                    } else if (isLeft && !isTop) {
+                        quadrant = 'top-right';
+                    } else if (!isLeft && !isTop) {
+                        quadrant = 'top-left';
+                    }
+                    setHoverQuadrant(quadrant);
+                }
             }
         })
         .on("mouseleave", (event, d) => {
@@ -1150,18 +1191,12 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             <div
                 style={
                     typeof window !== 'undefined' && window.innerWidth >= 1024
-                        /* Desktop: float above or below the hovered node depending on proximity to top edge */
-                        ? (() => {
-                            const nearTop = hoveredLink.y < 140;
-                            return {
-                                position: 'absolute' as const,
-                                left: hoveredLink.x,
-                                top: hoveredLink.y,
-                                transform: nearTop ? 'translate(-50%, 20px)' : 'translate(-50%, -100%)',
-                                pointerEvents: 'none' as const,
-                                zIndex: 50
-                            };
-                          })()
+                        /* Desktop: absolute positioning without mouse-following coordinates */
+                        ? {
+                            position: 'absolute' as const,
+                            pointerEvents: 'none' as const,
+                            zIndex: 50
+                          }
                         /* Mobile: absolute top-drop banner within the canvas container */
                         : {
                             position: 'absolute',
@@ -1174,8 +1209,13 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 }
                 className={
                     typeof window !== 'undefined' && window.innerWidth >= 1024
-                        /* Desktop visual tokens */
-                        ? 'bg-zinc-950/95 border border-zinc-700/80 px-3.5 py-2.5 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md rounded-xl flex flex-col gap-2 text-left min-w-[200px] max-w-[320px]'
+                        /* Desktop visual tokens + quadrant class positioning */
+                        ? `bg-zinc-950/95 border border-zinc-700/80 px-3.5 py-2.5 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md rounded-xl flex flex-col gap-2 text-left min-w-[200px] max-w-[320px] absolute ${
+                            hoverQuadrant === 'top-left' ? 'top-6 left-6' :
+                            hoverQuadrant === 'top-right' ? 'top-6 right-6' :
+                            hoverQuadrant === 'bottom-left' ? 'bottom-6 left-24' :
+                            'bottom-6 right-24'
+                          }`
                         /* Mobile visual tokens — full-width top-drop banner */
                         : 'bg-zinc-950/95 border-b border-zinc-700/80 px-4 py-3 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md w-full flex flex-col gap-2 text-left'
                 }
