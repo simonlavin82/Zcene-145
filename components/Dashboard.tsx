@@ -179,7 +179,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       <main className={`flex-1 overflow-y-auto ${isSmallScreen ? 'px-4' : 'px-6 lg:px-8'} py-8 relative z-10`}>
         <div className="max-w-7xl mx-auto space-y-8">
           <div className="flex flex-col items-center justify-center text-center md:flex-row md:justify-between md:items-center gap-4">
-            <h1 className="text-lg font-bold uppercase tracking-normal text-zinc-200">YOUR ZCENES</h1>
+            <h1 className="text-lg font-semibold uppercase tracking-wider text-zinc-200">YOUR ZCENES</h1>
             
             <div className="flex items-center gap-2 h-[36px] w-full justify-center md:w-auto md:justify-end">
               {/* Grid/List View Toggle */}
