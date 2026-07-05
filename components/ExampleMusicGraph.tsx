@@ -47,14 +47,12 @@ const exampleGraphData: GraphData = {
   ],
 };
 
-type FocusMode = 'organic' | 'cluster';
 type FilterKeys = 'genre' | 'label' | 'country' | 'founded' | 'seed' | 'recommended';
 
 const ExampleMusicGraph: React.FC = () => {
     const svgRef = useRef<SVGSVGElement | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const simulationRef = useRef<d3.Simulation<Node, Link> | null>(null);
-    const [focusOn, setFocusOn] = useState<FocusMode>('organic');
     const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
     const [isLegendExpanded, setIsLegendExpanded] = useState(false);
     const [isCompactMode, setIsCompactMode] = useState(false);
@@ -378,11 +376,7 @@ const ExampleMusicGraph: React.FC = () => {
             .attr("d", (d: any) => {
                 if (d.isLoading) return d3.symbol().type(d3.symbolCircle).size(600)();
                 const isSeed = seedIds.includes(d.id) || d.isSeed;
-                const isHub = ['genre', 'label', 'country'].includes(d.type);
-                const isCluster = focusOn === 'cluster';
-                
-                let area = d.type === 'artist' ? 350 : 250;
-                if (isHub && isCluster) area *= 1.4;
+                const area = d.type === 'artist' ? 350 : 250;
 
                 if (d.type === 'artist') {
                     return isSeed ? d3.symbol().type(d3.symbolCircle).size(area)() : d3.symbol().type(d3.symbolStar).size(area + 50)();
@@ -427,72 +421,11 @@ const ExampleMusicGraph: React.FC = () => {
         const forceX = d3.forceX<Node>(width / 2);
         const forceY = d3.forceY<Node>(height / 2);
 
-        if (focusOn === 'cluster') {
-            const currentSeedIds = [...seedIds, ...nodes.filter(n => n.isSeed).map(n => n.id)];
-            const hubs = nodes.filter(n => ['genre', 'label', 'country'].includes(n.type));
-            const recommendedArtists = nodes.filter(n => (n.type === 'artist' || n.isLoading) && !currentSeedIds.includes(n.id));
-            
-            const R1 = Math.min(width, height) * 0.18;
-            const R2 = Math.min(width, height) * 0.38;
-            
-            const hubPositions = new Map<string, { x: number, y: number }>();
-            if (hubs.length > 0) {
-                const angleStep = (2 * Math.PI) / hubs.length;
-                hubs.forEach((h, i) => {
-                    hubPositions.set(h.id, {
-                        x: width / 2 + R1 * Math.cos(i * angleStep),
-                        y: height / 2 + R1 * Math.sin(i * angleStep)
-                    });
-                });
-            }
-
-            const artistToHubMap = new Map<string, string>();
-            recommendedArtists.forEach(artist => {
-                const connections = links.filter(l => {
-                    const sId = typeof l.source === 'string' ? l.source : l.source.id;
-                    const tId = typeof l.target === 'string' ? l.target : l.target.id;
-                    return (sId === artist.id && hubPositions.has(tId)) || (tId === artist.id && hubPositions.has(sId));
-                });
-                if (connections.length > 0) {
-                    const firstHubId = (typeof connections[0].source === 'string' ? connections[0].source : connections[0].source.id) === artist.id 
-                        ? (typeof connections[0].target === 'string' ? connections[0].target : connections[0].target.id) 
-                        : (typeof connections[0].source === 'string' ? connections[0].source : connections[0].source.id);
-                    artistToHubMap.set(artist.id, firstHubId);
-                }
-            });
-
-            forceX.strength((d: Node) => d.type === 'founded' ? 0.05 : 0.25).x((d: Node) => {
-                if (currentSeedIds.includes(d.id)) return width / 2;
-                if (hubPositions.has(d.id)) return hubPositions.get(d.id)!.x;
-                const hubId = artistToHubMap.get(d.id);
-                if (hubId) {
-                    const hubPos = hubPositions.get(hubId)!;
-                    const angle = Math.atan2(hubPos.y - height / 2, hubPos.x - width / 2);
-                    return width / 2 + R2 * Math.cos(angle);
-                }
-                return width / 2;
-            });
-            forceY.strength((d: Node) => d.type === 'founded' ? 0.05 : 0.25).y((d: Node) => {
-                if (currentSeedIds.includes(d.id)) return height / 2;
-                if (hubPositions.has(d.id)) return hubPositions.get(d.id)!.y;
-                const hubId = artistToHubMap.get(d.id);
-                if (hubId) {
-                    const hubPos = hubPositions.get(hubId)!;
-                    const angle = Math.atan2(hubPos.y - height / 2, hubPos.x - width / 2);
-                    return height / 2 + R2 * Math.sin(angle);
-                }
-                return height / 2;
-            });
-            (simulation.force("charge") as d3.ForceManyBody<Node>).strength(-1500);
-            simulation.force('center', null);
-            simulation.force("collide", d3.forceCollide().radius(width < 600 ? 40 : 55));
-        } else {
-            forceX.strength(0.005).x(width / 2);
-            forceY.strength(0.005).y(height / 2);
-            simulation.force('center', d3.forceCenter(width / 2, height / 2));
-            (simulation.force("charge") as d3.ForceManyBody<Node>).strength(-500);
-            simulation.force("collide", d3.forceCollide().radius(width < 600 ? 40 : 45));
-        }
+        forceX.strength(0.005).x(width / 2);
+        forceY.strength(0.005).y(height / 2);
+        simulation.force('center', d3.forceCenter(width / 2, height / 2));
+        (simulation.force("charge") as d3.ForceManyBody<Node>).strength(-500);
+        simulation.force("collide", d3.forceCollide().radius(width < 600 ? 40 : 45));
 
         simulation.force("x", forceX).force("y", forceY);
         
@@ -506,7 +439,7 @@ const ExampleMusicGraph: React.FC = () => {
             simulation.alpha(0.02).restart();
         }
 
-    }, [dimensions, focusOn, graphData]);
+    }, [dimensions, graphData]);
 
     // Get position of the animating node for the UI overlay
     const getAnimatingNodePos = () => {
@@ -529,11 +462,11 @@ const ExampleMusicGraph: React.FC = () => {
              {/* Gradient for depth */}
              <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/40 to-transparent z-0"></div>
 
-             <div ref={containerRef} className="absolute inset-0 m-4 sm:m-4 md:m-8 bg-zinc-900 border border-zinc-600/50 shadow-2xl flex flex-col overflow-hidden text-left z-10 rounded-none">
+             <div ref={containerRef} className="absolute inset-0 m-4 sm:m-4 md:m-8 bg-zinc-900 border border-zinc-600/50 shadow-2xl flex flex-col overflow-hidden text-left z-10 rounded-none font-sans">
                 {/* Header (Matching GraphPage Spiderweb Header) */}
                 <div className="h-12 px-4 flex-shrink-0 border-b border-zinc-600/50 flex items-center justify-between overflow-hidden bg-zinc-900 relative z-20">
                     <div className="flex items-center gap-2">
-                        <h2 className="text-sm sm:text-base text-white font-bold uppercase tracking-widest whitespace-nowrap">Spiderweb</h2>
+                        <h2 className="text-sm sm:text-base text-white font-semibold uppercase tracking-wider whitespace-nowrap">Spiderweb</h2>
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                         <div className="relative flex items-center gap-2">
@@ -552,39 +485,6 @@ const ExampleMusicGraph: React.FC = () => {
                                 </div>
                             </div>
                             
-                            <div className="relative">
-                                <div className="flex items-center bg-zinc-900/60 border border-zinc-700 rounded-xl p-0.5 backdrop-blur-sm relative">
-                                    <motion.div 
-                                        className="absolute top-0.5 left-0.5 h-8 w-8 bg-zinc-800 rounded-[6px] shadow-inner ring-1 ring-zinc-700"
-                                        initial={false}
-                                        animate={{ x: focusOn === 'organic' ? 0 : 32 }}
-                                        transition={{ type: "spring", stiffness: 500, damping: 35 }}
-                                    />
-                                    <button 
-                                        className={`flex items-center justify-center w-8 h-8 rounded-lg transition-colors relative z-10 active:scale-95 ${focusOn === 'organic' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
-                                        onClick={() => setFocusOn('organic')}
-                                        title="Organic View"
-                                        aria-label="Organic View"
-                                    >
-                                        <span className="material-symbols-outlined !text-[18px]">hub</span>
-                                    </button>
-                                    <button 
-                                        className={`flex items-center justify-center w-8 h-8 rounded-lg transition-colors relative z-10 active:scale-95 ${focusOn === 'cluster' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
-                                        onClick={() => setFocusOn('cluster')}
-                                        title="Cluster View"
-                                        aria-label="Cluster View"
-                                    >
-                                        <span className="material-symbols-outlined !text-[18px]">bubble_chart</span>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <button 
-                                className="w-9 h-9 flex flex-shrink-0 items-center justify-center border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 transition-all duration-200 leading-none backdrop-blur-sm" 
-                                title="Spiderweb Preferences"
-                            >
-                                <span className="material-symbols-outlined !text-[18px]">tune</span>
-                            </button>
                         </div>
                     </div>
                 </div>

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { GraphData, Node, ParsedArtist, View, NodeDetails, GraphSettings, Link, ChatMessage, StackItem, DiscoveryFilters, UserTaste } from '../types';
+import { GraphData, Node, ParsedArtist, View, NodeDetails, Link, ChatMessage, StackItem, DiscoveryFilters, UserTaste } from '../types';
 import { User } from '../services/firebase';
 import { motion, AnimatePresence } from 'motion/react';
 import { normalizeArtistId, titleCaseArtistId } from '../services/artistCacheService';
@@ -8,7 +8,6 @@ import Header from './Header';
 import MusicGraph from './MusicGraph';
 import { DetailsPanel } from './DetailsPanel';
 import { LoadingSpinner, ZceneAbbreviatedLogo, FaviconLogo, SortControls, LegendSymbol, HelpIcon, MicIcon, Spinner, StackIcon, LibraryIcon } from './Icons';
-import ViewToggle from './ViewToggle';
 import { analyticsService } from '../services/analyticsService';
 import AdSenseUnit from './AdSenseUnit';
 import OnboardingTooltip from './OnboardingTooltip';
@@ -38,7 +37,6 @@ declare global {
 const MAX_SEED_ARTISTS = 5;
 
 type FilterKeys = 'genre' | 'label' | 'country' | 'founded' | 'seed' | 'recommended';
-type FocusMode = 'organic' | 'cluster';
 type MobileTab = 'artists' | 'spiderweb' | 'details';
 type SortKey = 'name' | 'dateAdded' | 'selected';
 
@@ -297,98 +295,6 @@ const ZceneEmptyState: React.FC<{ onNavigate: (view: View) => void }> = ({ onNav
   </div>
 );
 
-// Spiderweb Preferences Dialog
-const GraphSettingsDialog: React.FC<{
-    isOpen: boolean;
-    onClose: () => void;
-    settings: GraphSettings;
-    onSettingsChange: (newSettings: GraphSettings) => void;
-}> = ({ isOpen, onClose, settings, onSettingsChange }) => {
-    if (!isOpen) return null;
-
-    const handleChange = (key: keyof GraphSettings, value: string) => {
-        onSettingsChange({
-            ...settings,
-            [key]: parseFloat(value)
-        });
-    };
-
-    return (
-        <div className="fixed inset-0 bg-black/60 z-[110] flex items-center justify-center p-4 animate-fade-in-down" style={{ animationDuration: '200ms' }} onClick={onClose}>
-            <div className="bg-background-dark border border-zinc-600 rounded-none w-full sm:max-w-md shadow-2xl flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
-                <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-primary !text-[18px]">tune</span>
-                        <h3 className="text-lg font-medium text-white">
-                            Spiderweb Preferences
-                        </h3>
-                    </div>
-                    <button onClick={onClose} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none aspect-square">
-                        <span className="material-symbols-outlined !text-[18px]">close</span>
-                    </button>
-                </header>
-                <div className="p-6 space-y-6">
-                    <div className="space-y-3">
-                        <div className="flex justify-between items-center">
-                            <label htmlFor="link-distance" className="text-sm font-medium text-zinc-200">Repulsion Distance</label>
-                            <span className="text-xs font-mono text-primary bg-primary/10 px-2 py-0.5 rounded-md">{settings.linkDistance.toFixed(1)}x</span>
-                        </div>
-                        <input
-                            id="link-distance"
-                            type="range"
-                            min="0.1"
-                            max="5"
-                            step="0.1"
-                            value={settings.linkDistance}
-                            onChange={(e) => handleChange('linkDistance', e.target.value)}
-                            className="w-full h-2 bg-zinc-700 rounded-xl appearance-none cursor-pointer accent-primary hover:accent-primary/80"
-                        />
-                        <div className="flex justify-between text-xs text-zinc-500 font-bold uppercase tracking-widest">
-                            <span>Tight</span>
-                            <span>Loose</span>
-                        </div>
-                    </div>
-                    <div className="space-y-3">
-                        <div className="flex justify-between items-center">
-                            <label htmlFor="node-size" className="text-base sm:text-sm font-medium text-zinc-200">Node Size</label>
-                            <span className="text-xs font-mono text-primary bg-primary/10 px-2 py-0.5 rounded-md">{settings.nodeSize.toFixed(1)}x</span>
-                        </div>
-                         <input
-                            id="node-size"
-                            type="range"
-                            min="1"
-                            max="5"
-                            step="0.1"
-                            value={settings.nodeSize}
-                            onChange={(e) => handleChange('nodeSize', e.target.value)}
-                            className="w-full h-2 bg-zinc-700 rounded-xl appearance-none cursor-pointer accent-primary hover:accent-primary/80"
-                        />
-                        <div className="flex justify-between text-xs text-zinc-500 font-bold uppercase tracking-widest">
-                            <span>Tiny</span>
-                            <span>Huge</span>
-                        </div>
-                    </div>
-
-                    <div className="pt-4 border-t border-zinc-700/50">
-                        <button 
-                            onClick={() => onSettingsChange({ linkDistance: 1, nodeSize: 3 })}
-                            className="w-full rounded-xl border border-zinc-600 bg-transparent py-3 text-sm font-medium text-zinc-300 hover:bg-zinc-800 transition-colors flex items-center justify-center gap-2"
-                        >
-                            <span className="material-symbols-outlined !text-[18px]">refresh</span>
-                            Reset Preferences
-                        </button>
-                    </div>
-                </div>
-                <footer className="p-4 bg-zinc-900 border-t border-zinc-700 flex justify-end">
-                    <button onClick={onClose} className="rounded-xl bg-primary px-6 py-2 text-sm font-medium text-brand-black transition-opacity hover:opacity-90">
-                        Done
-                    </button>
-                </footer>
-            </div>
-        </div>
-    );
-};
-
 const LimitReachedDialog: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpen, onClose }) => {
     if (!isOpen) return null;
     return (
@@ -406,6 +312,8 @@ const LimitReachedDialog: React.FC<{ isOpen: boolean; onClose: () => void; }> = 
         </div>
     );
 };
+
+
 
 const LibraryDialog: React.FC<{
   isOpen: boolean;
@@ -667,7 +575,6 @@ const GraphPage: React.FC<GraphPageProps> = ({
   // Tooltip Target Refs
   const artistInputRef = useRef<HTMLInputElement>(null);
   const createZceneBtnRef = useRef<HTMLButtonElement>(null);
-  const layoutDropdownRef = useRef<HTMLDivElement>(null);
   
   const mobileGraphAreaRef = useRef<HTMLDivElement>(null);
   const desktopGraphAreaRef = useRef<HTMLDivElement>(null);
@@ -695,11 +602,6 @@ const GraphPage: React.FC<GraphPageProps> = ({
 
   const [isLibraryDialogOpen, setIsLibraryDialogOpen] = useState(false);
   const [isExpectingUpload, setIsExpectingUpload] = useState(false);
-  const [isGraphSettingsOpen, setIsGraphSettingsOpen] = useState(false);
-  const [graphSettings, setGraphSettings] = useState<GraphSettings>({
-      linkDistance: 1,
-      nodeSize: 3
-  });
   const [leftPanelWidth, setLeftPanelWidth] = useState(DEFAULT_LEFT_PANEL_WIDTH);
   const [rightPanelWidth, setRightPanelWidth] = useState(DEFAULT_RIGHT_PANEL_WIDTH);
   const [isRationaleModalOpen, setIsRationaleModalOpen] = useState(false);
@@ -717,7 +619,6 @@ const GraphPage: React.FC<GraphPageProps> = ({
       seed: true,
       recommended: true,
   });
-  const [focusOn, setFocusOn] = useState<FocusMode>('organic');
   const [searchQuery, setSearchQuery] = useState('');
 
   const [readNodeIds, setReadNodeIds] = useState<Set<string>>(new Set());
@@ -875,12 +776,10 @@ const GraphPage: React.FC<GraphPageProps> = ({
     const newVisibleTooltips = { step1: false, step2: false, step3: false, step4: false, step5: false };
     
     if (isShareIdActive) {
-        // Guest/Share onboarding: restrict to step3, step4, step5 (as a 3-step tour)
+        // Guest/Share onboarding: restrict to step3, step5 (as a 2-step tour)
         if (hasData && !isLoading) {
             if (!onboardingProgress.step3 && isGraphVisible) {
                 newVisibleTooltips.step3 = true;
-            } else if (!onboardingProgress.step4 && isGraphVisible) {
-                newVisibleTooltips.step4 = true;
             } else if (!onboardingProgress.step5 && selectedNode) {
                 newVisibleTooltips.step5 = true;
             }
@@ -893,7 +792,6 @@ const GraphPage: React.FC<GraphPageProps> = ({
             if (isArtistsVisible) newVisibleTooltips.step2 = true;
         } else if (hasData && !isLoading) {
             if (!onboardingProgress.step3 && isGraphVisible) newVisibleTooltips.step3 = true;
-            else if (!onboardingProgress.step4 && isGraphVisible) newVisibleTooltips.step4 = true;
             else if (!onboardingProgress.step5 && selectedNode) newVisibleTooltips.step5 = true;
         }
     }
@@ -1491,25 +1389,10 @@ const GraphPage: React.FC<GraphPageProps> = ({
     country: { label: 'Origin', shape: <LegendSymbol symbol={d3.symbolTriangle} size={260} className="text-[#F59E0B]" /> },
   };
   const legendOrder: FilterKeys[] = ['seed', 'recommended', 'label', 'genre', 'country', 'founded'];
-  const focusConfig: { id: FocusMode, label: string }[] = [
-    { id: 'organic', label: 'Organic' }, { id: 'cluster', label: 'Cluster' },
-  ];
   const toggleFilterInternal = (filter: FilterKeys) => {
     setActiveFilters(prev => { const newState = !prev[filter]; analyticsService.track('Filter Toggled', { filter, is_active: newState }); return { ...prev, [filter]: newState }; });
     if (!onboardingProgress.step3) updateOnboarding('step3');
   };
-  const handleFocusChangeInternal = useCallback((newFocus: FocusMode) => {
-    analyticsService.track('Layout Changed', { layout: newFocus });
-    setFocusOn(newFocus);
-    if (!onboardingProgress.step4) updateOnboarding('step4');
-  }, [onboardingProgress.step4]);
-  
-  const LayoutControl = useMemo(() => (
-    <div className="relative" ref={layoutDropdownRef}>
-        <ViewToggle value={focusOn} onChange={handleFocusChangeInternal} />
-    </div>
-  ), [focusOn, handleFocusChangeInternal]);
-  
   const SearchControl = useMemo(() => {
     return (
         <div className="relative flex items-center gap-2">
@@ -1518,8 +1401,6 @@ const GraphPage: React.FC<GraphPageProps> = ({
                 <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">{!searchQuery && (<button onClick={() => handleSpeechToText('graph')} className={`w-8 h-8 flex items-center justify-center rounded-[10px] transition-colors leading-none ${isListeningForGraph ? 'text-primary animate-pulse' : 'text-zinc-500 hover:text-white'}`} title="Search by voice"><MicIcon className="!text-[18px]" /></button>)}{searchQuery && (<button onClick={() => setSearchQuery('')} className="w-8 h-8 flex items-center justify-center rounded-[10px] text-zinc-400 hover:text-white transition-colors leading-none" aria-label="Clear search"><span className="material-symbols-outlined !text-[18px]">close</span></button>)}</div>
             </div>
             
-            {LayoutControl}
-
             {data && data.nodes && data.nodes.length > 0 && (
                 <button 
                     onClick={() => setIsRationaleModalOpen(true)} 
@@ -1529,17 +1410,9 @@ const GraphPage: React.FC<GraphPageProps> = ({
                     <span className="material-symbols-outlined !text-[18px]">info</span>
                 </button>
             )}
-
-            <button 
-                onClick={() => setIsGraphSettingsOpen(true)} 
-                className="w-9 h-9 flex flex-shrink-0 items-center justify-center border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none backdrop-blur-sm" 
-                title="Spiderweb Preferences"
-            >
-                <span className="material-symbols-outlined !text-[18px]">tune</span>
-            </button>
         </div>
     );
-  }, [searchQuery, isListeningForGraph, LayoutControl, data?.nodes?.length]);
+  }, [searchQuery, isListeningForGraph, data?.nodes?.length]);
 
   const displayBadgeCount = systemError ? 0 : activeNodes.length;
 
@@ -1556,12 +1429,10 @@ const GraphPage: React.FC<GraphPageProps> = ({
         <OnboardingTooltip isVisible={visibleTooltips.step1} content="Add your seed artists to start your Zcene. These are your starting points, you can type them or select from your library." position="bottom" anchorRef={artistInputRef} onDismiss={() => updateOnboarding('step1')} />
         <OnboardingTooltip isVisible={visibleTooltips.step2} content="Click here to create your Zcene from your selected artists and see the connections visually." position="top" anchorRef={createZceneBtnRef} onDismiss={() => updateOnboarding('step2')} />
         <OnboardingTooltip isVisible={visibleTooltips.step3} content="Drag, zoom and toggle node types to focus on what matters most: Seed Artists, AI Artists, Genres, Labels, Origins, Founded." position={isSmallScreen ? "top" : "bottom"} anchorRef={isSmallScreen ? mobileLegendAreaRef : desktopLegendAreaRef} onDismiss={() => updateOnboarding('step3')} />
-        <OnboardingTooltip isVisible={visibleTooltips.step4} content="Change how your Zcene is organised" position="bottom" anchorRef={layoutDropdownRef} onDismiss={() => updateOnboarding('step4')} />
         <OnboardingTooltip isVisible={visibleTooltips.step5} content="This is the Deep Cut, explore bios, connections, and insights." position={isSmallScreen ? "bottom" : "left"} anchorRef={isSmallScreen ? deepCutTabRef : detailsCollapseBtnRef} onDismiss={() => updateOnboarding('step5')} />
 
         <input type="file" accept=".csv,.txt,.xml" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
         <LibraryDialog isOpen={isLibraryDialogOpen} onClose={() => setIsLibraryDialogOpen(false)} libraryArtists={libraryArtists} selectedArtists={selectedSeedArtists} onArtistToggle={handleLibraryArtistToggle} uniqueGenres={uniqueGenres} artistGenreMap={artistGenreMap} fileInputRef={fileInputRef} onTriggerClear={() => setShowConfirmDelete(true)} />
-        <GraphSettingsDialog isOpen={isGraphSettingsOpen} onClose={() => setIsGraphSettingsOpen(false)} settings={graphSettings} onSettingsChange={setGraphSettings} />
         <LimitReachedDialog isOpen={showLimitDialog} onClose={() => setShowLimitDialog(false)} />
         {showConfirmDelete && <ConfirmDeleteModal />}
         {nodeToRemove && <ConfirmRemoveNodeModal />}
@@ -1635,7 +1506,6 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                                     <input type="search" placeholder="Search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full h-9 appearance-none rounded-xl border border-zinc-700 bg-zinc-900/60 text-zinc-300 pl-4 pr-12 text-sm font-normal focus:ring-1 focus:ring-primary focus:outline-none backdrop-blur-sm" />
                                                     <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">{!searchQuery && (<button onClick={() => handleSpeechToText('graph')} className={`w-8 h-8 flex items-center justify-center rounded-[10px] transition-colors leading-none ${isListeningForGraph ? 'text-primary animate-pulse' : 'text-zinc-500 hover:text-white'}`} title="Search by voice"><MicIcon className="!text-[18px]" /></button>)}{searchQuery && (<button onClick={() => setSearchQuery('')} className="w-8 h-8 flex items-center justify-center rounded-[10px] text-zinc-400 hover:text-white transition-colors leading-none" aria-label="Clear search"><span className="material-symbols-outlined !text-[18px]">close</span></button>)}</div>
                                                 </div>
-                                                {LayoutControl}
                                                 {data && data.nodes && data.nodes.length > 0 && (
                                                     <button 
                                                         onClick={() => setIsRationaleModalOpen(true)} 
@@ -1645,18 +1515,11 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                                         <span className="material-symbols-outlined !text-[18px]">info</span>
                                                     </button>
                                                 )}
-                                                <button 
-                                                    onClick={() => setIsGraphSettingsOpen(true)} 
-                                                    className="w-9 h-9 flex flex-shrink-0 items-center justify-center border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none backdrop-blur-sm" 
-                                                    title="Spiderweb Preferences"
-                                                >
-                                                    <span className="material-symbols-outlined !text-[18px]">tune</span>
-                                                </button>
                                             </div>
                                         </div>
                                         <div className="mt-4 w-full h-px bg-zinc-700" />
                                     </div>
-                                    <div className="flex-grow relative min-h-0 bg-zinc-900" ref={mobileGraphAreaRef}>{isLoading && (<div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-md z-[90] flex flex-col items-center justify-center gap-4 pointer-events-auto"><LoadingSpinner subtext={loadingSubtext} /><button onClick={(e) => { e.stopPropagation(); onCancelGeneration(); }} className="rounded-xl border border-zinc-600 px-6 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800 pointer-events-auto">Cancel</button></div>)}{isFirstGeneration && !isLoading && (<div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none"><ZceneEmptyState onNavigate={onNavigate} /></div>)}{data.nodes.length > 0 && (<MusicGraph data={data} libraryArtists={memoizedLibraryArtists} seedArtists={memoizedSeedArtists} onNodeClick={handleNodeClickInternal} selectedNode={selectedNode} isSmallScreen={isSmallScreen} activeFilters={activeFilters} focusOn={focusOn} searchQuery={searchQuery} setSearchQuery={setSearchQuery} toggleFilter={toggleFilterInternal} focusConfig={focusConfig} legendConfig={legendConfig} legendOrder={legendOrder} graphSettings={graphSettings} legendRef={desktopLegendAreaRef} onInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onLegendInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onExtendNode={onExtendNode} onRemoveNode={setNodeToRemove} isGuest={isGuest} detailsCache={detailsCache} isActive={isActive} />)}</div>
+                                    <div className="flex-grow relative min-h-0 bg-zinc-900" ref={mobileGraphAreaRef}>{isLoading && (<div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-md z-[90] flex flex-col items-center justify-center gap-4 pointer-events-auto"><LoadingSpinner subtext={loadingSubtext} /><button onClick={(e) => { e.stopPropagation(); onCancelGeneration(); }} className="rounded-xl border border-zinc-600 px-6 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800 pointer-events-auto">Cancel</button></div>)}{isFirstGeneration && !isLoading && (<div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none"><ZceneEmptyState onNavigate={onNavigate} /></div>)}{data.nodes.length > 0 && (<MusicGraph data={data} libraryArtists={memoizedLibraryArtists} seedArtists={memoizedSeedArtists} onNodeClick={handleNodeClickInternal} selectedNode={selectedNode} isSmallScreen={isSmallScreen} activeFilters={activeFilters} searchQuery={searchQuery} setSearchQuery={setSearchQuery} toggleFilter={toggleFilterInternal} legendConfig={legendConfig} legendOrder={legendOrder} legendRef={desktopLegendAreaRef} onInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onLegendInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onExtendNode={onExtendNode} onRemoveNode={setNodeToRemove} isGuest={isGuest} detailsCache={detailsCache} isActive={isActive} />)}</div>
                                 </div>
                             </div>
                             <div className={`w-full flex-shrink-0 h-full flex flex-col min-h-0 overflow-hidden relative ${isMagazineViewOpen ? 'fixed inset-0 z-[1000] pt-0 md:pt-4' : ''}`}>
@@ -1736,7 +1599,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                 <div ref={centerColumnRef} className={`flex-1 min-w-0 flex flex-col gap-4 relative z-10 transition-opacity duration-300 ${isMagazineViewOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                     <div className="flex-1 relative min-h-0 flex flex-col bg-zinc-900 border border-zinc-600/50 overflow-hidden">
                         <div className="h-12 px-4 flex-shrink-0 border-b border-zinc-600/50 flex items-center justify-between overflow-hidden"><h2 className="text-base text-white font-semibold uppercase tracking-wider whitespace-nowrap">Spiderweb</h2>{!isSmallScreen && (<div className="flex items-center gap-1.5 flex-shrink-0">{SearchControl}</div>)}</div>
-                        <div className="flex-grow relative min-h-0" ref={desktopGraphAreaRef}>{isLoading && (<div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-md z-[90] flex flex-col items-center justify-center gap-4 pointer-events-auto"><LoadingSpinner subtext={loadingSubtext} /><button onClick={(e) => { e.stopPropagation(); onCancelGeneration(); }} className="rounded-xl border border-zinc-600 px-6 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800 pointer-events-auto">Cancel</button></div>)}{isFirstGeneration && !isLoading && (<div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none"><ZceneEmptyState onNavigate={onNavigate} /></div>)}{data.nodes.length > 0 && (<MusicGraph data={data} libraryArtists={memoizedLibraryArtists} seedArtists={memoizedSeedArtists} onNodeClick={handleNodeClickInternal} selectedNode={selectedNode} isSmallScreen={isSmallScreen} activeFilters={activeFilters} focusOn={focusOn} searchQuery={searchQuery} setSearchQuery={setSearchQuery} toggleFilter={toggleFilterInternal} focusConfig={focusConfig} legendConfig={legendConfig} legendOrder={legendOrder} graphSettings={graphSettings} legendRef={desktopLegendAreaRef} onInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onLegendInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onExtendNode={onExtendNode} onRemoveNode={setNodeToRemove} isGuest={isGuest} detailsCache={detailsCache} isActive={isActive} />)}</div>
+                        <div className="flex-grow relative min-h-0" ref={desktopGraphAreaRef}>{isLoading && (<div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-md z-[90] flex flex-col items-center justify-center gap-4 pointer-events-auto"><LoadingSpinner subtext={loadingSubtext} /><button onClick={(e) => { e.stopPropagation(); onCancelGeneration(); }} className="rounded-xl border border-zinc-600 px-6 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800 pointer-events-auto">Cancel</button></div>)}{isFirstGeneration && !isLoading && (<div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none"><ZceneEmptyState onNavigate={onNavigate} /></div>)}{data.nodes.length > 0 && (<MusicGraph data={data} libraryArtists={memoizedLibraryArtists} seedArtists={memoizedSeedArtists} onNodeClick={handleNodeClickInternal} selectedNode={selectedNode} isSmallScreen={isSmallScreen} activeFilters={activeFilters} searchQuery={searchQuery} setSearchQuery={setSearchQuery} toggleFilter={toggleFilterInternal} legendConfig={legendConfig} legendOrder={legendOrder} legendRef={desktopLegendAreaRef} onInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onLegendInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onExtendNode={onExtendNode} onRemoveNode={setNodeToRemove} isGuest={isGuest} detailsCache={detailsCache} isActive={isActive} />)}</div>
                     </div>
                     <div key={`ad-container-${adSize}`} className="flex-shrink-0 bg-zinc-900 border border-zinc-600/50 px-2 py-0 flex justify-center items-center overflow-hidden">
                         <div className="text-zinc-500 text-[10px] text-center max-w-full">

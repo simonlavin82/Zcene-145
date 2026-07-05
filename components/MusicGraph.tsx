@@ -8,7 +8,6 @@ import { LegendSymbol } from './Icons';
 import { normalizeArtistId } from '../services/artistCacheService';
 
 type FilterKeys = 'genre' | 'label' | 'country' | 'founded' | 'seed' | 'recommended';
-type FocusMode = 'organic' | 'cluster';
 
 interface MusicGraphProps {
   data: GraphData;
@@ -18,14 +17,11 @@ interface MusicGraphProps {
   selectedNode: Node | null;
   isSmallScreen: boolean;
   activeFilters: Record<FilterKeys, boolean>;
-  focusOn: FocusMode;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
   toggleFilter: (filter: FilterKeys) => void;
-  focusConfig: { id: FocusMode, label: string }[];
   legendConfig: Record<string, { label: string; shape: React.ReactNode }>;
   legendOrder: FilterKeys[];
-  graphSettings?: GraphSettings;
   legendRef?: React.RefObject<HTMLDivElement | null>;
   onInteraction?: () => void;
   onLegendInteraction?: () => void;
@@ -43,10 +39,64 @@ const isSameNodeId = (id1: any, id2: any): boolean => {
   return s1 === s2 || normalizeArtistId(s1) === normalizeArtistId(s2);
 };
 
+const computeNodeDepths = (nodes: Node[], links: Link[], seedArtistSet: Set<string>): Map<string, number> => {
+  const depths = new Map<string, number>();
+  const adj = new Map<string, string[]>();
+  
+  // Initialize adjacency list
+  nodes.forEach(n => {
+    adj.set(n.id, []);
+  });
+  
+  links.forEach(l => {
+    const sourceId = typeof l.source === 'object' ? l.source.id : l.source;
+    const targetId = typeof l.target === 'object' ? l.target.id : l.target;
+    if (adj.has(sourceId) && adj.has(targetId)) {
+      adj.get(sourceId)!.push(targetId);
+      adj.get(targetId)!.push(sourceId);
+    }
+  });
+  
+  const queue: string[] = [];
+  
+  // Seed nodes get depth 0
+  nodes.forEach(n => {
+    const normId = normalizeArtistId(n.id);
+    const isSeed = n.type === 'artist' && (seedArtistSet.has(n.id.toLowerCase()) || seedArtistSet.has(normId));
+    if (isSeed) {
+      depths.set(n.id, 0);
+      queue.push(n.id);
+    }
+  });
+  
+  let head = 0;
+  while (head < queue.length) {
+    const currentId = queue[head++];
+    const currentDepth = depths.get(currentId)!;
+    
+    const neighbors = adj.get(currentId) || [];
+    for (const neighborId of neighbors) {
+      if (!depths.has(neighborId)) {
+        depths.set(neighborId, currentDepth + 1);
+        queue.push(neighborId);
+      }
+    }
+  }
+  
+  // Default depth for any disconnected nodes
+  nodes.forEach(n => {
+    if (!depths.has(n.id)) {
+      depths.set(n.id, 2);
+    }
+  });
+  
+  return depths;
+};
+
 const MusicGraph: React.FC<MusicGraphProps> = ({
   data, libraryArtists, seedArtists, onNodeClick, selectedNode, isSmallScreen,
-  activeFilters, focusOn, searchQuery, toggleFilter,
-  legendConfig, legendOrder, graphSettings = { linkDistance: 3, nodeSize: 3 },
+  activeFilters, searchQuery, toggleFilter,
+  legendConfig, legendOrder,
   legendRef, onInteraction, onLegendInteraction, onExtendNode, onRemoveNode, isGuest,
   detailsCache, isActive = false
 }) => {
@@ -145,8 +195,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     }
   }, [isActive]);
 
-  const distMult = Math.pow(1.8, graphSettings.linkDistance - 3);
-  const sizeMult = Math.max(0.1, graphSettings.nodeSize / 3);
+
 
   useEffect(() => {
     if (!isLegendExpanded || !localLegendRef.current) return;
@@ -235,9 +284,10 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         };
       });
     return { visibleNodes: finalVisibleNodes, visibleLinks: finalVisibleLinks };
-  }, [data, activeFilters, seedArtists, focusOn]);
+  }, [data, activeFilters, seedArtists]);
   
   const visibleNodesRef = useRef(visibleNodes);
+  const prevArtistIdsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     visibleNodesRef.current = visibleNodes;
   }, [visibleNodes, selectedNode]);
@@ -661,10 +711,10 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         const simulation = d3.forceSimulation<Node, Link>()
             .force("link", d3.forceLink<Node, Link>().id((d: any) => String(d.id)).strength(0.3))
             .force("charge", d3.forceManyBody().strength(-600))
-            .force("collide", d3.forceCollide().radius(55 * sizeMult))
-            .velocityDecay(0.7) 
-            .alphaMin(0.01)
-            .alphaDecay(0.1)
+            .force("collide", d3.forceCollide().radius(40))
+            .velocityDecay(0.36) 
+            .alphaMin(0.001)
+            .alphaDecay(0.022)
             .on("tick", () => {
                 if (!svgRef.current) return;
                 const currentContainer = d3.select(svgRef.current).select(".main-container");
@@ -766,26 +816,58 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
     const simulation = simulationRef.current;
 
+    // Map of artist positions for easy lookup
+    const artistPositions = new Map<string, { x: number, y: number }>();
     visibleNodes.forEach(n => {
-        if (n.x === undefined) {
-            n.x = width / 2 + (Math.random() - 0.5) * 200;
-            n.y = height / 2 + (Math.random() - 0.5) * 200;
+        if (n.type === 'artist' && n.x !== undefined && !isNaN(n.x) && n.y !== undefined && !isNaN(n.y)) {
+            artistPositions.set(n.id, { x: n.x, y: n.y });
+        }
+    });
+
+    visibleNodes.forEach(n => {
+        if (n.x === undefined || isNaN(n.x) || n.y === undefined || isNaN(n.y)) {
+            // Sprout metadata nodes from their parent artist positions to avoid layout drift
+            if (n.type !== 'artist') {
+                const connectedArtists: { x: number, y: number }[] = [];
+                visibleLinks.forEach(l => {
+                    const s = typeof l.source === 'object' ? l.source.id : l.source;
+                    const t = typeof l.target === 'object' ? l.target.id : l.target;
+                    if (s === n.id && artistPositions.has(t)) {
+                        connectedArtists.push(artistPositions.get(t)!);
+                    } else if (t === n.id && artistPositions.has(s)) {
+                        connectedArtists.push(artistPositions.get(s)!);
+                    }
+                });
+
+                if (connectedArtists.length > 0) {
+                    const avgX = connectedArtists.reduce((sum, p) => sum + p.x, 0) / connectedArtists.length;
+                    const avgY = connectedArtists.reduce((sum, p) => sum + p.y, 0) / connectedArtists.length;
+                    n.x = avgX + (Math.random() - 0.5) * 10;
+                    n.y = avgY + (Math.random() - 0.5) * 10;
+                    n.vx = 0;
+                    n.vy = 0;
+                    return;
+                }
+            }
+
+            // Fallback placement near the center of the viewport
+            n.x = width / 2 + (Math.random() - 0.5) * 100;
+            n.y = height / 2 + (Math.random() - 0.5) * 100;
+            n.vx = 0;
+            n.vy = 0;
         }
     });
 
     simulation.nodes(visibleNodes);
     (simulation.force("link") as d3.ForceLink<Node, Link>).links(visibleLinks);
-    
-    // Safety check: ensure all nodes have initial coordinates and are not NaN
-    visibleNodes.forEach(n => {
-        if (n.x === undefined || isNaN(n.x)) {
-            n.x = width / 2 + (Math.random() - 0.5) * 100;
-        }
-        if (n.y === undefined || isNaN(n.y)) {
-            n.y = height / 2 + (Math.random() - 0.5) * 100;
-        }
-        if (n.vx === undefined || isNaN(n.vx)) n.vx = 0;
-        if (n.vy === undefined || isNaN(n.vy)) n.vy = 0;
+
+    // Compute connection degrees for all visible nodes
+    const nodeDegrees = new Map<string, number>();
+    visibleLinks.forEach(l => {
+        const s = typeof l.source === 'object' ? l.source.id : l.source;
+        const t = typeof l.target === 'object' ? l.target.id : l.target;
+        nodeDegrees.set(s, (nodeDegrees.get(s) || 0) + 1);
+        nodeDegrees.set(t, (nodeDegrees.get(t) || 0) + 1);
     });
 
     const forceX = d3.forceX<Node>();
@@ -793,93 +875,117 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     const chargeForce = simulation.force("charge") as d3.ForceManyBody<Node>;
     const collideForce = simulation.force("collide") as d3.ForceCollide<Node>;
 
-    if (focusOn === 'cluster') {
-        // Cluster mode: Cluster attributes around their artists like petals
-        const seedArtistSet = new Set(seedArtists.map(a => normalizeArtistId(a)));
-        const artistNodes = visibleNodes.filter(n => n.type === 'artist');
-        
-        // Position artists on a radial spread - spread them further to avoid "one giant bloom"
-        const artistAngleStep = (2 * Math.PI) / Math.max(1, artistNodes.length);
-        const artistRadius = Math.min(width, height) * 0.45; 
-        
-        const artistCenters = new Map<string, { x: number, y: number }>();
-        artistNodes.forEach((artist, i) => {
-            const isSeed = seedArtistSet.has(String(artist.id).toLowerCase());
-            const r = isSeed ? artistRadius * 0.35 : artistRadius * 1.2;
-            const angle = i * artistAngleStep;
-            artistCenters.set(String(artist.id), {
-                x: width / 2 + r * Math.cos(angle),
-                y: height / 2 + r * Math.sin(angle)
-            });
-        });
+    // 1. Seed Anchoring & Global Gravity
+    const numSeeds = seedArtistSet.size;
+    const numNodes = visibleNodes.length;
+    
+    // Multi-seed or high-density projects (node count > 35) trigger wider spacing
+    const isExpandedLayout = numSeeds > 1 || numNodes > 35;
+    
+    const spacingMultiplier = isExpandedLayout ? 1.25 : 1.0;
+    const globalGravityStrength = isExpandedLayout ? 0.03 : 0.045;
+    const seedStrength = numSeeds > 1 ? 0.15 : 0.4;
 
-        // Pull artists to their specific centers, but let attributes be pulled by links
-        // Reduced strength from 0.8 to 0.3 to dampen the "frantic" snapping behavior
-        forceX.strength((d: Node) => d.type === 'artist' ? 0.3 : 0).x((d: Node) => {
-            if (d.type === 'artist') return artistCenters.get(String(d.id))?.x ?? width / 2;
-            return width / 2;
-        });
-        
-        forceY.strength((d: Node) => d.type === 'artist' ? 0.3 : 0).y((d: Node) => {
-            if (d.type === 'artist') return artistCenters.get(String(d.id))?.y ?? height / 2;
-            return height / 2;
-        });
+    forceX.strength((d: Node) => {
+        const isSeed = d.type === 'artist' && (seedArtistSet.has(d.id.toLowerCase()) || seedArtistSet.has(normalizeArtistId(d.id)));
+        return isSeed ? seedStrength : globalGravityStrength;
+    }).x(width / 2);
 
-        chargeForce.strength(-1200); 
-        collideForce.radius(d => d.type === 'artist' ? 120 * sizeMult : 45 * sizeMult);
-        simulation.force('center', d3.forceCenter(width / 2, height / 2).strength(0.005));
-    } else {
-        // Organic Mode: Enhanced spiderweb with more spread and varied distances
-        const seedArtistSet = new Set(seedArtists.map(a => normalizeArtistId(a)));
-        
-        forceX.strength((d: Node) => {
-            const isSeed = d.type === 'artist' && (seedArtistSet.has(d.id.toLowerCase()) || seedArtistSet.has(normalizeArtistId(d.id)));
-            return isSeed ? 0.4 : 0.0005;
-        }).x(width / 2);
+    forceY.strength((d: Node) => {
+        const isSeed = d.type === 'artist' && (seedArtistSet.has(d.id.toLowerCase()) || seedArtistSet.has(normalizeArtistId(d.id)));
+        return isSeed ? seedStrength : globalGravityStrength;
+    }).y(height / 2);
 
-        forceY.strength((d: Node) => {
-            const isSeed = d.type === 'artist' && (seedArtistSet.has(d.id.toLowerCase()) || seedArtistSet.has(normalizeArtistId(d.id)));
-            return isSeed ? 0.4 : 0.0005;
-        }).y(height / 2);
+    simulation.force('center', d3.forceCenter(width / 2, height / 2).strength(0.005));
 
-        simulation.force('center', d3.forceCenter(width / 2, height / 2).strength(0.002));
+    // 2 & 3. Balanced Repulsion: Spaced but cohesive
+    chargeForce.strength((d: Node) => {
+        if (d.type === 'artist') {
+            const isSeed = seedArtistSet.has(d.id.toLowerCase()) || seedArtistSet.has(normalizeArtistId(d.id));
+            return isSeed ? -800 : -500; // Moderated repulsion
+        }
         
-        // Slightly decreased repulsion as per user feedback
-        chargeForce.strength(-500); // Decreased from -900 for even more density
-        collideForce.radius(80 * sizeMult);
-    }
+        // Metadata petals
+        const deg = nodeDegrees.get(d.id) ?? 1;
+        if (deg > 1) {
+            return -60; // Moderated repulsion for shared metadata nodes
+        }
+        
+        // Private petals stay close
+        switch (d.type) {
+            case 'founded': return -15;
+            case 'label': return -20;
+            case 'genre': return -25;
+            case 'country': return -25;
+            default: return -20;
+        }
+    });
+
+    // 4. Automatic Collision Protection
+    collideForce.radius((d: Node) => {
+        const label = toDisplayLabel(d);
+        const textWidth = label.length * 6.0; 
+        const minRadius = d.type === 'artist' ? 32 : 20;
+        return Math.max(minRadius, textWidth / 2 + 10);
+    });
 
     simulation.force('x', forceX).force('y', forceY);
 
+    // BFS depth computation
+    const depths = computeNodeDepths(visibleNodes, visibleLinks, seedArtistSet);
+
+    // Condensed dynamic link distances (with density scaling)
     (simulation.force("link") as d3.ForceLink<Node, Link>).distance(d => {
         const s = d.source as Node;
         const t = d.target as Node;
-        const isCluster = focusOn === 'cluster';
-        
-        if (isCluster) {
-            // In cluster mode, artists are far apart, but their "petals" (attributes) are tight
-            if (s.type === 'artist' && t.type === 'artist') return 800 * distMult;
-            return 45 * distMult; // Tighter petals
+
+        // If one of the nodes is a metadata node
+        if (s.type !== 'artist' || t.type !== 'artist') {
+            const metaNode = s.type !== 'artist' ? s : t;
+            const deg = nodeDegrees.get(metaNode.id) ?? 1;
+            
+            if (deg > 1) {
+                return 160 * spacingMultiplier; // Shared metadata floats wider in complex layouts
+            }
+            
+            // Private petal: keep tight and category-specific
+            switch (metaNode.type) {
+                case 'founded': return 40;
+                case 'label': return 50;
+                case 'genre': return 60;
+                case 'country': return 70;
+                default: return 55;
+            }
         }
-        
-        // Organic mode: Highly varied distances to emphasize "complexity" and "non-linear" structure
-        if (s.type === 'artist' && t.type === 'artist') return 450 * distMult;
-        if (s.type === 'genre' || t.type === 'genre') return 280 * distMult;
-        if (s.type === 'label' || t.type === 'label') return 140 * distMult;
-        if (s.type === 'country' || t.type === 'country') return 320 * distMult;
-        if (s.type === 'founded' || t.type === 'founded') return 100 * distMult;
-        return 200 * distMult;
+
+        // Artist-to-Artist links: scale core skeleton
+        const depthS = depths.get(s.id) ?? 1;
+        const depthT = depths.get(t.id) ?? 1;
+
+        if (depthS === 0 || depthT === 0) {
+            return 230 * spacingMultiplier; // Core branches: scaled for density
+        }
+
+        const maxDepth = Math.max(depthS, depthT);
+        return (165 + (maxDepth - 1) * 30) * spacingMultiplier; // Compact recommendation branches
     });
 
+    // Re-tensioned dynamic link strengths
     (simulation.force("link") as d3.ForceLink<Node, Link>).strength(d => {
         const s = d.source as Node;
         const t = d.target as Node;
-        if (focusOn === 'cluster') {
-            // Stronger pull for attributes to their artist to form the "bloom"
-            if (s.type === 'artist' && t.type === 'artist') return 0.01;
-            return 0.7; // Reduced from 1.0 to allow for more fluid movement and less jitter
+        
+        if (s.type !== 'artist' || t.type !== 'artist') {
+            const metaNode = s.type !== 'artist' ? s : t;
+            const deg = nodeDegrees.get(metaNode.id) ?? 1;
+            
+            if (deg > 1) {
+                return 0.08; // Holds shared metadata in place without collapsing artists
+            }
+            return 0.85; // Private petals stay locked tight to their artist
         }
-        return 0.2; // Weaker links in organic mode to allow repulsion to dominate
+        
+        return 0.35; // Firm artist-to-artist connection
     });
 
     const getNodeColor = (node: Node, seedArtistSet: Set<string>) => {
@@ -1002,16 +1108,11 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         .attr("opacity", d => d.isLoading ? 0.3 : 1)
         .attr("d", d => {
             const isSeed = seedArtistSet.has(d.id.toLowerCase());
-            const isHub = ['genre', 'label', 'country'].includes(d.type);
-            const isCluster = focusOn === 'cluster';
+            const area = 350;
             
-            // Hubs are slightly larger in Cluster mode to act as visual anchors, but not too huge
-            let area = 350 * sizeMult * sizeMult;
-            if (isHub && isCluster) area *= 1.4;
-
             if (d.type === 'artist') return isSeed ? d3.symbol().type(d3.symbolCircle).size(area)() : d3.symbol().type(d3.symbolStar).size(area + 50)();
             if (d.type === 'genre') return d3.symbol().type(d3.symbolSquare).size(area - 50)();
-            if (d.type === 'label') return d3.symbol().type(d3.symbolDiamond).size(area)() ;
+            if (d.type === 'label') return d3.symbol().type(d3.symbolDiamond).size(area)();
             if (d.type === 'country') return d3.symbol().type(d3.symbolTriangle).size(area - 50)();
             if (d.type === 'founded') return d3.symbol().type(d3.symbolCross).size(area - 50)();
             return d3.symbol().type(d3.symbolCircle).size(area - 100)();
@@ -1037,8 +1138,8 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
 
     nodeElements.select("text")
-        .attr("y", 25 * sizeMult)
-        .style("font-size", `${12 * sizeMult}px`)
+        .attr("y", 25)
+        .style("font-size", "12px")
         .text(d => toDisplayLabel(d));
 
     nodeElements
@@ -1093,9 +1194,28 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         .attr("stroke-width", 16)
         .style("cursor", "default");
 
-    // Use a lower alpha for restarts to prevent "explosive" movement on interaction
-    simulation.alpha(0.15).alphaTarget(0).restart();
-  }, [dimensions, visibleNodes, visibleLinks, focusOn, distMult, sizeMult, seedArtists, activeFilters]);
+    // Check if the set of artists has structurally changed
+    const currentArtists = visibleNodes.filter(n => n.type === 'artist');
+    const currentArtistIds = new Set(currentArtists.map(n => n.id));
+    
+    let isStructuralChange = false;
+    if (currentArtistIds.size !== prevArtistIdsRef.current.size) {
+        isStructuralChange = true;
+    } else {
+        for (const id of currentArtistIds) {
+            if (!prevArtistIdsRef.current.has(id)) {
+                isStructuralChange = true;
+                break;
+            }
+        }
+    }
+    prevArtistIdsRef.current = currentArtistIds;
+
+    // Filter changes wake the simulation gently (alpha = 0.2) to maintain the spatial mental map.
+    // Structural changes (new artist searches or extensions) reset simulation with full alpha (1.0).
+    const restartAlpha = isStructuralChange ? 1.0 : 0.2;
+    simulation.alpha(restartAlpha).alphaTarget(0).restart();
+  }, [dimensions, visibleNodes, visibleLinks, seedArtists, activeFilters]);
 
   // Ensure selectedNodePos is updated when selection changes, even if simulation is idle
   useEffect(() => {
