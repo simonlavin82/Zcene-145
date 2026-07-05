@@ -90,23 +90,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 }) => {
   const [projectToDelete, setProjectToDelete] = React.useState<string | null>(null);
   const [view, setView] = React.useState<'grid' | 'list'>('grid');
-  const [sortBy, setSortBy] = React.useState<'recent' | 'title'>('recent');
-  const [isSortOpen, setIsSortOpen] = React.useState(false);
   const [activeMenuId, setActiveMenuId] = React.useState<string | null>(null);
-
-  const sortDropdownRef = React.useRef<HTMLDivElement>(null);
-
-  React.useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (sortDropdownRef.current && !sortDropdownRef.current.contains(event.target as Node)) {
-        setIsSortOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
 
   const handleRenameClick = (project: Project) => {
     const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
@@ -120,27 +104,55 @@ const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
-  const sortedProjects = React.useMemo(() => {
-    const list = [...projects];
-    if (sortBy === 'recent') {
-      list.sort((a, b) => {
-        const timeA = a.updatedAt?.seconds || 0;
-        const timeB = b.updatedAt?.seconds || 0;
-        return timeB - timeA;
-      });
-    } else if (sortBy === 'title') {
-      list.sort((a, b) => {
-        const seedListA = a.seedArtists ? a.seedArtists.split('::').filter(Boolean) : [];
-        const titleA = (a.name || (seedListA.length > 0 ? seedListA[0] : "Untitled Zcene")).toLowerCase();
-        
-        const seedListB = b.seedArtists ? b.seedArtists.split('::').filter(Boolean) : [];
-        const titleB = (b.name || (seedListB.length > 0 ? seedListB[0] : "Untitled Zcene")).toLowerCase();
-        
+  const groupedProjects = React.useMemo(() => {
+    const groups: Record<string, Project[]> = {};
+
+    projects.forEach((project) => {
+      let genresList: string[] = [];
+      if (project.graphData) {
+        try {
+          const parsed = typeof project.graphData === 'string' ? JSON.parse(project.graphData) : project.graphData;
+          if (parsed && Array.isArray(parsed.nodes)) {
+            const genreNodes = parsed.nodes.filter((n: any) => n.type === 'genre');
+            genresList = genreNodes
+              .map((n: any) => (n.label || n.id || '').trim())
+              .filter(Boolean);
+          }
+        } catch (e) {
+          console.warn("Failed to parse project graphData for genres:", e);
+        }
+      }
+
+      let bucketKey = "UNASSIGNED";
+      if (genresList.length > 0) {
+        bucketKey = genresList[0].trim().toUpperCase();
+      }
+
+      if (!groups[bucketKey]) {
+        groups[bucketKey] = [];
+      }
+      groups[bucketKey].push(project);
+    });
+
+    const getProjectDisplayTitle = (project: Project) => {
+      const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
+      return (project.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene")).toLowerCase();
+    };
+
+    Object.keys(groups).forEach((key) => {
+      groups[key].sort((a, b) => {
+        const titleA = getProjectDisplayTitle(a);
+        const titleB = getProjectDisplayTitle(b);
         return titleA.localeCompare(titleB);
       });
-    }
-    return list;
-  }, [projects, sortBy]);
+    });
+
+    return groups;
+  }, [projects]);
+
+  const sortedBucketKeys = React.useMemo(() => {
+    return Object.keys(groupedProjects).sort((a, b) => a.localeCompare(b));
+  }, [groupedProjects]);
 
   return (
     <div 
@@ -193,47 +205,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                 className="h-full"
               />
 
-              {/* Sorting Dropdown */}
-              <div className="relative flex items-center h-full" ref={sortDropdownRef}>
-                <button
-                  onClick={() => setIsSortOpen(!isSortOpen)}
-                  className={`h-full flex flex-shrink-0 items-center justify-center rounded-xl border border-zinc-700/50 shadow-lg transition-colors leading-none relative pl-2 pr-3 gap-2 cursor-pointer text-xs font-medium ${
-                    isSortOpen 
-                      ? 'bg-zinc-800 text-white' 
-                      : 'bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800'
-                  }`}
-                >
-                  <span className="material-symbols-outlined !text-[18px]">sort</span>
-                  <span>{sortBy === 'recent' ? 'Recent' : 'Title (A-Z)'}</span>
-                  <span className="material-symbols-outlined !text-[18px] transition-transform duration-200" style={{ transform: isSortOpen ? 'rotate(180deg)' : 'none' }}>keyboard_arrow_down</span>
-                </button>
-                
-                {isSortOpen && (
-                  <div className="absolute right-0 top-full mt-2 w-40 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl p-1 z-50">
-                    <button
-                      onClick={() => {
-                        setSortBy('recent');
-                        setIsSortOpen(false);
-                      }}
-                      className={`w-full text-left px-2 py-1.5 text-xs font-normal rounded-lg flex items-center justify-between transition-colors ${sortBy === 'recent' ? 'bg-primary/10 text-primary' : 'text-zinc-300 hover:bg-zinc-800 hover:text-white'}`}
-                    >
-                      <span>Recent</span>
-                      {sortBy === 'recent' && <span className="material-symbols-outlined !text-[14px] text-primary">check</span>}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSortBy('title');
-                        setIsSortOpen(false);
-                      }}
-                      className={`w-full text-left px-2 py-1.5 text-xs font-normal rounded-lg flex items-center justify-between transition-colors ${sortBy === 'title' ? 'bg-primary/10 text-primary' : 'text-zinc-300 hover:bg-zinc-800 hover:text-white'}`}
-                    >
-                      <span>Title (A-Z)</span>
-                      {sortBy === 'title' && <span className="material-symbols-outlined !text-[14px] text-primary">check</span>}
-                    </button>
-                  </div>
-                )}
-              </div>
-
               {/* New Zcene Button */}
               <button 
                 onClick={onCreateProject}
@@ -256,138 +227,164 @@ const Dashboard: React.FC<DashboardProps> = ({
           </div>
 
           {projects.length === 0 ? (
-            <div className="bg-zinc-900 border border-zinc-700/50 rounded-none p-12 text-center space-y-4">
-              <div className="w-16 h-16 bg-zinc-800 rounded-none flex items-center justify-center text-zinc-550 mx-auto">
-                <span className="material-symbols-outlined !text-3xl">folder_open</span>
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-lg font-medium text-white">No Zcenes yet</h3>
-                <p className="text-zinc-550 text-sm">Create your first music discovery project to get started.</p>
-              </div>
-              <button 
-                onClick={onCreateProject}
-                className="text-primary font-medium hover:underline text-sm"
-              >
-                Create a New Zcene
-              </button>
-            </div>
-          ) : view === 'grid' ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {sortedProjects.map((project) => {
-                const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
-                const displayTitle = project.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene");
-                
-                const deepCutsCount = (project.activeNodes || []).length;
-                
-                let recommendedCount = 0;
-                if (project.graphData) {
-                  try {
-                    const parsedGraph = typeof project.graphData === 'string' ? JSON.parse(project.graphData) : project.graphData;
-                    if (parsedGraph && Array.isArray(parsedGraph.nodes)) {
-                      const seedSet = new Set(seedList.map(s => normalizeArtistId(s)));
-                      const artistNodes = parsedGraph.nodes.filter((n: any) => n.type === 'artist' || !n.type);
-                      recommendedCount = artistNodes.filter((n: any) => !seedSet.has(normalizeArtistId(n.id))).length;
-                    }
-                  } catch (e) {
-                    console.warn(`Failed to parse graphData for project ${project.id}:`, e);
-                  }
-                }
-                
-                return (
-                  <motion.div
-                    key={project.id}
-                    whileHover={{ y: -4 }}
-                    onClick={() => onSelectProject(project.id)}
-                    className="group relative bg-zinc-900 border border-zinc-700/50 rounded-none p-5 hover:border-primary/50 transition-all cursor-pointer flex flex-col justify-between min-h-[160px] shadow-xl"
-                  >
-                    <div className="space-y-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <h3 className="text-base font-medium text-white group-hover:text-primary transition-colors truncate">
-                          {displayTitle}
-                        </h3>
-                        <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            onClick={() => setActiveMenuId(activeMenuId === project.id ? null : project.id)}
-                            className="p-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800/80 transition-all cursor-pointer flex items-center justify-center"
-                          >
-                            <span className="material-symbols-outlined !text-xl">more_vert</span>
-                          </button>
-                          
-                          {activeMenuId === project.id && (
-                            <>
-                              <div className="fixed inset-0 z-10" onClick={() => setActiveMenuId(null)} />
-                              <div className="absolute right-0 mt-1 w-36 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl z-50 py-1 text-left animate-fade-in-down">
-                                <button
-                                  onClick={() => {
-                                    setActiveMenuId(null);
-                                    handleRenameClick(project);
-                                  }}
-                                  className="w-full px-4 py-2.5 text-xs font-medium text-zinc-300 hover:bg-zinc-800/60 hover:text-white transition-all flex items-center gap-2"
-                                >
-                                  <span className="material-symbols-outlined !text-sm">edit</span>
-                                  Edit Title
-                                </button>
-                                <button
-                                  onClick={() => {
-                                    setActiveMenuId(null);
-                                    setProjectToDelete(project.id);
-                                  }}
-                                  className="w-full px-4 py-2.5 text-xs font-medium text-red-500 hover:bg-red-500/10 hover:text-red-400 transition-all flex items-center gap-2"
-                                >
-                                  <span className="material-symbols-outlined !text-sm">delete</span>
-                                  Delete
-                                </button>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      <p className="font-mono text-xs text-zinc-300 font-normal">
-                        {project.updatedAt ? `Edited ${formatProjectTimestamp(project.updatedAt)}` : 'New Project'}
-                      </p>
-                    </div>
-                    
-                    <div className="mt-4 pt-4 border-t border-white/5 flex items-center">
-                      <div className="flex items-center flex-wrap gap-x-1.5 gap-y-1.5">
-                        <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
-                          SEED: {seedList.length}
-                        </span>
-                        {project.graphData && (
-                          <>
-                            <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
-                              AI ARTISTS: {recommendedCount}
-                            </span>
-                            <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
-                              DEEP CUTS: {deepCutsCount}
-                            </span>
-                            <span className="text-[9px] uppercase tracking-wide text-primary/60 font-bold px-1.5 py-0.5 bg-primary/10 rounded-md border border-primary/10 whitespace-nowrap">
-                              Mapped
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </motion.div>
-                );
-              })}
-              
-              {/* Add New Card */}
+              {/* Standalone Add New Card */}
               <button 
                 onClick={onCreateProject}
                 disabled={isCreatingProject}
                 className="group relative bg-zinc-900 border-2 border-dashed border-zinc-700 rounded-none p-5 flex flex-col items-center justify-center gap-3 transition-all min-h-[160px] hover:border-primary/50 disabled:opacity-50 cursor-pointer overflow-hidden"
               >
-                <div className="w-10 h-10 rounded-full bg-zinc-800 group-hover:bg-primary group-hover:text-brand-black flex items-center justify-center text-zinc-500 transition-all relative z-10">
+                <div className="w-10 h-10 rounded-full bg-zinc-800 group-hover:bg-primary group-hover:text-brand-black flex items-center justify-center text-zinc-550 transition-all relative z-10">
                   {isCreatingProject ? (
                     <span className="material-symbols-outlined animate-spin !text-2xl">progress_activity</span>
                   ) : (
                     <span className="material-symbols-outlined !text-2xl">add</span>
                   )}
                 </div>
-                <span className="text-sm font-medium text-zinc-500 group-hover:text-zinc-350 transition-colors relative z-10">
+                <span className="text-sm font-medium text-zinc-550 group-hover:text-zinc-350 transition-colors relative z-10">
                   {isCreatingProject ? 'Creating Zcene...' : 'Create New Zcene'}
                 </span>
               </button>
+            </div>
+          ) : view === 'grid' ? (
+            <div className="flex flex-wrap gap-x-8 gap-y-10 items-start">
+              {sortedBucketKeys.map((bucketKey) => (
+                <div 
+                  key={bucketKey} 
+                  className="w-full sm:w-auto bg-zinc-950 rounded-tr-xl rounded-b-xl rounded-tl-none border border-zinc-800/60 p-4 relative flex-shrink-0"
+                  style={{ maxWidth: '100%' }}
+                >
+                  {/* Unified Folder Index Tab */}
+                  <div className="w-[160px] bg-zinc-950 border-t border-l border-r border-zinc-800 rounded-t-lg text-[9px] font-mono absolute -top-[22px] left-[-1px] px-3 py-1 flex items-center h-[22.5px] z-10 select-none">
+                    <div className="truncate text-ellipsis whitespace-nowrap uppercase tracking-widest text-zinc-400 font-medium">
+                      {bucketKey}
+                    </div>
+                  </div>
+
+                  {/* Cards inside this parent record crate compartment */}
+                  <div className="flex flex-wrap gap-4">
+                    {groupedProjects[bucketKey].map((project) => {
+                      const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
+                      const displayTitle = project.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene");
+                      
+                      const deepCutsCount = (project.activeNodes || []).length;
+                      
+                      let recommendedCount = 0;
+                      if (project.graphData) {
+                        try {
+                          const parsedGraph = typeof project.graphData === 'string' ? JSON.parse(project.graphData) : project.graphData;
+                          if (parsedGraph && Array.isArray(parsedGraph.nodes)) {
+                            const seedSet = new Set(seedList.map(s => normalizeArtistId(s)));
+                            const artistNodes = parsedGraph.nodes.filter((n: any) => n.type === 'artist' || !n.type);
+                            recommendedCount = artistNodes.filter((n: any) => !seedSet.has(normalizeArtistId(n.id))).length;
+                          }
+                        } catch (e) {
+                          console.warn(`Failed to parse graphData for project ${project.id}:`, e);
+                        }
+                      }
+                      
+                      return (
+                        <motion.div
+                          key={project.id}
+                          onClick={() => onSelectProject(project.id)}
+                          className="group relative bg-zinc-900 border border-zinc-700/50 rounded-none p-5 hover:border-primary/50 transition-all cursor-pointer flex flex-col justify-between w-full sm:w-[350px] min-h-[160px] shadow-xl"
+                        >
+                          <div className="space-y-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <h3 className="text-base font-medium text-white group-hover:text-primary transition-colors truncate">
+                                {displayTitle}
+                              </h3>
+                              <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  onClick={() => setActiveMenuId(activeMenuId === project.id ? null : project.id)}
+                                  className="p-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800/80 transition-all cursor-pointer flex items-center justify-center"
+                                >
+                                  <span className="material-symbols-outlined !text-xl">more_vert</span>
+                                </button>
+                                
+                                {activeMenuId === project.id && (
+                                  <>
+                                    <div className="fixed inset-0 z-10" onClick={() => setActiveMenuId(null)} />
+                                    <div className="absolute right-0 mt-1 w-36 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl z-50 py-1 text-left animate-fade-in-down">
+                                      <button
+                                        onClick={() => {
+                                          setActiveMenuId(null);
+                                          handleRenameClick(project);
+                                        }}
+                                        className="w-full px-4 py-2.5 text-xs font-medium text-zinc-300 hover:bg-zinc-800/60 hover:text-white transition-all flex items-center gap-2"
+                                      >
+                                        <span className="material-symbols-outlined !text-sm">edit</span>
+                                        Edit Title
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          setActiveMenuId(null);
+                                          setProjectToDelete(project.id);
+                                        }}
+                                        className="w-full px-4 py-2.5 text-xs font-medium text-red-500 hover:bg-red-500/10 hover:text-red-400 transition-all flex items-center gap-2"
+                                      >
+                                        <span className="material-symbols-outlined !text-sm">delete</span>
+                                        Delete
+                                      </button>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                            <p className="font-mono text-xs text-zinc-300 font-normal">
+                              {project.updatedAt ? `Edited ${formatProjectTimestamp(project.updatedAt)}` : 'New Project'}
+                            </p>
+                          </div>
+                          
+                          <div className="mt-4 pt-4 border-t border-white/5 flex items-center">
+                            <div className="flex items-center flex-wrap gap-x-1.5 gap-y-1.5">
+                              <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                                SEED: {seedList.length}
+                              </span>
+                              {project.graphData && (
+                                <>
+                                  <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                                    AI ARTISTS: {recommendedCount}
+                                  </span>
+                                  <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                                    DEEP CUTS: {deepCutsCount}
+                                  </span>
+                                  <span className="text-[9px] uppercase tracking-wide text-primary/60 font-bold px-1.5 py-0.5 bg-primary/10 rounded-md border border-primary/10 whitespace-nowrap">
+                                    Mapped
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+              
+              {/* Standalone Add New Card Container */}
+              <div 
+                className="w-full sm:w-[382px] bg-zinc-950/20 rounded-xl border border-dashed border-zinc-800/60 p-4 flex items-center justify-center h-[192px] flex-shrink-0"
+                style={{ maxWidth: '100%' }}
+              >
+                <button 
+                  onClick={onCreateProject}
+                  disabled={isCreatingProject}
+                  className="group relative bg-zinc-900 border-2 border-dashed border-zinc-700 rounded-none p-5 flex flex-col items-center justify-center gap-3 transition-all h-[160px] w-full hover:border-primary/50 disabled:opacity-50 cursor-pointer overflow-hidden"
+                >
+                  <div className="w-10 h-10 rounded-full bg-zinc-800 group-hover:bg-primary group-hover:text-brand-black flex items-center justify-center text-zinc-550 transition-all relative z-10">
+                    {isCreatingProject ? (
+                      <span className="material-symbols-outlined animate-spin !text-2xl">progress_activity</span>
+                    ) : (
+                      <span className="material-symbols-outlined !text-2xl">add</span>
+                    )}
+                  </div>
+                  <span className="text-sm font-medium text-zinc-550 group-hover:text-zinc-350 transition-colors relative z-10 font-sans">
+                    {isCreatingProject ? 'Creating Zcene...' : 'Create New Zcene'}
+                  </span>
+                </button>
+              </div>
             </div>
           ) : (
             /* High-Contrast Tabular List View */
@@ -404,111 +401,137 @@ const Dashboard: React.FC<DashboardProps> = ({
                     <th className="py-4 px-6 font-semibold text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-800/50 bg-zinc-900">
-                  {sortedProjects.map((project) => {
-                    const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
-                    const displayTitle = project.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene");
-                    const formattedDate = formatProjectTimestamp(project.updatedAt);
-                    const isMapped = !!project.graphData;
-                    
-                    const deepCutsCount = (project.activeNodes || []).length;
-                    
-                    let recommendedCount = 0;
-                    if (project.graphData) {
-                      try {
-                        const parsedGraph = typeof project.graphData === 'string' ? JSON.parse(project.graphData) : project.graphData;
-                        if (parsedGraph && Array.isArray(parsedGraph.nodes)) {
-                          const seedSet = new Set(seedList.map(s => normalizeArtistId(s)));
-                          const artistNodes = parsedGraph.nodes.filter((n: any) => n.type === 'artist' || !n.type);
-                          recommendedCount = artistNodes.filter((n: any) => !seedSet.has(normalizeArtistId(n.id))).length;
-                        }
-                      } catch (e) {
-                        console.warn(`Failed to parse graphData for project ${project.id}:`, e);
-                      }
-                    }
-                    
-                    return (
-                      <tr 
-                        key={project.id}
-                        onClick={() => onSelectProject(project.id)}
-                        className="group hover:bg-zinc-800 cursor-pointer transition-colors bg-zinc-900"
-                      >
-                        <td className="py-4 px-6 font-medium text-white group-hover:text-primary transition-colors">
-                          <div className="flex items-center gap-3">
-                            <span className="material-symbols-outlined text-zinc-555 !text-lg group-hover:text-primary transition-colors">folder</span>
-                            <span className="truncate max-w-[240px]">{displayTitle}</span>
-                          </div>
-                        </td>
-                        <td className="py-4 px-6 text-zinc-400 text-sm font-mono font-normal">
-                          {formattedDate}
-                        </td>
-                        <td className="py-4 px-6 font-normal">
-                          <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
-                            SEED: {seedList.length}
-                          </span>
-                        </td>
-                        <td className="py-4 px-6 font-normal">
-                          <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
-                            AI ARTISTS: {recommendedCount}
-                          </span>
-                        </td>
-                        <td className="py-4 px-6 font-normal">
-                          <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
-                            DEEP CUTS: {deepCutsCount}
-                          </span>
-                        </td>
-                        <td className="py-4 px-6 font-normal">
-                          {isMapped ? (
-                            <span className="text-[10px] uppercase tracking-widest text-primary/70 font-bold px-2 py-0.5 bg-primary/10 rounded-md border border-primary/20 whitespace-nowrap">
-                              Mapped
-                            </span>
-                          ) : (
-                            <span className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold px-2 py-0.5 bg-zinc-800 rounded-md border border-zinc-800 whitespace-nowrap">
-                              Unmapped
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-4 px-6 text-right" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center justify-end relative">
-                            <button
-                              onClick={() => setActiveMenuId(activeMenuId === project.id ? null : project.id)}
-                              className="p-1 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer flex items-center justify-center"
-                            >
-                              <span className="material-symbols-outlined !text-xl">more_vert</span>
-                            </button>
-                            
-                            {activeMenuId === project.id && (
-                              <>
-                                <div className="fixed inset-0 z-10" onClick={() => setActiveMenuId(null)} />
-                                <div className="absolute right-0 top-8 w-36 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl z-50 py-1 text-left animate-fade-in-down">
-                                  <button
-                                    onClick={() => {
-                                      setActiveMenuId(null);
-                                      handleRenameClick(project);
-                                    }}
-                                    className="w-full px-4 py-2.5 text-xs font-medium text-zinc-300 hover:bg-zinc-800/60 hover:text-white transition-all flex items-center gap-2"
-                                  >
-                                    <span className="material-symbols-outlined !text-sm">edit</span>
-                                    Edit Title
-                                  </button>
-                                  <button
-                                    onClick={() => {
-                                      setActiveMenuId(null);
-                                      setProjectToDelete(project.id);
-                                    }}
-                                    className="w-full px-4 py-2.5 text-xs font-medium text-red-500 hover:bg-red-500/10 hover:text-red-400 transition-all flex items-center gap-2"
-                                  >
-                                    <span className="material-symbols-outlined !text-sm">delete</span>
-                                    Delete
-                                  </button>
-                                </div>
-                              </>
-                            )}
+                <tbody className="bg-zinc-900">
+                  {sortedBucketKeys.map((bucketKey) => (
+                    <React.Fragment key={bucketKey}>
+                      {/* Unified Folder Tab Divider Row */}
+                      <tr className="select-none pointer-events-none bg-zinc-900">
+                        <td colSpan={7} className="pt-6 pb-0 px-6 align-bottom bg-zinc-900 border-none">
+                          {/* The Folder Tab */}
+                          <div className="w-[60%] sm:w-[160px] bg-zinc-950 border-t border-l border-r border-zinc-800 rounded-t-lg px-3 py-1.5 font-mono tracking-widest text-[9px] sm:text-[10px] text-zinc-400 uppercase font-medium relative -mb-[1px] z-0">
+                            <div className="truncate text-ellipsis whitespace-nowrap">
+                              {bucketKey}
+                            </div>
                           </div>
                         </td>
                       </tr>
-                    );
-                  })}
+
+                      {groupedProjects[bucketKey].map((project, index) => {
+                        const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
+                        const displayTitle = project.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene");
+                        const formattedDate = formatProjectTimestamp(project.updatedAt);
+                        const isMapped = !!project.graphData;
+                        
+                        const deepCutsCount = (project.activeNodes || []).length;
+                        
+                        let recommendedCount = 0;
+                        if (project.graphData) {
+                          try {
+                            const parsedGraph = typeof project.graphData === 'string' ? JSON.parse(project.graphData) : project.graphData;
+                            if (parsedGraph && Array.isArray(parsedGraph.nodes)) {
+                              const seedSet = new Set(seedList.map(s => normalizeArtistId(s)));
+                              const artistNodes = parsedGraph.nodes.filter((n: any) => n.type === 'artist' || !n.type);
+                              recommendedCount = artistNodes.filter((n: any) => !seedSet.has(normalizeArtistId(n.id))).length;
+                            }
+                          } catch (e) {
+                            console.warn(`Failed to parse graphData for project ${project.id}:`, e);
+                          }
+                        }
+                        
+                        const rowBg = index % 2 === 0 ? 'bg-zinc-900' : 'bg-zinc-950/40';
+                        const tdClass = index === 0 ? 'relative z-10 bg-zinc-900' : '';
+                        
+                        return (
+                          <tr 
+                            key={project.id}
+                            onClick={() => onSelectProject(project.id)}
+                            className={`group ${rowBg} hover:bg-primary/5 cursor-pointer transition-colors border-b border-zinc-800/30`}
+                          >
+                            <td className={`py-4 px-6 font-medium text-white group-hover:text-primary transition-colors ${tdClass}`}>
+                              {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
+                              <div className="flex items-center gap-3">
+                                <span className="material-symbols-outlined text-zinc-555 !text-lg group-hover:text-primary transition-colors">folder</span>
+                                <span className="truncate max-w-[240px]">{displayTitle}</span>
+                              </div>
+                            </td>
+                            <td className={`py-4 px-6 text-zinc-400 text-sm font-mono font-normal ${tdClass}`}>
+                              {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
+                              {formattedDate}
+                            </td>
+                            <td className={`py-4 px-6 font-normal ${tdClass}`}>
+                              {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
+                              <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                                SEED: {seedList.length}
+                              </span>
+                            </td>
+                            <td className={`py-4 px-6 font-normal ${tdClass}`}>
+                              {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
+                              <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                                AI ARTISTS: {recommendedCount}
+                              </span>
+                            </td>
+                            <td className={`py-4 px-6 font-normal ${tdClass}`}>
+                              {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
+                              <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                                DEEP CUTS: {deepCutsCount}
+                              </span>
+                            </td>
+                            <td className={`py-4 px-6 font-normal ${tdClass}`}>
+                              {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
+                              {isMapped ? (
+                                <span className="text-[10px] uppercase tracking-widest text-primary/70 font-bold px-2 py-0.5 bg-primary/10 rounded-md border border-primary/20 whitespace-nowrap">
+                                  Mapped
+                                  </span>
+                              ) : (
+                                <span className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold px-2 py-0.5 bg-zinc-800 rounded-md border border-zinc-800 whitespace-nowrap">
+                                  Unmapped
+                                </span>
+                              )}
+                            </td>
+                            <td className={`py-4 px-6 text-right ${tdClass}`} onClick={(e) => e.stopPropagation()}>
+                              {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
+                              <div className="flex items-center justify-end relative">
+                                <button
+                                  onClick={() => setActiveMenuId(activeMenuId === project.id ? null : project.id)}
+                                  className="p-1 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer flex items-center justify-center"
+                                >
+                                  <span className="material-symbols-outlined !text-xl">more_vert</span>
+                                </button>
+                                
+                                {activeMenuId === project.id && (
+                                  <>
+                                    <div className="fixed inset-0 z-10" onClick={() => setActiveMenuId(null)} />
+                                    <div className="absolute right-0 top-8 w-36 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl z-50 py-1 text-left animate-fade-in-down">
+                                      <button
+                                        onClick={() => {
+                                          setActiveMenuId(null);
+                                          handleRenameClick(project);
+                                        }}
+                                        className="w-full px-4 py-2.5 text-xs font-medium text-zinc-300 hover:bg-zinc-800/60 hover:text-white transition-all flex items-center gap-2"
+                                      >
+                                        <span className="material-symbols-outlined !text-sm">edit</span>
+                                        Edit Title
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          setActiveMenuId(null);
+                                          setProjectToDelete(project.id);
+                                        }}
+                                        className="w-full px-4 py-2.5 text-xs font-medium text-red-500 hover:bg-red-500/10 hover:text-red-400 transition-all flex items-center gap-2"
+                                      >
+                                        <span className="material-symbols-outlined !text-sm">delete</span>
+                                        Delete
+                                      </button>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </React.Fragment>
+                  ))}
                 </tbody>
               </table>
             </div>
