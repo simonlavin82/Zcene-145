@@ -144,13 +144,15 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     }
   }, [legendRef]);
 
-  // Detect if legend needs to be in compact mode based on container width
+  // Detect if legend needs to be in compact mode based on container width.
+  // 730px = minimum canvas width for all 6 filter pills to fit on a single row.
+  // Below this the ribbon would wrap, so we fall back to the drawer on all screen
+  // types — including compressed desktop panel configurations.
   useEffect(() => {
     const observer = new ResizeObserver(entries => {
       if (entries[0]) {
         const width = entries[0].contentRect.width;
-        // Switch to compact if container is less than 900px (lowered from 1000px)
-        setIsCompactMode(width < 900);
+        setIsCompactMode(width < 730);
       }
     });
 
@@ -1470,11 +1472,24 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 <span className="material-symbols-outlined !text-[20px]">remove</span>
             </button>
         </div>
-        <div ref={setLegendRef} className={`absolute z-30 pointer-events-none flex flex-col ${isCompactMode ? 'bottom-6 left-6 items-start' : 'top-6 left-1/2 -translate-x-1/2 items-center w-full max-w-[95%]'}`}>
+        {/* Legend / filter ribbon.
+             Two rendering paths, driven purely by canvas width:
+             • !isCompactMode (canvas ≥ 730px) → permanent single-row pill ribbon, centred at top.
+             •  isCompactMode (canvas < 730px)  → tap-to-reveal floating drawer, bottom-left.
+               Applies to both compressed desktop panel configs AND genuine mobile viewports. */}
+        <div
+            ref={setLegendRef}
+            className={`absolute z-30 pointer-events-none flex flex-col ${
+                isCompactMode
+                    ? 'bottom-6 left-6 items-start'
+                    : 'top-6 left-1/2 -translate-x-1/2 items-center w-full max-w-[95%]'
+            }`}
+        >
             {!isCompactMode ? (
-                <div className="flex flex-wrap justify-center border border-zinc-700 bg-zinc-900/90 backdrop-blur-md px-6 py-3 items-center gap-3 sm:gap-4 pointer-events-auto shadow-2xl rounded-none">
+                /* Wide canvas: single-row ribbon — flex-nowrap prevents wrapping ever occurring */
+                <div className="flex flex-nowrap justify-center overflow-hidden border border-zinc-700 bg-zinc-900/90 backdrop-blur-md px-6 py-3 items-center gap-3 pointer-events-auto shadow-2xl rounded-none">
                     {legendOrder.map(f => (
-                        <div 
+                        <div
                             key={f}
                             onClick={() => { toggleFilter(f); if (onLegendInteraction) onLegendInteraction(); }}
                             className={`flex items-center gap-2 cursor-pointer py-1.5 px-3 transition-all rounded-xl ${activeFilters[f] ? 'bg-zinc-800 ring-1 ring-zinc-700' : 'opacity-40 hover:opacity-60'}`}
@@ -1485,6 +1500,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     ))}
                 </div>
             ) : (
+                /* Narrow canvas: tap-to-reveal drawer (mobile OR compressed desktop panels) */
                 <div className="flex flex-col items-start gap-4 pointer-events-none w-full relative">
                     <button
                         onClick={(e) => { e.stopPropagation(); setIsLegendExpanded(!isLegendExpanded); if (onLegendInteraction) onLegendInteraction(); }}
@@ -1492,15 +1508,15 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     >
                         <span className="material-symbols-outlined !text-[20px]">{isLegendExpanded ? 'close' : 'filter_list'}</span>
                     </button>
-                    
+
                     <div
                         className={`w-[280px] border border-zinc-700 bg-zinc-900/98 backdrop-blur-xl p-4 pointer-events-auto shadow-2xl transition-all duration-300 origin-bottom-left absolute bottom-16 left-0 z-50 ${isLegendExpanded ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-4 scale-90 pointer-events-none invisible'} rounded-2xl`}
                     >
                         <div className="grid grid-cols-2 gap-2">
                             {legendOrder.map(f => (
-                                <div 
+                                <div
                                     key={f}
-                                    onClick={() => toggleFilter(f)}
+                                    onClick={() => { toggleFilter(f); if (onLegendInteraction) onLegendInteraction(); }}
                                     className={`flex items-center gap-2 py-2.5 px-3 transition-all cursor-pointer rounded-xl border ${activeFilters[f] ? 'bg-zinc-800 border-zinc-600 text-white' : 'bg-zinc-950/40 border-transparent opacity-60 hover:opacity-80'}`}
                                 >
                                     <div className="shrink-0 w-6 h-6 flex items-center justify-center">
