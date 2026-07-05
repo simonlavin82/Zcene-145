@@ -546,7 +546,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
             <div className="p-5 space-y-4 text-sm text-zinc-400">
               <p className="leading-relaxed">
-                Are you sure you want to delete <span className="font-semibold text-white">{projectToDelete.name}</span>? This action cannot be undone. All mapping and chat history for this Zcene will be permanently removed.
+                Are you sure you want to delete <span className="font-semibold text-white">{projects.find(p => p.id === projectToDelete)?.name || 'this Zcene'}</span>? This action cannot be undone. All mapping and chat history for this Zcene will be permanently removed.
               </p>
             </div>
 

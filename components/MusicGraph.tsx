@@ -36,6 +36,13 @@ interface MusicGraphProps {
   isActive?: boolean;
 }
 
+const isSameNodeId = (id1: any, id2: any): boolean => {
+  if (!id1 || !id2) return false;
+  const s1 = String(id1).toLowerCase();
+  const s2 = String(id2).toLowerCase();
+  return s1 === s2 || normalizeArtistId(s1) === normalizeArtistId(s2);
+};
+
 const MusicGraph: React.FC<MusicGraphProps> = ({
   data, libraryArtists, seedArtists, onNodeClick, selectedNode, isSmallScreen,
   activeFilters, focusOn, searchQuery, toggleFilter,
@@ -238,25 +245,50 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   const selectionHighlightIds = useMemo(() => {
     if (!selectedNode) return null;
     const selectedIdStr = String(selectedNode.id);
-    const highlighted = new Set<string>([selectedIdStr]);
+    const highlighted = new Set<string>([selectedIdStr, selectedIdStr.toLowerCase(), normalizeArtistId(selectedIdStr)]);
     
     const primaryConnections = new Set<string>();
     visibleLinks.forEach(link => {
         const sourceId = String(typeof link.source === 'string' ? link.source : (link.source as Node).id);
         const targetId = String(typeof link.target === 'string' ? link.target : (link.target as Node).id);
         
-        const isSourceSelected = highlighted.has(sourceId);
-        const isTargetSelected = highlighted.has(targetId);
+        const isSourceSelected = highlighted.has(sourceId) || highlighted.has(sourceId.toLowerCase()) || highlighted.has(normalizeArtistId(sourceId));
+        const isTargetSelected = highlighted.has(targetId) || highlighted.has(targetId.toLowerCase()) || highlighted.has(normalizeArtistId(targetId));
 
-        if (isSourceSelected) { highlighted.add(targetId); primaryConnections.add(targetId); }
-        if (isTargetSelected) { highlighted.add(sourceId); primaryConnections.add(sourceId); }
+        if (isSourceSelected) { 
+            highlighted.add(targetId); 
+            highlighted.add(targetId.toLowerCase());
+            highlighted.add(normalizeArtistId(targetId));
+            primaryConnections.add(targetId); 
+            primaryConnections.add(targetId.toLowerCase());
+            primaryConnections.add(normalizeArtistId(targetId));
+        }
+        if (isTargetSelected) { 
+            highlighted.add(sourceId); 
+            highlighted.add(sourceId.toLowerCase());
+            highlighted.add(normalizeArtistId(sourceId));
+            primaryConnections.add(sourceId); 
+            primaryConnections.add(sourceId.toLowerCase());
+            primaryConnections.add(normalizeArtistId(sourceId));
+        }
     });
     if (selectedNode.type !== 'artist') return highlighted;
     visibleLinks.forEach(link => {
         const sourceId = String(typeof link.source === 'string' ? link.source : (link.source as Node).id);
         const targetId = String(typeof link.target === 'string' ? link.target : (link.target as Node).id);
-        if (primaryConnections.has(sourceId)) highlighted.add(targetId);
-        if (primaryConnections.has(targetId)) highlighted.add(sourceId);
+        const isSourcePrimary = primaryConnections.has(sourceId) || primaryConnections.has(sourceId.toLowerCase()) || primaryConnections.has(normalizeArtistId(sourceId));
+        const isTargetPrimary = primaryConnections.has(targetId) || primaryConnections.has(targetId.toLowerCase()) || primaryConnections.has(normalizeArtistId(targetId));
+        
+        if (isSourcePrimary) { 
+            highlighted.add(targetId); 
+            highlighted.add(targetId.toLowerCase());
+            highlighted.add(normalizeArtistId(targetId));
+        }
+        if (isTargetPrimary) { 
+            highlighted.add(sourceId); 
+            highlighted.add(sourceId.toLowerCase());
+            highlighted.add(normalizeArtistId(sourceId));
+        }
     });
     return highlighted;
   }, [selectedNode, visibleLinks, visibleNodes]);
@@ -573,7 +605,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 // 1. Update selected node pos during zoom/pan
                 const currentSelected = selectedNodeRef.current;
                 if (currentSelected && svgRef.current) {
-                    const node = visibleNodesRef.current.find(n => String(n.id).toLowerCase() === String(currentSelected.id).toLowerCase());
+                    const node = visibleNodesRef.current.find(n => isSameNodeId(n.id, currentSelected.id));
                     if (node && !isNaN(node.x!) && !isNaN(node.y!)) {
                         setSelectedNodePos({
                             x: event.transform.applyX(node.x!),
@@ -711,7 +743,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 if (currentSelected && svgRef.current) {
                     // Use the live nodes from the simulation to avoid stale closures
                     const nodes = simulation.nodes();
-                    const node = nodes.find(n => String(n.id).toLowerCase() === String(currentSelected.id).toLowerCase());
+                    const node = nodes.find(n => isSameNodeId(n.id, currentSelected.id));
                     if (node && !isNaN(node.x!) && !isNaN(node.y!)) {
                         const transform = d3.zoomTransform(svgRef.current);
                         setSelectedNodePos({
@@ -1054,7 +1086,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   // Ensure selectedNodePos is updated when selection changes, even if simulation is idle
   useEffect(() => {
     if (selectedNode && svgRef.current) {
-        const node = visibleNodes.find(n => n.id.toLowerCase() === selectedNode.id.toLowerCase());
+        const node = visibleNodes.find(n => isSameNodeId(n.id, selectedNode.id));
         if (node && !isNaN(node.x!) && !isNaN(node.y!)) {
             const transform = d3.zoomTransform(svgRef.current);
             setSelectedNodePos({
@@ -1093,18 +1125,18 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     nodeElements.select("path")
         .transition().duration(300)
         .attr("stroke-width", d => {
-            const isSelected = selectedNode?.id === d.id;
+            const isSelected = selectedNode ? isSameNodeId(selectedNode.id, d.id) : false;
             const isSeed = seedArtists.some(a => normalizeArtistId(a) === d.id);
             if (isSelected) return 4;
             return isSeed ? 3 : 2;
         })
         .attr("stroke", d => {
-            const isSelected = selectedNode?.id === d.id;
+            const isSelected = selectedNode ? isSameNodeId(selectedNode.id, d.id) : false;
             const isSeed = seedArtists.some(a => normalizeArtistId(a) === d.id);
             if (isSelected) return '#F6E468';
             return isSeed ? '#F6E468' : '#1F1F1E';
         })
-        .attr("filter", d => selectedNode?.id === d.id ? "url(#node-glow)" : null);
+        .attr("filter", d => selectedNode && isSameNodeId(selectedNode.id, d.id) ? "url(#node-glow)" : null);
     container.select(".link-group").selectAll<SVGLineElement, Link>("line.visual-line")
         .transition().duration(300)
         .attr("stroke-opacity", (d: any) => {
