@@ -487,7 +487,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                       <tr className="select-none pointer-events-none bg-zinc-900">
                         <td colSpan={7} className="pt-6 pb-0 px-6 align-bottom bg-zinc-900 border-none">
                           {/* The Folder Tab */}
-                          <div className="w-[60%] sm:w-[160px] bg-zinc-950 border-t border-l border-r border-zinc-800 rounded-t-lg px-3 py-1.5 font-mono tracking-widest text-[9px] sm:text-[10px] text-zinc-400 uppercase font-medium relative -mb-[1px] z-0">
+                          <div className="w-[140px] sm:w-[160px] bg-zinc-950 border-t border-l border-r border-zinc-800 rounded-t-lg px-3 py-1.5 font-mono tracking-widest text-[9px] sm:text-[10px] text-zinc-400 uppercase font-medium relative -mb-[1px] z-0">
                             <div className="truncate text-ellipsis whitespace-nowrap">
                               {bucketKey}
                             </div>
