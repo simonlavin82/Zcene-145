@@ -95,6 +95,17 @@
     @apply text-6xl font-bold float-left mr-3 mt-2 text-primary leading-[0.8];
     font-family: var(--font-display);
   }
+
+  /* Observation B: Suppress native scrollbar rendering on any element.
+     Used on the connection snippet tooltip to prevent sub-pixel scrollbar
+     slivers from appearing on mobile high-DPI screens. */
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }
 
 @keyframes fadeInDown {

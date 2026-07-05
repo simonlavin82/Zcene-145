@@ -1499,7 +1499,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                             <div className="w-full flex-shrink-0 flex flex-col min-h-0 overflow-hidden relative">{ArtistsPanelContent}</div>
                             <div className="w-full flex-shrink-0 flex flex-col min-h-0 overflow-hidden relative">
                                 <div className="h-full flex flex-col overflow-hidden">
-                                    <div className="pt-4 bg-zinc-900 flex-shrink-0">
+                                    <div className="pt-2.5 bg-zinc-900 flex-shrink-0">
                                         <div className="flex items-center gap-2 px-4">
                                             <div className="relative flex-grow min-w-0 flex items-center gap-2">
                                                 <div className="relative flex-grow min-w-0">
@@ -1517,7 +1517,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                                 )}
                                             </div>
                                         </div>
-                                        <div className="mt-4 w-full h-px bg-zinc-700" />
+                                        <div className="mt-2.5 w-full h-px bg-zinc-700" />
                                     </div>
                                     <div className="flex-grow relative min-h-0 bg-zinc-900" ref={mobileGraphAreaRef}>{isLoading && (<div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-md z-[90] flex flex-col items-center justify-center gap-4 pointer-events-auto"><LoadingSpinner subtext={loadingSubtext} /><button onClick={(e) => { e.stopPropagation(); onCancelGeneration(); }} className="rounded-xl border border-zinc-600 px-6 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800 pointer-events-auto">Cancel</button></div>)}{isFirstGeneration && !isLoading && (<div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none"><ZceneEmptyState onNavigate={onNavigate} /></div>)}{data.nodes.length > 0 && (<MusicGraph data={data} libraryArtists={memoizedLibraryArtists} seedArtists={memoizedSeedArtists} onNodeClick={handleNodeClickInternal} selectedNode={selectedNode} isSmallScreen={isSmallScreen} activeFilters={activeFilters} searchQuery={searchQuery} setSearchQuery={setSearchQuery} toggleFilter={toggleFilterInternal} legendConfig={legendConfig} legendOrder={legendOrder} legendRef={desktopLegendAreaRef} onInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onLegendInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onExtendNode={onExtendNode} onRemoveNode={setNodeToRemove} isGuest={isGuest} detailsCache={detailsCache} isActive={isActive} />)}</div>
                                 </div>

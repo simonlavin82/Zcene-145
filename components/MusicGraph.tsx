@@ -371,6 +371,35 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     setHighlightedNodes(newHighlighted);
   }, [searchQuery, visibleNodes]);
 
+  // Observation A: When a search yields exactly one match, smoothly pan and
+  // zoom the D3 viewport to centre that node in the visible canvas frame.
+  useEffect(() => {
+    if (
+      highlightedNodes.size !== 1 ||
+      !svgRef.current ||
+      !zoomRef.current ||
+      dimensions.width === 0 ||
+      dimensions.height === 0
+    ) return;
+
+    const [matchedId] = highlightedNodes;
+    const node = visibleNodes.find(n => String(n.id) === matchedId);
+    if (!node || isNaN(node.x ?? NaN) || isNaN(node.y ?? NaN)) return;
+
+    const { width, height } = dimensions;
+    const [minScale, maxScale] = [0.1, 4]; // mirrors the zoom extent in the D3 setup
+    const targetScale = Math.min(Math.max(1.2, minScale), maxScale);
+    const tx = width  / 2 - targetScale * node.x!;
+    const ty = height / 2 - targetScale * node.y!;
+    const newTransform = d3.zoomIdentity.translate(tx, ty).scale(targetScale);
+
+    d3.select(svgRef.current)
+      .transition()
+      .duration(600)
+      .ease(d3.easeCubicOut)
+      .call(zoomRef.current.transform as any, newTransform);
+  }, [highlightedNodes, visibleNodes, dimensions]);
+
   useEffect(() => {
     const resizeObserver = new ResizeObserver(entries => {
         if (entries[0]) {
@@ -1388,10 +1417,16 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             >
                 <span className="font-poppins text-sm text-white border-b border-zinc-800 pb-1 mb-1 font-medium">{hoveredLink.sourceId}</span>
                 
-                {/* Zone 1: Direct Connections / Fallback */}
+                {/* Zone 1: Direct Connections / Fallback.
+                     On mobile we slice to ≤4 rows so the flex column shrink-wraps
+                     naturally — no height cap or overflow clipping needed.
+                     The D3 canvas continues to draw all edges regardless. */}
                 {hoveredLink.connections && hoveredLink.connections.length > 0 ? (
-                    <div className="flex flex-col gap-1 max-h-[120px] overflow-y-auto pr-1">
-                        {hoveredLink.connections.map((c, i) => (
+                    <div className="flex flex-col gap-1">
+                        {(isSmallScreen
+                            ? hoveredLink.connections.slice(0, 4)
+                            : hoveredLink.connections
+                        ).map((c, i) => (
                             <div key={i} className="text-xs font-medium text-zinc-300 leading-tight">
                                 <span className="text-zinc-400 font-normal">{c.context}</span>{" "}
                                 <span className="text-primary font-normal">{c.targetName}</span>
@@ -1411,7 +1446,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                             ? "mt-1 pt-1.5 border-t border-zinc-800/60"
                             : ""
                     }>
-                        <p className="text-xs leading-4 font-normal text-zinc-400 m-0">{hoveredLink.dna
+                        <p className={`text-xs leading-4 font-normal text-zinc-400 m-0${isSmallScreen ? ' line-clamp-2' : ''}`}>{hoveredLink.dna
                             ?.replace(/\btechnicolor\b/gi, 'technicolour')
                             .replace(/\bcolors\b/gi, 'colours')
                             .replace(/\bcolorful\b/gi, 'colourful')
