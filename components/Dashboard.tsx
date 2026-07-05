@@ -91,6 +91,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [projectToDelete, setProjectToDelete] = React.useState<string | null>(null);
   const [view, setView] = React.useState<'grid' | 'list'>('grid');
   const [activeMenuId, setActiveMenuId] = React.useState<string | null>(null);
+  const [sortBy, setSortBy] = React.useState<'recent' | 'alphabetical'>('recent');
 
   const handleRenameClick = (project: Project) => {
     const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
@@ -134,25 +135,92 @@ const Dashboard: React.FC<DashboardProps> = ({
       groups[bucketKey].push(project);
     });
 
-    const getProjectDisplayTitle = (project: Project) => {
-      const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
-      return (project.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene")).toLowerCase();
+    const getProjectDisplayTitle = (p: Project) => {
+      const seedList = p.seedArtists ? p.seedArtists.split('::').filter(Boolean) : [];
+      return (p.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene")).toLowerCase();
+    };
+
+    const getProjectTimestamp = (p: Project): number => {
+      const ts = p.updatedAt;
+      if (!ts) return 0;
+      if (typeof ts.toDate === 'function') return ts.toDate().getTime();
+      if (ts instanceof Date) return ts.getTime();
+      if (ts.seconds) return ts.seconds * 1000 + (ts.nanoseconds ? ts.nanoseconds / 1000000 : 0);
+      if (typeof ts === 'number') return ts;
+      if (typeof ts === 'string') {
+        const parsed = Date.parse(ts);
+        return isNaN(parsed) ? 0 : parsed;
+      }
+      return 0;
     };
 
     Object.keys(groups).forEach((key) => {
       groups[key].sort((a, b) => {
-        const titleA = getProjectDisplayTitle(a);
-        const titleB = getProjectDisplayTitle(b);
-        return titleA.localeCompare(titleB);
+        if (sortBy === 'recent') {
+          const timeA = getProjectTimestamp(a);
+          const timeB = getProjectTimestamp(b);
+          if (timeB !== timeA) {
+            return timeB - timeA;
+          }
+          return getProjectDisplayTitle(a).localeCompare(getProjectDisplayTitle(b));
+        } else {
+          const titleA = getProjectDisplayTitle(a);
+          const titleB = getProjectDisplayTitle(b);
+          if (titleA !== titleB) {
+            return titleA.localeCompare(titleB);
+          }
+          return getProjectTimestamp(b) - getProjectTimestamp(a);
+        }
       });
     });
 
     return groups;
-  }, [projects]);
+  }, [projects, sortBy]);
 
   const sortedBucketKeys = React.useMemo(() => {
-    return Object.keys(groupedProjects).sort((a, b) => a.localeCompare(b));
-  }, [groupedProjects]);
+    const getProjectDisplayTitle = (p: Project) => {
+      const seedList = p.seedArtists ? p.seedArtists.split('::').filter(Boolean) : [];
+      return (p.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene")).toLowerCase();
+    };
+
+    const getProjectTimestamp = (p: Project): number => {
+      const ts = p.updatedAt;
+      if (!ts) return 0;
+      if (typeof ts.toDate === 'function') return ts.toDate().getTime();
+      if (ts instanceof Date) return ts.getTime();
+      if (ts.seconds) return ts.seconds * 1000 + (ts.nanoseconds ? ts.nanoseconds / 1000000 : 0);
+      if (typeof ts === 'number') return ts;
+      if (typeof ts === 'string') {
+        const parsed = Date.parse(ts);
+        return isNaN(parsed) ? 0 : parsed;
+      }
+      return 0;
+    };
+
+    return Object.keys(groupedProjects).sort((keyA, keyB) => {
+      const projectsA = groupedProjects[keyA];
+      const projectsB = groupedProjects[keyB];
+
+      if (!projectsA || projectsA.length === 0) return 1;
+      if (!projectsB || projectsB.length === 0) return -1;
+
+      if (sortBy === 'recent') {
+        const maxTimeA = getProjectTimestamp(projectsA[0]);
+        const maxTimeB = getProjectTimestamp(projectsB[0]);
+        if (maxTimeB !== maxTimeA) {
+          return maxTimeB - maxTimeA;
+        }
+        return keyA.localeCompare(keyB);
+      } else {
+        const minTitleA = getProjectDisplayTitle(projectsA[0]);
+        const minTitleB = getProjectDisplayTitle(projectsB[0]);
+        if (minTitleA !== minTitleB) {
+          return minTitleA.localeCompare(minTitleB);
+        }
+        return keyA.localeCompare(keyB);
+      }
+    });
+  }, [groupedProjects, sortBy]);
 
   return (
     <div 
@@ -194,6 +262,17 @@ const Dashboard: React.FC<DashboardProps> = ({
             <h1 className="text-lg font-semibold uppercase tracking-wider text-zinc-200">YOUR ZCENES</h1>
             
             <div className="flex items-center gap-2 h-[36px] w-full justify-center md:w-auto md:justify-end">
+              {/* Sort Selector Toggle */}
+              <ViewToggle 
+                value={sortBy}
+                onChange={(s) => setSortBy(s as 'recent' | 'alphabetical')}
+                options={[
+                  { id: 'recent', icon: 'schedule', label: 'Sort by Recent' },
+                  { id: 'alphabetical', icon: 'sort_by_alpha', label: 'Sort Alphabetically' }
+                ]}
+                className="h-full"
+              />
+
               {/* Grid/List View Toggle */}
               <ViewToggle 
                 value={view}

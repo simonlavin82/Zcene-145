@@ -718,6 +718,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                                     <ColorSwatch name="UI Background" hex="#18181b" className="bg-zinc-900" />
                                     <ColorSwatch name="UI Border" hex="#52525b" className="bg-zinc-600" />
+                                    <ColorSwatch name="Console Partition" hex="#1f1f22" className="bg-zinc-850" />
                                     <ColorSwatch name="Light Text" hex="#e4e4e7" className="bg-zinc-200" />
                                     <ColorSwatch name="Subtle Light" hex="#a1a1aa" className="bg-zinc-400" />
                                     <ColorSwatch name="Dark Text" hex="#27272a" className="bg-zinc-800" />
@@ -1296,11 +1297,11 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         Interactive selector controls use a custom <strong>12px border-radius</strong> (<code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-xl">rounded-xl</code>) outer container and <strong>8px button frames</strong> (<code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-lg">rounded-lg</code>) — deliberately separating them from our strict <strong>0px brutalist</strong> layout containers. The active icon is highlighted by a <strong>tight square sliding badge</strong> that neatly wraps exactly one icon.
                                     </p>
                                     <ul className="text-xs text-zinc-500 space-y-2 list-disc list-inside">
-                                        <li><strong>Icon-only minimalism:</strong> No text labels — identity is communicated purely through the Material Symbol icons (Hub = Organic, Bubble Chart = Cluster).</li>
+                                        <li><strong>Icon-only minimalism:</strong> No text labels — identity is communicated purely through the Material Symbol icons (Hub = Organic, Bubble Chart = Cluster, Grid View = Grid, List = Table, Schedule = Recent, Sort By Alpha = Alphabetical).</li>
                                         <li><strong>Proportional sliding active badge:</strong> A fixed <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-xl">w-8 h-8</code> <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-xl">bg-zinc-800</code> active block with a soft <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-[6px]">rounded-[6px]</code> radius slides proportionally between positions.</li>
                                         <li><strong>Outer & Button Radius:</strong> The main outer toggle container uses a soft <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-xl">rounded-xl</code> border radius, and the button frames use a matching concentric <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-lg">rounded-lg</code> to form a unified set.</li>
                                         <li><strong>Spring animation:</strong> Badge translates via <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-xl">stiffness: 480 / damping: 38</code> — snappy and responsive, not floaty.</li>
-                                        <li><strong>Main Graph Alignment:</strong> This same component is used live inside the graph canvas for Organic/Cluster mode switching.</li>
+                                        <li><strong>Main Graph & Dashboard Alignment:</strong> This same component is used generic and dynamically inside the main graph canvas for layout mode switching, and inside the dashboard controls panel for View and Sort mode switching.</li>
                                     </ul>
                                 </div>
                             </div>
