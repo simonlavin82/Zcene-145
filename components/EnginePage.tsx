@@ -86,12 +86,14 @@ the entire dataset, the app evolves existing visual structures.
    100% compliance with user settings. This includes strict inclusion/exclusion 
    of geographical origins.
 
-3. NON-DESTRUCTIVE MERGE (App.tsx):
+3. NON-DESTRUCTIVE MERGE & NODE VISUAL STATES (App.tsx / MusicGraph.tsx):
    The merge logic preserves existing Node objects. This is critical because 
    D3 attaches internal state (x, y, vx, vy) directly to these objects. 
    Replacing objects would cause nodes to "explode" and reset their positions.
    - New nodes are injected with randomized positions (+/- 200px from center).
    - Existing nodes are updated via Object.assign to keep physics refs intact.
+   - Robust ID Matching: Node selection is matched case-insensitively and through 
+     normalized slugs ('isSameNodeId') to resolve raw artist name and selection mismatches.
 
 4. DATA INTEGRITY (geminiService.ts):
    The 'Orphaned Link Mitigation' logic filters the AI response. It ensures 
@@ -127,6 +129,9 @@ the entire dataset, the app evolves existing visual structures.
    interactively expand the graph in real-time.
    - Discovery UI: Contextual action buttons (+/-) emerge directly from 
      selected nodes, maintaining spatial anchoring during simulation.
+   - Central Anchoring Layout: Seed Artist nodes are visually anchored to the center 
+     coordinates of the graph viewport by applying a strong target positioning force (0.4), 
+     while AI discoveries and metadata hubs orbit them organically.
    - Predictive Loading: When a new artist is discovered, a "Loading Node" 
      and dashed connection line appear, inheriting the momentum of the 
      parent node to prevent visual jumps.

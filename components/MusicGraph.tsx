@@ -397,24 +397,25 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     };
 
     const triggerNodeHover = (d: Node) => {
-        if (d.type !== 'artist') return;
         setHoveredNodeId(d.id);
         activeHoveredNodeRef.current = d;
 
-        const directArtistLinks = visibleLinks.filter(l => {
+        const firstDegreeLinks = visibleLinks.filter(l => {
             const sId = nodeId(l.source);
             const tId = nodeId(l.target);
-            if (sId !== d.id && tId !== d.id) return false;
-            const otherId = sId === d.id ? tId : sId;
-            const otherNode = visibleNodes.find(n => String(n.id).toLowerCase() === otherId.toLowerCase());
-            return otherNode?.type === 'artist';
+            return isSameNodeId(sId, d.id) || isSameNodeId(tId, d.id);
         });
 
         const neighborNodeIds = new Set<string>();
-        neighborNodeIds.add(d.id);
-        directArtistLinks.forEach(l => {
-            neighborNodeIds.add(nodeId(l.source));
-            neighborNodeIds.add(nodeId(l.target));
+        neighborNodeIds.add(d.id.toLowerCase());
+        neighborNodeIds.add(normalizeArtistId(d.id));
+        firstDegreeLinks.forEach(l => {
+            const sId = nodeId(l.source);
+            const tId = nodeId(l.target);
+            neighborNodeIds.add(sId.toLowerCase());
+            neighborNodeIds.add(normalizeArtistId(sId));
+            neighborNodeIds.add(tId.toLowerCase());
+            neighborNodeIds.add(normalizeArtistId(tId));
         });
 
         if (svgRef.current) {
@@ -426,24 +427,14 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 .attr("stroke", (l: any) => {
                     const sId = nodeId(l.source);
                     const tId = nodeId(l.target);
-                    const isDirectArtistLink = (sId === d.id || tId === d.id) &&
-                        directArtistLinks.some(dal => {
-                            const dalS = nodeId(dal.source);
-                            const dalT = nodeId(dal.target);
-                            return (dalS === sId && dalT === tId) || (dalS === tId && dalT === sId);
-                        });
-                    return isDirectArtistLink ? "#F6E468" : "#e4e4e7";
+                    const isFirstDegreeLink = isSameNodeId(sId, d.id) || isSameNodeId(tId, d.id);
+                    return isFirstDegreeLink ? "#F6E468" : "#e4e4e7";
                 })
                 .attr("stroke-opacity", (l: any) => {
                     const sId = nodeId(l.source);
                     const tId = nodeId(l.target);
-                    const isDirectArtistLink = (sId === d.id || tId === d.id) &&
-                        directArtistLinks.some(dal => {
-                            const dalS = nodeId(dal.source);
-                            const dalT = nodeId(dal.target);
-                            return (dalS === sId && dalT === tId) || (dalS === tId && dalT === sId);
-                        });
-                    return isDirectArtistLink ? 0.9 : 0.05;
+                    const isFirstDegreeLink = isSameNodeId(sId, d.id) || isSameNodeId(tId, d.id);
+                    return isFirstDegreeLink ? 0.9 : 0.05;
                 });
 
             // Spotlight constellation nodes and dim others
@@ -455,64 +446,77 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                                           Object.prototype.hasOwnProperty.call(activeFilters, nodeType) && 
                                           !activeFilters[nodeType];
                     if (isFilteredOut) return 0.1;
-                    return neighborNodeIds.has(n.id) ? 1 : 0.15;
+                    return neighborNodeIds.has(n.id.toLowerCase()) || neighborNodeIds.has(normalizeArtistId(n.id)) ? 1 : 0.15;
                 });
 
-            // Aggregate all artist connections and group them
-            const connectionsByArtist = new Map<string, { node: Node; contexts: string[] }>();
-            directArtistLinks.forEach(l => {
-                const sId = nodeId(l.source);
-                const tId = nodeId(l.target);
-                const otherId = sId === d.id ? tId : sId;
-                const otherNode = visibleNodes.find(n => String(n.id).toLowerCase() === otherId.toLowerCase());
-                if (!otherNode) return;
-                
-                const normOtherId = otherNode.id;
-                if (!connectionsByArtist.has(normOtherId)) {
-                    connectionsByArtist.set(normOtherId, { node: otherNode, contexts: [] });
-                }
-                if (l.context) {
-                    connectionsByArtist.get(normOtherId)!.contexts.push(l.context);
-                }
-            });
-
-            const connections = Array.from(connectionsByArtist.values()).map(({ node, contexts }) => {
-                const rawContext = formatRelationContext(contexts);
-                const capitalizedContext = rawContext.charAt(0).toUpperCase() + rawContext.slice(1);
-                return {
-                    context: capitalizedContext,
-                    targetName: toDisplayLabel(node)
-                };
-            });
-
-            // Fetch DNA/Recommendation Reason
-            const normId = normalizeArtistId(d.id);
-            const nodeDna = detailsCache?.get(d.id)?.recommendationReason ||
-                            detailsCache?.get(d.id.toLowerCase())?.recommendationReason ||
-                            detailsCache?.get(normId)?.recommendationReason;
-
-            // Check raw connections for fallback type
-            const hasRawConnections = data.links.some(l => {
-                const sId = nodeId(l.source);
-                const tId = nodeId(l.target);
-                return sId === d.id || tId === d.id;
-            });
-
-            let fallbackMessage = "";
-            if (directArtistLinks.length === 0 && !hasRawConnections) {
-                fallbackMessage = "[Indirect recommendation]";
-            }
-
-            if (connections.length > 0 || nodeDna || fallbackMessage) {
-                const transform = d3.zoomTransform(svgRef.current);
-                setHoveredLink({
-                    sourceId: toDisplayLabel(d),
-                    connections: connections.length > 0 ? connections : undefined,
-                    fallbackMessage: fallbackMessage || undefined,
-                    dna: nodeDna || undefined,
-                    x: transform.applyX(d.x ?? 0),
-                    y: transform.applyY(d.y ?? 0)
+            if (d.type === 'artist') {
+                const directArtistLinks = visibleLinks.filter(l => {
+                    const sId = nodeId(l.source);
+                    const tId = nodeId(l.target);
+                    if (sId !== d.id && tId !== d.id) return false;
+                    const otherId = sId === d.id ? tId : sId;
+                    const otherNode = visibleNodes.find(n => String(n.id).toLowerCase() === otherId.toLowerCase());
+                    return otherNode?.type === 'artist';
                 });
+
+                // Aggregate all artist connections and group them
+                const connectionsByArtist = new Map<string, { node: Node; contexts: string[] }>();
+                directArtistLinks.forEach(l => {
+                    const sId = nodeId(l.source);
+                    const tId = nodeId(l.target);
+                    const otherId = sId === d.id ? tId : sId;
+                    const otherNode = visibleNodes.find(n => String(n.id).toLowerCase() === otherId.toLowerCase());
+                    if (!otherNode) return;
+                    
+                    const normOtherId = otherNode.id;
+                    if (!connectionsByArtist.has(normOtherId)) {
+                        connectionsByArtist.set(normOtherId, { node: otherNode, contexts: [] });
+                    }
+                    if (l.context) {
+                        connectionsByArtist.get(normOtherId)!.contexts.push(l.context);
+                    }
+                });
+
+                const connections = Array.from(connectionsByArtist.values()).map(({ node, contexts }) => {
+                    const rawContext = formatRelationContext(contexts);
+                    const capitalizedContext = rawContext.charAt(0).toUpperCase() + rawContext.slice(1);
+                    return {
+                        context: capitalizedContext,
+                        targetName: toDisplayLabel(node)
+                    };
+                });
+
+                // Fetch DNA/Recommendation Reason
+                const normId = normalizeArtistId(d.id);
+                const nodeDna = detailsCache?.get(d.id)?.recommendationReason ||
+                                detailsCache?.get(d.id.toLowerCase())?.recommendationReason ||
+                                detailsCache?.get(normId)?.recommendationReason;
+
+                // Check raw connections for fallback type
+                const hasRawConnections = data.links.some(l => {
+                    const sId = nodeId(l.source);
+                    const tId = nodeId(l.target);
+                    return sId === d.id || tId === d.id;
+                });
+
+                let fallbackMessage = "";
+                if (directArtistLinks.length === 0 && !hasRawConnections) {
+                    fallbackMessage = "[Indirect recommendation]";
+                }
+
+                if (connections.length > 0 || nodeDna || fallbackMessage) {
+                    const transform = d3.zoomTransform(svgRef.current);
+                    setHoveredLink({
+                        sourceId: toDisplayLabel(d),
+                        connections: connections.length > 0 ? connections : undefined,
+                        fallbackMessage: fallbackMessage || undefined,
+                        dna: nodeDna || undefined,
+                        x: transform.applyX(d.x ?? 0),
+                        y: transform.applyY(d.y ?? 0)
+                    });
+                } else {
+                    setHoveredLink(null);
+                }
             } else {
                 setHoveredLink(null);
             }
@@ -826,8 +830,18 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         simulation.force('center', d3.forceCenter(width / 2, height / 2).strength(0.005));
     } else {
         // Organic Mode: Enhanced spiderweb with more spread and varied distances
-        forceX.strength(0.0005).x(width / 2);
-        forceY.strength(0.0005).y(height / 2);
+        const seedArtistSet = new Set(seedArtists.map(a => normalizeArtistId(a)));
+        
+        forceX.strength((d: Node) => {
+            const isSeed = d.type === 'artist' && (seedArtistSet.has(d.id.toLowerCase()) || seedArtistSet.has(normalizeArtistId(d.id)));
+            return isSeed ? 0.4 : 0.0005;
+        }).x(width / 2);
+
+        forceY.strength((d: Node) => {
+            const isSeed = d.type === 'artist' && (seedArtistSet.has(d.id.toLowerCase()) || seedArtistSet.has(normalizeArtistId(d.id)));
+            return isSeed ? 0.4 : 0.0005;
+        }).y(height / 2);
+
         simulation.force('center', d3.forceCenter(width / 2, height / 2).strength(0.002));
         
         // Slightly decreased repulsion as per user feedback
@@ -931,8 +945,8 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             onInteractionRef.current?.();
         })
         .on("mouseenter", (event, d) => {
-            if (!isSmallScreen && d.type === 'artist') {
-                if (containerRef.current) {
+            if (!isSmallScreen) {
+                if (containerRef.current && d.type === 'artist') {
                     const rect = containerRef.current.getBoundingClientRect();
                     const x = event.clientX - rect.left;
                     const y = event.clientY - rect.top;
