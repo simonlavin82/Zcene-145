@@ -1485,6 +1485,85 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 </div>
                             </div>
                         </div>
+
+                        {/* ── Genre Compartment Folder Tab System ── */}
+                        <div className="mt-16 space-y-8">
+                            <div className="border-b border-zinc-800 pb-4">
+                                <h3 className="text-xl font-medium text-zinc-200">Genre Compartment Folder Tab System</h3>
+                                <p className="text-sm text-zinc-400 mt-2 leading-relaxed max-w-3xl">
+                                    Used in the dashboard grid view to organize projects into genre compartments. It employs a skeuomorphic folder-like layout with an index tab aligned on the top-left edge. To maintain the illusion of a continuous folder shell, both the tab and container must use identical solid borders.
+                                </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                                {/* Visual Harmonization Specs */}
+                                <div className="space-y-4">
+                                    <h4 className="text-base font-medium text-white flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-primary">analytics</span>
+                                        Visual &amp; Code Configuration
+                                    </h4>
+                                    <p className="text-sm text-zinc-400 leading-relaxed">
+                                        The folder compartment relies on absolute positioning of the index tab relative to the compartment container. The left edge of the tab is offset by <code>left-[-1px]</code>, overlaying and hiding the container's top-left corner border. By enforcing a solid <code>border-zinc-800</code> on both components, the seam merges perfectly.
+                                    </p>
+                                    <p className="text-sm text-zinc-400 leading-relaxed mt-3">
+                                        To prevent massive empty space voids in compartments with few cards (e.g. only 1 or 2 projects), the compartment box container utilizes <code>w-full sm:w-fit</code>. Individual project cards carry a stable width of <code>w-full sm:w-[350px]</code>, and the inner card wrapper applies dynamic column grid classes based on the active card count (e.g., <code>grid-cols-1</code> for 1 card, <code>grid-cols-1 sm:grid-cols-2</code> for 2 cards, and up to 4 columns). This forces the folder compartment to wrap snugly around its active columns while scaling cleanly up to a maximum of 4 columns when full.
+                                    </p>
+                                    <div className="space-y-4 pt-2">
+                                        <div>
+                                            <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Compartment Container Classes</p>
+                                            <code className="text-xs font-mono text-primary bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 block overflow-x-auto whitespace-nowrap">
+                                                w-full sm:w-fit bg-zinc-950 rounded-tr-xl rounded-b-xl rounded-tl-none border border-zinc-800 p-4 relative
+                                            </code>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Card Wrapper Classes</p>
+                                            <code className="text-xs font-mono text-primary bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 block overflow-x-auto whitespace-nowrap">
+                                                grid [cols-class] gap-4 w-full (dynamic cols-class based on card count)
+                                            </code>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Index Tab Classes</p>
+                                            <code className="text-xs font-mono text-primary bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 block overflow-x-auto whitespace-nowrap">
+                                                w-[160px] bg-zinc-950 border-t border-l border-r border-zinc-800 rounded-t-lg text-[9px] font-mono absolute -top-[22px] left-[-1px] px-3 py-1 h-[22.5px]
+                                            </code>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Compartment Visual Preview */}
+                                <div className="space-y-3">
+                                    <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Live Spec Preview</p>
+                                    <div className="p-8 bg-zinc-900/30 rounded-xl border border-zinc-800 flex justify-center">
+                                        <div 
+                                            className="w-full sm:w-fit bg-zinc-950 rounded-tr-xl rounded-b-xl rounded-tl-none border border-zinc-800 p-4 relative mt-6"
+                                        >
+                                            {/* Index Tab */}
+                                            <div className="w-[140px] bg-zinc-950 border-t border-l border-r border-zinc-800 rounded-t-lg text-[9px] font-mono absolute -top-[22px] left-[-1px] px-3 py-1 flex items-center h-[22.5px] z-10 select-none">
+                                                <div className="truncate text-ellipsis whitespace-nowrap uppercase tracking-widest text-zinc-400 font-medium">
+                                                    POP PUNK
+                                                </div>
+                                            </div>
+
+                                            {/* Cards inside this parent record crate compartment */}
+                                            <div className="grid grid-cols-1 gap-4 w-full">
+                                                {/* Inner Mock Card */}
+                                                <div className="bg-zinc-900 border border-zinc-700/50 p-5 flex flex-col justify-between min-h-[140px] w-full sm:w-[350px] shadow-xl">
+                                                    <div className="space-y-3">
+                                                        <h3 className="text-sm font-medium text-white truncate">Grayscale</h3>
+                                                        <p className="font-mono text-[10px] text-zinc-400">Edited 05/07/2026</p>
+                                                    </div>
+                                                    <div className="mt-4 pt-3 border-t border-white/5 flex items-center gap-1.5 flex-wrap">
+                                                        <span className="text-[8px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded border border-white/5 font-mono whitespace-nowrap">SEED: 1</span>
+                                                        <span className="text-[8px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded border border-white/5 font-mono whitespace-nowrap">AI ARTISTS: 22</span>
+                                                        <span className="text-[8px] uppercase tracking-wide text-primary/60 font-bold px-1.5 py-0.5 bg-primary/10 rounded border border-primary/10 font-mono whitespace-nowrap">Mapped</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </section>
 
                     {/* 10. LISTS */}

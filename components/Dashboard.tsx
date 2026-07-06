@@ -327,22 +327,34 @@ const Dashboard: React.FC<DashboardProps> = ({
             </div>
           ) : view === 'grid' ? (
             <div className="flex flex-wrap gap-x-8 gap-y-10 items-start">
-              {sortedBucketKeys.map((bucketKey) => (
-                <div 
-                  key={bucketKey} 
-                  className="w-full sm:w-auto bg-zinc-950 rounded-tr-xl rounded-b-xl rounded-tl-none border border-zinc-800/60 p-4 relative flex-shrink-0"
-                  style={{ maxWidth: '100%' }}
-                >
-                  {/* Unified Folder Index Tab */}
-                  <div className="w-[160px] bg-zinc-950 border-t border-l border-r border-zinc-800 rounded-t-lg text-[9px] font-mono absolute -top-[22px] left-[-1px] px-3 py-1 flex items-center h-[22.5px] z-10 select-none">
-                    <div className="truncate text-ellipsis whitespace-nowrap uppercase tracking-widest text-zinc-400 font-medium">
-                      {bucketKey}
-                    </div>
-                  </div>
+              {sortedBucketKeys.map((bucketKey) => {
+                const projectsInBucket = groupedProjects[bucketKey] || [];
+                const count = projectsInBucket.length;
+                let gridColsClass = "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
+                if (count === 1) {
+                  gridColsClass = "grid-cols-1";
+                } else if (count === 2) {
+                  gridColsClass = "grid-cols-1 sm:grid-cols-2";
+                } else if (count === 3) {
+                  gridColsClass = "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3";
+                }
 
-                  {/* Cards inside this parent record crate compartment */}
-                  <div className="flex flex-wrap gap-4">
-                    {groupedProjects[bucketKey].map((project) => {
+                return (
+                  <div 
+                    key={bucketKey} 
+                    className="w-full sm:w-fit bg-zinc-950 rounded-tr-xl rounded-b-xl rounded-tl-none border border-zinc-800 p-4 relative flex-shrink-0"
+                    style={{ maxWidth: '100%' }}
+                  >
+                    {/* Unified Folder Index Tab */}
+                    <div className="w-[160px] bg-zinc-950 border-t border-l border-r border-zinc-800 rounded-t-lg text-[9px] font-mono absolute -top-[22px] left-[-1px] px-3 py-1 flex items-center h-[22.5px] z-10 select-none">
+                      <div className="truncate text-ellipsis whitespace-nowrap uppercase tracking-widest text-zinc-400 font-medium">
+                        {bucketKey}
+                      </div>
+                    </div>
+
+                    {/* Cards inside this parent record crate compartment */}
+                    <div className={`grid ${gridColsClass} gap-4 w-full`}>
+                      {projectsInBucket.map((project) => {
                       const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
                       const displayTitle = project.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene");
                       
@@ -440,11 +452,12 @@ const Dashboard: React.FC<DashboardProps> = ({
                     })}
                   </div>
                 </div>
-              ))}
+              );
+            })}
               
               {/* Standalone Add New Card Container */}
               <div 
-                className="w-full sm:w-[382px] bg-zinc-950/20 rounded-xl border border-dashed border-zinc-800/60 p-4 flex items-center justify-center h-[192px] flex-shrink-0"
+                className="w-full bg-zinc-950/20 rounded-xl border border-dashed border-zinc-800/60 p-4 flex items-center justify-center h-[192px] flex-shrink-0"
                 style={{ maxWidth: '100%' }}
               >
                 <button 
