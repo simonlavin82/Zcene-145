@@ -531,13 +531,13 @@ const Dashboard: React.FC<DashboardProps> = ({
                         }
                         
                         const rowBg = index % 2 === 0 ? 'bg-zinc-900' : 'bg-zinc-950/40';
-                        const tdClass = index === 0 ? 'relative z-10 bg-zinc-900' : '';
+                        const tdClass = `transition-colors ${rowBg} group-hover:bg-primary/5 ${index === 0 ? 'relative z-10' : ''}`;
                         
                         return (
                           <tr 
                             key={project.id}
                             onClick={() => onSelectProject(project.id)}
-                            className={`group ${rowBg} hover:bg-primary/5 cursor-pointer transition-colors border-b border-zinc-800/30`}
+                            className="group cursor-pointer border-b border-zinc-800/30"
                           >
                             <td className={`py-4 px-6 font-medium text-white group-hover:text-primary transition-colors ${tdClass}`}>
                               {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}

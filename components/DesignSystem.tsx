@@ -1689,7 +1689,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <h4 className="text-base font-medium text-zinc-200">Project List — Table View Preview</h4>
                                     </div>
                                     <p className="text-sm text-zinc-400 leading-relaxed max-w-2xl">
-                                        In table view the same four tokens each occupy a dedicated column cell. The <strong>Status</strong> column renders <strong>Mapped</strong> (accent) or <strong>Unmapped</strong> (muted) depending on whether <code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.graphData</code> is truthy.
+                                        In table view the same four tokens each occupy a dedicated column cell. The <strong>Status</strong> column renders <strong>Mapped</strong> (accent) or <strong>Unmapped</strong> (muted) depending on whether <code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.graphData</code> is truthy. To ensure unified hover behavior across alternating striped rows and custom layouts, background hovers are applied directly to individual cell elements (<code className="text-xs text-primary bg-zinc-800 px-1 rounded">td</code>) using <code className="text-xs text-primary bg-zinc-800 px-1 rounded">group-hover:bg-primary/5 transition-colors</code> instead of on the parent row (<code className="text-xs text-primary bg-zinc-800 px-1 rounded">tr</code>) element.
                                     </p>
 
                                     {/* Mock Table */}
@@ -1707,72 +1707,72 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-zinc-800/50 bg-zinc-900">
-                                                {/* Mapped row */}
-                                                <tr className="hover:bg-zinc-800 cursor-pointer transition-colors bg-zinc-900">
-                                                    <td className="py-4 px-6 font-medium text-white">
+                                                {/* Mapped row (even / first row style: bg-zinc-900 with relative z-10) */}
+                                                <tr className="group cursor-pointer border-b border-zinc-800/30">
+                                                    <td className="py-4 px-6 font-medium text-white bg-zinc-900 group-hover:bg-primary/5 transition-colors relative z-10">
                                                         <div className="flex items-center gap-3">
-                                                            <span className="material-symbols-outlined text-zinc-500 !text-lg">folder</span>
+                                                            <span className="material-symbols-outlined text-zinc-555 !text-lg group-hover:text-primary transition-colors">folder</span>
                                                             <span className="truncate max-w-[180px]">Midwest Emo Roots</span>
                                                         </div>
                                                     </td>
-                                                    <td className="py-4 px-6 text-zinc-400 text-sm font-mono font-normal">27/06/2026 • 8:09 am</td>
+                                                    <td className="py-4 px-6 text-zinc-400 text-sm font-mono font-normal bg-zinc-900 group-hover:bg-primary/5 transition-colors relative z-10">27/06/2026 • 8:09 am</td>
                                                     {/* 1. SEED */}
-                                                    <td className="py-4 px-6 font-normal">
+                                                    <td className="py-4 px-6 font-normal bg-zinc-900 group-hover:bg-primary/5 transition-colors relative z-10">
                                                         <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
                                                             SEED: 3
                                                         </span>
                                                     </td>
                                                     {/* 2. AI ARTISTS */}
-                                                    <td className="py-4 px-6 font-normal">
+                                                    <td className="py-4 px-6 font-normal bg-zinc-900 group-hover:bg-primary/5 transition-colors relative z-10">
                                                         <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
                                                             AI ARTISTS: 24
                                                         </span>
                                                     </td>
                                                     {/* 3. DEEP CUTS */}
-                                                    <td className="py-4 px-6 font-normal">
+                                                    <td className="py-4 px-6 font-normal bg-zinc-900 group-hover:bg-primary/5 transition-colors relative z-10">
                                                         <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
                                                             DEEP CUTS: 7
                                                         </span>
                                                     </td>
                                                     {/* 4. MAPPED */}
-                                                    <td className="py-4 px-6 font-normal">
+                                                    <td className="py-4 px-6 font-normal bg-zinc-900 group-hover:bg-primary/5 transition-colors relative z-10">
                                                         <span className="text-[10px] uppercase tracking-widest text-primary/70 font-bold px-2 py-0.5 bg-primary/10 rounded-md border border-primary/20 whitespace-nowrap">
                                                             Mapped
                                                         </span>
                                                     </td>
-                                                    <td className="py-4 px-6 text-right">
+                                                    <td className="py-4 px-6 text-right bg-zinc-900 group-hover:bg-primary/5 transition-colors relative z-10">
                                                         <span className="material-symbols-outlined text-zinc-600 !text-xl">more_vert</span>
                                                     </td>
                                                 </tr>
-                                                {/* Unmapped row */}
-                                                <tr className="hover:bg-zinc-800 cursor-pointer transition-colors bg-zinc-900">
-                                                    <td className="py-4 px-6 font-medium text-zinc-300">
+                                                {/* Unmapped row (odd row style: bg-zinc-950/40) */}
+                                                <tr className="group cursor-pointer border-b border-zinc-800/30">
+                                                    <td className="py-4 px-6 font-medium text-zinc-300 bg-zinc-950/40 group-hover:bg-primary/5 transition-colors">
                                                         <div className="flex items-center gap-3">
-                                                            <span className="material-symbols-outlined text-zinc-600 !text-lg">folder</span>
+                                                            <span className="material-symbols-outlined text-zinc-600 !text-lg group-hover:text-primary transition-colors">folder</span>
                                                             <span className="truncate max-w-[180px]">New Zcene Draft</span>
                                                         </div>
                                                     </td>
-                                                    <td className="py-4 px-6 text-zinc-400 text-sm font-mono font-normal">New Project</td>
+                                                    <td className="py-4 px-6 text-zinc-400 text-sm font-mono font-normal bg-zinc-950/40 group-hover:bg-primary/5 transition-colors">New Project</td>
                                                     {/* 1. SEED */}
-                                                    <td className="py-4 px-6 font-normal">
+                                                    <td className="py-4 px-6 font-normal bg-zinc-950/40 group-hover:bg-primary/5 transition-colors">
                                                         <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
                                                             SEED: 1
                                                         </span>
                                                     </td>
                                                     {/* 2–3: hidden when unmapped */}
-                                                    <td className="py-4 px-6 font-normal">
+                                                    <td className="py-4 px-6 font-normal bg-zinc-950/40 group-hover:bg-primary/5 transition-colors">
                                                         <span className="text-[10px] text-zinc-600 font-mono">—</span>
                                                     </td>
-                                                    <td className="py-4 px-6 font-normal">
+                                                    <td className="py-4 px-6 font-normal bg-zinc-950/40 group-hover:bg-primary/5 transition-colors">
                                                         <span className="text-[10px] text-zinc-600 font-mono">—</span>
                                                     </td>
                                                     {/* 4. UNMAPPED */}
-                                                    <td className="py-4 px-6 font-normal">
+                                                    <td className="py-4 px-6 font-normal bg-zinc-950/40 group-hover:bg-primary/5 transition-colors">
                                                         <span className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold px-2 py-0.5 bg-zinc-800 rounded-md border border-zinc-800 whitespace-nowrap">
                                                             Unmapped
                                                         </span>
                                                     </td>
-                                                    <td className="py-4 px-6 text-right">
+                                                    <td className="py-4 px-6 text-right bg-zinc-950/40 group-hover:bg-primary/5 transition-colors">
                                                         <span className="material-symbols-outlined text-zinc-600 !text-xl">more_vert</span>
                                                     </td>
                                                 </tr>
