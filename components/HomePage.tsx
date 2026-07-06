@@ -17,12 +17,13 @@ interface HomePageProps {
   isActive: boolean;
   user: User | null;
   isAuthInitialized: boolean;
-  onLogin: () => void;
+  onLogin: (onSuccess?: () => void) => void;
   onLogout: () => void;
   isAdmin?: boolean;
+  onRestartWalkthrough?: () => void;
 }
 
-const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = false, isActive, user, isAuthInitialized, onLogin, onLogout, isAdmin }) => {
+const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = false, isActive, user, isAuthInitialized, onLogin, onLogout, isAdmin, onRestartWalkthrough }) => {
   const [isCopied, setIsCopied] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -176,59 +177,165 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
             >
               Support
             </button>
-            {user && (
-              <div className="relative">
-                <button 
-                  onClick={() => setIsProfileOpen(!isProfileOpen)}
-                  className="flex items-center gap-3 group transition-opacity hover:opacity-80"
-                  aria-label="Open profile menu"
-                >
-                  {user.photoURL ? (
+            <div className="relative">
+              <button 
+                onClick={() => setIsProfileOpen(!isProfileOpen)}
+                className="group relative flex items-center justify-center transition-all hover:opacity-90"
+                aria-label="Open profile menu"
+              >
+                {user ? (
+                  user.photoURL ? (
                     <img 
                       src={user.photoURL} 
                       alt={user.displayName || 'User'} 
-                      className="w-8 h-8 rounded-full border border-primary/50"
+                      className="w-8 h-8 rounded-full border border-primary/50 hover:scale-110 transition-transform"
                     />
                   ) : (
-                    <div className="w-8 h-8 rounded-full bg-zinc-800 border border-primary/50 flex items-center justify-center text-[10px] font-bold text-primary">
+                    <div className="w-8 h-8 rounded-full bg-zinc-800 border border-primary/50 flex items-center justify-center text-[10px] font-bold text-primary hover:scale-110 transition-transform">
                       {user.displayName?.charAt(0) || user.email?.charAt(0) || 'U'}
                     </div>
-                  )}
-                </button>
+                  )
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 hover:border-primary/50 flex items-center justify-center text-zinc-400 hover:text-primary hover:scale-110 transition-all">
+                    <span className="material-symbols-outlined !text-[18px]">account_circle</span>
+                  </div>
+                )}
+                {user && (
+                  <div className="absolute -bottom-1 -right-1 bg-green-500 w-2.5 h-2.5 rounded-full border-2 border-background-dark"></div>
+                )}
+              </button>
 
-                <AnimatePresence>
-                  {isProfileOpen && (
-                    <>
-                      <div 
-                        className="fixed inset-0 z-10" 
-                        onClick={() => setIsProfileOpen(false)}
-                      />
-                      <motion.div
-                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                        className="absolute right-0 mt-2 w-48 z-20 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1 shadow-2xl shadow-black"
-                      >
-                        <div className="px-3 py-2 border-b border-white/5">
-                          <p className="text-[10px] uppercase tracking-widest text-zinc-500 font-semibold mb-0.5">Account</p>
-                          <p className="text-xs font-medium text-zinc-300 truncate">{user.email}</p>
+              <AnimatePresence>
+                {isProfileOpen && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-10" 
+                      onClick={() => setIsProfileOpen(false)}
+                    />
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      className="absolute right-0 mt-2 w-56 z-20 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1 shadow-2xl shadow-black text-left font-display antialiased"
+                    >
+                      {user ? (
+                        <div className="px-3 py-2.5 border-b border-white/5">
+                          <p className="text-[9px] uppercase tracking-[0.2em] text-zinc-500 font-bold mb-1">Authenticated Account</p>
+                          <p className="text-xs font-medium text-zinc-200 truncate">{user.email}</p>
                         </div>
+                      ) : (
+                        <div className="px-3 py-2.5 border-b border-white/5">
+                          <p className="text-[9px] uppercase tracking-[0.2em] text-zinc-500 font-bold mb-1">Guest Account</p>
+                          <p className="text-xs font-medium text-zinc-400 truncate">Not Signed In</p>
+                        </div>
+                      )}
+
+                      {!user && onLogin && (
+                        <div className="p-1 border-b border-white/5">
+                          <button
+                            onClick={() => {
+                              setIsProfileOpen(false);
+                              onLogin(() => {
+                                onNavigate(hasExistingGraph ? View.Dashboard : View.Graph);
+                              });
+                            }}
+                            className="w-full bg-primary text-black rounded-xl px-4 py-2 flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-95 text-xs font-semibold cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined !text-[14px] text-black font-bold">login</span>
+                            Sign In with Google
+                          </button>
+                        </div>
+                      )}
+
+                      <div className="p-1">
+                        <button
+                          onClick={() => { setIsProfileOpen(false); onNavigate(View.Help); }}
+                          className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                        >
+                          <span className="material-symbols-outlined !text-[16px] text-zinc-500 group-hover:text-primary">help</span>
+                          Help
+                        </button>
+
+                        {isAdmin && (
+                          <>
+                            <button
+                              onClick={() => { setIsProfileOpen(false); onNavigate(View.StyleGuide); }}
+                              className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                            >
+                              <span className="material-symbols-outlined !text-[16px] text-zinc-500 group-hover:text-primary">grid_view</span>
+                              Design System
+                            </button>
+                            <button
+                              onClick={() => { setIsProfileOpen(false); onNavigate(View.Engine); }}
+                              className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                            >
+                              <span className="material-symbols-outlined !text-[16px] text-zinc-500 group-hover:text-primary">settings_input_component</span>
+                              Engine
+                            </button>
+                          </>
+                        )}
+
+                        {user && (
+                          <button
+                            onClick={() => { setIsProfileOpen(false); onNavigate(View.Analytics); }}
+                            className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                          >
+                            <span className="material-symbols-outlined !text-[16px] text-zinc-500 group-hover:text-primary">monitoring</span>
+                            Discovery Ledger
+                          </button>
+                        )}
+
                         <button
                           onClick={() => {
                             setIsProfileOpen(false);
-                            onLogout();
+                            window.open('https://instagram.com/zcene.io', '_blank');
                           }}
-                          className="w-full text-left px-3 py-2.5 text-xs font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors rounded-lg flex items-center gap-2"
+                          className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
                         >
-                          <span className="material-symbols-outlined !text-[16px]">logout</span>
-                          Sign Out
+                          <span className="material-symbols-outlined !text-[16px] text-zinc-500 group-hover:text-primary">camera_alt</span>
+                          Instagram
+                          <span className="material-symbols-outlined !text-[10px] ml-auto opacity-40">open_in_new</span>
                         </button>
-                      </motion.div>
-                    </>
-                  )}
-                </AnimatePresence>
-              </div>
-            )}
+
+                        <button
+                          onClick={() => {
+                            setIsProfileOpen(false);
+                            if (onRestartWalkthrough) {
+                              onRestartWalkthrough();
+                            } else {
+                              try {
+                                localStorage.removeItem('zcene_onboarding_progress');
+                              } catch (e) {
+                                console.error(e);
+                              }
+                            }
+                          }}
+                          className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                        >
+                          <span className="material-symbols-outlined !text-[16px] text-zinc-500 group-hover:text-primary">restart_alt</span>
+                          Restart Walkthrough
+                        </button>
+                      </div>
+
+                      {user && (
+                        <>
+                          <div className="border-t border-zinc-800/80 my-1.5" />
+                          <div className="p-1">
+                            <button
+                              onClick={() => { setIsProfileOpen(false); onLogout(); }}
+                              className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                            >
+                              <span className="material-symbols-outlined !text-[16px] text-zinc-500 group-hover:text-primary">logout</span>
+                              Sign Out
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </div>
       </header>
@@ -249,8 +356,13 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                     <div className="flex flex-col items-center gap-4">
                         <button
                           onClick={() => {
-                            if (!user) onLogin();
-                            else onNavigate(hasExistingGraph ? View.Dashboard : View.Graph);
+                            if (!user) {
+                              onLogin(() => {
+                                onNavigate(hasExistingGraph ? View.Dashboard : View.Graph);
+                              });
+                            } else {
+                              onNavigate(hasExistingGraph ? View.Dashboard : View.Graph);
+                            }
                           }}
                           className="cta-button rounded-2xl bg-primary px-8 py-4 text-base sm:text-lg font-medium text-brand-black transition-all hover:scale-105 shadow-xl shadow-primary/20 active:scale-95"
                         >
@@ -424,8 +536,13 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                     </h3>
                     <button
                         onClick={() => {
-                          if (!user) onLogin();
-                          else onNavigate(hasExistingGraph ? View.Dashboard : View.Graph);
+                          if (!user) {
+                            onLogin(() => {
+                              onNavigate(hasExistingGraph ? View.Dashboard : View.Graph);
+                            });
+                          } else {
+                            onNavigate(hasExistingGraph ? View.Dashboard : View.Graph);
+                          }
                         }}
                         className="cta-button rounded-2xl bg-brand-black px-8 py-4 text-base sm:text-lg font-medium text-white transition-all hover:scale-105 hover:bg-neutral-800 inline-block active:scale-95"
                     >

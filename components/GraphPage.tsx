@@ -1462,6 +1462,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
             setIsMenuOpen={setIsMenuOpen}
             isAdmin={isAdmin}
             isGuest={isGuest}
+            onLogin={onLogin}
             userTaste={profile?.taste}
             onSaveTaste={async (taste) => {
               await onUpdateProfile({ taste });

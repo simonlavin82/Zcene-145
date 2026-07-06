@@ -4,7 +4,7 @@ import { User } from 'firebase/auth';
 import { AnimatePresence, motion } from 'framer-motion';
 import { UserTaste } from '../types';
 
-import { HeaderMenu, MyTasteDialog } from './SharedModals';
+import { MyTasteDialog } from './SharedModals';
 
 interface HeaderProps {
   user: User | null;
@@ -34,6 +34,7 @@ interface HeaderProps {
   onRestartWalkthrough?: () => void;
   userTaste?: UserTaste;
   onSaveTaste?: (taste: UserTaste) => Promise<void>;
+  onLogin?: (onSuccess?: () => void) => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -63,7 +64,8 @@ const Header: React.FC<HeaderProps> = ({
   isGuest = false,
   onRestartWalkthrough,
   userTaste,
-  onSaveTaste
+  onSaveTaste,
+  onLogin
 }) => {
   const isDashboard = view === 'dashboard';
 
@@ -216,34 +218,14 @@ const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            <div className="relative">
+            <div className="flex items-center gap-3 ml-1 relative">
                 <button 
-                    onClick={() => setIsMenuOpen(!isMenuOpen)} 
-                    className={`h-8 flex flex-shrink-0 items-center justify-center rounded-xl transition-colors shadow-lg border border-zinc-700/50 ${isMenuOpen ? 'bg-zinc-800 text-white' : 'bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800'} ${isSmallScreen ? 'w-8' : 'pl-2 pr-3 gap-2'}`} 
-                    title="Menu"
+                    onClick={() => setIsProfileOpen(!isProfileOpen)}
+                    className="group relative flex items-center justify-center pointer-events-auto"
+                    aria-label="Open profile menu"
                 >
-                    <span className="material-symbols-outlined !text-[18px]">settings</span>
-                    {!isSmallScreen && <span className="text-xs font-medium">Settings</span>}
-                </button>
-                <HeaderMenu 
-                    isOpen={isMenuOpen}
-                    onClose={() => setIsMenuOpen(false)}
-                    onNavigate={onNavigate}
-                    isAdmin={isAdmin}
-                    isGuest={isGuest}
-                    onRestartWalkthrough={onRestartWalkthrough}
-                />
-            </div>
-
-
-            {user && (
-                <div className="flex items-center gap-3 ml-1 relative">
-                    <button 
-                        onClick={() => setIsProfileOpen(!isProfileOpen)}
-                        className="group relative flex items-center justify-center pointer-events-auto"
-                        aria-label="Open profile menu"
-                    >
-                        {user.photoURL ? (
+                    {user ? (
+                        user.photoURL ? (
                             <img 
                                 src={user.photoURL} 
                                 alt={user.displayName || 'User'} 
@@ -253,47 +235,147 @@ const Header: React.FC<HeaderProps> = ({
                             <div className="w-8 h-8 rounded-full bg-zinc-800 border border-primary/50 flex items-center justify-center text-[10px] font-bold text-primary hover:scale-110 transition-transform">
                                 {user.displayName?.charAt(0) || user.email?.charAt(0) || 'U'}
                             </div>
-                        )}
+                        )
+                    ) : (
+                        <div className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 hover:border-primary/50 flex items-center justify-center text-zinc-400 hover:text-primary hover:scale-110 transition-all">
+                            <span className="material-symbols-outlined !text-[18px]">account_circle</span>
+                        </div>
+                    )}
+                    {user && (
                         <div className="absolute -bottom-1 -right-1 bg-green-500 w-2.5 h-2.5 rounded-full border-2 border-background-dark"></div>
-                    </button>
+                    )}
+                </button>
 
-                    <AnimatePresence>
-                      {isProfileOpen && (
-                        <>
-                          <div className="fixed inset-0 z-10" onClick={() => setIsProfileOpen(false)} />
-                          <motion.div
-                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                            className="absolute right-0 top-full mt-2 w-56 z-20 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1 shadow-2xl shadow-black pointer-events-auto"
+                <AnimatePresence>
+                  {isProfileOpen && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setIsProfileOpen(false)} />
+                      <motion.div
+                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        className="absolute right-0 top-full mt-2 w-56 z-20 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1 shadow-2xl shadow-black pointer-events-auto text-left antialiased"
+                      >
+                        {user ? (
+                          <div className="px-3 py-2.5 border-b border-white/5">
+                            <p className="text-[9px] uppercase tracking-[0.2em] text-zinc-500 font-bold mb-1">Authenticated Account</p>
+                            <p className="text-xs font-medium text-zinc-200 truncate">{user.email}</p>
+                          </div>
+                        ) : (
+                          <div className="px-3 py-2.5 border-b border-white/5">
+                            <p className="text-[9px] uppercase tracking-[0.2em] text-zinc-500 font-bold mb-1">Guest Account</p>
+                            <p className="text-xs font-medium text-zinc-400 truncate">Not Signed In</p>
+                          </div>
+                        )}
+
+                        {!user && onLogin && (
+                          <div className="p-1 border-b border-white/5">
+                            <button
+                              onClick={() => { setIsProfileOpen(false); onLogin(); }}
+                              className="w-full bg-primary text-black rounded-xl px-4 py-2 flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-95 text-xs font-semibold cursor-pointer"
+                            >
+                              <span className="material-symbols-outlined !text-[14px] text-black font-bold">login</span>
+                              Sign In with Google
+                            </button>
+                          </div>
+                        )}
+                        <div className="p-1">
+                          <button
+                            onClick={() => { setIsProfileOpen(false); onNavigate('help'); }}
+                            className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
                           >
-                            <div className="px-3 py-2.5 border-b border-white/5">
-                              <p className="text-[9px] uppercase tracking-[0.2em] text-zinc-500 font-bold mb-1">Authenticated Account</p>
-                              <p className="text-xs font-medium text-zinc-200 truncate">{user.email}</p>
-                            </div>
+                            <span className="material-symbols-outlined !text-[16px] text-zinc-500 group-hover:text-primary">help</span>
+                            Help
+                          </button>
+
+                          {isAdmin && (
+                            <>
+                              <button
+                                onClick={() => { setIsProfileOpen(false); onNavigate('design'); }}
+                                className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                              >
+                                <span className="material-symbols-outlined !text-[16px] text-zinc-500 group-hover:text-primary">grid_view</span>
+                                Design System
+                              </button>
+                              <button
+                                onClick={() => { setIsProfileOpen(false); onNavigate('engine'); }}
+                                className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                              >
+                                <span className="material-symbols-outlined !text-[16px] text-zinc-500 group-hover:text-primary">settings_input_component</span>
+                                Engine
+                              </button>
+                            </>
+                          )}
+
+                          {!isGuest && (
+                            <button
+                              onClick={() => { setIsProfileOpen(false); onNavigate('analytics'); }}
+                              className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                            >
+                              <span className="material-symbols-outlined !text-[16px] text-zinc-500 group-hover:text-primary">monitoring</span>
+                              Discovery Ledger
+                            </button>
+                          )}
+
+                          <button
+                            onClick={() => {
+                              setIsProfileOpen(false);
+                              window.open('https://instagram.com/zcene.io', '_blank');
+                            }}
+                            className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                          >
+                            <span className="material-symbols-outlined !text-[16px] text-zinc-500 group-hover:text-primary">camera_alt</span>
+                            Instagram
+                            <span className="material-symbols-outlined !text-[10px] ml-auto opacity-40">open_in_new</span>
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              setIsProfileOpen(false);
+                              if (onRestartWalkthrough) {
+                                onRestartWalkthrough();
+                              } else {
+                                try {
+                                  localStorage.removeItem('zcene_onboarding_progress');
+                                } catch (e) {
+                                  console.error(e);
+                                }
+                              }
+                            }}
+                            className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                          >
+                            <span className="material-symbols-outlined !text-[16px] text-zinc-500 group-hover:text-primary">restart_alt</span>
+                            Restart Walkthrough
+                          </button>
+                        </div>
+
+                        {user && (
+                          <>
+                            <div className="border-t border-zinc-800/80 my-1.5" />
                             <div className="p-1">
                               <button
                                 onClick={() => { setIsProfileOpen(false); onLogout(); }}
-                                className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2"
+                                className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
                               >
-                                <span className="material-symbols-outlined !text-[16px] text-zinc-500">logout</span>
+                                <span className="material-symbols-outlined !text-[16px] text-zinc-500 group-hover:text-primary">logout</span>
                                 Sign Out
                               </button>
                               <div className="border-t border-zinc-800/80 my-1.5" />
                               <button
                                 onClick={() => { setIsProfileOpen(false); setIsDeleteAccountModalOpen(true); }}
-                                className="w-full text-left px-3 py-2 text-xs font-medium text-[#ef4444] hover:bg-[#ef4444]/10 transition-all rounded-lg flex items-center gap-2"
+                                className="w-full text-left px-3 py-2 text-xs font-medium text-[#ef4444] hover:bg-[#ef4444]/10 transition-all rounded-lg flex items-center gap-2 group"
                               >
                                 <span className="material-symbols-outlined !text-[16px] text-[#ef4444]">delete_forever</span>
                                 Delete Account
                               </button>
                             </div>
-                          </motion.div>
-                        </>
-                      )}
-                    </AnimatePresence>
-                </div>
-            )}
+                          </>
+                        )}
+                      </motion.div>
+                    </>
+                  )}
+                </AnimatePresence>
+            </div>
             </div>
         </div>
         <MyTasteDialog 

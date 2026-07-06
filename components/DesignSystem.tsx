@@ -197,6 +197,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
         { id: 'pagination', title: 'Pagination' },
         { id: 'loaders-status', title: 'Loaders & Status' },
         { id: 'dialogs', title: 'Dialogs' },
+        { id: 'dropdown-menus', title: 'Dropdown Menus' },
         { id: 'onboarding-flow', title: 'Onboarding Flow' },
         { id: 'error-messages', title: 'Error Messages' },
         { id: 'viewports', title: 'Viewports' },
@@ -2291,6 +2292,80 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Destructive Alerts</h4>
                                             <p className="text-sm text-zinc-400">For destructive or irreversible user actions (e.g., Clear Library, Remove Node), the header icon changes to warning and is colored <code className="text-red-400">text-red-400</code>, and the confirm action button uses <code className="text-white bg-red-500 font-medium">bg-red-500</code>.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* 18b. DROPDOWN MENUS */}
+                    <section id="dropdown-menus">
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Dropdown Menus</h2>
+                        <div className="space-y-12">
+                            <p className="text-base text-zinc-400 leading-relaxed max-w-3xl">
+                                Dropdown menus provide quick access to secondary utilities, account actions, and system features without cluttering the main header space.
+                            </p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                                <div className="space-y-6">
+                                    <h3 className="text-xl font-medium text-zinc-200">Unified Dropdown Anatomy</h3>
+                                    <div className="bg-zinc-950 p-8 rounded-xl border border-zinc-800 flex justify-center">
+                                        <div className="w-56 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1 shadow-2xl">
+                                            <div className="px-3 py-2.5 border-b border-white/5">
+                                                <p className="text-[9px] uppercase tracking-[0.2em] text-zinc-500 font-bold mb-1">Authenticated Account</p>
+                                                <p className="text-xs font-medium text-zinc-200 truncate">user@example.com</p>
+                                            </div>
+                                            
+                                            <div className="p-1">
+                                                <div className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 rounded-lg flex items-center gap-2">
+                                                    <span className="material-symbols-outlined !text-[16px] text-zinc-500">help</span>
+                                                    Help
+                                                </div>
+                                                <div className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 rounded-lg flex items-center gap-2">
+                                                    <span className="material-symbols-outlined !text-[16px] text-zinc-500">monitoring</span>
+                                                    Discovery Ledger
+                                                </div>
+                                                <div className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 rounded-lg flex items-center gap-2">
+                                                    <span className="material-symbols-outlined !text-[16px] text-zinc-500">camera_alt</span>
+                                                    Instagram
+                                                    <span className="material-symbols-outlined !text-[10px] ml-auto opacity-40">open_in_new</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="border-t border-zinc-800/80 my-1.5" />
+                                            
+                                            <div className="p-1">
+                                                <div className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 rounded-lg flex items-center gap-2">
+                                                    <span className="material-symbols-outlined !text-[16px] text-zinc-500">logout</span>
+                                                    Sign Out
+                                                </div>
+                                                <div className="border-t border-zinc-800/80 my-1.5" />
+                                                <div className="w-full text-left px-3 py-2 text-xs font-medium text-[#ef4444] rounded-lg flex items-center gap-2">
+                                                    <span className="material-symbols-outlined !text-[16px] text-[#ef4444]">delete_forever</span>
+                                                    Delete Account
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="space-y-6">
+                                    <h3 className="text-xl font-medium text-zinc-200">Design Guidelines</h3>
+                                    <div className="space-y-4">
+                                        <div className="space-y-1">
+                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Grouping & Hierarchy</h4>
+                                            <p className="text-sm text-zinc-400">Separate distinct item groups (account info/guest sign-in, utilities, and session/destructive actions) using thin borders (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">border-zinc-800/80</code>) to maximize reading scannability.</p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Border Radius</h4>
+                                            <p className="text-sm text-zinc-400">Dropdown containers use <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">rounded-xl</code> (12px) as functional interactive signifiers, separating them visually from hard-edged structural panels.</p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Typography & Smoothing</h4>
+                                            <p className="text-sm text-zinc-400">Labels use compact <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">text-xs font-medium</code> styling to match high-density UI constraints, with metadata labels in tiny caps (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">text-[9px] font-bold uppercase</code>) like GUEST ACCOUNT. The container uses <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">antialiased</code> font smoothing to keep small sizes thin and readable.</p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Sign-In Action CTA</h4>
+                                            <p className="text-sm text-zinc-400">Unauthenticated dropdowns feature a prominent primary CTA button (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">bg-primary text-black rounded-xl px-4 py-2 text-xs font-semibold</code>) to bridge guest journeys immediately.</p>
                                         </div>
                                     </div>
                                 </div>

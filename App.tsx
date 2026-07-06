@@ -14,7 +14,7 @@ import HelpPage from './components/HelpPage';
 import GraphPage from './components/GraphPage';
 import HomePage from './components/HomePage';
 import Dashboard from './components/Dashboard';
-import { MyStackDialog, HeaderMenu, TokenConfirmationDialog, CacheChoiceDialog } from './components/SharedModals';
+import { MyStackDialog, TokenConfirmationDialog, CacheChoiceDialog } from './components/SharedModals';
 
 import { ShareModal } from './components/ShareModal';
 import { analyticsService } from './services/analyticsService';
@@ -1205,10 +1205,13 @@ const App: React.FC = () => {
     return message;
   }, []);
 
-  const handleLogin = useCallback(async () => {
+  const handleLogin = useCallback(async (onSuccess?: () => void) => {
     try {
       await signInWithGoogle();
       showToast('Logged in successfully');
+      if (onSuccess) {
+        onSuccess();
+      }
     } catch (err) {
       setError(humanizeError(err));
     }
@@ -5122,6 +5125,7 @@ const App: React.FC = () => {
             onLogin={handleLogin}
             onLogout={handleLogout}
             isAdmin={isAdmin}
+            onRestartWalkthrough={handleDashboardRestartWalkthrough}
           />
         </div>
         <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Dashboard ? 'z-10' : 'z-0 opacity-0 pointer-events-none'}`}>
