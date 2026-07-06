@@ -35,6 +35,26 @@ interface SourcePageProps {
     onNavigateMenu?: (path: string) => void;
 }
 
+const CRATE_SIZING_RULES_DOCUMENTATION = `
+To prevent layout computation leaks, trailing dark voids, and mobile padding clipping bugs, the dashboard uses a count-aware layout system governed by the following rules:
+
+1. FOLDER CONTAINERS:
+   Must use a universal 'w-fit max-w-full' class. Sizing is delegated entirely 
+   to the inner content boundaries across all viewports to prevent folders 
+   from expanding into empty horizontal voids.
+
+2. INNER GRID WRAPPERS:
+   Must use explicit, dynamic count-mapped grid tracks ('grid \${gridColsClass}') 
+   coupled with a 'w-fit' width property. This breaks circular layout dependencies 
+   between the 'w-fit' parent folder and 'w-full' children, ensuring browser 
+   engines correctly add the folder's paddings during layout resolution.
+
+3. PROJECT CARDS:
+   Must be sized rigidly at 'w-full sm:w-[320px] min-h-[160px]' with zero 
+   elasticity ('flex-grow' and 'flex-shrink' properties are strictly banned) 
+   to enforce crisp, uniform grid column tracks and snug row hugging.
+`;
+
 const ARCHITECTURE_DOCUMENTATION = `
 Zcene is built on a modern, serverless full-stack architecture that prioritizes 
 real-time intelligence and global scalability.
@@ -595,6 +615,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
         { id: 'sharing-flow', title: 'Sharing & Collaboration' },
         { id: 'system-resilience', title: 'System Resilience' },
         { id: 'cost-estimation', title: 'Cost & Caching' },
+        { id: 'crate-sizing-rules', title: 'Dashboard Crate Sizing' },
         { id: 'graph-generation', title: 'Graph Generation' },
         { id: 'deep-cut-details', title: 'Deep Cut Details' },
         { id: 'conversational-ai', title: 'Conversational AI' },
@@ -797,6 +818,12 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                     <section id="cost-estimation">
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">Cost Estimation Architecture</h2>
                         <CodeBlock title="Ledger Rules & Caching Strategy" content={COST_ESTIMATION_DOCUMENTATION} />
+                    </section>
+
+                    {/* ── DASHBOARD CRATE SIZING ── */}
+                    <section id="crate-sizing-rules">
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">Dashboard Crate Sizing</h2>
+                        <CodeBlock title="Crate Sizing Rules & Layout Guidelines" content={CRATE_SIZING_RULES_DOCUMENTATION} />
                     </section>
 
                     {/* ── GRAPH GENERATION ── */}

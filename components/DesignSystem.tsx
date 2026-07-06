@@ -1507,19 +1507,19 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         The folder compartment relies on absolute positioning of the index tab relative to the compartment container. The left edge of the tab is offset by <code>left-[-1px]</code>, overlaying and hiding the container's top-left corner border. By enforcing a solid <code>border-zinc-800</code> on both components, the seam merges perfectly.
                                     </p>
                                     <p className="text-sm text-zinc-400 leading-relaxed mt-3">
-                                        To prevent massive empty space voids in compartments with few cards (e.g. only 1 or 2 projects), the compartment box container utilizes <code>w-full sm:w-fit</code>. Individual project cards carry a stable width of <code>w-full sm:w-[350px]</code>, and the inner card wrapper applies dynamic column grid classes based on the active card count (e.g., <code>grid-cols-1</code> for 1 card, <code>grid-cols-1 sm:grid-cols-2</code> for 2 cards, and up to 4 columns). This forces the folder compartment to wrap snugly around its active columns while scaling cleanly up to a maximum of 4 columns when full.
+                                        To prevent massive empty space voids in compartments with few cards (e.g. only 1 or 2 projects), the compartment box container utilizes a universal <code>w-fit max-w-full</code> layout class. Individual project cards carry a stable width of <code>w-full sm:w-[320px] min-h-[160px]</code> with zero elasticity (no <code>flex-grow</code> or <code>flex-shrink</code>), and the inner grid wrapper applies dynamic count-mapped grid tracks (e.g. <code>grid-cols-1 sm:grid-cols-2</code>) with a <code>w-fit</code> width property to preserve padding and break circular dependencies.
                                     </p>
                                     <div className="space-y-4 pt-2">
                                         <div>
                                             <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Compartment Container Classes</p>
                                             <code className="text-xs font-mono text-primary bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 block overflow-x-auto whitespace-nowrap">
-                                                w-full sm:w-fit bg-zinc-950 rounded-tr-xl rounded-b-xl rounded-tl-none border border-zinc-800 p-4 relative
+                                                w-fit max-w-full bg-zinc-950 rounded-tr-xl rounded-b-xl rounded-tl-none border border-zinc-800 p-4 relative
                                             </code>
                                         </div>
                                         <div>
                                             <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Card Wrapper Classes</p>
                                             <code className="text-xs font-mono text-primary bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 block overflow-x-auto whitespace-nowrap">
-                                                grid [cols-class] gap-4 w-full (dynamic cols-class based on card count)
+                                                grid [cols-class] gap-4 w-fit (dynamic cols-class based on card count)
                                             </code>
                                         </div>
                                         <div>
@@ -1536,19 +1536,19 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Live Spec Preview</p>
                                     <div className="p-8 bg-zinc-900/30 rounded-xl border border-zinc-800 flex justify-center">
                                         <div 
-                                            className="w-full sm:w-fit bg-zinc-950 rounded-tr-xl rounded-b-xl rounded-tl-none border border-zinc-800 p-4 relative mt-6"
+                                            className="w-fit max-w-full bg-zinc-950 rounded-tr-xl rounded-b-xl rounded-tl-none border border-zinc-800 p-4 relative mt-6"
                                         >
                                             {/* Index Tab */}
                                             <div className="w-[140px] bg-zinc-950 border-t border-l border-r border-zinc-800 rounded-t-lg text-[9px] font-mono absolute -top-[22px] left-[-1px] px-3 py-1 flex items-center h-[22.5px] z-10 select-none">
                                                 <div className="truncate text-ellipsis whitespace-nowrap uppercase tracking-widest text-zinc-400 font-medium">
                                                     POP PUNK
-                                                </div>
+                                                 </div>
                                             </div>
 
                                             {/* Cards inside this parent record crate compartment */}
-                                            <div className="grid grid-cols-1 gap-4 w-full">
+                                            <div className="grid grid-cols-1 gap-4 w-fit">
                                                 {/* Inner Mock Card */}
-                                                <div className="bg-zinc-900 border border-zinc-700/50 p-5 flex flex-col justify-between min-h-[140px] w-full sm:w-[350px] shadow-xl">
+                                                <div className="bg-zinc-900 border border-zinc-700/50 p-5 flex flex-col justify-between min-h-[160px] w-full sm:w-[320px] shadow-xl">
                                                     <div className="space-y-3">
                                                         <h3 className="text-sm font-medium text-white truncate">Grayscale</h3>
                                                         <p className="font-mono text-[10px] text-zinc-400">Edited 05/07/2026</p>

@@ -366,3 +366,12 @@ stateDiagram-v2
    * Concurrently, it queries `/api/artist/scrape-video-id` and validates YouTube playability on the server.
    * Once details resolve, it calls `setDetailsCache` and updates `selectedNode` with the biography. The loading spinner is cleared (`loadingNodeIds` is cleared).
    * The newly written metadata triggers a final autosave to capture the enriched details in the project document.
+
+---
+
+## 8. Dashboard Crate Sizing Rules
+
+To prevent layout computation leaks, trailing dark voids, and mobile padding clipping bugs, the dashboard uses a count-aware layout system governed by the following rules:
+*   **Folder Containers**: Must use a universal `w-fit max-w-full` class. Sizing is delegated entirely to the inner content boundaries across all viewports to prevent folders from expanding into empty horizontal voids.
+*   **Inner Grid Wrappers**: Must use explicit, dynamic count-mapped grid tracks (`grid ${gridColsClass}`) coupled with a `w-fit` width property. This breaks circular layout dependencies between the `w-fit` parent folder and `w-full` children, ensuring browser engines correctly add the folder's paddings during layout resolution.
+*   **Project Cards**: Must be sized rigidly at `w-full sm:w-[320px] min-h-[160px]` with zero elasticity (`flex-grow` and `flex-shrink` properties are strictly banned) to enforce crisp, uniform grid column tracks and snug row hugging.
