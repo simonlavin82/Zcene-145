@@ -120,11 +120,8 @@ const CollectionIntelligenceVisual: React.FC<{ className?: string }> = ({ classN
                             </div>
                         </div>
 
-                        {/* Curator Insight (Matching DetailsPanel Curator Insight) */}
-                        <div className="py-8 border-y border-zinc-800/80 relative">
-                            <div className="absolute -top-3 left-0 bg-zinc-900 pr-4 text-[11px] font-bold uppercase tracking-[0.3em] text-purple-400 flex items-center gap-2">
-                                <span className="material-symbols-outlined !text-sm">star</span> Curator Insight
-                            </div>
+                        {/* Bio Quote (Matching DetailsPanel Quote block) */}
+                        <div className="pt-2">
                             <p className="italic text-zinc-100 leading-tight font-serif tracking-tight text-[clamp(1.125rem,1.5vw,1.25rem)]">
                                 "The Get Up Kids are essential architects of the second-wave emo sound. Their ability to blend raw emotional vulnerability with infectious power-pop hooks created a blueprint that defined a generation of alternative music."
                             </p>

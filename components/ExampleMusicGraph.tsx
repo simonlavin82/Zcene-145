@@ -484,6 +484,12 @@ const ExampleMusicGraph: React.FC = () => {
                                     </button>
                                 </div>
                             </div>
+                            <button 
+                                className="w-9 h-9 flex flex-shrink-0 items-center justify-center border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none backdrop-blur-sm" 
+                                title="View roots breakdown"
+                            >
+                                <span className="material-symbols-outlined !text-[18px]">info</span>
+                            </button>
                             
                         </div>
                     </div>
