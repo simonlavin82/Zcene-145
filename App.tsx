@@ -5453,39 +5453,54 @@ const App: React.FC = () => {
 
       <AnimatePresence>
         {isExitBlockerModalOpen && (
-          <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/60">
+          <div 
+            className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/60 animate-fade-in-down"
+            style={{ animationDuration: '200ms' }}
+            onClick={() => setIsExitBlockerModalOpen(false)}
+          >
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="w-full max-w-sm rounded-none bg-zinc-900 border border-zinc-800 p-8 shadow-2xl relative overflow-hidden"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-hidden text-left"
+              onClick={e => e.stopPropagation()}
             >
-              <div className="w-16 h-16 rounded-none bg-red-500/10 flex items-center justify-center text-red-500 mb-6">
-                <span className="material-symbols-outlined !text-[32px]">warning</span>
+              <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-red-500 !text-[18px]">warning</span>
+                  <h3 className="text-base font-medium text-white">Exit Preview?</h3>
+                </div>
+                <button 
+                  onClick={() => setIsExitBlockerModalOpen(false)} 
+                  className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none"
+                >
+                  <span className="material-symbols-outlined !text-[18px]">close</span>
+                </button>
+              </header>
+
+              <div className="p-5 space-y-4 text-sm text-zinc-400">
+                <p className="leading-relaxed">
+                  Your preview session will be lost unless saved. Sign in or save this Zcene to your account to preserve your changes.
+                </p>
               </div>
 
-              <h3 className="text-xl font-bold text-white mb-3">Exit Preview?</h3>
-              <p className="text-zinc-400 text-sm mb-6 leading-relaxed">
-                Your preview session will be lost unless saved. Sign in or save this Zcene to your account to preserve your changes.
-              </p>
-
-              <div className="flex flex-col gap-3">
-                <button
-                  onClick={() => {
-                    setIsExitBlockerModalOpen(false);
-                    navigate('/');
-                  }}
-                  className="w-full py-4 rounded-none bg-[#ef4444] hover:bg-[#ef4444]/90 text-white font-bold transition-all active:scale-[0.98]"
-                >
-                  Exit without Saving
-                </button>
-                <button
-                  onClick={() => setIsExitBlockerModalOpen(false)}
-                  className="w-full py-4 rounded-none border border-zinc-800 text-zinc-400 font-bold hover:bg-zinc-800 hover:text-white transition-all"
+              <footer className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2">
+                <button 
+                  onClick={() => setIsExitBlockerModalOpen(false)} 
+                  className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors"
                 >
                   Cancel
                 </button>
-              </div>
+                <button 
+                  onClick={() => {
+                    setIsExitBlockerModalOpen(false);
+                    navigate('/');
+                  }} 
+                  className="px-4 py-1.5 bg-red-500 text-white rounded-xl font-medium text-sm transition-opacity hover:opacity-90"
+                >
+                  Exit without Saving
+                </button>
+              </footer>
             </motion.div>
           </div>
         )}

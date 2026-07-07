@@ -31,8 +31,8 @@ const ArtistFeatureVisual: React.FC<{ className?: string }> = ({ className }) =>
                     <div className="flex-grow overflow-y-auto scrollbar-none">
                         <div className="px-4 pt-4 pb-2">
                             <div className="mb-3">
-                                <button className="w-full flex items-center justify-center gap-2 rounded-xl border border-zinc-600 px-4 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800">
-                                    <span className="material-symbols-outlined !text-[18px]">library_music</span>
+                                <button className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 active:scale-95 transition-all text-xs font-medium leading-none">
+                                    <span className="material-symbols-outlined !text-[16px]">library_music</span>
                                     Select from Library (142)
                                 </button>
                             </div>
@@ -42,7 +42,7 @@ const ArtistFeatureVisual: React.FC<{ className?: string }> = ({ className }) =>
                                     value="The Get Up Kids"
                                     readOnly
                                     placeholder="Add artists"
-                                    className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900/60 py-3.5 lg:py-2 pl-4 pr-12 text-base lg:text-sm font-normal text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+                                    className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-4 pr-12 text-sm font-normal text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
                                 />
                                 <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
                                     <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white transition-colors leading-none">

@@ -1116,7 +1116,10 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Radius: 12px / rounded-xl</span>
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Height: 34px</span>
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Padding: px-4 py-1.5</span>
-                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Font: 14px / text-sm</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Radius: 9999px (Pill)</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Height: 32px</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Padding: px-4</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Font: 12px / text-xs</span>
                                     </div>
                                 </div>
                                 <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
@@ -1125,15 +1128,15 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
                                      <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Default Status</p>
-                                        <button className="w-full border border-zinc-600 text-zinc-300 px-4 py-1.5 rounded-xl font-medium text-sm">Import Library</button>
+                                        <button className="w-full border border-zinc-600 text-zinc-300 px-4 py-1 rounded-full font-medium text-xs">Import Library</button>
                                     </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover Status</p>
-                                        <button className="w-full border border-zinc-500 text-white px-4 py-1.5 rounded-xl font-medium bg-zinc-800 text-sm">Import Library</button>
+                                        <button className="w-full border border-zinc-500 text-white px-4 py-1 rounded-full font-medium bg-zinc-800 text-xs">Import Library</button>
                                     </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Disabled Status</p>
-                                        <button disabled className="w-full border border-zinc-700 text-zinc-500 px-4 py-1.5 rounded-xl font-medium opacity-50 cursor-not-allowed text-sm">Import Library</button>
+                                        <button disabled className="w-full border border-zinc-700 text-zinc-500 px-4 py-1 rounded-full font-medium opacity-50 cursor-not-allowed text-xs">Import Library</button>
                                     </div>
                                 </div>
                             </div>
@@ -1800,9 +1803,9 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <h3 className="text-xl font-medium text-primary">Input Size Scale</h3>
                                     <div className="flex flex-wrap gap-2">
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Radius: 12px / rounded-xl</span>
-                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Height: 38px (Desktop) / 52px (Mobile)</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Height: 38px (Standardized)</span>
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Padding: px-4</span>
-                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Font: 14px / text-sm (Desktop) / 16px / text-base (Mobile)</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Font: 14px / text-sm (Standardized)</span>
                                     </div>
                                 </div>
                                 
@@ -1812,7 +1815,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <input 
                                                 type="text" 
                                                 placeholder="Desktop Input" 
-                                                className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900/60 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none" 
+                                                className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none" 
                                             /> 
                                         </div>
                                         <div>
@@ -1827,13 +1830,13 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <input 
                                                 type="text" 
                                                 placeholder="Mobile Input" 
-                                                className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900/60 py-3.5 px-4 text-base text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none" 
+                                                className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none" 
                                             /> 
                                         </div>
                                         <div>
-                                            <h4 className="text-sm font-semibold text-zinc-200 uppercase tracking-widest">Mobile (Large)</h4>
-                                            <p className="text-xs text-zinc-500 mt-1 font-mono"><code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">py-3.5</code> <code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">text-base</code> (52px height) | Radius: 12px (<code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">rounded-xl</code>)</p>
-                                            <p className="text-xs text-zinc-400 mt-2">Used on mobile viewports (&lt;lg) to maximize touch accuracy and prevent browser zoom.</p>
+                                            <h4 className="text-sm font-semibold text-zinc-200 uppercase tracking-widest">Mobile (Standardized)</h4>
+                                            <p className="text-xs text-zinc-500 mt-1 font-mono"><code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">py-2</code> <code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">text-sm</code> (38px height) | Radius: 12px (<code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">rounded-xl</code>)</p>
+                                            <p className="text-xs text-zinc-400 mt-2">Standardized to text-sm and py-2 across all breakpoints since viewport configuration prevents auto-zoom.</p>
                                         </div>
                                     </div>
                                 </div>
@@ -1845,7 +1848,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <h3 className="text-xl font-medium text-zinc-200">Dropdowns & Selects</h3>
                                     <div className="flex flex-wrap gap-2">
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Radius: 12px / rounded-xl</span>
-                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Height: 44px / h-[44px]</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Height: 38px / py-2</span>
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Padding: px-4</span>
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Font: 14px / text-sm</span>
                                     </div>
@@ -1854,7 +1857,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <div className="space-y-4">
                                         <p className="text-xs text-zinc-500 uppercase tracking-widest">Standard Select</p>
                                         <div className="relative">
-                                            <select className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900 text-zinc-300 py-2 lg:py-2 py-3.5 pl-4 pr-10 text-base lg:text-sm focus:ring-1 focus:ring-primary focus:outline-none">
+                                            <select className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-zinc-300 py-2 px-4 text-sm focus:ring-1 focus:ring-primary focus:outline-none">
                                                 <option>Sort by Relevance</option>
                                                 <option>Sort by Date</option>
                                                 <option>Sort by Name</option>
@@ -1882,7 +1885,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:14px_24px] pointer-events-none" />
                                             
                                             {/* Blueprint Container */}
-                                            <div className="relative w-full max-w-[240px] h-[44px] bg-zinc-950 border border-zinc-800 rounded-xl flex items-center justify-between px-4 z-10 shadow-lg">
+                                            <div className="relative w-full max-w-[240px] h-[38px] bg-zinc-950 border border-zinc-800 rounded-xl flex items-center justify-between px-4 z-10 shadow-lg">
                                                 {/* Left padding indicator line */}
                                                 <div className="absolute left-0 top-0 bottom-0 w-4 bg-primary/10 border-r border-dashed border-primary/30 flex items-center justify-center">
                                                     <span className="text-[7px] text-primary font-mono select-none">px-4</span>
@@ -1900,7 +1903,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                 </div>
                                             </div>
                                             <div className="mt-4 text-[10px] text-zinc-500 font-mono flex gap-4 z-10">
-                                                <span>Height: 44px</span>
+                                                <span>Height: 38px</span>
                                                 <span>Radius: 12px (rounded-xl)</span>
                                             </div>
                                         </div>
@@ -1910,7 +1913,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <div className="border-l-2 border-primary pl-3 py-0.5">
                                                 <p className="font-semibold text-zinc-200 uppercase tracking-wider text-[10px]">Outer Structure</p>
                                                 <p className="text-zinc-400 mt-1 font-mono">
-                                                    Height: <code className="text-primary bg-zinc-900 px-1 py-0.5 rounded text-[10px]">h-[44px]</code> (44px)
+                                                    Height: <code className="text-primary bg-zinc-900 px-1 py-0.5 rounded text-[10px]">h-[38px]</code> (38px)
                                                 </p>
                                                 <p className="text-zinc-400 mt-0.5 font-mono">
                                                     Corner Radius: <code className="text-primary bg-zinc-900 px-1 py-0.5 rounded text-[10px]">rounded-xl</code> (12px)
@@ -1959,7 +1962,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <input 
                                             type="text" 
                                             defaultValue="Active Focus" 
-                                            className="w-full appearance-none rounded-xl border border-primary bg-zinc-900/60 py-2 px-4 text-sm text-white ring-1 ring-primary outline-none" 
+                                            className="w-full appearance-none rounded-xl border border-primary bg-zinc-950 py-2 px-4 text-sm text-white ring-1 ring-primary outline-none" 
                                         />
                                     </div>
                                     <div className="space-y-4">
@@ -1967,7 +1970,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <input 
                                             type="text" 
                                             defaultValue="Invalid Entry" 
-                                            className="w-full appearance-none rounded-xl border-red-500 bg-zinc-900/60 py-2 px-4 text-sm text-white focus:ring-1 focus:ring-red-500 outline-none" 
+                                            className="w-full appearance-none rounded-xl border-red-500 bg-zinc-950 py-2 px-4 text-sm text-white focus:ring-1 focus:ring-red-500 outline-none" 
                                         />
                                         <p className="text-[10px] text-red-500 font-medium">Please enter a valid artist name.</p>
                                     </div>

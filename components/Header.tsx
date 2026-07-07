@@ -138,17 +138,17 @@ const Header: React.FC<HeaderProps> = ({
                 <button 
                   onClick={onLogoClick} 
                   title={isDashboard ? "Back to landing" : "Back to dashboard"} 
-                  className="flex-shrink-0 flex justify-center items-center appearance-none bg-transparent border-none outline-none focus:outline-none active:scale-95 cursor-pointer pointer-events-auto p-0 h-10 w-10" 
+                  className="flex-shrink-0 flex justify-center items-center appearance-none bg-transparent border-none outline-none focus:outline-none active:scale-95 cursor-pointer pointer-events-auto p-0 h-8 w-8 md:h-10 md:w-10" 
                   aria-label="Logo"
                 >
                     <FaviconLogo className="h-full w-full text-primary pointer-events-none" />
                 </button>
                 
-                <div className="flex items-center pointer-events-auto flex-grow max-w-[160px] sm:max-w-[320px] md:max-w-[480px]">
+                <div className="flex items-center pointer-events-auto flex-grow max-w-[280px] sm:max-w-[320px] md:max-w-[480px]">
                   {isDashboard ? (
                     <h1 
                       onClick={onLogoClick}
-                      className={`truncate ${isSmallScreen ? 'text-base' : 'text-lg'} font-medium text-white select-none cursor-pointer hover:text-primary transition-colors tracking-tight`}
+                      className="hidden min-[385px]:block text-base md:text-lg font-medium text-white select-none cursor-pointer hover:text-primary transition-colors tracking-tight whitespace-nowrap"
                     >
                       Own Music Discovery
                     </h1>

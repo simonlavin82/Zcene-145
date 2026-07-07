@@ -179,15 +179,13 @@ const DiscoveryFiltersPanel: React.FC<{
       {isExpanded && (
         <div className="mt-3 p-4 rounded-none bg-zinc-800/30 border border-zinc-700/50 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
           {hasTasteData && (
-            <div className="flex justify-center mb-2">
-              <button
-                type="button"
-                onClick={handleApplyTaste}
-                className="flex items-center px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-white rounded-xl border border-zinc-700/50 transition-colors duration-200 cursor-pointer"
-              >
-                Apply my taste
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleApplyTaste}
+              className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 active:scale-95 transition-all text-xs font-medium leading-none cursor-pointer"
+            >
+              Apply my taste
+            </button>
           )}
           <div className="space-y-1.5">
             <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider block">Founded Era Range (Years)</label>
@@ -195,19 +193,19 @@ const DiscoveryFiltersPanel: React.FC<{
               <div className="space-y-1">
                 <input
                   type="number"
-                  placeholder="Min Year (e.g. 1990)"
+                  placeholder="Min Year"
                   value={filters.foundedAfter || ''}
                   onChange={(e) => updateField('foundedAfter', e.target.value ? parseInt(e.target.value) : undefined)}
-                  className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900/60 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200"
+                  className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
               </div>
               <div className="space-y-1">
                 <input
                   type="number"
-                  placeholder="Max Year (e.g. 2010)"
+                  placeholder="Max Year"
                   value={filters.foundedBefore || ''}
                   onChange={(e) => updateField('foundedBefore', e.target.value ? parseInt(e.target.value) : undefined)}
-                  className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900/60 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200"
+                  className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
               </div>
             </div>
@@ -220,7 +218,7 @@ const DiscoveryFiltersPanel: React.FC<{
               placeholder="e.g. Hardcore Punk, Grunge"
               value={filters.includeGenres?.join(', ') || ''}
               onChange={(e) => updateField('includeGenres', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
-              className="w-full bg-zinc-900/60 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+              className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
             />
           </div>
 
@@ -231,7 +229,7 @@ const DiscoveryFiltersPanel: React.FC<{
               placeholder="e.g. Canada, UK"
               value={filters.includeOrigins?.join(', ') || ''}
               onChange={(e) => updateField('includeOrigins', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
-              className="w-full bg-zinc-900/60 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+              className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
             />
           </div>
 
@@ -242,7 +240,7 @@ const DiscoveryFiltersPanel: React.FC<{
               placeholder="e.g. Australia"
               value={filters.excludeOrigins?.join(', ') || ''}
               onChange={(e) => updateField('excludeOrigins', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
-              className="w-full bg-zinc-900/60 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+              className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
             />
           </div>
 
@@ -252,7 +250,7 @@ const DiscoveryFiltersPanel: React.FC<{
               placeholder="e.g. Only underground artists..."
               value={filters.additionalInstructions || ''}
               onChange={(e) => updateField('additionalInstructions', e.target.value)}
-              className="w-full bg-zinc-900/60 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-600 focus:ring-1 focus:ring-primary focus:outline-none transition-all min-h-[60px] resize-none"
+              className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all min-h-[60px] resize-none"
             />
           </div>
           
@@ -434,7 +432,7 @@ const LibraryDialog: React.FC<{
                         placeholder="Search your library..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900 py-3.5 lg:py-2 text-base lg:text-sm px-4 pr-24 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none font-normal"
+                        className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 text-sm px-4 pr-24 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none font-normal"
                     />
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
                         {!searchTerm && (
@@ -1139,17 +1137,53 @@ const GraphPage: React.FC<GraphPageProps> = ({
   }, [data.nodes, onNodeClick, isSmallScreen, isDetailsPanelCollapsed, toggleDetailsPanel, onShowToast]);
 
   const ConfirmDeleteModal = () => (
-    <div className="fixed inset-0 bg-black/60 z-[110] flex items-center justify-center p-4">
-      <div className="bg-background-dark border border-zinc-600 rounded-none w-full sm:max-w-md shadow-2xl p-6 space-y-4 text-center">
-        <div className="mx-auto w-12 h-12 bg-zinc-800 rounded-none flex items-center justify-center text-red-400">
-            <span className="material-symbols-outlined !text-3xl">delete_sweep</span>
+    <div 
+      className="fixed inset-0 bg-black/60 z-[110] flex items-center justify-center p-4 animate-fade-in-down"
+      style={{ animationDuration: '200ms' }}
+      onClick={() => setShowConfirmDelete(false)}
+    >
+      <div 
+        className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-hidden text-left"
+        onClick={e => e.stopPropagation()}
+      >
+        <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-red-400 !text-[18px]">delete</span>
+            <h3 className="text-base font-medium text-white">Clear Library</h3>
+          </div>
+          <button 
+            onClick={() => setShowConfirmDelete(false)} 
+            className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none"
+          >
+            <span className="material-symbols-outlined !text-[18px]">close</span>
+          </button>
+        </header>
+
+        <div className="p-5 space-y-4 text-sm text-zinc-400">
+          <p className="leading-relaxed">
+            Are you sure? This action cannot be undone and will remove all imported artists.
+          </p>
         </div>
-        <h3 className="text-xl font-medium text-white">Clear Library</h3>
-        <p className="text-sm text-zinc-400">Are you sure? This action cannot be undone and will remove all imported artists.</p>
-        <div className="flex gap-4 pt-2">
-            <button onClick={() => setShowConfirmDelete(false)} className="flex-1 rounded-xl border border-zinc-600 px-6 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800">Cancel</button>
-            <button onClick={() => { onClearLibrary(); setSelectedSeedArtists([]); setShowConfirmDelete(false); setIsLibraryDialogOpen(false); }} className="flex-1 rounded-xl bg-red-500 px-6 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90">Clear</button>
-        </div>
+
+        <footer className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2">
+          <button 
+            onClick={() => setShowConfirmDelete(false)} 
+            className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors"
+          >
+            Cancel
+          </button>
+          <button 
+            onClick={() => {
+              onClearLibrary();
+              setSelectedSeedArtists([]);
+              setShowConfirmDelete(false);
+              setIsLibraryDialogOpen(false);
+            }} 
+            className="px-4 py-1.5 bg-red-500 text-white rounded-xl font-medium text-sm transition-opacity hover:opacity-90"
+          >
+            Clear
+          </button>
+        </footer>
       </div>
     </div>
   );
@@ -1237,13 +1271,13 @@ const GraphPage: React.FC<GraphPageProps> = ({
             {!isGuest && (
               <div className="mb-3">
                 {libraryArtists.length > 0 ? (
-                    <button onClick={() => { setIsLibraryDialogOpen(true); if (!onboardingProgress.step1) updateOnboarding('step1'); }} className="w-full flex items-center justify-center gap-2 rounded-xl border border-zinc-600 px-4 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800">
-                      <span className="material-symbols-outlined !text-[18px]">library_music</span>
+                    <button onClick={() => { setIsLibraryDialogOpen(true); if (!onboardingProgress.step1) updateOnboarding('step1'); }} className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 active:scale-95 transition-all text-xs font-medium leading-none">
+                      <span className="material-symbols-outlined !text-[16px]">library_music</span>
                       Select from Library ({libraryArtists.length})
                     </button>
                 ) : (
-                    <button onClick={() => { fileInputRef.current?.click(); if (!onboardingProgress.step1) updateOnboarding('step1'); }} className="w-full flex items-center justify-center gap-2 rounded-xl border border-zinc-600 px-4 py-2 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800">
-                      <span className="material-symbols-outlined !text-[18px]">upload</span>
+                    <button onClick={() => { fileInputRef.current?.click(); if (!onboardingProgress.step1) updateOnboarding('step1'); }} className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 active:scale-95 transition-all text-xs font-medium leading-none">
+                      <span className="material-symbols-outlined !text-[16px]">upload</span>
                       Import Music Library
                     </button>
                 )}
@@ -1251,7 +1285,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
             )}
             {!isGuest && (
               <form onSubmit={handleAddFromSearch} className="relative">
-                  <input ref={artistInputRef} onFocus={() => { if (!onboardingProgress.step1) updateOnboarding('step1'); }} type="search" placeholder="Add artist" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900/60 py-3.5 lg:py-2 pl-4 pr-12 text-base lg:text-sm font-normal text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all" />
+                  <input ref={artistInputRef} onFocus={() => { if (!onboardingProgress.step1) updateOnboarding('step1'); }} type="search" placeholder="Add artist" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-4 pr-12 text-sm font-normal text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all" />
                   <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
                       {!searchTerm && (
                           <button type="button" onClick={() => handleSpeechToText('artists')} className={`w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl transition-colors leading-none ${isListeningForArtists ? 'text-primary animate-pulse' : 'text-zinc-400 hover:text-white'}`} title="Search by voice">
@@ -1311,7 +1345,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                   ref={createZceneBtnRef} 
                   onClick={handleApplyChanges} 
                   disabled={(enabledArtistsCount === 0 && !searchTerm.trim()) || isLoading || isOverLimit} 
-                  className={`w-full flex items-center justify-center gap-2 bg-primary ${isSmallScreen ? 'px-8 py-4 text-lg rounded-2xl' : 'px-6 py-2 text-sm rounded-xl'} font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 shadow-lg ${visibleTooltips.step2 ? 'animate-pulse' : ''}`}
+                  className={`w-full flex items-center justify-center gap-2 bg-primary px-6 py-2 text-sm rounded-xl font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 shadow-lg ${visibleTooltips.step2 ? 'animate-pulse' : ''}`}
               >
                   <span>{createButtonLabel}</span>
                   <span className={`h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border transition-all duration-500 bg-brand-black text-primary border-primary/50`}>
@@ -1339,7 +1373,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                   {user ? (
                     <button 
                       onClick={onSaveToDashboard}
-                      className={`w-full flex items-center justify-center gap-2 bg-primary ${isSmallScreen ? 'px-8 py-4 text-lg rounded-2xl' : 'px-6 py-2 text-sm rounded-xl'} font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 shadow-lg`}
+                      className="w-full flex items-center justify-center gap-2 bg-primary px-6 py-2 text-sm rounded-xl font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 shadow-lg"
                     >
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
                         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
@@ -1352,7 +1386,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                     <>
                       <button 
                         onClick={onLogin}
-                        className={`w-full flex items-center justify-center gap-2 bg-primary ${isSmallScreen ? 'px-8 py-4 text-lg rounded-2xl' : 'px-6 py-2 text-sm rounded-xl'} font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 shadow-lg`}
+                        className="w-full flex items-center justify-center gap-2 bg-primary px-6 py-2 text-sm rounded-xl font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 shadow-lg"
                       >
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
                           <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
@@ -1397,7 +1431,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
     return (
         <div className="relative flex items-center gap-2">
             <div className="relative">
-                <input type="search" placeholder="Search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-60 appearance-none rounded-xl border border-zinc-700 bg-zinc-900/60 text-zinc-300 py-2 pl-4 pr-12 text-sm font-normal focus:ring-1 focus:ring-primary focus:outline-none backdrop-blur-sm" />
+                <input type="search" placeholder="Search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-60 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-4 pr-12 text-sm font-normal focus:ring-1 focus:ring-primary focus:outline-none backdrop-blur-sm" />
                 <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">{!searchQuery && (<button onClick={() => handleSpeechToText('graph')} className={`w-8 h-8 flex items-center justify-center rounded-[10px] transition-colors leading-none ${isListeningForGraph ? 'text-primary animate-pulse' : 'text-zinc-500 hover:text-white'}`} title="Search by voice"><MicIcon className="!text-[18px]" /></button>)}{searchQuery && (<button onClick={() => setSearchQuery('')} className="w-8 h-8 flex items-center justify-center rounded-[10px] text-zinc-400 hover:text-white transition-colors leading-none" aria-label="Clear search"><span className="material-symbols-outlined !text-[18px]">close</span></button>)}</div>
             </div>
             
@@ -1504,7 +1538,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                         <div className="flex items-center gap-2 px-4">
                                             <div className="relative flex-grow min-w-0 flex items-center gap-2">
                                                 <div className="relative flex-grow min-w-0">
-                                                    <input type="search" placeholder="Search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full h-9 appearance-none rounded-xl border border-zinc-700 bg-zinc-900/60 text-zinc-300 pl-4 pr-12 text-sm font-normal focus:ring-1 focus:ring-primary focus:outline-none backdrop-blur-sm" />
+                                                    <input type="search" placeholder="Search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full h-9 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 pl-4 pr-12 text-sm font-normal focus:ring-1 focus:ring-primary focus:outline-none backdrop-blur-sm" />
                                                     <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">{!searchQuery && (<button onClick={() => handleSpeechToText('graph')} className={`w-8 h-8 flex items-center justify-center rounded-[10px] transition-colors leading-none ${isListeningForGraph ? 'text-primary animate-pulse' : 'text-zinc-500 hover:text-white'}`} title="Search by voice"><MicIcon className="!text-[18px]" /></button>)}{searchQuery && (<button onClick={() => setSearchQuery('')} className="w-8 h-8 flex items-center justify-center rounded-[10px] text-zinc-400 hover:text-white transition-colors leading-none" aria-label="Clear search"><span className="material-symbols-outlined !text-[18px]">close</span></button>)}</div>
                                                 </div>
                                                 {data && data.nodes && data.nodes.length > 0 && (

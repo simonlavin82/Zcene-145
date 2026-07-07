@@ -1047,7 +1047,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                             onChange={(e) => setChatInput(e.target.value)}
                                             onKeyDown={handleKeyDown}
                                             placeholder="Consult Zcene AI..."
-                                            className="w-full bg-zinc-900 border border-zinc-800 py-3.5 lg:py-2 pl-4 pr-16 text-base lg:text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-primary transition-all rounded-xl resize-none min-h-[80px] scrollbar-thin scrollbar-thumb-zinc-700"
+                                            className="w-full bg-zinc-950 border border-zinc-700 py-2 pl-4 pr-16 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary transition-all rounded-xl resize-none min-h-[80px] scrollbar-thin scrollbar-thumb-zinc-700"
                                         />
                                         <div className="absolute right-2 bottom-3 flex flex-col items-center gap-2">
                                             {!chatInput.trim() ? (
@@ -1339,7 +1339,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                     placeholder="Filter magazine..."
                                     value={magazineSearchQuery}
                                     onChange={(e) => setMagazineSearchQuery(e.target.value)}
-                                    className="w-full appearance-none border border-zinc-700 bg-zinc-900/60 py-2 pl-10 pr-4 text-sm text-white placeholder:text-zinc-500 rounded-xl focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+                                    className="w-full appearance-none border border-zinc-700 bg-zinc-950 py-2 pl-10 pr-4 text-sm text-white placeholder:text-zinc-500 rounded-xl focus:ring-1 focus:ring-primary focus:outline-none transition-all"
                                 />
                             </div>
 
@@ -1381,7 +1381,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 placeholder="Filter magazine..."
                                                 value={magazineSearchQuery}
                                                 onChange={(e) => setMagazineSearchQuery(e.target.value)}
-                                                className="w-full appearance-none border border-zinc-700 bg-zinc-900/60 py-2 pl-10 pr-4 text-base lg:text-sm text-white placeholder:text-zinc-500 rounded-xl focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+                                                className="w-full appearance-none border border-zinc-700 bg-zinc-950 py-2 pl-10 pr-4 text-sm text-white placeholder:text-zinc-500 rounded-xl focus:ring-1 focus:ring-primary focus:outline-none transition-all"
                                             />
                                         </div>
                                         <div className="flex items-center gap-2 shrink-0">

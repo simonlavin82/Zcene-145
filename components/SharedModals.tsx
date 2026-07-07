@@ -178,7 +178,7 @@ export const MyTasteDialog: React.FC<{
               placeholder="e.g. Turnstile"
               value={favoriteArtist}
               onChange={(e) => setFavoriteArtist(e.target.value)}
-              className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900/60 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
+              className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
             />
           </div>
 
@@ -189,7 +189,7 @@ export const MyTasteDialog: React.FC<{
               placeholder="e.g. Hardcore Punk"
               value={favoriteGenre}
               onChange={(e) => setFavoriteGenre(e.target.value)}
-              className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900/60 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
+              className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
             />
           </div>
 
@@ -200,7 +200,7 @@ export const MyTasteDialog: React.FC<{
               placeholder="e.g. Baltimore"
               value={favoriteOrigin}
               onChange={(e) => setFavoriteOrigin(e.target.value)}
-              className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900/60 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
+              className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
             />
           </div>
 
@@ -210,19 +210,19 @@ export const MyTasteDialog: React.FC<{
               <div className="space-y-1">
                 <input 
                   type="number" 
-                  placeholder="Min Year (e.g. 1990)"
+                  placeholder="Min Year"
                   value={eraMin ?? ''}
                   onChange={(e) => setEraMin(e.target.value ? parseInt(e.target.value) : null)}
-                  className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900/60 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
+                  className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
                 />
               </div>
               <div className="space-y-1">
                 <input 
                   type="number" 
-                  placeholder="Max Year (e.g. 2010)"
+                  placeholder="Max Year"
                   value={eraMax ?? ''}
                   onChange={(e) => setEraMax(e.target.value ? parseInt(e.target.value) : null)}
-                  className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900/60 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
+                  className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
                 />
               </div>
             </div>

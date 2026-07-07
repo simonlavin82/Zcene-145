@@ -63,17 +63,17 @@ const CollectionIntelligenceVisual: React.FC<{ className?: string }> = ({ classN
                         <div className="flex flex-col gap-2 mb-2">
                             <div className="flex items-center justify-end gap-1 flex-shrink-0">
                                 {/* Stack Icon */}
-                                <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all duration-200">
+                                <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-700 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none">
                                     <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
                                     </svg>
                                 </button>
                                 {/* Add to Seeds button */}
-                                <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl text-primary bg-primary/5 border-primary/30 transition-all duration-200">
+                                <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl text-primary bg-primary/5 border-primary/30 hover:border-zinc-700 active:scale-95 transition-all duration-200 leading-none">
                                     <span className="material-symbols-outlined !text-[18px]">check_circle</span>
                                 </button>
                                 {/* Remove Card button */}
-                                <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all duration-200">
+                                <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-700 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none">
                                     <span className="material-symbols-outlined !text-[18px]">remove</span>
                                 </button>
                             </div>
@@ -104,18 +104,18 @@ const CollectionIntelligenceVisual: React.FC<{ className?: string }> = ({ classN
                         <div className="flex flex-col gap-1.5 w-full">
                             <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">
                                 <span>MY TASTE</span>
-                                <span className="font-mono text-zinc-500 font-bold">
-                                    0/3 Hits
+                                <span className="font-mono text-[#a855f7] font-bold">
+                                    2/3 Hits
                                 </span>
                             </div>
                             <div className="grid grid-cols-3 gap-1.5 w-full">
-                                <div className="h-2 border border-zinc-700 border-dashed transition-all" title="Genre: Unmatched" />
-                                <div className="h-2 border border-zinc-700 border-dashed transition-all" title="Origin: Unmatched" />
-                                <div className="h-2 border border-zinc-700 border-dashed transition-all" title="Era: Unmatched" />
+                                <div className="h-2 bg-[#a855f7] border border-[#a855f7] transition-all" title="Genre: Matched" />
+                                <div className="h-2 bg-[#a855f7] border border-[#a855f7] transition-all" title="Origin: Matched" />
+                                <div className="h-2 bg-transparent border border-[#52525b] border-solid transition-all" title="Era: Unmatched" />
                             </div>
                             <div className="flex justify-between text-[8px] font-mono tracking-widest text-zinc-500 uppercase select-none">
-                                <span className="text-zinc-400">GENRE</span>
-                                <span className="text-zinc-400">ORIGIN</span>
+                                <span className="text-[#a855f7] font-bold">GENRE</span>
+                                <span className="text-[#a855f7] font-bold">ORIGIN</span>
                                 <span className="text-zinc-400">ERA</span>
                             </div>
                         </div>

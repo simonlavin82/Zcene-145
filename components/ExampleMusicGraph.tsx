@@ -476,7 +476,7 @@ const ExampleMusicGraph: React.FC = () => {
                                     readOnly
                                     placeholder="Search" 
                                     value=""
-                                    className="w-24 sm:w-32 md:w-48 appearance-none rounded-xl border border-zinc-700 bg-zinc-900/60 text-zinc-300 py-2 pl-4 pr-12 text-sm font-normal focus:outline-none backdrop-blur-sm" 
+                                    className="w-24 sm:w-32 md:w-48 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-zinc-300 py-2 pl-4 pr-12 text-sm font-normal focus:outline-none" 
                                 />
                                 <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
                                     <button className="w-8 h-8 flex items-center justify-center rounded-[10px] text-zinc-500 hover:text-white transition-colors leading-none">
