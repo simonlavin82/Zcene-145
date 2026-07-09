@@ -14,8 +14,8 @@ export default defineConfig(({ mode }) => {
         'remix-145-zcene-live-800155534113.us-west1.run.app'
       ],
       proxy: {
-        '/api/gemini': {
-          target: 'https://remix-145-zcene-live-800155534113.us-west1.run.app',
+        '/api': {
+          target: 'http://localhost:8080',
           changeOrigin: true,
           configure: (proxy) => {
             proxy.on('proxyReq', (proxyReq, req) => {

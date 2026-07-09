@@ -366,11 +366,41 @@ export const writeArtistCacheMany = async (
       
       // Find the canonical node in the full returned graph
       const canonicalNode = findCanonicalNodeForArtist(name, normalizedGraph.nodes);
+      const targetNodeId = canonicalNode ? canonicalNode.id : name;
+
+      // Find connected country nodes in normalizedGraph
+      const connectedCountries = normalizedGraph.links
+        .filter(l => {
+          const sId = typeof l.source === 'string' ? l.source : (l.source as Node).id;
+          const tId = typeof l.target === 'string' ? l.target : (l.target as Node).id;
+          return sId.toLowerCase() === targetNodeId.toLowerCase() || tId.toLowerCase() === targetNodeId.toLowerCase();
+        })
+        .map(l => {
+          const sId = typeof l.source === 'string' ? l.source : (l.source as Node).id;
+          const tId = typeof l.target === 'string' ? l.target : (l.target as Node).id;
+          const otherId = sId.toLowerCase() === targetNodeId.toLowerCase() ? tId : sId;
+          return normalizedGraph.nodes.find(n => n.id.toLowerCase() === otherId.toLowerCase());
+        })
+        .filter(n => n && n.type === 'country')
+        .map(n => n!.label || n!.id);
+
       const canonicalId = canonicalNode ? normalizeArtistId(canonicalNode.id) : artistId;
       const canonicalName = canonicalNode?.label ?? canonicalNode?.id ?? name;
       
-      const compositeCanonicalId = buildCompositeCacheKey(canonicalId, filters);
-      const compositeArtistId = buildCompositeCacheKey(artistId, filters);
+      let disambiguatedCanonicalId = canonicalId;
+      if (connectedCountries.length > 0) {
+        const countryNorm = normalizeArtistId(connectedCountries[0]);
+        if (countryNorm) disambiguatedCanonicalId = `${canonicalId}-${countryNorm}`;
+      }
+
+      let disambiguatedArtistId = artistId;
+      if (connectedCountries.length > 0) {
+        const countryNorm = normalizeArtistId(connectedCountries[0]);
+        if (countryNorm) disambiguatedArtistId = `${artistId}-${countryNorm}`;
+      }
+
+      const compositeCanonicalId = buildCompositeCacheKey(disambiguatedCanonicalId, filters);
+      const compositeArtistId = buildCompositeCacheKey(disambiguatedArtistId, filters);
       const isAlias = compositeCanonicalId !== compositeArtistId;
 
       const { nodes, links } = preserveFullGraph

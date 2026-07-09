@@ -395,14 +395,14 @@ export const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed infor
 // --- SERVICE FUNCTIONS ---
 
 // --- LOCAL SANDBOX MOCKS ---
-const isLocal = import.meta.env.DEV || (typeof window !== 'undefined' && (
+const isLocal = (import.meta.env.VITE_USE_MOCKS === 'true') || (import.meta.env.VITE_USE_MOCKS !== 'false' && (import.meta.env.DEV || (typeof window !== 'undefined' && (
   window.location.hostname === 'localhost' || 
   window.location.hostname === '127.0.0.1' || 
   window.location.port === '3000' ||
   window.location.hostname.startsWith('192.168.') ||
   window.location.hostname.startsWith('10.') ||
   window.location.hostname.startsWith('172.')
-)); // Evaluate dynamically to short-circuit on local runs but run live on production
+)))); // Evaluate dynamically to short-circuit on local runs but run live on production
 
 const generateMockGraphData = (artists: string, baseGraph?: GraphData, filters?: DiscoveryFilters): GraphData => {
   const artistList = artists.split('::').map(a => a.trim()).filter(Boolean);

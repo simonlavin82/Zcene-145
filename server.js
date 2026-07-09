@@ -36,33 +36,63 @@ if (!GEMINI_API_KEY) {
 }
 
 // Proxy all requests starting with /api/gemini/ to the Google GenAI API
-app.use(
-  '/api/gemini',
-  (req, res, next) => {
-    // Cleanse request headers to prevent Google's gateway from seeing
-    // Firebase Hosting credentials (authorization) or client session cookies (cookie).
-    delete req.headers['authorization'];
-    delete req.headers['Authorization'];
-    delete req.headers['cookie'];
-    delete req.headers['Cookie'];
-    next();
-  },
-  createProxyMiddleware({
-    target: 'https://generativelanguage.googleapis.com',
-    changeOrigin: true,
-    pathRewrite: {
-      '^/api/gemini': '', // Remove the /api/gemini prefix when forwarding
-    },
-    on: {
-      proxyReq: (proxyReq, req, res) => {
-        // Inject the API key securely on the backend
-        if (GEMINI_API_KEY) {
-          proxyReq.setHeader('x-goog-api-key', GEMINI_API_KEY);
-        }
-      },
-    },
-  })
-);
+app.all('/api/gemini/*wildcard', async (req, res) => {
+  const headers = { ...req.headers };
+  // Cleanse credentials
+  delete headers['authorization'];
+  delete headers['Authorization'];
+  delete headers['cookie'];
+  delete headers['Cookie'];
+  delete headers['host'];
+  delete headers['connection'];
+  delete headers['content-length'];
+
+  if (GEMINI_API_KEY) {
+    headers['x-goog-api-key'] = GEMINI_API_KEY;
+  }
+
+  const targetPath = req.originalUrl.replace(/^\/api\/gemini/, '');
+  const targetUrl = `https://generativelanguage.googleapis.com${targetPath}`;
+
+  console.log(`[Gemini Proxy] Forwarding ${req.method} ${req.originalUrl} -> ${targetUrl}`);
+
+  try {
+    const fetchOptions = {
+      method: req.method,
+      headers: headers
+    };
+
+    if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
+      fetchOptions.body = req;
+      fetchOptions.duplex = 'half';
+    }
+
+    const response = await fetch(targetUrl, fetchOptions);
+    console.log(`[Gemini Proxy Response] Status: ${response.status} from Google for: ${targetPath}`);
+
+    res.status(response.status);
+    response.headers.forEach((value, key) => {
+      if (key.toLowerCase() !== 'transfer-encoding') {
+        res.setHeader(key, value);
+      }
+    });
+
+    if (response.body) {
+      const reader = response.body.getReader();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        res.write(value);
+      }
+    }
+    res.end();
+  } catch (error) {
+    console.error(`[Gemini Proxy Error] Failed to forward request to ${targetUrl}:`, error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+});
 
 // Proxy Firebase Authentication handlers to bypass cross-origin/unauthorized domain restrictions
 app.use(
@@ -344,7 +374,7 @@ async function triggerReSynthesis(artistId, originalData) {
     }
   };
 
-  const isLocal = !GEMINI_API_KEY || process.env.NODE_ENV === 'development';
+  const isLocal = !GEMINI_API_KEY || (process.env.NODE_ENV === 'development' && process.env.VITE_USE_MOCKS !== 'false');
   if (isLocal) {
     console.log(`[Re-Synthesis] Sandbox Mode: Simulating mock details healing for ${artistId}`);
     

@@ -1601,12 +1601,63 @@ const App: React.FC = () => {
     // the closure still holds the old empty Map and the lookup returns undefined — causing
     // the Token Quota modal to fire even though the data is already in memory.
     // detailsCacheRef.current is always synchronously up-to-date (synced via useEffect).
-    const cachedDetails = detailsCacheRef.current.get(node.id) || 
-                          detailsCacheRef.current.get(node.id.toLowerCase()) || 
-                          detailsCacheRef.current.get(normalizeArtistId(node.id)) ||
-                          healedDetailsCacheRef.current.get(node.id) || 
-                          healedDetailsCacheRef.current.get(node.id.toLowerCase()) || 
-                          healedDetailsCacheRef.current.get(normalizeArtistId(node.id));
+    const simpleId = normalizeArtistId(node.id);
+    let disambiguatedCacheId = simpleId;
+    let connectedCountries: string[] = [];
+    if (graphData) {
+      connectedCountries = graphData.links
+        .filter((l: any) => {
+          const sId = typeof l.source === 'string' ? l.source : l.source.id;
+          const tId = typeof l.target === 'string' ? l.target : l.target.id;
+          return sId.toLowerCase() === node.id.toLowerCase() || tId.toLowerCase() === node.id.toLowerCase();
+        })
+        .map((l: any) => {
+          const sId = typeof l.source === 'string' ? l.source : l.source.id;
+          const tId = typeof l.target === 'string' ? l.target : l.target.id;
+          const otherId = sId.toLowerCase() === node.id.toLowerCase() ? tId : sId;
+          return graphData.nodes.find((no: any) => no.id.toLowerCase() === otherId.toLowerCase());
+        })
+        .filter((no: any) => no && no.type === 'country')
+        .map((no: any) => no.label || no.id);
+        
+      if (connectedCountries.length > 0) {
+        const countryNorm = normalizeArtistId(connectedCountries[0]);
+        if (countryNorm) disambiguatedCacheId = `${simpleId}-${countryNorm}`;
+      }
+    }
+
+    let cachedDetails = detailsCacheRef.current.get(disambiguatedCacheId) || 
+                        healedDetailsCacheRef.current.get(disambiguatedCacheId);
+
+    if (!cachedDetails && disambiguatedCacheId !== simpleId) {
+      // If we didn't find the disambiguated key, check the simple key, but run context verification
+      const fallbackDetails = detailsCacheRef.current.get(simpleId) || 
+                              detailsCacheRef.current.get(node.id.toLowerCase()) ||
+                              detailsCacheRef.current.get(node.id) ||
+                              healedDetailsCacheRef.current.get(simpleId) ||
+                              healedDetailsCacheRef.current.get(node.id.toLowerCase()) ||
+                              healedDetailsCacheRef.current.get(node.id);
+      if (fallbackDetails) {
+        const cachedOrigin = fallbackDetails?.details?.origin || (fallbackDetails as any)?.origin || '';
+        const hasMismatch = connectedCountries.length > 0 && 
+          !connectedCountries.some((c: string) => {
+            const normC = c.toLowerCase().trim();
+            const normO = cachedOrigin.toLowerCase().trim();
+            return normO.includes(normC) || normC.includes(normO);
+          });
+        if (!hasMismatch) {
+          cachedDetails = fallbackDetails;
+        }
+      }
+    } else if (!cachedDetails) {
+      // If there is no country link/context, just check the simple key
+      cachedDetails = detailsCacheRef.current.get(simpleId) || 
+                      detailsCacheRef.current.get(node.id.toLowerCase()) ||
+                      detailsCacheRef.current.get(node.id) ||
+                      healedDetailsCacheRef.current.get(simpleId) ||
+                      healedDetailsCacheRef.current.get(node.id.toLowerCase()) ||
+                      healedDetailsCacheRef.current.get(node.id);
+    }
     
     // 2. Load Locally and Block the Network
     const isPlaceholderBio = cachedDetails && cachedDetails.summary && 
@@ -2172,6 +2223,31 @@ const App: React.FC = () => {
             if (entry && entry.detailsCache) {
               try {
                 let parsedData = parseDetailsCacheSafely(entry.detailsCache);
+                
+                // Context Check: Verify if the parsed origin aligns with the active search constraints
+                const originVal = parsedData?.details?.origin || parsedData?.origin || parsedData?.location || parsedData?.country || "";
+                const normOrigin = originVal.toLowerCase().trim();
+                
+                let isOriginMismatched = false;
+                if (activeDiscoveryFilters.includeOrigins && activeDiscoveryFilters.includeOrigins.length > 0) {
+                  isOriginMismatched = !activeDiscoveryFilters.includeOrigins.some(c => {
+                    const normC = c.toLowerCase().trim();
+                    return normOrigin.includes(normC) || normC.includes(normOrigin);
+                  });
+                }
+                if (activeDiscoveryFilters.excludeOrigins && activeDiscoveryFilters.excludeOrigins.length > 0) {
+                  const isExcluded = activeDiscoveryFilters.excludeOrigins.some(c => {
+                    const normC = c.toLowerCase().trim();
+                    return normOrigin.includes(normC) || normC.includes(normOrigin);
+                  });
+                  if (isExcluded) isOriginMismatched = true;
+                }
+
+                if (isOriginMismatched) {
+                  console.log(`[Baseline Prefetch Gate] Discarding baseline cache for ${key} due to origin mismatch: "${originVal}" does not match active filter.`);
+                  return; // Skip setting this entry in detailsCache
+                }
+
                 const entryBio = parsedData?.summary || parsedData?.bio || parsedData?.description || parsedData?.text || "";
                 if (entryBio && entryBio.length > 5) {
                   const detailsObj = {
@@ -2666,7 +2742,7 @@ const App: React.FC = () => {
         artistList.forEach(name => {
           const normName = name.toLowerCase();
           const entry = compositeCacheResult.cached.get(name) || compositeCacheResult.cached.get(normName);
-          const forceMockHit = (import.meta.env.DEV || import.meta.env.VITE_USE_MOCKS === 'true') && 
+          const forceMockHit = ((import.meta.env.VITE_USE_MOCKS === 'true') || (import.meta.env.VITE_USE_MOCKS !== 'false' && import.meta.env.DEV)) && 
             ['sick of it all', 'h2o', 'radiohead', 'blink-182', 'orange 9mm', 'madball'].includes(normName);
 
           const isAlreadyInGraph = !hasActiveFilters && (
@@ -3000,7 +3076,32 @@ const App: React.FC = () => {
             const baseNode = (match || { id: name, type: 'artist' as any, group: 0 }) as Node;
             const normId = normalizeArtistId(baseNode.id);
             const cachedDetails = detailsCache.get(normId) || detailsCache.get(baseNode.id.toLowerCase());
-            if (cachedDetails && cachedDetails.summary) {
+            
+            // Find connected countries in the merged graph
+            const connectedCountries = merged.links
+              .filter((l: any) => {
+                const sId = typeof l.source === 'string' ? l.source : l.source.id;
+                const tId = typeof l.target === 'string' ? l.target : l.target.id;
+                return sId.toLowerCase() === baseNode.id.toLowerCase() || tId.toLowerCase() === baseNode.id.toLowerCase();
+              })
+              .map((l: any) => {
+                const sId = typeof l.source === 'string' ? l.source : l.source.id;
+                const tId = typeof l.target === 'string' ? l.target : l.target.id;
+                const otherId = sId.toLowerCase() === baseNode.id.toLowerCase() ? tId : sId;
+                return merged.nodes.find((no: any) => no.id.toLowerCase() === otherId.toLowerCase());
+              })
+              .filter((no: any) => no && no.type === 'country')
+              .map((no: any) => no.label || no.id);
+
+            const cachedOrigin = cachedDetails?.details?.origin || (cachedDetails as any)?.origin || '';
+            const hasMismatch = connectedCountries.length > 0 && 
+              !connectedCountries.some((c: string) => {
+                const normC = c.toLowerCase().trim();
+                const normO = cachedOrigin.toLowerCase().trim();
+                return normO.includes(normC) || normC.includes(normO);
+              });
+
+            if (cachedDetails && cachedDetails.summary && !hasMismatch) {
               return {
                 ...baseNode,
                 bio: cachedDetails.summary,
@@ -3204,7 +3305,32 @@ const App: React.FC = () => {
       if (primaryNode) {
         const normId = normalizeArtistId(primaryNode.id);
         const cachedDetails = detailsCache.get(normId) || detailsCache.get(primaryNode.id.toLowerCase());
-        if (cachedDetails && cachedDetails.summary) {
+        
+        // Find connected countries in the newly synthesized graph
+        const connectedCountries = final.links
+          .filter((l: any) => {
+            const sId = typeof l.source === 'string' ? l.source : l.source.id;
+            const tId = typeof l.target === 'string' ? l.target : l.target.id;
+            return sId.toLowerCase() === primaryNode.id.toLowerCase() || tId.toLowerCase() === primaryNode.id.toLowerCase();
+          })
+          .map((l: any) => {
+            const sId = typeof l.source === 'string' ? l.source : l.source.id;
+            const tId = typeof l.target === 'string' ? l.target : l.target.id;
+            const otherId = sId.toLowerCase() === primaryNode.id.toLowerCase() ? tId : sId;
+            return final.nodes.find((no: any) => no.id.toLowerCase() === otherId.toLowerCase());
+          })
+          .filter((no: any) => no && no.type === 'country')
+          .map((no: any) => no.label || no.id);
+
+        const cachedOrigin = cachedDetails?.details?.origin || (cachedDetails as any)?.origin || '';
+        const hasMismatch = connectedCountries.length > 0 && 
+          !connectedCountries.some((c: string) => {
+            const normC = c.toLowerCase().trim();
+            const normO = cachedOrigin.toLowerCase().trim();
+            return normO.includes(normC) || normC.includes(normO);
+          });
+
+        if (cachedDetails && cachedDetails.summary && !hasMismatch) {
           setSelectedNode({
             ...primaryNode,
             bio: cachedDetails.summary,
@@ -3215,6 +3341,18 @@ const App: React.FC = () => {
             imageUrl: cachedDetails.imageUrl || (primaryNode as any).imageUrl || ""
           } as any);
         } else {
+          // If there is an origin mismatch, evict the stale entry from detailsCache so the queue can fetch it
+          if (hasMismatch) {
+            console.log(`[Selection Hydration Gate] Origin mismatch detected for ${primaryNode.id} selection (cached: "${cachedOrigin}", graph: [${connectedCountries.join(', ')}]). Evicting simple-key cache.`);
+            setDetailsCache(prev => {
+              const next = new Map(prev);
+              next.delete(normId);
+              next.delete(primaryNode.id.toLowerCase());
+              return next;
+            });
+            detailsCacheRef.current.delete(normId);
+            detailsCacheRef.current.delete(primaryNode.id.toLowerCase());
+          }
           setSelectedNode(primaryNode);
         }
       }
@@ -3433,17 +3571,61 @@ const App: React.FC = () => {
   // and pre-populates the local detailsCache Map before the UI declares
   // the load cycle complete. This completely prevents the deep cut queue
   // from ever falling through to a live Gemini proxy call for known artists.
-  const batchHydrateDetailsCache = useCallback(async (nodes: any[]): Promise<void> => {
+  const batchHydrateDetailsCache = useCallback(async (nodes: any[], links: any[] = []): Promise<void> => {
     const artistNodes = nodes.filter((n: any) => n.type === 'artist' || !n.type);
     if (!artistNodes.length) return;
 
     const results = new Map<string, NodeDetails>();
 
     await Promise.allSettled(artistNodes.map(async (n: any) => {
-      const standardizedId = normalizeArtistId(n.id);
+      const simpleId = normalizeArtistId(n.id);
+
+      // Find connected countries in the graph links
+      const connectedCountries = links
+        .filter((l: any) => {
+          const sId = typeof l.source === 'string' ? l.source : l.source.id;
+          const tId = typeof l.target === 'string' ? l.target : l.target.id;
+          return sId.toLowerCase() === n.id.toLowerCase() || tId.toLowerCase() === n.id.toLowerCase();
+        })
+        .map((l: any) => {
+          const sId = typeof l.source === 'string' ? l.source : l.source.id;
+          const tId = typeof l.target === 'string' ? l.target : l.target.id;
+          const otherId = sId.toLowerCase() === n.id.toLowerCase() ? tId : sId;
+          return nodes.find((no: any) => no.id.toLowerCase() === otherId.toLowerCase());
+        })
+        .filter((no: any) => no && no.type === 'country')
+        .map((no: any) => no.label || no.id);
+
+      let cacheId = simpleId;
+      if (connectedCountries.length > 0) {
+        const countryNorm = normalizeArtistId(connectedCountries[0]);
+        if (countryNorm) cacheId = `${simpleId}-${countryNorm}`;
+      }
       
       try {
-        let snap = await getArtistDocWithRedirect(standardizedId);
+        let snap = await getArtistDocWithRedirect(cacheId);
+        
+        // If the country-disambiguated doc does not exist, check the simple ID with context verification
+        if (!snap.exists() && cacheId !== simpleId) {
+          const fallbackSnap = await getArtistDocWithRedirect(simpleId);
+          if (fallbackSnap.exists()) {
+            const data = fallbackSnap.data();
+            if (data?.detailsCache) {
+              const parsed = parseDetailsCacheSafely(data.detailsCache);
+              const cachedOrigin = parsed?.details?.origin || parsed?.origin || '';
+              const hasMismatch = connectedCountries.length > 0 && 
+                !connectedCountries.some((c: string) => {
+                  const normC = c.toLowerCase().trim();
+                  const normO = cachedOrigin.toLowerCase().trim();
+                  return normO.includes(normC) || normC.includes(normO);
+                });
+              if (!hasMismatch) {
+                snap = fallbackSnap;
+              }
+            }
+          }
+        }
+
         if (!snap.exists()) return;
 
         const data = snap.data();
@@ -3500,8 +3682,11 @@ const App: React.FC = () => {
         // Register under all lookup key variants
         results.set(n.id, payload);
         results.set(n.id.toLowerCase(), payload);
-        results.set(standardizedId, payload);
-        console.log('[Batch Hydration] Loaded from global artists:', n.id, '→', standardizedId);
+        results.set(simpleId, payload);
+        if (cacheId !== simpleId) {
+          results.set(cacheId, payload);
+        }
+        console.log('[Batch Hydration] Loaded from global artists:', n.id, '→', cacheId);
       } catch (e) {
         console.warn('[Batch Hydration] Failed for', n.id, e);
       }
@@ -3692,7 +3877,7 @@ const App: React.FC = () => {
             }
 
             // ── FIRESTORE-FIRST: batch-load all node biographies before marking load complete
-            await batchHydrateDetailsCache(g.nodes);
+            await batchHydrateDetailsCache(g.nodes, g.links);
             hydratedNodes = g.nodes;
 
             // Restore active nodes
@@ -3776,7 +3961,7 @@ const App: React.FC = () => {
               setGraphData((prev: any) => isGraphEqual(prev, g) ? prev : g);
 
               // ── FIRESTORE-FIRST: batch-load all node biographies before marking load complete
-              await batchHydrateDetailsCache(g.nodes);
+              await batchHydrateDetailsCache(g.nodes, g.links);
               hydratedNodes = g.nodes;
 
               if (missing.length > 0) {
@@ -3825,7 +4010,7 @@ const App: React.FC = () => {
               setCurrentCacheKey(data.cacheKey);
 
               // ── FIRESTORE-FIRST: batch-load biographies from global collection
-              await batchHydrateDetailsCache(g.nodes);
+              await batchHydrateDetailsCache(g.nodes, g.links);
               hydratedNodes = g.nodes;
 
 
@@ -3890,7 +4075,7 @@ const App: React.FC = () => {
             setGraphData((prev: any) => isGraphEqual(prev, g) ? prev : g);
 
             // ── FIRESTORE-FIRST: batch-load biographies from global collection
-            await batchHydrateDetailsCache(g.nodes);
+            await batchHydrateDetailsCache(g.nodes, g.links);
             hydratedNodes = g.nodes;
 
             if (data.detailsCache) {
@@ -4288,15 +4473,15 @@ const App: React.FC = () => {
             const g = normalizeGraphData(JSON.parse(data.graphData));
             g.links = g.links.map((l: any) => ({
               ...l,
-              source: typeof l.source === 'object' ? l.source.id : l.source,
-              target: typeof l.target === 'object' ? l.target.id : l.target
+              source: typeof l.source === 'string' ? l.source : l.source.id,
+              target: typeof l.target === 'string' ? l.target : l.target.id
             }));
             g.nodes.forEach((n: any) => { n.fx = null; n.fy = null; });
 
             setGraphData(g);
             setSeedArtists(data.seedArtists);
             if (data.detailsCache) setDetailsCache(new Map(JSON.parse(data.detailsCache)));
-            await batchHydrateDetailsCache(g.nodes);
+            await batchHydrateDetailsCache(g.nodes, g.links);
             if (data.activeNodes && Array.isArray(data.activeNodes)) {
               setActiveNodes(restoreActiveNodesHelper(data.activeNodes, g.nodes));
             }
@@ -4531,13 +4716,13 @@ const App: React.FC = () => {
   }, [selectedNode, showToast]);
 
   const incrementDeepCutsOpenedCount = useCallback(async () => {
-    // Guardrail: Sandbox Safety & Key Protection
     const isLocal = typeof window !== 'undefined' && 
       (window.location.hostname === 'localhost' || 
        window.location.hostname === '127.0.0.1' ||
        window.location.port === '3000');
     
-    if (isLocal || import.meta.env.DEV) {
+    const shouldMock = (import.meta.env.VITE_USE_MOCKS === 'true') || (import.meta.env.VITE_USE_MOCKS !== 'false' && (isLocal || import.meta.env.DEV));
+    if (shouldMock) {
       console.log("[Analytics] Sandbox Mode: Suppressed JIT increment of Deep Cuts Opened counter.");
       return;
     }
@@ -4562,7 +4747,8 @@ const App: React.FC = () => {
        window.location.hostname === '127.0.0.1' ||
        window.location.port === '3000');
     
-    if (isLocal || import.meta.env.DEV) {
+    const shouldMock = (import.meta.env.VITE_USE_MOCKS === 'true') || (import.meta.env.VITE_USE_MOCKS !== 'false' && (isLocal || import.meta.env.DEV));
+    if (shouldMock) {
       console.log("[Revalidation] Sandbox Mode: Suppressed background refresh for: " + node.id);
       return;
     }
@@ -4649,14 +4835,66 @@ const App: React.FC = () => {
       // ONLY process the actively selected node to prevent neighbor chain-fetching
       const nodes = activeNodes.filter(n => {
         const isSelected = selectedNode && normalizeArtistId(selectedNode.id) === normalizeArtistId(n.id);
-        
+        const simpleId = normalizeArtistId(n.id);
+        let disambiguatedCacheId = simpleId;
+        let connectedCountries: string[] = [];
+
+        if (graphData) {
+          connectedCountries = graphData.links
+            .filter((l: any) => {
+              const sId = typeof l.source === 'string' ? l.source : l.source.id;
+              const tId = typeof l.target === 'string' ? l.target : l.target.id;
+              return sId.toLowerCase() === n.id.toLowerCase() || tId.toLowerCase() === n.id.toLowerCase();
+            })
+            .map((l: any) => {
+              const sId = typeof l.source === 'string' ? l.source : l.source.id;
+              const tId = typeof l.target === 'string' ? l.target : l.target.id;
+              const otherId = sId.toLowerCase() === n.id.toLowerCase() ? tId : sId;
+              return graphData.nodes.find((no: any) => no.id.toLowerCase() === otherId.toLowerCase());
+            })
+            .filter((no: any) => no && no.type === 'country')
+            .map((no: any) => no.label || no.id);
+            
+          if (connectedCountries.length > 0) {
+            const countryNorm = normalizeArtistId(connectedCountries[0]);
+            if (countryNorm) disambiguatedCacheId = `${simpleId}-${countryNorm}`;
+          }
+        }
+
+        // Context Check for simpleId details: if it is in cache, verify if its origin conflicts with connected countries
+        const simpleDetails = detailsCache.get(simpleId) || detailsCache.get(n.id.toLowerCase());
+        const simpleOrigin = simpleDetails?.details?.origin || (simpleDetails as any)?.origin || '';
+        let isSimpleKeyMismatched = false;
+        if (simpleDetails && connectedCountries.length > 0) {
+          isSimpleKeyMismatched = !connectedCountries.some((c: string) => {
+            const normC = c.toLowerCase().trim();
+            const normO = simpleOrigin.toLowerCase().trim();
+            return normO.includes(normC) || normC.includes(normO);
+          });
+        }
+
         // If the selected node has already been hydrated with bio text from the local cache, 
-        // DO NOT fetch again, even if the detailsCache Map hasn't technically committed to the component yet.
-        const hasHydratedBio = isSelected && (selectedNode as any)?.bio && (selectedNode as any).bio.length > 5;
-        
-        const normId = normalizeArtistId(n.id);
-        return !detailsCache.has(normId) && 
-               !detailsCache.has(n.id.toLowerCase()) && 
+        // DO NOT fetch again, unless the biography has an origin mismatch.
+        const selectedOrigin = (selectedNode as any)?.origin || (selectedNode as any)?.details?.origin || '';
+        let isSelectedMismatched = false;
+        if (isSelected && selectedNode && connectedCountries.length > 0) {
+          isSelectedMismatched = !connectedCountries.some((c: string) => {
+            const normC = c.toLowerCase().trim();
+            const normO = selectedOrigin.toLowerCase().trim();
+            return normO.includes(normC) || normC.includes(normO);
+          });
+        }
+
+        const hasHydratedBio = isSelected && 
+                               (selectedNode as any)?.bio && 
+                               (selectedNode as any).bio.length > 5 && 
+                               !isSelectedMismatched;
+
+        const isCached = (detailsCache.has(simpleId) && !isSimpleKeyMismatched) || 
+                         detailsCache.has(disambiguatedCacheId) || 
+                         (detailsCache.has(n.id.toLowerCase()) && !isSimpleKeyMismatched);
+
+        return !isCached && 
                !fetchingNodeIdsRef.current.has(n.id) &&
                isSelected &&
                !hasHydratedBio;
@@ -4668,8 +4906,31 @@ const App: React.FC = () => {
 
       try {
         for (const node of nodes) {
-          const slugId = normalizeArtistId(node.id);
-          if (detailsCache.has(node.id) || detailsCache.has(node.id.toLowerCase()) || detailsCache.has(slugId) || fetchingNodeIdsRef.current.has(node.id)) continue;
+          const simpleId = normalizeArtistId(node.id);
+          
+          // Find connected countries in the graph links
+          const connectedCountries = graphData.links
+            .filter((l: any) => {
+              const sId = typeof l.source === 'string' ? l.source : l.source.id;
+              const tId = typeof l.target === 'string' ? l.target : l.target.id;
+              return sId.toLowerCase() === node.id.toLowerCase() || tId.toLowerCase() === node.id.toLowerCase();
+            })
+            .map((l: any) => {
+              const sId = typeof l.source === 'string' ? l.source : l.source.id;
+              const tId = typeof l.target === 'string' ? l.target : l.target.id;
+              const otherId = sId.toLowerCase() === node.id.toLowerCase() ? tId : sId;
+              return graphData.nodes.find((no: any) => no.id.toLowerCase() === otherId.toLowerCase());
+            })
+            .filter((no: any) => no && no.type === 'country')
+            .map((no: any) => no.label || no.id);
+
+          let disambiguatedCacheId = simpleId;
+          if (connectedCountries.length > 0) {
+            const countryNorm = normalizeArtistId(connectedCountries[0]);
+            if (countryNorm) disambiguatedCacheId = `${simpleId}-${countryNorm}`;
+          }
+
+          if (detailsCache.has(node.id) || detailsCache.has(node.id.toLowerCase()) || detailsCache.has(disambiguatedCacheId) || fetchingNodeIdsRef.current.has(node.id)) continue;
 
           fetchingNodeIdsRef.current.add(node.id);
           setLoadingNodeIds(prev => new Set(prev).add(node.id));
@@ -4691,21 +4952,44 @@ const App: React.FC = () => {
                 
                 const isEvicted = evictedNodeIdsRef.current.has(node.id) || 
                                   evictedNodeIdsRef.current.has(node.id.toLowerCase()) || 
-                                  evictedNodeIdsRef.current.has(normalizeArtistId(node.id));
+                                  evictedNodeIdsRef.current.has(simpleId) ||
+                                  evictedNodeIdsRef.current.has(disambiguatedCacheId);
                 if (!isEvicted) {
                   try {
-                    const cacheId = normalizeArtistId(node.id);
+                    let cacheId = disambiguatedCacheId;
                     let cacheDoc = await getArtistDocWithRedirect(cacheId);
+                    
+                    if (!cacheDoc.exists() && cacheId !== simpleId) {
+                      // Try simple ID fallback
+                      const fallbackSnap = await getArtistDocWithRedirect(simpleId);
+                      if (fallbackSnap.exists()) {
+                        const data = fallbackSnap.data();
+                        if (data && data.detailsCache) {
+                          const parsed = parseDetailsCacheSafely(data.detailsCache);
+                          const cachedOrigin = parsed?.details?.origin || parsed?.origin || '';
+                          const hasMismatch = connectedCountries.length > 0 && 
+                            !connectedCountries.some((c: string) => {
+                              const normC = c.toLowerCase().trim();
+                              const normO = cachedOrigin.toLowerCase().trim();
+                              return normO.includes(normC) || normC.includes(normO);
+                            });
+                          if (!hasMismatch) {
+                            cacheDoc = fallbackSnap;
+                            cacheId = simpleId;
+                          }
+                        }
+                      }
+                    }
                     
                     if (cacheDoc.exists()) {
                        const data = cacheDoc.data();
-                     if (data) {
-                        isStale = isCacheExpired(data.cachedAt);
-                     }
-                     if (data && data.detailsCache) {
-                        try {
-                            const parsed = parseDetailsCacheSafely(data.detailsCache);
-                            if (parsed && (parsed.bio || parsed.summary)) {
+                      if (data) {
+                         isStale = isCacheExpired(data.cachedAt);
+                      }
+                      if (data && data.detailsCache) {
+                         try {
+                             const parsed = parseDetailsCacheSafely(data.detailsCache);
+                             if (parsed && (parsed.bio || parsed.summary)) {
                                const bio = parsed.summary || parsed.bio || parsed.description || parsed.text || "";
                                const imageUrl = parsed.imageUrl || parsed.image || "";
                                const genre = parsed.details?.genre || parsed.genre || parsed.genres || "";
@@ -4740,12 +5024,12 @@ const App: React.FC = () => {
                                   groundingLinks,
                                   tourDates,
                                   tourCachedAt
-                               };
+                                };
                                console.log("[Global Cache] Fallback successful for:", node.id);
-                            }
-                        } catch(e) { console.warn("Failed parsing global detailsCache", e); }
-                     }
-                  }
+                             }
+                         } catch(e) { console.warn("Failed parsing global detailsCache", e); }
+                      }
+                   }
                 } catch (e) { console.warn("[Global Cache] Fallback read failed", e); }
                 }
 
@@ -4753,8 +5037,7 @@ const App: React.FC = () => {
                 if (fallbackDetails) {
                    details = fallbackDetails;
                    if (isStale) {
-                     const cacheId = normalizeArtistId(node.id);
-                     triggerBackgroundRevalidation(node, cacheId);
+                     triggerBackgroundRevalidation(node, disambiguatedCacheId);
                    }
                 } else {
                    // Individual node timeout (45s) to prevent the whole queue from hanging
@@ -4813,19 +5096,26 @@ const App: React.FC = () => {
 
                 healedDetailsCacheRef.current.set(node.id, details);
                 healedDetailsCacheRef.current.set(node.id.toLowerCase(), details);
-                healedDetailsCacheRef.current.set(normalizeArtistId(node.id), details);
+                healedDetailsCacheRef.current.set(simpleId, details);
+                if (disambiguatedCacheId !== simpleId) {
+                  healedDetailsCacheRef.current.set(disambiguatedCacheId, details);
+                }
 
                 setDetailsCache(prev => {
                   const updated = new Map(prev);
                   updated.set(node.id, details);
                   updated.set(node.id.toLowerCase(), details);
-                  updated.set(normalizeArtistId(node.id), details);
+                  updated.set(simpleId, details);
+                  if (disambiguatedCacheId !== simpleId) {
+                    updated.set(disambiguatedCacheId, details);
+                  }
                   return updated;
                 });
                 
                 evictedNodeIdsRef.current.delete(node.id);
                 evictedNodeIdsRef.current.delete(node.id.toLowerCase());
-                evictedNodeIdsRef.current.delete(normalizeArtistId(node.id));
+                evictedNodeIdsRef.current.delete(simpleId);
+                evictedNodeIdsRef.current.delete(disambiguatedCacheId);
 
                 incrementDeepCutsOpenedCount();
 
@@ -4836,16 +5126,24 @@ const App: React.FC = () => {
                 // regardless of whether the data came from a live Gemini call or the Firestore fallback.
                 // JIT creation (setDoc) is only attempted when the document does not yet exist.
                 {
-                  const cacheId = normalizeArtistId(node.id);
+                  const cacheId = disambiguatedCacheId;
                   try {
                     const existingSnap = await getArtistDocWithRedirect(cacheId);
                     
                     const canonicalNameFromDetails = details.details?.artist;
-                    const canonicalId = canonicalNameFromDetails ? normalizeArtistId(canonicalNameFromDetails) : cacheId;
+                    
+                    const freshCountries = connectedCountries.length > 0 
+                      ? connectedCountries 
+                      : (details.details?.origin ? [details.details.origin] : []);
+                    let canonicalId = canonicalNameFromDetails ? normalizeArtistId(canonicalNameFromDetails) : simpleId;
+                    if (freshCountries.length > 0) {
+                      const countryNorm = normalizeArtistId(freshCountries[0]);
+                      if (countryNorm) canonicalId = `${canonicalId}-${countryNorm}`;
+                    }
                     const isAlias = canonicalId !== cacheId;
 
                     if (isAlias) {
-                      const canonicalName = canonicalNameFromDetails;
+                      const canonicalName = canonicalNameFromDetails || canonicalId;
                       
                       // 1. Mutate seedArtists
                       setSeedArtists(prev => {
@@ -4876,14 +5174,9 @@ const App: React.FC = () => {
 
                     // 4. Mutate selectedNode (always run to ensure fresh metadata is painted to the active sidebar)
                     setSelectedNode(prev => {
-                      if (prev && (normalizeArtistId(prev.id) === cacheId || prev.id.toLowerCase() === node.id.toLowerCase())) {
-                        const canonicalName = details.details?.artist || prev.label || prev.id;
-                        const canonicalId = normalizeArtistId(canonicalName);
+                      if (prev && (normalizeArtistId(prev.id) === simpleId || prev.id.toLowerCase() === node.id.toLowerCase())) {
                         return {
                           ...prev,
-                          id: canonicalId,
-                          label: canonicalName,
-                          name: canonicalName,
                           bio: details.summary,
                           summary: details.summary,
                           genre: details.details?.genre || "",
@@ -4914,7 +5207,7 @@ const App: React.FC = () => {
                       }
                       
                       const canonicalNode = subNodes.find(
-                        n => n.type === 'artist' && (n.id.trim().toLowerCase() === node.id.trim().toLowerCase() || normalizeArtistId(n.id) === cacheId)
+                        n => n.type === 'artist' && (n.id.trim().toLowerCase() === node.id.trim().toLowerCase() || normalizeArtistId(n.id) === canonicalId)
                       );
                       const canonicalName = canonicalNode?.label ?? canonicalNode?.id ?? node.id;
                       
@@ -4957,6 +5250,7 @@ const App: React.FC = () => {
                     );
                   }
                 }
+
                 
                 success = true;
                 lastProgressTimestampRef.current = Date.now();

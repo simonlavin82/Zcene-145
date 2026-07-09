@@ -375,3 +375,278 @@ To prevent layout computation leaks, trailing dark voids, and mobile padding cli
 *   **Folder Containers**: Must use a universal `w-fit max-w-full` class. Sizing is delegated entirely to the inner content boundaries across all viewports to prevent folders from expanding into empty horizontal voids.
 *   **Inner Grid Wrappers**: Must use explicit, dynamic count-mapped grid tracks (`grid ${gridColsClass}`) coupled with a `w-fit` width property. This breaks circular layout dependencies between the `w-fit` parent folder and `w-full` children, ensuring browser engines correctly add the folder's paddings during layout resolution.
 *   **Project Cards**: Must be sized rigidly at `w-full sm:w-[320px] min-h-[160px]` with zero elasticity (`flex-grow` and `flex-shrink` properties are strictly banned) to enforce crisp, uniform grid column tracks and snug row hugging.
+
+---
+
+## 9. Entity Collision Disambiguation Architecture
+
+This section documents the **Entity Collision Disambiguation** system, implemented to resolve a class of cache-poisoning bug that manifests when multiple distinct real-world musical acts share an identical display name (e.g., a UK post-hardcore band and a Japanese melodic death metal act both named *Afraid to Die*). Prior to this implementation, a simple-key Firestore cache lookup — keyed only on `normalizeArtistId(name)` — would resolve to whichever artist's document was written first, injecting the wrong biographical profile into the Deep Cut panel regardless of the active discovery filter context.
+
+### 9.1 Root Cause: Simple-Key Cache Namespace Collision
+
+The global `/artists/{cacheKey}` Firestore collection uses a normalized slug as the document ID (e.g., `afraid-to-die`). When two musically unrelated artists share a name, they collide on this single key. The collision produces a **state synchronization race condition**:
+
+1.  A user seeds a search for `Afraid to Die` with an `Include Origins: UK` filter, triggering a live synthesis pass.
+2.  While the Gemini graph is being compiled, a **Baseline Prefetch** — an asynchronous `readArtistCacheMany` call issued concurrently at synthesis start — resolves the key `afraid-to-die` from Firestore and finds the Japanese artist's document.
+3.  The prefetch writes the Japanese biographical data into the local `detailsCache` state Map under the simple key `afraid-to-die`.
+4.  On synthesis completion, the selection hydration logic reads from `detailsCache` using the same simple key and immediately finds the Japanese profile, mounting it into `selectedNode` before the Gemini graph topology — which correctly shows a `United Kingdom` country node — has had a chance to establish context.
+5.  The fetch queue `useEffect`, gated by the `hasHydratedBio` check on `selectedNode`, detects that the biography is already populated and skips the queue entirely, preventing a corrective API call.
+
+### 9.2 Composite Disambiguation Key Pattern
+
+The resolution strategy is a **country-anchored composite cache key** constructed by inspecting the live graph link topology. The key is derived, never externally supplied, ensuring it is always grounded in graph-verified data:
+
+```
+compositeKey = `${normalizeArtistId(artistName)}-${normalizeArtistId(countryLabel)}`
+               e.g. "afraid-to-die-united-kingdom"
+```
+
+**Construction algorithm** (shared across `App.tsx` and `artistCacheService.ts`):
+
+```typescript
+const connectedCountries = graphData.links
+  .filter(l => {
+    const sId = typeof l.source === 'string' ? l.source : l.source.id;
+    const tId = typeof l.target === 'string' ? l.target : l.target.id;
+    return sId.toLowerCase() === node.id.toLowerCase() || tId.toLowerCase() === node.id.toLowerCase();
+  })
+  .map(l => {
+    const sId = typeof l.source === 'string' ? l.source : l.source.id;
+    const tId = typeof l.target === 'string' ? l.target : l.target.id;
+    const otherId = sId.toLowerCase() === node.id.toLowerCase() ? tId : sId;
+    return graphData.nodes.find(no => no.id.toLowerCase() === otherId.toLowerCase());
+  })
+  .filter(no => no && no.type === 'country')
+  .map(no => no.label || no.id);
+
+const simpleId = normalizeArtistId(node.id);
+let disambiguatedCacheId = simpleId;
+if (connectedCountries.length > 0) {
+  const countryNorm = normalizeArtistId(connectedCountries[0]);
+  if (countryNorm) disambiguatedCacheId = `${simpleId}-${countryNorm}`;
+}
+```
+
+The algorithm traverses the live graph's `links` array, finds all edges incident to the target node, follows them to neighbouring nodes of `type === 'country'`, and uses the first resolved country label to suffix the slug. If the node has no connected country (e.g., a label or genre metadata hub), `disambiguatedCacheId === simpleId` and the simple key is used, preserving backward compatibility.
+
+**Fallback hierarchy** (applied in `handleNodeClick`, the fetch queue `useEffect`, and `batchHydrateDetailsCache`):
+
+1.  Look up `disambiguatedCacheId` in the local cache / Firestore. If found, use it directly — it is already contextually verified.
+2.  If not found *and* `disambiguatedCacheId !== simpleId` (i.e., country context is available), fall back to the simple key but run an **origin mismatch check** before accepting the result:
+    ```typescript
+    const cachedOrigin = fallbackDetails?.details?.origin || '';
+    const hasMismatch = connectedCountries.length > 0 &&
+      !connectedCountries.some(c => {
+        const normC = c.toLowerCase().trim();
+        const normO = cachedOrigin.toLowerCase().trim();
+        return normO.includes(normC) || normC.includes(normO);
+      });
+    if (!hasMismatch) cachedDetails = fallbackDetails; // only accept if origin aligns
+    ```
+    A simple-key document whose `details.origin` field does not contain or overlap with any of the graph-verified country labels is treated as a **mismatch** and discarded, forcing the pipeline to treat the node as a cache miss.
+3.  If `disambiguatedCacheId === simpleId` (no country context), accept the simple key result without mismatch checking to preserve standard behaviour for nodes with no country links.
+
+### 9.3 Gate 1: Baseline Prefetch Filter (`handleGenerateGraph`)
+
+**Location:** `App.tsx` — inside the `isLiveSynthesis` baseline prefetch callback.
+
+**Trigger:** Fires when a live synthesis pass is initiated (active `includeOrigins`, `excludeOrigins`, or multi-seed). A concurrent `readArtistCacheMany` call is dispatched immediately to populate `detailsCache` with existing biographies to preserve them across the graph rebuild.
+
+**Problem addressed:** The prefetch fires and resolves *before* the new Gemini graph topology is available. The simple-key fallback may return a document whose origin is incompatible with the active filter constraints — poisoning `detailsCache` with a mismatched entity profile.
+
+**Implementation:** Before writing any entry from the prefetch result set into `detailsCache`, the gate extracts the cached document's origin value (`parsedData?.details?.origin || parsedData?.origin || parsedData?.location || parsedData?.country`) and performs a bidirectional substring match against `activeDiscoveryFilters.includeOrigins` and `activeDiscoveryFilters.excludeOrigins`:
+
+```typescript
+const originVal = parsedData?.details?.origin || parsedData?.origin || parsedData?.location || parsedData?.country || "";
+const normOrigin = originVal.toLowerCase().trim();
+
+let isOriginMismatched = false;
+if (activeDiscoveryFilters.includeOrigins?.length > 0) {
+  isOriginMismatched = !activeDiscoveryFilters.includeOrigins.some(c => {
+    const normC = c.toLowerCase().trim();
+    return normOrigin.includes(normC) || normC.includes(normOrigin);
+  });
+}
+if (activeDiscoveryFilters.excludeOrigins?.length > 0) {
+  const isExcluded = activeDiscoveryFilters.excludeOrigins.some(c => {
+    const normC = c.toLowerCase().trim();
+    return normOrigin.includes(normC) || normC.includes(normOrigin);
+  });
+  if (isExcluded) isOriginMismatched = true;
+}
+
+if (isOriginMismatched) {
+  console.log(`[Baseline Prefetch Gate] Discarding baseline cache for ${key} ...`);
+  return; // skip setDetailsCache for this entry
+}
+```
+
+A mismatch causes an early `return` inside the `.forEach` callback, preventing that document from ever entering the `detailsCache` state map. The rest of the baseline cache entries (those whose origin aligns with the filter) are still written normally, preserving biography continuity for correctly-matched entities.
+
+### 9.4 Gate 2: Selection Hydration Gate (`handleGenerateGraph`)
+
+**Location:** `App.tsx` — at the completion callback of `handleGenerateGraph`, executed once the compiled graph has been committed to `setGraphData`.
+
+**Trigger:** Fires after the Gemini graph topology and the nuclear filter pass have both completed and `final` (or `merged`) graph data is available in scope. At this point, country-node connections are definitive.
+
+**Problem addressed:** After synthesis completes, the engine selects the primary seed node and immediately tries to hydrate `selectedNode` with a cached biography. If Gate 1 failed to block a stale prefetch entry (e.g., no origin filter was active but the search was multi-seed), this is the final opportunity to prevent a mismatched profile from being mounted.
+
+**Implementation (full synthesis path):**
+
+```typescript
+const connectedCountries = final.links
+  .filter/map/filter/map  // → string[] of country labels
+const cachedOrigin = cachedDetails?.details?.origin || (cachedDetails as any)?.origin || '';
+const hasMismatch = connectedCountries.length > 0 &&
+  !connectedCountries.some(c => { /* bidirectional substring match */ });
+
+if (cachedDetails && cachedDetails.summary && !hasMismatch) {
+  setSelectedNode({ ...primaryNode, bio: cachedDetails.summary, ... });
+} else {
+  if (hasMismatch) {
+    console.log(`[Selection Hydration Gate] Origin mismatch detected for ${primaryNode.id}...`);
+    setDetailsCache(prev => { const next = new Map(prev); next.delete(normId); ... return next; });
+    detailsCacheRef.current.delete(normId);
+    detailsCacheRef.current.delete(primaryNode.id.toLowerCase());
+  }
+  setSelectedNode(primaryNode); // mount bare node; biography will be fetched by the queue
+}
+```
+
+An eviction is performed on both the React state Map (`setDetailsCache`) and the synchronous ref (`detailsCacheRef.current`) for the mismatched simple key, ensuring the fetch queue's `hasHydratedBio` check evaluates as `false` and the queue proceeds to fetch the correct document.
+
+An identical mismatch check is applied inside `setActiveNodes` in the **partial cache hit path** (where some seeds were cached and some required synthesis) to prevent mismatched profiles from leaking into the artist panel sidebar during the merge.
+
+### 9.5 Gate 3: Fetch Queue Alignment (`useEffect` deep cut queue)
+
+**Location:** `App.tsx` — inside the `useEffect` that drives the sequential JIT details fetch queue.
+
+**Trigger:** Fires whenever `activeNodes`, `selectedNode`, `isLoading`, or `detailsCache` change state. Its filter step determines which nodes are eligible to enter the fetch queue.
+
+**Problem addressed:** After Gates 1 and 2 run, a stale entry that survived (e.g., written to `detailsCache` by a different codepath before synthesis completed) would pass the standard `!detailsCache.has(simpleId)` gate check as a false negative — the key *is* in the cache, so the node would be skipped, and the mismatched biography would persist indefinitely on screen.
+
+**Implementation:** The filter now computes `disambiguatedCacheId` and `connectedCountries` for each candidate node *inside the filter callback* and performs a two-level cache validity check:
+
+```typescript
+const simpleDetails = detailsCache.get(simpleId) || detailsCache.get(n.id.toLowerCase());
+const simpleOrigin = simpleDetails?.details?.origin || (simpleDetails as any)?.origin || '';
+let isSimpleKeyMismatched = false;
+if (simpleDetails && connectedCountries.length > 0) {
+  isSimpleKeyMismatched = !connectedCountries.some(c => { /* bidirectional substring match */ });
+}
+
+const isCached =
+  (detailsCache.has(simpleId) && !isSimpleKeyMismatched) ||     // simple key, but only if origin valid
+   detailsCache.has(disambiguatedCacheId) ||                     // or disambiguated key exists
+  (detailsCache.has(n.id.toLowerCase()) && !isSimpleKeyMismatched);
+
+return !isCached && !fetchingNodeIdsRef.current.has(n.id) && isSelected && !hasHydratedBio;
+```
+
+The `hasHydratedBio` guard is also made mismatch-aware: if `selectedNode.origin` (or `selectedNode.details.origin`) does not align with the graph's connected country labels, `isSelectedMismatched` is set to `true`, and `hasHydratedBio` evaluates to `false` even if a `bio` string is populated, allowing the queue to replace the incorrect biography.
+
+Within the inner fetch loop, the queue uses `disambiguatedCacheId` as the primary Firestore lookup key and applies the same origin fallback logic before falling back to the simple document.
+
+### 9.6 Cache Write-Back with Disambiguation (`artistCacheService.ts`)
+
+**Location:** `writeArtistCacheMany` in `services/artistCacheService.ts`.
+
+**Purpose:** Ensures that newly generated profiles are written under the correct disambiguation key so that future lookups resolve immediately without requiring the fallback check.
+
+**Implementation:** After the canonical node is located via `findCanonicalNodeForArtist`, the writer traverses the graph links to extract connected country nodes — using the same traversal algorithm described in §9.2 — and constructs both `disambiguatedCanonicalId` and `disambiguatedArtistId` before passing them to `buildCompositeCacheKey`:
+
+```typescript
+const connectedCountries = normalizedGraph.links
+  .filter/map/filter/map  // → string[] of country labels
+const targetNodeId = canonicalNode ? canonicalNode.id : name;
+
+let disambiguatedCanonicalId = canonicalId;
+if (connectedCountries.length > 0) {
+  const countryNorm = normalizeArtistId(connectedCountries[0]);
+  if (countryNorm) disambiguatedCanonicalId = `${canonicalId}-${countryNorm}`;
+}
+
+let disambiguatedArtistId = artistId;
+if (connectedCountries.length > 0) {
+  const countryNorm = normalizeArtistId(connectedCountries[0]);
+  if (countryNorm) disambiguatedArtistId = `${artistId}-${countryNorm}`;
+}
+
+const compositeCanonicalId = buildCompositeCacheKey(disambiguatedCanonicalId, filters);
+const compositeArtistId    = buildCompositeCacheKey(disambiguatedArtistId, filters);
+```
+
+The result is that the Firestore document for a UK-origin *Afraid to Die* synthesis is written under `afraid-to-die-united-kingdom`, while the simple key `afraid-to-die` is left untouched and continues to resolve to the Japanese artist. Both entities coexist in the global cache namespace without collision.
+
+Additionally, inside the deep cut queue's Firestore write-back block (at the end of the fetch loop), the `cacheId` variable is set to `disambiguatedCacheId` for `getDoc`, `setDoc`, and `updateDoc` operations. The `triggerBackgroundRevalidation` call also targets `disambiguatedCacheId`, ensuring stale-while-revalidate refreshes overwrite the correct document.
+
+Local cache write-back mirrors this: both the `healedDetailsCacheRef` and `setDetailsCache` state map write entries under both `simpleId` and `disambiguatedCacheId` (when they differ) to ensure all lookup paths remain warm.
+
+### 9.7 Sandbox Mode Isolation (`geminiService.ts`)
+
+**Location:** `isLocal` constant in `services/geminiService.ts`.
+
+**Change:** The `isLocal` flag was previously computed purely from the runtime hostname (`localhost`, `127.0.0.1`, port `3000`, etc.), unconditionally activating mock mode on any local machine. The flag is now gated by the `VITE_USE_MOCKS` environment variable:
+
+```typescript
+const isLocal =
+  (import.meta.env.VITE_USE_MOCKS === 'true') ||
+  (import.meta.env.VITE_USE_MOCKS !== 'false' && (
+    import.meta.env.DEV ||
+    window.location.hostname === 'localhost' || ...
+  ));
+```
+
+*   `VITE_USE_MOCKS=true` → always mock, regardless of hostname.
+*   `VITE_USE_MOCKS=false` → always live, even on `localhost` — enabling live API testing locally without modifying code.
+*   `VITE_USE_MOCKS` unset → preserves the original hostname-based heuristic (default sandbox on local).
+
+An identical `VITE_USE_MOCKS !== 'false'` guard is applied inside `server.js`'s re-synthesis sandbox flag and inside all `isLocal`-dependent analytics increment guards in `App.tsx`.
+
+### 9.8 Gemini Proxy Rewrite: Native Fetch Handler (`server.js`)
+
+**Location:** `server.js`, route handler for `/api/gemini`.
+
+**Previous implementation:** A two-stage `http-proxy-middleware` chain using `pathRewrite: { '^/api/gemini': '' }` and a `proxyReq` hook for key injection. Under Node.js v24 and Express v5 (which uses `path-to-regexp` v8+), wildcard route patterns were rejected at startup, and the `http-proxy-middleware` stream pipeline produced indefinite hangs for large POST payloads from the GenAI SDK.
+
+**Current implementation:** Replaced with a native async Express route handler using Node's built-in `fetch` API with half-duplex body streaming:
+
+```javascript
+app.all('/api/gemini/*wildcard', async (req, res) => {
+  const headers = { ...req.headers };
+  // Credential strip: remove auth, cookie, host, connection, content-length
+  delete headers['authorization']; delete headers['cookie'];
+  delete headers['host']; delete headers['connection']; delete headers['content-length'];
+
+  if (GEMINI_API_KEY) headers['x-goog-api-key'] = GEMINI_API_KEY;
+
+  const targetPath = req.originalUrl.replace(/^\/api\/gemini/, '');
+  const targetUrl  = `https://generativelanguage.googleapis.com${targetPath}`;
+
+  const fetchOptions = { method: req.method, headers };
+  if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
+    fetchOptions.body   = req;   // stream the raw IncomingMessage body directly
+    fetchOptions.duplex = 'half';
+  }
+
+  const response = await fetch(targetUrl, fetchOptions);
+  res.status(response.status);
+  response.headers.forEach((value, key) => {
+    if (key.toLowerCase() !== 'transfer-encoding') res.setHeader(key, value);
+  });
+  const reader = response.body.getReader();
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    res.write(value);
+  }
+  res.end();
+});
+```
+
+Key design decisions:
+*   **`req` as body stream:** Passing the Express `IncomingMessage` directly as `fetchOptions.body` with `duplex: 'half'` forwards the raw POST payload without buffering it into memory, preserving streaming semantics for large JSON bodies.
+*   **`transfer-encoding` header exclusion:** Google's API returns chunked transfer-encoding headers that conflict with Express's response pipeline; these are stripped before forwarding headers to the client.
+*   **`/api/gemini/*wildcard` syntax:** Express v5 / `path-to-regexp` v8 requires a named parameter prefixed with `*` (`*wildcard`) instead of the legacy bare wildcard (`/*`) pattern.
+*   **Security parity:** The credential strip (`authorization`, `cookie`, `host`, `connection`, `content-length`) is retained and extended relative to the previous implementation. The `x-goog-api-key` injection is unchanged.
+
