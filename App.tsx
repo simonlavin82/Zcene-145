@@ -5300,9 +5300,33 @@ const App: React.FC = () => {
                   await wait(1000);
                 } else {
                   console.error(`[Deep Cut Queue] Failed for node ${node.id}:`, err);
-                  
-                  // Insulate the Sidebar Lifecycle:
-                  // Show a toast instead of setting detailsError to prevent the sidebar from wiping cache values
+
+                  // [Sentinel Write] ✦
+                  // Write a minimal placeholder entry to detailsCache and its ref before
+                  // breaking so the queue filter's `isCached` check resolves to `true` on
+                  // the next render. Without this, an empty cache causes infinite re-queuing
+                  // because the filter never becomes satisfied after a parse or network failure.
+                  const sentinelEntry = {
+                    summary: `Details temporarily unavailable for ${node.label || node.id}. Tap the heal icon to retry.`,
+                    details: { genre: "", origin: "", founded: "", notableArtists: [] },
+                    links: [],
+                    discography: [],
+                    members: [],
+                    recommendationReason: "",
+                    _isSentinel: true,
+                  } as any;
+                  healedDetailsCacheRef.current.set(node.id, sentinelEntry);
+                  healedDetailsCacheRef.current.set(node.id.toLowerCase(), sentinelEntry);
+                  healedDetailsCacheRef.current.set(simpleId, sentinelEntry);
+                  setDetailsCache(prev => {
+                    const next = new Map(prev);
+                    next.set(node.id, sentinelEntry);
+                    next.set(node.id.toLowerCase(), sentinelEntry);
+                    next.set(simpleId, sentinelEntry);
+                    return next;
+                  });
+
+                  // Show toast only for the actively selected node
                   if (selectedNode?.id === node.id) {
                       showToast(humanizeError(err));
                   }

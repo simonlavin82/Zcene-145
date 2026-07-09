@@ -1241,8 +1241,31 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
         try {
             details = JSON.parse(repaired) as NodeDetails;
         } catch (repairError) {
-            console.error("Failed to parse AI details JSON (even after repair):", repaired);
-            throw new Error("Invalid data format from AI details service.");
+            // [Grounding Prose Fallback] ✦
+            // When Google Search grounding is active the model drops JSON mode and
+            // returns unstructured prose with inline citations. Both JSON.parse and
+            // repairJson fail in this case. If the raw text is a meaningful prose
+            // string (> 40 chars), treat it as the biography and construct a minimal
+            // valid NodeDetails so the queue can write to detailsCache and stop
+            // re-queueing instead of throwing a terminal format exception.
+            const rawProse = cleanedJsonText.trim();
+            if (rawProse.length > 40) {
+                console.warn(
+                    `[Deep Cut Parse] JSON repair failed — response appears to be grounding prose (${rawProse.length} chars). ` +
+                    `Mapping prose to NodeDetails bio field as graceful fallback.`
+                );
+                details = {
+                    summary: rawProse,
+                    details: { genre: "", origin: "", founded: "", notableArtists: [] },
+                    links: [],
+                    discography: [],
+                    members: [],
+                    recommendationReason: "",
+                } as unknown as NodeDetails;
+            } else {
+                console.error("Failed to parse AI details JSON (even after repair):", repaired);
+                throw new Error("Invalid data format from AI details service.");
+            }
         }
     }
 
