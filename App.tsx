@@ -2465,6 +2465,16 @@ const App: React.FC = () => {
     fetchingNodeIdsRef.current.clear();
     setLoadingNodeIds(new Set());
 
+    // [Selection Lifecycle Reset — bypassToken path] ✦
+    // For synthesis paths that skip the token confirmation dialog (force-synthesis,
+    // cache-upgrade confirms, bypassTokenConfirmation=true callers), apply the same
+    // selectedNode reset so the Deep Cut panel stays clean during loading regardless
+    // of entry path. No deep detailsCache eviction needed here because these paths
+    // are entered only after the user has already approved a separate confirmation.
+    if (isLiveSynthesis) {
+      setSelectedNode(null);
+    }
+
 
 
     // --- PHASE 02: PER-ARTIST CACHE CHECK ---
@@ -3152,6 +3162,27 @@ const App: React.FC = () => {
         setSeedArtists(prevSeedArtists);
         return;
       }
+    }
+
+    // [Selection Lifecycle Reset] ✦
+    // The user has confirmed a live synthesis pass. Any selectedNode hydrated from
+    // a pre-generation simple-key cache lookup is now stale context. Reset to null
+    // so the Deep Cut panel clears immediately and does not display a mismatched
+    // profile during the loading window. Gates 1–3 will correctly re-hydrate on
+    // graph completion.
+    if (isLiveSynthesis) {
+      setSelectedNode(null);
+      // Evict simple-key detailsCache entries for the seed artists so a concurrent
+      // Baseline Prefetch flush cannot re-inject stale data via React state batching.
+      const seedEvictionKeys = artistList.flatMap(name => [
+        name, name.toLowerCase(), normalizeArtistId(name)
+      ]);
+      setDetailsCache(prev => {
+        const next = new Map(prev);
+        seedEvictionKeys.forEach(k => next.delete(k));
+        return next;
+      });
+      seedEvictionKeys.forEach(k => detailsCacheRef.current.delete(k));
     }
 
     artistList.forEach(name => {
