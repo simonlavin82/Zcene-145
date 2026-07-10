@@ -5340,21 +5340,39 @@ const App: React.FC = () => {
                         n => n.type === 'artist' && (n.id.trim().toLowerCase() === node.id.trim().toLowerCase() || normalizeArtistId(n.id) === canonicalId)
                       );
                       const canonicalName = canonicalNode?.label ?? canonicalNode?.id ?? node.id;
-                      
-                      const canonicalDocRef = doc(db, 'artists', canonicalId);
-                      await setDoc(canonicalDocRef, {
-                        cacheKey: canonicalId,
-                        artistId: canonicalId,
-                        seedArtists: canonicalNameFromDetails || canonicalName,
-                        graphData: JSON.stringify({ nodes: subNodes, links: subLinks }),
-                        filters: discoveryFiltersRef.current || {},
-                        cacheVersion: 2,
-                        cachedAt: serverTimestamp(),
-                        hitCount: 0,
-                        isDeep: false,
-                        detailsCache: JSON.stringify(details)
-                      });
-                      console.log(`[Deep Cut Queue] JIT cached Canonical node: ${canonicalId}`);
+
+                      const simpleArtistId = normalizeArtistId(node.id);
+                      const reconciliationQuery = query(
+                        collection(db, 'artists'),
+                        where('artistId', '==', simpleArtistId),
+                        limit(1)
+                      );
+                      const reconciliationSnap = await getDocs(reconciliationQuery);
+
+                      if (!reconciliationSnap.empty) {
+                        const existingDoc = reconciliationSnap.docs[0];
+                        console.log(`[Deep Cut Queue] Reconciliation: Found existing document "${existingDoc.id}" for artistId "${simpleArtistId}". Patching to avoid duplicate.`);
+                        await updateDoc(doc(db, 'artists', existingDoc.id), {
+                          graphData: JSON.stringify({ nodes: subNodes, links: subLinks }),
+                          detailsCache: JSON.stringify(details),
+                          cachedAt: serverTimestamp()
+                        });
+                      } else {
+                        const canonicalDocRef = doc(db, 'artists', canonicalId);
+                        await setDoc(canonicalDocRef, {
+                          cacheKey: canonicalId,
+                          artistId: canonicalId,
+                          seedArtists: canonicalNameFromDetails || canonicalName,
+                          graphData: JSON.stringify({ nodes: subNodes, links: subLinks }),
+                          filters: discoveryFiltersRef.current || {},
+                          cacheVersion: 2,
+                          cachedAt: serverTimestamp(),
+                          hitCount: 0,
+                          isDeep: false,
+                          detailsCache: JSON.stringify(details)
+                        });
+                        console.log(`[Deep Cut Queue] JIT cached Canonical node: ${canonicalId}`);
+                      }
                       
                       if (isAlias) {
                         const aliasDocRef = doc(db, 'artists', cacheId);
