@@ -4917,7 +4917,7 @@ const App: React.FC = () => {
 
       // Overwrite the global cache doc with fresh data and a new cachedAt timestamp
       await updateDoc(doc(db, 'artists', cacheId), {
-        detailsCache: freshDetails,
+        detailsCache: JSON.stringify(freshDetails),
         cachedAt: serverTimestamp()
       });
       console.log("[Revalidation] Successfully updated stale cache in Firestore for: " + cacheId);
@@ -5321,7 +5321,7 @@ const App: React.FC = () => {
                       // Update the existing doc with fresh detailsCache and a new cachedAt timestamp.
                       // The security rule Case A permits: detailsCache, hitCount, and cachedAt.
                       await updateDoc(doc(db, 'artists', existingSnap.id), {
-                        detailsCache: details,
+                        detailsCache: JSON.stringify(details),
                         cachedAt: serverTimestamp()
                       });
                       console.log(`[Deep Cut Queue] Write-back: Updated detailsCache + cachedAt for: ${existingSnap.id}`);
@@ -5352,7 +5352,7 @@ const App: React.FC = () => {
                         cachedAt: serverTimestamp(),
                         hitCount: 0,
                         isDeep: false,
-                        detailsCache: details
+                        detailsCache: JSON.stringify(details)
                       });
                       console.log(`[Deep Cut Queue] JIT cached Canonical node: ${canonicalId}`);
                       
