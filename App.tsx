@@ -1122,8 +1122,7 @@ const App: React.FC = () => {
       const q = query(
         collection(db, 'artists'),
         where('cacheKey', '>=', normQuery),
-        where('cacheKey', '<=', normQuery + '\uf8ff'),
-        limit(10)
+        where('cacheKey', '<=', normQuery + '\uf8ff')
       );
 
       const snapshot = await getDocs(q);
@@ -1153,8 +1152,7 @@ const App: React.FC = () => {
       const q = query(
         collection(db, 'artists'),
         where('cacheKey', '>=', normQuery),
-        where('cacheKey', '<=', normQuery + '\uf8ff'),
-        limit(10)
+        where('cacheKey', '<=', normQuery + '\uf8ff')
       );
 
       const snapshot = await getDocs(q);
