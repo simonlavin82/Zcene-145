@@ -231,6 +231,50 @@ This section details the critical stability enhancements made to resolve timing 
     4.  `mutateGraphArtistId`: Modifies and matches seed identifiers without stripping the parent rationale property.
     5.  `assembleGraphFromCache`: Aggregates, parses, and joins non-empty rationale texts from all resolved cache entries.
 
+### 3.6 Grounding Prose Fallback (`geminiService.ts`)
+*   **The Issue:** When Google Search grounding (`googleSearch: {}`) is active on the Gemini Flash Deep Cut request, the model occasionally drops structured JSON mode entirely and returns unstructured prose with inline citation markers (e.g. `[1]`, `[source]`). Both `JSON.parse` and `repairJson` fail against this format. Under the previous implementation, the parse failure would throw an unhandled `Error("Invalid data format from AI details service.")`, propagate out of `fetchNodeDetails`, be caught by the Deep Cut queue's outer `catch`, and count against the retry budget — ultimately causing the queue to exhaust retries and terminate without writing anything to `detailsCache`. Because the queue filter's `isCached` check never became satisfied, the node would be immediately re-queued on the next render cycle, producing an infinite re-queuing and re-fetch loop.
+*   **The Solution:** A **Grounding Prose Fallback** was introduced inside the inner `repairError` catch block in `fetchNodeDetails` (`services/geminiService.ts`). The guard checks whether the raw cleaned response text exceeds 40 characters before throwing. If it does, the prose is treated as a valid biography payload and mapped directly to a minimal `NodeDetails`-shaped object:
+    ```typescript
+    // [Grounding Prose Fallback] ✦
+    const rawProse = cleanedJsonText.trim();
+    if (rawProse.length > 40) {
+        details = {
+            summary: rawProse,
+            details: { genre: "", origin: "", founded: "", notableArtists: [] },
+            links: [], discography: [], members: [], recommendationReason: "",
+        } as unknown as NodeDetails;
+    } else {
+        throw new Error("Invalid data format from AI details service.");
+    }
+    ```
+    The fallback object passes through the downstream `hydratedDetails` assembly block unchanged, is written to `detailsCache` normally, and satisfies the queue filter. The resulting profile will have an empty `genre` and `origin`, which will trigger the standard `⚠️ Cache Incomplete` self-healing pathway, allowing the user to force-refresh for a clean JSON parse on retry. The 40-character threshold prevents the fallback from accepting single-word error strings or empty citation-only payloads.
+*   **Resilience boundary:** This pattern handles the specific case where the grounding layer overrides JSON mode. It does not suppress genuine network or auth failures (those still propagate to the retry/Sentinel path described in §3.7).
+
+### 3.7 Sentinel Cache Write (`App.tsx`)
+*   **The Issue:** When the Deep Cut queue's inner retry loop exhausts all attempts — whether due to persistent 429 rate-limit errors, unrecoverable parse failures, or network timeouts — it `break`s out of the `while` loop without writing any entry to `detailsCache` or `healedDetailsCacheRef`. On the next render cycle, all three queue filter conditions (`!isCached`, `!fetchingNodeIdsRef.current.has`, `isSelected`) remained true simultaneously, causing the queue `useEffect` to immediately re-enqueue the same failed node and dispatch a fresh fetch. This created an infinite fetch-and-fail loop that saturated the rate-limit budget and prevented the queue from advancing to any other pending node.
+*   **The Solution:** A **Sentinel Cache Write** was introduced inside the terminal `else` branch of the retry `catch` block (after all retries have been exhausted), immediately before `break`. The sentinel is a minimal `NodeDetails`-shaped object with a user-facing error message and an `_isSentinel: true` discriminator flag:
+    ```typescript
+    // [Sentinel Write] ✦
+    const sentinelEntry = {
+        summary: `Details temporarily unavailable for ${node.label || node.id}. Tap the heal icon to retry.`,
+        details: { genre: "", origin: "", founded: "", notableArtists: [] },
+        links: [], discography: [], members: [], recommendationReason: "",
+        _isSentinel: true,
+    } as any;
+    healedDetailsCacheRef.current.set(node.id, sentinelEntry);
+    healedDetailsCacheRef.current.set(node.id.toLowerCase(), sentinelEntry);
+    healedDetailsCacheRef.current.set(simpleId, sentinelEntry);
+    setDetailsCache(prev => {
+        const next = new Map(prev);
+        next.set(node.id, sentinelEntry);
+        next.set(node.id.toLowerCase(), sentinelEntry);
+        next.set(simpleId, sentinelEntry);
+        return next;
+    });
+    ```
+    By writing the sentinel under all three key variants (`node.id`, `node.id.toLowerCase()`, `simpleId`), the queue filter's `isCached` check resolves to `true` on the next render, cleanly stopping the re-queuing cycle. The `_isSentinel: true` flag distinguishes this entry from a genuine biography so that downstream consumers (e.g. `checkIsProfileIncomplete`) can correctly identify and surface the self-healing `⚠️ Cache Incomplete` warning, giving the user a clear path to retry. The sentinel is **not** written to Firestore; it exists only in the in-memory cache for the current session.
+*   **Interaction with the Grounding Prose Fallback (§3.6):** The two resilience patterns operate at different failure depths. The Prose Fallback fires first (inside the `repairJson` catch) and prevents a format exception from even reaching the retry loop. Only if both JSON parse and the Prose Fallback reject the payload (i.e., the raw text is ≤ 40 chars) does a real exception propagate to the retry loop, where the Sentinel Write acts as the final backstop after all retries are exhausted.
+
 ---
 
 ## 4. Cost Estimation Architecture
