@@ -343,8 +343,8 @@ export const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed infor
       "imageUrl": "https://en.wikipedia.org/wiki/Special:FilePath/...",
       "members": ["Name (Role)", ...],
       "details": {
-        "genre": "string",
-        "origin": "City, Country",
+        "genre": "The primary music genre(s) as a plain string (e.g. 'Hardcore Punk', 'Post-Hardcore', 'Metalcore'). NEVER return the literal string 'Unknown', 'N/A', or leave this empty — if grounding is inconclusive, infer the genre from the bio summary text and the connected scene context provided.",
+        "origin": "City, Country format (e.g. 'Baltimore, USA'). NEVER return the literal string 'Unknown', 'N/A', or leave this empty — if grounding is inconclusive, infer the origin from the bio summary text or the band's known regional scene.",
         "founded": "YYYY",
         "notableArtists": ["Artist Name", ...]
       },
@@ -1282,7 +1282,28 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
     const hydratedDetails: NodeDetails = {
         ...details,
         summary: details.summary || "No summary available (AI response was truncated).",
-        details: details.details || {},
+        details: (() => {
+            // [Metadata Sanitization] ✦
+            // Strip literal "Unknown"/"N/A"/"None" values from genre and origin before
+            // writing to detailsCache or Firestore. The model occasionally returns these
+            // strings verbatim when Google Search grounding is inconclusive (e.g. for
+            // bands with common names). If stored as-is, these literals would previously
+            // trigger checkIsProfileIncomplete → eviction → re-synthesis → same result
+            // (infinite loop). An empty string is the safe canonical form: the DetailsPanel
+            // renders it via its || 'Unknown' display fallback, so the UI is unchanged.
+            const d = details.details || {} as any;
+            const sanitizeMetaField = (val: string | undefined): string => {
+                if (!val) return "";
+                const t = val.trim().toLowerCase();
+                if (t === "unknown" || t === "n/a" || t === "none" || t === "not available") return "";
+                return val.trim();
+            };
+            return {
+                ...d,
+                genre: sanitizeMetaField(d.genre),
+                origin: sanitizeMetaField(d.origin),
+            };
+        })(),
         links: sanitisedLinks,
         discography: details.discography || [],
         members: details.members || [],

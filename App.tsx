@@ -773,16 +773,20 @@ const checkIsProfileIncomplete = (node: Node, details: NodeDetails | null | unde
   const isArtist = node.type === 'artist' || !node.type || details?.details?.artist !== undefined;
   if (!details || !isArtist) return false;
 
-  // Change the validation gate to only fail if core data properties are missing (!details.summary or empty strings).
-  // If an artist text bio exists, return false silently.
-  if (!details.summary || details.summary.trim() === "") {
+  // A sentinel entry (written by §3.7 after total queue failure) is always incomplete.
+  if ((details as any)._isSentinel) {
     return true;
   }
 
-  // Intercept precise "Unknown" or missing/empty string states for self-healing
-  const genre = details.details?.genre?.trim().toLowerCase();
-  const origin = details.details?.origin?.trim().toLowerCase();
-  if (!genre || genre === 'unknown' || !origin || origin === 'unknown') {
+  // Only treat a profile as corrupt if the bio itself is absent or empty.
+  // Genre/origin being "Unknown" or empty is a display-level gap — it surfaces the
+  // Cache Incomplete UI warning box in DetailsPanel for manual self-healing, but it
+  // must NOT trigger automatic re-synthesis. Doing so caused an infinite eviction loop
+  // for artists (like "End It") where the model legitimately returns "Unknown" for
+  // those fields: the profile was evicted, re-synthesised to the same state, then
+  // immediately evicted again on the next click — silently bypassing the Token Warning
+  // because approvedSeedsRef auto-confirms the re-synthesis for seed artists.
+  if (!details.summary || details.summary.trim() === "") {
     return true;
   }
 
