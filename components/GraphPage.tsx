@@ -870,9 +870,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
 
   const isDetailsVisible = useMemo(() => isSmallScreen ? activeTab === 'details' : !isDetailsPanelCollapsed, [isSmallScreen, activeTab, isDetailsPanelCollapsed]);
 
-  const shouldRenderDetailsPanel = useMemo(() => {
-    return activeNodes.length > 0 || selectedNode !== null || isLoading;
-  }, [activeNodes, selectedNode, isLoading]);
+
 
   useEffect(() => {
     if (isLoading && isDetailsPanelCollapsed) {
@@ -1673,8 +1671,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                     </div>
                 </div>
                 
-                {shouldRenderDetailsPanel && (
-                  <aside style={isMagazineViewOpen ? {} : { width: `${rightPanelWidth}px` }} className={`z-50 flex flex-col flex-shrink-0 ${isMagazineViewOpen ? '!fixed !inset-0 !top-0 !left-0 !m-0 !w-screen !h-screen !z-[1000] bg-background-dark/95' : 'relative h-full bg-zinc-900 border border-zinc-600/50 overflow-hidden transition-all duration-300 ease-in-out'}`}>
+                <aside style={isMagazineViewOpen ? {} : { width: `${rightPanelWidth}px` }} className={`z-50 flex flex-col flex-shrink-0 ${isMagazineViewOpen ? '!fixed !inset-0 !top-0 !left-0 !m-0 !w-screen !h-screen !z-[1000] bg-background-dark/95' : 'relative h-full bg-zinc-900 border border-zinc-600/50 overflow-hidden transition-all duration-300 ease-in-out'}`}>
                        {!isDetailsPanelCollapsed && !isMagazineViewOpen && (
                          <div onMouseDown={handleMouseDown('right')} className="absolute top-0 left-0 h-full w-2 cursor-col-resize select-none touch-none z-10 group" aria-label="Resize right panel" role="separator">
                            <div className="w-full h-full bg-transparent group-hover:bg-primary/20 transition-colors"></div>
@@ -1724,8 +1721,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                          onAuthRequest={() => { user ? onSaveToDashboard?.() : onLogin(); }}
                          userTaste={profile?.taste}
                        />
-                  </aside>
-                )}
+                </aside>
             </main>
         )}
         <GenerativeRationaleModal 
