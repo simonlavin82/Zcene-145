@@ -871,8 +871,14 @@ const GraphPage: React.FC<GraphPageProps> = ({
   const isDetailsVisible = useMemo(() => isSmallScreen ? activeTab === 'details' : !isDetailsPanelCollapsed, [isSmallScreen, activeTab, isDetailsPanelCollapsed]);
 
   const shouldRenderDetailsPanel = useMemo(() => {
-    return activeNodes.length > 0 || selectedNode !== null;
-  }, [activeNodes, selectedNode]);
+    return activeNodes.length > 0 || selectedNode !== null || isLoading;
+  }, [activeNodes, selectedNode, isLoading]);
+
+  useEffect(() => {
+    if (isLoading && isDetailsPanelCollapsed) {
+      setIsDetailsPanelCollapsed(false);
+    }
+  }, [isLoading]);
 
   useEffect(() => {
     if (selectedNode && isDetailsVisible) {
