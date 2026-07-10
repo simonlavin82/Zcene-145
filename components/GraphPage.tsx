@@ -105,6 +105,12 @@ interface GraphPageProps {
   setIsStackDialogOpen: (open: boolean) => void;
   isMenuOpen: boolean;
   setIsMenuOpen: (open: boolean) => void;
+  disambiguationDialog: {
+    isOpen: boolean;
+    query: string;
+    candidates: DisambiguationCandidate[];
+  } | null;
+  onSelectDisambiguation: (choice: string | 'synthesis' | 'cancel') => void;
 }
 
 const DEFAULT_LEFT_PANEL_WIDTH = 320;
@@ -115,7 +121,7 @@ const COLLAPSED_WIDTH = 64;
 const MIN_GRAPH_WIDTH = 400;
 
 // --- Components ---
-import { GenerativeRationaleModal } from './SharedModals';
+import { GenerativeRationaleModal, DisambiguationModal, DisambiguationCandidate } from './SharedModals';
 
 
 const DiscoveryFiltersPanel: React.FC<{
@@ -531,7 +537,8 @@ const GraphPage: React.FC<GraphPageProps> = ({
   isProfileOpen, setIsProfileOpen,
   isDeleteAccountModalOpen, setIsDeleteAccountModalOpen,
   isStackDialogOpen, setIsStackDialogOpen,
-  isMenuOpen, setIsMenuOpen
+  isMenuOpen, setIsMenuOpen,
+  disambiguationDialog, onSelectDisambiguation
 }) => {
   const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
   const [isDetailsPanelCollapsed, setIsDetailsPanelCollapsed] = useState(true);
@@ -1728,6 +1735,12 @@ const GraphPage: React.FC<GraphPageProps> = ({
           isOpen={isRationaleModalOpen} 
           onClose={() => setIsRationaleModalOpen(false)} 
           rationale={data.synthesisRationale} 
+        />
+        <DisambiguationModal
+          isOpen={!!disambiguationDialog}
+          query={disambiguationDialog?.query || ''}
+          candidates={disambiguationDialog?.candidates || []}
+          onSelect={onSelectDisambiguation}
         />
     </div>
   );

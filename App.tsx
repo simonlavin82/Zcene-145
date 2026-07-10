@@ -14,7 +14,7 @@ import HelpPage from './components/HelpPage';
 import GraphPage from './components/GraphPage';
 import HomePage from './components/HomePage';
 import Dashboard from './components/Dashboard';
-import { MyStackDialog, TokenConfirmationDialog, CacheChoiceDialog } from './components/SharedModals';
+import { MyStackDialog, TokenConfirmationDialog, CacheChoiceDialog, DisambiguationCandidate } from './components/SharedModals';
 
 import { ShareModal } from './components/ShareModal';
 import { analyticsService } from './services/analyticsService';
@@ -35,72 +35,7 @@ const checkVideoPlayabilityOnServer = async (videoId: string): Promise<boolean> 
   return false;
 };
 
-interface DisambiguationDialogProps {
-  isOpen: boolean;
-  query: string;
-  options: string[];
-  onSelect: (choice: string | 'synthesis' | 'cancel') => void;
-}
 
-const DisambiguationDialog: React.FC<DisambiguationDialogProps> = ({
-  isOpen,
-  query,
-  options,
-  onSelect
-}) => {
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-none bg-zinc-900 border border-zinc-800 p-8 shadow-2xl relative overflow-hidden flex flex-col gap-6">
-        {/* Border glow accent */}
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-yellow-500/30 via-yellow-500 to-yellow-500/30" />
-        
-        <div className="flex flex-col gap-2">
-          <h3 className="text-xl font-bold text-zinc-100 uppercase tracking-wider flex items-center gap-2">
-            <span className="material-symbols-outlined text-yellow-500">psychology</span>
-            Disambiguation
-          </h3>
-          <p className="text-sm text-zinc-400">
-            We found multiple canonical artists in our index matching <span className="text-yellow-500 font-semibold">"{query}"</span>. Which one did you mean?
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-3 max-h-[250px] overflow-y-auto pr-1">
-          {options.map((opt) => (
-            <button
-              key={opt}
-              onClick={() => onSelect(opt)}
-              className="w-full text-left p-4 bg-zinc-800/40 hover:bg-zinc-800 border border-zinc-700/50 hover:border-yellow-500 transition-all duration-200 flex items-center justify-between group"
-            >
-              <span className="text-zinc-200 group-hover:text-yellow-500 font-medium transition-colors">
-                {opt}
-              </span>
-              <span className="material-symbols-outlined text-zinc-600 group-hover:text-yellow-500 transition-colors text-sm">
-                arrow_forward_ios
-              </span>
-            </button>
-          ))}
-        </div>
-
-        <div className="flex flex-col gap-2 pt-2 border-t border-zinc-800/80">
-          <button
-            onClick={() => onSelect('synthesis')}
-            className="w-full py-3 px-4 bg-zinc-800/30 hover:bg-zinc-800 text-zinc-300 hover:text-zinc-100 font-semibold border border-zinc-700/30 hover:border-zinc-700 transition-all text-sm uppercase tracking-wider"
-          >
-            Create New Graph for "{query}"
-          </button>
-          <button
-            onClick={() => onSelect('cancel')}
-            className="w-full py-3 px-4 bg-transparent hover:bg-zinc-800/20 text-zinc-500 hover:text-zinc-400 font-medium transition-all text-sm uppercase tracking-wider"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 declare global {
   interface Window {
@@ -1063,7 +998,7 @@ const App: React.FC = () => {
   const [disambiguationDialog, setDisambiguationDialog] = useState<{
     isOpen: boolean;
     query: string;
-    options: string[];
+    candidates: DisambiguationCandidate[];
     onSelect: (choice: string | 'synthesis' | 'cancel') => void;
   } | null>(null);
 
@@ -1206,6 +1141,68 @@ const App: React.FC = () => {
       return Array.from(matches).map(id => titleCaseArtistId(id));
     } catch (err) {
       console.warn("[Disambiguation] Prefix match lookup failed:", err);
+      return [];
+    }
+  }, []);
+
+  const searchDisambiguationCandidates = useCallback(async (queryStr: string): Promise<DisambiguationCandidate[]> => {
+    const normQuery = normalizeArtistId(queryStr);
+    if (normQuery.length < 2) return [];
+
+    try {
+      const q = query(
+        collection(db, 'artists'),
+        where('cacheKey', '>=', normQuery),
+        where('cacheKey', '<=', normQuery + '\uf8ff'),
+        limit(10)
+      );
+
+      const snapshot = await getDocs(q);
+      const candidatesMap = new Map<string, DisambiguationCandidate>();
+
+      for (const docSnap of snapshot.docs) {
+        const data = docSnap.data();
+        const docId = docSnap.id;
+        
+        let originVal = "";
+        let genreVal = "";
+        let labelVal = docId;
+        
+        if (data.detailsCache) {
+          try {
+            const parsed = JSON.parse(data.detailsCache);
+            labelVal = parsed.details?.artist || parsed.name || docId;
+            originVal = parsed.details?.origin || parsed.origin || "";
+            genreVal = parsed.details?.genre || parsed.genre || "";
+          } catch (e) {}
+        } else if (data.graphData) {
+          try {
+            const parsed = JSON.parse(data.graphData);
+            const nodes = parsed.nodes || [];
+            const primaryNode = nodes.find((n: any) => n.type === 'artist' && n.id.toLowerCase() === docId.toLowerCase()) || nodes[0];
+            if (primaryNode) {
+              labelVal = primaryNode.label || primaryNode.id;
+            }
+            const countries = nodes.filter((n: any) => n.type === 'country').map((n: any) => n.label || n.id);
+            originVal = countries.join(', ');
+            const genres = nodes.filter((n: any) => n.type === 'genre').map((n: any) => n.label || n.id);
+            genreVal = genres.join(', ');
+          } catch (e) {}
+        }
+        
+        const candidateKey = normalizeArtistId(docId);
+        if (!candidatesMap.has(candidateKey)) {
+          candidatesMap.set(candidateKey, {
+            id: docId,
+            label: titleCaseArtistId(labelVal),
+            origin: originVal,
+            genre: genreVal
+          });
+        }
+      }
+      return Array.from(candidatesMap.values());
+    } catch (err) {
+      console.warn('[Disambiguation Candidates Search] Failed:', err);
       return [];
     }
   }, []);
@@ -2276,36 +2273,46 @@ const App: React.FC = () => {
     }
 
     // --- STAGE 0: DISAMBIGUATION CHECK ---
-    if (artistList.length === 1 && !isRegeneration && !overrideFilters && !bypassToken) {
-      const searchId = artistList[0];
-      const matches = await searchMatchingArtistsInCache(searchId);
-      if (matches.length > 1) {
-        setIsLoading(false);
-        isHydratingSessionRef.current = false;
-        isProjectLoadingRef.current = false;
-        
-        const choice = await new Promise<string | 'synthesis' | 'cancel'>((resolve) => {
-          setDisambiguationDialog({
-            isOpen: true,
-            query: artists,
-            options: matches,
-            onSelect: (c) => {
-              setDisambiguationDialog(null);
-              resolve(c);
-            }
+    let resolvedArtistSeeds = [...artistList];
+    let hasDisambiguated = false;
+    if (!bypassToken) {
+      for (let i = 0; i < artistList.length; i++) {
+        const searchId = artistList[i];
+        const candidates = await searchDisambiguationCandidates(searchId);
+        if (candidates.length > 1) {
+          setIsLoading(false);
+          isHydratingSessionRef.current = false;
+          isProjectLoadingRef.current = false;
+          
+          const choice = await new Promise<string | 'synthesis' | 'cancel'>((resolve) => {
+            setDisambiguationDialog({
+              isOpen: true,
+              query: searchId,
+              candidates,
+              onSelect: (c) => {
+                setDisambiguationDialog(null);
+                resolve(c);
+              }
+            });
           });
-        });
 
-        if (choice === 'cancel') {
-          return;
-        }
-        if (choice === 'synthesis') {
-          bypassToken = true;
-        } else {
-          handleGenerateGraph(choice, false, graphToEnhance, bypassCacheValidation, false, overrideFilters);
-          return;
+          if (choice === 'cancel') {
+            return;
+          }
+          if (choice === 'synthesis') {
+            // Keep the raw searchId so synthesis generates it from scratch
+          } else {
+            resolvedArtistSeeds[i] = normalizeArtistId(choice);
+            hasDisambiguated = true;
+          }
         }
       }
+    }
+
+    if (hasDisambiguated) {
+      const newArtistsStr = resolvedArtistSeeds.join('::');
+      handleGenerateGraph(newArtistsStr, isRegeneration, graphToEnhance, bypassCacheValidation, true, overrideFilters);
+      return;
     }
 
     try {
@@ -5657,6 +5664,8 @@ const App: React.FC = () => {
               setIsStackDialogOpen={setIsStackDialogOpen}
               isMenuOpen={isMenuOpen}
               setIsMenuOpen={setIsMenuOpen}
+              disambiguationDialog={disambiguationDialog}
+              onSelectDisambiguation={(choice) => disambiguationDialog?.onSelect(choice)}
             />
           )}
         </div>
@@ -5887,12 +5896,6 @@ const App: React.FC = () => {
         cost={cacheChoiceDialog?.cost || 0}
       />
 
-      <DisambiguationDialog
-        isOpen={!!disambiguationDialog}
-        query={disambiguationDialog?.query || ''}
-        options={disambiguationDialog?.options || []}
-        onSelect={(c) => disambiguationDialog?.onSelect(c)}
-      />
 
       <AnimatePresence>
         {isExitBlockerModalOpen && (
