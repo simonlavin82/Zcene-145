@@ -14,6 +14,7 @@ export interface Node {
   type: 'artist' | 'genre' | 'label' | 'country' | 'founded';
   group: number;
   isLoading?: boolean;
+  isPending?: boolean;
   isSeed?: boolean;
   x?: number;
   y?: number;

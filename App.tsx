@@ -986,7 +986,7 @@ const App: React.FC = () => {
   const [libraryArtists, setLibraryArtists] = useState<ParsedArtist[]>([]);
   const [seedArtists, setSeedArtists] = useState<string>('');
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
-  const [activeNodes, setActiveNodes] = useState<Node[]>([]);
+  const [activeNodeIds, setActiveNodeIds] = useState<string[]>([]);
   const [stack, setStack] = useState<StackItem[]>([]);
   const [lastViewedStackCount, setLastViewedStackCount] = useState<number>(0);
   const [baseGraph, setBaseGraph] = useState<GraphData | null>(null);
@@ -1023,6 +1023,19 @@ const App: React.FC = () => {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [currentCacheKey, setCurrentCacheKey] = useState<string | null>(null);
+
+  const activeNodes = useMemo(() => {
+    if (!graphData || !graphData.nodes) return [];
+    return activeNodeIds
+      .map(id => graphData.nodes.find(n => n.id.toLowerCase() === id.toLowerCase() || normalizeArtistId(n.id) === normalizeArtistId(id)))
+      .filter((n): n is Node => {
+        if (!n || n.type !== 'artist') return false;
+        const details = detailsCache.get(n.id) || 
+                        detailsCache.get(n.id.toLowerCase()) || 
+                        detailsCache.get(normalizeArtistId(n.id));
+        return !!(details && details.summary && details.summary.trim().length > 5 && !(details as any)._isSentinel);
+      });
+  }, [activeNodeIds, graphData, detailsCache]);
   const [isStackDialogOpen, setIsStackDialogOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const isAdmin = useMemo(() => {
@@ -1092,6 +1105,78 @@ const App: React.FC = () => {
         }
       });
     });
+  }, []);
+  const resolveContextualEntityIds = useCallback(async (
+    artistsStr: string,
+    filters: DiscoveryFilters
+  ): Promise<string> => {
+    const list = artistsStr.split('::').map(s => s.trim()).filter(Boolean);
+    const resolvedList = await Promise.all(
+      list.map(async (name) => {
+        const normName = normalizeArtistId(name);
+        try {
+          const q = query(
+            collection(db, 'artists'),
+            where('cacheKey', '>=', normName),
+            where('cacheKey', '<=', normName + '\uf8ff'),
+            limit(10)
+          );
+          const snapshot = await getDocs(q);
+          
+          let matchedDocId: string | null = null;
+          
+          for (const docSnap of snapshot.docs) {
+            const data = docSnap.data();
+            let originVal = "";
+            let genreVal = "";
+            if (data.graphData) {
+              try {
+                const parsed = JSON.parse(data.graphData);
+                const nodes = parsed.nodes || [];
+                const countries = nodes.filter((n: any) => n.type === 'country').map((n: any) => n.label || n.id);
+                originVal = countries.join(', ');
+                const genres = nodes.filter((n: any) => n.type === 'genre').map((n: any) => n.label || n.id);
+                genreVal = genres.join(', ');
+              } catch (e) {}
+            }
+            
+            const normOrigin = originVal.toLowerCase().trim();
+            const normGenre = genreVal.toLowerCase().trim();
+            let satisfiesFilters = true;
+
+            if (filters.includeOrigins && filters.includeOrigins.length > 0) {
+              const allowed = filters.includeOrigins.map(o => o.toLowerCase().trim());
+              const matchesOrigin = allowed.some(o => normOrigin.includes(o) || o.includes(normOrigin));
+              if (!matchesOrigin) satisfiesFilters = false;
+            }
+            if (filters.excludeOrigins && filters.excludeOrigins.length > 0) {
+              const forbidden = filters.excludeOrigins.map(o => o.toLowerCase().trim());
+              const matchesOrigin = forbidden.some(o => normOrigin.includes(o) || o.includes(normOrigin));
+              if (matchesOrigin) satisfiesFilters = false;
+            }
+            if (filters.includeGenres && filters.includeGenres.length > 0) {
+              const allowed = filters.includeGenres.map(g => g.toLowerCase().trim());
+              const matchesGenre = allowed.some(g => normGenre.includes(g) || g.includes(normGenre));
+              if (!matchesGenre) satisfiesFilters = false;
+            }
+
+            if (satisfiesFilters) {
+              matchedDocId = docSnap.id;
+              break;
+            }
+          }
+
+          if (matchedDocId) {
+            console.log(`[Contextual Resolve] Mapped "${name}" to entity ID "${matchedDocId}" matching filters`);
+            return titleCaseArtistId(matchedDocId);
+          }
+        } catch (err) {
+          console.warn(`[Contextual Resolve] Failed for "${name}":`, err);
+        }
+        return name;
+      })
+    );
+    return resolvedList.join('::');
   }, []);
 
   const searchMatchingArtistsInCache = useCallback(async (queryStr: string): Promise<string[]> => {
@@ -1246,7 +1331,7 @@ const App: React.FC = () => {
     // EXPLICITLY RESET CANVAS STATE IMMEDIATELY (Fixing state leak from previous guest projects)
     setGraphData({ nodes: [], links: [] });
     setSeedArtists('');
-    setActiveNodes([]);
+    setActiveNodeIds([]);
     setDetailsCache(new Map());
     setChatHistories(new Map());
     setCurrentCacheKey(null);
@@ -1522,7 +1607,7 @@ const App: React.FC = () => {
     setGraphData(null);
     setBaseGraph(null);
     setSelectedNode(null);
-    setActiveNodes([]);
+    setActiveNodeIds([]);
     setDetailsCache(new Map());
     setChatHistories(new Map());
     setError(null);
@@ -1592,7 +1677,7 @@ const App: React.FC = () => {
     if (isTransitioning) {
        setSelectedNode(node);
        if (node.type !== 'founded') {
-         setActiveNodes(prev => prev.some(n => n.id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node]);
+         setActiveNodeIds(prev => prev.some(id => id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node.id]);
        }
        return;
     }
@@ -1681,7 +1766,7 @@ const App: React.FC = () => {
        
        setSelectedNode(hydratedNode);
        if (node.type !== 'founded') {
-         setActiveNodes(prev => prev.some(n => n.id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node]);
+         setActiveNodeIds(prev => prev.some(id => id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node.id]);
        }
        incrementDeepCutsOpenedCount();
        
@@ -1747,7 +1832,7 @@ const App: React.FC = () => {
        // Select the node so the sidebar shows and queue triggers a fresh live load
        setSelectedNode(node);
        if (node.type !== 'founded') {
-         setActiveNodes(prev => prev.some(n => n.id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node]);
+         setActiveNodeIds(prev => prev.some(id => id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node.id]);
        }
        return;
     }
@@ -1825,8 +1910,9 @@ const App: React.FC = () => {
                     };
                     
                     setSelectedNode(hydratedNode);
+                    setActiveNodeIds([hydratedNode.id]);
                     if (node.type !== 'founded') {
-                        setActiveNodes(prev => prev.some(n => n.id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node]);
+                        setActiveNodeIds(prev => prev.some(id => id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node.id]);
                     }
                     incrementDeepCutsOpenedCount();
                     
@@ -1903,7 +1989,7 @@ const App: React.FC = () => {
                     // Select the node so the sidebar shows and queue triggers a fresh live load
                     setSelectedNode(node);
                     if (node.type !== 'founded') {
-                        setActiveNodes(prev => prev.some(n => n.id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node]);
+                        setActiveNodeIds(prev => prev.some(id => id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node.id]);
                     }
                     return;
                 }
@@ -1926,7 +2012,7 @@ const App: React.FC = () => {
 
     setSelectedNode(node);
     if (node.type !== 'founded') {
-      setActiveNodes(prev => prev.some(n => n.id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node]);
+      setActiveNodeIds(prev => prev.some(id => id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node.id]);
     }
   }, [confirmTokenUsage, selectedNode, loadingNodeIds]);
 
@@ -2131,22 +2217,37 @@ const App: React.FC = () => {
   };
 
   const handleGenerateGraph = useCallback(async (
-    artists: string,
+    rawArtists: string,
     isRegeneration: boolean = false,
     graphToEnhance?: GraphData | null,
     bypassCacheValidation: boolean = false,
     bypassTokenConfirmation: boolean = false,
     overrideFilters?: DiscoveryFilters
   ) => {
+    const activeDiscoveryFilters = overrideFilters || discoveryFilters;
+    const hasActiveFilters = !!(
+      activeDiscoveryFilters.foundedAfter ||
+      activeDiscoveryFilters.foundedBefore ||
+      (activeDiscoveryFilters.includeOrigins && activeDiscoveryFilters.includeOrigins.length > 0) ||
+      (activeDiscoveryFilters.excludeOrigins && activeDiscoveryFilters.excludeOrigins.length > 0) ||
+      (activeDiscoveryFilters.includeGenres && activeDiscoveryFilters.includeGenres.length > 0) ||
+      (activeDiscoveryFilters.additionalInstructions && activeDiscoveryFilters.additionalInstructions.trim().length > 0)
+    );
+    const isLiveSynthesisTemp = hasActiveFilters || (rawArtists.split('::').map(s => s.trim()).filter(Boolean).length > 1);
+
+    let artists = rawArtists;
+    if (isLiveSynthesisTemp) {
+      artists = await resolveContextualEntityIds(rawArtists, activeDiscoveryFilters);
+    }
+
     isHydratingSessionRef.current = true;
     isProjectLoadingRef.current = true;
     setIsLoading(true);
     let controller: AbortController | null = null;
     let isLockReleasedByAutosave = false;
     let bypassToken = bypassTokenConfirmation;
-    const prevActiveNodes = activeNodes;
+    const prevActiveNodeIds = activeNodeIds;
     const prevSeedArtists = seedArtists;
-    const activeDiscoveryFilters = overrideFilters || discoveryFilters;
 
     // Clear previously approved seeds on fresh project generation
     if (!isRegeneration && !graphToEnhance) {
@@ -2395,7 +2496,7 @@ const App: React.FC = () => {
                       group: 0
                   };
                   setSelectedNode(hydratedNode);
-                  setActiveNodes([{...hydratedNode}]);
+                  setActiveNodeIds([hydratedNode.id]);
               }
               
               setSeedArtists(artists);
@@ -2420,6 +2521,23 @@ const App: React.FC = () => {
           } else {
             console.log(`[Front Gate Cache] Cache doc found for "${searchId}" but failed strict validation. Intercepting for self-healing.`);
             setIsLoading(true);
+            
+            let parsedGraph = null;
+            try {
+              parsedGraph = typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData;
+            } catch (e) {}
+            if (parsedGraph && parsedGraph.nodes && parsedGraph.nodes.length > 0) {
+              const normalizedGraph = applyHumanCasedLabels(normalizeGraphData(parsedGraph), artists);
+              normalizedGraph.nodes = normalizedGraph.nodes.map((n: any) => {
+                if (n.type === 'artist' && (normalizeArtistId(n.id) === normalizeArtistId(searchId) || n.id.toLowerCase() === searchIdLower)) {
+                  return { ...n, isPending: true };
+                }
+                return n;
+              });
+              setGraphData(normalizedGraph);
+              setActiveNodeIds([searchId]);
+            }
+
             const confirmed = await confirmTokenUsage('cache_upgrade', [], [searchId], []);
             if (confirmed) {
               console.log(`[Front Gate Cache] User confirmed cache upgrade. Overwriting old entry.`);
@@ -2441,15 +2559,15 @@ const App: React.FC = () => {
     controller = new AbortController();
     abortControllerRef.current = controller;
 
-    setActiveNodes(prev => {
-      const currentActiveIds = new Set(prev.map(n => n.id.toLowerCase()));
+    setActiveNodeIds(prev => {
+      const currentActiveIds = new Set(prev.map(id => id.toLowerCase()));
       const nextActive = [...prev];
 
       // Ensure all current seeds are in the active list
       artistList.forEach(name => {
         if (!currentActiveIds.has(name.toLowerCase())) {
           console.log(`[Graph Generation] Syncing Seed to Active:`, name);
-          nextActive.push({ id: name, type: 'artist' as any, group: 0 });
+          nextActive.push(name);
         }
       });
       return nextActive;
@@ -2457,12 +2575,22 @@ const App: React.FC = () => {
     let pruned: GraphData | undefined = undefined;
     if (graphToEnhance && graphToEnhance.nodes && graphToEnhance.nodes.length > 0) {
       const seedsLower = new Set(artists.split('::').map(a => a.trim().toLowerCase()));
-      pruned = pruneGraphToSeeds(graphToEnhance, seedsLower);
+      if (isLiveSynthesis) {
+        // Enforce a Clean Slate hand-off: keep ONLY the seed nodes, discard all recommended nodes/links
+        const seedNodes = graphToEnhance.nodes.filter(node => 
+          node.type === 'artist' && seedsLower.has(node.id.toLowerCase())
+        );
+        pruned = { nodes: seedNodes, links: [] };
+      } else {
+        pruned = pruneGraphToSeeds(graphToEnhance, seedsLower);
+      }
     }
     if (pruned) {
       pruned = filterGraphByDiscoveryFilters(pruned, activeDiscoveryFilters, artists);
     }
 
+    // Instantly commit the clean-slate pruned graph to React state to purge stale lineage data
+    setGraphData(pruned || { nodes: [], links: [] });
 
     setIsLoading(true); setError(null); setSeedArtists(artists);
     isFetchingDetailsRef.current = false;
@@ -2551,7 +2679,7 @@ const App: React.FC = () => {
           if (choice === 'cancel' || controller.signal.aborted) {
             isHydratingSessionRef.current = false;
             setIsLoading(false);
-            setActiveNodes(prevActiveNodes);
+            setActiveNodeIds(prevActiveNodeIds);
             setSeedArtists(prevSeedArtists);
             return;
           }
@@ -2654,19 +2782,13 @@ const App: React.FC = () => {
           
           setGraphData(final);
 
-          setActiveNodes(prev => {
-            const currentActive = [...prev];
-            const seedMapped = artistList.map(name => {
-              const match = final.nodes.find(fn => fn.id.toLowerCase() === name.toLowerCase());
-              return (match || { id: name, type: 'artist' as any, group: 0 }) as Node;
-            });
-            const seedIds = new Set(seedMapped.map(s => s.id.toLowerCase()));
-            const finalActive = [...seedMapped];
-            currentActive.forEach(p => {
-              if (!seedIds.has(p.id.toLowerCase())) {
-                const match = final.nodes.find(fn => fn.id.toLowerCase() === p.id.toLowerCase());
-                finalActive.push(match || p);
-                seedIds.add(p.id.toLowerCase());
+          setActiveNodeIds(prev => {
+            const seedIds = new Set(artistList.map(name => name.toLowerCase()));
+            const finalActive = [...artistList];
+            prev.forEach(id => {
+              if (!seedIds.has(id.toLowerCase())) {
+                finalActive.push(id);
+                seedIds.add(id.toLowerCase());
               }
             });
             return finalActive;
@@ -2830,7 +2952,7 @@ const App: React.FC = () => {
         if (choice === 'cancel' || controller.signal.aborted) {
           isHydratingSessionRef.current = false;
           setIsLoading(false);
-          setActiveNodes(prevActiveNodes);
+          setActiveNodeIds(prevActiveNodeIds);
           setSeedArtists(prevSeedArtists);
           return;
         }
@@ -2910,19 +3032,13 @@ const App: React.FC = () => {
         
         setGraphData(final);
 
-        setActiveNodes(prev => {
-          const currentActive = [...prev];
-          const seedMapped = artistList.map(name => {
-            const match = final.nodes.find(fn => fn.id.toLowerCase() === name.toLowerCase());
-            return (match || { id: name, type: 'artist' as any, group: 0 }) as Node;
-          });
-          const seedIds = new Set(seedMapped.map(s => s.id.toLowerCase()));
-          const finalActive = [...seedMapped];
-          currentActive.forEach(p => {
-            if (!seedIds.has(p.id.toLowerCase())) {
-              const match = final.nodes.find(fn => fn.id.toLowerCase() === p.id.toLowerCase());
-              finalActive.push(match || p);
-              seedIds.add(p.id.toLowerCase());
+        setActiveNodeIds(prev => {
+          const seedIds = new Set(artistList.map(name => name.toLowerCase()));
+          const finalActive = [...artistList];
+          prev.forEach(id => {
+            if (!seedIds.has(id.toLowerCase())) {
+              finalActive.push(id);
+              seedIds.add(id.toLowerCase());
             }
           });
           return finalActive;
@@ -3017,6 +3133,20 @@ const App: React.FC = () => {
         showToast(`⚡ ${fullHits.length + enrichmentRequired.length} artist${(fullHits.length + enrichmentRequired.length) > 1 ? 's' : ''} from cache — fetching ${toFetch.join(', ')}...`);
 
         // Intercept with token confirmation modal
+        const optimisticGraph = assembleGraphFromCache(cached);
+        const enrichmentSet = new Set(enrichmentRequired.map(name => normalizeArtistId(name)));
+        optimisticGraph.nodes = optimisticGraph.nodes.map(n => {
+          if (n.type === 'artist' && enrichmentSet.has(normalizeArtistId(n.id))) {
+            return { ...n, isPending: true };
+          }
+          return n;
+        });
+        setGraphData(optimisticGraph);
+        const optimisticActiveIds = Array.from(cached.values()).map(entry => entry.artistId).filter(Boolean);
+        if (optimisticActiveIds.length > 0) {
+          setActiveNodeIds(optimisticActiveIds);
+        }
+
         const confirmed = await confirmTokenUsage(
           enrichmentRequired.length > 0 && missing.length === 0 ? 'cache_upgrade' : 'generation',
           fullHits,
@@ -3027,13 +3157,13 @@ const App: React.FC = () => {
           setIsLoading(false);
           const legacyArtists = [...fullHits, ...enrichmentRequired];
           if (legacyArtists.length > 0) {
-            setActiveNodes(prevActiveNodes);
+            setActiveNodeIds(prevActiveNodeIds);
             setSeedArtists(prevSeedArtists);
             showToast(`Loading cached artists: ${legacyArtists.join(', ')}`);
             handleGenerateGraph(legacyArtists.join('::'), isRegeneration, graphToEnhance, true);
           } else {
             isHydratingSessionRef.current = false;
-            setActiveNodes(prevActiveNodes);
+            setActiveNodeIds(prevActiveNodeIds);
             setSeedArtists(prevSeedArtists);
           }
           return;
@@ -3083,7 +3213,7 @@ const App: React.FC = () => {
           return match ? { ...prev, id: match.id, label: match.label || prev.label } : prev;
         });
 
-        setActiveNodes(prev => {
+        setActiveNodeIds(prev => {
           const currentActive = [...prev];
           const seedMapped = artistList.map(name => {
             const match = merged.nodes.find(fn => fn.id.toLowerCase() === name.toLowerCase());
@@ -3129,12 +3259,11 @@ const App: React.FC = () => {
             return baseNode;
           });
           const seedIds = new Set(seedMapped.map(s => s.id.toLowerCase()));
-          const finalActive = [...seedMapped];
+          const finalActive = [...seedMapped.map(n => n.id)];
           currentActive.forEach(p => {
-            if (!seedIds.has(p.id.toLowerCase())) {
-              const match = merged.nodes.find(fn => fn.id.toLowerCase() === p.id.toLowerCase());
-              finalActive.push(match || p);
-              seedIds.add(p.id.toLowerCase());
+            if (!seedIds.has(p.toLowerCase())) {
+              finalActive.push(p);
+              seedIds.add(p.toLowerCase());
             }
           });
           return finalActive;
@@ -3162,7 +3291,7 @@ const App: React.FC = () => {
       if (!confirmed || (controller && controller.signal.aborted)) {
         isHydratingSessionRef.current = false;
         setIsLoading(false);
-        setActiveNodes(prevActiveNodes);
+        setActiveNodeIds(prevActiveNodeIds);
         setSeedArtists(prevSeedArtists);
         return;
       }
@@ -3261,12 +3390,12 @@ const App: React.FC = () => {
               }
               return prev;
             });
-            setActiveNodes(prev => {
-              return prev.map(an => {
-                if (normalizeArtistId(an.id) === oldSeedId) {
-                  return { ...an, id: newSeedId, label: newSeedLabel, name: newSeedLabel };
+            setActiveNodeIds(prev => {
+              return prev.map(id => {
+                if (normalizeArtistId(id) === oldSeedId) {
+                  return newSeedId;
                 }
-                return an;
+                return id;
               });
             });
           }
@@ -3296,38 +3425,15 @@ const App: React.FC = () => {
       }
 
       // Update active nodes metadata from the final graph, ensuring all seeds are present
-      setActiveNodes(prev => {
-        const currentActive = [...prev];
-
-        // Map current seeds first to maintain their presence and update them
-        const seedMapped = resolvedArtistList.map(name => {
-          const match = final.nodes.find(fn => fn.id.toLowerCase() === name.toLowerCase());
-          const baseNode = (match || { id: name, type: 'artist' as any, group: 0 }) as Node;
-          const normId = normalizeArtistId(baseNode.id);
-          const cachedDetails = detailsCache.get(normId) || detailsCache.get(baseNode.id.toLowerCase());
-          if (cachedDetails && cachedDetails.summary) {
-            return {
-              ...baseNode,
-              bio: cachedDetails.summary,
-              summary: cachedDetails.summary,
-              genre: cachedDetails.details?.genre || "",
-              origin: cachedDetails.details?.origin || "",
-              founded: cachedDetails.details?.founded || "",
-              imageUrl: cachedDetails.imageUrl || (baseNode as any).imageUrl || ""
-            };
-          }
-          return baseNode;
-        });
-
-        const seedIds = new Set(seedMapped.map(s => s.id.toLowerCase()));
-        const finalActive = [...seedMapped];
+      setActiveNodeIds(prev => {
+        const seedIds = new Set(resolvedArtistList.map(name => name.toLowerCase()));
+        const finalActive = [...resolvedArtistList];
 
         // Add back other previously active nodes that aren't seeds (e.g. manual discoveries)
-        currentActive.forEach(p => {
-          if (!seedIds.has(p.id.toLowerCase())) {
-            const match = final.nodes.find(fn => fn.id.toLowerCase() === p.id.toLowerCase());
-            finalActive.push(match || p);
-            seedIds.add(p.id.toLowerCase());
+        prev.forEach(id => {
+          if (!seedIds.has(id.toLowerCase())) {
+            finalActive.push(id);
+            seedIds.add(id.toLowerCase());
           }
         });
 
@@ -3772,7 +3878,7 @@ const App: React.FC = () => {
         // Clear ephemeral state if no project selected
         setGraphData(null);
         setSeedArtists('');
-        setActiveNodes([]);
+        setActiveNodeIds([]);
         setDetailsCache(new Map());
         setChatHistories(new Map());
         setCurrentCacheKey(null);
@@ -3917,11 +4023,7 @@ const App: React.FC = () => {
 
             // Restore active nodes
             if (data.activeNodes && Array.isArray(data.activeNodes)) {
-              const nextActive = restoreActiveNodesHelper(data.activeNodes, g.nodes);
-              setActiveNodes((prev: any) => {
-                if (prev.length !== nextActive.length) return nextActive;
-                return JSON.stringify(prev.map((n: any) => n.id)) === JSON.stringify(nextActive.map((n: any) => n.id)) ? prev : nextActive;
-              });
+              setActiveNodeIds(data.activeNodes);
             }
 
             loadedFromGraphData = true;
@@ -3956,12 +4058,7 @@ const App: React.FC = () => {
             if (isMultiArtistIncoming || hasActiveFiltersIncoming) {
               console.log(`[ProjectLoader] Intercepting Phase 1 loading for complex query. Multi-artist: ${isMultiArtistIncoming}, Filtered: ${hasActiveFiltersIncoming}. Handing over to handleGenerateGraph.`);
               if (data.activeNodes && Array.isArray(data.activeNodes)) {
-                const rawActive = data.activeNodes.map((item: any) => {
-                  return typeof item === 'string'
-                    ? { id: item, type: 'artist' as const, group: 0 }
-                    : { id: item.id, type: item.type || 'artist', group: item.group || 0, label: item.label };
-                });
-                setActiveNodes(rawActive);
+                setActiveNodeIds(data.activeNodes);
               }
               handleGenerateGraph(data.seedArtists || data.artistIds.join('::'), false, null, false, false, parsedFilters);
               return true;
@@ -4008,12 +4105,7 @@ const App: React.FC = () => {
 
             // Restore active nodes
             if (data.activeNodes && Array.isArray(data.activeNodes)) {
-              setActiveNodes((prev: any) => {
-                const gNodes = cached.size > 0 ? assembleGraphFromCache(cached).nodes : [];
-                const nextActive = restoreActiveNodesHelper(data.activeNodes, gNodes);
-                if (prev.length !== nextActive.length) return nextActive;
-                return JSON.stringify(prev.map((n: any) => n.id)) === JSON.stringify(nextActive.map((n: any) => n.id)) ? prev : nextActive;
-              });
+              setActiveNodeIds(data.activeNodes);
             }
 
           } else if (data.cacheKey) {
@@ -4066,11 +4158,7 @@ const App: React.FC = () => {
               }
 
               if (data.activeNodes && Array.isArray(data.activeNodes)) {
-                const nextActive = restoreActiveNodesHelper(data.activeNodes, g.nodes);
-                setActiveNodes((prev: any) => {
-                  if (prev.length !== nextActive.length) return nextActive;
-                  return JSON.stringify(prev.map((n: any) => n.id)) === JSON.stringify(nextActive.map((n: any) => n.id)) ? prev : nextActive;
-                });
+                setActiveNodeIds(data.activeNodes);
               }
             } else {
               // Legacy cache miss — fall back to inline graphData blob if available
@@ -4087,11 +4175,7 @@ const App: React.FC = () => {
                   setGraphData((prev: any) => isGraphEqual(prev, g) ? prev : g);
                   hydratedNodes = g.nodes;
                   if (data.activeNodes && Array.isArray(data.activeNodes)) {
-                    const nextActive = restoreActiveNodesHelper(data.activeNodes, g.nodes);
-                    setActiveNodes((prev: any) => {
-                      if (prev.length !== nextActive.length) return nextActive;
-                      return JSON.stringify(prev.map((n: any) => n.id)) === JSON.stringify(nextActive.map((n: any) => n.id)) ? prev : nextActive;
-                    });
+                    setActiveNodeIds(data.activeNodes);
                   }
                 }
               }
@@ -4130,11 +4214,7 @@ const App: React.FC = () => {
             }
 
             if (data.activeNodes && Array.isArray(data.activeNodes)) {
-              const nextActive = restoreActiveNodesHelper(data.activeNodes, g.nodes);
-              setActiveNodes((prev: any) => {
-                if (prev.length !== nextActive.length) return nextActive;
-                return JSON.stringify(prev.map((n: any) => n.id)) === JSON.stringify(nextActive.map((n: any) => n.id)) ? prev : nextActive;
-              });
+              setActiveNodeIds(data.activeNodes);
             }
           }
         }
@@ -4424,7 +4504,7 @@ const App: React.FC = () => {
                 isProjectLoadingRef.current = true;
                 setGraphData({ nodes: [], links: [] });
                 setSeedArtists('');
-                setActiveNodes([]);
+                setActiveNodeIds([]);
                 setDetailsCache(new Map());
                 setChatHistories(new Map());
                 setCurrentCacheKey(null);
@@ -4518,7 +4598,7 @@ const App: React.FC = () => {
             if (data.detailsCache) setDetailsCache(new Map(JSON.parse(data.detailsCache)));
             await batchHydrateDetailsCache(g.nodes, g.links);
             if (data.activeNodes && Array.isArray(data.activeNodes)) {
-              setActiveNodes(restoreActiveNodesHelper(data.activeNodes, g.nodes));
+              setActiveNodeIds(data.activeNodes);
             }
             showToast("Zcene Imported");
           } else {
@@ -4557,14 +4637,17 @@ const App: React.FC = () => {
   }, [handleGenerateGraph, seedArtists, isLoading, graphData, handleNodeClick, isAuthInitialized, user, isFirebaseReady, showToast, isAdmin, navigate]);
 
   const handleCloseNode = useCallback((nodeId: string) => {
-    setActiveNodes(prev => {
-      const idx = prev.findIndex(n => n.id.toLowerCase() === nodeId.toLowerCase());
+    setActiveNodeIds(prev => {
+      const idx = prev.findIndex(id => id.toLowerCase() === nodeId.toLowerCase());
       if (idx === -1) return prev;
       const next = prev.filter((_, i) => i !== idx);
-      if (selectedNode?.id.toLowerCase() === nodeId.toLowerCase()) setSelectedNode(next.length ? next[Math.min(idx, next.length - 1)] : null);
+      if (selectedNode?.id.toLowerCase() === nodeId.toLowerCase()) {
+        const remaining = activeNodes.filter(n => n.id.toLowerCase() !== nodeId.toLowerCase());
+        setSelectedNode(remaining.length ? remaining[Math.min(idx, remaining.length - 1)] : null);
+      }
       return next;
     });
-  }, [selectedNode]);
+  }, [selectedNode, activeNodes]);
 
   const handleRefreshNode = useCallback(async (nodeId: string) => {
     // ── Token Quota Gate ───────────────────────────────────────────────────────
@@ -5195,13 +5278,13 @@ const App: React.FC = () => {
                         return mutateGraphArtistId(prev, node.id, canonicalId, canonicalName);
                       });
 
-                      // 3. Mutate activeNodes
-                      setActiveNodes(prev => {
-                        return prev.map(n => {
-                          if (normalizeArtistId(n.id) === cacheId) {
-                            return { ...n, id: canonicalId, label: canonicalName, name: canonicalName };
+                      // 3. Mutate activeNodeIds
+                      setActiveNodeIds(prev => {
+                        return prev.map(id => {
+                          if (normalizeArtistId(id) === cacheId) {
+                            return canonicalId;
                           }
-                          return n;
+                          return id;
                         });
                       });
 
@@ -5457,7 +5540,7 @@ const App: React.FC = () => {
               setError(null);
               setDetailsError(null);
               setLoadingNodeIds(new Set());
-              setActiveNodes([]);
+              setActiveNodeIds([]);
               setSelectedNode(null);
             }}
             onRetryKey={handleSelectKey}

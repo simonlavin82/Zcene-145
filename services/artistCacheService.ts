@@ -101,10 +101,15 @@ export const normalizeGraphData = (graph: GraphData): GraphData => {
     idMap.set(originalId.toLowerCase(), normalizedId); // fallback
     idMap.set(normalizeArtistId(originalId), normalizedId); // accent-insensitive fallback
 
+    let label = node.label || originalId.trim();
+    if (node.type === 'artist') {
+      label = titleCaseArtistId(label);
+    }
+
     return {
       ...node,
       id: normalizedId,
-      label: node.label || originalId.trim()
+      label
     };
   });
 
@@ -256,6 +261,56 @@ export const extractArtistSubGraph = (
   return { nodes: ownNodes, links: ownLinks };
 };
 
+export const eagerNormalizeCacheEntry = (entry: ArtistCacheEntry): ArtistCacheEntry => {
+  if (!entry) return entry;
+  
+  if (entry.seedArtists) {
+    entry.seedArtists = titleCaseArtistId(entry.seedArtists);
+  }
+  
+  if (entry.graphData) {
+    try {
+      const graph = JSON.parse(entry.graphData);
+      if (graph && graph.nodes) {
+        graph.nodes.forEach((n: any) => {
+          if (n.type === 'artist') {
+            n.label = titleCaseArtistId(n.label || n.id);
+          }
+        });
+        entry.graphData = JSON.stringify(graph);
+      }
+    } catch (e) {
+      console.warn("[ArtistCache] Eager graphData normalization failed:", e);
+    }
+  }
+  
+  if (entry.detailsCache) {
+    try {
+      const parsed = JSON.parse(entry.detailsCache);
+      const processDetails = (details: any) => {
+        if (details) {
+          if (details.details) {
+            details.details.artist = titleCaseArtistId(details.details.artist || details.name || "");
+          }
+          if (details.name) {
+            details.name = titleCaseArtistId(details.name);
+          }
+        }
+      };
+      if (Array.isArray(parsed)) {
+        parsed.forEach(processDetails);
+      } else {
+        processDetails(parsed);
+      }
+      entry.detailsCache = JSON.stringify(parsed);
+    } catch (e) {
+      console.warn("[ArtistCache] Eager detailsCache normalization failed:", e);
+    }
+  }
+  
+  return entry;
+};
+
 // ─── READ ─────────────────────────────────────────────────────────────────────
 
 /**
@@ -311,11 +366,12 @@ export const readArtistCacheMany = async (
     if (result.status === 'fulfilled' && result.value) {
       const { name, entry } = result.value;
       if (entry) {
-        cached.set(name, entry);
-        cached.set(name.toLowerCase(), entry);
-        if (entry.artistId) {
-          cached.set(entry.artistId, entry);
-          cached.set(entry.artistId.toLowerCase(), entry);
+        const normalizedEntry = eagerNormalizeCacheEntry(entry);
+        cached.set(name, normalizedEntry);
+        cached.set(name.toLowerCase(), normalizedEntry);
+        if (normalizedEntry.artistId) {
+          cached.set(normalizedEntry.artistId, normalizedEntry);
+          cached.set(normalizedEntry.artistId.toLowerCase(), normalizedEntry);
         }
       } else {
         missing.push(name);
@@ -606,10 +662,43 @@ export const readLegacyArtistCache = async (
     if (snap.exists()) {
       const data = snap.data();
       console.log(`[ArtistCache] Legacy HIT: ${cacheKey}`);
-      // Legacy docs stored graphData + detailsCache as top-level string fields
+      let graphDataStr = data.graphData ?? '{"nodes":[],"links":[]}';
+      let detailsCacheStr = data.detailsCache ?? '[]';
+      try {
+        const graph = JSON.parse(graphDataStr);
+        if (graph && graph.nodes) {
+          graph.nodes.forEach((n: any) => {
+            if (n.type === 'artist') {
+              n.label = titleCaseArtistId(n.label || n.id);
+            }
+          });
+          graphDataStr = JSON.stringify(graph);
+        }
+      } catch (e) {}
+
+      try {
+        const parsed = JSON.parse(detailsCacheStr);
+        const processDetails = (details: any) => {
+          if (details) {
+            if (details.details) {
+              details.details.artist = titleCaseArtistId(details.details.artist || details.name || "");
+            }
+            if (details.name) {
+              details.name = titleCaseArtistId(details.name);
+            }
+          }
+        };
+        if (Array.isArray(parsed)) {
+          parsed.forEach(processDetails);
+        } else {
+          processDetails(parsed);
+        }
+        detailsCacheStr = JSON.stringify(parsed);
+      } catch (e) {}
+
       return {
-        graphData: data.graphData ?? '{"nodes":[],"links":[]}',
-        detailsCache: data.detailsCache ?? '[]',
+        graphData: graphDataStr,
+        detailsCache: detailsCacheStr,
       };
     }
     console.log(`[ArtistCache] Legacy MISS: ${cacheKey}`);

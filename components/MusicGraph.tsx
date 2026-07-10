@@ -419,6 +419,13 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     const seedArtistSet = new Set(seedArtists.map(a => normalizeArtistId(a)));
     const { width, height } = dimensions;
 
+    visibleNodes.forEach(n => {
+        if (n.x !== undefined && isNaN(n.x)) n.x = undefined;
+        if (n.y !== undefined && isNaN(n.y)) n.y = undefined;
+        if (n.fx !== undefined && n.fx !== null && isNaN(n.fx)) n.fx = null;
+        if (n.fy !== undefined && n.fy !== null && isNaN(n.fy)) n.fy = null;
+    });
+
     // Title-case formatter: converts raw id slugs (e.g. "buggin", "hardcore-punk")
     // to their display form ("Buggin", "Hardcore Punk") for legacy cache docs
     // where the .label field was not populated at write time.
@@ -752,6 +759,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 if (currentContainer.empty()) return;
 
                  currentContainer.select(".link-group").selectAll<SVGLineElement, Link>("line.visual-line")
+                    .style("display", (d: any) => (isNaN((d.source as any).x) || isNaN((d.source as any).y) || isNaN((d.target as any).x) || isNaN((d.target as any).y)) ? "none" : null)
                     .attr("x1", (d: any) => {
                         const val = (d.source as any).x;
                         return isNaN(val) ? 0 : val;
@@ -770,6 +778,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     });
 
                  currentContainer.select(".link-group").selectAll<SVGLineElement, Link>("line.interactive-link")
+                    .style("display", (d: any) => (isNaN((d.source as any).x) || isNaN((d.source as any).y) || isNaN((d.target as any).x) || isNaN((d.target as any).y)) ? "none" : null)
                     .attr("x1", (d: any) => {
                         const val = (d.source as any).x;
                         return isNaN(val) ? 0 : val;
@@ -817,6 +826,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                   }
                 
                 currentContainer.select(".node-group").selectAll<SVGGElement, Node>("g.node-element")
+                    .style("display", (d: any) => (isNaN(d.x) || isNaN(d.y)) ? "none" : null)
                     .attr("transform", (d: any) => {
                         const x = isNaN(d.x) ? 0 : (d.x ?? 0);
                         const y = isNaN(d.y) ? 0 : (d.y ?? 0);
@@ -1132,11 +1142,14 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             }
         });
 
+    nodeElements
+        .attr("class", d => `node-element ${d.isLoading || d.isPending ? 'animate-pulse' : ''}`);
+
     nodeElements.select("path")
         .attr("stroke-width", d => seedArtistSet.has(d.id.toLowerCase()) ? 3 : 2)
         .attr("stroke", d => seedArtistSet.has(d.id.toLowerCase()) ? '#F6E468' : '#1F1F1E')
         .attr("fill", d => getNodeColor(d, seedArtistSet))
-        .attr("opacity", d => d.isLoading ? 0.3 : 1)
+        .attr("opacity", d => d.isLoading || d.isPending ? 0.35 : 1)
         .attr("d", d => {
             const isSeed = seedArtistSet.has(d.id.toLowerCase());
             const area = 350;

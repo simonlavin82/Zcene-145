@@ -870,6 +870,10 @@ const GraphPage: React.FC<GraphPageProps> = ({
 
   const isDetailsVisible = useMemo(() => isSmallScreen ? activeTab === 'details' : !isDetailsPanelCollapsed, [isSmallScreen, activeTab, isDetailsPanelCollapsed]);
 
+  const shouldRenderDetailsPanel = useMemo(() => {
+    return activeNodes.length > 0 || selectedNode !== null;
+  }, [activeNodes, selectedNode]);
+
   useEffect(() => {
     if (selectedNode && isDetailsVisible) {
         setReadNodeIds(prev => {
@@ -1663,57 +1667,59 @@ const GraphPage: React.FC<GraphPageProps> = ({
                     </div>
                 </div>
                 
-                <aside style={isMagazineViewOpen ? {} : { width: `${rightPanelWidth}px` }} className={`z-50 flex flex-col flex-shrink-0 ${isMagazineViewOpen ? '!fixed !inset-0 !top-0 !left-0 !m-0 !w-screen !h-screen !z-[1000] bg-background-dark/95' : 'relative h-full bg-zinc-900 border border-zinc-600/50 overflow-hidden transition-all duration-300 ease-in-out'}`}>
-                     {!isDetailsPanelCollapsed && !isMagazineViewOpen && (
-                       <div onMouseDown={handleMouseDown('right')} className="absolute top-0 left-0 h-full w-2 cursor-col-resize select-none touch-none z-10 group" aria-label="Resize right panel" role="separator">
-                         <div className="w-full h-full bg-transparent group-hover:bg-primary/20 transition-colors"></div>
-                       </div>
-                     )}
-                     <DetailsPanel 
-                       selectedNode={selectedNode} 
-                       activeNodes={activeNodes} 
-                       detailsCache={detailsCache} 
-                       loadingNodeIds={loadingNodeIds} 
-                       onCloseNode={nodeId => onCloseNode(nodeId)} 
-                       onRefreshNode={nodeId => onRefreshNode(nodeId)} 
-                       error={detailsError} 
-                       systemError={systemError}
-                       graphData={data} 
-                       libraryArtists={memoizedLibraryArtists} 
-                       seedArtists={memoizedAllSeedArtists} 
-                       onAddArtist={(artist) => {
-                            const normalizedArtist = normalizeArtistId(artist);
-                            const isAlreadySeed = selectedSeedArtists.some(s => normalizeArtistId(s.name) === normalizedArtist);
-                            if (isAlreadySeed) {
-                                setSelectedSeedArtists(prev => prev.filter(s => normalizeArtistId(s.name) !== normalizedArtist));
-                                onShowToast(`Removed ${titleCaseArtistId(artist)} from seed list`);
-                            } else {
-                                setSelectedSeedArtists(prev => [...prev, { name: artist, enabled: true }]);
-                                onShowToast(`Added ${titleCaseArtistId(artist)} to seed list`);
-                            }
-                       }} 
-                       isCollapsed={isDetailsPanelCollapsed} 
-                       onToggleCollapse={toggleDetailsPanel} 
-                       isSmallScreen={isSmallScreen} 
-                       onNodeClick={handleNodeClickInternal} 
-                       onNavigate={onNavigate} 
-                       isGlobalLoading={isLoading} 
-                       onCancelGlobalLoading={onCancelGeneration} 
-                       unreadCount={systemError ? 0 : unreadDetailsCount} 
-                       collapseBtnRef={detailsCollapseBtnRef} 
-                       isMagazineViewOpen={isMagazineViewOpen} 
-                       onMagazineViewToggle={onUpdateIsMagazineViewOpen} 
-                       chatHistories={chatHistories} 
-                       onUpdateChatHistories={onUpdateChatHistories} 
-                       isActive={isActive} 
-                       stack={stack} 
-                       onToggleStack={onToggleStack} 
-                       isGuest={isGuest}
-                       user={user}
-                       onAuthRequest={() => { user ? onSaveToDashboard?.() : onLogin(); }}
-                       userTaste={profile?.taste}
-                     />
-                </aside>
+                {shouldRenderDetailsPanel && (
+                  <aside style={isMagazineViewOpen ? {} : { width: `${rightPanelWidth}px` }} className={`z-50 flex flex-col flex-shrink-0 ${isMagazineViewOpen ? '!fixed !inset-0 !top-0 !left-0 !m-0 !w-screen !h-screen !z-[1000] bg-background-dark/95' : 'relative h-full bg-zinc-900 border border-zinc-600/50 overflow-hidden transition-all duration-300 ease-in-out'}`}>
+                       {!isDetailsPanelCollapsed && !isMagazineViewOpen && (
+                         <div onMouseDown={handleMouseDown('right')} className="absolute top-0 left-0 h-full w-2 cursor-col-resize select-none touch-none z-10 group" aria-label="Resize right panel" role="separator">
+                           <div className="w-full h-full bg-transparent group-hover:bg-primary/20 transition-colors"></div>
+                         </div>
+                       )}
+                       <DetailsPanel 
+                         selectedNode={selectedNode} 
+                         activeNodes={activeNodes} 
+                         detailsCache={detailsCache} 
+                         loadingNodeIds={loadingNodeIds} 
+                         onCloseNode={nodeId => onCloseNode(nodeId)} 
+                         onRefreshNode={nodeId => onRefreshNode(nodeId)} 
+                         error={detailsError} 
+                         systemError={systemError}
+                         graphData={data} 
+                         libraryArtists={memoizedLibraryArtists} 
+                         seedArtists={memoizedAllSeedArtists} 
+                         onAddArtist={(artist) => {
+                              const normalizedArtist = normalizeArtistId(artist);
+                              const isAlreadySeed = selectedSeedArtists.some(s => normalizeArtistId(s.name) === normalizedArtist);
+                              if (isAlreadySeed) {
+                                  setSelectedSeedArtists(prev => prev.filter(s => normalizeArtistId(s.name) !== normalizedArtist));
+                                  onShowToast(`Removed ${titleCaseArtistId(artist)} from seed list`);
+                              } else {
+                                  setSelectedSeedArtists(prev => [...prev, { name: artist, enabled: true }]);
+                                  onShowToast(`Added ${titleCaseArtistId(artist)} to seed list`);
+                              }
+                         }} 
+                         isCollapsed={isDetailsPanelCollapsed} 
+                         onToggleCollapse={toggleDetailsPanel} 
+                         isSmallScreen={isSmallScreen} 
+                         onNodeClick={handleNodeClickInternal} 
+                         onNavigate={onNavigate} 
+                         isGlobalLoading={isLoading} 
+                         onCancelGlobalLoading={onCancelGeneration} 
+                         unreadCount={systemError ? 0 : unreadDetailsCount} 
+                         collapseBtnRef={detailsCollapseBtnRef} 
+                         isMagazineViewOpen={isMagazineViewOpen} 
+                         onMagazineViewToggle={onUpdateIsMagazineViewOpen} 
+                         chatHistories={chatHistories} 
+                         onUpdateChatHistories={onUpdateChatHistories} 
+                         isActive={isActive} 
+                         stack={stack} 
+                         onToggleStack={onToggleStack} 
+                         isGuest={isGuest}
+                         user={user}
+                         onAuthRequest={() => { user ? onSaveToDashboard?.() : onLogin(); }}
+                         userTaste={profile?.taste}
+                       />
+                  </aside>
+                )}
             </main>
         )}
         <GenerativeRationaleModal 
