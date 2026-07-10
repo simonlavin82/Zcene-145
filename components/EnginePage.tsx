@@ -730,6 +730,8 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                             <p className="text-zinc-400 leading-relaxed max-w-3xl text-base">
                                 This page documents the structural architecture, prompt templates, and discovery logic that drive Zcene. 
                                 It is the underlying system that allows the Author to map the unknown.
+                                <br /><br />
+                                <strong className="text-zinc-300 font-medium">Governance Intent:</strong> This document defines the system's behavioral laws—how the architecture orchestrates state, handles errors, and prevents regressions. It captures the 'why' behind structural decisions to ensure any new code reinforces system resilience.
                             </p>
                         </div>
 

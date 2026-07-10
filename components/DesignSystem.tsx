@@ -315,6 +315,8 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             <h1 className="text-3xl font-medium text-white mb-4">Design System</h1>
                             <p className="text-zinc-400 leading-relaxed max-w-3xl text-base">
                                 This style guide documents the layout patterns, visual tokens, and UI components that form the Zcene experience. It is our unified language for blending brutalist structure with premium interaction.
+                                <br /><br />
+                                <strong className="text-zinc-300 font-medium">Governance Intent:</strong> This is the source of truth for all UI components, interaction patterns, and visual specs. Any proposed changes to layout, spacing, or component behavior must align with these specs to ensure consistency across the Zcene application.
                             </p>
                         </div>
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Introduction</h2>
