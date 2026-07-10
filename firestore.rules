@@ -176,8 +176,8 @@ service cloud.firestore {
     // Top-level collection storing computed graph structures and Deep Cut metadata.
     // Keyed by a normalized artist+filter string for O(1) lookup before Gemini is called.
     match /artists/{cacheKey} {
-      // Anyone (even guests) can read the global cache for instant hydration.
-      allow get: if true;
+      // Anyone (even guests) can read and query the global cache for instant hydration.
+      allow read: if true;
 
       // Any authenticated user may CREATE a new entry on a cache miss.
       // The rule checks that the document does not already exist, preventing poisoning.

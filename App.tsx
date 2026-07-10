@@ -35,6 +35,16 @@ const checkVideoPlayabilityOnServer = async (videoId: string): Promise<boolean> 
   return false;
 };
 
+const isArtistIdMatch = (nodeId: string, activeId: string): boolean => {
+  if (!nodeId || !activeId) return false;
+  const nNorm = normalizeArtistId(nodeId);
+  const aNorm = normalizeArtistId(activeId);
+  if (nNorm === aNorm) return true;
+  if (aNorm.startsWith(nNorm + '-')) return true;
+  if (nNorm.startsWith(aNorm + '-')) return true;
+  return false;
+};
+
 
 
 declare global {
@@ -780,7 +790,7 @@ const validateCacheEntry = (data: any): CacheValidationResult => {
     
     // Check if there are peer bands (multiple artist nodes)
     const artistNodes = graph.nodes.filter((n: any) => n.type === 'artist');
-    if (artistNodes.length <= 1) {
+    if (artistNodes.length === 0) {
       needsPeerBands = true;
     }
 
@@ -962,7 +972,7 @@ const App: React.FC = () => {
   const activeNodes = useMemo(() => {
     if (!graphData || !graphData.nodes) return [];
     return activeNodeIds
-      .map(id => graphData.nodes.find(n => n.id.toLowerCase() === id.toLowerCase() || normalizeArtistId(n.id) === normalizeArtistId(id)))
+      .map(id => graphData.nodes.find(n => n.id.toLowerCase() === id.toLowerCase() || normalizeArtistId(n.id) === normalizeArtistId(id) || isArtistIdMatch(n.id, id)))
       .filter((n): n is Node => {
         if (!n || n.type !== 'artist') return false;
         const details = detailsCache.get(n.id) || 
@@ -2534,7 +2544,7 @@ const App: React.FC = () => {
             if (parsedGraph && parsedGraph.nodes && parsedGraph.nodes.length > 0) {
               const normalizedGraph = applyHumanCasedLabels(normalizeGraphData(parsedGraph), artists);
               normalizedGraph.nodes = normalizedGraph.nodes.map((n: any) => {
-                if (n.type === 'artist' && (normalizeArtistId(n.id) === normalizeArtistId(searchId) || n.id.toLowerCase() === searchIdLower)) {
+                if (n.type === 'artist' && (normalizeArtistId(n.id) === normalizeArtistId(searchId) || n.id.toLowerCase() === searchIdLower || isArtistIdMatch(n.id, searchId))) {
                   return { ...n, isPending: true };
                 }
                 return n;
@@ -2888,7 +2898,7 @@ const App: React.FC = () => {
 
           const isAlreadyInGraph = !hasActiveFilters && (
             currentSeeds.includes(normName) || 
-            (graphData?.nodes.some(n => n.id.toLowerCase() === normName || normalizeArtistId(n.id) === normName) ?? false)
+            (graphData?.nodes.some(n => n.id.toLowerCase() === normName || normalizeArtistId(n.id) === normName || isArtistIdMatch(n.id, normName)) ?? false)
           );
 
           const validation = entry ? validateCacheEntry(entry) : null;
@@ -4958,13 +4968,13 @@ const App: React.FC = () => {
       // ONLY process the actively selected node to prevent neighbor chain-fetching
       const candidateNodes = (graphData?.nodes || []).filter(n => 
         n.type === 'artist' && (
-          activeNodeIds.some(id => n.id.toLowerCase() === id.toLowerCase() || normalizeArtistId(n.id) === normalizeArtistId(id)) ||
-          (selectedNode && (n.id.toLowerCase() === selectedNode.id.toLowerCase() || normalizeArtistId(n.id) === normalizeArtistId(selectedNode.id)))
+          activeNodeIds.some(id => n.id.toLowerCase() === id.toLowerCase() || normalizeArtistId(n.id) === normalizeArtistId(id) || isArtistIdMatch(n.id, id)) ||
+          (selectedNode && (n.id.toLowerCase() === selectedNode.id.toLowerCase() || normalizeArtistId(n.id) === normalizeArtistId(selectedNode.id) || isArtistIdMatch(n.id, selectedNode.id)))
         )
       );
 
       const nodes = candidateNodes.filter(n => {
-        const isSelected = selectedNode && normalizeArtistId(selectedNode.id) === normalizeArtistId(n.id);
+        const isSelected = selectedNode && (normalizeArtistId(selectedNode.id) === normalizeArtistId(n.id) || isArtistIdMatch(n.id, selectedNode.id));
         const simpleId = normalizeArtistId(n.id);
         let disambiguatedCacheId = simpleId;
         let connectedCountries: string[] = [];
@@ -5317,18 +5327,31 @@ const App: React.FC = () => {
                       return prev;
                     });
 
-                    if (existingSnap.exists()) {
-                      // Update the existing doc with fresh detailsCache and a new cachedAt timestamp.
-                      // The security rule Case A permits: detailsCache, hitCount, and cachedAt.
-                      await updateDoc(doc(db, 'artists', existingSnap.id), {
+                    const simpleArtistId = normalizeArtistId(node.id);
+                    const reconciliationQuery = query(
+                      collection(db, 'artists'),
+                      where('artistId', '==', simpleArtistId),
+                      limit(1)
+                    );
+                    const reconciliationSnap = await getDocs(reconciliationQuery);
+
+                    let targetDocId = existingSnap.id;
+                    let docExists = existingSnap.exists();
+
+                    if (!reconciliationSnap.empty) {
+                      const matchedDoc = reconciliationSnap.docs[0];
+                      targetDocId = matchedDoc.id;
+                      docExists = true;
+                      console.log(`[Deep Cut Queue] Reconciliation match resolved: "${targetDocId}" for artistId "${simpleArtistId}"`);
+                    }
+
+                    if (docExists) {
+                      await updateDoc(doc(db, 'artists', targetDocId), {
                         detailsCache: JSON.stringify(details),
                         cachedAt: serverTimestamp()
                       });
-                      console.log(`[Deep Cut Queue] Write-back: Updated detailsCache + cachedAt for: ${existingSnap.id}`);
+                      console.log(`[Deep Cut Queue] Write-back: Successfully updated detailsCache + cachedAt for: ${targetDocId}`);
                     } else if (!fallbackDetails) {
-                      // JIT cache creation for peripheral recommendation nodes:
-                      // Only create a new document if the node came from live Gemini synthesis
-                      // (i.e. no fallback was available). This prevents poisoning with stale data.
                       const normalizedGraph = normalizeGraphData(graphData);
                       let { nodes: subNodes, links: subLinks } = extractArtistSubGraph(node.id, normalizedGraph, seedArtists.split('::'));
                       
@@ -5337,58 +5360,39 @@ const App: React.FC = () => {
                       }
                       
                       const canonicalNode = subNodes.find(
-                        n => n.type === 'artist' && (n.id.trim().toLowerCase() === node.id.trim().toLowerCase() || normalizeArtistId(n.id) === canonicalId)
+                        n => n.type === 'artist' && (n.id.trim().toLowerCase() === node.id.trim().toLowerCase() || normalizeArtistId(n.id) === targetDocId)
                       );
                       const canonicalName = canonicalNode?.label ?? canonicalNode?.id ?? node.id;
 
-                      const simpleArtistId = normalizeArtistId(node.id);
-                      const reconciliationQuery = query(
-                        collection(db, 'artists'),
-                        where('artistId', '==', simpleArtistId),
-                        limit(1)
-                      );
-                      const reconciliationSnap = await getDocs(reconciliationQuery);
-
-                      if (!reconciliationSnap.empty) {
-                        const existingDoc = reconciliationSnap.docs[0];
-                        console.log(`[Deep Cut Queue] Reconciliation: Found existing document "${existingDoc.id}" for artistId "${simpleArtistId}". Patching to avoid duplicate.`);
-                        await updateDoc(doc(db, 'artists', existingDoc.id), {
-                          graphData: JSON.stringify({ nodes: subNodes, links: subLinks }),
-                          detailsCache: JSON.stringify(details),
-                          cachedAt: serverTimestamp()
-                        });
-                      } else {
-                        const canonicalDocRef = doc(db, 'artists', canonicalId);
-                        await setDoc(canonicalDocRef, {
-                          cacheKey: canonicalId,
-                          artistId: canonicalId,
-                          seedArtists: canonicalNameFromDetails || canonicalName,
-                          graphData: JSON.stringify({ nodes: subNodes, links: subLinks }),
-                          filters: discoveryFiltersRef.current || {},
-                          cacheVersion: 2,
-                          cachedAt: serverTimestamp(),
-                          hitCount: 0,
-                          isDeep: false,
-                          detailsCache: JSON.stringify(details)
-                        });
-                        console.log(`[Deep Cut Queue] JIT cached Canonical node: ${canonicalId}`);
-                      }
+                      await setDoc(doc(db, 'artists', targetDocId), {
+                        cacheKey: targetDocId,
+                        artistId: simpleArtistId,
+                        seedArtists: canonicalNameFromDetails || canonicalName,
+                        graphData: JSON.stringify({ nodes: subNodes, links: subLinks }),
+                        filters: discoveryFiltersRef.current || {},
+                        cacheVersion: 2,
+                        cachedAt: serverTimestamp(),
+                        hitCount: 0,
+                        isDeep: false,
+                        detailsCache: JSON.stringify(details)
+                      });
+                      console.log(`[Deep Cut Queue] JIT cached Canonical node: ${targetDocId}`);
+                    }
                       
-                      if (isAlias) {
-                        const aliasDocRef = doc(db, 'artists', cacheId);
-                        await setDoc(aliasDocRef, {
-                          cacheKey: cacheId,
-                          artistId: cacheId,
-                          seedArtists: node.id,
-                          graphData: JSON.stringify({ nodes: [], links: [] }),
-                          filters: {},
-                          cacheVersion: 2,
-                          cachedAt: serverTimestamp(),
-                          hitCount: 0,
-                          redirectTo: canonicalId
-                        });
-                        console.log(`[Deep Cut Queue] Created Alias Redirect: ${cacheId} -> ${canonicalId}`);
-                      }
+                    if (isAlias) {
+                      const aliasDocRef = doc(db, 'artists', cacheId);
+                      await setDoc(aliasDocRef, {
+                        cacheKey: cacheId,
+                        artistId: cacheId,
+                        seedArtists: node.id,
+                        graphData: JSON.stringify({ nodes: [], links: [] }),
+                        filters: {},
+                        cacheVersion: 2,
+                        cachedAt: serverTimestamp(),
+                        hitCount: 0,
+                        redirectTo: canonicalId
+                      });
+                      console.log(`[Deep Cut Queue] Created Alias Redirect: ${cacheId} -> ${canonicalId}`);
                     }
                   } catch (e: any) {
                     console.error(
