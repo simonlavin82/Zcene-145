@@ -1,5 +1,11 @@
 # Zcene Engine & Production Architecture
 
+> **GOVERNANCE: ARCHITECTURAL INTENT & RESILIENCE**
+> This document defines the system's "behavioral laws"—how the architecture orchestrates
+> state, handles errors, and prevents regressions. It captures the *why* behind
+> structural decisions. Use this to ensure any new code reinforces system resilience
+> and adheres to the established architectural flow.
+
 This document outlines the core technical architecture, interface boundaries, and data pipelines of the Zcene music discovery platform.
 
 ---

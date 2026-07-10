@@ -1,3 +1,9 @@
+/**
+ * PURPOSE: VISUAL & BEHAVIORAL STANDARD
+ * This is the source of truth for all UI components, interaction patterns, and visual specs.
+ * Any proposed changes to layout, spacing, or component behavior must align with these specs
+ * to ensure consistency across the Zcene application.
+ */
 import React, { useEffect, useState, useRef } from 'react';
 import { View } from '../types';
 import * as d3 from 'd3';
