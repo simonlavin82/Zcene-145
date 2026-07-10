@@ -4951,7 +4951,14 @@ const App: React.FC = () => {
     const fetch = async () => {
       // 1. Block Automated Background Fetches: ✦
       // ONLY process the actively selected node to prevent neighbor chain-fetching
-      const nodes = activeNodes.filter(n => {
+      const candidateNodes = (graphData?.nodes || []).filter(n => 
+        n.type === 'artist' && (
+          activeNodeIds.some(id => n.id.toLowerCase() === id.toLowerCase() || normalizeArtistId(n.id) === normalizeArtistId(id)) ||
+          (selectedNode && (n.id.toLowerCase() === selectedNode.id.toLowerCase() || normalizeArtistId(n.id) === normalizeArtistId(selectedNode.id)))
+        )
+      );
+
+      const nodes = candidateNodes.filter(n => {
         const isSelected = selectedNode && normalizeArtistId(selectedNode.id) === normalizeArtistId(n.id);
         const simpleId = normalizeArtistId(n.id);
         let disambiguatedCacheId = simpleId;
@@ -5440,7 +5447,7 @@ const App: React.FC = () => {
       } finally { isFetchingDetailsRef.current = false; }
     };
     fetch();
-  }, [activeNodes, detailsCache, graphData, seedArtists, selectedNode, urlOriginHint, humanizeError, user, isLoading, incrementDeepCutsOpenedCount, triggerBackgroundRevalidation]);
+  }, [activeNodeIds, activeNodes, detailsCache, graphData, seedArtists, selectedNode, urlOriginHint, humanizeError, user, isLoading, incrementDeepCutsOpenedCount, triggerBackgroundRevalidation]);
 
   const handleViewChange = useCallback((newView: View) => {
     if (newView === View.Graph && !graphData) setGraphData({ nodes: [], links: [] });
