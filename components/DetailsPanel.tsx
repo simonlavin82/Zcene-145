@@ -25,13 +25,9 @@ const checkIsProfileIncomplete = (node: Node, details: NodeDetails | null | unde
   const isArtist = node.type === 'artist' || !node.type || details?.details?.artist !== undefined;
   if (!details || !isArtist) return false;
 
+  // A profile is only incomplete if the biography itself is absent or empty.
+  // Missing metadata (Genre/Origin) is treated as a normal state, not a corrupt/incomplete profile.
   if (!details.summary || details.summary.trim() === "") {
-    return true;
-  }
-
-  const genre = details.details?.genre?.trim().toLowerCase();
-  const origin = details.details?.origin?.trim().toLowerCase();
-  if (!genre || genre === 'unknown' || !origin || origin === 'unknown') {
     return true;
   }
 

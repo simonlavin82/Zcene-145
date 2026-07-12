@@ -782,6 +782,23 @@ export const getArtistDocWithRedirect = async (
           console.log(`[Client-Side Redirect] Redirecting ${artistId} -> ${data.redirectTo}`);
           return getArtistDocWithRedirect(data.redirectTo, depth + 1);
         }
+        return snap;
+      }
+
+      // Prefix match lookup fallback: check if any document has a cacheKey starting with artistId
+      if (depth === 0) {
+        const { collection, query, where, getDocs } = await import('firebase/firestore');
+        const q = query(
+          collection(db, 'artists'),
+          where('cacheKey', '>=', artistId),
+          where('cacheKey', '<=', artistId + '\uf8ff')
+        );
+        const qSnap = await getDocs(q);
+        const validDocs = qSnap.docs.filter(d => !d.data().redirectTo);
+        if (validDocs.length > 0) {
+          console.log(`[Client-Side Prefix Match] Resolved ${artistId} -> ${validDocs[0].id}`);
+          return validDocs[0];
+        }
       }
       return snap;
     }
@@ -815,6 +832,27 @@ export const getArtistDocWithRedirect = async (
       if (data && data.redirectTo && depth < 3) {
         console.log(`[Client-Side Redirect] Redirecting ${artistId} -> ${data.redirectTo}`);
         return getArtistDocWithRedirect(data.redirectTo, depth + 1);
+      }
+      return snap;
+    }
+
+    // Prefix match lookup fallback: check if any document has a cacheKey starting with artistId
+    if (depth === 0) {
+      try {
+        const { collection, query, where, getDocs } = await import('firebase/firestore');
+        const q = query(
+          collection(db, 'artists'),
+          where('cacheKey', '>=', artistId),
+          where('cacheKey', '<=', artistId + '\uf8ff')
+        );
+        const qSnap = await getDocs(q);
+        const validDocs = qSnap.docs.filter(d => !d.data().redirectTo);
+        if (validDocs.length > 0) {
+          console.log(`[Client-Side Prefix Match (Catch)] Resolved ${artistId} -> ${validDocs[0].id}`);
+          return validDocs[0];
+        }
+      } catch (innerErr) {
+        console.warn(`[Client-Side Prefix Match (Catch)] Failed query:`, innerErr);
       }
     }
     return snap;
