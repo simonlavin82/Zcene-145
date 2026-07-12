@@ -2415,7 +2415,11 @@ const App: React.FC = () => {
           const isDeep = data?.isDeep === true;
           const validation = validateCacheEntry(data);
           const hasGraph = parsedGraph && parsedGraph.nodes && parsedGraph.nodes.length > 0;
-          const hasDetailsObj = data.detailsCache && data.detailsCache.trim().length > 0;
+          const hasDetailsObj = !!data.detailsCache && (
+            typeof data.detailsCache === 'string'
+              ? data.detailsCache.trim().length > 0
+              : Object.keys(data.detailsCache).length > 0
+          );
           
           // Relaxed cache qualification check: if graphData exists, accept as cache hit!
           const isQualified = !!hasGraph;
