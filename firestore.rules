@@ -222,8 +222,9 @@ service cloud.firestore {
                        ) || (
                           // Case C: Convert a legacy/duplicate document to a redirect pointer
                           incoming().cacheVersion == 2 &&
-                          request.resource.data.diff(resource.data).affectedKeys()
-                            .hasOnly(['redirectTo', 'artistId', 'cacheKey', 'cacheVersion', 'cachedAt'])
+                          'redirectTo' in incoming() &&
+                          incoming().redirectTo is string &&
+                          incoming().redirectTo != ""
                        );
 
       // Only admins may delete cache entries (manual invalidation).

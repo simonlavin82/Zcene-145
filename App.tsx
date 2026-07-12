@@ -1615,19 +1615,24 @@ const App: React.FC = () => {
   }, [user, showToast]);
 
   const displayProjectName = useMemo(() => {
-    if (projectName) return projectName;
-    if (seedArtists) {
-      const first = seedArtists.split('::')[0]?.trim();
-      return first || 'Untitled Zcene';
+    let name = projectName;
+    if (!name && seedArtists) {
+      name = seedArtists.split('::')[0]?.trim();
     }
-    return 'Untitled Zcene';
+    if (!name) return 'Untitled Zcene';
+    
+    if (name === name.toLowerCase()) {
+      return titleCaseArtistId(name);
+    }
+    return name;
   }, [projectName, seedArtists]);
 
   useEffect(() => {
     if (seedArtists && (!projectName || projectName === 'Untitled Zcene')) {
       const first = seedArtists.split('::')[0]?.trim();
       if (first) {
-        handleUpdateProjectName(first);
+        const formatted = first === first.toLowerCase() ? titleCaseArtistId(first) : first;
+        handleUpdateProjectName(formatted);
       }
     }
   }, [seedArtists, projectName, handleUpdateProjectName]);
