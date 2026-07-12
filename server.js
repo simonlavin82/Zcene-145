@@ -362,7 +362,7 @@ async function triggerReSynthesis(artistId, originalData) {
   }
 
   const artistName = details?.details?.artist || originalData.seedArtists || artistId;
-  const canonicalId = normalizeArtistId(artistName);
+  const canonicalId = originalData.cacheKey || originalData.artistId || normalizeArtistId(artistName);
   const isAlias = canonicalId !== artistId;
   const genre = details?.details?.genre || '';
   const seedArtists = artistName;
@@ -394,8 +394,6 @@ async function triggerReSynthesis(artistId, originalData) {
       }
     ],
     generationConfig: {
-      responseMimeType: "application/json",
-      responseSchema: NODE_DETAILS_SCHEMA_SERVER,
       maxOutputTokens: 4000,
     }
   };
@@ -453,7 +451,8 @@ async function triggerReSynthesis(artistId, originalData) {
         console.log(`[Re-Synthesis] Mock Created Alias Redirect: ${artistId} -> ${cleanCanonicalId}`);
       }
     } catch (dbErr) {
-      console.error("[Re-Synthesis] Mock database set failed:", dbErr);
+      console.error(`[Re-Synthesis] Mock database set failed for document: ${cleanCanonicalId}. Error:`, dbErr.message);
+      console.error(`[Re-Synthesis] Contaminated Payload Dump:`, JSON.stringify(finalPayload, null, 2));
     }
     return;
   }
@@ -479,7 +478,11 @@ async function triggerReSynthesis(artistId, originalData) {
       throw new Error("No text candidate returned from Gemini");
     }
 
-    const synthesizedDetails = JSON.parse(candidateText.trim());
+    let cleanText = candidateText.trim();
+    if (cleanText.startsWith('```')) {
+      cleanText = cleanText.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+    }
+    const synthesizedDetails = JSON.parse(cleanText.trim());
     
     // Check if new youtubeVideoId is playable
     let isPlayable = false;
@@ -505,24 +508,30 @@ async function triggerReSynthesis(artistId, originalData) {
     };
 
     // Update Firestore at canonicalId using Admin SDK
-    enforceArtistCacheSchemaServer(finalPayload);
-    await db.collection('artists').doc(canonicalId).set(finalPayload, { merge: true });
-    console.log(`[Re-Synthesis] Successfully healed profile for canonical artist: ${canonicalId}`);
+    try {
+      enforceArtistCacheSchemaServer(finalPayload);
+      await db.collection('artists').doc(canonicalId).set(finalPayload, { merge: true });
+      console.log(`[Re-Synthesis] Successfully healed profile for canonical artist: ${canonicalId}`);
 
-    if (isAlias) {
-      // Write alias redirect doc
-      await db.collection('artists').doc(artistId).set({
-        cacheKey: artistId,
-        artistId: artistId,
-        seedArtists: originalData.seedArtists || artistId,
-        graphData: JSON.stringify({ nodes: [], links: [] }),
-        filters: {},
-        cacheVersion: 2,
-        cachedAt: admin.firestore.FieldValue.serverTimestamp(),
-        hitCount: 0,
-        redirectTo: canonicalId
-      });
-      console.log(`[Re-Synthesis] Created Alias Redirect: ${artistId} -> ${canonicalId}`);
+      if (isAlias) {
+        // Write alias redirect doc
+        await db.collection('artists').doc(artistId).set({
+          cacheKey: artistId,
+          artistId: artistId,
+          seedArtists: originalData.seedArtists || artistId,
+          graphData: JSON.stringify({ nodes: [], links: [] }),
+          filters: {},
+          cacheVersion: 2,
+          cachedAt: admin.firestore.FieldValue.serverTimestamp(),
+          hitCount: 0,
+          redirectTo: canonicalId
+        });
+        console.log(`[Re-Synthesis] Created Alias Redirect: ${artistId} -> ${canonicalId}`);
+      }
+    } catch (dbErr) {
+      console.error(`[Re-Synthesis] Firestore set() failed for document: ${canonicalId}. Error:`, dbErr.message);
+      console.error(`[Re-Synthesis] Contaminated Payload Dump:`, JSON.stringify(finalPayload, null, 2));
+      throw dbErr;
     }
 
   } catch (error) {
