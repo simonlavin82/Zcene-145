@@ -1169,6 +1169,19 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     const touchEndX = useRef<number | null>(null);
     const minSwipeDistance = 50;
 
+    const isSelectedNodeHydrating = useMemo(() => {
+        if (!selectedNode) return false;
+        const normId = normalizeArtistId(selectedNode.id);
+        const details = detailsCache.get(selectedNode.id) || 
+                        detailsCache.get(selectedNode.id.toLowerCase()) || 
+                        detailsCache.get(normId);
+        return !details;
+    }, [selectedNode, detailsCache]);
+
+    const isReconciliationPending = useMemo(() => {
+        return isGlobalLoading || loadingNodeIds.size > 0 || isSelectedNodeHydrating;
+    }, [isGlobalLoading, loadingNodeIds, isSelectedNodeHydrating]);
+
     useEffect(() => {
         if (selectedNode && activeNodes && activeNodes.length > 0) {
             const idx = activeNodes.findIndex(n => n.id.toLowerCase() === selectedNode.id.toLowerCase());
@@ -1522,12 +1535,19 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                         >
                             {filteredAndSortedNodes.length === 0 || systemError ? (
                                 <div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none">
-                                    {(isGlobalLoading && !systemError) ? (
+                                    {(isReconciliationPending && !systemError) ? (
                                         <div className="flex flex-col items-center justify-center gap-6">
-                                            <LoadingSpinner 
-                                                steps={["Waiting for the Spiderweb to settle...", "Mapping relationships first...", "Synchronising nodes..."]}
-                                                subtext="Graph mapping takes priority. Details will follow."
-                                            />
+                                            {isGlobalLoading ? (
+                                                <LoadingSpinner 
+                                                    steps={["Waiting for the Spiderweb to settle...", "Mapping relationships first...", "Synchronising nodes..."]}
+                                                    subtext="Graph mapping takes priority. Details will follow."
+                                                />
+                                            ) : (
+                                                <LoadingSpinner 
+                                                    steps={DETAIL_THINKING_STEPS}
+                                                    subtext="Typically takes 20–30 seconds to dig for details."
+                                                />
+                                            )}
                                         </div>
                                     ) : (
                                         <div className="flex flex-col items-center gap-4">
