@@ -1214,6 +1214,10 @@ const App: React.FC = () => {
         const data = docSnap.data();
         const docId = docSnap.id;
         
+        if (data.redirectTo) {
+          continue; // Skip redirect pointer documents
+        }
+        
         let originVal = "";
         let genreVal = "";
         let labelVal = docId;

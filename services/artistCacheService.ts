@@ -168,14 +168,23 @@ export const extractArtistSubGraph = (
   // Make sure the target artist itself is not in the other seeds set we want to exclude
   seedsNorm.delete(artistNameNorm);
 
+  const isArtistIdMatch = (a: string, b: string) => {
+    const na = normalizeArtistId(a);
+    const nb = normalizeArtistId(b);
+    return na === nb || na.startsWith(nb + '-') || nb.startsWith(na + '-');
+  };
+
   // Find the canonical artist node from the full graph
   const artistNode = fullGraph.nodes.find(
-    n => n.type === 'artist' && normalizeArtistId(n.id) === artistNameNorm
+    n => n.type === 'artist' && (normalizeArtistId(n.id) === artistNameNorm || isArtistIdMatch(n.id, artistName))
   );
 
   if (!artistNode) {
     return { nodes: [], links: [] };
   }
+
+  const originalArtistNodeId = artistNode.id;
+  const artistNodeIdNorm = normalizeArtistId(originalArtistNodeId);
 
   // Resolve link endpoints to string IDs
   const resolveId = (endpoint: string | Node): string =>
@@ -189,8 +198,8 @@ export const extractArtistSubGraph = (
     const sNorm = normalizeArtistId(s);
     const tNorm = normalizeArtistId(t);
 
-    if (sNorm === artistNameNorm || tNorm === artistNameNorm) {
-      const otherId = sNorm === artistNameNorm ? t : s;
+    if (sNorm === artistNodeIdNorm || tNorm === artistNodeIdNorm) {
+      const otherId = sNorm === artistNodeIdNorm ? t : s;
       const otherNorm = normalizeArtistId(otherId);
       
       const otherNode = fullGraph.nodes.find(n => normalizeArtistId(n.id) === otherNorm);
@@ -201,7 +210,7 @@ export const extractArtistSubGraph = (
   });
 
   // 2. Combine all kept artist nodes (target artist itself + its peer bands)
-  const keptArtistIds = new Set<string>([artistNode.id]);
+  const keptArtistIds = new Set<string>([originalArtistNodeId]);
   peerArtistIds.forEach(id => keptArtistIds.add(id));
   const keptArtistIdsNorm = new Set<string>(
     Array.from(keptArtistIds).map(id => normalizeArtistId(id))
@@ -230,7 +239,7 @@ export const extractArtistSubGraph = (
 
   // 4. Gather all final node IDs to keep
   const keptNodeIds = new Set<string>();
-  keptNodeIds.add(artistNode.id);
+  keptNodeIds.add(originalArtistNodeId);
   peerArtistIds.forEach(id => keptNodeIds.add(id));
   metadataNodeIds.forEach(id => keptNodeIds.add(id));
 
@@ -258,7 +267,23 @@ export const extractArtistSubGraph = (
            (keptNodeIdsNorm.has(tNorm) || keptNodeIdsLower.has(tLower));
   });
 
-  return { nodes: ownNodes, links: ownLinks };
+  // Map the matched artist's node ID to the query's canonical artistName
+  const ownNodesMapped = ownNodes.map(n => {
+    if (n.id === originalArtistNodeId) {
+      return { ...n, id: artistName };
+    }
+    return n;
+  });
+
+  const ownLinksMapped = ownLinks.map(link => {
+    const s = resolveId(link.source);
+    const t = resolveId(link.target);
+    const newSource = s === originalArtistNodeId ? artistName : s;
+    const newTarget = t === originalArtistNodeId ? artistName : t;
+    return { ...link, source: newSource, target: newTarget };
+  });
+
+  return { nodes: ownNodesMapped, links: ownLinksMapped };
 };
 
 export const eagerNormalizeCacheEntry = (entry: ArtistCacheEntry): ArtistCacheEntry => {
@@ -751,16 +776,32 @@ export const getArtistDocWithRedirect = async (
       // Fallback to client-side direct read if proxy endpoint fails or returns 404
       const docRef = doc(db, 'artists', artistId);
       const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data && data.redirectTo && depth < 3) {
+          console.log(`[Client-Side Redirect] Redirecting ${artistId} -> ${data.redirectTo}`);
+          return getArtistDocWithRedirect(data.redirectTo, depth + 1);
+        }
+      }
       return snap;
     }
     
     const data = await response.json();
+    if (data && data.redirectTo && depth < 3) {
+      console.log(`[Client-Side Redirect Proxy] Redirecting ${artistId} -> ${data.redirectTo}`);
+      return getArtistDocWithRedirect(data.redirectTo, depth + 1);
+    }
+    
+    let canonicalId = artistId;
+    if (data && data.cacheKey) {
+      canonicalId = data.cacheKey;
+    }
     
     // Return a mocked DocumentSnapshot to maintain type compatibility
     return {
       exists: () => true,
       data: () => data,
-      id: artistId,
+      id: canonicalId,
       metadata: {} as any,
       ref: {} as any,
       get: (fieldPath: string) => (data as any)[fieldPath],
@@ -768,7 +809,15 @@ export const getArtistDocWithRedirect = async (
   } catch (error) {
     console.warn(`[Proxy Fetch] Failed for ${artistId}, falling back to direct Firestore read:`, error);
     const docRef = doc(db, 'artists', artistId);
-    return getDoc(docRef);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      if (data && data.redirectTo && depth < 3) {
+        console.log(`[Client-Side Redirect] Redirecting ${artistId} -> ${data.redirectTo}`);
+        return getArtistDocWithRedirect(data.redirectTo, depth + 1);
+      }
+    }
+    return snap;
   }
 };
 
