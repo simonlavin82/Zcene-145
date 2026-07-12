@@ -2453,15 +2453,21 @@ const App: React.FC = () => {
           });
         } else {
           const data = cacheDoc.data();
+          // getArtistDocWithRedirect already followed any redirectTo chain and returned the canonical doc's data.
+          // Compute the canonical ID so we can update the seedArtists state, but do NOT re-dispatch
+          // handleGenerateGraph — we already have the resolved data and can fall straight through to
+          // the cache-hit path below.  Re-dispatching caused the Token Quota Warning to appear because
+          // bypassTokenConfirmation was not propagated to the recursive call.
           const canonicalArtistId = data?.cacheKey || data?.artistId || cacheDoc.id;
-          const canonicalArtistName = data?.seedArtists || canonicalArtistId;
-          if (canonicalArtistId && canonicalArtistId.toLowerCase() !== searchIdLower) {
-            console.log(`[Front Gate Cache] Redirect/disambiguation detected: ${searchIdLower} -> ${canonicalArtistId}`);
-            showToast(`Did you mean ${canonicalArtistName}? Resolved '${artists}' to '${canonicalArtistName}'.`);
-            setSeedArtists(canonicalArtistId);
-            handleGenerateGraph(canonicalArtistId, isRegeneration, graphToEnhance, bypassCacheValidation, bypassTokenConfirmation, overrideFilters);
-            return;
+          const resolvedSearchId = (canonicalArtistId && canonicalArtistId.toLowerCase() !== searchIdLower)
+            ? canonicalArtistId
+            : searchId;
+
+          if (resolvedSearchId !== searchId) {
+            console.log(`[Front Gate Cache] Redirect resolved inline: ${searchId} -> ${resolvedSearchId} (data already in hand, no re-dispatch)`);
+            setSeedArtists(resolvedSearchId);
           }
+
 
           let parsedGraph = null;
           try {
@@ -2480,13 +2486,17 @@ const App: React.FC = () => {
           
           console.log("Decision State:", {
             searchedId: searchId,
+            resolvedId: resolvedSearchId,
+            firestoreDocId: cacheDoc.id,
             foundDoc: true,
             hasGraph,
+            graphNodeCount: parsedGraph?.nodes?.length ?? 0,
             hasDetails: hasDetailsObj,
+            isQualifiedByCacheEntry: validation.isFullyQualified,
             finalDecision: isQualified ? 'CACHE' : 'API'
           });
           
-          console.log(`[Front Gate Cache Check] searchId: ${searchId}, isQualified: ${isQualified}`);
+          console.log(`[Front Gate Cache Check] searchId: ${searchId}, resolvedId: ${resolvedSearchId}, isQualified: ${isQualified}`);
           console.log(`[Front Gate Cache Details] isDeep: ${isDeep}, hasGraph: ${hasGraph}, hasDetailsObj: ${hasDetailsObj}, isFullyQualified: ${validation.isFullyQualified}`);
           if (!isQualified) {
             console.log(`[Front Gate Cache Rejected Reasons] searchId: ${searchId}:`, {
@@ -2504,7 +2514,7 @@ const App: React.FC = () => {
                 parsedGraph.synthesisRationale = rationaleVal;
               }
               const normalizedGraph = applyHumanCasedLabels(normalizeGraphData(parsedGraph), artists);
-              console.log("[Front Gate Cache] Hit! Bypassing all generation logic for:", searchId);
+              console.log(`[Front Gate Cache] GOLD STANDARD HIT! Bypassing all generation logic. searchId: ${searchId} -> resolvedId: ${resolvedSearchId}, nodes: ${normalizedGraph.nodes.length}`);
               setGraphData(normalizedGraph);
               
               // 3. Extract the detailsCache string from the same document read
