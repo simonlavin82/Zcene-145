@@ -1257,6 +1257,53 @@ const App: React.FC = () => {
     }
   }, []);
 
+  const mergeAndCleanupArtists = useCallback(async (selectedId: string, nonSelectedId: string) => {
+    try {
+      const selectedRef = doc(db, 'artists', selectedId);
+      const nonSelectedRef = doc(db, 'artists', nonSelectedId);
+      
+      const [selectedSnap, nonSelectedSnap] = await Promise.all([
+        getDoc(selectedRef),
+        getDoc(nonSelectedRef)
+      ]);
+      
+      if (selectedSnap.exists() && nonSelectedSnap.exists()) {
+        const selectedData = selectedSnap.data();
+        const nonSelectedData = nonSelectedSnap.data();
+        
+        const mergedData: any = { ...selectedData };
+        let hasMerged = false;
+        
+        if (nonSelectedData.detailsCache && !selectedData.detailsCache) {
+          mergedData.detailsCache = nonSelectedData.detailsCache;
+          hasMerged = true;
+        }
+        if (nonSelectedData.graphData && !selectedData.graphData) {
+          mergedData.graphData = nonSelectedData.graphData;
+          mergedData.filters = nonSelectedData.filters || {};
+          hasMerged = true;
+        }
+        
+        const batch = writeBatch(db);
+        if (hasMerged) {
+          batch.set(selectedRef, mergedData, { merge: true });
+        }
+        batch.set(nonSelectedRef, {
+          artistId: nonSelectedData.artistId || normalizeArtistId(nonSelectedId),
+          cacheKey: nonSelectedId,
+          redirectTo: selectedId,
+          cacheVersion: 2,
+          cachedAt: serverTimestamp()
+        });
+        
+        await batch.commit();
+        console.log(`[Auto-Merge] Successfully merged duplicate artist "${nonSelectedId}" into canonical "${selectedId}" and redirected.`);
+      }
+    } catch (err) {
+      console.error("[Auto-Merge] Failed to merge duplicate artists:", err);
+    }
+  }, []);
+
   const authRedirectPathRef = useRef<string | null>(null);
   const isHydratingSessionRef = useRef(false);
   const isProjectLoadingRef = useRef(false);
@@ -2354,6 +2401,12 @@ const App: React.FC = () => {
           } else {
             resolvedArtistSeeds[i] = normalizeArtistId(choice);
             hasDisambiguated = true;
+            
+            // Auto-Merge legacy/duplicate records into selected canonical ID
+            const nonSelectedCandidates = candidates.filter(c => c.id !== choice);
+            nonSelectedCandidates.forEach(nonSelected => {
+              mergeAndCleanupArtists(choice, nonSelected.id);
+            });
           }
         }
       }

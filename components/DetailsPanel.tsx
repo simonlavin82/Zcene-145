@@ -12,6 +12,15 @@ import { doc, updateDoc } from 'firebase/firestore';
 
 const SENTINEL_INSIGHT = 'No insight provided.';
 
+export const getArtistDisplayName = (details: any, node: any): string => {
+  const rawArtist = details?.details?.artist || node?.label || node?.id || '';
+  if (!rawArtist) return '';
+  if (rawArtist === rawArtist.toLowerCase()) {
+    return titleCaseArtistId(rawArtist);
+  }
+  return rawArtist;
+};
+
 const checkIsProfileIncomplete = (node: Node, details: NodeDetails | null | undefined): boolean => {
   const isArtist = node.type === 'artist' || !node.type || details?.details?.artist !== undefined;
   if (!details || !isArtist) return false;
@@ -602,9 +611,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     title="Click to copy name"
                                 >
                                     <h3 className={`${headerSizeClass} text-white leading-[0.9] py-1 break-normal`}>
-                                        {details?.details?.artist
-                                            || (node.label && /^[a-z]/.test(node.label) ? titleCaseArtistId(node.label) : node.label)
-                                            || titleCaseArtistId(node.id)}
+                                        {getArtistDisplayName(details, node)}
                                     </h3>
                                     <span className={`material-symbols-outlined !text-[16px] flex-shrink-0 transition-all duration-300 ${isIdCopied ? 'text-primary opacity-100 scale-110' : 'text-zinc-500 opacity-0 group-hover:opacity-100'}`}>
                                         {isIdCopied ? 'check' : 'content_copy'}
@@ -708,7 +715,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     <img 
                                         ref={imgRef}
                                         src={details.imageUrl} 
-                                        alt={details?.details?.artist || node.label || titleCaseArtistId(node.id)} 
+                                        alt={getArtistDisplayName(details, node)} 
                                         className="w-full h-full object-cover scale-105 hover:scale-100 transition-transform duration-1000"
                                         onLoad={() => setImgLoaded(true)}
                                         onError={() => setImageError(true)}
@@ -923,9 +930,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
                                         {/* Watch on YouTube button styled identically to Official Website */}
                                         {(() => {
-                                            const rawLabel = node.label || '';
-                                            const sanitisedLabel = rawLabel && /^[a-z]/.test(rawLabel) ? titleCaseArtistId(rawLabel) : rawLabel;
-                                            const artistDisplay = details?.details?.artist || sanitisedLabel || titleCaseArtistId(node.id);
+                                            const artistDisplay = getArtistDisplayName(details, node);
                                             const youtubeVideoId = details.youtubeVideoId;
                                             const youtubeUrl = youtubeVideoId && youtubeVideoId.length === 11
                                                 ? `https://www.youtube.com/watch?v=${youtubeVideoId}`
@@ -1098,7 +1103,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                     type="live_tour_search"
                     cost={COST_PER_AI_CALL}
                     cachedArtists={[]}
-                    missingArtists={[details?.details?.artist || node.label || titleCaseArtistId(node.id)]}
+                    missingArtists={[getArtistDisplayName(details, node)]}
                 />,
                 document.body
             )}
@@ -1108,7 +1113,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                 <FullItineraryDialog
                     isOpen={true}
                     onClose={() => setTourStatus('resolved_summary')}
-                    artistName={details?.details?.artist || node.label || titleCaseArtistId(node.id)}
+                    artistName={getArtistDisplayName(details, node)}
                     tourDates={tourDates}
                 />,
                 document.body
@@ -1283,7 +1288,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
             result = result.filter(node => {
                 const details = detailsCache.get(node.id) || detailsCache.get(node.id.toLowerCase()) || detailsCache.get(normalizeArtistId(node.id));
                 return (
-                    (details?.details?.artist || node.label || titleCaseArtistId(node.id)).toLowerCase().includes(query) ||
+                    getArtistDisplayName(details, node).toLowerCase().includes(query) ||
                     details?.details?.genre?.toLowerCase().includes(query) ||
                     details?.details?.origin?.toLowerCase().includes(query) ||
                     details?.summary?.toLowerCase().includes(query)
