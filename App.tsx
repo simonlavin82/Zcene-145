@@ -1135,12 +1135,10 @@ const App: React.FC = () => {
         let labelVal = docId;
         
         if (data.detailsCache) {
-          try {
-            const parsed = JSON.parse(data.detailsCache);
-            labelVal = parsed.details?.artist || parsed.name || docId;
-            originVal = parsed.details?.origin || parsed.origin || "";
-            genreVal = parsed.details?.genre || parsed.genre || "";
-          } catch (e) {}
+          const parsed = parseDetailsCacheSafely(data.detailsCache);
+          labelVal = parsed?.details?.artist || parsed?.name || docId;
+          originVal = parsed?.details?.origin || parsed?.origin || "";
+          genreVal = parsed?.details?.genre || parsed?.genre || "";
         } else if (data.graphData) {
           try {
             const parsed = JSON.parse(data.graphData);
@@ -4802,7 +4800,7 @@ const App: React.FC = () => {
       .catch((error: any) => {
         console.warn("[Cache Eviction] deleteDoc failed, invalidating in-place:", error.message);
         updateDoc(doc(db, 'artists', cacheId), {
-            detailsCache: '',
+            detailsCache: null,
             cachedAt: serverTimestamp()
         }).then(() => console.log(`[Cache Eviction] Fallback: Invalidated stale record in-place for: ${cacheId}`))
           .catch((fallbackError: any) => {
@@ -5009,7 +5007,7 @@ const App: React.FC = () => {
 
       // Overwrite the global cache doc with fresh data and a new cachedAt timestamp
       const updatePayload = {
-        detailsCache: JSON.stringify(freshDetails),
+        detailsCache: freshDetails,
         cachedAt: serverTimestamp()
       };
       enforceArtistCacheSchema(updatePayload);
@@ -5470,7 +5468,7 @@ const App: React.FC = () => {
 
                     if (docExists) {
                       const updatePayload = {
-                        detailsCache: JSON.stringify(details),
+                        detailsCache: details,
                         cachedAt: serverTimestamp()
                       };
                       enforceArtistCacheSchema(updatePayload);

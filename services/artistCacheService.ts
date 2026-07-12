@@ -311,7 +311,7 @@ export const eagerNormalizeCacheEntry = (entry: ArtistCacheEntry): ArtistCacheEn
   
   if (entry.detailsCache) {
     try {
-      const parsed = JSON.parse(entry.detailsCache);
+      const parsed = typeof entry.detailsCache === 'string' ? JSON.parse(entry.detailsCache) : entry.detailsCache;
       const processDetails = (details: any) => {
         if (details) {
           if (details.details) {
@@ -327,7 +327,7 @@ export const eagerNormalizeCacheEntry = (entry: ArtistCacheEntry): ArtistCacheEn
       } else {
         processDetails(parsed);
       }
-      entry.detailsCache = JSON.stringify(parsed);
+      entry.detailsCache = parsed;
     } catch (e) {
       console.warn("[ArtistCache] Eager detailsCache normalization failed:", e);
     }
@@ -909,31 +909,36 @@ export const findCanonicalNodeForArtist = (name: string, nodes: Node[]): Node | 
  */
 export const enforceArtistCacheSchema = (payload: any): void => {
   if (payload && 'detailsCache' in payload) {
-    const detailsCacheRaw = payload.detailsCache;
-    if (!detailsCacheRaw) {
-      throw new Error("[Schema Enforcement] detailsCache field is missing or empty.");
-    }
-    
-    let parsed: any = null;
     try {
-      parsed = typeof detailsCacheRaw === 'string' ? JSON.parse(detailsCacheRaw) : detailsCacheRaw;
-    } catch (e: any) {
-      throw new Error(`[Schema Enforcement] detailsCache is not valid JSON: ${e.message}`);
-    }
-    
-    if (!parsed) {
-      throw new Error("[Schema Enforcement] Parsed detailsCache is null or empty.");
-    }
-    
-    // Check for biography or summary
-    const bio = parsed.summary || parsed.bio || parsed.description || parsed.text;
-    if (!bio || typeof bio !== 'string' || bio.trim().length < 5) {
-      throw new Error("[Schema Enforcement] detailsCache is missing biography/summary text.");
-    }
-    
-    // Check for discography array
-    if (!parsed.discography || !Array.isArray(parsed.discography)) {
-      throw new Error("[Schema Enforcement] detailsCache is missing discography array.");
+      const detailsCacheRaw = payload.detailsCache;
+      if (!detailsCacheRaw) {
+        throw new Error("[Schema Enforcement] detailsCache field is missing or empty.");
+      }
+      
+      let parsed: any = null;
+      try {
+        parsed = typeof detailsCacheRaw === 'string' ? JSON.parse(detailsCacheRaw) : detailsCacheRaw;
+      } catch (e: any) {
+        throw new Error(`[Schema Enforcement] detailsCache is not valid JSON: ${e.message}`);
+      }
+      
+      if (!parsed) {
+        throw new Error("[Schema Enforcement] Parsed detailsCache is null or empty.");
+      }
+      
+      // Check for biography or summary
+      const bio = parsed.summary || parsed.bio || parsed.description || parsed.text;
+      if (!bio || typeof bio !== 'string' || bio.trim().length < 5) {
+        throw new Error("[Schema Enforcement] detailsCache is missing biography/summary text.");
+      }
+      
+      // Check for discography array
+      if (!parsed.discography || !Array.isArray(parsed.discography)) {
+        throw new Error("[Schema Enforcement] detailsCache is missing discography array.");
+      }
+    } catch (err: any) {
+      console.error("[Schema Enforcement] Client Validation failed for payload:", JSON.stringify(payload, null, 2));
+      throw err;
     }
   }
 };

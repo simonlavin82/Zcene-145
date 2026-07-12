@@ -351,7 +351,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                         };
 
                         const updatePayload = {
-                            detailsCache: JSON.stringify(updatedDetails)
+                            detailsCache: updatedDetails
                         };
                         enforceArtistCacheSchema(updatePayload);
                         await updateDoc(doc(db, 'artists', existingSnap.id), updatePayload);
