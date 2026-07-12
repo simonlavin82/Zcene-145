@@ -774,10 +774,7 @@ const validateCacheEntry = (data: any): CacheValidationResult => {
     return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
   }
 
-  let needsPeerBands = false;
-  let needsFutureFields = false;
-
-  // 1. Verify graphData layout is non-empty and has nodes
+  // A document is fully qualified ("Gold Standard" Cache Hit) if it contains non-empty graphData
   if (!data.graphData) {
     return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
   }
@@ -787,93 +784,14 @@ const validateCacheEntry = (data: any): CacheValidationResult => {
     if (!graph || !graph.nodes || !Array.isArray(graph.nodes) || graph.nodes.length === 0) {
       return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
     }
-    
-    // Check if there are peer bands (multiple artist nodes)
-    const artistNodes = graph.nodes.filter((n: any) => n.type === 'artist');
-    if (artistNodes.length === 0) {
-      needsPeerBands = true;
-    }
-
-    // Check if links exist and if any of them are missing context or use low-value literal fallbacks
-    const graphLinks = graph.links || [];
-    if (graphLinks.length > 0) {
-      const hasInvalidContext = graphLinks.some((l: any) => {
-        if (!l.context || typeof l.context !== 'string') return true;
-        const normalizedContext = l.context.trim().toLowerCase();
-        return (
-          normalizedContext === '' ||
-          normalizedContext.includes('is connected to') ||
-          normalizedContext.includes('is musically related to')
-        );
-      });
-      if (hasInvalidContext) {
-        needsFutureFields = true;
-      }
-    }
   } catch (e) {
     return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
   }
-
-  // 2. Verify detailsCache exists, parses correctly, and has a populated bio/summary
-  if (!data.detailsCache) {
-    return { isFullyQualified: false, needsPeerBands: true, needsFutureFields: false };
-  }
-
-  try {
-    const parsed = parseDetailsCacheSafely(data.detailsCache);
-    let entries: any[] = [];
-    if (Array.isArray(parsed)) {
-      entries = parsed;
-    } else if (parsed) {
-      entries = [parsed];
-    }
-
-    if (entries.length === 0) {
-      return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
-    }
-
-    for (const targetObj of entries) {
-      const bio = targetObj?.summary || targetObj?.bio || targetObj?.description || targetObj?.text || '';
-      if (!bio || bio.trim().length <= 5 || bio.includes('sandbox mock') || bio.includes('test scenarios')) {
-        return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
-      }
-
-      // Intercept precise "Unknown" or missing/empty string states in genre or origin
-      const genre = targetObj?.details?.genre || targetObj?.genre;
-      const origin = targetObj?.details?.origin || targetObj?.origin;
-      if (
-        !genre || (typeof genre === 'string' && (genre.trim() === '' || genre.trim().toLowerCase() === 'unknown')) ||
-        !origin || (typeof origin === 'string' && (origin.trim() === '' || origin.trim().toLowerCase() === 'unknown'))
-      ) {
-        return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
-      }
-
-      // NOTE: The former 'links array' future-proof placeholder was removed.
-      // It set needsFutureFields=true for every record that lacked a links array,
-      // which made isFullyQualified permanently false for all cached entries.
-    }
-  } catch (e) {
-    return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
-  }
-
-  // 3. Verify synthesisRationale is present (demand for new melting pot/context)
-  let parsedGraph: any = null;
-  try {
-    parsedGraph = typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData;
-  } catch (e) {}
-  
-  const hasRationale = !!(data.synthesisRationale || (parsedGraph && parsedGraph.synthesisRationale));
-  if (!hasRationale) {
-    needsFutureFields = true;
-  }
-
-  // A document is fully qualified if it has no deficiencies
-  const isFullyQualified = !needsPeerBands && !needsFutureFields;
 
   return {
-    isFullyQualified,
-    needsPeerBands,
-    needsFutureFields
+    isFullyQualified: true,
+    needsPeerBands: false,
+    needsFutureFields: false
   };
 };
 
