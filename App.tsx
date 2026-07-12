@@ -2526,13 +2526,13 @@ const App: React.FC = () => {
         }
         if (cacheDoc.exists()) {
           const data = cacheDoc.data();
-          const canonicalArtistId = data?.artistId || data?.cacheKey;
-          const canonicalArtistName = data?.seedArtists;
+          const canonicalArtistId = data?.cacheKey || data?.artistId || cacheDoc.id;
+          const canonicalArtistName = data?.seedArtists || canonicalArtistId;
           if (canonicalArtistId && canonicalArtistId.toLowerCase() !== searchIdLower) {
             console.log(`[Front Gate Cache] Redirect/disambiguation detected: ${searchIdLower} -> ${canonicalArtistId}`);
             showToast(`Did you mean ${canonicalArtistName}? Resolved '${artists}' to '${canonicalArtistName}'.`);
-            setSeedArtists(canonicalArtistName);
-            handleGenerateGraph(canonicalArtistName, isRegeneration, graphToEnhance, bypassCacheValidation, bypassTokenConfirmation, overrideFilters);
+            setSeedArtists(canonicalArtistId);
+            handleGenerateGraph(canonicalArtistId, isRegeneration, graphToEnhance, bypassCacheValidation, bypassTokenConfirmation, overrideFilters);
             return;
           }
 
@@ -2547,7 +2547,20 @@ const App: React.FC = () => {
           const validation = validateCacheEntry(data);
           const hasGraph = parsedGraph && parsedGraph.nodes && parsedGraph.nodes.length > 0;
           const hasDetailsObj = data.detailsCache && data.detailsCache.trim().length > 0;
-          const isQualified = (validation.isFullyQualified && isDeep) || (hasGraph && hasDetailsObj);
+          
+          // Relaxed cache qualification check: if graphData exists, accept as cache hit!
+          const isQualified = !!hasGraph;
+          
+          console.log(`[Front Gate Cache Check] searchId: ${searchId}, isQualified: ${isQualified}`);
+          console.log(`[Front Gate Cache Details] isDeep: ${isDeep}, hasGraph: ${hasGraph}, hasDetailsObj: ${hasDetailsObj}, isFullyQualified: ${validation.isFullyQualified}`);
+          if (!isQualified) {
+            console.log(`[Front Gate Cache Rejected Reasons] searchId: ${searchId}:`, {
+              missingGraphData: !parsedGraph,
+              emptyGraphNodes: parsedGraph && (!parsedGraph.nodes || parsedGraph.nodes.length === 0),
+              isDeep: isDeep,
+              validationErrors: validation
+            });
+          }
           
           if (data && (bypassCacheValidation || isQualified)) {
             if (parsedGraph && parsedGraph.nodes && parsedGraph.nodes.length > 0) {
