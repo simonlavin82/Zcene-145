@@ -183,12 +183,24 @@ service cloud.firestore {
       // The rule checks that the document does not already exist, preventing poisoning.
       // (Firestore enforces this via the `create` operation — not `update`.)
       allow create: if isSignedIn() &&
-                       incoming().keys().hasAll(['cacheKey', 'graphData', 'seedArtists', 'filters', 'cacheVersion']) &&
-                       incoming().cacheKey == cacheKey &&
-                       incoming().graphData is string &&
-                       incoming().graphData.size() <= 2097152 &&
-                       incoming().seedArtists is string &&
-                       incoming().hitCount == 0;
+                       (
+                         // Standard creation
+                         (
+                           incoming().keys().hasAll(['cacheKey', 'graphData', 'seedArtists', 'filters', 'cacheVersion']) &&
+                           incoming().cacheKey == cacheKey &&
+                           incoming().graphData is string &&
+                           incoming().graphData.size() <= 2097152 &&
+                           incoming().seedArtists is string &&
+                           incoming().hitCount == 0
+                         ) ||
+                         // Redirect pointer creation
+                         (
+                           incoming().keys().hasAll(['cacheKey', 'artistId', 'redirectTo', 'cacheVersion']) &&
+                           incoming().cacheKey == cacheKey &&
+                           incoming().redirectTo is string &&
+                           incoming().redirectTo != ""
+                         )
+                       );
 
       // Authenticated users may update detailsCache (Phase 03 write-back) and hitCount (analytics).
       // They may also upgrade legacy cache entries (cacheVersion < 2) to version 2 by writing graphData and filters.
@@ -207,6 +219,11 @@ service cloud.firestore {
                           incoming().cacheVersion == 2 &&
                           request.resource.data.diff(resource.data).affectedKeys()
                             .hasOnly(['detailsCache', 'hitCount', 'graphData', 'cacheVersion', 'filters', 'cacheKey', 'artistId', 'seedArtists', 'cachedAt', 'isDeep'])
+                       ) || (
+                          // Case C: Convert a legacy/duplicate document to a redirect pointer
+                          incoming().cacheVersion == 2 &&
+                          request.resource.data.diff(resource.data).affectedKeys()
+                            .hasOnly(['redirectTo', 'artistId', 'cacheKey', 'cacheVersion', 'cachedAt'])
                        );
 
       // Only admins may delete cache entries (manual invalidation).
