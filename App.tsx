@@ -1934,17 +1934,22 @@ const App: React.FC = () => {
 
     const isApprovedSeed = approvedSeedsRef.current.has(normalizeArtistId(node.id)) || 
                            approvedSeedsRef.current.has(node.id.toLowerCase());
-    const confirmed = isApprovedSeed ? true : await confirmTokenUsage('deep_cut_creation', [], [node.label || titleCaseArtistId(node.id)]);
-    if (!confirmed) {
-      return;
-    }
-    
-    // Trigger spinner immediately
-    setLoadingNodeIds(prev => new Set(prev).add(node.id));
 
+    // Open the panel and show the localized spinner immediately — before the token
+    // confirmation modal appears. This gives the user instant visual feedback that
+    // something is happening, and prevents the "jumps straight to content" UX regression
+    // where synthesis completes (via Firestore cache) faster than the modal resolves.
+    setLoadingNodeIds(prev => new Set(prev).add(node.id));
     setSelectedNode(node);
     if (node.type !== 'founded') {
       setActiveNodeIds(prev => prev.some(id => id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node.id]);
+    }
+
+    const confirmed = isApprovedSeed ? true : await confirmTokenUsage('deep_cut_creation', [], [node.label || titleCaseArtistId(node.id)]);
+    if (!confirmed) {
+      // User cancelled — remove the spinner we just added
+      setLoadingNodeIds(prev => { const next = new Set(prev); next.delete(node.id); return next; });
+      return;
     }
   }, [confirmTokenUsage, selectedNode, loadingNodeIds]);
 

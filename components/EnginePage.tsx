@@ -429,22 +429,37 @@ generation never causes global layout shifts or blocks UI interactivity.
 
 1. MECHANISM (DetailsPanel.tsx / App.tsx):
    - App.tsx maintains a loadingNodeIds: Set<string> state variable.
-   - When generation is triggered for a node, its ID is immediately added:
+   - When generation is triggered, the spinner is activated IMMEDIATELY
+     on node click — before the Token Confirmation Modal is shown:
        setLoadingNodeIds(prev => new Set(prev).add(node.id));
+       setSelectedNode(node);                      // panel opens instantly
+       setActiveNodeIds(...);                       // card is activated
+       const confirmed = await confirmTokenUsage(...);
+       if (!confirmed) {
+         setLoadingNodeIds(prev => { ... delete(node.id); return next; });
+         return;  // Clean up spinner if user cancels
+       }
    - Each NodeDetailsCard receives isLoading={loadingNodeIds.has(node.id)}.
    - The card renders the full 'Scanning live cultural archives...' spinner
      ONLY within its own card boundary when isLoading === true.
    - The Spiderweb, other Deep Cut cards, and global nav remain fully
      interactive and responsive while generation runs in the background.
 
-2. TRANSITION BEHAVIOR:
-   - On completion, setDetailsCache writes the new NodeDetails into the Map.
-   - loadingNodeIds removes the node.id entry.
+2. CRITICAL ORDERING RULE (Anti-Regression):
+   NEVER call setLoadingNodeIds AFTER await confirmTokenUsage.
+   If synthesis (or a Firestore cache read) completes before the modal
+   resolves, the spinner window collapses to zero frames — the UI jumps
+   directly from empty state to populated content with no loading indicator.
+   The spinner MUST be set before any async await to guarantee it renders.
+
+3. TRANSITION BEHAVIOR:
+   - On completion, the JIT queue calls setDetailsCache to write NodeDetails.
+   - The JIT's per-node finally block removes the node.id from loadingNodeIds.
    - React re-renders only the affected NodeDetailsCard, transitioning
      seamlessly from the spinner to the populated content without
      triggering any global layout shifts or full-page re-renders.
 
-3. ANTI-PATTERN (AVOID):
+4. ANTI-PATTERN (AVOID):
    Do NOT use the global isLoading flag (setIsLoading) for individual node
    generation. The global flag is reserved exclusively for graph-level
    operations (seed artist synthesis, graph expansion). Misusing it causes:
@@ -452,7 +467,7 @@ generation never causes global layout shifts or blocks UI interactivity.
    - The Spiderweb to become non-interactive.
    - Confusing UX where the user cannot cancel or navigate away.
 
-4. SPINNER COPY (Icons.tsx: DETAIL_THINKING_STEPS):
+5. SPINNER COPY (Icons.tsx: DETAIL_THINKING_STEPS):
    The card spinner cycles through contextual steps:
    "Contacting live model orchestration..."
    "Scanning live cultural archives..."
