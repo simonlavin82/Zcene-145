@@ -2239,6 +2239,11 @@ const App: React.FC = () => {
     bypassTokenConfirmation: boolean = false,
     overrideFilters?: DiscoveryFilters
   ) => {
+    // Normalize empty graph to null to eliminate ghost-enhancement API path
+    if (graphToEnhance && (!graphToEnhance.nodes || graphToEnhance.nodes.length === 0)) {
+      graphToEnhance = null;
+    }
+
     const activeDiscoveryFilters = overrideFilters || discoveryFilters;
     const hasActiveFilters = !!(
       activeDiscoveryFilters.foundedAfter ||
