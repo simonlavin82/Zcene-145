@@ -2536,16 +2536,20 @@ const App: React.FC = () => {
             return;
           }
 
+          let parsedGraph = null;
+          try {
+            parsedGraph = typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData;
+          } catch (e) {
+            console.warn("Failed to parse cached graphData");
+          }
+
           const isDeep = data?.isDeep === true;
           const validation = validateCacheEntry(data);
-          const isQualified = validation.isFullyQualified && isDeep;
+          const hasGraph = parsedGraph && parsedGraph.nodes && parsedGraph.nodes.length > 0;
+          const hasDetailsObj = data.detailsCache && data.detailsCache.trim().length > 0;
+          const isQualified = (validation.isFullyQualified && isDeep) || (hasGraph && hasDetailsObj);
+          
           if (data && (bypassCacheValidation || isQualified)) {
-            let parsedGraph = null;
-            try {
-              parsedGraph = typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData;
-            } catch (e) {
-              console.warn("Failed to parse cached graphData");
-            }
             if (parsedGraph && parsedGraph.nodes && parsedGraph.nodes.length > 0) {
               const rationaleVal = data.synthesisRationale || parsedGraph.synthesisRationale;
               if (rationaleVal) {
@@ -2589,13 +2593,35 @@ const App: React.FC = () => {
                             tourCachedAt: parsedDetails?.tourCachedAt || ""
                          };
                           console.log("[Phase 3 Cache Payload – Front Gate]", searchId, JSON.stringify({ youtubeVideoId: detailsPayload.youtubeVideoId, youtubeSearchQuery: detailsPayload.youtubeSearchQuery }));
-                          setDetailsCache(prev => new Map(prev).set(searchIdLower, detailsPayload).set(searchId, detailsPayload).set(normalizeArtistId(searchId), detailsPayload));
+                          
+                          const canonicalId = data?.cacheKey || searchId;
+                          const canonicalIdLower = canonicalId.toLowerCase();
+                          const normalizedCanonicalId = normalizeArtistId(canonicalId);
+                          
+                          setDetailsCache(prev => {
+                            const updated = new Map(prev);
+                            updated.set(searchIdLower, detailsPayload);
+                            updated.set(searchId, detailsPayload);
+                            updated.set(normalizeArtistId(searchId), detailsPayload);
+                            updated.set(canonicalIdLower, detailsPayload);
+                            updated.set(canonicalId, detailsPayload);
+                            updated.set(normalizedCanonicalId, detailsPayload);
+                            if (data?.artistId) {
+                              updated.set(data.artistId.toLowerCase(), detailsPayload);
+                              updated.set(normalizeArtistId(data.artistId), detailsPayload);
+                            }
+                            return updated;
+                          });
                       }
                   } catch(e) { console.warn("Failed to parse detailsCache", e); }
               }
               
               // 4. Find the primary node and instantly hydrate it with the biography text
-              const primaryNode = normalizedGraph.nodes.find((n: any) => n.id.toLowerCase() === searchIdLower) as any;
+              const primaryNode = normalizedGraph.nodes.find((n: any) => 
+                n.id.toLowerCase() === searchIdLower || 
+                normalizeArtistId(n.id) === normalizeArtistId(searchId) || 
+                isArtistIdMatch(n.id, searchId)
+              ) as any;
               if (primaryNode) {
                   let unwrappedDetails = parsedDetails;
                   if (Array.isArray(unwrappedDetails) && unwrappedDetails.length > 0) {
