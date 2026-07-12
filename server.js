@@ -266,6 +266,32 @@ function normalizeArtistId(name) {
     .substring(0, 256);
 }
 
+/**
+ * Enforces schema validation for artist documents written to Firestore.
+ * Ensures detailsCache is valid, non-empty, and contains biography/summary and discography to prevent data rot.
+ */
+function enforceArtistCacheSchemaServer(payload) {
+  if (payload && payload.detailsCache) {
+    const detailsCacheRaw = payload.detailsCache;
+    let parsed = typeof detailsCacheRaw === 'string' ? JSON.parse(detailsCacheRaw) : detailsCacheRaw;
+    
+    if (!parsed) {
+      throw new Error("[Schema Enforcement] Parsed detailsCache is null or empty.");
+    }
+    
+    // Check for biography or summary
+    const bio = parsed.summary || parsed.bio || parsed.description || parsed.text;
+    if (!bio || typeof bio !== 'string' || bio.trim().length < 5) {
+      throw new Error("[Schema Enforcement] detailsCache is missing biography/summary text.");
+    }
+    
+    // Check for discography array
+    if (!parsed.discography || !Array.isArray(parsed.discography)) {
+      throw new Error("[Schema Enforcement] detailsCache is missing discography array.");
+    }
+  }
+}
+
 // Playability memory cache (videoId -> { playable: boolean, expiresAt: number })
 const playabilityCache = new Map();
 
@@ -393,6 +419,7 @@ async function triggerReSynthesis(artistId, originalData) {
         origin: "United States",
         founded: "1959",
       },
+      discography: [],
       youtubeVideoId: "hFi7XZw1OYk", // Marvin Gaye - What's Going On
     };
 
@@ -401,12 +428,13 @@ async function triggerReSynthesis(artistId, originalData) {
       artistId: cleanCanonicalId,
       cacheKey: cleanCanonicalId,
       seedArtists: cleanArtistName,
-      detailsCache: updatedDetails,
+      detailsCache: JSON.stringify(updatedDetails),
       cachedAt: admin.firestore.FieldValue.serverTimestamp(),
       cacheVersion: 2
     };
 
     try {
+      enforceArtistCacheSchemaServer(finalPayload);
       await db.collection('artists').doc(cleanCanonicalId).set(finalPayload, { merge: true });
       console.log(`[Re-Synthesis] Mock healed profile for canonical artist: ${cleanCanonicalId}`);
 
@@ -471,12 +499,13 @@ async function triggerReSynthesis(artistId, originalData) {
       artistId: canonicalId,
       cacheKey: canonicalId,
       seedArtists: artistName,
-      detailsCache: updatedDetails,
+      detailsCache: JSON.stringify(updatedDetails),
       cachedAt: admin.firestore.FieldValue.serverTimestamp(),
       cacheVersion: 2 // Match standard cacheVersion
     };
 
     // Update Firestore at canonicalId using Admin SDK
+    enforceArtistCacheSchemaServer(finalPayload);
     await db.collection('artists').doc(canonicalId).set(finalPayload, { merge: true });
     console.log(`[Re-Synthesis] Successfully healed profile for canonical artist: ${canonicalId}`);
 
@@ -720,24 +749,17 @@ If you cannot find a clear YouTube video ID for this artist, return null for the
         }
         details.youtubeVideoId = videoId;
         
-        await docRef.set({
+        const updatePayload = {
           ...docData,
           youtubeVideoId: videoId,
-          detailsCache: details,
+          detailsCache: JSON.stringify(details),
           cachedAt: admin.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
+        };
+        enforceArtistCacheSchemaServer(updatePayload);
+        await docRef.set(updatePayload, { merge: true });
         console.log(`[Scraper API] Successfully updated Firestore doc "${targetId}" with video ID "${videoId}"`);
       } else {
-        const details = { youtubeVideoId: videoId };
-        await docRef.set({
-          artistId: targetId,
-          youtubeVideoId: videoId,
-          detailsCache: details,
-          cachedAt: admin.firestore.FieldValue.serverTimestamp(),
-          cacheVersion: 2,
-          hitCount: 1
-        });
-        console.log(`[Scraper API] Successfully created new Firestore doc "${targetId}" with video ID "${videoId}"`);
+        console.log(`[Scraper API] Document does not exist for "${targetId}". Skipping skeleton creation.`);
       }
 
       return res.json({ youtubeVideoId: videoId });
@@ -766,12 +788,14 @@ If you cannot find a clear YouTube video ID for this artist, return null for the
         }
         details.youtubeVideoId = null;
         
-        await docRef.set({
+        const updatePayload = {
           ...docData,
           youtubeVideoId: null,
-          detailsCache: details,
+          detailsCache: JSON.stringify(details),
           cachedAt: admin.firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
+        };
+        enforceArtistCacheSchemaServer(updatePayload);
+        await docRef.set(updatePayload, { merge: true });
         console.log(`[Scraper API] Updated Firestore doc "${targetId}" with youtubeVideoId = null`);
       }
 

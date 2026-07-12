@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { AlertCircle, AlertTriangle, X, CheckCircle2, Key } from 'lucide-react';
 import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project, ArtistCacheEntry, COST_PER_AI_CALL } from './types';
 import { generateGraphData, fetchNodeDetails, extendGraphFromNode } from './services/geminiService';
-import { normalizeArtistId, readArtistCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, titleCaseArtistId, findCanonicalNodeForArtist, buildCompositeCacheKey } from './services/artistCacheService';
+import { normalizeArtistId, readArtistCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, titleCaseArtistId, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema } from './services/artistCacheService';
 import { auth, signInWithGoogle, logout, onAuthStateChanged, User, db, handleFirestoreError, OperationType } from './services/firebase';
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, getDocFromServer, serverTimestamp, addDoc, getDoc, getDocs, orderBy, where, writeBatch, getDocFromCache, updateDoc, increment, limit } from 'firebase/firestore';
 const StyleGuidePage = React.lazy(() => import('./components/DesignSystem').then(m => ({ default: m.StyleGuidePage })));
@@ -5008,10 +5008,12 @@ const App: React.FC = () => {
       });
 
       // Overwrite the global cache doc with fresh data and a new cachedAt timestamp
-      await updateDoc(doc(db, 'artists', cacheId), {
+      const updatePayload = {
         detailsCache: JSON.stringify(freshDetails),
         cachedAt: serverTimestamp()
-      });
+      };
+      enforceArtistCacheSchema(updatePayload);
+      await updateDoc(doc(db, 'artists', cacheId), updatePayload);
       console.log("[Revalidation] Successfully updated stale cache in Firestore for: " + cacheId);
     } catch (e: any) {
       console.warn("[Revalidation] Background refresh failed for: " + cacheId, e.message);
@@ -5467,10 +5469,12 @@ const App: React.FC = () => {
                     }
 
                     if (docExists) {
-                      await updateDoc(doc(db, 'artists', targetDocId), {
+                      const updatePayload = {
                         detailsCache: JSON.stringify(details),
                         cachedAt: serverTimestamp()
-                      });
+                      };
+                      enforceArtistCacheSchema(updatePayload);
+                      await updateDoc(doc(db, 'artists', targetDocId), updatePayload);
                       console.log(`[Deep Cut Queue] Write-back: Successfully updated detailsCache + cachedAt for: ${targetDocId}`);
                     } else if (!fallbackDetails) {
                       const normalizedGraph = normalizeGraphData(graphData);
@@ -5485,7 +5489,7 @@ const App: React.FC = () => {
                       );
                       const canonicalName = canonicalNode?.label ?? canonicalNode?.id ?? node.id;
 
-                      await setDoc(doc(db, 'artists', targetDocId), {
+                      const setPayload = {
                         cacheKey: targetDocId,
                         artistId: simpleArtistId,
                         seedArtists: canonicalNameFromDetails || canonicalName,
@@ -5496,7 +5500,9 @@ const App: React.FC = () => {
                         hitCount: 0,
                         isDeep: false,
                         detailsCache: JSON.stringify(details)
-                      });
+                      };
+                      enforceArtistCacheSchema(setPayload);
+                      await setDoc(doc(db, 'artists', targetDocId), setPayload);
                       console.log(`[Deep Cut Queue] JIT cached Canonical node: ${targetDocId}`);
                     }
                       

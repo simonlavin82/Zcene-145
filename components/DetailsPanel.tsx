@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import Markdown from 'react-markdown';
 import { Node, NodeDetails, GraphData, View, ChatMessage, StackItem, UserTaste, COST_PER_AI_CALL } from '../types';
 import { streamNodeChat, fetchLiveTourData } from '../services/geminiService';
-import { normalizeArtistId, titleCaseArtistId, getArtistDocWithRedirect } from '../services/artistCacheService';
+import { normalizeArtistId, titleCaseArtistId, getArtistDocWithRedirect, enforceArtistCacheSchema } from '../services/artistCacheService';
 import { analyticsService } from '../services/analyticsService';
 import { Spinner, HelpIcon, MicIcon, LoadingSpinner, DETAIL_THINKING_STEPS, StackIcon } from './Icons';
 import { TokenConfirmationDialog, FullItineraryDialog } from './SharedModals';
@@ -350,9 +350,11 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             tourCachedAt: freshCachedAt
                         };
 
-                        await updateDoc(doc(db, 'artists', existingSnap.id), {
+                        const updatePayload = {
                             detailsCache: JSON.stringify(updatedDetails)
-                        });
+                        };
+                        enforceArtistCacheSchema(updatePayload);
+                        await updateDoc(doc(db, 'artists', existingSnap.id), updatePayload);
                         console.log(`[Tour Cache] Successfully synced tour data to Firestore for: ${existingSnap.id}`);
                     }
                 } catch (dbErr) {
