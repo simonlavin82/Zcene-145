@@ -2433,7 +2433,7 @@ const App: React.FC = () => {
 
     // --- STRICT FRONT-GATE CACHE CHECK ---
     // If this is a fresh search for a single artist without special filters, check the cache immediately
-    if (artistList.length === 1 && !isRegeneration && !hasActiveFilters) {
+    if (artistList.length === 1 && !hasActiveFilters) {
       const searchId = artistList[0];
       const searchIdLower = searchId.toLowerCase();
       
@@ -2442,7 +2442,16 @@ const App: React.FC = () => {
         if (!cacheDoc.exists()) {
           cacheDoc = await getArtistDocWithRedirect(searchIdLower);
         }
-        if (cacheDoc.exists()) {
+        
+        if (!cacheDoc.exists()) {
+          console.log("Decision State:", {
+            searchedId: searchId,
+            foundDoc: false,
+            hasGraph: false,
+            hasDetails: false,
+            finalDecision: 'API'
+          });
+        } else {
           const data = cacheDoc.data();
           const canonicalArtistId = data?.cacheKey || data?.artistId || cacheDoc.id;
           const canonicalArtistName = data?.seedArtists || canonicalArtistId;
@@ -2468,6 +2477,14 @@ const App: React.FC = () => {
           
           // Relaxed cache qualification check: if graphData exists, accept as cache hit!
           const isQualified = !!hasGraph;
+          
+          console.log("Decision State:", {
+            searchedId: searchId,
+            foundDoc: true,
+            hasGraph,
+            hasDetails: hasDetailsObj,
+            finalDecision: isQualified ? 'CACHE' : 'API'
+          });
           
           console.log(`[Front Gate Cache Check] searchId: ${searchId}, isQualified: ${isQualified}`);
           console.log(`[Front Gate Cache Details] isDeep: ${isDeep}, hasGraph: ${hasGraph}, hasDetailsObj: ${hasDetailsObj}, isFullyQualified: ${validation.isFullyQualified}`);
