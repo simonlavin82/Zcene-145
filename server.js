@@ -559,7 +559,12 @@ app.get('/api/artist/:id', async (req, res) => {
     
     // Resolve redirect if present (up to 3 redirects)
     if (data && typeof data.redirectTo === 'string' && data.redirectTo.trim().length > 0) {
-      const canonicalId = data.redirectTo.trim();
+      let canonicalId = data.redirectTo.trim();
+      const match = canonicalId.match(/^([a-z0-9\-]+-(?:united-states|united-kingdom|canada|australia|germany|france|sweden|norway|italy|spain|brazil|mexico|japan|south-korea))-.+$/i);
+      if (match) {
+        console.log(`[Proxy Redirect Suffix Cleaner] Normalized redirect: ${canonicalId} -> ${match[1]}`);
+        canonicalId = match[1];
+      }
       console.log(`[Proxy] Redirecting artist read: ${artistId} -> ${canonicalId}`);
       let currentId = canonicalId;
       let depth = 0;
@@ -571,7 +576,12 @@ app.get('/api/artist/:id', async (req, res) => {
         currentSnap = nextSnap;
         const nextData = nextSnap.data();
         if (nextData && typeof nextData.redirectTo === 'string' && nextData.redirectTo.trim().length > 0) {
-          currentId = nextData.redirectTo.trim();
+          let nextRedirectId = nextData.redirectTo.trim();
+          const innerMatch = nextRedirectId.match(/^([a-z0-9\-]+-(?:united-states|united-kingdom|canada|australia|germany|france|sweden|norway|italy|spain|brazil|mexico|japan|south-korea))-.+$/i);
+          if (innerMatch) {
+            nextRedirectId = innerMatch[1];
+          }
+          currentId = nextRedirectId;
           depth++;
         } else {
           break;

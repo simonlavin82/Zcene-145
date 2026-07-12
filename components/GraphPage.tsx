@@ -1577,6 +1577,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                     <DetailsPanel 
                                         selectedNode={selectedNode} 
                                         activeNodes={activeNodes} 
+                                        isAdmin={isAdmin}
                                         detailsCache={detailsCache} 
                                         loadingNodeIds={loadingNodeIds} 
                                         onCloseNode={onCloseNode} 
@@ -1687,6 +1688,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                        <DetailsPanel 
                          selectedNode={selectedNode} 
                          activeNodes={activeNodes} 
+                         isAdmin={isAdmin}
                          detailsCache={detailsCache} 
                          loadingNodeIds={loadingNodeIds} 
                          onCloseNode={nodeId => onCloseNode(nodeId)} 

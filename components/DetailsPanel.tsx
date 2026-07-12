@@ -239,6 +239,7 @@ interface NodeDetailsCardProps {
   user?: any;
   onAuthRequest?: () => void;
   userTaste?: UserTaste;
+  isAdmin?: boolean;
 }
 
 const parseTourDates = (text: string): { isTouring: boolean; dates: string[] } => {
@@ -285,7 +286,7 @@ const isTourCacheStale = (tourCachedAtString: string | undefined): boolean => {
 const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     node, details, isLoading, isGlobalLoading, graphData, libraryArtists, seedArtists, onAddArtist, isSmallScreen, onRefresh, onClose, onNodeClick, onNavigate,
     chatHistory, onSendMessage, isChatLoading, isFullScreenMode = false, isHero = false, isInStack, onToggleStack, onToggleMagazineView, isGuest = false, onAuthRequest, user,
-    userTaste
+    userTaste, isAdmin = false
 }) => {
     const [chatInput, setChatInput] = useState('');
     const [isListening, setIsListening] = useState(false);
@@ -593,14 +594,24 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 </button>
                             )}
 
-                            {isArtistNode && details && checkIsProfileIncomplete(node, details) && (
-                                <button
-                                    onClick={onRefresh}
-                                    className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-yellow-500/50 rounded-xl text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20 active:scale-95 transition-all duration-200 leading-none animate-pulse"
-                                    title="Heal Corrupted Cache (Force Refresh)"
-                                >
-                                    <span className="material-symbols-outlined !text-[18px]">healing</span>
-                                </button>
+                            {isArtistNode && details && isAdmin && (
+                                checkIsProfileIncomplete(node, details) ? (
+                                    <button
+                                        onClick={onRefresh}
+                                        className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-yellow-500/50 rounded-xl text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20 active:scale-95 transition-all duration-200 leading-none animate-pulse"
+                                        title="Heal Corrupted Cache (Force Refresh)"
+                                    >
+                                        <span className="material-symbols-outlined !text-[18px]">healing</span>
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={onRefresh}
+                                        className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-700 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none"
+                                        title="Force Refresh & Re-synthesize (Admin)"
+                                    >
+                                        <span className="material-symbols-outlined !text-[18px]">autorenew</span>
+                                    </button>
+                                )
                             )}
 
                             <button onClick={onClose} className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-700 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none" title="Remove Card">
@@ -745,7 +756,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 ) : null;
                             })()}
 
-                            {checkIsProfileIncomplete(node, details) && (
+                            {isAdmin && checkIsProfileIncomplete(node, details) && (
                                 <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg flex flex-col gap-2 my-2">
                                     <div className="flex items-center gap-2 text-yellow-500">
                                         <span className="material-symbols-outlined !text-[18px]">warning</span>
@@ -1160,6 +1171,7 @@ interface DetailsPanelProps {
   user?: any;
   onAuthRequest?: () => void;
   userTaste?: UserTaste;
+  isAdmin?: boolean;
 }
 
 export const DetailsPanel: React.FC<DetailsPanelProps> = ({
@@ -1167,7 +1179,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
   error, systemError, graphData, libraryArtists, seedArtists, onAddArtist, isCollapsed, onToggleCollapse,
   isSmallScreen, onNodeClick, onNavigate, isGlobalLoading, onCancelGlobalLoading, unreadCount, isActive, collapseBtnRef,
   isMagazineViewOpen, onMagazineViewToggle, chatHistories, onUpdateChatHistories, stack, onToggleStack,
-  isGuest = false, onAuthRequest, user, userTaste
+  isGuest = false, onAuthRequest, user, userTaste, isAdmin = false
 }) => {
     const [viewedIndex, setViewedIndex] = useState(0);
     const [isChatLoading, setIsChatLoading] = useState(false);

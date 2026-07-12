@@ -176,20 +176,12 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     // The selectedNodePos useEffect handles the button positioning even when simulation is idle.
   }, [onNodeClick, onInteraction, selectedNode]);
 
-  // Restart D3 simulation to update position calculations when details hydrate
-  const details = useMemo(() => {
-    if (!selectedNode || !detailsCache) return null;
-    const normId = normalizeArtistId(selectedNode.id);
-    return detailsCache.get(selectedNode.id) || 
-           detailsCache.get(selectedNode.id.toLowerCase()) || 
-           detailsCache.get(normId);
-  }, [selectedNode, detailsCache]);
-
-  useEffect(() => {
-    if (details) {
-      simulationRef.current?.alpha(0.15).restart();
-    }
-  }, [details]);
+  // NOTE: The details useMemo + simulation restart was removed.
+  // Previously, this restarted the simulation every time detailsCache changed
+  // (because setDetailsCache creates a new Map reference on every write),
+  // causing violent physics jitter on every node click.
+  // The simulation tick handler already uses live x/y coordinates on the nodes;
+  // no restart is needed for correct layout.
 
   useEffect(() => {
     if (isActive && simulationRef.current) {

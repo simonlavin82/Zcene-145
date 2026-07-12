@@ -347,6 +347,169 @@ designed for expert-friend utility.
    maximize information density.
 `;
 
+const ADMIN_OVERRIDE_DOCUMENTATION = `
+The "Quick Heal" (Force Refresh) capability is a privileged, Admin-only operation.
+It is strictly gated behind identity-based authorization to protect the shared
+global artist cache from unauthorized mutations.
+
+1. IDENTITY GATE (App.tsx / DetailsPanel.tsx):
+   The isAdmin flag is derived from a hard-coded email comparison:
+     const ADMIN_EMAIL = 'zcene.online@gmail.com';
+     const isAdmin = user?.email === ADMIN_EMAIL;
+   The "Quick Heal" button is conditionally rendered ONLY when isAdmin === true.
+   Standard users see no such control in the DetailsPanel UI.
+
+2. CONFIRMATION REQUIREMENT:
+   When an Admin triggers Quick Heal, a TokenConfirmationDialog is shown before
+   any write operation or synthesis call proceeds. This "human-in-the-loop" step
+   prevents accidental global cache evictions.
+
+3. CACHE EVICTION FALLBACK:
+   The eviction flow first attempts deleteDoc on the Firestore artist document.
+   If this fails due to security rule restrictions (e.g. non-admin context),
+   the system falls back to updateDoc, setting detailsCache to '' (empty string)
+   to in-place invalidate the cache without full document deletion.
+   - Successful: The node is added to evictedNodeIdsRef and cleared from the
+     local detailsCache Map and healedNodeIdsRef, forcing a full re-synthesis.
+   - Failed/Fallback: updateDoc marks the document as stale, triggering a
+     validation failure on the next read, which routes through the synthesis flow.
+
+4. RATIONALE (Design Decision):
+   Deep Cut metadata is a shared global resource. Every user reading the same
+   artist benefits from the cached result. Granting standard users the ability
+   to trigger re-synthesis would: (a) cause unnecessary token quota consumption,
+   (b) allow cache poisoning via rapid successive refresh clicks, and
+   (c) introduce race conditions between parallel synthesis calls.
+   The Admin-only model ensures curation quality and budget control.
+`;
+
+const SELF_HEALING_DOCUMENTATION = `
+Zcene implements a Priority-Based Self-Healing system that autonomously repairs
+degraded Deep Cut metadata without triggering unnecessary API calls.
+
+The system distinguishes between two categories of data quality:
+
+1. HARD REQUIREMENT — AUTO-HEAL (App.tsx: checkIsProfileStaleOrCorrupt):
+   The following conditions trigger an immediate background re-synthesis:
+   - Biography/summary is null, empty, or consists only of whitespace.
+   - Summary length is below 100 characters (classified as a "lite" profile).
+   - Summary contains placeholder text (e.g., "currently unavailable").
+
+   Trigger mechanism: handleNodeClick detects a stale profile via
+   checkIsProfileStaleOrCorrupt(cachedDetails). If stale, the node is quietly
+   evicted from the local healedNodeIdsRef tracking set and re-queued for
+   synthesis in the background, WITHOUT prompting the user.
+
+   Session Guard (healedNodeIdsRef): A Set<string> tracks node IDs that have
+   already been auto-healed in the current session. A node will not be
+   re-synthesized more than once per session, preventing infinite healing loops.
+
+2. OPPORTUNISTIC ENHANCEMENT — DO NOT AUTO-HEAL:
+   The following conditions are treated as acceptable "lite" states:
+   - High-quality biography present (>= 100 chars) but no image URL.
+   - Genre or origin is "Unknown" but bio text is substantive.
+
+   Images are classified as optional enrichment data. The system will NOT
+   trigger re-synthesis solely because an image is absent. This prevents
+   wasteful API calls for content that is functionally complete.
+
+3. ADMIN OVERRIDE:
+   An Admin can bypass the "Do Not Auto-Heal" logic at any time using the
+   "Quick Heal" button. This forces a full re-synthesis, which includes a
+   fresh attempt at image discovery, regardless of current profile quality.
+
+4. SCOPE BOUNDARY:
+   Auto-healing only fires for ARTIST nodes (type === 'artist'). Metadata
+   hub nodes (Genre, Label, Origin, Founded) are never auto-healed.
+`;
+
+const LOCALIZED_LOADING_DOCUMENTATION = `
+Zcene uses a "Localized Loading" pattern to ensure individual Deep Cut card
+generation never causes global layout shifts or blocks UI interactivity.
+
+1. MECHANISM (DetailsPanel.tsx / App.tsx):
+   - App.tsx maintains a loadingNodeIds: Set<string> state variable.
+   - When generation is triggered for a node, its ID is immediately added:
+       setLoadingNodeIds(prev => new Set(prev).add(node.id));
+   - Each NodeDetailsCard receives isLoading={loadingNodeIds.has(node.id)}.
+   - The card renders the full 'Scanning live cultural archives...' spinner
+     ONLY within its own card boundary when isLoading === true.
+   - The Spiderweb, other Deep Cut cards, and global nav remain fully
+     interactive and responsive while generation runs in the background.
+
+2. TRANSITION BEHAVIOR:
+   - On completion, setDetailsCache writes the new NodeDetails into the Map.
+   - loadingNodeIds removes the node.id entry.
+   - React re-renders only the affected NodeDetailsCard, transitioning
+     seamlessly from the spinner to the populated content without
+     triggering any global layout shifts or full-page re-renders.
+
+3. ANTI-PATTERN (AVOID):
+   Do NOT use the global isLoading flag (setIsLoading) for individual node
+   generation. The global flag is reserved exclusively for graph-level
+   operations (seed artist synthesis, graph expansion). Misusing it causes:
+   - The entire graph to enter a locked loading state.
+   - The Spiderweb to become non-interactive.
+   - Confusing UX where the user cannot cancel or navigate away.
+
+4. SPINNER COPY (Icons.tsx: DETAIL_THINKING_STEPS):
+   The card spinner cycles through contextual steps:
+   "Contacting live model orchestration..."
+   "Scanning live cultural archives..."
+   "Synthesising musical profile and discography..."
+   "Indexing audio-visual fragments..."
+   "Finalising deep insights..."
+`;
+
+const PHYSICS_STABILIZATION_DOCUMENTATION = `
+Zcene's D3.js physics engine is intentionally stabilized to prevent jitter.
+This section documents the specific anti-patterns that were identified and
+eliminated to guarantee a smooth Spiderweb experience.
+
+1. ROOT CAUSE OF JITTER (RESOLVED — MusicGraph.tsx):
+   The primary source of physics jitter was a useMemo + useEffect pattern
+   that called simulationRef.current.alpha(0.15).restart() whenever
+   the detailsCache Map prop changed.
+
+   The Problem:
+   - App.tsx updates the cache via: setDetailsCache(prev => new Map(prev).set(...))
+   - new Map(prev) creates a brand-new Map object reference on every write.
+   - The useMemo([selectedNode, detailsCache]) recomputed on every reference change.
+   - The useEffect fired, restarting the physics simulation on EVERY node click.
+   - Result: All nodes re-settled from their current positions on every interaction.
+
+   The Fix:
+   The details useMemo and its restart useEffect were deleted entirely.
+   The D3 tick handler already computes node positions from live x/y properties
+   attached directly to node objects; no simulation restart is needed for
+   correct layout after a cache hydration event.
+
+2. SECONDARY RESTART (PRESERVE WITH CAUTION):
+   A second restart exists at MusicGraph.tsx:
+     useEffect(() => {
+       if (isActive && simulationRef.current) {
+         simulationRef.current.alpha(0.3).restart();
+       }
+     }, [isActive]);
+   This fires only when the graph tab becomes active (isActive toggles).
+   It is intentional — it re-energizes the simulation when the user switches
+   back to the Spiderweb tab after the sim has cooled. Do not remove it.
+
+3. GOVERNING RULE FOR FUTURE DEVELOPERS:
+   NEVER call simulationRef.current.restart() or .alpha() in response to:
+   - detailsCache Map changes
+   - loadingNodeIds Set changes
+   - selectedNode changes
+   - Any prop that updates more frequently than the isActive tab toggle.
+   Doing so will re-introduce the jitter regression.
+
+4. ALPHA VALUES (Reference):
+   - Initial layout: alpha(0.15) — gentle, approachable
+   - Tab re-activation: alpha(0.3) — moderate re-energization
+   - Interactive drag: alphaTarget(0.2) on drag start, alphaTarget(0) on end
+   - alphaDecay(0.1) and alphaMin(0.01) ensure the sim halts quickly
+`;
+
 const COST_ESTIMATION_DOCUMENTATION = `
 Zcene implements an explicit cost estimation ledger to track and gate billable 
 AI API credit utilization.
@@ -614,6 +777,10 @@ export const EnginePage: React.FC<SourcePageProps> = ({
         { id: 'visualization-engine', title: 'Visualization Engine' },
         { id: 'sharing-flow', title: 'Sharing & Collaboration' },
         { id: 'system-resilience', title: 'System Resilience' },
+        { id: 'admin-override', title: 'Admin-Only Override' },
+        { id: 'self-healing', title: 'Priority-Based Self-Healing' },
+        { id: 'localized-loading', title: 'Localized Loading UX' },
+        { id: 'physics-stabilization', title: 'Physics Stabilization' },
         { id: 'cost-estimation', title: 'Cost & Caching' },
         { id: 'crate-sizing-rules', title: 'Dashboard Crate Sizing' },
         { id: 'graph-generation', title: 'Graph Generation' },
@@ -814,6 +981,30 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                     <section id="system-resilience">
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">System Resilience</h2>
                         <CodeBlock title="Network Logic & Selection strategy" content={RESILIENCE_DOCUMENTATION} />
+                    </section>
+
+                    {/* ── ADMIN OVERRIDE ── */}
+                    <section id="admin-override">
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">Admin-Only Override</h2>
+                        <CodeBlock title="Quick Heal (Force Refresh) — Access Control & Eviction Logic" content={ADMIN_OVERRIDE_DOCUMENTATION} />
+                    </section>
+
+                    {/* ── SELF-HEALING ── */}
+                    <section id="self-healing">
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">Priority-Based Self-Healing</h2>
+                        <CodeBlock title="Auto-Heal Rules & Session Guard" content={SELF_HEALING_DOCUMENTATION} />
+                    </section>
+
+                    {/* ── LOCALIZED LOADING ── */}
+                    <section id="localized-loading">
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">Localized Loading UX Pattern</h2>
+                        <CodeBlock title="Card-Level Spinner — Implementation & Anti-Pattern" content={LOCALIZED_LOADING_DOCUMENTATION} />
+                    </section>
+
+                    {/* ── PHYSICS STABILIZATION ── */}
+                    <section id="physics-stabilization">
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">Physics Stabilization</h2>
+                        <CodeBlock title="D3 Jitter Prevention & Governing Rules" content={PHYSICS_STABILIZATION_DOCUMENTATION} />
                     </section>
 
                     {/* ── COST ESTIMATION ── */}

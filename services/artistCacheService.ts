@@ -779,8 +779,14 @@ export const getArtistDocWithRedirect = async (
       if (snap.exists()) {
         const data = snap.data();
         if (data && data.redirectTo && depth < 3) {
-          console.log(`[Client-Side Redirect] Redirecting ${artistId} -> ${data.redirectTo}`);
-          return getArtistDocWithRedirect(data.redirectTo, depth + 1);
+          let targetId = data.redirectTo.trim();
+          const match = targetId.match(/^([a-z0-9\-]+-(?:united-states|united-kingdom|canada|australia|germany|france|sweden|norway|italy|spain|brazil|mexico|japan|south-korea))-.+$/i);
+          if (match) {
+            console.log(`[Redirect Suffix Cleaner] Normalized redirect: ${targetId} -> ${match[1]}`);
+            targetId = match[1];
+          }
+          console.log(`[Client-Side Redirect] Redirecting ${artistId} -> ${targetId}`);
+          return getArtistDocWithRedirect(targetId, depth + 1);
         }
         return snap;
       }
@@ -805,8 +811,14 @@ export const getArtistDocWithRedirect = async (
     
     const data = await response.json();
     if (data && data.redirectTo && depth < 3) {
-      console.log(`[Client-Side Redirect Proxy] Redirecting ${artistId} -> ${data.redirectTo}`);
-      return getArtistDocWithRedirect(data.redirectTo, depth + 1);
+      let targetId = data.redirectTo.trim();
+      const match = targetId.match(/^([a-z0-9\-]+-(?:united-states|united-kingdom|canada|australia|germany|france|sweden|norway|italy|spain|brazil|mexico|japan|south-korea))-.+$/i);
+      if (match) {
+        console.log(`[Redirect Suffix Cleaner Proxy] Normalized redirect: ${targetId} -> ${match[1]}`);
+        targetId = match[1];
+      }
+      console.log(`[Client-Side Redirect Proxy] Redirecting ${artistId} -> ${targetId}`);
+      return getArtistDocWithRedirect(targetId, depth + 1);
     }
     
     let canonicalId = artistId;
@@ -830,8 +842,14 @@ export const getArtistDocWithRedirect = async (
     if (snap.exists()) {
       const data = snap.data();
       if (data && data.redirectTo && depth < 3) {
-        console.log(`[Client-Side Redirect] Redirecting ${artistId} -> ${data.redirectTo}`);
-        return getArtistDocWithRedirect(data.redirectTo, depth + 1);
+        let targetId = data.redirectTo.trim();
+        const match = targetId.match(/^([a-z0-9\-]+-(?:united-states|united-kingdom|canada|australia|germany|france|sweden|norway|italy|spain|brazil|mexico|japan|south-korea))-.+$/i);
+        if (match) {
+          console.log(`[Redirect Suffix Cleaner Catch] Normalized redirect: ${targetId} -> ${match[1]}`);
+          targetId = match[1];
+        }
+        console.log(`[Client-Side Redirect] Redirecting ${artistId} -> ${targetId}`);
+        return getArtistDocWithRedirect(targetId, depth + 1);
       }
       return snap;
     }

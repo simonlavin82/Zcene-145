@@ -35,6 +35,22 @@ const checkVideoPlayabilityOnServer = async (videoId: string): Promise<boolean> 
   return false;
 };
 
+const checkIsProfileStaleOrCorrupt = (details: any): boolean => {
+  if (!details) return false;
+  if (details._isSentinel) return false;
+
+  // Refined Priority-Based Self-Healing:
+  // ONLY biography/summary gaps (empty, placeholders, corrupted formatting, or < 100 chars) trigger auto-healing.
+  const summary = details.summary || details.bio || "";
+  if (!summary || summary.trim() === "") return true;
+  if (summary.length < 100) return true;
+  if (summary.toLowerCase().includes('sandbox mock') || summary.toLowerCase().includes('test scenarios')) return true;
+  if (summary.includes('{{') || summary.includes('}}')) return true;
+
+  // Images and metadata (genre/origin) missing/unknown are best-effort only — they do NOT trigger autonomous re-synthesis.
+  return false;
+};
+
 const isArtistIdMatch = (nodeId: string, activeId: string): boolean => {
   if (!nodeId || !activeId) return false;
   const nNorm = normalizeArtistId(nodeId);
@@ -922,6 +938,7 @@ const App: React.FC = () => {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [currentCacheKey, setCurrentCacheKey] = useState<string | null>(null);
+  const healedNodeIdsRef = useRef<Set<string>>(new Set());
 
   const activeNodes = useMemo(() => {
     if (!graphData || !graphData.nodes) return [];
@@ -1802,6 +1819,15 @@ const App: React.FC = () => {
         
         if (globalDoc.exists()) {
             const data = globalDoc.data();
+            console.log("[Node Click Telemetry] globalDoc data:", {
+              exists: true,
+              cacheKey: data?.cacheKey,
+              artistId: data?.artistId,
+              hasDetailsCache: !!data?.detailsCache,
+              detailsCacheType: typeof data?.detailsCache,
+              detailsCacheKeys: data?.detailsCache ? Object.keys(data.detailsCache) : [],
+              detailsCache: data?.detailsCache
+            });
             if (data && data.detailsCache) {
                 let parsed: any = parseDetailsCacheSafely(data.detailsCache);
                 
@@ -1905,52 +1931,6 @@ const App: React.FC = () => {
       graphDataLoaded: !!graphData,
       nodeInGraph: !!isNodeInGraph
     });
-
-    if (isNodeInGraph) {
-      const fallbackDetails: NodeDetails = {
-        summary: `Biography and details for **${node.label || titleCaseArtistId(node.id)}** are currently unavailable in the local cache. Click the "Heal Cache (Force Refresh)" button below if you would like to force-refresh and generate metadata for this artist.`,
-        imageUrl: "",
-        details: {
-          artist: node.label || titleCaseArtistId(node.id),
-          genre: "Unknown",
-          origin: "Unknown",
-          founded: "",
-          notableArtists: []
-        },
-        members: [],
-        links: [],
-        discography: [],
-        tourInfo: "",
-        recommendationReason: "",
-        groundingLinks: [],
-        tourDates: [],
-        tourCachedAt: ""
-      };
-
-      // Store in local cache so subsequent clicks don't query Firestore
-      setDetailsCache(prev => new Map(prev)
-        .set(node.id.toLowerCase(), fallbackDetails)
-        .set(normalizeArtistId(node.id), fallbackDetails)
-        .set(node.id, fallbackDetails)
-      );
-      
-      setSelectedNode({
-        ...node,
-        bio: fallbackDetails.summary,
-        summary: fallbackDetails.summary,
-        genre: "Unknown",
-        origin: "Unknown",
-        founded: "",
-        name: node.label || titleCaseArtistId(node.id),
-        isLibrary: true
-      } as any);
-
-      // Clear loading flags
-      fetchingNodeIdsRef.current.delete(node.id);
-      setLoadingNodeIds(prev => { const next = new Set(prev); next.delete(node.id); return next; });
-      setIsLoading(false);
-      return;
-    }
 
     const isApprovedSeed = approvedSeedsRef.current.has(normalizeArtistId(node.id)) || 
                            approvedSeedsRef.current.has(node.id.toLowerCase());
@@ -5111,6 +5091,15 @@ const App: React.FC = () => {
           });
         }
 
+        const cachedDetails = detailsCache.get(disambiguatedCacheId) || 
+                              detailsCache.get(simpleId) || 
+                              detailsCache.get(n.id.toLowerCase());
+
+        const isCorruptOrStale = checkIsProfileStaleOrCorrupt(cachedDetails) &&
+                                 !healedNodeIdsRef.current.has(simpleId) &&
+                                 !healedNodeIdsRef.current.has(disambiguatedCacheId) &&
+                                 !healedNodeIdsRef.current.has(n.id.toLowerCase());
+
         const hasHydratedBio = isSelected && 
                                (selectedNode as any)?.bio && 
                                (selectedNode as any).bio.length > 5 && 
@@ -5120,10 +5109,10 @@ const App: React.FC = () => {
                          detailsCache.has(disambiguatedCacheId) || 
                          (detailsCache.has(n.id.toLowerCase()) && !isSimpleKeyMismatched);
 
-        return !isCached && 
+        return (!isCached || isCorruptOrStale) && 
                !fetchingNodeIdsRef.current.has(n.id) &&
                isSelected &&
-               !hasHydratedBio;
+               (!hasHydratedBio || isCorruptOrStale);
       });
       
       if (!nodes.length || isFetchingDetailsRef.current) return;
@@ -5156,10 +5145,32 @@ const App: React.FC = () => {
             if (countryNorm) disambiguatedCacheId = `${simpleId}-${countryNorm}`;
           }
 
-          if (detailsCache.has(node.id) || detailsCache.has(node.id.toLowerCase()) || detailsCache.has(disambiguatedCacheId) || fetchingNodeIdsRef.current.has(node.id)) continue;
+          const cachedVal = detailsCache.get(disambiguatedCacheId) || detailsCache.get(node.id) || detailsCache.get(node.id.toLowerCase());
+          const isCorruptOrStale = checkIsProfileStaleOrCorrupt(cachedVal) &&
+                                   !healedNodeIdsRef.current.has(simpleId) &&
+                                   !healedNodeIdsRef.current.has(disambiguatedCacheId) &&
+                                   !healedNodeIdsRef.current.has(node.id.toLowerCase());
+          const isCached = detailsCache.has(node.id) || detailsCache.has(node.id.toLowerCase()) || detailsCache.has(disambiguatedCacheId);
+
+          if (isCached && !isCorruptOrStale) continue;
+          if (fetchingNodeIdsRef.current.has(node.id)) continue;
 
           fetchingNodeIdsRef.current.add(node.id);
-          setLoadingNodeIds(prev => new Set(prev).add(node.id));
+          fetchingNodeIdsRef.current.add(node.id.toLowerCase());
+          fetchingNodeIdsRef.current.add(disambiguatedCacheId);
+          fetchingNodeIdsRef.current.add(simpleId);
+
+          if (isCorruptOrStale) {
+            healedNodeIdsRef.current.add(simpleId);
+            healedNodeIdsRef.current.add(disambiguatedCacheId);
+            healedNodeIdsRef.current.add(node.id.toLowerCase());
+            healedNodeIdsRef.current.add(node.id);
+          }
+
+          // Silent background self-healing: DO NOT show a spinner if the user already has cached data
+          if (!isCached) {
+            setLoadingNodeIds(prev => new Set(prev).add(node.id));
+          }
           lastProgressTimestampRef.current = Date.now();
 
           // Fix 2: Per-node try/finally guarantees loadingNodeIds cleanup even if an
@@ -5260,7 +5271,7 @@ const App: React.FC = () => {
                 }
 
                 let details: NodeDetails;
-                if (fallbackDetails) {
+                if (fallbackDetails && !checkIsProfileStaleOrCorrupt(fallbackDetails)) {
                    details = fallbackDetails;
                    if (isStale) {
                      triggerBackgroundRevalidation(node, disambiguatedCacheId);
@@ -5513,13 +5524,9 @@ const App: React.FC = () => {
                       await setDoc(aliasDocRef, {
                         cacheKey: cacheId,
                         artistId: cacheId,
-                        seedArtists: node.id,
-                        graphData: JSON.stringify({ nodes: [], links: [] }),
-                        filters: {},
+                        redirectTo: canonicalId,
                         cacheVersion: 2,
-                        cachedAt: serverTimestamp(),
-                        hitCount: 0,
-                        redirectTo: canonicalId
+                        cachedAt: serverTimestamp()
                       });
                       console.log(`[Deep Cut Queue] Created Alias Redirect: ${cacheId} -> ${canonicalId}`);
                     }
