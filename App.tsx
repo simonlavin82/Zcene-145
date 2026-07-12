@@ -2772,13 +2772,19 @@ const App: React.FC = () => {
           return entry && isGraphDataPresent(entry) && isCacheEntryFullyQualified(entry);
         });
 
+        // Phase 02 Decision State Trace
+        normalizedArtistList.forEach(name => {
+          const entry = baseCacheResult.cached.get(name) || baseCacheResult.cached.get(name.toLowerCase());
+          const hasGraph = entry ? isGraphDataPresent(entry) : false;
+          const isFullyQ = entry ? isCacheEntryFullyQualified(entry) : false;
+          console.log(`[Phase 02 Decision State] name: "${name}", foundDoc: ${!!entry}, hasGraph: ${hasGraph}, isFullyQualified: ${isFullyQ}, allArtistsCached: ${allArtistsCached}`);
+        });
+
         if (allArtistsCached) {
-          const allDeep = normalizedArtistList.every(name => {
-            const normName = name.toLowerCase();
-            const entry = baseCacheResult.cached.get(name) || baseCacheResult.cached.get(normName);
-            return entry && entry.isDeep === true;
-          });
-          const choice = (allCompositeCached || bypassCacheValidation) ? 'cache' : await confirmCacheChoice(artistList);
+          // For single-artist queries: skip confirmCacheChoice entirely — load directly from cache.
+          // This prevents the cache-choice modal appearing for known artists.
+          const skipChoiceModal = artistList.length === 1 || bypassCacheValidation || allCompositeCached;
+          const choice = skipChoiceModal ? 'cache' : await confirmCacheChoice(artistList);
           if (choice === 'cancel' || controller.signal.aborted) {
             isHydratingSessionRef.current = false;
             setIsLoading(false);
