@@ -807,18 +807,12 @@ const isCacheEntryFullyQualified = (data: any): boolean => {
  * function only asks: "is there usable graphData?"
  */
 const isGraphDataPresent = (data: any): boolean => {
+  // Gold Standard: any document with non-empty graphData nodes is considered cache-present.
+  // Link context quality is a secondary enrichment concern, NOT a cache validity gate.
   if (!data?.graphData) return false;
   try {
     const g = typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData;
-    if (!Array.isArray(g?.nodes) || g.nodes.length === 0) return false;
-    
-    // Reject graph cache if links are missing the context property
-    const links = g.links || [];
-    if (links.length > 0) {
-      const hasMissingContext = links.some((l: any) => !l.context || typeof l.context !== 'string' || l.context.trim() === '');
-      if (hasMissingContext) return false;
-    }
-    return true;
+    return Array.isArray(g?.nodes) && g.nodes.length > 0;
   } catch { return false; }
 };
 
@@ -3395,6 +3389,55 @@ const App: React.FC = () => {
 
     if (fullCacheHit) return;
 
+    // ── DEFINITIVE HARD GUARD: Last-Chance Cache Firewall ─────────────────────────────────────
+    // Prevent confirmTokenUsage from ever firing for artists that exist in Firestore.
+    // This catches any edge case where Phase 02's validation gates (isGraphDataPresent / filtersMatch)
+    // returned false for non-critical reasons (e.g. missing link context, filter mismatch).
+    // If we find a valid graphData document for ALL artists, we load from cache and return.
+    if (!bypassToken && artistList.length >= 1) {
+      try {
+        const hardGuardResults = await Promise.allSettled(
+          artistList.map(async (name) => {
+            const snap = await getArtistDocWithRedirect(normalizeArtistId(name));
+            if (!snap.exists()) return null;
+            const d = snap.data();
+            if (!d) return null;
+            return isGraphDataPresent(d) ? d : null;
+          })
+        );
+
+        const hardGuardEntries = hardGuardResults
+          .filter(r => r.status === 'fulfilled' && r.value !== null)
+          .map(r => (r as PromiseFulfilledResult<any>).value);
+
+        if (hardGuardEntries.length === artistList.length) {
+          // ALL artists have cached graphData — load the first one's graph and abort synthesis
+          console.log(`[HARD GUARD] All ${artistList.length} artist(s) found in Firestore with graphData. Blocking synthesis.`);
+          const firstData = hardGuardEntries[0];
+          let parsedGraph: GraphData | null = null;
+          try {
+            parsedGraph = typeof firstData.graphData === 'string'
+              ? JSON.parse(firstData.graphData)
+              : firstData.graphData;
+          } catch (e) { console.warn('[HARD GUARD] Failed to parse graphData:', e); }
+
+          if (parsedGraph && parsedGraph.nodes && parsedGraph.nodes.length > 0) {
+            const normalizedGraph = applyHumanCasedLabels(normalizeGraphData(parsedGraph), artists);
+            setGraphData(normalizedGraph);
+            setIsLoading(false);
+            isHydratingSessionRef.current = false;
+            showToast('⚡ Loaded from cache');
+            console.log(`[HARD GUARD] Cache loaded successfully. Nodes: ${normalizedGraph.nodes.length}. Synthesis blocked.`);
+            return;
+          }
+        } else {
+          console.log(`[HARD GUARD] ${hardGuardEntries.length}/${artistList.length} artists cached — synthesis will proceed for missing artists.`);
+        }
+      } catch (guardErr) {
+        console.warn('[HARD GUARD] Last-chance firewall check failed, proceeding to synthesis:', guardErr);
+      }
+    }
+
     if (!bypassToken) {
       const confirmed = await confirmTokenUsage(isLiveSynthesis ? 'live_synthesis' : 'generation', [], artistList);
       if (!confirmed || (controller && controller.signal.aborted)) {
@@ -3405,6 +3448,7 @@ const App: React.FC = () => {
         return;
       }
     }
+
 
     // [Selection Lifecycle Reset] ✦
     // The user has confirmed a live synthesis pass. Any selectedNode hydrated from
