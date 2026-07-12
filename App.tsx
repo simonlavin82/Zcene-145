@@ -924,6 +924,48 @@ const App: React.FC = () => {
   const [previousWorkspace, setPreviousWorkspace] = useState<{ view: View; projectId: string | null } | null>(null);
   useEffect(() => { currentViewRef.current = currentView; }, [currentView]);
   useEffect(() => { currentProjectIdRef.current = currentProjectId; }, [currentProjectId]);
+
+  // One-time startup database migration for 'needtobreathe' collision resolution
+  useEffect(() => {
+    const performNeedtobreatheMigration = async () => {
+      try {
+        const simpleRef = doc(db, 'artists', 'needtobreathe');
+        const suffixedRef = doc(db, 'artists', 'needtobreathe-united-states');
+        
+        const [simpleSnap, suffixedSnap] = await Promise.all([
+          getDoc(simpleRef),
+          getDoc(suffixedRef)
+        ]);
+        
+        if (simpleSnap.exists() && suffixedSnap.exists()) {
+          const simpleData = simpleSnap.data();
+          const suffixedData = suffixedSnap.data();
+          
+          if (simpleData && simpleData.detailsCache && suffixedData && !suffixedData.detailsCache) {
+            console.log("[Migration] needtobreathe data mismatch detected. Merging simple record into suffixed record...");
+            const batch = writeBatch(db);
+            batch.update(suffixedRef, {
+              detailsCache: simpleData.detailsCache,
+              cachedAt: serverTimestamp()
+            });
+            batch.set(simpleRef, {
+              artistId: "needtobreathe",
+              cacheKey: "needtobreathe",
+              redirectTo: "needtobreathe-united-states",
+              cacheVersion: 2,
+              cachedAt: serverTimestamp()
+            });
+            await batch.commit();
+            console.log("[Migration] needtobreathe merge and redirect successfully completed.");
+          }
+        }
+      } catch (err) {
+        console.warn("[Migration] failed to execute needtobreathe cleanup:", err);
+      }
+    };
+    performNeedtobreatheMigration();
+  }, []);
+
   const [graphData, setGraphData] = useState<GraphData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -5328,21 +5370,60 @@ const App: React.FC = () => {
                     });
 
                     const simpleArtistId = normalizeArtistId(node.id);
-                    const reconciliationQuery = query(
-                      collection(db, 'artists'),
-                      where('artistId', '==', simpleArtistId),
-                      limit(1)
-                    );
-                    const reconciliationSnap = await getDocs(reconciliationQuery);
 
-                    let targetDocId = existingSnap.id;
+                    let targetDocId = cacheId;
                     let docExists = existingSnap.exists();
 
-                    if (!reconciliationSnap.empty) {
-                      const matchedDoc = reconciliationSnap.docs[0];
-                      targetDocId = matchedDoc.id;
-                      docExists = true;
-                      console.log(`[Deep Cut Queue] Reconciliation match resolved: "${targetDocId}" for artistId "${simpleArtistId}"`);
+                    // If we have a disambiguated ID (e.g. "needtobreathe-united-states"), we should check if
+                    // there is an existing legacy or simple record at "needtobreathe" and merge it.
+                    if (cacheId !== simpleArtistId) {
+                      try {
+                        const simpleDocRef = doc(db, 'artists', simpleArtistId);
+                        const simpleSnap = await getDoc(simpleDocRef);
+                        if (simpleSnap.exists()) {
+                          const simpleData = simpleSnap.data();
+                          if (simpleData && !simpleData.redirectTo) {
+                            console.log(`[Reconciliation] Found legacy base document for "${simpleArtistId}". Merging into "${cacheId}".`);
+                            // Merge detailsCache from base doc if we don't have fallbackDetails already
+                            if (simpleData.detailsCache && !fallbackDetails) {
+                              try {
+                                const parsed = parseDetailsCacheSafely(simpleData.detailsCache);
+                                if (parsed && (parsed.bio || parsed.summary)) {
+                                  fallbackDetails = {
+                                    summary: parsed.summary || parsed.bio || "",
+                                    imageUrl: parsed.imageUrl || "",
+                                    details: parsed.details || { genre: "", origin: "", founded: "", notableArtists: [] },
+                                    members: parsed.members || [],
+                                    links: parsed.links || [],
+                                    discography: parsed.discography || [],
+                                    tourInfo: parsed.tourInfo || "",
+                                    recommendationReason: parsed.recommendationReason || "",
+                                    groundingLinks: parsed.groundingLinks || [],
+                                    tourDates: parsed.tourDates || [],
+                                    tourCachedAt: parsed.tourCachedAt || ""
+                                  };
+                                  details = fallbackDetails;
+                                  console.log(`[Reconciliation] Merging detailsCache from legacy base doc.`);
+                                }
+                              } catch (pe) {
+                                console.warn("Failed parsing legacy detailsCache during merge", pe);
+                              }
+                            }
+                            
+                            // Convert the base document into a redirect to the disambiguated document
+                            await setDoc(simpleDocRef, {
+                              artistId: simpleArtistId,
+                              cacheKey: simpleArtistId,
+                              redirectTo: cacheId,
+                              cacheVersion: 2,
+                              cachedAt: serverTimestamp()
+                            });
+                            console.log(`[Reconciliation] Converted base document "${simpleArtistId}" into a redirect to "${cacheId}".`);
+                          }
+                        }
+                      } catch (err) {
+                        console.warn("[Reconciliation] Failed base document check/migration:", err);
+                      }
                     }
 
                     if (docExists) {
