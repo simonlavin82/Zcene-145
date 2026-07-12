@@ -25,9 +25,15 @@ const checkIsProfileIncomplete = (node: Node, details: NodeDetails | null | unde
   const isArtist = node.type === 'artist' || !node.type || details?.details?.artist !== undefined;
   if (!details || !isArtist) return false;
 
-  // A profile is only incomplete if the biography itself is absent or empty.
-  // Missing metadata (Genre/Origin) is treated as a normal state, not a corrupt/incomplete profile.
-  if (!details.summary || details.summary.trim() === "") {
+  // A profile is incomplete if summary is missing or is the fallback description
+  if (!details.summary || details.summary.trim() === "" || details.summary.includes("currently unavailable")) {
+    return true;
+  }
+
+  // Genre/origin missing or unknown is incomplete for UI curation (shows Heal Cache button)
+  const genre = details.details?.genre?.trim().toLowerCase();
+  const origin = details.details?.origin?.trim().toLowerCase();
+  if (!genre || genre === 'unknown' || !origin || origin === 'unknown') {
     return true;
   }
 

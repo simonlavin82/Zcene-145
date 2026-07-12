@@ -1764,10 +1764,9 @@ const App: React.FC = () => {
     }
     
     // 2. Load Locally and Block the Network
-    const isPlaceholderBio = cachedDetails && cachedDetails.summary && 
-      (cachedDetails.summary.includes('sandbox mock') || cachedDetails.summary.includes('test scenarios'));
-      
-    if (cachedDetails && cachedDetails.summary && cachedDetails.summary.length >= 5 && !isPlaceholderBio && !checkIsProfileIncomplete(node, cachedDetails)) {
+    // Treat existing cache entries (even if incomplete or containing placeholders) as authoritative on normal click.
+    // We only trigger re-synthesis when the user explicitly clicks "Heal Cache" (which runs handleRefreshNode).
+    if (cachedDetails && cachedDetails.summary && cachedDetails.summary.length >= 5) {
        const hydratedNode = {
           ...node,
           bio: cachedDetails.summary,
@@ -1789,79 +1788,19 @@ const App: React.FC = () => {
        fetchingNodeIdsRef.current.delete(node.id);
        setLoadingNodeIds(prev => { const next = new Set(prev); next.delete(node.id); return next; });
        return; // BLOCK network queue entirely
-    } else if (cachedDetails) {
-       console.log(`[Node Click Intercept] Incomplete/broken local profile detected for: ${node.id}`);
-       const displayName = cachedDetails?.details?.artist || node.label || titleCaseArtistId(node.id);
-       const isApprovedSeed = approvedSeedsRef.current.has(normalizeArtistId(node.id)) || 
-                              approvedSeedsRef.current.has(node.id.toLowerCase());
-       const confirmed = isApprovedSeed ? true : await confirmTokenUsage('data_quality_optimization', [], [displayName]);
-       if (!confirmed) return; // Cancel: return early without rendering details
-       
-       const cacheId = normalizeArtistId(node.id);
-       evictedNodeIdsRef.current.add(node.id);
-       evictedNodeIdsRef.current.add(node.id.toLowerCase());
-       evictedNodeIdsRef.current.add(cacheId);
-
-       healedDetailsCacheRef.current.delete(node.id);
-       healedDetailsCacheRef.current.delete(node.id.toLowerCase());
-       healedDetailsCacheRef.current.delete(cacheId);
-
-       // Synchronously clear the stale entries from detailsCacheRef.current
-       detailsCacheRef.current.delete(node.id);
-       detailsCacheRef.current.delete(node.id.toLowerCase());
-       detailsCacheRef.current.delete(cacheId);
-
-       setDetailsCache(prev => {
-           const n = new Map(prev);
-           n.delete(node.id);
-           n.delete(node.id.toLowerCase());
-           n.delete(cacheId);
-           return n;
-       });
-
-       // Attempt to evict the stale Firestore document in the background (non-blocking)
-       deleteDoc(doc(db, 'artists', cacheId))
-         .then(() => console.log(`[Node Click Intercept] Evicted stale local Firestore cache for: ${cacheId}`))
-         .catch((error: any) => {
-           console.error(
-               `[PERMISSIONS] deleteDoc failed for artists/${cacheId}:`,
-               `code=${error?.code}`,
-               `message=${error.message}`
-           );
-           updateDoc(doc(db, 'artists', cacheId), {
-               detailsCache: '',
-               cachedAt: serverTimestamp()
-           }).then(() => console.log(`[Node Click Intercept] Fallback: Invalidated stale record in-place for: ${cacheId}`))
-             .catch((fallbackError: any) => {
-               console.error(
-                   `[PERMISSIONS] updateDoc fallback also failed for artists/${cacheId}:`,
-                   `code=${fallbackError?.code}`,
-                   `message=${fallbackError.message}`
-               );
-             });
-         });
-
-       // Trigger spinner immediately
-       setLoadingNodeIds(prev => new Set(prev).add(node.id));
-
-       // Select the node so the sidebar shows and queue triggers a fresh live load
-       setSelectedNode(node);
-       if (node.type !== 'founded') {
-         setActiveNodeIds(prev => prev.some(id => id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node.id]);
-       }
-       return;
     }
     
     // 2.5 GLOBAL ARTISTS FALLBACK
     // If the local detailsCache is empty (e.g. freshly loaded project), query the root artists collection directly.
     // Firestore stores detailsCache as a JSON string — parse it and unwrap any array wrapper layers.
+    let globalDoc: any | null = null;
     const isEvicted = evictedNodeIdsRef.current.has(node.id) || 
                       evictedNodeIdsRef.current.has(node.id.toLowerCase()) || 
                       evictedNodeIdsRef.current.has(normalizeArtistId(node.id));
     if (!isEvicted) {
         try {
             const standardizedId = normalizeArtistId(node.id);
-            let globalDoc = await getArtistDocWithRedirect(standardizedId);
+            globalDoc = await getArtistDocWithRedirect(standardizedId);
         
         if (globalDoc.exists()) {
             const data = globalDoc.data();
@@ -1945,74 +1884,74 @@ const App: React.FC = () => {
                     setIsLoading(false);
                     console.log("[Node Click] Hydrated from global artists collection:", node.id, "→", standardizedId);
                     return;
-                } else {
-                    console.log(`[Node Click Intercept] Incomplete global Firestore profile detected for: ${node.id}`);
-                    const displayName = detailsPayload?.details?.artist || node.label || titleCaseArtistId(node.id);
-                    const isApprovedSeed = approvedSeedsRef.current.has(normalizeArtistId(node.id)) || 
-                                           approvedSeedsRef.current.has(node.id.toLowerCase());
-                    const confirmed = isApprovedSeed ? true : await confirmTokenUsage('data_quality_optimization', [], [displayName]);
-                    if (!confirmed) return; // Cancel: return early without rendering details
-
-                    // Delete from local memory and Firestore cache
-                    healedDetailsCacheRef.current.delete(node.id);
-                    healedDetailsCacheRef.current.delete(node.id.toLowerCase());
-                    healedDetailsCacheRef.current.delete(standardizedId);
-
-                    // Clear detailsCacheRef.current and detailsCache state synchronously
-                    detailsCacheRef.current.delete(node.id);
-                    detailsCacheRef.current.delete(node.id.toLowerCase());
-                    detailsCacheRef.current.delete(standardizedId);
-
-                    setDetailsCache(prev => {
-                        const n = new Map(prev);
-                        n.delete(node.id);
-                        n.delete(node.id.toLowerCase());
-                        n.delete(standardizedId);
-                        return n;
-                    });
-
-                    // Synchronously mark as evicted so the queue skips cache lookup
-                    evictedNodeIdsRef.current.add(node.id);
-                    evictedNodeIdsRef.current.add(node.id.toLowerCase());
-                    evictedNodeIdsRef.current.add(standardizedId);
-
-                    // Perform Firestore eviction in the background (non-blocking)
-                    deleteDoc(doc(db, 'artists', standardizedId))
-                      .then(() => console.log(`[Node Click Intercept] Evicted stale global Firestore cache for: ${standardizedId}`))
-                      .catch((error: any) => {
-                        console.error(
-                            `[PERMISSIONS] deleteDoc failed for artists/${standardizedId}:`,
-                            `code=${error?.code}`,
-                            `message=${error.message}`
-                        );
-                        updateDoc(doc(db, 'artists', standardizedId), {
-                            detailsCache: '',
-                            cachedAt: serverTimestamp()
-                        }).then(() => console.log(`[Node Click Intercept] Fallback: Invalidated stale record in-place for: ${standardizedId}`))
-                          .catch((fallbackError: any) => {
-                            console.error(
-                                `[PERMISSIONS] updateDoc fallback also failed for artists/${standardizedId}:`,
-                                `code=${fallbackError?.code}`,
-                                `message=${fallbackError.message}`
-                            );
-                          });
-                      });
-
-                    // Trigger spinner immediately
-                    setLoadingNodeIds(prev => new Set(prev).add(node.id));
-
-                    // Select the node so the sidebar shows and queue triggers a fresh live load
-                    setSelectedNode(node);
-                    if (node.type !== 'founded') {
-                        setActiveNodeIds(prev => prev.some(id => id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node.id]);
-                    }
-                    return;
                 }
             }
         }
         } catch(err) {
             console.warn("[Node Click] Global fallback read failed:", err);
         }
+    }
+
+    const isNodeInGraph = graphData && graphData.nodes.some((n: any) => 
+      n.id.toLowerCase() === node.id.toLowerCase() || 
+      normalizeArtistId(n.id) === normalizeArtistId(node.id) || 
+      isArtistIdMatch(n.id, node.id)
+    );
+
+    console.log("[DEEP CUT Cache Validity Check]", {
+      nodeId: node.id,
+      hasLocalCachedDetails: !!cachedDetails,
+      localCachedSummaryLen: cachedDetails?.summary?.length ?? 0,
+      globalDocExists: !!(globalDoc && globalDoc.exists()),
+      globalDocHasDetailsCache: !!(globalDoc && globalDoc.exists() && globalDoc.data()?.detailsCache),
+      graphDataLoaded: !!graphData,
+      nodeInGraph: !!isNodeInGraph
+    });
+
+    if (isNodeInGraph) {
+      const fallbackDetails: NodeDetails = {
+        summary: `Biography and details for **${node.label || titleCaseArtistId(node.id)}** are currently unavailable in the local cache. Click the "Heal Cache (Force Refresh)" button below if you would like to force-refresh and generate metadata for this artist.`,
+        imageUrl: "",
+        details: {
+          artist: node.label || titleCaseArtistId(node.id),
+          genre: "Unknown",
+          origin: "Unknown",
+          founded: "",
+          notableArtists: []
+        },
+        members: [],
+        links: [],
+        discography: [],
+        tourInfo: "",
+        recommendationReason: "",
+        groundingLinks: [],
+        tourDates: [],
+        tourCachedAt: ""
+      };
+
+      // Store in local cache so subsequent clicks don't query Firestore
+      setDetailsCache(prev => new Map(prev)
+        .set(node.id.toLowerCase(), fallbackDetails)
+        .set(normalizeArtistId(node.id), fallbackDetails)
+        .set(node.id, fallbackDetails)
+      );
+      
+      setSelectedNode({
+        ...node,
+        bio: fallbackDetails.summary,
+        summary: fallbackDetails.summary,
+        genre: "Unknown",
+        origin: "Unknown",
+        founded: "",
+        name: node.label || titleCaseArtistId(node.id),
+        isLibrary: true
+      } as any);
+
+      // Clear loading flags
+      fetchingNodeIdsRef.current.delete(node.id);
+      setLoadingNodeIds(prev => { const next = new Set(prev); next.delete(node.id); return next; });
+      setIsLoading(false);
+      return;
     }
 
     const isApprovedSeed = approvedSeedsRef.current.has(normalizeArtistId(node.id)) || 
