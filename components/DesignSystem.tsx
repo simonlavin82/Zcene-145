@@ -142,6 +142,37 @@ interface StyleGuidePageProps {
     onNavigateMenu?: (path: string) => void;
 }
 
+export interface RootsBreakdownButtonProps {
+  state: 'disabled' | 'attention' | 'neutral';
+  onClick?: () => void;
+  isLoading?: boolean;
+}
+
+export const RootsBreakdownButton: React.FC<RootsBreakdownButtonProps> = ({ state, onClick, isLoading }) => {
+  const btnClasses = {
+    disabled: "w-9 h-9 flex flex-shrink-0 items-center justify-center border border-zinc-800 bg-zinc-900/20 rounded-xl text-zinc-600 cursor-not-allowed transition-all duration-200 leading-none backdrop-blur-sm",
+    attention: "w-9 h-9 flex flex-shrink-0 items-center justify-center border border-primary bg-primary/10 rounded-xl text-primary animate-pulse hover:bg-primary/20 active:scale-95 transition-all duration-200 leading-none backdrop-blur-sm",
+    neutral: "w-9 h-9 flex flex-shrink-0 items-center justify-center border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none backdrop-blur-sm"
+  }[state];
+
+  const btnTitle = {
+    disabled: isLoading ? "Roots breakdown in progress..." : "No roots breakdown available",
+    attention: "New roots breakdown available! Click to view",
+    neutral: "View roots breakdown"
+  }[state];
+
+  return (
+    <button 
+      onClick={state !== 'disabled' ? onClick : undefined}
+      disabled={state === 'disabled'}
+      className={btnClasses}
+      title={btnTitle}
+    >
+      <span className="material-symbols-outlined !text-[18px]">info</span>
+    </button>
+  );
+};
+
 export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ 
     onNavigate, 
     isActive, 
@@ -1266,6 +1297,34 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <div className="space-y-2">
                                         <p className="text-sm text-zinc-500 font-semibold">Padding</p>
                                         <p className="text-xs text-zinc-400 leading-relaxed">A bottom padding of <strong>48px (pb-12)</strong> is applied to the scrollable container to ensure the button can be scrolled completely clear of the advertisement area on mobile devices.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Roots Breakdown Button */}
+                            <div>
+                                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
+                                    <h3 className="text-xl font-medium text-zinc-200">Roots Breakdown Button</h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Component: RootsBreakdownButton</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">States: disabled, attention, neutral</span>
+                                    </div>
+                                </div>
+                                <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
+                                    An always-visible, state-driven information button. Guides users to the graph's metadata breakdown using a tri-state visual logic.
+                                </p>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-none border border-zinc-800">
+                                     <div className="space-y-4">
+                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Disabled State (No content/loading)</p>
+                                        <RootsBreakdownButton state="disabled" isLoading={false} />
+                                    </div>
+                                     <div className="space-y-4">
+                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Attention State (Unread insights)</p>
+                                        <RootsBreakdownButton state="attention" />
+                                    </div>
+                                     <div className="space-y-4">
+                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Neutral State (Read insights)</p>
+                                        <RootsBreakdownButton state="neutral" />
                                     </div>
                                 </div>
                             </div>
