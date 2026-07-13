@@ -431,20 +431,28 @@ generation never causes global layout shifts or blocks UI interactivity.
    A loading overlay is rendered OVER the entire card carousel area using
    absolute positioning inside the relative flex-grow container:
 
-     {selectedNode && loadingNodeIds.has(selectedNode.id) && !isMagazineViewOpen && (
+     {viewedNode && loadingNodeIds.has(viewedNode.id) && !isMagazineViewOpen && (
        <div className="absolute inset-0 z-40 ...">
          <LoadingSpinner steps={DETAIL_THINKING_STEPS} ... />
-         <button onClick={() => onCloseNode(selectedNode.id)}>Cancel</button>
+         <button onClick={() => onCloseNode(viewedNode.id)}>Cancel</button>
        </div>
      )}
 
-   This overlay activates solely on: selectedNode.id ∈ loadingNodeIds.
+   This overlay activates solely on: viewedNode.id ∈ loadingNodeIds.
    It is completely independent of:
-   - filteredAndSortedNodes / activeNodes (node does not need to be in the list)
-   - viewedIndex (which carousel card is currently showing)
    - detailsCache (whether synthesis data exists yet)
 
-2. WHY ALL STATE-MANAGEMENT APPROACHES FAILED (History):
+2. PERSISTENT BACKGROUND AWARENESS & NAVIGATION:
+   To ensure tasks do not feel "dead" or cancelled when the user navigates:
+   - viewedNode Mapping: The overlay is tied to viewedNode (the current item
+     at viewedIndex) rather than selectedNode, so it perfectly locks the
+     current card being focused if it is generating.
+   - Header Badge: If other cards are generating in the background, a pulsing
+     "{count} Generating" badge appears in the panel header.
+   - Carousel Navigation Dots: Dots corresponding to loading nodes pulse
+     gently in the accent color, indicating background progress.
+
+3. WHY ALL STATE-MANAGEMENT APPROACHES FAILED (History):
 
    ATTEMPT 1: setLoadingNodeIds + setSelectedNode AFTER modal
    - Problem: JIT completes Firestore read and clears loadingNodeIds

@@ -1335,6 +1335,18 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         return result;
     }, [activeNodes, isMagazineViewOpen, magazineSortBy, magazineSearchQuery, detailsCache]);
 
+    const viewedNode = useMemo(() => {
+        return filteredAndSortedNodes[viewedIndex] || null;
+    }, [filteredAndSortedNodes, viewedIndex]);
+
+    const backgroundLoadingCount = useMemo(() => {
+        let count = loadingNodeIds.size;
+        if (viewedNode && loadingNodeIds.has(viewedNode.id)) {
+            count--;
+        }
+        return Math.max(0, count);
+    }, [loadingNodeIds, viewedNode]);
+
     return (
         <div 
           className="w-full h-full flex flex-col bg-zinc-900 overflow-hidden relative min-h-0"
@@ -1459,6 +1471,14 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                     <span className={`h-5 w-5 flex flex-shrink-0 items-center justify-center text-[9px] font-bold border rounded-md transition-all duration-500 ${unreadCount > 0 ? 'bg-brand-black text-primary border-primary/50' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>
                                         {activeNodes.length}
                                     </span>
+                                    {backgroundLoadingCount > 0 && (
+                                        <div className="flex items-center gap-1 text-[10px] text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-full animate-pulse">
+                                            <span className="material-symbols-outlined animate-spin !text-[12px] leading-none">sync</span>
+                                            <span className="font-semibold uppercase tracking-wider text-[8px] leading-none">
+                                                {backgroundLoadingCount} Generating
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -1512,14 +1532,23 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                         
                                         <div className="relative flex items-center max-w-[80px] sm:max-w-[120px] overflow-hidden flex-shrink-0">
                                             <div className="flex items-center gap-1 flex-nowrap pr-4 overflow-hidden">
-                                                {activeNodes.map((node, i) => (
-                                                    <div 
-                                                        key={node.id} 
-                                                        onClick={() => { setViewedIndex(i); onNodeClick(node); }}
-                                                        className={`h-1 transition-all cursor-pointer flex-shrink-0 rounded-full ${i === viewedIndex ? 'w-4 bg-primary' : 'w-1 bg-zinc-600 active:bg-zinc-400'}`}
-                                                        title={node.label || titleCaseArtistId(node.id)}
-                                                    />
-                                                ))}
+                                                {activeNodes.map((node, i) => {
+                                                    const isLoading = loadingNodeIds.has(node.id);
+                                                    return (
+                                                        <div 
+                                                            key={node.id} 
+                                                            onClick={() => { setViewedIndex(i); onNodeClick(node); }}
+                                                            className={`transition-all cursor-pointer flex-shrink-0 rounded-full ${
+                                                                i === viewedIndex 
+                                                                    ? 'w-4 h-1 bg-primary' 
+                                                                    : isLoading 
+                                                                        ? 'w-1.5 h-1.5 bg-primary/80 animate-pulse' 
+                                                                        : 'w-1 h-1 bg-zinc-600 active:bg-zinc-400'
+                                                            }`}
+                                                            title={`${node.label || titleCaseArtistId(node.id)}${isLoading ? ' (Generating...)' : ''}`}
+                                                        />
+                                                    );
+                                                })}
                                             </div>
                                             <div className="absolute right-0 top-0 bottom-0 w-4 bg-gradient-to-r from-transparent to-zinc-900 pointer-events-none" />
                                         </div>
@@ -1641,14 +1670,14 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                               - detailsCache (whether details exist yet)
                             It activates solely on: selectedNode.id ∈ loadingNodeIds.
                             It persists until the JIT queue's finally block clears the node's ID. */}
-                        {selectedNode && loadingNodeIds.has(selectedNode.id) && !isMagazineViewOpen && (
+                        {viewedNode && loadingNodeIds.has(viewedNode.id) && !isMagazineViewOpen && (
                             <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-6 bg-zinc-900/98 backdrop-blur-sm">
                                 <LoadingSpinner
                                     steps={DETAIL_THINKING_STEPS}
                                     subtext="Typically takes 20–30 seconds to dig for details."
                                 />
                                 <button
-                                    onClick={() => onCloseNode(selectedNode.id)}
+                                    onClick={() => onCloseNode(viewedNode.id)}
                                     className="rounded-xl border border-zinc-600 px-6 py-2 text-sm font-medium text-zinc-300 transition-colors active:bg-zinc-800"
                                 >
                                     Cancel
