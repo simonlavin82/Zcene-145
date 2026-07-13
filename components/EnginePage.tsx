@@ -427,45 +427,51 @@ const LOCALIZED_LOADING_DOCUMENTATION = `
 Zcene uses a "Localized Loading" pattern to ensure individual Deep Cut card
 generation never causes global layout shifts or blocks UI interactivity.
 
-1. MECHANISM (DetailsPanel.tsx / App.tsx):
-   - App.tsx maintains a loadingNodeIds: Set<string> state variable.
-   - When generation is triggered, the spinner is activated IMMEDIATELY
-     on node click — before the Token Confirmation Modal is shown:
-       setLoadingNodeIds(prev => new Set(prev).add(node.id));
-       setSelectedNode(node);                      // panel opens instantly
-       setActiveNodeIds(...);                       // card is activated
-       const confirmed = await confirmTokenUsage(...);
-       if (!confirmed) {
-         setLoadingNodeIds(prev => { ... delete(node.id); return next; });
-         return;  // Clean up spinner if user cancels
-       }
-   - Each NodeDetailsCard receives isLoading={loadingNodeIds.has(node.id)}.
-   - The card renders the full 'Scanning live cultural archives...' spinner
-     ONLY within its own card boundary when isLoading === true.
-   - The Spiderweb, other Deep Cut cards, and global nav remain fully
-     interactive and responsive while generation runs in the background.
+1. MECHANISM — EXACT ORDERING (App.tsx: handleNodeClick):
+   The ordering of state calls is CRITICAL and must not be changed.
+   The correct sequence is:
 
-2. CRITICAL ORDERING RULE (Anti-Regression):
-   NEVER call setLoadingNodeIds AFTER await confirmTokenUsage.
-   If synthesis (or a Firestore cache read) completes before the modal
-   resolves, the spinner window collapses to zero frames — the UI jumps
-   directly from empty state to populated content with no loading indicator.
-   The spinner MUST be set before any async await to guarantee it renders.
+     setLoadingNodeIds(prev => new Set(prev).add(node.id));  // Step A: reserve slot
+     const confirmed = await confirmTokenUsage(...);          // Step B: show modal
+     if (!confirmed) {
+       setLoadingNodeIds(prev => { ... delete(node.id) });    // Cancel: release slot
+       return;
+     }
+     setSelectedNode(node);                                   // Step C: trigger JIT
+     setActiveNodeIds(...);                                   // Step C: activate card
+
+   WHY THIS ORDER:
+   - Step A (setLoadingNodeIds) must come BEFORE the modal (before any await).
+     This reserves the loading slot. The spinner will render the instant the
+     panel opens after confirmation because loadingNodeIds already has node.id.
+   - setSelectedNode must come AFTER confirmation (NOT before the modal).
+     The JIT queue useEffect has selectedNode in its dep array. If setSelectedNode
+     is called before the modal, the JIT fires immediately, reads Firestore
+     (~200ms), completes synthesis, and calls setLoadingNodeIds(delete) — all
+     while the user is still reading the modal. When the user clicks Confirm,
+     loadingNodeIds is already empty and details already exist → no spinner.
+
+2. HOW THE SPINNER RENDERS:
+   After confirmation, setSelectedNode triggers a React render where:
+   - details = detailsCache.get(node.id) → undefined (JIT hasn't run yet)
+   - isLoading = loadingNodeIds.has(node.id) → true (reserved in Step A)
+   - NodeDetailsCard condition: !details && isLoading → TRUE → spinner shows
 
 3. TRANSITION BEHAVIOR:
-   - On completion, the JIT queue calls setDetailsCache to write NodeDetails.
-   - The JIT's per-node finally block removes the node.id from loadingNodeIds.
-   - React re-renders only the affected NodeDetailsCard, transitioning
-     seamlessly from the spinner to the populated content without
-     triggering any global layout shifts or full-page re-renders.
+   - JIT queue fires (selectedNode changed) → finds Firestore doc or calls Gemini
+   - On success: setDetailsCache(add) → React render: details exists, content shows
+   - JIT per-node finally: setLoadingNodeIds(delete) → spinner clears
 
 4. ANTI-PATTERN (AVOID):
+   Do NOT call setSelectedNode before await confirmTokenUsage.
+   This triggers the JIT queue during the modal wait, completing synthesis
+   silently and clearing loadingNodeIds before the user can see the spinner.
+
    Do NOT use the global isLoading flag (setIsLoading) for individual node
    generation. The global flag is reserved exclusively for graph-level
    operations (seed artist synthesis, graph expansion). Misusing it causes:
    - The entire graph to enter a locked loading state.
    - The Spiderweb to become non-interactive.
-   - Confusing UX where the user cannot cancel or navigate away.
 
 5. SPINNER COPY (Icons.tsx: DETAIL_THINKING_STEPS):
    The card spinner cycles through contextual steps:
@@ -475,6 +481,8 @@ generation never causes global layout shifts or blocks UI interactivity.
    "Indexing audio-visual fragments..."
    "Finalising deep insights..."
 `;
+
+
 
 const PHYSICS_STABILIZATION_DOCUMENTATION = `
 Zcene's D3.js physics engine is intentionally stabilized to prevent jitter.

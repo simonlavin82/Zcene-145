@@ -1935,22 +1935,28 @@ const App: React.FC = () => {
     const isApprovedSeed = approvedSeedsRef.current.has(normalizeArtistId(node.id)) || 
                            approvedSeedsRef.current.has(node.id.toLowerCase());
 
-    // Open the panel and show the localized spinner immediately — before the token
-    // confirmation modal appears. This gives the user instant visual feedback that
-    // something is happening, and prevents the "jumps straight to content" UX regression
-    // where synthesis completes (via Firestore cache) faster than the modal resolves.
+    // Reserve the loading slot BEFORE the modal so the spinner is ready to show
+    // the instant the user confirms. DO NOT call setSelectedNode here — that would
+    // trigger the JIT queue useEffect (which has selectedNode in its dep array),
+    // causing it to run a Firestore cache read during the modal wait and clear
+    // loadingNodeIds before the user even clicks Confirm.
     setLoadingNodeIds(prev => new Set(prev).add(node.id));
+
+    const confirmed = isApprovedSeed ? true : await confirmTokenUsage('deep_cut_creation', [], [node.label || titleCaseArtistId(node.id)]);
+    if (!confirmed) {
+      // User cancelled — release the loading slot
+      setLoadingNodeIds(prev => { const next = new Set(prev); next.delete(node.id); return next; });
+      return;
+    }
+
+    // After confirmation: switch the panel and trigger the JIT queue.
+    // loadingNodeIds already has node.id, so the card renders with isLoading=true
+    // and details=null → the "Scanning live cultural archives..." spinner shows immediately.
     setSelectedNode(node);
     if (node.type !== 'founded') {
       setActiveNodeIds(prev => prev.some(id => id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node.id]);
     }
 
-    const confirmed = isApprovedSeed ? true : await confirmTokenUsage('deep_cut_creation', [], [node.label || titleCaseArtistId(node.id)]);
-    if (!confirmed) {
-      // User cancelled — remove the spinner we just added
-      setLoadingNodeIds(prev => { const next = new Set(prev); next.delete(node.id); return next; });
-      return;
-    }
   }, [confirmTokenUsage, selectedNode, loadingNodeIds]);
 
   const handleToggleStack = useCallback(async (node: Node, link?: string) => {
