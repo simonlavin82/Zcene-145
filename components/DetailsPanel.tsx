@@ -1630,6 +1630,33 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                 <p className="text-red-400 text-sm">{error}</p>
                             </div>
                         )}
+                        {/* Panel-level loading overlay — renders OVER the card carousel.
+                            This is the definitive spinner fix. Previous approaches tried to ensure
+                            the spinner rendered inside NodeDetailsCard (gated on !details), but that
+                            condition is preempted when the JIT queue's Firestore SDK cache read
+                            completes and populates detailsCache before viewedIndex has a chance to
+                            update. This overlay is completely independent of:
+                              - filteredAndSortedNodes (whether the node is in activeNodes)
+                              - viewedIndex (which card the carousel shows)
+                              - detailsCache (whether details exist yet)
+                            It activates solely on: selectedNode.id ∈ loadingNodeIds.
+                            It persists until the JIT queue's finally block clears the node's ID. */}
+                        {selectedNode && loadingNodeIds.has(selectedNode.id) && !isMagazineViewOpen && (
+                            <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-6 bg-zinc-900/98 backdrop-blur-sm">
+                                <LoadingSpinner
+                                    steps={DETAIL_THINKING_STEPS}
+                                    subtext="Typically takes 20–30 seconds to dig for details."
+                                />
+                                <button
+                                    onClick={() => onCloseNode(selectedNode.id)}
+                                    className="rounded-xl border border-zinc-600 px-6 py-2 text-sm font-medium text-zinc-300 transition-colors active:bg-zinc-800"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        )}
+
+
                     </div>
                 </div>
             )}

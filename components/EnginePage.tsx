@@ -427,61 +427,75 @@ const LOCALIZED_LOADING_DOCUMENTATION = `
 Zcene uses a "Localized Loading" pattern to ensure individual Deep Cut card
 generation never causes global layout shifts or blocks UI interactivity.
 
-1. MECHANISM — EXACT ORDERING (App.tsx: handleNodeClick):
-   The ordering of state calls is CRITICAL. The correct sequence is:
+1. THE DEFINITIVE FIX — Panel-Level Overlay (DetailsPanel.tsx):
+   A loading overlay is rendered OVER the entire card carousel area using
+   absolute positioning inside the relative flex-grow container:
 
-     setLoadingNodeIds(prev => new Set(prev).add(node.id));    // Step A: reserve slot
-     const confirmed = await confirmTokenUsage(...);            // Step B: modal
+     {selectedNode && loadingNodeIds.has(selectedNode.id) && !isMagazineViewOpen && (
+       <div className="absolute inset-0 z-40 ...">
+         <LoadingSpinner steps={DETAIL_THINKING_STEPS} ... />
+         <button onClick={() => onCloseNode(selectedNode.id)}>Cancel</button>
+       </div>
+     )}
+
+   This overlay activates solely on: selectedNode.id ∈ loadingNodeIds.
+   It is completely independent of:
+   - filteredAndSortedNodes / activeNodes (node does not need to be in the list)
+   - viewedIndex (which carousel card is currently showing)
+   - detailsCache (whether synthesis data exists yet)
+
+2. WHY ALL STATE-MANAGEMENT APPROACHES FAILED (History):
+
+   ATTEMPT 1: setLoadingNodeIds + setSelectedNode AFTER modal
+   - Problem: JIT completes Firestore read and clears loadingNodeIds
+     before setSelectedNode fires. No spinner window.
+
+   ATTEMPT 2: setLoadingNodeIds BEFORE modal, setSelectedNode AFTER
+   - Problem: setActiveNodeIds (after confirm) triggers JIT, which reads
+     from Firestore SDK's in-memory cache (0ms, SDK caches on first read).
+     React 18 automatic batching collapses setActiveNodeIds + setDetailsCache
+     + setLoadingNodeIds(delete) into ONE render → spinner never commits.
+
+   ATTEMPT 3: flushSync(() => { setSelectedNode(node) })
+   - Problem: flushSync committed setSelectedNode BUT at that moment the new
+     node was NOT yet in activeNodes (setActiveNodeIds hadn't fired). So
+     filteredAndSortedNodes was empty → DetailsPanel showed the isLoading
+     spinner branch at L1557-1570 only briefly. Then setActiveNodeIds fired,
+     the node appeared in filteredAndSortedNodes (length > 0), the spinner
+     branch was replaced by the card carousel — but the JIT had already
+     completed via SDK cache, so the card rendered with content immediately.
+
+   ROOT CAUSE SUMMARY:
+   The spinner inside NodeDetailsCard (gated on !details) and the spinner in
+   the empty-state branch (gated on filteredAndSortedNodes.length === 0) both
+   have preconditions that the JIT's near-instant Firestore SDK cache reads
+   can preempt. The panel-level overlay has NO such preconditions.
+
+3. EXACT ORDERING (App.tsx: handleNodeClick):
+     setLoadingNodeIds(prev => new Set(prev).add(node.id));  // reserve slot
+     const confirmed = await confirmTokenUsage(...);          // modal
      if (!confirmed) {
-       setLoadingNodeIds(prev => { ... delete(node.id) });      // cancel: release slot
+       setLoadingNodeIds(prev => { ... delete(node.id) });    // cancel
        return;
      }
-     flushSync(() => { setSelectedNode(node); });               // Step C: FORCED paint
-     setActiveNodeIds(...);                                     // Step D: activate card
-
-2. ROOT CAUSE — REACT 18 AUTOMATIC BATCHING (Critical):
-   React 18 automatically batches all state updates that occur within
-   the same microtask queue into a single render. Without flushSync, the
-   following updates all collapse into ONE render:
-
-     setSelectedNode(node)             ← triggers JIT useEffect
-     └── JIT fires immediately
-         └── getArtistDocWithRedirect() → returns from Firestore SDK's
-             in-memory document cache (0ms — SDK cached it on first read)
-         └── setDetailsCache(add data) ← batched with setSelectedNode
-         └── setLoadingNodeIds(delete)  ← batched into same render
-
-   The intermediate state where details=null AND isLoading=true is NEVER
-   committed to the DOM. The browser paints ONE frame: content already
-   loaded, loading=false. The spinner has zero render window.
-
-3. THE FIX — flushSync (react-dom):
-   flushSync(() => { setSelectedNode(node); }) forces React to synchronously
-   commit the render for setSelectedNode BEFORE any useEffect can fire.
-   After flushSync returns, the browser has painted:
-     details = null (JIT hasn't run yet)
-     isLoading = true (reserved in Step A)
-     → NodeDetailsCard condition: !details && isLoading → TRUE → SPINNER SHOWS
-
-   The JIT useEffect then fires in a SEPARATE render cycle, after paint.
-   This is a legitimate React escape hatch for exactly this scenario.
+     flushSync(() => { setSelectedNode(node); });             // force paint
+     setActiveNodeIds(...);                                   // activate card
 
 4. TRANSITION BEHAVIOR:
+   - loadingNodeIds has node.id → overlay appears over the panel
    - JIT queue fires (selectedNode changed) → reads Firestore or calls Gemini
-   - On success: setDetailsCache(add) → React render: details exists → content
-   - JIT per-node finally: setLoadingNodeIds(delete) → spinner clears
+   - On success: setDetailsCache(add) → card carousel has content underneath
+   - JIT per-node finally: setLoadingNodeIds(delete node.id) → overlay disappears
+   - React renders card with content already populated → seamless transition
 
 5. ANTI-PATTERNS (AVOID):
+   - DO NOT remove the panel-level overlay. It is the only approach proven
+     to be immune to the Firestore SDK cache preemption race.
    - DO NOT call setSelectedNode BEFORE await confirmTokenUsage.
-     This triggers the JIT during the modal wait; it completes the Firestore read
-     (~200ms) and clears loadingNodeIds before the user clicks Confirm.
-   - DO NOT remove flushSync from around setSelectedNode.
-     Without it, React 18 batching collapses the spinner render window to zero.
+     This triggers the JIT during the modal wait.
    - DO NOT use global isLoading (setIsLoading) for individual node generation.
-     The global flag locks the entire Spiderweb and all other UI elements.
 
 6. SPINNER COPY (Icons.tsx: DETAIL_THINKING_STEPS):
-   The card spinner cycles through contextual steps:
    "Contacting live model orchestration..."
    "Scanning live cultural archives..."
    "Synthesising musical profile and discography..."
