@@ -643,7 +643,21 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                     </div>
                 </div>
 
-                <div className={`px-4 space-y-10 flex-grow min-h-0 ${isFullScreenMode ? 'py-4 md:px-8' : 'py-8'}`}>
+                <div className={`px-4 space-y-10 flex-grow min-h-0 relative ${isFullScreenMode ? 'py-4 md:px-8' : 'py-8'}`}>
+                    {isLoading && details && (
+                        <div className="absolute inset-0 bg-zinc-900/90 backdrop-blur-sm z-30 flex flex-col items-center justify-center text-center space-y-8 h-full bg-zinc-900">
+                            <LoadingSpinner 
+                                steps={DETAIL_THINKING_STEPS}
+                                subtext="Typically takes 20–30 seconds to dig for details."
+                            />
+                            <button 
+                                onClick={onClose}
+                                className="rounded-xl border border-zinc-600 px-6 py-2 text-sm font-medium text-zinc-300 transition-colors active:bg-zinc-800"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    )}
                     {!details && (
                         <div className="flex flex-col items-center justify-center text-center py-12 space-y-8 h-full bg-zinc-900">
                             {isLoading ? (
@@ -1471,14 +1485,6 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                     <span className={`h-5 w-5 flex flex-shrink-0 items-center justify-center text-[9px] font-bold border rounded-md transition-all duration-500 ${unreadCount > 0 ? 'bg-brand-black text-primary border-primary/50' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>
                                         {activeNodes.length}
                                     </span>
-                                    {backgroundLoadingCount > 0 && (
-                                        <div className="flex items-center gap-1 text-[10px] text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-full animate-pulse">
-                                            <span className="material-symbols-outlined animate-spin !text-[12px] leading-none">sync</span>
-                                            <span className="font-semibold uppercase tracking-wider text-[8px] leading-none">
-                                                {backgroundLoadingCount} Generating
-                                            </span>
-                                        </div>
-                                    )}
                                 </div>
                             </div>
                         )}
@@ -1659,31 +1665,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                 <p className="text-red-400 text-sm">{error}</p>
                             </div>
                         )}
-                        {/* Panel-level loading overlay — renders OVER the card carousel.
-                            This is the definitive spinner fix. Previous approaches tried to ensure
-                            the spinner rendered inside NodeDetailsCard (gated on !details), but that
-                            condition is preempted when the JIT queue's Firestore SDK cache read
-                            completes and populates detailsCache before viewedIndex has a chance to
-                            update. This overlay is completely independent of:
-                              - filteredAndSortedNodes (whether the node is in activeNodes)
-                              - viewedIndex (which card the carousel shows)
-                              - detailsCache (whether details exist yet)
-                            It activates solely on: selectedNode.id ∈ loadingNodeIds.
-                            It persists until the JIT queue's finally block clears the node's ID. */}
-                        {viewedNode && loadingNodeIds.has(viewedNode.id) && !isMagazineViewOpen && (
-                            <div className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-6 bg-zinc-900/98 backdrop-blur-sm">
-                                <LoadingSpinner
-                                    steps={DETAIL_THINKING_STEPS}
-                                    subtext="Typically takes 20–30 seconds to dig for details."
-                                />
-                                <button
-                                    onClick={() => onCloseNode(viewedNode.id)}
-                                    className="rounded-xl border border-zinc-600 px-6 py-2 text-sm font-medium text-zinc-300 transition-colors active:bg-zinc-800"
-                                >
-                                    Cancel
-                                </button>
-                            </div>
-                        )}
+
 
 
                     </div>

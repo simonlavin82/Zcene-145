@@ -424,81 +424,68 @@ The system distinguishes between two categories of data quality:
 `;
 
 const LOCALIZED_LOADING_DOCUMENTATION = `
-Zcene uses a "Localized Loading" pattern to ensure individual Deep Cut card
-generation never causes global layout shifts or blocks UI interactivity.
+1. CARD-BODY-SCOPED LOADING SPINNER (DetailsPanel.tsx):
+   Instead of global or panel-level overlays, the loading spinner is rendered
+   strictly inside the body of the individual NodeDetailsCard:
+   - When details is null (net-new): The card body is replaced by the spinner.
+   - When details exists (Force Refresh/regenerating): An absolute backdrop
+     blur and loading spinner overlays the details container, leaving the
+     artist title, tags, and header action buttons fully visible and active.
+   - Cancel button is accessible directly in the card body at all times.
 
-1. THE DEFINITIVE FIX — Panel-Level Overlay (DetailsPanel.tsx):
-   A loading overlay is rendered OVER the entire card carousel area using
-   absolute positioning inside the relative flex-grow container:
+2. GUARANTEEING SPINNER PAINT WITH flushSync (App.tsx):
+   To prevent React 18 automatic batching and the Firestore SDK in-memory cache
+   from bypassing the spinner entirely (which happens when the JIT useEffect
+   completes in 0ms and adds details before the card is even mounted), we wrap
+   both setSelectedNode and setActiveNodeIds in flushSync:
 
-     {viewedNode && loadingNodeIds.has(viewedNode.id) && !isMagazineViewOpen && (
-       <div className="absolute inset-0 z-40 ...">
-         <LoadingSpinner steps={DETAIL_THINKING_STEPS} ... />
-         <button onClick={() => onCloseNode(viewedNode.id)}>Cancel</button>
-       </div>
-     )}
+     flushSync(() => {
+       setSelectedNode(node);
+       setActiveNodeIds(prev => [...prev, node.id]);
+     });
 
-   This overlay activates solely on: viewedNode.id ∈ loadingNodeIds.
-   It is completely independent of:
-   - detailsCache (whether synthesis data exists yet)
+   This forces React to synchronously mount the card and paint the spinner
+   before the JIT useEffect executes.
 
-2. PERSISTENT BACKGROUND AWARENESS & NAVIGATION:
-   To ensure tasks do not feel "dead" or cancelled when the user navigates:
-   - viewedNode Mapping: The overlay is tied to viewedNode (the current item
-     at viewedIndex) rather than selectedNode, so it perfectly locks the
-     current card being focused if it is generating.
-   - Header Badge: If other cards are generating in the background, a pulsing
-     "{count} Generating" badge appears in the panel header.
+3. PERSISTENT BACKGROUND AWARENESS & NAVIGATION:
+   - Navigation: Because each card in the carousel evaluates its own loading
+     state via loadingNodeIds.has(node.id), navigation does not kill the loader.
+     Users can scroll between cards freely, and generating cards will show
+     spinners while loaded cards show content normally.
    - Carousel Navigation Dots: Dots corresponding to loading nodes pulse
      gently in the accent color, indicating background progress.
 
-3. WHY ALL STATE-MANAGEMENT APPROACHES FAILED (History):
+4. WHY PREVIOUS APPROACHES FAILED (History):
+   - ATTEMPT 1: JIT ran too fast and cleared loadingNodeIds before setSelectedNode.
+   - ATTEMPT 2: JIT SDK cache read (0ms) batched with setActiveNodeIds. The card
+     rendered directly with details without painting a spinner frame.
+   - ATTEMPT 3: flushSync only wrapped setSelectedNode. The card was not in
+     activeNodes yet, so it was not rendered in the carousel during the paint frame.
+     Then the next frame batched activeNodes and details together, bypassing spinner.
 
-   ATTEMPT 1: setLoadingNodeIds + setSelectedNode AFTER modal
-   - Problem: JIT completes Firestore read and clears loadingNodeIds
-     before setSelectedNode fires. No spinner window.
-
-   ATTEMPT 2: setLoadingNodeIds BEFORE modal, setSelectedNode AFTER
-   - Problem: setActiveNodeIds (after confirm) triggers JIT, which reads
-     from Firestore SDK's in-memory cache (0ms, SDK caches on first read).
-     React 18 automatic batching collapses setActiveNodeIds + setDetailsCache
-     + setLoadingNodeIds(delete) into ONE render → spinner never commits.
-
-   ATTEMPT 3: flushSync(() => { setSelectedNode(node) })
-   - Problem: flushSync committed setSelectedNode BUT at that moment the new
-     node was NOT yet in activeNodes (setActiveNodeIds hadn't fired). So
-     filteredAndSortedNodes was empty → DetailsPanel showed the isLoading
-     spinner branch at L1557-1570 only briefly. Then setActiveNodeIds fired,
-     the node appeared in filteredAndSortedNodes (length > 0), the spinner
-     branch was replaced by the card carousel — but the JIT had already
-     completed via SDK cache, so the card rendered with content immediately.
-
-   ROOT CAUSE SUMMARY:
-   The spinner inside NodeDetailsCard (gated on !details) and the spinner in
-   the empty-state branch (gated on filteredAndSortedNodes.length === 0) both
-   have preconditions that the JIT's near-instant Firestore SDK cache reads
-   can preempt. The panel-level overlay has NO such preconditions.
-
-3. EXACT ORDERING (App.tsx: handleNodeClick):
+5. EXACT ORDERING (App.tsx: handleNodeClick):
      setLoadingNodeIds(prev => new Set(prev).add(node.id));  // reserve slot
      const confirmed = await confirmTokenUsage(...);          // modal
      if (!confirmed) {
        setLoadingNodeIds(prev => { ... delete(node.id) });    // cancel
        return;
      }
-     flushSync(() => { setSelectedNode(node); });             // force paint
-     setActiveNodeIds(...);                                   // activate card
+     flushSync(() => {
+       setSelectedNode(node);
+       setActiveNodeIds(prev => [...prev, node.id]);          // force synchronous mount
+     });
 
 4. TRANSITION BEHAVIOR:
-   - loadingNodeIds has node.id → overlay appears over the panel
+   - loadingNodeIds has node.id → spinner/overlay appears inside the card body
    - JIT queue fires (selectedNode changed) → reads Firestore or calls Gemini
-   - On success: setDetailsCache(add) → card carousel has content underneath
-   - JIT per-node finally: setLoadingNodeIds(delete node.id) → overlay disappears
+   - On success: setDetailsCache(add) → card transitions to populated content
+   - JIT per-node finally: setLoadingNodeIds(delete node.id) → spinner clears
    - React renders card with content already populated → seamless transition
 
 5. ANTI-PATTERNS (AVOID):
-   - DO NOT remove the panel-level overlay. It is the only approach proven
-     to be immune to the Firestore SDK cache preemption race.
+   - DO NOT remove the flushSync wrapper around setSelectedNode/setActiveNodeIds.
+     Without it, React 18 batching collapses the card-mount and JIT fetch into
+     a single render frame, skipping the spinner entirely.
    - DO NOT call setSelectedNode BEFORE await confirmTokenUsage.
      This triggers the JIT during the modal wait.
    - DO NOT use global isLoading (setIsLoading) for individual node generation.

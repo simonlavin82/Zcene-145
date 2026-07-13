@@ -1961,10 +1961,10 @@ const App: React.FC = () => {
     // then the JIT's updates land in a separate render cycle.
     flushSync(() => {
       setSelectedNode(node);
+      if (node.type !== 'founded') {
+        setActiveNodeIds(prev => prev.some(id => id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node.id]);
+      }
     });
-    if (node.type !== 'founded') {
-      setActiveNodeIds(prev => prev.some(id => id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node.id]);
-    }
 
   }, [confirmTokenUsage, selectedNode, loadingNodeIds]);
 
