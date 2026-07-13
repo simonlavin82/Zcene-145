@@ -947,12 +947,19 @@ const App: React.FC = () => {
       .map(id => graphData.nodes.find(n => n.id.toLowerCase() === id.toLowerCase() || normalizeArtistId(n.id) === normalizeArtistId(id) || isArtistIdMatch(n.id, id)))
       .filter((n): n is Node => {
         if (!n || n.type !== 'artist') return false;
+        
+        // Include nodes actively generating so their cards render the spinner
+        const isGenerating = loadingNodeIds.has(n.id) || 
+                             loadingNodeIds.has(n.id.toLowerCase()) || 
+                             loadingNodeIds.has(normalizeArtistId(n.id));
+        if (isGenerating) return true;
+
         const details = detailsCache.get(n.id) || 
                         detailsCache.get(n.id.toLowerCase()) || 
                         detailsCache.get(normalizeArtistId(n.id));
         return !!(details && details.summary && details.summary.trim().length > 5 && !(details as any)._isSentinel);
       });
-  }, [activeNodeIds, graphData, detailsCache]);
+  }, [activeNodeIds, graphData, detailsCache, loadingNodeIds]);
   const [isStackDialogOpen, setIsStackDialogOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const isAdmin = useMemo(() => {

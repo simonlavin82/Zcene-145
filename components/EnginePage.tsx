@@ -433,7 +433,7 @@ const LOCALIZED_LOADING_DOCUMENTATION = `
      artist title, tags, and header action buttons fully visible and active.
    - Cancel button is accessible directly in the card body at all times.
 
-2. GUARANTEEING SPINNER PAINT WITH flushSync (App.tsx):
+2. GUARANTEEING SPINNER PAINT WITH flushSync & activeNodes BYPASS (App.tsx):
    To prevent React 18 automatic batching and the Firestore SDK in-memory cache
    from bypassing the spinner entirely (which happens when the JIT useEffect
    completes in 0ms and adds details before the card is even mounted), we wrap
@@ -443,6 +443,14 @@ const LOCALIZED_LOADING_DOCUMENTATION = `
        setSelectedNode(node);
        setActiveNodeIds(prev => [...prev, node.id]);
      });
+
+   Additionally, because activeNodes is filtered to only include nodes with
+   populated details Cache, a net-new generating node would normally be filtered
+   out and its card would never mount. We update the activeNodes useMemo filter
+   to check loadingNodeIds and bypass the details presence check:
+
+     const isGenerating = loadingNodeIds.has(n.id) || ...;
+     if (isGenerating) return true;
 
    This forces React to synchronously mount the card and paint the spinner
    before the JIT useEffect executes.
