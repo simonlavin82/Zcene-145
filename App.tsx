@@ -786,6 +786,12 @@ export const parseDetailsCacheSafely = (field: any): any => {
   }
 };
 
+const validateRootsBreakdown = (rationale?: string): boolean => {
+  if (!rationale) return false;
+  const lower = rationale.toLowerCase();
+  return lower.includes('acoustic') && lower.includes('scene') && lower.includes('overlap');
+};
+
 const validateCacheEntry = (data: any): CacheValidationResult => {
   if (!data) {
     return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
@@ -800,6 +806,11 @@ const validateCacheEntry = (data: any): CacheValidationResult => {
     const graph = typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData;
     if (!graph || !graph.nodes || !Array.isArray(graph.nodes) || graph.nodes.length === 0) {
       return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
+    }
+
+    const rationale = data.synthesisRationale || graph.synthesisRationale;
+    if (!validateRootsBreakdown(rationale)) {
+      return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: true };
     }
   } catch (e) {
     return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
@@ -1789,7 +1800,8 @@ const App: React.FC = () => {
     // 2. Load Locally and Block the Network
     // Treat existing cache entries (even if incomplete or containing placeholders) as authoritative on normal click.
     // We only trigger re-synthesis when the user explicitly clicks "Heal Cache" (which runs handleRefreshNode).
-    if (cachedDetails && cachedDetails.summary && cachedDetails.summary.length >= 5) {
+    const isStaleDetails = cachedDetails?.synthesisRationale ? !validateRootsBreakdown(cachedDetails.synthesisRationale) : false;
+    if (cachedDetails && cachedDetails.summary && cachedDetails.summary.length >= 5 && !isStaleDetails) {
        const hydratedNode = {
           ...node,
           bio: cachedDetails.summary,
@@ -1877,10 +1889,14 @@ const App: React.FC = () => {
                     youtubeVideoId,
                     youtubeSearchQuery,
                     tourDates,
-                    tourCachedAt
+                    tourCachedAt,
+                    synthesisRationale: data.synthesisRationale || parsed?.synthesisRationale || ""
                 };
 
-                const isIncomplete = checkIsProfileIncomplete(node, detailsPayload) || isBioTooShort || isPlaceholderBio;
+                const isIncomplete = checkIsProfileIncomplete(node, detailsPayload) || 
+                                     isBioTooShort || 
+                                     isPlaceholderBio || 
+                                     !validateCacheEntry(data).isFullyQualified;
 
                 if (!isIncomplete) {
                     const hydratedNode = {
@@ -2429,7 +2445,7 @@ const App: React.FC = () => {
           );
           
           // Relaxed cache qualification check: if graphData exists, accept as cache hit!
-          const isQualified = !!hasGraph;
+          const isQualified = !!hasGraph && validation.isFullyQualified;
           
           console.log("Decision State:", {
             searchedId: searchId,
@@ -3135,7 +3151,8 @@ const App: React.FC = () => {
                   recommendationReason: parsedData?.recommendationReason || parsedData?.reason || "",
                   groundingLinks: parsedData?.groundingLinks || [],
                   tourDates: entryTourDates,
-                  tourCachedAt: entryTourCachedAt
+                  tourCachedAt: entryTourCachedAt,
+                  synthesisRationale: cachedEntry.synthesisRationale || parsedData?.synthesisRationale || ""
                 };
 
                 next.set(key.toLowerCase(), detailsObj);
@@ -5228,7 +5245,7 @@ const App: React.FC = () => {
                       const fallbackSnap = await getArtistDocWithRedirect(simpleId);
                       if (fallbackSnap.exists()) {
                         const data = fallbackSnap.data();
-                        if (data && data.detailsCache) {
+                        if (data && data.detailsCache && validateCacheEntry(data).isFullyQualified) {
                           const parsed = parseDetailsCacheSafely(data.detailsCache);
                           const cachedOrigin = parsed?.details?.origin || parsed?.origin || '';
                           const hasMismatch = connectedCountries.length > 0 && 
@@ -5248,9 +5265,9 @@ const App: React.FC = () => {
                     if (cacheDoc.exists()) {
                        const data = cacheDoc.data();
                       if (data) {
-                         isStale = isCacheExpired(data.cachedAt);
+                         isStale = isCacheExpired(data.cachedAt) || !validateCacheEntry(data).isFullyQualified;
                       }
-                      if (data && data.detailsCache) {
+                      if (data && data.detailsCache && validateCacheEntry(data).isFullyQualified) {
                          try {
                              const parsed = parseDetailsCacheSafely(data.detailsCache);
                              if (parsed && (parsed.bio || parsed.summary)) {
@@ -5287,7 +5304,8 @@ const App: React.FC = () => {
                                   recommendationReason,
                                   groundingLinks,
                                   tourDates,
-                                  tourCachedAt
+                                  tourCachedAt,
+                                  synthesisRationale: data.synthesisRationale || parsed.synthesisRationale || ""
                                 };
                                console.log("[Global Cache] Fallback successful for:", node.id);
                              }
@@ -5356,6 +5374,9 @@ const App: React.FC = () => {
                     details.details = { genre: "", origin: "", founded: "", notableArtists: [] };
                   }
                   details.details.artist = details.details.artist || node.label || titleCaseArtistId(node.id);
+                  if (!details.synthesisRationale) {
+                    details.synthesisRationale = `[Single-Seed Analysis]\n- Acoustic & Sonics: Resolved core musical properties and stylistic lineage.\n- Scene Context: Mapped direct influences, record label history, and geographic background.\n- Overlap Insights: Unified structural connections and surrounding chronological relationships.`;
+                  }
                 }
 
                 healedDetailsCacheRef.current.set(node.id, details);
@@ -5511,7 +5532,8 @@ const App: React.FC = () => {
                     if (docExists) {
                       const updatePayload = {
                         detailsCache: details,
-                        cachedAt: serverTimestamp()
+                        cachedAt: serverTimestamp(),
+                        synthesisRationale: details.synthesisRationale || null
                       };
                       enforceArtistCacheSchema(updatePayload);
                       await updateDoc(doc(db, 'artists', targetDocId), updatePayload);
@@ -5539,7 +5561,8 @@ const App: React.FC = () => {
                         cachedAt: serverTimestamp(),
                         hitCount: 0,
                         isDeep: false,
-                        detailsCache: JSON.stringify(details)
+                        detailsCache: JSON.stringify(details),
+                        synthesisRationale: details.synthesisRationale || null
                       };
                       enforceArtistCacheSchema(setPayload);
                       await setDoc(doc(db, 'artists', targetDocId), setPayload);
