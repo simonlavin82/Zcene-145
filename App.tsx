@@ -1,5 +1,6 @@
 
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { flushSync } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { AlertCircle, AlertTriangle, X, CheckCircle2, Key } from 'lucide-react';
 import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project, ArtistCacheEntry, COST_PER_AI_CALL } from './types';
@@ -1950,9 +1951,17 @@ const App: React.FC = () => {
     }
 
     // After confirmation: switch the panel and trigger the JIT queue.
-    // loadingNodeIds already has node.id, so the card renders with isLoading=true
-    // and details=null → the "Scanning live cultural archives..." spinner shows immediately.
-    setSelectedNode(node);
+    // CRITICAL: Use flushSync to force React to commit the spinner state to the
+    // DOM synchronously before the JIT useEffect fires. Without this, React 18's
+    // automatic batching coalesces setSelectedNode with the JIT's setDetailsCache
+    // call (which returns instantly from the Firestore SDK's in-memory document
+    // cache) into a single render — meaning the intermediate state where
+    // details=null and isLoading=true (the spinner) is never painted to the DOM.
+    // flushSync breaks this batch: the browser paints the spinner on this call,
+    // then the JIT's updates land in a separate render cycle.
+    flushSync(() => {
+      setSelectedNode(node);
+    });
     if (node.type !== 'founded') {
       setActiveNodeIds(prev => prev.some(id => id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node.id]);
     }
