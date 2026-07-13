@@ -421,6 +421,12 @@ The system distinguishes between two categories of data quality:
 4. SCOPE BOUNDARY:
    Auto-healing only fires for ARTIST nodes (type === 'artist'). Metadata
    hub nodes (Genre, Label, Origin, Founded) are never auto-healed.
+
+5. THE SELF-HEALING LIFECYCLE (MANDATORY CONTRACT):
+   - To prevent legacy data regressions, a strict "schema-first" cache validation model is enforced via the 'validateCacheEntry' and 'validateRootsBreakdown' pattern.
+   - Every cached artist card/document must contain a complete dataset, including the required "Roots Breakdown" structure (Acoustic & Sonics, Scene Context, Overlap Insights).
+   - MANDATORY CONTRACT FOR DATA-LAYER CHANGES: Any new data field introduced to 'NodeDetails' that is required for high-fidelity UI representation must be added to the 'validateCacheEntry' schema-validation gate in 'App.tsx'.
+   - This ensures that legacy or incomplete datasets lacking the new fields are treated as "cache misses" at the front gate and details panel, automatically routing through the standard 'confirmTokenUsage' estimation warning and live Gemini API re-synthesis to heal the cached records to the current schema standards.
 `;
 
 const LOCALIZED_LOADING_DOCUMENTATION = `

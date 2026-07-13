@@ -544,6 +544,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
   const [isDetailsPanelCollapsed, setIsDetailsPanelCollapsed] = useState(true);
   const [nodeToRemove, setNodeToRemove] = useState<Node | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [viewedRationale, setViewedRationale] = useState<string | null>(null);
   
   const [selectedSeedArtists, setSelectedSeedArtists] = useState<SelectedArtist[]>(() =>
     seedArtists.split('::').map(a => a.trim()).filter(Boolean).map(name => ({ name, enabled: true }))
@@ -1443,6 +1444,26 @@ const GraphPage: React.FC<GraphPageProps> = ({
     if (!onboardingProgress.step3) updateOnboarding('step3');
   };
   const SearchControl = useMemo(() => {
+    const hasRationale = !!data?.synthesisRationale;
+    const isRationaleViewed = viewedRationale === data?.synthesisRationale;
+    
+    let btnState: 'disabled' | 'attention' | 'neutral' = 'disabled';
+    if (!isLoading && hasRationale) {
+      btnState = isRationaleViewed ? 'neutral' : 'attention';
+    }
+
+    const btnClasses = {
+      disabled: "w-9 h-9 flex flex-shrink-0 items-center justify-center border border-zinc-800 bg-zinc-900/20 rounded-xl text-zinc-600 cursor-not-allowed transition-all duration-200 leading-none backdrop-blur-sm",
+      attention: "w-9 h-9 flex flex-shrink-0 items-center justify-center border border-primary bg-primary/10 rounded-xl text-primary animate-pulse hover:bg-primary/20 active:scale-95 transition-all duration-200 leading-none backdrop-blur-sm",
+      neutral: "w-9 h-9 flex flex-shrink-0 items-center justify-center border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none backdrop-blur-sm"
+    }[btnState];
+
+    const btnTitle = {
+      disabled: isLoading ? "Roots breakdown in progress..." : "No roots breakdown available",
+      attention: "New roots breakdown available! Click to view",
+      neutral: "View roots breakdown"
+    }[btnState];
+
     return (
         <div className="relative flex items-center gap-2">
             <div className="relative">
@@ -1450,18 +1471,22 @@ const GraphPage: React.FC<GraphPageProps> = ({
                 <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">{!searchQuery && (<button onClick={() => handleSpeechToText('graph')} className={`w-8 h-8 flex items-center justify-center rounded-[10px] transition-colors leading-none ${isListeningForGraph ? 'text-primary animate-pulse' : 'text-zinc-500 hover:text-white'}`} title="Search by voice"><MicIcon className="!text-[18px]" /></button>)}{searchQuery && (<button onClick={() => setSearchQuery('')} className="w-8 h-8 flex items-center justify-center rounded-[10px] text-zinc-400 hover:text-white transition-colors leading-none" aria-label="Clear search"><span className="material-symbols-outlined !text-[18px]">close</span></button>)}</div>
             </div>
             
-            {data && data.nodes && data.nodes.length > 0 && (
-                <button 
-                    onClick={() => setIsRationaleModalOpen(true)} 
-                    className="w-9 h-9 flex flex-shrink-0 items-center justify-center border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none backdrop-blur-sm" 
-                    title="View roots breakdown"
-                >
-                    <span className="material-symbols-outlined !text-[18px]">info</span>
-                </button>
-            )}
+            <button 
+                onClick={() => {
+                    setIsRationaleModalOpen(true);
+                    if (data?.synthesisRationale) {
+                        setViewedRationale(data.synthesisRationale);
+                    }
+                }}
+                disabled={btnState === 'disabled'}
+                className={btnClasses}
+                title={btnTitle}
+            >
+                <span className="material-symbols-outlined !text-[18px]">info</span>
+            </button>
         </div>
     );
-  }, [searchQuery, isListeningForGraph, data?.nodes?.length]);
+  }, [searchQuery, isListeningForGraph, data?.synthesisRationale, isLoading, viewedRationale]);
 
   const displayBadgeCount = systemError ? 0 : activeNodes.length;
 
@@ -1556,15 +1581,35 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                                     <input type="search" placeholder="Search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full h-9 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 pl-4 pr-12 text-sm font-normal focus:ring-1 focus:ring-primary focus:outline-none backdrop-blur-sm" />
                                                     <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">{!searchQuery && (<button onClick={() => handleSpeechToText('graph')} className={`w-8 h-8 flex items-center justify-center rounded-[10px] transition-colors leading-none ${isListeningForGraph ? 'text-primary animate-pulse' : 'text-zinc-500 hover:text-white'}`} title="Search by voice"><MicIcon className="!text-[18px]" /></button>)}{searchQuery && (<button onClick={() => setSearchQuery('')} className="w-8 h-8 flex items-center justify-center rounded-[10px] text-zinc-400 hover:text-white transition-colors leading-none" aria-label="Clear search"><span className="material-symbols-outlined !text-[18px]">close</span></button>)}</div>
                                                 </div>
-                                                {data && data.nodes && data.nodes.length > 0 && (
-                                                    <button 
-                                                        onClick={() => setIsRationaleModalOpen(true)} 
-                                                        className="w-9 h-9 flex flex-shrink-0 items-center justify-center border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none backdrop-blur-sm" 
-                                                        title="View roots breakdown"
-                                                    >
-                                                        <span className="material-symbols-outlined !text-[18px]">info</span>
-                                                    </button>
-                                                )}
+                                                <button 
+                                                    onClick={() => {
+                                                        setIsRationaleModalOpen(true);
+                                                        if (data?.synthesisRationale) {
+                                                            setViewedRationale(data.synthesisRationale);
+                                                        }
+                                                    }}
+                                                    disabled={(() => {
+                                                        const hasRationale = !!data?.synthesisRationale;
+                                                        return isLoading || !hasRationale;
+                                                    })()}
+                                                    className={(() => {
+                                                        const hasRationale = !!data?.synthesisRationale;
+                                                        const isRationaleViewed = viewedRationale === data?.synthesisRationale;
+                                                        if (isLoading || !hasRationale) return "w-9 h-9 flex flex-shrink-0 items-center justify-center border border-zinc-800 bg-zinc-900/20 rounded-xl text-zinc-600 cursor-not-allowed transition-all duration-200 leading-none backdrop-blur-sm";
+                                                        if (!isRationaleViewed) return "w-9 h-9 flex flex-shrink-0 items-center justify-center border border-primary bg-primary/10 rounded-xl text-primary animate-pulse hover:bg-primary/20 active:scale-95 transition-all duration-200 leading-none backdrop-blur-sm";
+                                                        return "w-9 h-9 flex flex-shrink-0 items-center justify-center border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none backdrop-blur-sm";
+                                                    })()}
+                                                    title={(() => {
+                                                        const hasRationale = !!data?.synthesisRationale;
+                                                        const isRationaleViewed = viewedRationale === data?.synthesisRationale;
+                                                        if (isLoading) return "Roots breakdown in progress...";
+                                                        if (!hasRationale) return "No roots breakdown available";
+                                                        if (!isRationaleViewed) return "New roots breakdown available! Click to view";
+                                                        return "View roots breakdown";
+                                                    })()}
+                                                >
+                                                    <span className="material-symbols-outlined !text-[18px]">info</span>
+                                                </button>
                                             </div>
                                         </div>
                                         <div className="mt-2.5 w-full h-px bg-zinc-700" />
