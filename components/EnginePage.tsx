@@ -298,6 +298,40 @@ designed to minimize friction for new users while rewarding existing authors.
      Consult AI, and project renaming).
 `;
 
+const DATA_SYNTHESIS_PERSISTENCE_DOCUMENTATION = `
+To prevent data rot, API failures, and visual rendering regressions, the synthesis and persistence pipeline is governed by the following rules:
+
+1. ATOMICITY MANDATE (Direct Writes):
+   - All synthesized seed artist documents must bundle 'graphData' and 'detailsCache' 
+     in a single, atomic database write (either setDoc or updateDoc).
+   - Writing 'graphData' (Phase 2 graph synthesis) as a fire-and-forget promise 
+     prior to details extraction is strictly banned. 
+   - This ensures that Firestore documents are never committed in a fragmented, 
+     "half-made" state that bypasses schema validation.
+
+2. API GATEWAY MUTUAL EXCLUSIVITY RULE:
+   - Tool calls (specifically Google Search grounding) and structured output 
+     configurations (responseMimeType: 'application/json' or responseSchema) 
+     are mutually exclusive at the Google Gemini API layer.
+   - For any details-fetching request with search tools enabled, the client and 
+     server MUST conditionally omit 'responseMimeType' and 'responseSchema' from 
+     generationConfig to avoid a terminal 400 Invalid Argument error.
+
+3. STRING SANITIZATION PIPELINE:
+   - All AI-synthesized string metadata must pass through the 'sanitizeString' 
+     utility to strip search-grounding citations and footnote brackets 
+     (e.g., [1], [2], (3)) prior to caching or database serialization.
+   - This ensures that UI-ready fields remain clean, readable, and free of 
+     unsightly citation markers when bound to the sidebar panels.
+
+4. MODEL STANDARDIZATION:
+   - Detail extraction (fetchNodeDetails and triggerReSynthesis) must strictly 
+     standardize on the 'gemini-2.5-flash' model. 
+   - This model offers the optimal speed-to-fidelity ratio and guarantees 
+     reliable JSON structure output, preventing parser failures and empty 
+     metadata fallbacks.
+`;
+
 const DEEP_CUT_INTELLIGENCE_DOCUMENTATION = `
 Zcene's "Curator Insights" use a Variety-First strategy to ensure every 
 artist recommendation feels bespoke, snappy, and avoiding AI linguistic decay.
@@ -836,6 +870,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
         { id: 'crate-sizing-rules', title: 'Dashboard Crate Sizing' },
         { id: 'graph-generation', title: 'Graph Generation' },
         { id: 'deep-cut-details', title: 'Deep Cut Details' },
+        { id: 'data-synthesis', title: 'Data Synthesis & Persistence' },
         { id: 'conversational-ai', title: 'Conversational AI' },
         { id: 'access-management', title: 'Access Management' },
     ];
@@ -1084,6 +1119,12 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                         <CodeBlock title="Lexical Hardening & Persona" content={DEEP_CUT_INTELLIGENCE_DOCUMENTATION} />
                         <CodeBlock title="Fetch Details Prompt" content={FETCH_NODE_DETAILS_PROMPT_TEMPLATE} />
                         <CodeBlock title="Node Details Schema" content={NODE_DETAILS_SCHEMA} isJson />
+                    </section>
+
+                    {/* ── DATA SYNTHESIS & PERSISTENCE ── */}
+                    <section id="data-synthesis">
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">Data Synthesis & Persistence</h2>
+                        <CodeBlock title="Atomicity, API Gateway & Sanitization Specification" content={DATA_SYNTHESIS_PERSISTENCE_DOCUMENTATION} />
                     </section>
 
                     {/* ── CONVERSATIONAL AI ── */}
