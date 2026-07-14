@@ -68,10 +68,15 @@ real-time intelligence and global scalability.
      schema definition, and secure API key management during 
      the prototype-to-production lifecycle.
 
-2. COMPUTE & SERVING (Cloud Run):
-   The application is containerized and hosted on Google Cloud Run.
-   - Autoscaling: The container scale dynamically based on request traffic, 
+2. COMPUTE & SERVING (Cloud Run & Functions):
+   The application is containerized and hosted on Google Cloud Run, supported by 
+   Firebase Cloud Functions for event-driven orchestration.
+   - Autoscaling: The containers scale dynamically based on request traffic, 
      ensuring the interactive D3 simulations remain responsive.
+   - Cloud-Side Orchestrated Background Curation: Curation jobs are delegated 
+     to an event-driven queue. Upon a new document in 'curationJobs', a gen2 
+     Cloud Function manages the heavy lifting of calling Gemini, scraping YouTube 
+     playability, and formatting metadata, fully offloading the client browser.
    - Global Deployment: Serves at sub-second speeds by leveraging 
      Google's global edge network.
 
@@ -116,21 +121,31 @@ the entire dataset, the app evolves existing visual structures.
    - Robust ID Matching: Node selection is matched case-insensitively and through 
      normalized slugs ('isSameNodeId') to resolve raw artist name and selection mismatches.
 
-4. DATA INTEGRITY (geminiService.ts):
-   The 'Orphaned Link Mitigation' logic filters the AI response. It ensures 
-   every link's 'source' and 'target' corresponds to a validated node ID 
-   present in either the legacy graph or the new delta.
+4. DATA INTEGRITY & PARALLEL HYDRATION PIPELINE:
+   - Parallel Backend Hydration: Curation details (biographies, genres, origins, 
+     formed years, and member lists) for all nodes are resolved in sequential-batch 
+     API calls on the backend. This pipeline integrates real-time YouTube scraping 
+     and status check routines.
+   - Orphaned Link Mitigation (geminiService.ts): Filters the AI response to 
+     ensure every link's 'source' and 'target' corresponds to a validated node ID.
+   - Client detailsCache callback: The client subscribes to job updates, immediately 
+     piping compiled backend metadata into React memory upon completion.
 
-5. GLOBAL CACHE ALIGNMENT & TOKEN GATING (artistCacheService.ts / App.tsx):
+5. GLOBAL CACHE ALIGNMENT & PROACTIVE 'DEEP CACHE' STRATEGY (artistCacheService.ts / App.tsx):
    Before invoking Gemini for Phase 02 Orchestration, the engine computes a 
    normalized single-artist ID (using Unicode NFD accent-stripping and hyphen replacement) 
    and probes the global 'artists' collection concurrently for all seeds.
    - Cache HIT: Graph structure + Deep Cut metadata are returned instantly. 
      Phases 02 and 03 are bypassed entirely. D3 Phase 04 begins immediately, 
      and artist canvas positions from the project's canvasLayout are restored.
-   - Cache MISS / Partial Cache Hit Gating: If a query requires net-new model 
-     synthesis, the engine intercepts the flow and triggers the Token Confirmation 
-     Dialog showing split lists of "Ready (Cached/Free)" vs "Synthesis Required" artists.
+   - Proactive Deep Cache: Upon generating a graph, the Cloud Function proactively 
+     hydrates and caches full profile details (biographies, YouTube IDs, discographies) 
+     for both the seeds and all recommended peer bands (isDeep: true). This ensures 
+     that subsequent user clicks on recommended nodes load details instantly offline.
+   - Case-Insensitive Seed Normalization: Resolves casing discrepancies between 
+     user seed inputs and lowercase model graph slugs. This guarantees that seed 
+     metadata is correctly identified during proactive recommendation walks and 
+     never overwritten with empty/null rationales.
    - Cache Upgrades & Self-Healing: If a cache document exists but fails validation 
      (e.g., legacy version), a "cache_upgrade" confirmation warning is shown. 
      If confirmed, live model queries update the cache. If canceled, the system triggers 
