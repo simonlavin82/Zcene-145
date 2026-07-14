@@ -643,3 +643,340 @@ export const generateGraphDataBackend = async (
 
   return finalGraph;
 };
+
+// --- NODE DETAILS SCHEMAS & PROMPTS ---
+
+export const NODE_DETAILS_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    summary: {
+      type: Type.STRING,
+      description: "A scannable bio (approx. 100 words) using Markdown: short paragraphs, bolding for key terms, and bullet points for lists. Focus on style and significance."
+    },
+    imageUrl: {
+      type: Type.STRING,
+      description: "MUST be a Wikipedia Special:FilePath URL (https://en.wikipedia.org/wiki/Special:FilePath/...). Do not use image URLs from official artist sites or third-party hosts — only Wikipedia FilePath URLs are trusted by the image pipeline."
+    },
+    members: {
+      type: Type.ARRAY,
+      items: { type: Type.STRING },
+      description: "List of members and their roles."
+    },
+    details: {
+      type: Type.OBJECT,
+      properties: {
+        genre: { type: Type.STRING },
+        origin: { type: Type.STRING },
+        founded: { type: Type.STRING },
+        notableArtists: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING }
+        }
+      },
+      required: ["genre", "origin", "founded", "notableArtists"]
+    },
+    links: {
+      type: Type.ARRAY,
+      description: "Wikipedia link MUST be index 0 if found. Do NOT include Official Website or Bandcamp entries — those are handled by the client. Only include grounded reference links.",
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          site: { type: Type.STRING },
+          url: {
+            type: Type.STRING,
+            nullable: true,
+            description: "The verified, active URL. MUST be null if the URL cannot be confirmed. Do NOT guess or fabricate."
+          }
+        },
+        required: ["site"]
+      }
+    },
+    discography: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          albumName: { type: Type.STRING },
+          releaseYear: { type: Type.STRING }
+        },
+        required: ["albumName", "releaseYear"]
+      }
+    },
+    recommendationReason: {
+      type: Type.STRING,
+      description: "Curator insight."
+    },
+    youtubeVideoId: {
+      type: Type.STRING,
+      nullable: true,
+      description: "The YouTube video ID (11-character string) for the best available official video. Priority order: (1) most iconic/popular official music video, (2) high-profile professional full live set on an official channel. MUST NOT be a lyric video, fan-cam bootleg, low-quality upload, non-musical interview clip, or YouTube Shorts (do not return vertical formats or '/shorts/' routes; prioritize landscape videos longer than 2 minutes). Ensure the video belongs strictly to verified artist channels, high-fidelity archives (e.g. Hate5six, KEXP, Audiotree), or standard label uploads. Return null if no high-quality official video can be confirmed."
+    },
+    youtubeSearchQuery: {
+      type: Type.STRING,
+      description: "A guaranteed-non-null YouTube search query string to use as a fallback when youtubeVideoId cannot be confirmed. Format: '[Artist Name] [genre] [live OR official video]'. Example: 'Turnstile hardcore punk official music video'. Always populate this field. Append semantic terms such as 'full set', 'live performance', or 'official music video' before resolving."
+    }
+  },
+  required: ["summary", "details", "discography", "recommendationReason", "youtubeSearchQuery"]
+};
+
+export const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed information for the music entity: "{{nodeIdentifier}}" (type: {{nodeType}}).
+    
+    Context:
+    - Seed artists: {{seedArtists}}.
+    - Connected nodes: {{contextNodes}}.
+    - Date: {{currentDate}}.
+    {{#if originHint}}
+    - Origin Hint: {{originHint}}.
+    {{/if}}
+    
+    USE GOOGLE SEARCH to find:
+    1. The most accurate bio and cultural significance. Use scannability techniques:
+       - Chunking: Break information into smaller, digestible units.
+       - Text Segmentation: Use short paragraphs and meaningful phrases.
+       - Formatting: Use bolding for key terms and bullet points where appropriate to create white space.
+       - Semantic Splitting: Group related content together by meaning.
+    2. The canonical Wikipedia Special:FilePath image URL. imageUrl MUST be a Wikipedia Special:FilePath URL (https://en.wikipedia.org/wiki/Special:FilePath/...). Do not use image URLs from official artist sites or any third-party host.
+    3. Confirmed top 3 studio albums.
+    4. A verified, active YouTube video for the artist. You MUST run a dedicated search query like "[Artist Name] official music video site:youtube.com" or "[Artist Name] live performance site:youtube.com" to find a real, active video URL. Extract the 11-character video ID (e.g. from watch?v=XXXXXXXXXXX) only from verified Search results. If you cannot find a verified active video ID, or if the search results do not show the full URL, you MUST return null. Never guess or hallucinate a video ID.
+    
+    CRITICAL OUTPUT REQUIREMENTS (STRICTLY ENFORCED):
+    1. You MUST respond with a single, valid JSON object matching the schema below. Do NOT write any conversational text or prose outside the JSON.
+    2. Do NOT include markdown code fences (do NOT wrap the response in \`\`\`json ... \`\`\`). Output raw JSON directly.
+    3. Do NOT include any inline search citations, footnote markers (such as [1], [2], [3], etc.), or source references anywhere in the text or JSON fields. Ensure all string values are plain text or markdown bold/bullets only, with absolutely no citation brackets.
+    
+    Your task is to generate a JSON object matching this structure precisely:
+    {
+      "summary": "A scannable bio (approx. 100 words) using Markdown: short paragraphs, bolding for key terms, and bullet points for lists. Focus on style and significance.",
+      "imageUrl": "https://en.wikipedia.org/wiki/Special:FilePath/...",
+      "members": ["Name (Role)", ...],
+      "details": {
+        "genre": "The primary music genre(s) as a plain string (e.g. 'Hardcore Punk', 'Post-Hardcore', 'Metalcore'). NEVER return the literal string 'Unknown', 'N/A', or leave this empty — if grounding is inconclusive, infer the genre from the bio summary text and the connected scene context provided.",
+        "origin": "City, Country format (e.g. 'Baltimore, USA'). NEVER return the literal string 'Unknown', 'N/A', or leave this empty — if grounding is inconclusive, infer the origin from the bio summary text or the band's known regional scene.",
+        "founded": "YYYY",
+        "notableArtists": ["Artist Name", ...]
+      },
+      "links": [
+        {"site": "Wikipedia", "url": "https://en.wikipedia.org/wiki/..."}
+      ],
+      "discography": [{"albumName": "Name", "releaseYear": "YYYY"}],
+      "recommendationReason": "Curator insight about their role in this scene.",
+      "youtubeVideoId": "dQw4w9WgXcQ",
+      "youtubeSearchQuery": "Turnstile hardcore punk official music video"
+    }
+
+    YOUTUBE VIDEO SELECTION RULES (CRITICAL):
+    - Use Google Search to find the best official YouTube video for this artist.
+    - Priority: (1) Most iconic/popular official music video from their official YouTube channel, (2) high-profile full professional live set on an official or reputable label channel.
+    - ABSOLUTELY FORBIDDEN: lyric videos, fan-cam bootlegs, low-resolution uploads, non-musical interview clips, or YouTube Shorts (do not return vertical formats or '/shorts/' routes; prioritize landscape videos longer than 2 minutes).
+    - The youtubeVideoId value must be ONLY the 11-character YouTube video ID (e.g. "dQw4w9WgXcQ"), NOT a full URL.
+    - Set youtubeVideoId to null if no high-quality, officially-sourced video can be confirmed via search.
+    - youtubeSearchQuery MUST always be populated as a non-null fallback. Format: "[Artist Name] [genre] [live OR official video]". This is MANDATORY.
+    - QUERY MODIFICATION: Append semantic terms such as "full set", "live performance", or "official music video" to your search queries before resolving an asset hash.
+    - NEGATIVE SHORTS CONSTRAINT: DO NOT parse or return video hashes derived from search queries matching vertical formats or the '/shorts/' route structure. Prioritize landscape video IDs with durations longer than 2 minutes.
+    - ENTITY VALIDATION: Ensure the chosen video belongs strictly to verified artist channels, high-fidelity archive channels (e.g., Hate5six, KEXP, Audiotree), or standard label uploads (e.g., Relapse Records, Epitaph Records).
+    - ZERO HALLUCINATION (MANDATORY): You must only return a youtubeVideoId if you can extract the exact 11-character ID from a YouTube watch URL (e.g., youtube.com/watch?v=...) present in your Google Search results. If you do not see the exact URL or video ID in the search results, set youtubeVideoId to null. NEVER guess or hallucinate a video ID under any circumstances.
+    - AMBIGUITY RESOLUTION: For bands with common or ambiguous names (such as "Cave In"), make sure your search query includes qualifiers (e.g. "Cave In band" or "Cave In post-hardcore") to avoid generic results.
+
+    WIKIPEDIA ORDERING RULE (MANDATORY):
+    If a Wikipedia link is found, it MUST be the very first item (index 0) in the links array.`;
+
+// --- DETAILS HYDRATION MODULES ---
+
+export const fetchNodeDetailsBackend = async (
+  node: Node,
+  graphData: GraphData,
+  seedArtists: string,
+  originHint?: string | null
+): Promise<any> => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY is not defined in environment secrets.");
+  }
+  
+  const ai = new GoogleGenAI({ apiKey });
+  const currentModel = "gemini-2.5-flash";
+
+  const contextNodes = graphData.links
+    .filter(l => (typeof l.source === 'string' ? l.source : (l.source as Node).id) === node.id || (typeof l.target === 'string' ? l.target : (l.target as Node).id) === node.id)
+    .map(l => {
+      const sourceId = typeof l.source === 'string' ? l.source : (l.source as Node).id;
+      const targetId = typeof l.target === 'string' ? l.target : (l.target as Node).id;
+      return sourceId === node.id ? targetId : sourceId;
+    })
+    .slice(0, 10)
+    .join(', ');
+
+  const currentDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  let prompt = FETCH_NODE_DETAILS_PROMPT_TEMPLATE
+    .replace('{{nodeIdentifier}}', node.id)
+    .replace('{{nodeType}}', node.type)
+    .replace('{{seedArtists}}', seedArtists)
+    .replace('{{contextNodes}}', contextNodes)
+    .replace(/{{currentDate}}/g, currentDate);
+      
+  if (originHint) {
+    prompt = prompt.replace(/{{#if originHint}}[\s\S]*?{{originHint}}[\s\S]*?{{\/if}}/g, 
+        `- **Origin Hint (CRITICAL):** Details for: ${originHint}.`);
+  } else {
+    prompt = prompt.replace(/{{#if originHint}}[\s\S]*?{{\/if}}/g, '');
+  }
+
+  const response = await ai.models.generateContent({
+    model: currentModel,
+    contents: prompt,
+    config: {
+      tools: [{ googleSearch: {} }]
+    }
+  });
+
+  const jsonText = response.text?.trim();
+  if (!jsonText) {
+    throw new Error("The AI returned an empty response for details.");
+  }
+
+  let cleanedJsonText = jsonText;
+  if (cleanedJsonText.startsWith('```')) {
+    cleanedJsonText = cleanedJsonText.replace(/^```(?:json)?\n?/i, '').replace(/```$/, '').trim();
+  }
+
+  let details: any;
+  try {
+    details = JSON.parse(cleanedJsonText);
+  } catch (parseError) {
+    const repaired = repairJson(cleanedJsonText);
+    try {
+      details = JSON.parse(repaired);
+    } catch (repairError) {
+      if (cleanedJsonText.trim().length > 40) {
+        details = {
+          summary: cleanedJsonText.trim(),
+          details: { genre: "", origin: "", founded: "", notableArtists: [] },
+          links: [],
+          discography: [],
+          members: [],
+          recommendationReason: ""
+        };
+      } else {
+        throw new Error("Invalid data format from details service.");
+      }
+    }
+  }
+
+  const sanitizeString = (str: any): string => {
+    if (typeof str !== 'string') return "";
+    return str.replace(/\[\d+\]/g, '').replace(/\(\d+\)/g, '').trim();
+  };
+
+  const sanitisedLinks = (details.links || []).map((l: any) => ({
+    ...l,
+    url: (l.url && typeof l.url === 'string' && l.url.trim().startsWith('http'))
+      ? l.url.trim()
+      : null
+  }));
+
+  const hydratedDetails: any = {
+    ...details,
+    summary: sanitizeString(details.summary || "No summary available (AI response was truncated)."),
+    details: (() => {
+      const d = details.details || {};
+      const sanitizeMetaField = (val: string | undefined): string => {
+        if (!val) return "";
+        const t = val.trim().toLowerCase();
+        if (t === "unknown" || t === "n/a" || t === "none" || t === "not available") return "";
+        return sanitizeString(val);
+      };
+      return {
+        ...d,
+        genre: sanitizeMetaField(d.genre),
+        origin: sanitizeMetaField(d.origin),
+        founded: sanitizeString(d.founded),
+        notableArtists: (d.notableArtists || []).map(sanitizeString)
+      };
+    })(),
+    links: sanitisedLinks,
+    discography: (details.discography || []).map((album: any) => ({
+      albumName: sanitizeString(album?.albumName),
+      releaseYear: sanitizeString(album?.releaseYear)
+    })),
+    members: (details.members || []).map(sanitizeString),
+    recommendationReason: sanitizeString(details.recommendationReason || ""),
+    youtubeVideoId: typeof details.youtubeVideoId === 'string' && details.youtubeVideoId.trim().length === 11
+      ? details.youtubeVideoId.trim()
+      : undefined,
+    youtubeSearchQuery: typeof details.youtubeSearchQuery === 'string' && details.youtubeSearchQuery.trim().length > 0
+      ? sanitizeString(details.youtubeSearchQuery.trim())
+      : undefined,
+  };
+
+  if (!hydratedDetails.details) hydratedDetails.details = {};
+
+  const groundingChunks = (response as any).candidates?.[0]?.groundingMetadata?.groundingChunks;
+  if (groundingChunks && Array.isArray(groundingChunks)) {
+    const uniqueLinks = new Map<string, { title: string; url: string }>();
+    groundingChunks.forEach((chunk: any) => {
+      if (chunk.web) {
+        uniqueLinks.set(chunk.web.uri, {
+          title: chunk.web.title || 'Source',
+          url: chunk.web.uri
+        });
+      }
+    });
+    hydratedDetails.groundingLinks = Array.from(uniqueLinks.values());
+  }
+
+  return hydratedDetails;
+};
+
+export const scrapeVideoIdBackend = async (
+  artistName: string,
+  artistId: string
+): Promise<string | null> => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+
+  const ai = new GoogleGenAI({ apiKey });
+  const currentModel = "gemini-2.5-flash";
+
+  const prompt = `Perform a Google Search for: '${artistName} official music video youtube'. 
+Look at the top organic YouTube video in search results. Extract its 11-character video ID (the string after v= or inside the URL). Return ONLY the 11-character video ID as a plain string. Do not include any JSON, quotes, explanations, markdown, or other text. If not found, return "null".`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: currentModel,
+      contents: prompt,
+      config: {
+        tools: [{ googleSearch: {} }],
+        maxOutputTokens: 200,
+      }
+    });
+
+    const text = response.text?.trim();
+    if (!text) return null;
+
+    let cleaned = text.replace(/['"`]/g, '').trim();
+    if (cleaned.toLowerCase() === 'null') return null;
+
+    const match = cleaned.match(/([a-zA-Z0-9_-]{11})/);
+    return match ? match[1] : null;
+  } catch (err) {
+    console.error(`[scrapeVideoIdBackend] Scrape failed for ${artistName}:`, err);
+    return null;
+  }
+};
+
+export const checkVideoPlayability = async (videoId: string): Promise<boolean> => {
+  if (!videoId || videoId.length !== 11) return false;
+  try {
+    const url = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`;
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch(url, { method: 'HEAD', signal: controller.signal });
+    clearTimeout(id);
+    return res.status === 200;
+  } catch (err) {
+    console.error(`[Playability Check] Failed for ${videoId}:`, err);
+    return true;
+  }
+};
+
