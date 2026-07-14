@@ -1,0 +1,43 @@
+2026-07-14T22:10:30.732469Z ? oncurationjobcreated: [Curation Backend] Cache miss. Hydrating details for: chevelle (9/13)...
+
+2026-07-14T22:10:38.560584Z ? oncurationjobcreated: [Curation Backend] Hydration successful for: emery
+
+2026-07-14T22:10:38.805441Z ? oncurationjobcreated: [Curation Backend] Cache miss. Hydrating details for: thrice (7/10)...
+
+2026-07-14T22:10:51.654968Z ? oncurationjobcreated: [Curation Backend] Hydrating details for 13 artists in the graph: [
+  'blindside',   'project-86',
+  'p-o-d',       'norma-jean',
+  'underoath',   'demon-hunter',
+  'emery',       'thrice',
+  'chevelle',    'refused',
+  'anberlin',    'spoken',
+  'dead-poetic'
+]
+
+2026-07-14T22:10:51.724232Z ? oncurationjobcreated: [Curation Backend] Cache miss. Hydrating details for: blindside (1/13)...
+
+2026-07-14T22:10:54.226025Z ? oncurationjobcreated: [Curation Backend] Hydration successful for: chevelle
+
+2026-07-14T22:10:54.459282Z ? oncurationjobcreated: [Curation Backend] Cache miss. Hydrating details for: anberlin (10/13)...
+
+2026-07-14T22:10:59.045394Z ? oncurationjobcreated: [Curation Backend] Hydration successful for: thrice
+
+2026-07-14T22:10:59.278662Z ? oncurationjobcreated: [Curation Backend] Cache miss. Hydrating details for: demon-hunter (8/10)...
+
+2026-07-14T22:11:39.349525Z ? oncurationjobcreated: [Curation Backend] Hydration successful for: blindside
+
+2026-07-14T22:11:45.649047Z ? oncurationjobcreated: [Playability Check] Failed for rC8Wv74S1e0: DOMException [AbortError]: This operation was aborted
+    at node:internal/deps/undici/undici:14976:13
+    at processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at runNextTicks (node:internal/process/task_queues:68:3)
+    at process.processTimers (node:internal/timers:518:9)
+    at async checkVideoPlayability (/workspace/lib/services/curatorService.js:874:21)
+    at async /workspace/lib/onCurationJobCreated.js:158:50
+
+2026-07-14T22:11:45.649321Z ? oncurationjobcreated: [Curation Backend] Hydration successful for: demon-hunter
+
+2026-07-14T22:11:49.749310Z ? oncurationjobcreated: [Curation Backend] Cache miss. Hydrating details for: project-86 (2/13)...
+
+2026-07-14T22:11:54.690466Z I oncurationjobcreated: 
+2026-07-14T22:11:54.716676Z ? oncurationjobcreated: [Curation Backend] Processing job job-1784067113895-3dfom18li with status: pending
+

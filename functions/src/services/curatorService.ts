@@ -637,8 +637,8 @@ export const generateGraphDataBackend = async (
       links: Array.isArray(validLinks) ? validLinks : []
   });
 
-  if (data && (data as any).synthesis_rationale) {
-      finalGraph.synthesisRationale = (data as any).synthesis_rationale;
+  if (data) {
+      finalGraph.synthesisRationale = (data as any).synthesisRationale || (data as any).synthesis_rationale;
   }
 
   return finalGraph;

@@ -214,8 +214,9 @@ export const onCurationJobCreated = onDocumentCreated({
         }
 
         // Proactively cache each recommended artist as a deep cache entry as well!
+        const seedNorms = new Set(artistList.map((a: string) => normalizeArtistId(a)));
         for (const recArtist of recommendedArtists) {
-          if (artistList.includes(recArtist)) continue; // Already seeds
+          if (seedNorms.has(normalizeArtistId(recArtist))) continue; // Already seeds
           
           const recNorm = normalizeArtistId(recArtist);
           const { nodes: subNodes, links: subLinks } = extractArtistSubGraph(recArtist, finalGraph, artistList);

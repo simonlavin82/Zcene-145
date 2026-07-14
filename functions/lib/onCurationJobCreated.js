@@ -212,8 +212,9 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                     console.log(`[Curation Backend] Wrote DEEP global cache for seed: ${seedNorm}`);
                 }
                 // Proactively cache each recommended artist as a deep cache entry as well!
+                const seedNorms = new Set(artistList.map((a) => (0, curatorService_1.normalizeArtistId)(a)));
                 for (const recArtist of recommendedArtists) {
-                    if (artistList.includes(recArtist))
+                    if (seedNorms.has((0, curatorService_1.normalizeArtistId)(recArtist)))
                         continue; // Already seeds
                     const recNorm = (0, curatorService_1.normalizeArtistId)(recArtist);
                     const { nodes: subNodes, links: subLinks } = (0, curatorService_1.extractArtistSubGraph)(recArtist, finalGraph, artistList);

@@ -67,7 +67,8 @@ const generateGraphDataViaCloudJob = async (
   artists: string,
   filters: DiscoveryFilters,
   userId: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onDetailsCacheReceived?: (detailsCacheJson: string) => void
 ): Promise<GraphData> => {
   const jobId = `job-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
   const jobRef = doc(db, 'curationJobs', jobId);
@@ -122,6 +123,9 @@ const generateGraphDataViaCloudJob = async (
       if (job.status === 'completed') {
         unsubscribe();
         if (job.result && job.result.graphData) {
+          if (job.result.detailsCache && onDetailsCacheReceived) {
+            onDetailsCacheReceived(job.result.detailsCache);
+          }
           resolve(job.result.graphData);
         } else {
           reject(new Error("Job completed but did not return graphData."));
@@ -905,9 +909,9 @@ const validateCacheEntry = (data: any, isSingleArtist: boolean = false): CacheVa
       return { isFullyQualified: false, needsPeerBands, needsFutureFields: true };
     }
 
-    // 5. synthesisRationale exists and is valid
+    // 5. If synthesisRationale exists, validate it
     const rationale = data.synthesisRationale || graph.synthesisRationale;
-    if (!validateRootsBreakdown(rationale, isSingleArtist)) {
+    if (rationale && !validateRootsBreakdown(rationale, isSingleArtist)) {
       return { isFullyQualified: false, needsPeerBands, needsFutureFields: true };
     }
 
@@ -3346,7 +3350,28 @@ const App: React.FC = () => {
         let partialGraphPromise;
         if (useCloudCuration && user?.uid) {
           console.log("[Music Discovery] Routing partial graph generation via Cloud-Side Curation.");
-          partialGraphPromise = generateGraphDataViaCloudJob(toFetch.join('::'), activeDiscoveryFilters, user.uid, controller?.signal);
+          partialGraphPromise = generateGraphDataViaCloudJob(
+            toFetch.join('::'),
+            activeDiscoveryFilters,
+            user.uid,
+            controller?.signal,
+            (detailsCacheJson) => {
+              try {
+                const rawMap = new Map<string, any>(JSON.parse(detailsCacheJson));
+                setDetailsCache(prev => {
+                  const next = new Map(prev);
+                  rawMap.forEach((v, k) => {
+                    next.set(k, v);
+                    next.set(k.toLowerCase(), v);
+                    next.set(normalizeArtistId(k), v);
+                  });
+                  return next;
+                });
+              } catch (e) {
+                console.warn("Failed to parse detailsCache from cloud job:", e);
+              }
+            }
+          );
         } else {
           partialGraphPromise = generateGraphData(toFetch.join('::'), pruned, activeDiscoveryFilters, user?.uid, controller?.signal);
         }
@@ -3623,7 +3648,28 @@ const App: React.FC = () => {
       let graphPromise;
       if (useCloudCuration && user?.uid) {
         console.log("[Music Discovery] Routing graph generation via Cloud-Side Curation.");
-        graphPromise = generateGraphDataViaCloudJob(artists, activeDiscoveryFilters, user.uid, controller?.signal);
+        graphPromise = generateGraphDataViaCloudJob(
+          artists,
+          activeDiscoveryFilters,
+          user.uid,
+          controller?.signal,
+          (detailsCacheJson) => {
+            try {
+              const rawMap = new Map<string, any>(JSON.parse(detailsCacheJson));
+              setDetailsCache(prev => {
+                const next = new Map(prev);
+                rawMap.forEach((v, k) => {
+                  next.set(k, v);
+                  next.set(k.toLowerCase(), v);
+                  next.set(normalizeArtistId(k), v);
+                });
+                return next;
+              });
+            } catch (e) {
+              console.warn("Failed to parse detailsCache from cloud job:", e);
+            }
+          }
+        );
       } else {
         graphPromise = generateGraphData(artists, pruned, activeDiscoveryFilters, user?.uid, controller?.signal);
       }

@@ -559,8 +559,8 @@ const generateGraphDataBackend = async (artists, filters, cachedSubgraphsContext
         nodes: Array.isArray(deduplicatedNodes) ? deduplicatedNodes : [],
         links: Array.isArray(validLinks) ? validLinks : []
     });
-    if (data && data.synthesis_rationale) {
-        finalGraph.synthesisRationale = data.synthesis_rationale;
+    if (data) {
+        finalGraph.synthesisRationale = data.synthesisRationale || data.synthesis_rationale;
     }
     return finalGraph;
 };
