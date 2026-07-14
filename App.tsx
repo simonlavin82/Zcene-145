@@ -5737,7 +5737,7 @@ const App: React.FC = () => {
                         cachedAt: serverTimestamp(),
                         hitCount: 0,
                         isDeep: false,
-                        detailsCache: JSON.stringify(details),
+                        detailsCache: details,
                         synthesisRationale: details.synthesisRationale || null
                       };
                       enforceArtistCacheSchema(setPayload);

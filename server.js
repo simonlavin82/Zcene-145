@@ -111,6 +111,9 @@ const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed information 
     - Seed artists: {{seedArtists}}.
     - Connected nodes: {{contextNodes}}.
     - Date: {{currentDate}}.
+    {{#if originHint}}
+    - Origin Hint: {{originHint}}.
+    {{/if}}
     
     USE GOOGLE SEARCH to find:
     1. The most accurate bio and cultural significance. Use scannability techniques:
@@ -122,14 +125,19 @@ const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed information 
     3. Confirmed top 3 studio albums.
     4. A verified, active YouTube video for the artist. You MUST run a dedicated search query like "[Artist Name] official music video site:youtube.com" or "[Artist Name] live performance site:youtube.com" to find a real, active video URL. Extract the 11-character video ID (e.g. from watch?v=XXXXXXXXXXX) only from verified Search results. If you cannot find a verified active video ID, or if the search results do not show the full URL, you MUST return null. Never guess or hallucinate a video ID.
     
-    Your task is to generate a JSON object. You MUST follow this structure precisely:
+    CRITICAL OUTPUT REQUIREMENTS (STRICTLY ENFORCED):
+    1. You MUST respond with a single, valid JSON object matching the schema below. Do NOT write any conversational text or prose outside the JSON.
+    2. Do NOT include markdown code fences (do NOT wrap the response in \`\`\`json ... \`\`\`). Output raw JSON directly.
+    3. Do NOT include any inline search citations, footnote markers (such as [1], [2], [3], etc.), or source references anywhere in the text or JSON fields. Ensure all string values are plain text or markdown bold/bullets only, with absolutely no citation brackets.
+    
+    Your task is to generate a JSON object matching this structure precisely:
     {
       "summary": "A scannable bio (approx. 100 words) using Markdown: short paragraphs, bolding for key terms, and bullet points for lists. Focus on style and significance.",
       "imageUrl": "https://en.wikipedia.org/wiki/Special:FilePath/...",
       "members": ["Name (Role)", ...],
       "details": {
-        "genre": "string",
-        "origin": "City, Country",
+        "genre": "The primary music genre(s) as a plain string (e.g. 'Hardcore Punk', 'Post-Hardcore', 'Metalcore'). NEVER return the literal string 'Unknown', 'N/A', or leave this empty — if grounding is inconclusive, infer the genre from the bio summary text and the connected scene context provided.",
+        "origin": "City, Country format (e.g. 'Baltimore, USA'). NEVER return the literal string 'Unknown', 'N/A', or leave this empty — if grounding is inconclusive, infer the origin from the bio summary text or the band's known regional scene.",
         "founded": "YYYY",
         "notableArtists": ["Artist Name", ...]
       },

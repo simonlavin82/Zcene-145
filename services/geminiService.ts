@@ -337,7 +337,12 @@ export const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed infor
     3. Confirmed top 3 studio albums.
     4. A verified, active YouTube video for the artist. You MUST run a dedicated search query like "[Artist Name] official music video site:youtube.com" or "[Artist Name] live performance site:youtube.com" to find a real, active video URL. Extract the 11-character video ID (e.g. from watch?v=XXXXXXXXXXX) only from verified Search results. If you cannot find a verified active video ID, or if the search results do not show the full URL, you MUST return null. Never guess or hallucinate a video ID.
     
-    Your task is to generate a JSON object. You MUST follow this structure precisely:
+    CRITICAL OUTPUT REQUIREMENTS (STRICTLY ENFORCED):
+    1. You MUST respond with a single, valid JSON object matching the schema below. Do NOT write any conversational text or prose outside the JSON.
+    2. Do NOT include markdown code fences (do NOT wrap the response in \`\`\`json ... \`\`\`). Output raw JSON directly.
+    3. Do NOT include any inline search citations, footnote markers (such as [1], [2], [3], etc.), or source references anywhere in the text or JSON fields. Ensure all string values are plain text or markdown bold/bullets only, with absolutely no citation brackets.
+    
+    Your task is to generate a JSON object matching this structure precisely:
     {
       "summary": "A scannable bio (approx. 100 words) using Markdown: short paragraphs, bolding for key terms, and bullet points for lists. Focus on style and significance.",
       "imageUrl": "https://en.wikipedia.org/wiki/Special:FilePath/...",
@@ -1200,7 +1205,7 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
       }
     };
 
-    const url = `${baseUrl}/v1beta/models/gemini-3-flash-preview:generateContent`;
+    const url = `${baseUrl}/v1beta/models/gemini-2.5-flash:generateContent`;
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -1455,7 +1460,7 @@ export const fetchLiveTourData = async (artistName: string): Promise<string> => 
       }
     };
 
-    const url = `${baseUrl}/v1beta/models/gemini-3-flash-preview:generateContent`;
+    const url = `${baseUrl}/v1beta/models/gemini-2.5-flash:generateContent`;
     const response = await fetch(url, {
       method: 'POST',
       headers: {

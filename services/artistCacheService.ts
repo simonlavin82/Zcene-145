@@ -518,7 +518,7 @@ export const writeArtistCacheMany = async (
             isDeep: preserveFullGraph || false,
           };
           if (artistDetails) {
-            setPayload.detailsCache = typeof artistDetails === 'string' ? artistDetails : JSON.stringify(artistDetails);
+            setPayload.detailsCache = typeof artistDetails === 'string' ? JSON.parse(artistDetails) : artistDetails;
           }
           enforceArtistCacheSchema(setPayload);
           await setDoc(canonicalDocRef, setPayload);
@@ -539,7 +539,7 @@ export const writeArtistCacheMany = async (
               isDeep: preserveFullGraph || false,
             };
             if (artistDetails) {
-              updatePayload.detailsCache = typeof artistDetails === 'string' ? artistDetails : JSON.stringify(artistDetails);
+              updatePayload.detailsCache = typeof artistDetails === 'string' ? JSON.parse(artistDetails) : artistDetails;
             }
             enforceArtistCacheSchema(updatePayload);
             await updateDoc(canonicalDocRef, updatePayload);
