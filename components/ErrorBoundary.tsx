@@ -53,10 +53,10 @@ export class ErrorBoundary extends Component<Props, State> {
             </div>
             
             <div className="space-y-2">
-              <h1 className="text-2xl font-bold text-white">Something went wrong</h1>
+              <h1 className="text-2xl font-bold text-white">Curation Pipeline Disrupted</h1>
               <p className="text-zinc-400 text-sm leading-relaxed">
-                The Zcene engine encountered an unexpected error while rendering the map. 
-                This can happen with extremely complex graphs or temporary data issues.
+                The visual canvas encountered a structural anomaly. 
+                Re-initialise the session or return to the main dashboard.
               </p>
             </div>
 
@@ -75,14 +75,14 @@ export class ErrorBoundary extends Component<Props, State> {
                 className="flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-3 rounded-2xl text-sm font-semibold transition-all active:scale-95"
               >
                 <Home className="w-4 h-4" />
-                Go Home
+                Exit Curation
               </button>
               <button
                 onClick={this.handleReset}
                 className="flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-brand-black px-4 py-3 rounded-2xl text-sm font-semibold transition-all active:scale-95"
               >
                 <RefreshCw className="w-4 h-4" />
-                Reload App
+                Re-initialise
               </button>
             </div>
           </div>

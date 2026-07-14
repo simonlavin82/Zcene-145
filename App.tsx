@@ -7,6 +7,7 @@ import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, St
 import { generateGraphData, fetchNodeDetails, extendGraphFromNode } from './services/geminiService';
 import { normalizeArtistId, readArtistCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, titleCaseArtistId, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema } from './services/artistCacheService';
 import { auth, signInWithGoogle, logout, onAuthStateChanged, User, db, handleFirestoreError, OperationType } from './services/firebase';
+import { translateError, translateToast } from './services/errorTranslationLayer';
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, getDocFromServer, serverTimestamp, addDoc, getDoc, getDocs, orderBy, where, writeBatch, getDocFromCache, updateDoc, increment, limit } from 'firebase/firestore';
 const StyleGuidePage = React.lazy(() => import('./components/DesignSystem').then(m => ({ default: m.StyleGuidePage })));
 const EnginePage = React.lazy(() => import('./components/EnginePage').then(m => ({ default: m.EnginePage })));
@@ -1352,34 +1353,10 @@ const App: React.FC = () => {
   const fetchingNodeIdsRef = useRef<Set<string>>(new Set());
   const lastProgressTimestampRef = useRef<number>(Date.now());
 
-  const showToast = useCallback((message: string) => setToast({ message, id: Date.now() }), []);
+  const showToast = useCallback((message: string) => setToast({ message: translateToast(message), id: Date.now() }), []);
 
   const humanizeError = useCallback((error: any): string => {
-    const message = error?.message || String(error) || 'An unknown error occurred.';
-
-    // Check for specific AI Studio Key error
-    if (message.includes("Requested entity was not found")) {
-      return "The selected AI model is unavailable for your current API key. Please use the 'Re-select API Key' button below to refresh your session.";
-    }
-
-    try {
-      const errorJson = JSON.parse(message);
-      if (errorJson.error === "Proxying failed") return "Connection issue: AI unreachable.";
-      if (errorJson.error?.message) {
-        const apiMessage = errorJson.error.message;
-        if (apiMessage.includes("Requested entity was not found")) {
-          return "The selected AI model is unavailable for your current API key. Please use the 'Re-select API Key' button below to refresh your session.";
-        }
-        if (errorJson.error.status === 'RESOURCE_EXHAUSTED' || errorJson.error.code === 429) return "AI is busy. Please wait a minute.";
-        if (errorJson.error.status === 'INVALID_ARGUMENT' && apiMessage.toLowerCase().includes('api key')) {
-          return "Authentication issue. Please use the 'Re-select API Key' button below to refresh your session.";
-        }
-        return apiMessage;
-      }
-    } catch (e) {
-      if (message.includes('Failed to fetch') || message.includes('NetworkError')) return "Network issue. Check your internet.";
-    }
-    return message;
+    return translateError(error).userFriendlyMessage;
   }, []);
 
   const handleLogin = useCallback(async (onSuccess?: () => void) => {
@@ -5794,7 +5771,7 @@ const App: React.FC = () => {
                   // the next render. Without this, an empty cache causes infinite re-queuing
                   // because the filter never becomes satisfied after a parse or network failure.
                   const sentinelEntry = {
-                    summary: `Details temporarily unavailable for ${node.label || node.id}. Tap the heal icon to retry.`,
+                    summary: `Archival slot offline for ${node.label || node.id}. Re-evaluate node to re-establish curation.`,
                     details: { genre: "", origin: "", founded: "", notableArtists: [] },
                     links: [],
                     discography: [],

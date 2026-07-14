@@ -281,6 +281,20 @@ This section details the critical stability enhancements made to resolve timing 
     By writing the sentinel under all three key variants (`node.id`, `node.id.toLowerCase()`, `simpleId`), the queue filter's `isCached` check resolves to `true` on the next render, cleanly stopping the re-queuing cycle. The `_isSentinel: true` flag distinguishes this entry from a genuine biography so that downstream consumers (e.g. `checkIsProfileIncomplete`) can correctly identify and surface the self-healing `⚠️ Cache Incomplete` warning, giving the user a clear path to retry. The sentinel is **not** written to Firestore; it exists only in the in-memory cache for the current session.
 *   **Interaction with the Grounding Prose Fallback (§3.6):** The two resilience patterns operate at different failure depths. The Prose Fallback fires first (inside the `repairJson` catch) and prevents a format exception from even reaching the retry loop. Only if both JSON parse and the Prose Fallback reject the payload (i.e., the raw text is ≤ 40 chars) does a real exception propagate to the retry loop, where the Sentinel Write acts as the final backstop after all retries are exhausted.
 
+### 3.8 Error Strategy Matrix & System Resilience Rules
+
+To maintain high availability and preserve user immersion, the Zcene engine governs error states according to the following strategy matrix:
+
+| Failure Type | User Impact | Implementation Component | Persistence Level | Mitigation / Recovery Pathway |
+| :--- | :--- | :--- | :--- | :--- |
+| **API Rate Limit (429)** | Curation paused; delay. | `geminiService.ts` (queue) / `App.tsx` | Transient (Memory) | Jittered Exponential Backoff (2s, 4s, 8s...) up to 3 retries; falls back to Sentinel Cache Write. |
+| **Invalid API Key (401/403)** | Blocked generation & query. | `App.tsx` / `ApiKeySelectorModal` | Persistent (LocalStorage) | Triggers Global Error Overlay. Blocks UI inputs. Demands key re-entry or token refresh. |
+| **Network Loss (Fetch Fail)** | Canvas or sidebar loading freeze. | `App.tsx` (`humanizeError`) / fetch | Transient (Memory) | Global Error Overlay if app cannot initialise; Toast notification if transient detail fetching fails. |
+| **Grounding JSON Mutation** | Partial artist details (no bio). | `geminiService.ts` (Prose Fallback) | Semi-Persistent (Firestore) | Intercepts raw prose, maps to schema, writes to database with incomplete tag. Triggers Curation incomplete Toast. |
+| **Retry Exhaustion (Sentinel)** | Localized detail panel failure. | `App.tsx` Deep Cut Queue catch block | Persistent (detailsCache) | Writes Sentinel record (`_isSentinel: true`) to `detailsCache`. Prevents infinite loops. Evicts on Force Refresh. |
+| **Security Rule Breach** | Operation aborted cleanly. | Firebase Security Rules / `App.tsx` | Persistent (Rules Engine) | Catches permission error, aborts state transition, alerts user to authenticate or upgrade credentials. |
+| **Quota Saturated (Firestore)** | Cannot save curations online. | `App.tsx` (`showToast` quota error) | Semi-Persistent (Session) | Notifies user via Toast; redirects saves to local browser sandbox storage. |
+
 ---
 
 ## 4. Cost Estimation Architecture

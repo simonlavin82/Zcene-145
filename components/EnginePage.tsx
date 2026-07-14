@@ -268,6 +268,19 @@ Serial Fetch & Backoff Strategy in App.tsx and OS-level stability logic.
 
 9. ROOTS BREAKDOWN SCANNABILITY FORMATTING (SharedModals.tsx / index.css):
    - Markdown Bio Styling Parity: The synthesis rationale payload is parsed and rendered natively via standard Markdown components using the .markdown-bio design guidelines. This ensures bullet points, paragraph spacing, and bold key term highlighting maintain consistent scannability aesthetics with the Deep Cut biographies.
+
+10. ERROR STRATEGY MATRIX (System Resilience):
+    This matrix governs all system-level, entity-level, and feedback-level error handling policies:
+
+    | Failure Type               | User Impact                     | Implementation Component              | Persistence Level          | Mitigation / Recovery Pathway                                                                                                      |
+    | :------------------------- | :------------------------------ | :------------------------------------- | :------------------------- | :--------------------------------------------------------------------------------------------------------------------------------- |
+    | API Rate Limit (429)       | Curation paused; delay.         | geminiService.ts (queue) / App.tsx     | Transient (Memory)         | Jittered Exponential Backoff (2s, 4s, 8s...) up to 3 retries; falls back to Sentinel Cache Write.                                  |
+    | Invalid API Key (401/403)  | Blocked generation & query.     | App.tsx / ApiKeySelectorModal          | Persistent (LocalStorage)  | Triggers Global Error Overlay. Blocks UI inputs. Demands key re-entry or token refresh.                                            |
+    | Network Loss (Fetch Fail)   | Canvas or sidebar loading freeze| App.tsx (humanizeError) / fetch        | Transient (Memory)         | Global Error Overlay if app cannot initialise; Toast notification if transient detail fetching fails.                              |
+    | Grounding JSON Mutation    | Partial artist details (no bio).| geminiService.ts (Prose Fallback)      | Semi-Persistent (Firestore)| Intercepts raw prose, maps to schema, writes to database with incomplete tag. Triggers Curation incomplete Toast.                   |
+    | Retry Exhaustion (Sentinel) | Localized detail panel failure. | App.tsx Deep Cut Queue catch block     | Persistent (detailsCache)  | Writes Sentinel record (_isSentinel: true) to detailsCache. Prevents infinite fetch loops. Evicts on Force Refresh.                |
+    | Security Rule Breach        | Operation aborted cleanly.      | Firebase Security Rules / App.tsx      | Persistent (Rules Engine)  | Catches permission error, aborts state transition, alerts user to authenticate or upgrade credentials.                             |
+    | Quota Saturated (Firestore) | Cannot save curations online.   | App.tsx (showToast quota error)        | Semi-Persistent (Session)  | Notifies user via Toast; redirects saves to local browser sandbox storage.                                                        |
 `;
 
 const SHARING_FLOW_DOCUMENTATION = `

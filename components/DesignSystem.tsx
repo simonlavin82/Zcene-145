@@ -2157,7 +2157,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                         <div className="flex justify-center p-12 bg-zinc-950 rounded-xl border border-zinc-800">
                              <div className="bg-brand-black text-primary px-6 py-3 rounded-xl shadow-2xl flex items-center justify-center gap-3 border border-primary/50">
                                 <span className="material-symbols-outlined !text-[20px]">check_circle</span>
-                                <span className="text-sm font-semibold tracking-tight">Added artist to seed list</span>
+                                <span className="text-sm font-semibold tracking-tight">Artist seed registered in the curation queue</span>
                              </div>
                         </div>
                     </section>
@@ -2648,8 +2648,48 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Error Messages</h2>
                         <div className="space-y-12">
                             <p className="text-base text-zinc-400 leading-relaxed max-w-3xl">
-                                Zcene uses a tiered error handling system to maintain immersion while providing critical feedback when the AI engine or network encounters issues.
+                                Zcene uses a tiered error handling system to maintain immersion while providing critical feedback when the curation engine or network encounters issues.
                             </p>
+
+                            {/* Rules of Engagement */}
+                            <div className="p-8 bg-zinc-900/30 rounded-xl border border-zinc-800 space-y-6">
+                                <h3 className="text-xl font-medium text-white">Rules of Engagement</h3>
+                                <p className="text-sm text-zinc-400 leading-relaxed">
+                                    Our error handling system categorises failures into three distinct tiers based on severity, ensuring the user remains immersed in the curatorial experience.
+                                </p>
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                    <div className="p-6 bg-zinc-950 rounded-xl border border-zinc-800 space-y-3">
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>
+                                            <h4 className="text-sm font-semibold text-white uppercase tracking-wider">Global Error Overlay</h4>
+                                        </div>
+                                        <p className="text-xs text-zinc-500 uppercase tracking-widest">Severity: System-level</p>
+                                        <p className="text-xs text-zinc-400 leading-relaxed">
+                                            Used for fatal infrastructure blocks (e.g. key authorisation failures or complete network offline). Blocks all interface interactions to preserve token quotas and prevent state corruption. Requires active user input to dismiss.
+                                        </p>
+                                    </div>
+                                    <div className="p-6 bg-zinc-950 rounded-xl border border-zinc-800 space-y-3">
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                                            <h4 className="text-sm font-semibold text-white uppercase tracking-wider">Inline Panel Error</h4>
+                                        </div>
+                                        <p className="text-xs text-zinc-500 uppercase tracking-widest">Severity: Entity-level</p>
+                                        <p className="text-xs text-zinc-400 leading-relaxed">
+                                            Used for isolated node detail retrieval or format parse errors in the sidebar. Keeps the main graph canvas and navigation fully responsive. Includes inline refresh actions to trigger self-healing cache recovery.
+                                        </p>
+                                    </div>
+                                    <div className="p-6 bg-zinc-950 rounded-xl border border-zinc-800 space-y-3">
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-2.5 h-2.5 rounded-full bg-primary"></span>
+                                            <h4 className="text-sm font-semibold text-white uppercase tracking-wider">Transient Toast</h4>
+                                        </div>
+                                        <p className="text-xs text-zinc-500 uppercase tracking-widest">Severity: Feedback-level</p>
+                                        <p className="text-xs text-zinc-400 leading-relaxed">
+                                            Used for non-blocking notifications, successful collection updates, share confirmations, or partial data warning states. Slides in temporarily near the edge of the viewport and auto-dismisses within 3–5 seconds.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                                 <div className="space-y-6">
@@ -2658,7 +2698,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <div className="w-full bg-red-900 border border-red-600 text-red-200 px-4 py-3 rounded-xl shadow-2xl flex items-start justify-between gap-4">
                                             <div className="flex-grow min-w-0 break-all sm:break-words pt-2.5">
                                                 <strong className="font-medium text-red-100">Error: </strong>
-                                                <span>The AI needs a short break. Please wait a minute and try again.</span>
+                                                <span>Operational limits exceeded. The curation engine is temporarily saturated. Retrying in a moment.</span>
                                             </div>
                                             <button className="w-10 h-10 rounded-xl text-red-200 hover:bg-red-800 transition-colors flex-shrink-0 flex items-center justify-center">
                                                 <span className="material-symbols-outlined !text-[24px]">close</span>
@@ -2674,7 +2714,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <h3 className="text-xl font-medium text-zinc-200">Inline Panel Error</h3>
                                     <div className="p-6 bg-zinc-950 rounded-xl border border-zinc-800 flex items-center justify-center">
                                         <div className="w-full bg-zinc-900 border border-zinc-800 p-6 text-center rounded-xl">
-                                            <p className="text-red-400 text-sm">Failed to retrieve biographical data for this artist.</p>
+                                            <p className="text-red-400 text-sm">Failed to retrieve biographical data for this artist. Re-evaluating node...</p>
                                         </div>
                                     </div>
                                     <p className="text-sm text-zinc-500 leading-relaxed">
@@ -2693,16 +2733,16 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <p className="text-[10px] font-semibold text-zinc-600 uppercase tracking-widest mb-1">Raw API Error</p>
                                         <code className="text-xs text-zinc-500">RESOURCE_EXHAUSTED (429)</code>
                                         <div className="mt-3 pt-3 border-t border-zinc-800">
-                                            <p className="text-[10px] font-semibold text-primary uppercase tracking-widest mb-1">Humanized (Zcene Tone)</p>
-                                            <p className="text-sm text-zinc-300">"The AI needs a short break. Please wait a minute and try again."</p>
+                                            <p className="text-[10px] font-semibold text-primary uppercase tracking-widest mb-1">Humanised (Zcene Tone)</p>
+                                            <p className="text-sm text-zinc-300">"Operational limits exceeded. The curation engine is temporarily saturated. Retrying in a moment."</p>
                                         </div>
                                     </div>
                                     <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-800">
                                         <p className="text-[10px] font-semibold text-zinc-600 uppercase tracking-widest mb-1">Raw API Error</p>
                                         <code className="text-xs text-zinc-500">Proxying failed / NetworkError</code>
                                         <div className="mt-3 pt-3 border-t border-zinc-800">
-                                            <p className="text-[10px] font-semibold text-primary uppercase tracking-widest mb-1">Humanized (Zcene Tone)</p>
-                                            <p className="text-sm text-zinc-300">"Connection issue: We couldn't reach the AI. Please check your internet connection."</p>
+                                            <p className="text-[10px] font-semibold text-primary uppercase tracking-widest mb-1">Humanised (Zcene Tone)</p>
+                                            <p className="text-sm text-zinc-300">"Signal degradation. The connection has failed. Please verify your local network."</p>
                                         </div>
                                     </div>
                                 </div>
