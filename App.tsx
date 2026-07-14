@@ -786,13 +786,17 @@ export const parseDetailsCacheSafely = (field: any): any => {
   }
 };
 
-const validateRootsBreakdown = (rationale?: string): boolean => {
+const validateRootsBreakdown = (rationale?: string, isSingleArtist: boolean = false): boolean => {
   if (!rationale) return false;
   const lower = rationale.toLowerCase();
+  if (isSingleArtist) {
+    return lower.includes('acoustic') && lower.includes('scene');
+  }
   return lower.includes('acoustic') && lower.includes('scene') && lower.includes('overlap');
 };
 
-const validateCacheEntry = (data: any): CacheValidationResult => {
+
+const validateCacheEntry = (data: any, isSingleArtist: boolean = false): CacheValidationResult => {
   if (!data) {
     return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
   }
@@ -826,7 +830,7 @@ const validateCacheEntry = (data: any): CacheValidationResult => {
 
     // 5. synthesisRationale exists and is valid
     const rationale = data.synthesisRationale || graph.synthesisRationale;
-    if (!validateRootsBreakdown(rationale)) {
+    if (!validateRootsBreakdown(rationale, isSingleArtist)) {
       return { isFullyQualified: false, needsPeerBands, needsFutureFields: true };
     }
 
@@ -863,8 +867,8 @@ const validateCacheEntry = (data: any): CacheValidationResult => {
   }
 };
 
-const isCacheEntryFullyQualified = (data: any): boolean => {
-  return validateCacheEntry(data).isFullyQualified;
+const isCacheEntryFullyQualified = (data: any, isSingleArtist: boolean = false): boolean => {
+  return validateCacheEntry(data, isSingleArtist).isFullyQualified;
 };
 
 /**
@@ -1936,7 +1940,7 @@ const App: React.FC = () => {
                 const isIncomplete = checkIsProfileIncomplete(node, detailsPayload) || 
                                      isBioTooShort || 
                                      isPlaceholderBio || 
-                                     !validateCacheEntry(data).isFullyQualified;
+                                     !validateCacheEntry(data, true).isFullyQualified;
 
                 if (!isIncomplete) {
                     const hydratedNode = {
@@ -2476,7 +2480,7 @@ const App: React.FC = () => {
           }
 
           const isDeep = data?.isDeep === true;
-          const validation = validateCacheEntry(data);
+          const validation = validateCacheEntry(data, true);
           const hasGraph = parsedGraph && parsedGraph.nodes && parsedGraph.nodes.length > 0;
           const hasDetailsObj = !!data.detailsCache && (
             typeof data.detailsCache === 'string'
@@ -2766,20 +2770,20 @@ const App: React.FC = () => {
         const allArtistsCached = normalizedArtistList.every(name => {
           const normName = name.toLowerCase();
           const entry = baseCacheResult.cached.get(name) || baseCacheResult.cached.get(normName);
-          return entry && isGraphDataPresent(entry) && isCacheEntryFullyQualified(entry);
+          return entry && isGraphDataPresent(entry) && isCacheEntryFullyQualified(entry, artistList.length === 1);
         });
 
         const allCompositeCached = normalizedArtistList.every(name => {
           const normName = name.toLowerCase();
           const entry = compositeCacheResult.cached.get(name) || compositeCacheResult.cached.get(normName);
-          return entry && isGraphDataPresent(entry) && isCacheEntryFullyQualified(entry);
+          return entry && isGraphDataPresent(entry) && isCacheEntryFullyQualified(entry, artistList.length === 1);
         });
 
         // Phase 02 Decision State Trace
         normalizedArtistList.forEach(name => {
           const entry = baseCacheResult.cached.get(name) || baseCacheResult.cached.get(name.toLowerCase());
           const hasGraph = entry ? isGraphDataPresent(entry) : false;
-          const isFullyQ = entry ? isCacheEntryFullyQualified(entry) : false;
+          const isFullyQ = entry ? isCacheEntryFullyQualified(entry, artistList.length === 1) : false;
           console.log(`[Phase 02 Decision State] name: "${name}", foundDoc: ${!!entry}, hasGraph: ${hasGraph}, isFullyQualified: ${isFullyQ}, allArtistsCached: ${allArtistsCached}`);
         });
 
@@ -2966,7 +2970,7 @@ const App: React.FC = () => {
               detail: { artist: entry?.seedArtists || entry?.artistId || firstSlug } 
           }));
           
-          const allQualified = Array.from(cached.values()).every(e => validateCacheEntry(e).isFullyQualified);
+          const allQualified = Array.from(cached.values()).every(e => validateCacheEntry(e, artistList.length === 1).isFullyQualified);
           if (!allQualified) {
             showToast('⚠️ Cache Incomplete');
           } else {
@@ -2998,7 +3002,7 @@ const App: React.FC = () => {
             (graphData?.nodes.some(n => n.id.toLowerCase() === normName || normalizeArtistId(n.id) === normName || isArtistIdMatch(n.id, normName)) ?? false)
           );
 
-          const validation = entry ? validateCacheEntry(entry) : null;
+          const validation = entry ? validateCacheEntry(entry, artistList.length === 1) : null;
           const filtersMatch = bypassChoiceConfirmation ? true : (entry ? areFiltersEqual(entry.filters, activeDiscoveryFilters) : false);
           const isQualified = bypassChoiceConfirmation ? true : validation?.isFullyQualified;
 
@@ -3222,7 +3226,7 @@ const App: React.FC = () => {
             detail: { artist: entry?.seedArtists || entry?.artistId || firstSlug } 
         }));
         
-        const allQualified = Array.from(cached.values()).every(e => validateCacheEntry(e).isFullyQualified);
+        const allQualified = Array.from(cached.values()).every(e => validateCacheEntry(e, artistList.length === 1).isFullyQualified);
         if (!allQualified) {
           showToast('⚠️ Cache Incomplete');
         } else {
@@ -5421,7 +5425,7 @@ const App: React.FC = () => {
                       const fallbackSnap = await getArtistDocWithRedirect(simpleId);
                       if (fallbackSnap.exists()) {
                         const data = fallbackSnap.data();
-                        if (data && data.detailsCache && validateCacheEntry(data).isFullyQualified) {
+                        if (data && data.detailsCache && validateCacheEntry(data, true).isFullyQualified) {
                           const parsed = parseDetailsCacheSafely(data.detailsCache);
                           const cachedOrigin = parsed?.details?.origin || parsed?.origin || '';
                           const hasMismatch = connectedCountries.length > 0 && 
@@ -5441,9 +5445,9 @@ const App: React.FC = () => {
                     if (cacheDoc.exists()) {
                        const data = cacheDoc.data();
                       if (data) {
-                         isStale = isCacheExpired(data.cachedAt) || !validateCacheEntry(data).isFullyQualified;
+                         isStale = isCacheExpired(data.cachedAt) || !validateCacheEntry(data, true).isFullyQualified;
                       }
-                      if (data && data.detailsCache && validateCacheEntry(data).isFullyQualified) {
+                      if (data && data.detailsCache && validateCacheEntry(data, true).isFullyQualified) {
                          try {
                              const parsed = parseDetailsCacheSafely(data.detailsCache);
                              if (parsed && (parsed.bio || parsed.summary)) {
