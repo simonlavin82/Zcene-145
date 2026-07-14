@@ -463,6 +463,29 @@ The system distinguishes between two categories of data quality:
    - This ensures that legacy or incomplete datasets lacking the new fields are treated as "cache misses" at the front gate and details panel, automatically routing through the standard 'confirmTokenUsage' estimation warning and live Gemini API re-synthesis to heal the cached records to the current schema standards.
 `;
 
+const CACHE_VALIDATION_DOCUMENTATION = `
+1. CONTEXT-AWARE VALIDATION (validateRootsBreakdown):
+   The validation of cached reasoning rationales (synthesisRationale) is context-aware to ensure optimal data-reuse. 
+   It operates in two distinct validation scopes governed by the 'isSingleArtist' flag:
+   - Single-Artist Mode (isSingleArtist === true):
+     Validates single-artist Zcenes. Requires only 'acoustic' and 'scene' keywords.
+     The 'overlap' insight check is bypassed because single-seed graphs contain no overlapping relationships.
+   - Multi-Artist Mode (isSingleArtist === false):
+     Validates complex, multi-artist graphs. Enforces all three keywords: 'acoustic', 'scene', and 'overlap' 
+     to ensure cross-connection network fidelity.
+
+2. LOGIC FORKING GATES (MANDATORY REQUIREMENT):
+   Any future modifications to the 'validateRootsBreakdown' or 'validateCacheEntry' functions in 'App.tsx' 
+   MUST preserve this context-aware logic fork. Disabling the fork or applying the strict multi-artist 
+   'overlap' constraint globally will regress the system into redundant, paid Gemini API re-synthesis loops 
+   for single-artist caches.
+
+3. FLAG PROPAGATION PATTERN:
+   The 'isSingleArtist' flag should be propagated dynamically from the graph generation queries 
+   (e.g., checking 'artistList.length === 1' inside handleGenerateGraph) or set to 'true' in isolated 
+   detail panel reads where only a single artist's profile card is being evaluated.
+`;
+
 const LOCALIZED_LOADING_DOCUMENTATION = `
 1. CARD-BODY-SCOPED LOADING SPINNER (DetailsPanel.tsx):
    Instead of global or panel-level overlays, the loading spinner is rendered
@@ -1125,6 +1148,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                     <section id="data-synthesis">
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">Data Synthesis & Persistence</h2>
                         <CodeBlock title="Atomicity, API Gateway & Sanitization Specification" content={DATA_SYNTHESIS_PERSISTENCE_DOCUMENTATION} />
+                        <CodeBlock title="Cache Validation & Qualification Rules" content={CACHE_VALIDATION_DOCUMENTATION} />
                     </section>
 
                     {/* ── CONVERSATIONAL AI ── */}
