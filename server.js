@@ -545,6 +545,41 @@ async function triggerReSynthesis(artistId, originalData) {
     }
     const synthesizedDetails = JSON.parse(cleanText.trim());
     
+    const sanitizeString = (str) => {
+      if (typeof str !== 'string') return "";
+      return str.replace(/\[\d+\]/g, '').replace(/\(\d+\)/g, '').trim();
+    };
+
+    if (synthesizedDetails) {
+      if (synthesizedDetails.summary) {
+        synthesizedDetails.summary = sanitizeString(synthesizedDetails.summary);
+      }
+      if (synthesizedDetails.recommendationReason) {
+        synthesizedDetails.recommendationReason = sanitizeString(synthesizedDetails.recommendationReason);
+      }
+      if (synthesizedDetails.details) {
+        const det = synthesizedDetails.details;
+        if (det.genre) det.genre = sanitizeString(det.genre);
+        if (det.origin) det.origin = sanitizeString(det.origin);
+        if (det.founded) det.founded = sanitizeString(det.founded);
+        if (det.notableArtists) {
+          det.notableArtists = det.notableArtists.map(sanitizeString);
+        }
+      }
+      if (synthesizedDetails.discography) {
+        synthesizedDetails.discography = synthesizedDetails.discography.map(album => ({
+          albumName: sanitizeString(album?.albumName),
+          releaseYear: sanitizeString(album?.releaseYear)
+        }));
+      }
+      if (synthesizedDetails.members) {
+        synthesizedDetails.members = synthesizedDetails.members.map(sanitizeString);
+      }
+      if (synthesizedDetails.youtubeSearchQuery) {
+        synthesizedDetails.youtubeSearchQuery = sanitizeString(synthesizedDetails.youtubeSearchQuery);
+      }
+    }
+    
     // Check if new youtubeVideoId is playable
     let isPlayable = false;
     if (synthesizedDetails.youtubeVideoId) {

@@ -1199,8 +1199,6 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
         }
       ],
       generationConfig: {
-        responseMimeType: "application/json",
-        responseSchema: NODE_DETAILS_SCHEMA,
         maxOutputTokens: 4000,
       }
     };
@@ -1284,9 +1282,14 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
             : null
     }));
 
+    const sanitizeString = (str: any): string => {
+        if (typeof str !== 'string') return "";
+        return str.replace(/\[\d+\]/g, '').replace(/\(\d+\)/g, '').trim();
+    };
+
     const hydratedDetails: NodeDetails = {
         ...details,
-        summary: details.summary || "No summary available (AI response was truncated).",
+        summary: sanitizeString(details.summary || "No summary available (AI response was truncated)."),
         details: (() => {
             // [Metadata Sanitization] ✦
             // Strip literal "Unknown"/"N/A"/"None" values from genre and origin before
@@ -1301,23 +1304,28 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
                 if (!val) return "";
                 const t = val.trim().toLowerCase();
                 if (t === "unknown" || t === "n/a" || t === "none" || t === "not available") return "";
-                return val.trim();
+                return sanitizeString(val);
             };
             return {
                 ...d,
                 genre: sanitizeMetaField(d.genre),
                 origin: sanitizeMetaField(d.origin),
+                founded: sanitizeString(d.founded),
+                notableArtists: (d.notableArtists || []).map(sanitizeString)
             };
         })(),
         links: sanitisedLinks,
-        discography: details.discography || [],
-        members: details.members || [],
-        recommendationReason: details.recommendationReason || "",
+        discography: (details.discography || []).map((album: any) => ({
+            albumName: sanitizeString(album?.albumName),
+            releaseYear: sanitizeString(album?.releaseYear)
+        })),
+        members: (details.members || []).map(sanitizeString),
+        recommendationReason: sanitizeString(details.recommendationReason || ""),
         youtubeVideoId: typeof details.youtubeVideoId === 'string' && details.youtubeVideoId.trim().length === 11
             ? details.youtubeVideoId.trim()
             : undefined,
         youtubeSearchQuery: typeof details.youtubeSearchQuery === 'string' && details.youtubeSearchQuery.trim().length > 0
-            ? details.youtubeSearchQuery.trim()
+            ? sanitizeString(details.youtubeSearchQuery.trim())
             : undefined,
     };
 
