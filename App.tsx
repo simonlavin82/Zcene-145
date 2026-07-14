@@ -797,7 +797,7 @@ const validateCacheEntry = (data: any): CacheValidationResult => {
     return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
   }
 
-  // A document is fully qualified ("Gold Standard" Cache Hit) if it contains non-empty graphData
+  // 1. graphData exists, parses cleanly, and contains nodes
   if (!data.graphData) {
     return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
   }
@@ -808,19 +808,59 @@ const validateCacheEntry = (data: any): CacheValidationResult => {
       return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
     }
 
+    // Check for peer bands
+    const artistNodes = graph.nodes.filter((n: any) => n.type === 'artist' || !n.type);
+    const needsPeerBands = artistNodes.length < 2;
+
+    // 2. Graph edge context strings are meaningful (not generic fallbacks)
+    let hasGenericContext = false;
+    if (graph.links && Array.isArray(graph.links)) {
+      const genericStrings = ["is connected to", "is musically related to"];
+      hasGenericContext = graph.links.some((l: any) => 
+        l.context && genericStrings.includes(l.context.toLowerCase().trim())
+      );
+    }
+    if (hasGenericContext) {
+      return { isFullyQualified: false, needsPeerBands, needsFutureFields: true };
+    }
+
+    // 5. synthesisRationale exists and is valid
     const rationale = data.synthesisRationale || graph.synthesisRationale;
     if (!validateRootsBreakdown(rationale)) {
-      return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: true };
+      return { isFullyQualified: false, needsPeerBands, needsFutureFields: true };
     }
+
+    // 3. detailsCache exists, parses cleanly, and contains a non-trivial biography (>5 chars, no mock)
+    if (!data.detailsCache) {
+      return { isFullyQualified: false, needsPeerBands, needsFutureFields: true };
+    }
+    const details = parseDetailsCacheSafely(data.detailsCache);
+    if (!details) {
+      return { isFullyQualified: false, needsPeerBands, needsFutureFields: true };
+    }
+    const bio = details.summary || details.bio || details.description || details.text || "";
+    if (typeof bio !== 'string' || bio.trim().length <= 5 || bio.toLowerCase().includes("sandbox mock")) {
+      return { isFullyQualified: false, needsPeerBands, needsFutureFields: true };
+    }
+
+    // 4. genre and origin fields are non-empty and not "unknown"
+    const genre = details.details?.genre || details.genre;
+    const origin = details.details?.origin || details.origin;
+    if (!genre || typeof genre !== 'string' || genre.trim().length === 0 || genre.toLowerCase().trim() === "unknown") {
+      return { isFullyQualified: false, needsPeerBands, needsFutureFields: true };
+    }
+    if (!origin || typeof origin !== 'string' || origin.trim().length === 0 || origin.toLowerCase().trim() === "unknown") {
+      return { isFullyQualified: false, needsPeerBands, needsFutureFields: true };
+    }
+
+    return {
+      isFullyQualified: !needsPeerBands,
+      needsPeerBands,
+      needsFutureFields: false
+    };
   } catch (e) {
     return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
   }
-
-  return {
-    isFullyQualified: true,
-    needsPeerBands: false,
-    needsFutureFields: false
-  };
 };
 
 const isCacheEntryFullyQualified = (data: any): boolean => {
@@ -2975,9 +3015,11 @@ const App: React.FC = () => {
                 summary: `**${name}** is a standard sandbox mock cached band for test scenarios.`,
                 imageUrl: '',
                 members: [],
-                details: { genre: 'Hardcore Punk', origin: 'New York, USA', founded: '1990' },
+                details: { genre: 'Hardcore Punk', origin: 'New York, USA', founded: '1990', notableArtists: [], artist: name },
                 links: [],
-                discography: []
+                discography: [],
+                recommendationReason: "Mock curator insight.",
+                youtubeSearchQuery: `Mock youtube search query for ${name}`
               })
             };
             cached.set(name, finalEntry);
@@ -3259,7 +3301,74 @@ const App: React.FC = () => {
 
         // Write both newly fetched and enriched/upgraded artists to Firestore (fire-and-forget) - only for standalone queries
         if (artistList.length === 1) {
-          writeArtistCacheMany(toFetch, freshData, user?.uid, activeDiscoveryFilters, true, true)
+          const fetchedDetailsMap = new Map<string, NodeDetails>();
+          const seedName = toFetch[0];
+          const nodeObj = { id: seedName, label: seedName, type: 'artist' as any, group: 0 };
+          
+          const runUpfrontFetchAndWrite = async () => {
+            try {
+              console.log(`[Music Discovery] Fetching upfront details for seed: ${seedName}`);
+              const details = await fetchNodeDetails(nodeObj, freshData, seedArtists, urlOriginHint);
+              
+              // JIT Scraper Hook
+              const artistDisplay = details.details?.artist || seedName;
+              try {
+                const scrapeRes = await window.fetch('/api/artist/scrape-video-id', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    artistName: artistDisplay,
+                    artistId: normalizeArtistId(seedName)
+                  })
+                });
+                if (scrapeRes.ok) {
+                  const scrapeData = await scrapeRes.json();
+                  if (scrapeData.youtubeVideoId) {
+                    details.youtubeVideoId = scrapeData.youtubeVideoId;
+                  }
+                }
+              } catch (err) {
+                console.warn("[Music Discovery] Scraper failed during upfront fetch:", err);
+              }
+
+              if (details.youtubeVideoId) {
+                const playable = await checkVideoPlayabilityOnServer(details.youtubeVideoId);
+                if (!playable) {
+                  details.youtubeVideoId = null;
+                }
+              }
+
+              if (!details.details) {
+                details.details = { genre: "", origin: "", founded: "", notableArtists: [] };
+              }
+              details.details.artist = details.details.artist || seedName;
+              if (!details.synthesisRationale) {
+                details.synthesisRationale = freshData.synthesisRationale || "";
+              }
+
+              fetchedDetailsMap.set(normalizeArtistId(seedName), details);
+              fetchedDetailsMap.set(seedName.toLowerCase(), details);
+
+              // Seed detailsCache so JIT loading is instant
+              setDetailsCache(prev => {
+                const updated = new Map(prev);
+                updated.set(seedName, details);
+                updated.set(seedName.toLowerCase(), details);
+                updated.set(normalizeArtistId(seedName), details);
+                return updated;
+              });
+              healedDetailsCacheRef.current.set(seedName, details);
+              healedDetailsCacheRef.current.set(seedName.toLowerCase(), details);
+              healedDetailsCacheRef.current.set(normalizeArtistId(seedName), details);
+            } catch (err) {
+              console.error(`[Music Discovery] Upfront details fetch failed for ${seedName}:`, err);
+            }
+
+            // Write to Firestore
+            await writeArtistCacheMany(toFetch, freshData, user?.uid, activeDiscoveryFilters, true, true, fetchedDetailsMap);
+          };
+
+          runUpfrontFetchAndWrite()
             .then(() => console.log(`[Music Discovery] Cache write/upgrade confirmed for: [${toFetch.join(', ')}]`))
             .catch(e => console.error('[Music Discovery] Cache write/upgrade failed:', e));
         }
@@ -3542,7 +3651,74 @@ const App: React.FC = () => {
       // Phase 02 complete — write each artist as an isolated individual doc - only for standalone queries
       if (artistList.length === 1) {
         console.log(`[Music Discovery] Full cache MISS — writing per-artist docs for: [${artistList.join(', ')}]`);
-        writeArtistCacheMany(artistList, final, user?.uid, activeDiscoveryFilters, true, true)
+        const fetchedDetailsMap = new Map<string, NodeDetails>();
+        const seedName = artistList[0];
+        const nodeObj = { id: seedName, label: seedName, type: 'artist' as any, group: 0 };
+        
+        const runUpfrontFetchAndWrite = async () => {
+          try {
+            console.log(`[Music Discovery] Fetching upfront details for seed: ${seedName}`);
+            const details = await fetchNodeDetails(nodeObj, final, seedArtists, urlOriginHint);
+            
+            // JIT Scraper Hook
+            const artistDisplay = details.details?.artist || seedName;
+            try {
+              const scrapeRes = await window.fetch('/api/artist/scrape-video-id', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  artistName: artistDisplay,
+                  artistId: normalizeArtistId(seedName)
+                })
+              });
+              if (scrapeRes.ok) {
+                const scrapeData = await scrapeRes.json();
+                if (scrapeData.youtubeVideoId) {
+                  details.youtubeVideoId = scrapeData.youtubeVideoId;
+                }
+              }
+            } catch (err) {
+              console.warn("[Music Discovery] Scraper failed during upfront fetch:", err);
+            }
+
+            if (details.youtubeVideoId) {
+              const playable = await checkVideoPlayabilityOnServer(details.youtubeVideoId);
+              if (!playable) {
+                details.youtubeVideoId = null;
+              }
+            }
+
+            if (!details.details) {
+              details.details = { genre: "", origin: "", founded: "", notableArtists: [] };
+            }
+            details.details.artist = details.details.artist || seedName;
+            if (!details.synthesisRationale) {
+              details.synthesisRationale = final.synthesisRationale || "";
+            }
+
+            fetchedDetailsMap.set(normalizeArtistId(seedName), details);
+            fetchedDetailsMap.set(seedName.toLowerCase(), details);
+
+            // Seed detailsCache so JIT loading is instant
+            setDetailsCache(prev => {
+              const updated = new Map(prev);
+              updated.set(seedName, details);
+              updated.set(seedName.toLowerCase(), details);
+              updated.set(normalizeArtistId(seedName), details);
+              return updated;
+            });
+            healedDetailsCacheRef.current.set(seedName, details);
+            healedDetailsCacheRef.current.set(seedName.toLowerCase(), details);
+            healedDetailsCacheRef.current.set(normalizeArtistId(seedName), details);
+          } catch (err) {
+            console.error(`[Music Discovery] Upfront details fetch failed for ${seedName}:`, err);
+          }
+
+          // Write to Firestore
+          await writeArtistCacheMany(artistList, final, user?.uid, activeDiscoveryFilters, true, true, fetchedDetailsMap);
+        };
+
+        runUpfrontFetchAndWrite()
           .then(() => console.log(`[Music Discovery] Per-artist cache write confirmed for: [${artistList.join(', ')}]`))
           .catch(e => console.error('[Music Discovery] Per-artist cache write failed:', e));
       }

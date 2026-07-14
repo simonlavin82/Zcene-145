@@ -271,24 +271,69 @@ function normalizeArtistId(name) {
  * Ensures detailsCache is valid, non-empty, and contains biography/summary and discography to prevent data rot.
  */
 function enforceArtistCacheSchemaServer(payload) {
-  if (payload && payload.detailsCache) {
+  if (!payload) return;
+  if (payload.redirectTo) return;
+
+  const isDeep = payload.isDeep === true;
+
+  if (isDeep || payload.detailsCache) {
     try {
       const detailsCacheRaw = payload.detailsCache;
-      let parsed = typeof detailsCacheRaw === 'string' ? JSON.parse(detailsCacheRaw) : detailsCacheRaw;
-      
-      if (!parsed) {
-        throw new Error("[Schema Enforcement] Parsed detailsCache is null or empty.");
+      if (isDeep && !detailsCacheRaw) {
+        throw new Error("[Schema Enforcement] detailsCache is required for deep/seed artist cache entries.");
       }
-      
-      // Check for biography or summary
-      const bio = parsed.summary || parsed.bio || parsed.description || parsed.text;
-      if (!bio || typeof bio !== 'string' || bio.trim().length < 5) {
-        throw new Error("[Schema Enforcement] detailsCache is missing biography/summary text.");
-      }
-      
-      // Check for discography array
-      if (!parsed.discography || !Array.isArray(parsed.discography)) {
-        throw new Error("[Schema Enforcement] detailsCache is missing discography array.");
+
+      if (detailsCacheRaw) {
+        let parsed = typeof detailsCacheRaw === 'string' ? JSON.parse(detailsCacheRaw) : detailsCacheRaw;
+        
+        if (!parsed) {
+          throw new Error("[Schema Enforcement] Parsed detailsCache is null or empty.");
+        }
+        
+        // Check for biography or summary
+        const bio = parsed.summary || parsed.bio || parsed.description || parsed.text;
+        if (!bio || typeof bio !== 'string' || bio.trim().length < 5) {
+          throw new Error("[Schema Enforcement] detailsCache is missing biography/summary text.");
+        }
+        
+        // Check details object
+        if (!parsed.details || typeof parsed.details !== 'object') {
+          throw new Error("[Schema Enforcement] detailsCache is missing or has invalid details object.");
+        }
+        const { genre, origin, founded, notableArtists } = parsed.details;
+        if (!genre || typeof genre !== 'string' || genre.trim().length === 0) {
+          throw new Error("[Schema Enforcement] detailsCache.details is missing genre.");
+        }
+        if (!origin || typeof origin !== 'string' || origin.trim().length === 0) {
+          throw new Error("[Schema Enforcement] detailsCache.details is missing origin.");
+        }
+        if (!founded || typeof founded !== 'string' || founded.trim().length === 0) {
+          throw new Error("[Schema Enforcement] detailsCache.details is missing founded year.");
+        }
+        if (!notableArtists || !Array.isArray(notableArtists)) {
+          throw new Error("[Schema Enforcement] detailsCache.details is missing notableArtists array.");
+        }
+
+        // Check for discography array
+        if (!parsed.discography || !Array.isArray(parsed.discography)) {
+          throw new Error("[Schema Enforcement] detailsCache is missing discography array.");
+        }
+        for (let i = 0; i < parsed.discography.length; i++) {
+          const item = parsed.discography[i];
+          if (!item || typeof item !== 'object' || !item.albumName || !item.releaseYear) {
+            throw new Error(`[Schema Enforcement] discography item at index ${i} is missing albumName or releaseYear.`);
+          }
+        }
+
+        // Check recommendationReason
+        if (!parsed.recommendationReason || typeof parsed.recommendationReason !== 'string' || parsed.recommendationReason.trim().length === 0) {
+          throw new Error("[Schema Enforcement] detailsCache is missing recommendationReason.");
+        }
+
+        // Check youtubeSearchQuery
+        if (!parsed.youtubeSearchQuery || typeof parsed.youtubeSearchQuery !== 'string' || parsed.youtubeSearchQuery.trim().length === 0) {
+          throw new Error("[Schema Enforcement] detailsCache is missing youtubeSearchQuery.");
+        }
       }
     } catch (err) {
       console.error("[Schema Enforcement] Server Validation failed for payload:", JSON.stringify(payload, null, 2));
@@ -421,8 +466,11 @@ async function triggerReSynthesis(artistId, originalData) {
         genre: "Soul / R&B",
         origin: "United States",
         founded: "1959",
+        notableArtists: []
       },
       discography: [],
+      recommendationReason: "Mock curator insight.",
+      youtubeSearchQuery: `Mock youtube search query for ${cleanArtistName}`,
       youtubeVideoId: "hFi7XZw1OYk", // Marvin Gaye - What's Going On
     };
 

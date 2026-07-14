@@ -8,7 +8,7 @@ import {
   serverTimestamp,
   DocumentSnapshot,
 } from 'firebase/firestore';
-import { GraphData, Node, Link, ArtistCacheEntry, DiscoveryFilters } from '../types';
+import { GraphData, Node, Link, ArtistCacheEntry, DiscoveryFilters, NodeDetails } from '../types';
 
 // ─── UTILITIES ────────────────────────────────────────────────────────────────
 
@@ -425,7 +425,8 @@ export const writeArtistCacheMany = async (
   activeUserId?: string | null,
   filters?: any,
   preserveFullGraph?: boolean,
-  forceOverwrite?: boolean
+  forceOverwrite?: boolean,
+  detailsMap?: Map<string, NodeDetails>
 ): Promise<void> => {
   const hasActiveFilters = !!(filters && (
     filters.foundedAfter ||
@@ -497,9 +498,14 @@ export const writeArtistCacheMany = async (
         const canonicalDocRef = doc(db, 'artists', compositeCanonicalId);
         const canonicalSnap = await getDoc(canonicalDocRef);
 
+        const artistDetails = detailsMap?.get(canonicalId) || 
+                              detailsMap?.get(artistId) || 
+                              detailsMap?.get(canonicalName.toLowerCase()) || 
+                              detailsMap?.get(name.toLowerCase());
+
         if (!canonicalSnap.exists()) {
           // ── CREATE PATH ─────────────────────────────────────────────────────
-          await setDoc(canonicalDocRef, {
+          const setPayload: any = {
             cacheKey: compositeCanonicalId,
             artistId: canonicalId,
             seedArtists: canonicalName,
@@ -510,13 +516,18 @@ export const writeArtistCacheMany = async (
             cachedAt: serverTimestamp(),
             hitCount: 0,
             isDeep: preserveFullGraph || false,
-          });
+          };
+          if (artistDetails) {
+            setPayload.detailsCache = typeof artistDetails === 'string' ? artistDetails : JSON.stringify(artistDetails);
+          }
+          enforceArtistCacheSchema(setPayload);
+          await setDoc(canonicalDocRef, setPayload);
           console.log(`[ArtistCache] Created Canonical: ${compositeCanonicalId} (${nodes.length} nodes, ${links.length} links)`);
         } else {
           const existing = canonicalSnap.data();
           if (forceOverwrite || (existing && (!existing.cacheVersion || existing.cacheVersion < 2 || (preserveFullGraph && existing.isDeep !== true)))) {
             // ── UPGRADE PATH (Case B) ─────────────────────────────────────────
-            await updateDoc(canonicalDocRef, {
+            const updatePayload: any = {
               cacheKey: compositeCanonicalId,
               artistId: canonicalId,
               seedArtists: canonicalName,
@@ -526,7 +537,12 @@ export const writeArtistCacheMany = async (
               cacheVersion: 2,
               cachedAt: serverTimestamp(),
               isDeep: preserveFullGraph || false,
-            });
+            };
+            if (artistDetails) {
+              updatePayload.detailsCache = typeof artistDetails === 'string' ? artistDetails : JSON.stringify(artistDetails);
+            }
+            enforceArtistCacheSchema(updatePayload);
+            await updateDoc(canonicalDocRef, updatePayload);
             console.log(`[ArtistCache] Upgraded/Overwritten Canonical doc: ${compositeCanonicalId} → cacheVersion 2`);
           } else {
             console.log(`[ArtistCache] Skipping write for Canonical "${compositeCanonicalId}" — doc already at v${existing?.cacheVersion || 2}.`);
@@ -926,33 +942,74 @@ export const findCanonicalNodeForArtist = (name: string, nodes: Node[]): Node | 
  * Ensures detailsCache is valid, non-empty, and contains biography/summary and discography to prevent data rot.
  */
 export const enforceArtistCacheSchema = (payload: any): void => {
-  if (payload && 'detailsCache' in payload) {
+  if (!payload) return;
+  if (payload.redirectTo) return;
+
+  const isDeep = payload.isDeep === true;
+
+  if (isDeep || 'detailsCache' in payload) {
     try {
       const detailsCacheRaw = payload.detailsCache;
-      if (!detailsCacheRaw) {
-        throw new Error("[Schema Enforcement] detailsCache field is missing or empty.");
+      if (isDeep && !detailsCacheRaw) {
+        throw new Error("[Schema Enforcement] detailsCache is required for deep/seed artist cache entries.");
       }
-      
-      let parsed: any = null;
-      try {
-        parsed = typeof detailsCacheRaw === 'string' ? JSON.parse(detailsCacheRaw) : detailsCacheRaw;
-      } catch (e: any) {
-        throw new Error(`[Schema Enforcement] detailsCache is not valid JSON: ${e.message}`);
-      }
-      
-      if (!parsed) {
-        throw new Error("[Schema Enforcement] Parsed detailsCache is null or empty.");
-      }
-      
-      // Check for biography or summary
-      const bio = parsed.summary || parsed.bio || parsed.description || parsed.text;
-      if (!bio || typeof bio !== 'string' || bio.trim().length < 5) {
-        throw new Error("[Schema Enforcement] detailsCache is missing biography/summary text.");
-      }
-      
-      // Check for discography array
-      if (!parsed.discography || !Array.isArray(parsed.discography)) {
-        throw new Error("[Schema Enforcement] detailsCache is missing discography array.");
+
+      if (detailsCacheRaw) {
+        let parsed: any = null;
+        try {
+          parsed = typeof detailsCacheRaw === 'string' ? JSON.parse(detailsCacheRaw) : detailsCacheRaw;
+        } catch (e: any) {
+          throw new Error(`[Schema Enforcement] detailsCache is not valid JSON: ${e.message}`);
+        }
+        
+        if (!parsed) {
+          throw new Error("[Schema Enforcement] Parsed detailsCache is null or empty.");
+        }
+        
+        // Check for biography or summary
+        const bio = parsed.summary || parsed.bio || parsed.description || parsed.text;
+        if (!bio || typeof bio !== 'string' || bio.trim().length < 5) {
+          throw new Error("[Schema Enforcement] detailsCache is missing biography/summary text.");
+        }
+        
+        // Check details object
+        if (!parsed.details || typeof parsed.details !== 'object') {
+          throw new Error("[Schema Enforcement] detailsCache is missing or has invalid details object.");
+        }
+        const { genre, origin, founded, notableArtists } = parsed.details;
+        if (!genre || typeof genre !== 'string' || genre.trim().length === 0) {
+          throw new Error("[Schema Enforcement] detailsCache.details is missing genre.");
+        }
+        if (!origin || typeof origin !== 'string' || origin.trim().length === 0) {
+          throw new Error("[Schema Enforcement] detailsCache.details is missing origin.");
+        }
+        if (!founded || typeof founded !== 'string' || founded.trim().length === 0) {
+          throw new Error("[Schema Enforcement] detailsCache.details is missing founded year.");
+        }
+        if (!notableArtists || !Array.isArray(notableArtists)) {
+          throw new Error("[Schema Enforcement] detailsCache.details is missing notableArtists array.");
+        }
+
+        // Check for discography array
+        if (!parsed.discography || !Array.isArray(parsed.discography)) {
+          throw new Error("[Schema Enforcement] detailsCache is missing discography array.");
+        }
+        for (let i = 0; i < parsed.discography.length; i++) {
+          const item = parsed.discography[i];
+          if (!item || typeof item !== 'object' || !item.albumName || !item.releaseYear) {
+            throw new Error(`[Schema Enforcement] discography item at index ${i} is missing albumName or releaseYear.`);
+          }
+        }
+
+        // Check recommendationReason
+        if (!parsed.recommendationReason || typeof parsed.recommendationReason !== 'string' || parsed.recommendationReason.trim().length === 0) {
+          throw new Error("[Schema Enforcement] detailsCache is missing recommendationReason.");
+        }
+
+        // Check youtubeSearchQuery
+        if (!parsed.youtubeSearchQuery || typeof parsed.youtubeSearchQuery !== 'string' || parsed.youtubeSearchQuery.trim().length === 0) {
+          throw new Error("[Schema Enforcement] detailsCache is missing youtubeSearchQuery.");
+        }
       }
     } catch (err: any) {
       console.error("[Schema Enforcement] Client Validation failed for payload:", JSON.stringify(payload, null, 2));
