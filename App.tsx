@@ -3342,7 +3342,7 @@ const App: React.FC = () => {
         }
 
         // Call Gemini ONLY for the missing and enrichment artists
-        const useCloudCuration = import.meta.env.VITE_USE_CLOUD_CURATION === 'true' && user?.email === 'zcene.online@gmail.com';
+        const useCloudCuration = import.meta.env.VITE_USE_CLOUD_CURATION === 'true';
         let partialGraphPromise;
         if (useCloudCuration && user?.uid) {
           console.log("[Music Discovery] Routing partial graph generation via Cloud-Side Curation.");
@@ -3619,7 +3619,7 @@ const App: React.FC = () => {
     });
 
 
-      const useCloudCuration = import.meta.env.VITE_USE_CLOUD_CURATION === 'true' && user?.email === 'zcene.online@gmail.com';
+      const useCloudCuration = import.meta.env.VITE_USE_CLOUD_CURATION === 'true';
       let graphPromise;
       if (useCloudCuration && user?.uid) {
         console.log("[Music Discovery] Routing graph generation via Cloud-Side Curation.");
