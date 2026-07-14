@@ -9,6 +9,7 @@ import {
     GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE,
     FETCH_NODE_DETAILS_PROMPT_TEMPLATE
 } from '../services/geminiService';
+import { ERROR_MAPPING_RULES, TOAST_MAPPING_RULES } from '../services/errorTranslationLayer';
 
 interface SourcePageProps {
     onNavigate: (view: View) => void;
@@ -268,19 +269,6 @@ Serial Fetch & Backoff Strategy in App.tsx and OS-level stability logic.
 
 9. ROOTS BREAKDOWN SCANNABILITY FORMATTING (SharedModals.tsx / index.css):
    - Markdown Bio Styling Parity: The synthesis rationale payload is parsed and rendered natively via standard Markdown components using the .markdown-bio design guidelines. This ensures bullet points, paragraph spacing, and bold key term highlighting maintain consistent scannability aesthetics with the Deep Cut biographies.
-
-10. ERROR STRATEGY MATRIX (System Resilience):
-    This matrix governs all system-level, entity-level, and feedback-level error handling policies:
-
-    | Failure Type               | User Impact                     | Implementation Component              | Persistence Level          | Mitigation / Recovery Pathway                                                                                                      |
-    | :------------------------- | :------------------------------ | :------------------------------------- | :------------------------- | :--------------------------------------------------------------------------------------------------------------------------------- |
-    | API Rate Limit (429)       | Curation paused; delay.         | geminiService.ts (queue) / App.tsx     | Transient (Memory)         | Jittered Exponential Backoff (2s, 4s, 8s...) up to 3 retries; falls back to Sentinel Cache Write.                                  |
-    | Invalid API Key (401/403)  | Blocked generation & query.     | App.tsx / ApiKeySelectorModal          | Persistent (LocalStorage)  | Triggers Global Error Overlay. Blocks UI inputs. Demands key re-entry or token refresh.                                            |
-    | Network Loss (Fetch Fail)   | Canvas or sidebar loading freeze| App.tsx (humanizeError) / fetch        | Transient (Memory)         | Global Error Overlay if app cannot initialise; Toast notification if transient detail fetching fails.                              |
-    | Grounding JSON Mutation    | Partial artist details (no bio).| geminiService.ts (Prose Fallback)      | Semi-Persistent (Firestore)| Intercepts raw prose, maps to schema, writes to database with incomplete tag. Triggers Curation incomplete Toast.                   |
-    | Retry Exhaustion (Sentinel) | Localized detail panel failure. | App.tsx Deep Cut Queue catch block     | Persistent (detailsCache)  | Writes Sentinel record (_isSentinel: true) to detailsCache. Prevents infinite fetch loops. Evicts on Force Refresh.                |
-    | Security Rule Breach        | Operation aborted cleanly.      | Firebase Security Rules / App.tsx      | Persistent (Rules Engine)  | Catches permission error, aborts state transition, alerts user to authenticate or upgrade credentials.                             |
-    | Quota Saturated (Firestore) | Cannot save curations online.   | App.tsx (showToast quota error)        | Semi-Persistent (Session)  | Notifies user via Toast; redirects saves to local browser sandbox storage.                                                        |
 `;
 
 const SHARING_FLOW_DOCUMENTATION = `
@@ -845,6 +833,83 @@ const SharingFlowDiagram: React.FC = () => (
     </div>
 );
 
+interface StrategyMatrixRow {
+  failureType: string;
+  userImpact: string;
+  component: string;
+  persistence: string;
+  mitigation: string;
+}
+
+const ERROR_STRATEGY_MATRIX: StrategyMatrixRow[] = [
+  {
+    failureType: "API Rate Limit (429)",
+    userImpact: "Curation paused; delay.",
+    component: "geminiService.ts (queue) / App.tsx",
+    persistence: "Transient (Memory)",
+    mitigation: "Jittered Exponential Backoff (2s, 4s, 8s...) up to 3 retries; falls back to Sentinel Cache Write."
+  },
+  {
+    failureType: "Invalid API Key (401/403)",
+    userImpact: "Blocked generation & query.",
+    component: "App.tsx / ApiKeySelectorModal",
+    persistence: "Persistent (LocalStorage)",
+    mitigation: "Triggers Global Error Overlay. Blocks UI inputs. Demands key re-entry or token refresh."
+  },
+  {
+    failureType: "Network Loss (Fetch Fail)",
+    userImpact: "Canvas or sidebar loading freeze.",
+    component: "App.tsx (humanizeError) / fetch",
+    persistence: "Transient (Memory)",
+    mitigation: "Global Error Overlay if app cannot initialise; Toast notification if transient detail fetching fails."
+  },
+  {
+    failureType: "Grounding JSON Mutation",
+    userImpact: "Partial artist details (no bio).",
+    component: "geminiService.ts (Prose Fallback)",
+    persistence: "Semi-Persistent (Firestore)",
+    mitigation: "Intercepts raw prose, maps to schema, writes to database with incomplete tag. Triggers Curation incomplete Toast."
+  },
+  {
+    failureType: "Retry Exhaustion (Sentinel)",
+    userImpact: "Localized detail panel failure.",
+    component: "App.tsx Deep Cut Queue catch block",
+    persistence: "Persistent (detailsCache)",
+    mitigation: "Writes Sentinel record (_isSentinel: true) to detailsCache. Prevents infinite fetch loops. Evicts on Force Refresh."
+  },
+  {
+    failureType: "Security Rule Breach",
+    userImpact: "Operation aborted cleanly.",
+    component: "Firebase Security Rules / App.tsx",
+    persistence: "Persistent (Rules Engine)",
+    mitigation: "Catches permission error, aborts state transition, alerts user to authenticate or upgrade credentials."
+  },
+  {
+    failureType: "Quota Saturated (Firestore)",
+    userImpact: "Cannot save curations online.",
+    component: "App.tsx (showToast quota error)",
+    persistence: "Semi-Persistent (Session)",
+    mitigation: "Notifies user via Toast; redirects saves to local browser sandbox storage."
+  }
+];
+
+const Table: React.FC<{ headers: string[]; children: React.ReactNode }> = ({ headers, children }) => (
+    <div className="overflow-x-auto rounded-xl border border-zinc-800 bg-zinc-950/40 mb-12">
+        <table className="w-full border-collapse text-left">
+            <thead>
+                <tr className="bg-zinc-900/60 border-b border-zinc-800">
+                    {headers.map(h => (
+                        <th key={h} className="py-4 px-6 text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">{h}</th>
+                    ))}
+                </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-900/50">
+                {children}
+            </tbody>
+        </table>
+    </div>
+);
+
 export const EnginePage: React.FC<SourcePageProps> = ({ 
     onNavigate, 
     isActive, 
@@ -898,6 +963,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
         { id: 'visualization-engine', title: 'Visualization Engine' },
         { id: 'sharing-flow', title: 'Sharing & Collaboration' },
         { id: 'system-resilience', title: 'System Resilience' },
+        { id: 'error-messaging-reference', title: 'Error Messaging Reference' },
         { id: 'admin-override', title: 'Admin-Only Override' },
         { id: 'self-healing', title: 'Priority-Based Self-Healing' },
         { id: 'localized-loading', title: 'Localized Loading UX' },
@@ -1103,6 +1169,80 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                     <section id="system-resilience">
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">System Resilience</h2>
                         <CodeBlock title="Network Logic & Selection strategy" content={RESILIENCE_DOCUMENTATION} />
+                        
+                        <div className="mb-12">
+                            <h3 className="text-zinc-200 font-medium text-lg mb-6 uppercase tracking-wider">Error Strategy Matrix</h3>
+                            <Table headers={["Failure Type", "User Impact", "Component", "Persistence", "Mitigation / Recovery Pathway"]}>
+                                {ERROR_STRATEGY_MATRIX.map((row, idx) => (
+                                    <tr key={idx} className="hover:bg-zinc-900/10 transition-colors border-b border-zinc-900/30">
+                                        <td className="py-4 px-6 text-xs font-semibold text-zinc-200">{row.failureType}</td>
+                                        <td className="py-4 px-6 text-xs text-zinc-400 leading-relaxed">{row.userImpact}</td>
+                                        <td className="py-4 px-6 text-xs text-zinc-500 font-mono">{row.component}</td>
+                                        <td className="py-4 px-6 text-xs">
+                                            <span className={`inline-block px-2.5 py-0.5 rounded-full text-[9px] font-semibold tracking-wide uppercase border ${
+                                                row.persistence.includes('Transient') 
+                                                    ? 'text-primary bg-primary/10 border-primary/20' 
+                                                    : row.persistence.includes('Semi-Persistent')
+                                                    ? 'text-amber-400 bg-amber-950/40 border-amber-900/40'
+                                                    : 'text-red-400 bg-red-950/40 border-red-900/40'
+                                            }`}>
+                                                {row.persistence}
+                                            </span>
+                                        </td>
+                                        <td className="py-4 px-6 text-xs text-zinc-400 leading-relaxed">{row.mitigation}</td>
+                                    </tr>
+                                ))}
+                            </Table>
+                        </div>
+                    </section>
+
+                    {/* ── ERROR MESSAGING REFERENCE ── */}
+                    <section id="error-messaging-reference">
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">Error Messaging Reference</h2>
+                        <p className="text-sm text-zinc-400 leading-relaxed mb-8 max-w-3xl">
+                            The following reference tables catalog the mapping rules resolved by the <code>ErrorTranslationLayer</code> to translate raw platform signals into brand-aligned, UK English curation feedback.
+                        </p>
+
+                        <div className="mb-12">
+                            <h3 className="text-zinc-200 font-medium text-lg mb-6 uppercase tracking-wider">System & API Exception Translations</h3>
+                            <Table headers={["Scenario", "Raw Pattern / Code", "Final User Message", "Target UI Component"]}>
+                                {ERROR_MAPPING_RULES.map((rule, idx) => (
+                                    <tr key={idx} className="hover:bg-zinc-900/10 transition-colors border-b border-zinc-900/30">
+                                        <td className="py-4 px-6 text-xs font-semibold text-zinc-200">{rule.scenario}</td>
+                                        <td className="py-4 px-6 text-xs text-zinc-500 font-mono break-all">{rule.rawPattern}{rule.code ? ` (with: "${rule.code}")` : ""}</td>
+                                        <td className="py-4 px-6 text-xs text-zinc-200 italic leading-relaxed">"{rule.finalMessage}"</td>
+                                        <td className="py-4 px-6 text-xs">
+                                            <span className={`inline-block px-2.5 py-0.5 rounded-full text-[9px] font-semibold tracking-wide uppercase border ${
+                                                rule.severity === 'system'
+                                                    ? 'text-red-400 bg-red-950/40 border-red-900/40'
+                                                    : rule.severity === 'entity'
+                                                    ? 'text-amber-400 bg-amber-950/40 border-amber-900/40'
+                                                    : 'text-primary bg-primary/10 border-primary/20'
+                                            }`}>
+                                                {rule.targetComponent}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </Table>
+                        </div>
+
+                        <div className="mb-12">
+                            <h3 className="text-zinc-200 font-medium text-lg mb-6 uppercase tracking-wider">Transient Toast Notifications</h3>
+                            <Table headers={["Original Message", "Translated Curator Message", "Target Component"]}>
+                                {Object.entries(TOAST_MAPPING_RULES).map(([raw, final], idx) => (
+                                    <tr key={idx} className="hover:bg-zinc-900/10 transition-colors border-b border-zinc-900/30">
+                                        <td className="py-4 px-6 text-xs text-zinc-500 font-mono break-all">{raw}</td>
+                                        <td className="py-4 px-6 text-xs text-zinc-200 italic leading-relaxed">"{final}"</td>
+                                        <td className="py-4 px-6 text-xs">
+                                            <span className="inline-block px-2.5 py-0.5 rounded-full text-[9px] font-semibold tracking-wide uppercase border text-primary bg-primary/10 border-primary/20">
+                                                Transient Toast
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </Table>
+                        </div>
                     </section>
 
                     {/* ── ADMIN OVERRIDE ── */}
