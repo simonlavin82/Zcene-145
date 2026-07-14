@@ -1,7 +1,7 @@
 {
   "name": "functions",
   "scripts": {
-    "build": "mkdir -p src/services && cp ../services/errorTranslationLayer.ts src/services/errorTranslationLayer.ts && tsc",
+    "build": "mkdir -p src/services && cp ../services/errorTranslationLayer.ts src/services/errorTranslationLayer.ts && cp ../types.ts src/types.ts && tsc",
     "serve": "npm run build && firebase emulators:start --only functions",
     "shell": "npm run build && firebase functions:shell",
     "start": "npm run shell",

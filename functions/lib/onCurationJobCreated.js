@@ -38,6 +38,7 @@ const firestore_1 = require("firebase-functions/v2/firestore");
 const admin = __importStar(require("firebase-admin"));
 const firestore_2 = require("firebase-admin/firestore");
 const errorTranslationLayer_1 = require("./services/errorTranslationLayer");
+const curatorService_1 = require("./services/curatorService");
 // Initialize Firebase Admin SDK if not already done
 if (admin.apps.length === 0) {
     admin.initializeApp();
@@ -65,23 +66,58 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
         status: "processing",
         updatedAt: firestore_2.FieldValue.serverTimestamp()
     });
-    // Simulate a 5-second processing delay to verify client loading transitions
-    await new Promise(resolve => setTimeout(resolve, 5000));
     try {
         const { jobType, inputPayload } = jobData;
         console.log(`[Curation Backend] Executing ${jobType} for user ${jobData.userId} with payload:`, inputPayload);
-        // Skeleton implementation
         let result = null;
         if (jobType === "graph_generation") {
-            result = {
-                graphData: {
-                    nodes: [
-                        { id: "Skeleton Node", type: "artist", group: 1 }
-                    ],
-                    links: [],
-                    synthesisRationale: "Skeleton rationale. Real-time background curation running on backend."
+            // Determine if we should run in mock mode
+            const isEmulator = process.env.FUNCTIONS_EMULATOR === "true";
+            const isMissingApiKey = !process.env.GEMINI_API_KEY;
+            const forceMocks = inputPayload?.useMocks === true;
+            if (isEmulator || isMissingApiKey || forceMocks) {
+                console.log(`[Curation Backend] Mock conditions met. Emulator: ${isEmulator}, No Key: ${isMissingApiKey}, Force Mocks: ${forceMocks}. Running simulated mock.`);
+                // Keep the 5-second simulated delay for verification of loading screens
+                await new Promise(resolve => setTimeout(resolve, 5000));
+                result = {
+                    graphData: {
+                        nodes: [
+                            { id: "Skeleton Node", type: "artist", group: 1 }
+                        ],
+                        links: [],
+                        synthesisRationale: "Skeleton rationale. Real-time background curation running on backend."
+                    }
+                };
+            }
+            else {
+                console.log("[Curation Backend] Executing live Gemini AI graph synthesis...");
+                // Run backend curation synthesis
+                const finalGraph = await (0, curatorService_1.generateGraphDataBackend)(inputPayload.artists, inputPayload.filters, inputPayload.cachedSubgraphsContext, inputPayload.baseGraph);
+                // Parse seed artists list
+                const artistList = inputPayload.artists
+                    .split('::')
+                    .map((a) => a.trim())
+                    .filter(Boolean);
+                // Write-back sub-graphs to the global /artists cache collection
+                for (const seed of artistList) {
+                    const seedNorm = (0, curatorService_1.normalizeArtistId)(seed);
+                    const { nodes: subNodes, links: subLinks } = (0, curatorService_1.extractArtistSubGraph)(seed, finalGraph, artistList);
+                    await db.collection("artists").doc(seedNorm).set({
+                        cacheKey: seedNorm,
+                        artistId: seedNorm,
+                        seedArtists: seed,
+                        graphData: JSON.stringify({ nodes: subNodes, links: subLinks }),
+                        filters: inputPayload.filters || null,
+                        cacheVersion: 2,
+                        cachedAt: firestore_2.FieldValue.serverTimestamp(),
+                        hitCount: 0,
+                        isDeep: false,
+                        synthesisRationale: finalGraph.synthesisRationale || null
+                    });
+                    console.log(`[Curation Backend] Wrote global cache for seed: ${seedNorm}`);
                 }
-            };
+                result = { graphData: finalGraph };
+            }
         }
         else {
             throw new Error(`Unsupported jobType: ${jobType}`);
