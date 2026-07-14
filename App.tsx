@@ -63,6 +63,82 @@ const isArtistIdMatch = (nodeId: string, activeId: string): boolean => {
   return false;
 };
 
+const generateGraphDataViaCloudJob = async (
+  artists: string,
+  filters: DiscoveryFilters,
+  userId: string,
+  signal?: AbortSignal
+): Promise<GraphData> => {
+  const jobId = `job-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+  const jobRef = doc(db, 'curationJobs', jobId);
+
+  await setDoc(jobRef, {
+    jobId,
+    userId,
+    status: 'pending',
+    jobType: 'graph_generation',
+    inputPayload: {
+      artists,
+      filters
+    },
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  });
+
+  return new Promise((resolve, reject) => {
+    let hasAborted = false;
+    let unsubscribe: () => void = () => {};
+
+    if (signal) {
+      if (signal.aborted) {
+        reject(new DOMException("Aborted", "AbortError"));
+        return;
+      }
+      signal.addEventListener('abort', () => {
+        hasAborted = true;
+        unsubscribe();
+        updateDoc(jobRef, { status: 'cancelled' }).catch(err => {
+          console.warn("[Cloud Job] Failed to mark job as cancelled:", err);
+        });
+        reject(new DOMException("Aborted", "AbortError"));
+      });
+    }
+
+    unsubscribe = onSnapshot(jobRef, (snapshot) => {
+      if (hasAborted) {
+        unsubscribe();
+        return;
+      }
+      
+      const job = snapshot.data();
+      if (!job) {
+        unsubscribe();
+        reject(new Error("Curation job was deleted or not found."));
+        return;
+      }
+
+      console.log(`[Cloud Curation Listener] Job ${jobId} status: ${job.status}`);
+
+      if (job.status === 'completed') {
+        unsubscribe();
+        if (job.result && job.result.graphData) {
+          resolve(job.result.graphData);
+        } else {
+          reject(new Error("Job completed but did not return graphData."));
+        }
+      } else if (job.status === 'failed') {
+        unsubscribe();
+        const serverError = new Error(job.errorMessage || "Backend curation failed.");
+        (serverError as any).errorDetails = job.errorDetails;
+        reject(serverError);
+      }
+    }, (error) => {
+      unsubscribe();
+      reject(error);
+    });
+  });
+};
+
 
 
 declare global {
@@ -3266,7 +3342,14 @@ const App: React.FC = () => {
         }
 
         // Call Gemini ONLY for the missing and enrichment artists
-        const partialGraphPromise = generateGraphData(toFetch.join('::'), pruned, activeDiscoveryFilters, user?.uid, controller?.signal);
+        const useCloudCuration = import.meta.env.VITE_USE_CLOUD_CURATION === 'true' && user?.email === 'zcene.online@gmail.com';
+        let partialGraphPromise;
+        if (useCloudCuration && user?.uid) {
+          console.log("[Music Discovery] Routing partial graph generation via Cloud-Side Curation.");
+          partialGraphPromise = generateGraphDataViaCloudJob(toFetch.join('::'), activeDiscoveryFilters, user.uid, controller?.signal);
+        } else {
+          partialGraphPromise = generateGraphData(toFetch.join('::'), pruned, activeDiscoveryFilters, user?.uid, controller?.signal);
+        }
         const timeoutPromise = new Promise((_, reject) =>
           setTimeout(() => reject(new Error("The AI is taking too long to respond. The request has timed out.")), 180000)
         );
@@ -3536,7 +3619,14 @@ const App: React.FC = () => {
     });
 
 
-      const graphPromise = generateGraphData(artists, pruned, activeDiscoveryFilters, user?.uid, controller?.signal);
+      const useCloudCuration = import.meta.env.VITE_USE_CLOUD_CURATION === 'true' && user?.email === 'zcene.online@gmail.com';
+      let graphPromise;
+      if (useCloudCuration && user?.uid) {
+        console.log("[Music Discovery] Routing graph generation via Cloud-Side Curation.");
+        graphPromise = generateGraphDataViaCloudJob(artists, activeDiscoveryFilters, user.uid, controller?.signal);
+      } else {
+        graphPromise = generateGraphData(artists, pruned, activeDiscoveryFilters, user?.uid, controller?.signal);
+      }
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error("The AI is taking too long to respond. The request has timed out.")), 180000)
       );

@@ -88,5 +88,20 @@ service cloud.firestore {
         allow delete: if isOwner(userId);
       }
     }
+
+    // --- Curation Jobs ---
+    match /curationJobs/{jobId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().status == 'pending' &&
+                       incoming().createdAt == request.time;
+      allow update: if isSignedIn() &&
+                       resource.data.userId == request.auth.uid &&
+                       incoming().userId == request.auth.uid &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) &&
+                       incoming().status == 'cancelled';
+      allow delete: if isAdmin();
+    }
   }
 }

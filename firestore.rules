@@ -230,5 +230,27 @@ service cloud.firestore {
       // Only admins may delete cache entries (manual invalidation).
       allow delete: if isAdmin();
     }
+
+    // --- Curation Jobs ---
+    match /curationJobs/{jobId} {
+      // Users can only read their own curation jobs, admins can read all
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      
+      // Users can only create pending curation jobs owned by themselves
+      allow create: if isSignedIn() &&
+                       incoming().userId == request.auth.uid &&
+                       incoming().status == 'pending' &&
+                       incoming().createdAt == request.time;
+                       
+      // Users can only cancel their own pending/processing jobs
+      allow update: if isSignedIn() &&
+                       resource.data.userId == request.auth.uid &&
+                       incoming().userId == request.auth.uid &&
+                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) &&
+                       incoming().status == 'cancelled';
+                       
+      // Only admins can delete jobs
+      allow delete: if isAdmin();
+    }
   }
 }
