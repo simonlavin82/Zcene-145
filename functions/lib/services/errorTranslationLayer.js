@@ -94,6 +94,20 @@ exports.ERROR_MAPPING_RULES = [
         targetComponent: "Global Error Overlay"
     },
     {
+        scenario: "AI Response Timeout",
+        rawPattern: "taking too long to respond",
+        finalMessage: "Curation latency. The AI engine is taking longer than usual to map connections. Retrying in background...",
+        severity: "transient",
+        targetComponent: "Toast / Local Catch"
+    },
+    {
+        scenario: "AI Response Timeout",
+        rawPattern: "timed out",
+        finalMessage: "Curation latency. The AI engine has timed out. Please try again or simplify your query.",
+        severity: "system",
+        targetComponent: "Global Error Overlay"
+    },
+    {
         scenario: "Network Loss",
         rawPattern: "deadline exceeded",
         finalMessage: "Network anomaly. The host connection has timed out. Verify your internet status.",

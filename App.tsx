@@ -3376,7 +3376,7 @@ const App: React.FC = () => {
           partialGraphPromise = generateGraphData(toFetch.join('::'), pruned, activeDiscoveryFilters, user?.uid, controller?.signal);
         }
         const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("The AI is taking too long to respond. The request has timed out.")), 180000)
+          setTimeout(() => reject(new Error("The AI is taking too long to respond. The request has timed out.")), 600000)
         );
 
         const startTime = Date.now();
@@ -3674,7 +3674,7 @@ const App: React.FC = () => {
         graphPromise = generateGraphData(artists, pruned, activeDiscoveryFilters, user?.uid, controller?.signal);
       }
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("The AI is taking too long to respond. The request has timed out.")), 180000)
+        setTimeout(() => reject(new Error("The AI is taking too long to respond. The request has timed out.")), 600000)
       );
 
       const startTime = Date.now();
