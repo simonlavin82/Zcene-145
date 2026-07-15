@@ -51,7 +51,7 @@ To prevent layout computation leaks, trailing dark voids, and mobile padding cli
    engines correctly add the folder's paddings during layout resolution.
 
 3. PROJECT CARDS:
-   Must be sized rigidly at 'w-full sm:w-[320px] min-h-[160px]' with zero 
+   Must be sized rigidly at 'w-full sm:w-[320px] h-[180px]' with zero 
    elasticity ('flex-grow' and 'flex-shrink' properties are strictly banned) 
    to enforce crisp, uniform grid column tracks and snug row hugging.
 `;

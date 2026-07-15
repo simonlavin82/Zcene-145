@@ -4843,6 +4843,28 @@ const App: React.FC = () => {
     return () => unsub();
   }, [user, currentProjectId, isFirebaseReady, isGuest, projectStatus, activeJobId]);
 
+  // Re-hydration Hook: Synchronize frontend UI state with Firestore project status
+  useEffect(() => {
+    if (!user || !currentProjectId || !isFirebaseReady || isGuest) return;
+
+    if (projectStatus === 'completed') {
+      const hasGraphNodes = graphData && graphData.nodes && graphData.nodes.length > 0;
+      if (hasGraphNodes) {
+        console.log(`[Re-hydration Hook] Project completed with graph. Clearing loading state.`);
+        setIsLoading(false);
+      } else {
+        console.log(`[Re-hydration Hook] Project status is completed but local graphData state is empty. Falling back to curation loading state.`);
+        setIsLoading(true);
+      }
+    } else if (projectStatus === 'curating') {
+      console.log(`[Re-hydration Hook] Project status: curating. Ensuring loading spinner is active.`);
+      setIsLoading(true);
+    } else if (projectStatus === 'failed') {
+      console.log(`[Re-hydration Hook] Project status: failed. Clearing loading state.`);
+      setIsLoading(false);
+    }
+  }, [user, currentProjectId, isFirebaseReady, isGuest, projectStatus, graphData]);
+
 
   // Save Current Project to Firestore (Silent background task)
   useEffect(() => {

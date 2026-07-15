@@ -17,6 +17,7 @@ if (getApps().length === 0) {
 }
 
 const db = getFirestore();
+db.settings({ ignoreUndefinedProperties: true });
 
 /**
  * Sanity Check: Validate that detailsCache is a structured object matching the schema,
@@ -61,17 +62,40 @@ function validateArtistDetailsSchema(artistId: string, details: any): void {
 }
 
 /**
+ * Recursively removes any undefined properties from an object,
+ * replacing them with null or omitting them, to prevent Firestore serialization errors.
+ */
+function sanitizeUndefinedProperties(obj: any): any {
+  if (obj === null || obj === undefined) return null;
+  if (Array.isArray(obj)) {
+    return obj.map(item => sanitizeUndefinedProperties(item));
+  }
+  if (typeof obj === 'object') {
+    const clean: any = {};
+    for (const key of Object.keys(obj)) {
+      const val = obj[key];
+      if (val !== undefined) {
+        clean[key] = sanitizeUndefinedProperties(val);
+      }
+    }
+    return clean;
+  }
+  return obj;
+}
+
+/**
  * Stateful Project UX Upgrade: Update the user's project document status
  * to reflect in-progress background curation and write back completed graphData.
  */
 async function updateProjectStatus(userId: string, projectId: string, updates: any) {
   try {
     const projectRef = db.collection("users").doc(userId).collection("projects").doc(projectId);
+    const sanitizedUpdates = sanitizeUndefinedProperties(updates);
     await projectRef.update({
-      ...updates,
+      ...sanitizedUpdates,
       updatedAt: FieldValue.serverTimestamp()
     });
-    console.log(`[Curation Backend] Project ${projectId} status updated successfully:`, updates);
+    console.log(`[Curation Backend] Project ${projectId} status updated successfully:`, sanitizedUpdates);
   } catch (err: any) {
     console.error(`[Curation Backend] Failed to update project ${projectId} status:`, err.message);
   }
@@ -286,7 +310,7 @@ export const onCurationJobCreated = onDocumentCreated({
             artistId: seedNorm,
             seedArtists: seed,
             graphData: JSON.stringify({ nodes: subNodes, links: subLinks }),
-            detailsCache: seedDetails, // Save as structured object!
+            detailsCache: sanitizeUndefinedProperties(seedDetails), // Save as structured object!
             filters: inputPayload.filters || null,
             cacheVersion: 2,
             cachedAt: FieldValue.serverTimestamp(),
@@ -317,7 +341,7 @@ export const onCurationJobCreated = onDocumentCreated({
             artistId: recNorm,
             seedArtists: recArtist,
             graphData: JSON.stringify({ nodes: subNodes, links: subLinks }),
-            detailsCache: recDetails, // Save as structured object!
+            detailsCache: sanitizeUndefinedProperties(recDetails), // Save as structured object!
             filters: null,
             cacheVersion: 2,
             cachedAt: FieldValue.serverTimestamp(),
