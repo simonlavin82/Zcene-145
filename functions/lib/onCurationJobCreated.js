@@ -1,49 +1,54 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.onCurationJobCreated = void 0;
 const firestore_1 = require("firebase-functions/v2/firestore");
-const admin = __importStar(require("firebase-admin"));
+const app_1 = require("firebase-admin/app");
 const firestore_2 = require("firebase-admin/firestore");
 const errorTranslationLayer_1 = require("./services/errorTranslationLayer");
 const curatorService_1 = require("./services/curatorService");
 // Initialize Firebase Admin SDK if not already done
-if (admin.apps.length === 0) {
-    admin.initializeApp();
+if ((0, app_1.getApps)().length === 0) {
+    (0, app_1.initializeApp)();
 }
-const db = admin.firestore();
+const db = (0, firestore_2.getFirestore)();
+/**
+ * Sanity Check: Validate that detailsCache is a structured object matching the schema,
+ * and specifically reject raw strings or arrays of entries to prevent database pollution.
+ */
+function validateArtistDetailsSchema(artistId, details) {
+    if (!details) {
+        throw new Error(`[Schema Sanity Check] detailsCache is null or undefined for artist: ${artistId}`);
+    }
+    if (typeof details === "string") {
+        throw new Error(`[Schema Sanity Check] detailsCache is serialized as a raw string for artist: ${artistId}`);
+    }
+    if (Array.isArray(details)) {
+        throw new Error(`[Schema Sanity Check] detailsCache is an array instead of a structured object for artist: ${artistId}`);
+    }
+    // Verify biography/summary
+    const bio = details.summary || details.bio;
+    if (!bio || typeof bio !== 'string' || bio.trim().length < 5) {
+        throw new Error(`[Schema Sanity Check] detailsCache is missing summary for artist: ${artistId}`);
+    }
+    // Verify details object
+    if (!details.details || typeof details.details !== 'object') {
+        throw new Error(`[Schema Sanity Check] detailsCache.details is missing or invalid for artist: ${artistId}`);
+    }
+    const { genre, origin, founded } = details.details;
+    if (!genre || typeof genre !== 'string' || genre.trim().length === 0) {
+        throw new Error(`[Schema Sanity Check] detailsCache.details is missing genre for artist: ${artistId}`);
+    }
+    if (!origin || typeof origin !== 'string' || origin.trim().length === 0) {
+        throw new Error(`[Schema Sanity Check] detailsCache.details is missing origin for artist: ${artistId}`);
+    }
+    if (!founded || typeof founded !== 'string' || founded.trim().length === 0) {
+        throw new Error(`[Schema Sanity Check] detailsCache.details is missing founded year for artist: ${artistId}`);
+    }
+    // Verify discography
+    if (!details.discography || !Array.isArray(details.discography)) {
+        throw new Error(`[Schema Sanity Check] detailsCache.discography is missing or not an array for artist: ${artistId}`);
+    }
+}
 exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
     document: "curationJobs/{jobId}",
     secrets: ["GEMINI_API_KEY"]
@@ -129,13 +134,29 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                         const cacheDoc = await db.collection("artists").doc(artistNormId).get();
                         if (cacheDoc.exists) {
                             const cacheData = cacheDoc.data();
-                            if (cacheData && cacheData.isDeep && cacheData.detailsCache) {
-                                // Parse out the details for this specific artist from the cache
-                                const parsedCache = JSON.parse(cacheData.detailsCache);
-                                const match = parsedCache.find((item) => (0, curatorService_1.normalizeArtistId)(item[0]) === artistNormId);
-                                if (match && match[1] && match[1].summary && match[1].summary.length > 50) {
-                                    details = match[1];
-                                    console.log(`[Curation Backend] Direct cache hit for details of: ${artistNormId}`);
+                            if (cacheData && cacheData.detailsCache) {
+                                let cachedDetails = cacheData.detailsCache;
+                                if (typeof cachedDetails === 'string') {
+                                    try {
+                                        cachedDetails = JSON.parse(cachedDetails);
+                                    }
+                                    catch (e) { }
+                                }
+                                if (cachedDetails) {
+                                    // Un-nest array wrapper layer if legacy format [ [ "name", { ... } ] ]
+                                    if (Array.isArray(cachedDetails) && cachedDetails.length > 0) {
+                                        const match = cachedDetails.find((item) => (0, curatorService_1.normalizeArtistId)(item[0]) === artistNormId);
+                                        if (match && match[1]) {
+                                            cachedDetails = match[1];
+                                        }
+                                        else {
+                                            cachedDetails = Array.isArray(cachedDetails[0]) ? cachedDetails[0][1] : cachedDetails[0];
+                                        }
+                                    }
+                                    if (cachedDetails && cachedDetails.summary && cachedDetails.summary.length > 50) {
+                                        details = cachedDetails;
+                                        console.log(`[Curation Backend] Direct cache hit for details of: ${artistNormId}`);
+                                    }
                                 }
                             }
                         }
@@ -196,12 +217,16 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                 for (const seed of artistList) {
                     const seedNorm = (0, curatorService_1.normalizeArtistId)(seed);
                     const { nodes: subNodes, links: subLinks } = (0, curatorService_1.extractArtistSubGraph)(seed, finalGraph, artistList);
+                    const seedDetailsEntry = detailsCacheEntries.find(entry => (0, curatorService_1.normalizeArtistId)(entry[0]) === seedNorm);
+                    const seedDetails = seedDetailsEntry ? seedDetailsEntry[1] : null;
+                    // Run Sanity Check
+                    validateArtistDetailsSchema(seedNorm, seedDetails);
                     await db.collection("artists").doc(seedNorm).set({
                         cacheKey: seedNorm,
                         artistId: seedNorm,
                         seedArtists: seed,
                         graphData: JSON.stringify({ nodes: subNodes, links: subLinks }),
-                        detailsCache: JSON.stringify(detailsCacheEntries),
+                        detailsCache: seedDetails, // Save as structured object!
                         filters: inputPayload.filters || null,
                         cacheVersion: 2,
                         cachedAt: firestore_2.FieldValue.serverTimestamp(),
@@ -218,12 +243,16 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                         continue; // Already seeds
                     const recNorm = (0, curatorService_1.normalizeArtistId)(recArtist);
                     const { nodes: subNodes, links: subLinks } = (0, curatorService_1.extractArtistSubGraph)(recArtist, finalGraph, artistList);
+                    const recDetailsEntry = detailsCacheEntries.find(entry => (0, curatorService_1.normalizeArtistId)(entry[0]) === recNorm);
+                    const recDetails = recDetailsEntry ? recDetailsEntry[1] : null;
+                    // Run Sanity Check
+                    validateArtistDetailsSchema(recNorm, recDetails);
                     await db.collection("artists").doc(recNorm).set({
                         cacheKey: recNorm,
                         artistId: recNorm,
                         seedArtists: recArtist,
                         graphData: JSON.stringify({ nodes: subNodes, links: subLinks }),
-                        detailsCache: JSON.stringify(detailsCacheEntries),
+                        detailsCache: recDetails, // Save as structured object!
                         filters: null,
                         cacheVersion: 2,
                         cachedAt: firestore_2.FieldValue.serverTimestamp(),

@@ -1,6 +1,6 @@
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
-import * as admin from "firebase-admin";
-import { FieldValue } from "firebase-admin/firestore";
+import { getApps, initializeApp } from "firebase-admin/app";
+import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { translateError } from "./services/errorTranslationLayer";
 import {
   generateGraphDataBackend,
@@ -12,11 +12,53 @@ import {
 } from "./services/curatorService";
 
 // Initialize Firebase Admin SDK if not already done
-if (admin.apps.length === 0) {
-  admin.initializeApp();
+if (getApps().length === 0) {
+  initializeApp();
 }
 
-const db = admin.firestore();
+const db = getFirestore();
+
+/**
+ * Sanity Check: Validate that detailsCache is a structured object matching the schema,
+ * and specifically reject raw strings or arrays of entries to prevent database pollution.
+ */
+function validateArtistDetailsSchema(artistId: string, details: any): void {
+  if (!details) {
+    throw new Error(`[Schema Sanity Check] detailsCache is null or undefined for artist: ${artistId}`);
+  }
+  if (typeof details === "string") {
+    throw new Error(`[Schema Sanity Check] detailsCache is serialized as a raw string for artist: ${artistId}`);
+  }
+  if (Array.isArray(details)) {
+    throw new Error(`[Schema Sanity Check] detailsCache is an array instead of a structured object for artist: ${artistId}`);
+  }
+
+  // Verify biography/summary
+  const bio = details.summary || details.bio;
+  if (!bio || typeof bio !== 'string' || bio.trim().length < 5) {
+    throw new Error(`[Schema Sanity Check] detailsCache is missing summary for artist: ${artistId}`);
+  }
+
+  // Verify details object
+  if (!details.details || typeof details.details !== 'object') {
+    throw new Error(`[Schema Sanity Check] detailsCache.details is missing or invalid for artist: ${artistId}`);
+  }
+  const { genre, origin, founded } = details.details;
+  if (!genre || typeof genre !== 'string' || genre.trim().length === 0) {
+    throw new Error(`[Schema Sanity Check] detailsCache.details is missing genre for artist: ${artistId}`);
+  }
+  if (!origin || typeof origin !== 'string' || origin.trim().length === 0) {
+    throw new Error(`[Schema Sanity Check] detailsCache.details is missing origin for artist: ${artistId}`);
+  }
+  if (!founded || typeof founded !== 'string' || founded.trim().length === 0) {
+    throw new Error(`[Schema Sanity Check] detailsCache.details is missing founded year for artist: ${artistId}`);
+  }
+
+  // Verify discography
+  if (!details.discography || !Array.isArray(details.discography)) {
+    throw new Error(`[Schema Sanity Check] detailsCache.discography is missing or not an array for artist: ${artistId}`);
+  }
+}
 
 export const onCurationJobCreated = onDocumentCreated({
   document: "curationJobs/{jobId}",
@@ -124,13 +166,29 @@ export const onCurationJobCreated = onDocumentCreated({
             const cacheDoc = await db.collection("artists").doc(artistNormId).get();
             if (cacheDoc.exists) {
               const cacheData = cacheDoc.data();
-              if (cacheData && cacheData.isDeep && cacheData.detailsCache) {
-                // Parse out the details for this specific artist from the cache
-                const parsedCache = JSON.parse(cacheData.detailsCache);
-                const match = parsedCache.find((item: any) => normalizeArtistId(item[0]) === artistNormId);
-                if (match && match[1] && match[1].summary && match[1].summary.length > 50) {
-                  details = match[1];
-                  console.log(`[Curation Backend] Direct cache hit for details of: ${artistNormId}`);
+              if (cacheData && cacheData.detailsCache) {
+                let cachedDetails = cacheData.detailsCache;
+                if (typeof cachedDetails === 'string') {
+                  try {
+                    cachedDetails = JSON.parse(cachedDetails);
+                  } catch (e) {}
+                }
+                
+                if (cachedDetails) {
+                  // Un-nest array wrapper layer if legacy format [ [ "name", { ... } ] ]
+                  if (Array.isArray(cachedDetails) && cachedDetails.length > 0) {
+                    const match = cachedDetails.find((item: any) => normalizeArtistId(item[0]) === artistNormId);
+                    if (match && match[1]) {
+                      cachedDetails = match[1];
+                    } else {
+                      cachedDetails = Array.isArray(cachedDetails[0]) ? cachedDetails[0][1] : cachedDetails[0];
+                    }
+                  }
+                  
+                  if (cachedDetails && cachedDetails.summary && cachedDetails.summary.length > 50) {
+                    details = cachedDetails;
+                    console.log(`[Curation Backend] Direct cache hit for details of: ${artistNormId}`);
+                  }
                 }
               }
             }
@@ -196,12 +254,18 @@ export const onCurationJobCreated = onDocumentCreated({
           const seedNorm = normalizeArtistId(seed);
           const { nodes: subNodes, links: subLinks } = extractArtistSubGraph(seed, finalGraph, artistList);
           
+          const seedDetailsEntry = detailsCacheEntries.find(entry => normalizeArtistId(entry[0]) === seedNorm);
+          const seedDetails = seedDetailsEntry ? seedDetailsEntry[1] : null;
+
+          // Run Sanity Check
+          validateArtistDetailsSchema(seedNorm, seedDetails);
+
           await db.collection("artists").doc(seedNorm).set({
             cacheKey: seedNorm,
             artistId: seedNorm,
             seedArtists: seed,
             graphData: JSON.stringify({ nodes: subNodes, links: subLinks }),
-            detailsCache: JSON.stringify(detailsCacheEntries),
+            detailsCache: seedDetails, // Save as structured object!
             filters: inputPayload.filters || null,
             cacheVersion: 2,
             cachedAt: FieldValue.serverTimestamp(),
@@ -221,12 +285,18 @@ export const onCurationJobCreated = onDocumentCreated({
           const recNorm = normalizeArtistId(recArtist);
           const { nodes: subNodes, links: subLinks } = extractArtistSubGraph(recArtist, finalGraph, artistList);
           
+          const recDetailsEntry = detailsCacheEntries.find(entry => normalizeArtistId(entry[0]) === recNorm);
+          const recDetails = recDetailsEntry ? recDetailsEntry[1] : null;
+
+          // Run Sanity Check
+          validateArtistDetailsSchema(recNorm, recDetails);
+
           await db.collection("artists").doc(recNorm).set({
             cacheKey: recNorm,
             artistId: recNorm,
             seedArtists: recArtist,
             graphData: JSON.stringify({ nodes: subNodes, links: subLinks }),
-            detailsCache: JSON.stringify(detailsCacheEntries),
+            detailsCache: recDetails, // Save as structured object!
             filters: null,
             cacheVersion: 2,
             cachedAt: FieldValue.serverTimestamp(),
