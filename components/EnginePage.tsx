@@ -77,6 +77,12 @@ real-time intelligence and global scalability.
      to an event-driven queue. Upon a new document in 'curationJobs', a gen2 
      Cloud Function manages the heavy lifting of calling Gemini, scraping YouTube 
      playability, and formatting metadata, fully offloading the client browser.
+   - Stateful Project Orchestration: When a curation job begins, the frontend 
+     immediately saves the project status as 'curating', recording seedArtists 
+     and activeJobId. Even if the browser tab is closed, the background Cloud 
+     Function writes the completed graphData and artistIds directly to the 
+     project document upon completion, allowing seamless session restoration 
+     on page reload.
    - Global Deployment: Serves at sub-second speeds by leveraging 
      Google's global edge network.
 

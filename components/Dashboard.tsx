@@ -431,7 +431,11 @@ const Dashboard: React.FC<DashboardProps> = ({
                               <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
                                 SEED: {seedList.length}
                               </span>
-                              {project.graphData && (
+                              {(project.status === 'curating' || (!project.graphData && project.seedArtists)) ? (
+                                <span className="text-[9px] uppercase tracking-wider text-amber-500/80 font-bold px-1.5 py-0.5 bg-amber-500/10 rounded-md border border-amber-500/10 whitespace-nowrap animate-pulse">
+                                  Mapping...
+                                </span>
+                              ) : project.graphData ? (
                                 <>
                                   <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
                                     AI ARTISTS: {recommendedCount}
@@ -443,7 +447,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                     Mapped
                                   </span>
                                 </>
-                              )}
+                              ) : null}
                             </div>
                           </div>
                         </motion.div>

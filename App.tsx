@@ -68,19 +68,22 @@ const generateGraphDataViaCloudJob = async (
   filters: DiscoveryFilters,
   userId: string,
   signal?: AbortSignal,
-  onDetailsCacheReceived?: (detailsCacheJson: string) => void
+  onDetailsCacheReceived?: (detailsCacheJson: string) => void,
+  projectId?: string,
+  jobId?: string
 ): Promise<GraphData> => {
-  const jobId = `job-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-  const jobRef = doc(db, 'curationJobs', jobId);
+  const finalJobId = jobId || `job-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+  const jobRef = doc(db, 'curationJobs', finalJobId);
 
   await setDoc(jobRef, {
-    jobId,
+    jobId: finalJobId,
     userId,
     status: 'pending',
     jobType: 'graph_generation',
     inputPayload: {
       artists,
-      filters
+      filters,
+      projectId
     },
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
@@ -118,7 +121,7 @@ const generateGraphDataViaCloudJob = async (
         return;
       }
 
-      console.log(`[Cloud Curation Listener] Job ${jobId} status: ${job.status}`);
+      console.log(`[Cloud Curation Listener] Job ${finalJobId} status: ${job.status}`);
 
       if (job.status === 'completed') {
         unsubscribe();
@@ -986,6 +989,8 @@ const App: React.FC = () => {
   const currentProjectIdRef = useRef<string | null>(null);
   const [currentProjectOwnerId, setCurrentProjectOwnerId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string>('');
+  const [projectStatus, setProjectStatus] = useState<string | null>(null);
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [previousWorkspace, setPreviousWorkspace] = useState<{ view: View; projectId: string | null } | null>(null);
   useEffect(() => { currentViewRef.current = currentView; }, [currentView]);
   useEffect(() => { currentProjectIdRef.current = currentProjectId; }, [currentProjectId]);
@@ -3648,6 +3653,31 @@ const App: React.FC = () => {
       let graphPromise;
       if (useCloudCuration && user?.uid) {
         console.log("[Music Discovery] Routing graph generation via Cloud-Side Curation.");
+        const jobId = `job-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+
+        // Stateful Project UX: Update project document immediately before running job
+        if (currentProjectId && !isGuest) {
+          const projectPath = `users/${user.uid}/projects/${currentProjectId}`;
+          const firstArtist = artists.split('::')[0];
+          try {
+            await updateDoc(doc(db, projectPath), {
+              status: 'curating',
+              activeJobId: jobId,
+              seedArtists: artists,
+              name: projectName || firstArtist,
+              updatedAt: serverTimestamp()
+            });
+          } catch (e) {
+            await setDoc(doc(db, projectPath), {
+              status: 'curating',
+              activeJobId: jobId,
+              seedArtists: artists,
+              name: projectName || firstArtist,
+              updatedAt: serverTimestamp()
+            }, { merge: true });
+          }
+        }
+
         graphPromise = generateGraphDataViaCloudJob(
           artists,
           activeDiscoveryFilters,
@@ -3668,7 +3698,9 @@ const App: React.FC = () => {
             } catch (e) {
               console.warn("Failed to parse detailsCache from cloud job:", e);
             }
-          }
+          },
+          currentProjectId || undefined,
+          jobId
         );
       } else {
         graphPromise = generateGraphData(artists, pruned, activeDiscoveryFilters, user?.uid, controller?.signal);
@@ -4349,6 +4381,8 @@ const App: React.FC = () => {
         incomingGraphEmpty = false;
       } else if (data.cacheKey) {
         incomingGraphEmpty = false;
+      } else if (data.status === 'curating') {
+        incomingGraphEmpty = false;
       }
 
       if (localGraphPopulated && incomingGraphEmpty) {
@@ -4358,6 +4392,11 @@ const App: React.FC = () => {
       }
       setCurrentProjectOwnerId(data.authorId || null);
       if (data.name !== undefined) setProjectName(data.name);
+      setProjectStatus(data.status || null);
+      setActiveJobId(data.activeJobId || null);
+      if (data.status === 'curating') {
+        setIsLoading(true);
+      }
 
       // Always restore non-graph metadata (available in both new and legacy formats)
       if (data.seedArtists) setSeedArtists((prev: any) => prev === data.seedArtists ? prev : data.seedArtists);
@@ -4773,6 +4812,36 @@ const App: React.FC = () => {
       unsubscribeList.forEach(u => u());
     };
   }, [user, isAuthInitialized, isFirebaseReady, currentProjectId]);
+
+  // Reconnect to active background curation job if page refreshed during curation
+  useEffect(() => {
+    if (!user || !currentProjectId || !isFirebaseReady || isGuest) return;
+    if (projectStatus !== 'curating' || !activeJobId) return;
+
+    console.log(`[Curation Reconnect] Listening to active background job: ${activeJobId}`);
+    setIsLoading(true);
+
+    const jobRef = doc(db, 'curationJobs', activeJobId);
+    const unsub = onSnapshot(jobRef, async (snap) => {
+      const job = snap.data();
+      if (!job) return;
+
+      console.log(`[Curation Reconnect] Job ${activeJobId} status updated: ${job.status}`);
+
+      if (job.status === 'completed') {
+        setIsLoading(false);
+        console.log(`[Curation Reconnect] Job completed. Handled by backend project update.`);
+      } else if (job.status === 'failed') {
+        setIsLoading(false);
+        setError(job.errorMessage || "Backend curation failed.");
+        showToast(`Curation failed: ${job.errorMessage || "System anomaly"}`);
+      }
+    }, (err) => {
+      console.error(`[Curation Reconnect] Failed listening to job ${activeJobId}:`, err);
+    });
+
+    return () => unsub();
+  }, [user, currentProjectId, isFirebaseReady, isGuest, projectStatus, activeJobId]);
 
 
   // Save Current Project to Firestore (Silent background task)

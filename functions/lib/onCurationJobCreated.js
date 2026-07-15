@@ -49,6 +49,23 @@ function validateArtistDetailsSchema(artistId, details) {
         throw new Error(`[Schema Sanity Check] detailsCache.discography is missing or not an array for artist: ${artistId}`);
     }
 }
+/**
+ * Stateful Project UX Upgrade: Update the user's project document status
+ * to reflect in-progress background curation and write back completed graphData.
+ */
+async function updateProjectStatus(userId, projectId, updates) {
+    try {
+        const projectRef = db.collection("users").doc(userId).collection("projects").doc(projectId);
+        await projectRef.update({
+            ...updates,
+            updatedAt: firestore_2.FieldValue.serverTimestamp()
+        });
+        console.log(`[Curation Backend] Project ${projectId} status updated successfully:`, updates);
+    }
+    catch (err) {
+        console.error(`[Curation Backend] Failed to update project ${projectId} status:`, err.message);
+    }
+}
 exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
     document: "curationJobs/{jobId}",
     secrets: ["GEMINI_API_KEY"]
@@ -71,8 +88,11 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
         status: "processing",
         updatedAt: firestore_2.FieldValue.serverTimestamp()
     });
+    const { jobType, inputPayload } = jobData;
+    if (inputPayload?.projectId && jobData.userId) {
+        await updateProjectStatus(jobData.userId, inputPayload.projectId, { status: "curating" });
+    }
     try {
-        const { jobType, inputPayload } = jobData;
         console.log(`[Curation Backend] Executing ${jobType} for user ${jobData.userId} with payload:`, inputPayload);
         let result = null;
         if (jobType === "graph_generation") {
@@ -279,6 +299,18 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
             completedAt: firestore_2.FieldValue.serverTimestamp()
         });
         console.log(`[Curation Backend] Successfully completed job ${jobId}`);
+        if (inputPayload?.projectId && jobData.userId && result?.graphData) {
+            const graphObj = typeof result.graphData === 'string' ? JSON.parse(result.graphData) : result.graphData;
+            const artistIds = graphObj.nodes
+                ? graphObj.nodes.filter((n) => n.type === 'artist').map((n) => (0, curatorService_1.normalizeArtistId)(n.id))
+                : [];
+            await updateProjectStatus(jobData.userId, inputPayload.projectId, {
+                status: "completed",
+                graphData: JSON.stringify(result.graphData),
+                artistIds: artistIds,
+                activeJobId: null
+            });
+        }
     }
     catch (error) {
         console.error(`[Curation Backend] Failed processing job ${jobId}:`, error);
@@ -295,6 +327,13 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
             updatedAt: firestore_2.FieldValue.serverTimestamp(),
             completedAt: firestore_2.FieldValue.serverTimestamp()
         });
+        if (jobData?.inputPayload?.projectId && jobData?.userId) {
+            await updateProjectStatus(jobData.userId, jobData.inputPayload.projectId, {
+                status: "failed",
+                errorMessage: translatedError.userFriendlyMessage,
+                activeJobId: null
+            });
+        }
     }
 });
 //# sourceMappingURL=onCurationJobCreated.js.map

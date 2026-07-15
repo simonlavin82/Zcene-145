@@ -144,6 +144,8 @@ export interface Project {
   lastViewedStackCount?: number;
   isMagazineViewOpen?: boolean;
   authorId?: string;
+  status?: string;
+  activeJobId?: string | null;
   createdAt?: any;
   updatedAt?: any;
 }

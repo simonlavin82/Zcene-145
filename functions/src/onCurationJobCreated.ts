@@ -60,6 +60,23 @@ function validateArtistDetailsSchema(artistId: string, details: any): void {
   }
 }
 
+/**
+ * Stateful Project UX Upgrade: Update the user's project document status
+ * to reflect in-progress background curation and write back completed graphData.
+ */
+async function updateProjectStatus(userId: string, projectId: string, updates: any) {
+  try {
+    const projectRef = db.collection("users").doc(userId).collection("projects").doc(projectId);
+    await projectRef.update({
+      ...updates,
+      updatedAt: FieldValue.serverTimestamp()
+    });
+    console.log(`[Curation Backend] Project ${projectId} status updated successfully:`, updates);
+  } catch (err: any) {
+    console.error(`[Curation Backend] Failed to update project ${projectId} status:`, err.message);
+  }
+}
+
 export const onCurationJobCreated = onDocumentCreated({
   document: "curationJobs/{jobId}",
   secrets: ["GEMINI_API_KEY"]
@@ -86,8 +103,12 @@ export const onCurationJobCreated = onDocumentCreated({
     updatedAt: FieldValue.serverTimestamp()
   });
 
+  const { jobType, inputPayload } = jobData;
+  if (inputPayload?.projectId && jobData.userId) {
+    await updateProjectStatus(jobData.userId, inputPayload.projectId, { status: "curating" });
+  }
+
   try {
-    const { jobType, inputPayload } = jobData;
     console.log(`[Curation Backend] Executing ${jobType} for user ${jobData.userId} with payload:`, inputPayload);
 
     let result: any = null;
@@ -326,6 +347,20 @@ export const onCurationJobCreated = onDocumentCreated({
     });
     console.log(`[Curation Backend] Successfully completed job ${jobId}`);
 
+    if (inputPayload?.projectId && jobData.userId && result?.graphData) {
+      const graphObj = typeof result.graphData === 'string' ? JSON.parse(result.graphData) : result.graphData;
+      const artistIds = graphObj.nodes
+        ? graphObj.nodes.filter((n: any) => n.type === 'artist').map((n: any) => normalizeArtistId(n.id))
+        : [];
+
+      await updateProjectStatus(jobData.userId, inputPayload.projectId, {
+        status: "completed",
+        graphData: JSON.stringify(result.graphData),
+        artistIds: artistIds,
+        activeJobId: null
+      });
+    }
+
   } catch (error: any) {
     console.error(`[Curation Backend] Failed processing job ${jobId}:`, error);
     
@@ -343,5 +378,13 @@ export const onCurationJobCreated = onDocumentCreated({
       updatedAt: FieldValue.serverTimestamp(),
       completedAt: FieldValue.serverTimestamp()
     });
+
+    if (jobData?.inputPayload?.projectId && jobData?.userId) {
+      await updateProjectStatus(jobData.userId, jobData.inputPayload.projectId, {
+        status: "failed",
+        errorMessage: translatedError.userFriendlyMessage,
+        activeJobId: null
+      });
+    }
   }
 });
