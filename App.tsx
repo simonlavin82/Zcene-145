@@ -39,7 +39,7 @@ const checkVideoPlayabilityOnServer = async (videoId: string): Promise<boolean> 
 
 const checkIsProfileStaleOrCorrupt = (details: any): boolean => {
   if (!details) return false;
-  if (details._isSentinel) return false;
+  if (details._isSentinel) return true;
 
   // Refined Priority-Based Self-Healing:
   // ONLY biography/summary gaps (empty, placeholders, corrupted formatting, or < 100 chars) trigger auto-healing.
@@ -1907,7 +1907,7 @@ const App: React.FC = () => {
     // Treat existing cache entries (even if incomplete or containing placeholders) as authoritative on normal click.
     // We only trigger re-synthesis when the user explicitly clicks "Heal Cache" (which runs handleRefreshNode).
     const isStaleDetails = cachedDetails?.synthesisRationale ? !validateRootsBreakdown(cachedDetails.synthesisRationale) : false;
-    if (cachedDetails && cachedDetails.summary && cachedDetails.summary.length >= 5 && !isStaleDetails) {
+    if (cachedDetails && cachedDetails.summary && cachedDetails.summary.length >= 5 && !isStaleDetails && !cachedDetails._isSentinel) {
        const hydratedNode = {
           ...node,
           bio: cachedDetails.summary,
@@ -2684,7 +2684,7 @@ const App: React.FC = () => {
                 isHydratingSessionRef.current = false;
               }
               if (!isQualified) {
-                showToast('⚠️ Cache Incomplete');
+                console.log('[Front Gate Cache] Cache doc found but not fully qualified. Background revalidation queued.');
               } else {
                 showToast('⚡ Loaded from cache');
               }
@@ -3034,7 +3034,7 @@ const App: React.FC = () => {
           
           const allQualified = Array.from(cached.values()).every(e => validateCacheEntry(e, artistList.length === 1).isFullyQualified);
           if (!allQualified) {
-            showToast('⚠️ Cache Incomplete');
+            console.log('[Front Gate Cache] Some artists not fully qualified. Background revalidation queued.');
           } else {
             showToast('⚡ Loaded from cache');
           }
@@ -3290,7 +3290,7 @@ const App: React.FC = () => {
         
         const allQualified = Array.from(cached.values()).every(e => validateCacheEntry(e, artistList.length === 1).isFullyQualified);
         if (!allQualified) {
-          showToast('⚠️ Cache Incomplete');
+          console.log('[Front Gate Cache] Some artists not fully qualified. Background revalidation queued.');
         } else {
           showToast('⚡ Loaded from cache');
         }
@@ -4699,7 +4699,7 @@ const App: React.FC = () => {
             }
           }
           if (hasIncomplete) {
-            showToast('⚠️ Cache Incomplete');
+            console.log('[ProjectLoader] Cache incomplete for some seed nodes. Background revalidation queued.');
           } else {
             showToast('⚡ Loaded from cache');
           }
@@ -4852,6 +4852,19 @@ const App: React.FC = () => {
       if (hasGraphNodes) {
         console.log(`[Re-hydration Hook] Project completed with graph. Clearing loading state.`);
         setIsLoading(false);
+
+        // Auto-hydrate the Deep Cut panel on load if nothing is selected
+        if (!selectedNode) {
+          const seeds = (seedArtists || '').split('::').map(s => s.trim().toLowerCase());
+          const firstSeedNode = graphData.nodes.find(n => 
+            n.type === 'artist' && seeds.includes(n.id.toLowerCase())
+          );
+          const defaultNode = firstSeedNode || graphData.nodes.find(n => n.type === 'artist');
+          if (defaultNode) {
+            console.log(`[Re-hydration Hook] Auto-selecting seed node for hydration:`, defaultNode.id);
+            handleNodeClick(defaultNode);
+          }
+        }
       } else {
         console.log(`[Re-hydration Hook] Project status is completed but local graphData state is empty. Falling back to curation loading state.`);
         setIsLoading(true);
@@ -4863,7 +4876,7 @@ const App: React.FC = () => {
       console.log(`[Re-hydration Hook] Project status: failed. Clearing loading state.`);
       setIsLoading(false);
     }
-  }, [user, currentProjectId, isFirebaseReady, isGuest, projectStatus, graphData]);
+  }, [user, currentProjectId, isFirebaseReady, isGuest, projectStatus, graphData, selectedNode, seedArtists, handleNodeClick]);
 
 
   // Save Current Project to Firestore (Silent background task)
@@ -5010,11 +5023,27 @@ const App: React.FC = () => {
               if (currentProjectIdRef.current !== projectId) {
                 isProjectLoadingRef.current = true;
                 setGraphData({ nodes: [], links: [] });
-                setSeedArtists('');
                 setActiveNodeIds([]);
                 setDetailsCache(new Map());
                 setChatHistories(new Map());
                 setCurrentCacheKey(null);
+                
+                const localProj = projects.find(p => p.id === projectId);
+                if (localProj) {
+                  console.log(`[Router] Pre-populating context for project ${projectId} from dashboard data:`, localProj.seedArtists);
+                  setSeedArtists(localProj.seedArtists || localProj.name || '');
+                  setProjectName(localProj.name || '');
+                  setProjectStatus(localProj.status || null);
+                  setActiveJobId(localProj.activeJobId || null);
+                  if (localProj.status === 'curating') {
+                    setIsLoading(true);
+                  }
+                } else {
+                  setSeedArtists('');
+                  setProjectName('');
+                  setProjectStatus(null);
+                  setActiveJobId(null);
+                }
               }
               setCurrentProjectId(projectId);
               setCurrentView(View.Graph);
@@ -5141,7 +5170,7 @@ const App: React.FC = () => {
       window.removeEventListener('popstate', processDeepLink);
       window.removeEventListener('hashchange', processDeepLink);
     };
-  }, [handleGenerateGraph, seedArtists, isLoading, graphData, handleNodeClick, isAuthInitialized, user, isFirebaseReady, showToast, isAdmin, navigate]);
+  }, [handleGenerateGraph, seedArtists, isLoading, graphData, handleNodeClick, isAuthInitialized, user, isFirebaseReady, showToast, isAdmin, navigate, projects]);
 
   const handleCloseNode = useCallback((nodeId: string) => {
     setActiveNodeIds(prev => {
