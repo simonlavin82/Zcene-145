@@ -5309,7 +5309,7 @@ const App: React.FC = () => {
       if (discoveredArtistNames.length > 0) {
         showToast("Saving new artists to global cache...");
         try {
-          await writeArtistCacheMany(discoveredArtistNames, mergedGraph, user?.uid, discoveryFilters);
+          await writeArtistCacheMany(discoveredArtistNames, mergedGraph, user?.uid, discoveryFilters, true);
           console.log(`[Node Extension] Global cache double-write confirmed for: ${discoveredArtistNames.join(', ')}`);
         } catch (e) {
           console.error('[Node Extension] Global cache double-write failed:', e);

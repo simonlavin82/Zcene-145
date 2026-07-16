@@ -193,6 +193,12 @@ the entire dataset, the app evolves existing visual structures.
      preventing the header from briefly clearing or flickering.
    - Auto-Hydration: The Deep Cut details panel automatically hydrates upon loading a completed project 
      by auto-selecting the first seed artist node and triggering the local details loader.
+   - Hydration Spinner Safeguard: To prevent race conditions where the Deep Cut panel momentarily flickers 
+     to the "Create Your Zcene" onboarding state before details are loaded, the panel renders the LoadingSpinner 
+     if seed artists are present in the project context.
+   - Canonical Graph Caching: Global shared artist cache documents (/artists/{id}) store the complete, 
+     canonical compiled graph returned by the model rather than pruned sub-graph snippets. This guarantees 
+     that both single-seed and multi-seed projects consistently reference the full master network.
    - Sentinel Resolution: Cache entries marked as sentinel slots (_isSentinel: true) are flagged as corrupt; 
      clicking a sentinel node bypasses the early-return cache checks and triggers JIT re-evaluation.
    - Silent Re-validation: Metadata re-validation checks operate fully in the background. 

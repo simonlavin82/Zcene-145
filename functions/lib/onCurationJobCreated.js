@@ -260,7 +260,6 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                 // Write-back cache entries for the seed artists (deep cache: isDeep: true)
                 for (const seed of artistList) {
                     const seedNorm = (0, curatorService_1.normalizeArtistId)(seed);
-                    const { nodes: subNodes, links: subLinks } = (0, curatorService_1.extractArtistSubGraph)(seed, finalGraph, artistList);
                     const seedDetailsEntry = detailsCacheEntries.find(entry => (0, curatorService_1.normalizeArtistId)(entry[0]) === seedNorm);
                     const seedDetails = seedDetailsEntry ? seedDetailsEntry[1] : null;
                     // Run Sanity Check
@@ -269,7 +268,7 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                         cacheKey: seedNorm,
                         artistId: seedNorm,
                         seedArtists: seed,
-                        graphData: JSON.stringify({ nodes: subNodes, links: subLinks }),
+                        graphData: JSON.stringify(finalGraph),
                         detailsCache: sanitizeUndefinedProperties(seedDetails), // Save as structured object!
                         filters: inputPayload.filters || null,
                         cacheVersion: 2,
@@ -286,7 +285,6 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                     if (seedNorms.has((0, curatorService_1.normalizeArtistId)(recArtist)))
                         continue; // Already seeds
                     const recNorm = (0, curatorService_1.normalizeArtistId)(recArtist);
-                    const { nodes: subNodes, links: subLinks } = (0, curatorService_1.extractArtistSubGraph)(recArtist, finalGraph, artistList);
                     const recDetailsEntry = detailsCacheEntries.find(entry => (0, curatorService_1.normalizeArtistId)(entry[0]) === recNorm);
                     const recDetails = recDetailsEntry ? recDetailsEntry[1] : null;
                     // Run Sanity Check
@@ -295,7 +293,7 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                         cacheKey: recNorm,
                         artistId: recNorm,
                         seedArtists: recArtist,
-                        graphData: JSON.stringify({ nodes: subNodes, links: subLinks }),
+                        graphData: JSON.stringify(finalGraph),
                         detailsCache: sanitizeUndefinedProperties(recDetails), // Save as structured object!
                         filters: null,
                         cacheVersion: 2,

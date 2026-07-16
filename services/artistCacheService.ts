@@ -424,7 +424,7 @@ export const writeArtistCacheMany = async (
   fullGraph: GraphData,
   activeUserId?: string | null,
   filters?: any,
-  preserveFullGraph?: boolean,
+  preserveFullGraph: boolean = true,
   forceOverwrite?: boolean,
   detailsMap?: Map<string, NodeDetails>
 ): Promise<void> => {

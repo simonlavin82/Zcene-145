@@ -5,7 +5,6 @@ import { translateError } from "./services/errorTranslationLayer";
 import {
   generateGraphDataBackend,
   normalizeArtistId,
-  extractArtistSubGraph,
   fetchNodeDetailsBackend,
   scrapeVideoIdBackend,
   checkVideoPlayability
@@ -297,7 +296,6 @@ export const onCurationJobCreated = onDocumentCreated({
         // Write-back cache entries for the seed artists (deep cache: isDeep: true)
         for (const seed of artistList) {
           const seedNorm = normalizeArtistId(seed);
-          const { nodes: subNodes, links: subLinks } = extractArtistSubGraph(seed, finalGraph, artistList);
           
           const seedDetailsEntry = detailsCacheEntries.find(entry => normalizeArtistId(entry[0]) === seedNorm);
           const seedDetails = seedDetailsEntry ? seedDetailsEntry[1] : null;
@@ -309,7 +307,7 @@ export const onCurationJobCreated = onDocumentCreated({
             cacheKey: seedNorm,
             artistId: seedNorm,
             seedArtists: seed,
-            graphData: JSON.stringify({ nodes: subNodes, links: subLinks }),
+            graphData: JSON.stringify(finalGraph),
             detailsCache: sanitizeUndefinedProperties(seedDetails), // Save as structured object!
             filters: inputPayload.filters || null,
             cacheVersion: 2,
@@ -328,7 +326,6 @@ export const onCurationJobCreated = onDocumentCreated({
           if (seedNorms.has(normalizeArtistId(recArtist))) continue; // Already seeds
           
           const recNorm = normalizeArtistId(recArtist);
-          const { nodes: subNodes, links: subLinks } = extractArtistSubGraph(recArtist, finalGraph, artistList);
           
           const recDetailsEntry = detailsCacheEntries.find(entry => normalizeArtistId(entry[0]) === recNorm);
           const recDetails = recDetailsEntry ? recDetailsEntry[1] : null;
@@ -340,7 +337,7 @@ export const onCurationJobCreated = onDocumentCreated({
             cacheKey: recNorm,
             artistId: recNorm,
             seedArtists: recArtist,
-            graphData: JSON.stringify({ nodes: subNodes, links: subLinks }),
+            graphData: JSON.stringify(finalGraph),
             detailsCache: sanitizeUndefinedProperties(recDetails), // Save as structured object!
             filters: null,
             cacheVersion: 2,

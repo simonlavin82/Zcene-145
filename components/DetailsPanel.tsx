@@ -1591,7 +1591,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                         >
                             {filteredAndSortedNodes.length === 0 || systemError ? (
                                 <div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none">
-                                    {(isReconciliationPending && !systemError) ? (
+                                    {(isReconciliationPending || (seedArtists && seedArtists.length > 0)) && !systemError ? (
                                         <div className="flex flex-col items-center justify-center gap-6">
                                             {isGlobalLoading ? (
                                                 <LoadingSpinner 
