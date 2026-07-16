@@ -184,6 +184,20 @@ the entire dataset, the app evolves existing visual structures.
      collapses the left 'ARTISTS' sidebar to yield horizontal space to the canvas.
    - Mobile Dynamic Landing Routing: Initializes the mobile viewport directly on the 
      'SPIDERWEB' canvas tab if the loaded project contains seed artists.
+
+7. UNIFIED PROJECT CONTEXT & STATE-SYNCHRONIZATION (App.tsx / GraphPage.tsx):
+   Zcene enforces a single, unified project state that orchestrates project identity 
+   and curation status to eliminate loading jitter and flickering.
+   - Synchronous Pre-population: Project identity (seedArtists, projectName, status, and activeJobId) 
+     is synchronously pre-populated from the local dashboard 'projects' list during routing, 
+     preventing the header from briefly clearing or flickering.
+   - Auto-Hydration: The Deep Cut details panel automatically hydrates upon loading a completed project 
+     by auto-selecting the first seed artist node and triggering the local details loader.
+   - Sentinel Resolution: Cache entries marked as sentinel slots (_isSentinel: true) are flagged as corrupt; 
+     clicking a sentinel node bypasses the early-return cache checks and triggers JIT re-evaluation.
+   - Silent Re-validation: Metadata re-validation checks operate fully in the background. 
+     User-facing toasts for 'Cache Incomplete' (curation incomplete) warnings are suppressed 
+     to prevent developer-level notification noise.
 `;
 
 const PHYSICS_ENGINE_DOCUMENTATION = `
