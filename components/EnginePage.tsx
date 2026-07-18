@@ -199,7 +199,8 @@ the entire dataset, the app evolves existing visual structures.
    - Graceful Degradation: Displays existing cached details (summary/biography) in the sidebar panel 
      immediately on load or click. Necessary data validation, revalidation, or cache self-healing 
      is executed strictly in the background (via 'triggerBackgroundRevalidation') without blocking the user, 
-     clearing the panel, or triggering the foreground loading overlay.
+     clearing the panel, or triggering the foreground loading overlay. If the JIT details queue revalidation 
+     fails for an already displayable node, the exception is bypassed silently without writing sentinels or toasting error alerts.
    - Canonical Graph Caching: Global shared artist cache documents (/artists/{id}) store the complete, 
      canonical compiled graph returned by the model rather than pruned sub-graph snippets. This guarantees 
      that both single-seed and multi-seed projects consistently reference the full master network.

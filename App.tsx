@@ -5604,6 +5604,7 @@ const App: React.FC = () => {
           }
 
           const cachedVal = detailsCache.get(disambiguatedCacheId) || detailsCache.get(node.id) || detailsCache.get(node.id.toLowerCase());
+          const wasDisplayable = !!(cachedVal && cachedVal.summary && cachedVal.summary.length > 5 && !cachedVal._isSentinel);
           const isCorruptOrStale = checkIsProfileStaleOrCorrupt(cachedVal) &&
                                    !healedNodeIdsRef.current.has(simpleId) &&
                                    !healedNodeIdsRef.current.has(disambiguatedCacheId) &&
@@ -5625,8 +5626,8 @@ const App: React.FC = () => {
             healedNodeIdsRef.current.add(node.id);
           }
 
-          // Silent background self-healing: DO NOT show a spinner if the user already has cached data
-          if (!isCached) {
+          // Silent background self-healing: DO NOT show a spinner if the user already has cached data or it was displayable
+          if (!isCached && !wasDisplayable) {
             setLoadingNodeIds(prev => new Set(prev).add(node.id));
           }
           lastProgressTimestampRef.current = Date.now();
@@ -6011,6 +6012,12 @@ const App: React.FC = () => {
               } catch (err: any) {
                 const isRate = err?.message?.includes('429') || err?.message?.includes('RESOURCE_EXHAUSTED');
                 const isTimeout = err?.message?.includes('timed out');
+
+                if (wasDisplayable) {
+                  console.warn(`[Deep Cut Queue] Silent background revalidation failed for displayable node ${node.id}. Keeping cached data.`, err);
+                  success = true;
+                  break;
+                }
 
                 if (isRate && retries < max - 1) {
                   retries++;
