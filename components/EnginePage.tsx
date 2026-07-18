@@ -196,11 +196,12 @@ the entire dataset, the app evolves existing visual structures.
    - Hydration Spinner Safeguard: To prevent race conditions where the Deep Cut panel momentarily flickers 
      to the "Create Your Zcene" onboarding state before details are loaded, the panel renders the LoadingSpinner 
      if seed artists are present in the project context.
-   - Graceful Degradation: Displays existing cached details (summary/biography) in the sidebar panel 
-     immediately on load or click. Necessary data validation, revalidation, or cache self-healing 
-     is executed strictly in the background (via 'triggerBackgroundRevalidation') without blocking the user, 
-     clearing the panel, or triggering the foreground loading overlay. If the JIT details queue revalidation 
-     fails for an already displayable node, the exception is bypassed silently without writing sentinels or toasting error alerts.
+   - Graceful Degradation Protocol: Any node with a displayable biography (summary length > 5 characters) 
+     must be rendered immediately from cache, bypassing all loaders. Necessary data validation, revalidation, 
+     or cache self-healing is executed strictly in the background (via 'triggerBackgroundRevalidation') 
+     without blocking the user, clearing the panel, or triggering the foreground loading overlay. If the JIT 
+     details queue revalidation fails for an already displayable node, the exception is bypassed silently 
+     without writing sentinels or toasting error alerts.
    - Canonical Graph Caching: Global shared artist cache documents (/artists/{id}) store the complete, 
      canonical compiled graph returned by the model rather than pruned sub-graph snippets. This guarantees 
      that both single-seed and multi-seed projects consistently reference the full master network.
