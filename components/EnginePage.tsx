@@ -185,7 +185,7 @@ the entire dataset, the app evolves existing visual structures.
    - Mobile Dynamic Landing Routing: Initializes the mobile viewport directly on the 
      'SPIDERWEB' canvas tab if the loaded project contains seed artists.
 
-7. UNIFIED PROJECT CONTEXT & STATE-SYNCHRONIZATION (App.tsx / GraphPage.tsx):
+7. UNIFIED PROJECT CONTEXT & STATE-SYNCHRONIZATION (App.tsx / GraphPage.tsx / EnginePage.tsx):
    Zcene enforces a single, unified project state that orchestrates project identity 
    and curation status to eliminate loading jitter and flickering.
    - Synchronous Pre-population: Project identity (seedArtists, projectName, status, and activeJobId) 
@@ -196,6 +196,10 @@ the entire dataset, the app evolves existing visual structures.
    - Hydration Spinner Safeguard: To prevent race conditions where the Deep Cut panel momentarily flickers 
      to the "Create Your Zcene" onboarding state before details are loaded, the panel renders the LoadingSpinner 
      if seed artists are present in the project context.
+   - Graceful Degradation: Displays existing cached details (summary/biography) in the sidebar panel 
+     immediately on load or click. Necessary data validation, revalidation, or cache self-healing 
+     is executed strictly in the background (via 'triggerBackgroundRevalidation') without blocking the user, 
+     clearing the panel, or triggering the foreground loading overlay.
    - Canonical Graph Caching: Global shared artist cache documents (/artists/{id}) store the complete, 
      canonical compiled graph returned by the model rather than pruned sub-graph snippets. This guarantees 
      that both single-seed and multi-seed projects consistently reference the full master network.

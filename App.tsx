@@ -1999,12 +1999,13 @@ const App: React.FC = () => {
                     synthesisRationale: data.synthesisRationale || parsed?.synthesisRationale || ""
                 };
 
+                const isDisplayable = bio && bio.trim().length > 5 && !isPlaceholderBio;
                 const isIncomplete = checkIsProfileIncomplete(node, detailsPayload) || 
                                      isBioTooShort || 
                                      isPlaceholderBio || 
                                      !validateCacheEntry(data, true).isFullyQualified;
 
-                if (!isIncomplete) {
+                if (isDisplayable) {
                     const hydratedNode = {
                         ...node,
                         bio,
@@ -2018,7 +2019,6 @@ const App: React.FC = () => {
                     };
                     
                     setSelectedNode(hydratedNode);
-                    setActiveNodeIds([hydratedNode.id]);
                     if (node.type !== 'founded') {
                         setActiveNodeIds(prev => prev.some(id => id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node.id]);
                     }
@@ -2028,7 +2028,8 @@ const App: React.FC = () => {
                     console.log("[Phase 3 Cache Payload]", node.id, JSON.stringify({ youtubeVideoId: detailsPayload.youtubeVideoId, summary: detailsPayload.summary?.substring(0, 40) }));
                     setDetailsCache(prev => new Map(prev).set(node.id.toLowerCase(), detailsPayload).set(standardizedId, detailsPayload).set(node.id, detailsPayload));
 
-                    if (isCacheExpired(data.cachedAt)) {
+                    if (isIncomplete || isCacheExpired(data.cachedAt)) {
+                        console.log("[Node Click] Cache is incomplete or expired; triggering background revalidation:", node.id);
                         triggerBackgroundRevalidation(node, standardizedId);
                     }
 
@@ -2036,7 +2037,7 @@ const App: React.FC = () => {
                     fetchingNodeIdsRef.current.delete(node.id);
                     setLoadingNodeIds(prev => { const next = new Set(prev); next.delete(node.id); return next; });
                     setIsLoading(false);
-                    console.log("[Node Click] Hydrated from global artists collection:", node.id, "→", standardizedId);
+                    console.log("[Node Click] Hydrated displayable cache from global collection:", node.id, "→", standardizedId);
                     return;
                 }
             }
