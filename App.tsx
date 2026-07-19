@@ -6298,12 +6298,6 @@ const App: React.FC = () => {
 
   return (
     <div className="h-[100dvh] flex flex-col overflow-hidden" key={refreshKey}>
-      {/* Loading Sliver */}
-      {(isLoading || loadingNodeIds.size > 0) && (
-        <div className="fixed top-0 left-0 w-full h-[2px] z-[200] overflow-hidden pointer-events-none">
-          <div className="h-full bg-primary animate-[loading-sliver_2s_infinite_linear] w-[30%] shadow-[0_0_10px_#F6E468]" />
-        </div>
-      )}
       <AnimatePresence>
         {error && (
           <ErrorOverlay

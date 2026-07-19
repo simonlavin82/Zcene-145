@@ -2289,7 +2289,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <div className="p-12 bg-zinc-900/50 rounded-xl border border-zinc-800 flex flex-col items-center justify-center">
                                         <LoadingSpinner 
                                             steps={["Finalising graph data...", "Establishing links...", "Finalising Zcene..."]}
-                                            subtext="Typically takes 40–50 seconds to map connections."
+                                            subtext="Mapping your Zcene connections... This usually takes a minute or two to find the best musical paths."
                                         />
                                     </div>
                                     <p className="text-sm text-zinc-500 leading-relaxed">Used during the primary spiderweb generation when high-volume relational data is being structured.</p>

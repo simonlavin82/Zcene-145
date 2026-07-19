@@ -1262,9 +1262,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
 
   const enabledArtistsCount = selectedSeedArtists.filter(a => a.enabled).length;
 
-  const loadingSubtext = enabledArtistsCount <= 1
-    ? "Typically takes 30–45 seconds to map connections."
-    : "Typically takes 1–3 minutes to synthesize heavy multi-seed connections.";
+  const loadingSubtext = "Mapping your Zcene connections... This usually takes a minute or two to find the best musical paths.";
 
   const totalPendingCount = useMemo(() => {
     if (!searchTerm.trim()) return enabledArtistsCount;

@@ -90,7 +90,7 @@ interface LoadingSpinnerProps {
 
 export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ 
     steps = GRAPH_THINKING_STEPS, 
-    subtext = "Typically takes 40–50 seconds to map connections."
+    subtext = "Mapping your Zcene connections... This usually takes a minute or two to find the best musical paths."
 }) => {
     const [currentStep, setCurrentStep] = useState(0);
     const [isVisible, setIsVisible] = useState(true);
