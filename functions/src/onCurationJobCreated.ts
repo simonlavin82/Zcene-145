@@ -184,6 +184,13 @@ export const onCurationJobCreated = onDocumentCreated({
           inputPayload.baseGraph
         );
 
+        // Structural Integrity Guard: Verify that we received a valid, rich graph from the model
+        const artistNodesCount = finalGraph.nodes?.filter(n => n.type === 'artist' || !n.type).length || 0;
+        const minimumRequiredArtists = 2; // Seed artist + at least 1 recommendation
+        if (!finalGraph.nodes || finalGraph.nodes.length === 0 || artistNodesCount < minimumRequiredArtists) {
+          throw new Error(`Generated graph failed structural integrity check. Artist nodes count: ${artistNodesCount} (minimum required: ${minimumRequiredArtists}). Curation aborted.`);
+        }
+
         // Parse seed artists list
         const artistList = inputPayload.artists
           .split('::')
