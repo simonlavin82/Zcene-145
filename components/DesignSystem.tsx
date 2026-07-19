@@ -2887,6 +2887,18 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 </div>
                             </div>
 
+                            <div className="p-6 bg-zinc-900/30 border border-zinc-800 rounded-xl space-y-4 mt-6">
+                                <div className="flex items-center gap-3 text-white font-medium">
+                                    <span className="material-symbols-outlined text-primary">arrow_forward</span>
+                                    Deep Cut Pagination Bypass (Context-Aware State Control)
+                                </div>
+                                <p className="text-sm text-zinc-400 leading-relaxed">
+                                    To eliminate visual friction when navigating between multiple artists inside the Deep Cut details carousel:
+                                    <br /><br />
+                                    When clicking the pagination arrows (<code>&lt;</code> or <code>&gt;</code>) or pagination dot indicators, the selection action passes the <code>forceActionState=true</code> flag. The system bypasses the two-tap Sticky Peek state (State 1) entirely and transitions the graph directly to the Action Gateway (State 2). This immediately hides the floating hover box, draws yellow connection paths, and displays overlay controls, avoiding any obstruction of the canvas while browsing.
+                                </p>
+                            </div>
+
                             <div className="p-8 bg-zinc-900/50 rounded-xl border border-zinc-800">
                                 <h3 className="text-xl font-medium text-white mb-4">Mobile Gesture Safety</h3>
                                 <p className="text-sm text-zinc-400 leading-relaxed mb-8 max-w-3xl">

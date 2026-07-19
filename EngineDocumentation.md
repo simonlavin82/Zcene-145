@@ -755,4 +755,17 @@ This section documents the cross-platform unified interaction design implemented
 *   **Transient Hover Restorations:** If a user hovers over a peer node `n2` while node `d` is pinned, the UI transiently updates to show `n2`'s connections and hover box. Once the cursor leaves `n2`, the `clearNodeHover` callback executes and detects that `d` is still peeked or selected, calling `triggerNodeHover(d)` to restore the pinned highlights instantly.
 *   **Smart Quota Cancel State Preservation:** If the user enters the Action state and triggers the Token Quota Warning but chooses to cancel, the graph does **not** reset to the Peek State. The node remains in the Action State (State 2) with the `+ Explore` action overlay visible, allowing the user to easily click it again.
 
+### 10.3 Deep Cut Pagination Bypass
+
+*   **Problem Addressed:** When a user navigates between multiple selected artists via pagination controls (left/right chevron buttons or pagination dots) inside the Deep Cut panel, they are already browsing detailed profiles. Requiring a two-tap flow or displaying the floating hover box causes redundant clicks and visual clutter.
+*   **Implementation:** All pagination click events inside `DetailsPanel.tsx` (namely `handleNext`, `handlePrev`, and the pagination dots mapping) forward a `forceActionState = true` flag to `onNodeClick`. The click handler in `App.tsx` checks this flag:
+    ```typescript
+    if (!isAlreadyPeeked && !forceActionState) {
+        // State 1 Sticky Peek logic
+        ...
+    }
+    ```
+    By bypassing the `!isAlreadyPeeked` Sticky Peek guard when `forceActionState` is active, the graph transitions directly into State 2 (Action State). This dismisses the floating hover box, draws yellow connection paths, and displays overlays, keeping the canvas neat while browsing.
+
+
 

@@ -225,7 +225,7 @@ interface NodeDetailsCardProps {
   isSmallScreen: boolean;
   onRefresh: () => void;
   onClose: () => void;
-  onNodeClick: (node: Node | null) => void;
+  onNodeClick: (node: Node | null, forceActionState?: boolean) => void;
   onNavigate: (view: View) => void;
   chatHistory: ChatMessage[];
   onSendMessage: (message: string) => void;
@@ -1219,7 +1219,7 @@ interface DetailsPanelProps {
   isCollapsed: boolean;
   onToggleCollapse: () => void;
   isSmallScreen: boolean;
-  onNodeClick: (node: Node | null) => void;
+  onNodeClick: (node: Node | null, forceActionState?: boolean) => void;
   onNavigate: (view: View) => void;
   isGlobalLoading: boolean;
   onCancelGlobalLoading: () => void;
@@ -1322,7 +1322,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         if (activeNodes && viewedIndex < activeNodes.length - 1) {
             const nextIdx = viewedIndex + 1;
             setViewedIndex(nextIdx);
-            onNodeClick(activeNodes[nextIdx]);
+            onNodeClick(activeNodes[nextIdx], true);
         }
     }, [viewedIndex, activeNodes, onNodeClick]);
 
@@ -1330,7 +1330,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         if (activeNodes && viewedIndex > 0) {
             const prevIdx = viewedIndex - 1;
             setViewedIndex(prevIdx);
-            onNodeClick(activeNodes[prevIdx]);
+            onNodeClick(activeNodes[prevIdx], true);
         }
     }, [viewedIndex, activeNodes, onNodeClick]);
 
@@ -1607,7 +1607,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                     return (
                                                         <div 
                                                             key={node.id} 
-                                                            onClick={() => { setViewedIndex(i); onNodeClick(node); }}
+                                                            onClick={() => { setViewedIndex(i); onNodeClick(node, true); }}
                                                             className={`transition-all cursor-pointer flex-shrink-0 rounded-full ${
                                                                 i === viewedIndex 
                                                                     ? 'w-4 h-1 bg-primary' 

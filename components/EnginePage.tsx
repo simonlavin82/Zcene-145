@@ -740,6 +740,10 @@ Zcene implements a cross-platform 'Sticky Peek + Action Gateway' interaction mod
    - In D3's 'mouseleave' event handler, the system queries the active ref states (selectedNodeRef.current and peekedNodeRef.current).
    - If the cursor leaves a node that is currently peeked or selected, the clearNodeHover command is bypassed. This keeps connection lines and hover snippet elements locked and stable.
    - When hovering over other nodes, temporary transient highlights are drawn, and leaving those transient nodes gracefully restores the pinned node's visual state.
+
+4. DEEP CUT PAGINATION BYPASS:
+   - When navigating artists in the Deep Cut pagination carousel (via <, >, or dot indicators), the graph automatically bypasses the Sticky Peek state (State 1) and transitions directly to the Action Gateway (State 2) by passing the forceActionState=true flag to handleNodeClick.
+   - This ensures that the floating hover box is immediately dismissed and connection lines/explore button are shown, maintaining visual focus on details rather than graph overlay cards.
 `;
 
 const SitemapNode: React.FC<{ title: string; description: string; children?: React.ReactNode }> = ({ title, description, children }) => (

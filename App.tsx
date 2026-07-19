@@ -1803,7 +1803,7 @@ const App: React.FC = () => {
   }, []);
 
 
-  const handleNodeClick = useCallback(async (node: Node | null) => {
+  const handleNodeClick = useCallback(async (node: Node | null, forceActionState = false) => {
     if (!node) {
        setSelectedNode(null);
        setPeekedNode(null);
@@ -1830,7 +1830,7 @@ const App: React.FC = () => {
     }
 
     // STATE 1: Sticky Peek (First Click / Tap on any node)
-    if (!isAlreadyPeeked) {
+    if (!isAlreadyPeeked && !forceActionState) {
       setSelectedNode(null);
       setPeekedNode(node);
       return;

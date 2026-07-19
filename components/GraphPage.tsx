@@ -55,7 +55,7 @@ interface GraphPageProps {
   isLoading: boolean;
   onCancelGeneration: () => void;
   onFileUpload: (file: File) => void;
-  onNodeClick: (node: Node | null) => void;
+  onNodeClick: (node: Node | null, forceActionState?: boolean) => void;
   selectedNode: Node | null;
   peekedNode: Node | null;
   activeNodes: Node[];
@@ -868,8 +868,8 @@ const GraphPage: React.FC<GraphPageProps> = ({
     } else setRightPanelWidth(rightPanelPreCollapseWidth.current);
   }, [isDetailsPanelCollapsed]);
 
-  const handleNodeClickInternal = useCallback((node: Node | null) => {
-    onNodeClick(node);
+  const handleNodeClickInternal = useCallback((node: Node | null, forceActionState = false) => {
+    onNodeClick(node, forceActionState);
     if (node) {
       analyticsService.track('Node Clicked', { node_id: node?.id, node_type: node?.type });
       if (!isSmallScreen) {
