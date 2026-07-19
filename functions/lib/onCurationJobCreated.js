@@ -336,7 +336,8 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                 status: "completed",
                 graphData: JSON.stringify(result.graphData),
                 artistIds: artistIds,
-                activeJobId: null
+                activeJobId: null,
+                detailsCache: result.detailsCache
             });
         }
     }

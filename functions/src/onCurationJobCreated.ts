@@ -385,7 +385,8 @@ export const onCurationJobCreated = onDocumentCreated({
         status: "completed",
         graphData: JSON.stringify(result.graphData),
         artistIds: artistIds,
-        activeJobId: null
+        activeJobId: null,
+        detailsCache: result.detailsCache
       });
     }
 

@@ -1907,7 +1907,7 @@ const App: React.FC = () => {
     // 2. Load Locally and Block the Network
     // Treat existing cache entries (even if incomplete or containing placeholders) as authoritative on normal click.
     // We only trigger re-synthesis when the user explicitly clicks "Heal Cache" (which runs handleRefreshNode).
-    const isStaleDetails = cachedDetails?.synthesisRationale ? !validateRootsBreakdown(cachedDetails.synthesisRationale) : false;
+    const isStaleDetails = cachedDetails?.synthesisRationale ? !validateRootsBreakdown(cachedDetails.synthesisRationale, true) : false;
     if (cachedDetails && cachedDetails.summary && cachedDetails.summary.length >= 5 && !isStaleDetails && !cachedDetails._isSentinel) {
        const hydratedNode = {
           ...node,
@@ -6016,13 +6016,7 @@ const App: React.FC = () => {
                       console.log(`[Deep Cut Queue] Write-back: Successfully updated detailsCache + cachedAt for: ${targetDocId}`);
                     } else if (!fallbackDetails) {
                       const normalizedGraph = normalizeGraphData(graphData);
-                      let { nodes: subNodes, links: subLinks } = extractArtistSubGraph(node.id, normalizedGraph, seedArtists.split('::'));
-                      
-                      if (subNodes.length === 0) {
-                        subNodes = [{ id: node.id, label: node.label || node.id, type: 'artist', group: node.group || 1 }];
-                      }
-                      
-                      const canonicalNode = subNodes.find(
+                      const canonicalNode = normalizedGraph.nodes.find(
                         n => n.type === 'artist' && (n.id.trim().toLowerCase() === node.id.trim().toLowerCase() || normalizeArtistId(n.id) === targetDocId)
                       );
                       const canonicalName = canonicalNode?.label ?? canonicalNode?.id ?? node.id;
@@ -6031,18 +6025,18 @@ const App: React.FC = () => {
                         cacheKey: targetDocId,
                         artistId: simpleArtistId,
                         seedArtists: canonicalNameFromDetails || canonicalName,
-                        graphData: JSON.stringify({ nodes: subNodes, links: subLinks }),
+                        graphData: JSON.stringify(normalizedGraph),
                         filters: discoveryFiltersRef.current || {},
                         cacheVersion: 2,
                         cachedAt: serverTimestamp(),
                         hitCount: 0,
-                        isDeep: false,
+                        isDeep: true,
                         detailsCache: details,
                         synthesisRationale: details.synthesisRationale || null
                       };
                       enforceArtistCacheSchema(setPayload);
                       await setDoc(doc(db, 'artists', targetDocId), setPayload);
-                      console.log(`[Deep Cut Queue] JIT cached Canonical node: ${targetDocId}`);
+                      console.log(`[Deep Cut Queue] JIT cached Canonical node (full context): ${targetDocId}`);
                     }
                       
                     if (isAlias) {
