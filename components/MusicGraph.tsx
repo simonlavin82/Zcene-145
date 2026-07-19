@@ -138,6 +138,8 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   }, [hoveredNodeId]);
   const containerRef = useRef<HTMLDivElement>(null);
   const localLegendRef = useRef<HTMLDivElement | null>(null);
+  const isTrackingRef = useRef(false);
+  const targetNodeIdRef = useRef<string | null>(null);
 
   const setLegendRef = useCallback((node: HTMLDivElement | null) => {
     localLegendRef.current = node;
@@ -216,12 +218,14 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
   const handleZoomOut = () => {
     if (svgRef.current && zoomRef.current) {
+        isTrackingRef.current = false;
         d3.select(svgRef.current).transition().duration(300).call(zoomRef.current.scaleBy, 0.75);
     }
   };
 
   const handleCenter = () => {
     if (svgRef.current && zoomRef.current && dimensions.width > 0) {
+        isTrackingRef.current = false;
         const k = 0.5;
         const tx = (dimensions.width / 2) - VIRTUAL_CENTER_X * k;
         const ty = (dimensions.height / 2) - VIRTUAL_CENTER_Y * k;
@@ -372,36 +376,14 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     setHighlightedNodes(newHighlighted);
   }, [searchQuery, visibleNodes]);
 
-  const prevHighlightedRef = useRef<string | null>(null);
-
+  // Set tracking target when search highlight changes
   useEffect(() => {
-    if (!svgRef.current || !zoomRef.current || highlightedNodes.size === 0) return;
-    if (
-      dimensions.width === 0 || 
-      dimensions.height === 0
-    ) return;
-
-    const [matchedId] = highlightedNodes;
-    const node = visibleNodes.find(n => String(n.id) === matchedId);
-    if (!node || isNaN(node.x ?? NaN) || isNaN(node.y ?? NaN)) return;
-
-    const { width, height } = dimensions;
-    const [minScale, maxScale] = [0.1, 4]; // mirrors the zoom extent in the D3 setup
-    const targetScale = Math.min(Math.max(1.2, minScale), maxScale);
-    const tx = width  / 2 - targetScale * node.x!;
-    const ty = height / 2 - targetScale * node.y!;
-    const newTransform = d3.zoomIdentity.translate(tx, ty).scale(targetScale);
-
-    const isHighlightChange = prevHighlightedRef.current !== matchedId;
-    prevHighlightedRef.current = matchedId;
-    const duration = isHighlightChange ? 600 : 0;
-
-    d3.select(svgRef.current)
-      .transition() // Using transition(0) interrupts any ongoing animation and locks instantly
-      .duration(duration)
-      .ease(d3.easeCubicOut)
-      .call(zoomRef.current.transform as any, newTransform);
-  }, [highlightedNodes, visibleNodes, dimensions]);
+    if (highlightedNodes.size > 0) {
+        const [matchedId] = highlightedNodes;
+        isTrackingRef.current = true;
+        targetNodeIdRef.current = String(matchedId);
+    }
+  }, [highlightedNodes]);
 
   useEffect(() => {
     const resizeObserver = new ResizeObserver(entries => {
@@ -413,6 +395,11 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     if (svgRef.current?.parentElement) resizeObserver.observe(svgRef.current.parentElement);
     return () => resizeObserver.disconnect();
   }, []);
+
+  const dimensionsRef = useRef(dimensions);
+  useEffect(() => {
+      dimensionsRef.current = dimensions;
+  }, [dimensions]);
 
   useEffect(() => {
     if (!svgRef.current || dimensions.width === 0) return;
@@ -732,6 +719,12 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                             y: event.transform.applyY(n.y!)
                         } : null);
                     }
+                }
+            })
+            .on("start", (event) => {
+                // Disable auto-tracking if the user initiates a manual pan/zoom
+                if (event.sourceEvent) {
+                    isTrackingRef.current = false;
                 }
             });
         svg.call(zoom);
@@ -1304,42 +1297,50 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     }
   }, [selectedNode, visibleNodes, dimensions]);
 
-  // Smoothly center the selected node in the viewport, using instant tracking during resizes
-  const lastCenteredNodeIdRef = useRef<string | null>(null);
-
+  // Set tracking target when selectedNode changes
   useEffect(() => {
-    if (
-      !selectedNode || 
-      !svgRef.current || 
-      !zoomRef.current || 
-      dimensions.width === 0 || 
-      dimensions.height === 0
-    ) return;
+      if (selectedNode) {
+          isTrackingRef.current = true;
+          targetNodeIdRef.current = selectedNode.id;
+      } else {
+          isTrackingRef.current = false;
+          targetNodeIdRef.current = null;
+      }
+  }, [selectedNode]);
 
-    const node = visibleNodesRef.current.find(n => isSameNodeId(n.id, selectedNode.id));
-    if (!node || isNaN(node.x ?? NaN) || isNaN(node.y ?? NaN)) return;
+  // Unified D3 Timer Lerp Camera
+  // Fluidly interpolates the camera to track the active node (physics bouncing or CSS resizing)
+  // completely decoupled from React renders and independent of transition() abort bugs.
+  useEffect(() => {
+      const timer = d3.timer(() => {
+          if (!isTrackingRef.current || !targetNodeIdRef.current || !svgRef.current || !zoomRef.current) return;
+          if (dimensionsRef.current.width === 0) return;
 
-    const { width, height } = dimensions;
-    const transform = d3.zoomTransform(svgRef.current);
-    const k = transform.k; // Preserves current zoom level
-    const tx = width / 2 - k * node.x!;
-    const ty = height / 2 - k * node.y!;
-    const newTransform = d3.zoomIdentity.translate(tx, ty).scale(k);
+          // visibleNodesRef.current always contains the live, mutated physics coordinates
+          const node = visibleNodesRef.current.find(n => isSameNodeId(n.id, targetNodeIdRef.current));
+          if (!node || isNaN(node.x!) || isNaN(node.y!)) return;
 
-    const isSelectionChange = lastCenteredNodeIdRef.current !== selectedNode.id;
-    lastCenteredNodeIdRef.current = selectedNode.id;
-
-    const animationDuration = isSelectionChange ? 600 : 0;
-
-    // By explicitly using a transition(0), D3 interrupts any currently playing 
-    // smooth-pan animations, forcing an immediate, synchronous snap to the new transform.
-    // This eliminates camera "drifting" or "lag" when the UI flexbox resizes rapidly.
-    d3.select(svgRef.current)
-      .transition()
-      .duration(animationDuration)
-      .ease(d3.easeCubicOut)
-      .call(zoomRef.current.transform as any, newTransform);
-  }, [selectedNode, dimensions]);
+          const { width, height } = dimensionsRef.current;
+          const currentTransform = d3.zoomTransform(svgRef.current);
+          const k = currentTransform.k;
+          
+          const targetTx = width / 2 - k * node.x!;
+          const targetTy = height / 2 - k * node.y!;
+          
+          const dx = targetTx - currentTransform.x;
+          const dy = targetTy - currentTransform.y;
+          
+          // Only update if distance is significant to avoid micro-jitters
+          if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
+              const lerpFactor = 0.08;
+              const newTx = currentTransform.x + dx * lerpFactor;
+              const newTy = currentTransform.y + dy * lerpFactor;
+              
+              zoomRef.current.transform(d3.select(svgRef.current), d3.zoomIdentity.translate(newTx, newTy).scale(k));
+          }
+      });
+      return () => timer.stop();
+  }, []);
 
   useEffect(() => {
     if (!svgRef.current) return;
