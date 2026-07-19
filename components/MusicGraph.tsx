@@ -873,7 +873,29 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         }
     });
 
+    // --- LIVE COORDINATE HANDSHAKE ---
+    // Extract the live coordinates from the current simulation state before we overwrite them.
+    // This prevents stale JSON coordinates from 'teleporting' active nodes back in time.
+    const currentLiveNodes = simulation.nodes();
+    const livePhysicsState = new Map<string, { x?: number, y?: number, vx?: number, vy?: number, fx?: number | null, fy?: number | null }>();
+    currentLiveNodes.forEach(n => {
+        livePhysicsState.set(n.id, { x: n.x, y: n.y, vx: n.vx, vy: n.vy, fx: n.fx, fy: n.fy });
+    });
+
     visibleNodes.forEach(n => {
+        // If the node already exists in the live physics engine, perfectly inherit its momentum and position
+        const liveState = livePhysicsState.get(n.id);
+        if (liveState && liveState.x !== undefined && liveState.y !== undefined && !isNaN(liveState.x) && !isNaN(liveState.y)) {
+            n.x = liveState.x;
+            n.y = liveState.y;
+            n.vx = liveState.vx;
+            n.vy = liveState.vy;
+            n.fx = liveState.fx;
+            n.fy = liveState.fy;
+            return; // Skip fallback initialization
+        }
+
+        // --- NEW NODE INITIALIZATION ---
         if (n.x === undefined || isNaN(n.x) || n.y === undefined || isNaN(n.y)) {
             // Sprout metadata nodes from their parent artist positions to avoid layout drift
             if (n.type !== 'artist') {
