@@ -1808,7 +1808,16 @@ const App: React.FC = () => {
        return;
     }
 
-    if (node.id === selectedNode?.id) {
+    const isTouchInteraction = isSmallScreen || (typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches);
+    const isAlreadySelected = selectedNode && (
+      selectedNode.id.toLowerCase() === node.id.toLowerCase() ||
+      normalizeArtistId(selectedNode.id) === normalizeArtistId(node.id) ||
+      (selectedNode.type === 'artist' && node.type === 'artist' && isArtistIdMatch(selectedNode.id, node.id))
+    );
+
+    const isBlockedType = node.type === 'founded' || node.type === 'country';
+
+    if (isAlreadySelected && (!isTouchInteraction || isBlockedType)) {
       return;
     }
 
@@ -2052,6 +2061,24 @@ const App: React.FC = () => {
       nodeInGraph: !!isNodeInGraph
     });
 
+    // Blocked types must never trigger an API call.
+    if (isBlockedType) {
+      setSelectedNode(node);
+      if (node.type !== 'founded') {
+        setActiveNodeIds(prev => prev.some(id => id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node.id]);
+      }
+      return;
+    }
+
+    // Touch interaction: Tap 1 selects and highlights, Tap 2 triggers the API
+    if (isTouchInteraction && !isAlreadySelected) {
+      setSelectedNode(node);
+      if (node.type !== 'founded') {
+        setActiveNodeIds(prev => prev.some(id => id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node.id]);
+      }
+      return;
+    }
+
     const isApprovedSeed = approvedSeedsRef.current.has(normalizeArtistId(node.id)) || 
                            approvedSeedsRef.current.has(node.id.toLowerCase());
 
@@ -2085,7 +2112,7 @@ const App: React.FC = () => {
       }
     });
 
-  }, [confirmTokenUsage, selectedNode, loadingNodeIds]);
+  }, [confirmTokenUsage, selectedNode, loadingNodeIds, isSmallScreen]);
 
   const handleToggleStack = useCallback(async (node: Node, link?: string) => {
     if (!user) {
@@ -5628,14 +5655,14 @@ const App: React.FC = () => {
       // 1. Block Automated Background Fetches: ✦
       // ONLY process the actively selected node to prevent neighbor chain-fetching
       const candidateNodes = (graphData?.nodes || []).filter(n => 
-        n.type === 'artist' && (
-          activeNodeIds.some(id => n.id.toLowerCase() === id.toLowerCase() || normalizeArtistId(n.id) === normalizeArtistId(id) || isArtistIdMatch(n.id, id)) ||
-          (selectedNode && (n.id.toLowerCase() === selectedNode.id.toLowerCase() || normalizeArtistId(n.id) === normalizeArtistId(selectedNode.id) || isArtistIdMatch(n.id, selectedNode.id)))
+        (n.type === 'artist' || n.type === 'label' || n.type === 'genre') && (
+          activeNodeIds.some(id => n.id.toLowerCase() === id.toLowerCase() || normalizeArtistId(n.id) === normalizeArtistId(id) || (n.type === 'artist' && isArtistIdMatch(n.id, id))) ||
+          (selectedNode && (n.id.toLowerCase() === selectedNode.id.toLowerCase() || normalizeArtistId(n.id) === normalizeArtistId(selectedNode.id) || (n.type === 'artist' && selectedNode.type === 'artist' && isArtistIdMatch(n.id, selectedNode.id))))
         )
       );
 
       const nodes = candidateNodes.filter(n => {
-        const isSelected = selectedNode && (normalizeArtistId(selectedNode.id) === normalizeArtistId(n.id) || isArtistIdMatch(n.id, selectedNode.id));
+        const isSelected = selectedNode && (normalizeArtistId(selectedNode.id) === normalizeArtistId(n.id) || (selectedNode.type === 'artist' && n.type === 'artist' && isArtistIdMatch(n.id, selectedNode.id)));
         const simpleId = normalizeArtistId(n.id);
         let disambiguatedCacheId = simpleId;
         let connectedCountries: string[] = [];

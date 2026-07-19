@@ -663,30 +663,52 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                         </div>
                     )}
                     {(!details || !isLocked) && (
-                        <div className="flex flex-col items-center justify-center text-center py-12 space-y-8 h-full bg-zinc-900">
-                            {isLoading ? (
-                                <LoadingSpinner 
-                                    steps={DETAIL_THINKING_STEPS}
-                                    subtext="Typically takes 20–30 seconds to dig for details."
-                                />
-                            ) : isGlobalLoading ? (
-                                <LoadingSpinner 
-                                    steps={["Waiting for the Spiderweb to settle...", "Mapping relationships first...", "Synchronising nodes..."]}
-                                    subtext="Graph mapping takes priority. Details will follow."
-                                />
-                            ) : (
-                                <LoadingSpinner 
-                                    steps={["Queued for background synthesis...", "Awaiting active slot in worker queue...", "Serialised processing active..."]}
-                                    subtext="Serialised processing preserves synthesis integrity."
-                                />
-                            )}
-                            <button 
-                                onClick={onClose}
-                                className="rounded-xl border border-zinc-600 px-6 py-2 text-sm font-medium text-zinc-300 transition-colors active:bg-zinc-800"
-                            >
-                                Cancel
-                            </button>
-                        </div>
+                        node.type === 'founded' || node.type === 'country' ? (
+                            <div className="flex flex-col items-center justify-center text-center py-12 px-6 space-y-6 h-full bg-zinc-900 text-zinc-300">
+                                <div className="w-16 h-16 rounded-full bg-zinc-800/80 flex items-center justify-center border border-zinc-700/50 shadow-inner">
+                                    <span className="material-symbols-outlined text-zinc-400 !text-3xl select-none">
+                                        {node.type === 'founded' ? 'calendar_today' : 'public'}
+                                    </span>
+                                </div>
+                                <div className="space-y-2">
+                                    <h4 className="text-xl font-bold tracking-tight text-white">{node.label || node.id}</h4>
+                                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#F59E0B]">
+                                        {node.type === 'founded' ? 'Founded Year' : 'Origin Location'}
+                                    </p>
+                                </div>
+                                <p className="text-sm text-zinc-400 max-w-xs leading-relaxed">
+                                    {node.type === 'founded' 
+                                        ? "This metadata node represents the year connected artists were formed or active."
+                                        : "This metadata node represents the geographic origin of connected artists."
+                                    }
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center text-center py-12 space-y-8 h-full bg-zinc-900">
+                                {isLoading ? (
+                                    <LoadingSpinner 
+                                        steps={DETAIL_THINKING_STEPS}
+                                        subtext="Typically takes 20–30 seconds to dig for details."
+                                    />
+                                ) : isGlobalLoading ? (
+                                    <LoadingSpinner 
+                                        steps={["Waiting for the Spiderweb to settle...", "Mapping relationships first...", "Synchronising nodes..."]}
+                                        subtext="Graph mapping takes priority. Details will follow."
+                                    />
+                                ) : (
+                                    <LoadingSpinner 
+                                        steps={["Queued for background synthesis...", "Awaiting active slot in worker queue...", "Serialised processing active..."]}
+                                        subtext="Serialised processing preserves synthesis integrity."
+                                    />
+                                )}
+                                <button 
+                                    onClick={onClose}
+                                    className="rounded-xl border border-zinc-600 px-6 py-2 text-sm font-medium text-zinc-300 transition-colors active:bg-zinc-800"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        )
                     )}
 
                     {details && (

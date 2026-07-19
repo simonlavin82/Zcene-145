@@ -1111,12 +1111,9 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 window.navigator.vibrate(10);
             }
             
-            if (isSmallScreen && d.type === 'artist') {
-                if (hoveredNodeIdRef.current !== d.id) {
-                    triggerNodeHoverRef.current(d);
-                    onInteractionRef.current?.();
-                    return;
-                }
+            const isTouch = isSmallScreen || (typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches);
+            if (isTouch) {
+                triggerNodeHoverRef.current(d);
             }
             
             onNodeClickRef.current(d);
