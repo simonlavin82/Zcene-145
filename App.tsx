@@ -4484,14 +4484,23 @@ const App: React.FC = () => {
               await batchHydrateDetailsCache(g.nodes, g.links);
               hydratedNodes = g.nodes;
 
-              // Restore active nodes
+              // Restore active nodes — with seed-fallback for stale documents where activeNodes was never
+              // written by the backend (legacy projects have activeNodes: [] from creation).
               if (data.activeNodes && Array.isArray(data.activeNodes)) {
-                setActiveNodeIds(data.activeNodes);
+                let resolvedActiveNodes = data.activeNodes;
+                if (resolvedActiveNodes.length === 0 && g.nodes.length > 0) {
+                  const seedList = (data.seedArtists || '').split('::').map((s: string) => s.trim()).filter(Boolean);
+                  const seedSet = new Set(seedList.map((s: string) => normalizeArtistId(s)));
+                  resolvedActiveNodes = g.nodes
+                    .filter((n: any) => (n.type === 'artist' || !n.type) && seedSet.has(normalizeArtistId(n.id)))
+                    .map((n: any) => n.id);
+                }
+                setActiveNodeIds(resolvedActiveNodes);
                 
                 // Synchronously auto-select/hydrate the first active node if nothing is selected
-                if (!selectedNode && data.activeNodes.length > 0) {
-                  const defaultNodeId = data.activeNodes[0];
-                  const defaultNode = g.nodes.find(n => n.id.toLowerCase() === defaultNodeId.toLowerCase() || normalizeArtistId(n.id) === normalizeArtistId(defaultNodeId));
+                if (!selectedNode && resolvedActiveNodes.length > 0) {
+                  const defaultNodeId = resolvedActiveNodes[0];
+                  const defaultNode = g.nodes.find((n: any) => n.id.toLowerCase() === defaultNodeId.toLowerCase() || normalizeArtistId(n.id) === normalizeArtistId(defaultNodeId));
                   if (defaultNode) {
                     const normId = normalizeArtistId(defaultNode.id);
                     const cachedDetails = detailsCacheRef.current.get(normId) || detailsCacheRef.current.get(defaultNode.id.toLowerCase());
@@ -4549,8 +4558,14 @@ const App: React.FC = () => {
             if (isMultiArtistIncoming || hasActiveFiltersIncoming) {
               console.log(`[ProjectLoader] Intercepting Phase 1 loading for complex query. Multi-artist: ${isMultiArtistIncoming}, Filtered: ${hasActiveFiltersIncoming}. Handing over to handleGenerateGraph.`);
               if (data.activeNodes && Array.isArray(data.activeNodes)) {
-                setActiveNodeIds(data.activeNodes);
+                let resolvedActiveNodes = data.activeNodes;
+                if (resolvedActiveNodes.length === 0 && data.seedArtists) {
+                  const seedList = data.seedArtists.split('::').map((s: string) => normalizeArtistId(s.trim())).filter(Boolean);
+                  resolvedActiveNodes = seedList.slice(0, 1); // pass through; handleGenerateGraph will compute graph
+                }
+                setActiveNodeIds(resolvedActiveNodes);
               }
+
               handleGenerateGraph(data.seedArtists || data.artistIds.join('::'), false, null, false, false, parsedFilters);
               return true;
             }
@@ -4594,10 +4609,19 @@ const App: React.FC = () => {
               console.warn(`[ProjectLoader] All artistIds cache-missed — graph will be empty until regenerated.`);
             }
 
-            // Restore active nodes
+            // Restore active nodes — with seed-fallback for stale documents
             if (data.activeNodes && Array.isArray(data.activeNodes)) {
-              setActiveNodeIds(data.activeNodes);
+              let resolvedActiveNodes = data.activeNodes;
+              if (resolvedActiveNodes.length === 0 && g.nodes.length > 0) {
+                const seedList = (data.seedArtists || '').split('::').map((s: string) => s.trim()).filter(Boolean);
+                const seedSet = new Set(seedList.map((s: string) => normalizeArtistId(s)));
+                resolvedActiveNodes = g.nodes
+                  .filter((n: any) => (n.type === 'artist' || !n.type) && seedSet.has(normalizeArtistId(n.id)))
+                  .map((n: any) => n.id);
+              }
+              setActiveNodeIds(resolvedActiveNodes);
             }
+
 
           } else if (data.cacheKey) {
             // --- LEGACY FORMAT (deprecated): hydrate from compound /artists/{cacheKey} doc ---
@@ -4649,8 +4673,17 @@ const App: React.FC = () => {
               }
 
               if (data.activeNodes && Array.isArray(data.activeNodes)) {
-                setActiveNodeIds(data.activeNodes);
+                let resolvedActiveNodes = data.activeNodes;
+                if (resolvedActiveNodes.length === 0 && g.nodes.length > 0) {
+                  const seedList = (data.seedArtists || '').split('::').map((s: string) => s.trim()).filter(Boolean);
+                  const seedSet = new Set(seedList.map((s: string) => normalizeArtistId(s)));
+                  resolvedActiveNodes = g.nodes
+                    .filter((n: any) => (n.type === 'artist' || !n.type) && seedSet.has(normalizeArtistId(n.id)))
+                    .map((n: any) => n.id);
+                }
+                setActiveNodeIds(resolvedActiveNodes);
               }
+
             } else {
               // Legacy cache miss — fall back to inline graphData blob if available
               console.warn(`[ProjectLoader] Legacy cache miss for key: ${data.cacheKey} — trying inline graphData fallback.`);
@@ -4665,9 +4698,18 @@ const App: React.FC = () => {
                 if (g.nodes.length > 0) {
                   setGraphData((prev: any) => isGraphEqual(prev, g) ? prev : g);
                   hydratedNodes = g.nodes;
-                  if (data.activeNodes && Array.isArray(data.activeNodes)) {
-                    setActiveNodeIds(data.activeNodes);
-                  }
+                    if (data.activeNodes && Array.isArray(data.activeNodes)) {
+                      let resolvedActiveNodes = data.activeNodes;
+                      if (resolvedActiveNodes.length === 0 && g.nodes.length > 0) {
+                        const seedList = (data.seedArtists || '').split('::').map((s: string) => s.trim()).filter(Boolean);
+                        const seedSet = new Set(seedList.map((s: string) => normalizeArtistId(s)));
+                        resolvedActiveNodes = g.nodes
+                          .filter((n: any) => (n.type === 'artist' || !n.type) && seedSet.has(normalizeArtistId(n.id)))
+                          .map((n: any) => n.id);
+                      }
+                      setActiveNodeIds(resolvedActiveNodes);
+                    }
+
                 }
               }
             }
@@ -4705,8 +4747,17 @@ const App: React.FC = () => {
             }
 
             if (data.activeNodes && Array.isArray(data.activeNodes)) {
-              setActiveNodeIds(data.activeNodes);
+              let resolvedActiveNodes = data.activeNodes;
+              if (resolvedActiveNodes.length === 0 && g.nodes.length > 0) {
+                const seedList = (data.seedArtists || '').split('::').map((s: string) => s.trim()).filter(Boolean);
+                const seedSet = new Set(seedList.map((s: string) => normalizeArtistId(s)));
+                resolvedActiveNodes = g.nodes
+                  .filter((n: any) => (n.type === 'artist' || !n.type) && seedSet.has(normalizeArtistId(n.id)))
+                  .map((n: any) => n.id);
+              }
+              setActiveNodeIds(resolvedActiveNodes);
             }
+
           }
         }
 
