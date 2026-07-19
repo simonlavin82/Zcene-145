@@ -844,6 +844,16 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 } else {
                     setSelectedNodePos(null);
                 }
+            })
+            .on("end", () => {
+                // Pin all nodes once the simulation settles to maintain absolute coordinate stability
+                const nodes = simulation.nodes();
+                nodes.forEach(n => {
+                    if (n.x !== undefined && n.y !== undefined) {
+                        n.fx = n.x;
+                        n.fy = n.y;
+                    }
+                });
             });
         simulationRef.current = simulation;
     }
@@ -1254,6 +1264,12 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     prevLayoutSignatureRef.current = layoutSignature;
 
     if (isLayoutChange) {
+        // Unpin all nodes so they can adjust to the new layout structure
+        visibleNodes.forEach(n => {
+            n.fx = null;
+            n.fy = null;
+        });
+
         // Filter changes wake the simulation gently (alpha = 0.2) to maintain the spatial mental map.
         // Structural changes (new artist searches or extensions) reset simulation with full alpha (1.0).
         const restartAlpha = isStructuralChange ? 1.0 : 0.2;
@@ -1279,7 +1295,9 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     }
   }, [selectedNode, visibleNodes, dimensions]);
 
-  // Smoothly center the selected node in the viewport when selected or when dimensions change
+  // Smoothly center the selected node in the viewport, using instant tracking during resizes
+  const lastCenteredNodeIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (
       !selectedNode || 
@@ -1299,11 +1317,21 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     const ty = height / 2 - k * node.y!;
     const newTransform = d3.zoomIdentity.translate(tx, ty).scale(k);
 
-    d3.select(svgRef.current)
-      .transition()
-      .duration(600)
-      .ease(d3.easeCubicOut)
-      .call(zoomRef.current.transform as any, newTransform);
+    const isSelectionChange = lastCenteredNodeIdRef.current !== selectedNode.id;
+    lastCenteredNodeIdRef.current = selectedNode.id;
+
+    if (isSelectionChange) {
+      // Smooth eased transition when the user selects a new node
+      d3.select(svgRef.current)
+        .transition()
+        .duration(600)
+        .ease(d3.easeCubicOut)
+        .call(zoomRef.current.transform as any, newTransform);
+    } else {
+      // Instant update on resize so the graph tracks the sidebar transition in real-time
+      d3.select(svgRef.current)
+        .call(zoomRef.current.transform as any, newTransform);
+    }
   }, [selectedNode, dimensions]);
 
   useEffect(() => {
