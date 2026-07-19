@@ -1043,6 +1043,7 @@ const App: React.FC = () => {
   const [libraryArtists, setLibraryArtists] = useState<ParsedArtist[]>([]);
   const [seedArtists, setSeedArtists] = useState<string>('');
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+  const [peekedNode, setPeekedNode] = useState<Node | null>(null);
   const [activeNodeIds, setActiveNodeIds] = useState<string[]>([]);
   const [stack, setStack] = useState<StackItem[]>([]);
   const [lastViewedStackCount, setLastViewedStackCount] = useState<number>(0);
@@ -1805,6 +1806,7 @@ const App: React.FC = () => {
   const handleNodeClick = useCallback(async (node: Node | null) => {
     if (!node) {
        setSelectedNode(null);
+       setPeekedNode(null);
        return;
     }
 
@@ -1815,9 +1817,15 @@ const App: React.FC = () => {
       (selectedNode.type === 'artist' && node.type === 'artist' && isArtistIdMatch(selectedNode.id, node.id))
     );
 
+    const isAlreadyPeeked = peekedNode && (
+      peekedNode.id.toLowerCase() === node.id.toLowerCase() ||
+      normalizeArtistId(peekedNode.id) === normalizeArtistId(node.id) ||
+      (peekedNode.type === 'artist' && node.type === 'artist' && isArtistIdMatch(peekedNode.id, node.id))
+    );
+
     const isBlockedType = node.type === 'founded' || node.type === 'country';
 
-    if (isAlreadySelected && (!isTouchInteraction || isBlockedType)) {
+    if (isAlreadySelected) {
       return;
     }
 
@@ -1828,6 +1836,7 @@ const App: React.FC = () => {
                             loadingNodeIds.has(normalizeArtistId(node.id)) || 
                             fetchingNodeIdsRef.current.has(normalizeArtistId(node.id));
     if (isTransitioning) {
+       setPeekedNode(null);
        setSelectedNode(node);
        if (node.type !== 'founded') {
          setActiveNodeIds(prev => prev.some(id => id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node.id]);
@@ -1917,6 +1926,7 @@ const App: React.FC = () => {
           isLibrary: true
        };
        
+       setPeekedNode(null);
        setSelectedNode(hydratedNode);
        if (node.type !== 'founded') {
          setActiveNodeIds(prev => prev.some(id => id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node.id]);
@@ -2016,6 +2026,7 @@ const App: React.FC = () => {
                         isLibrary: true
                     };
                     
+                    setPeekedNode(null);
                     setSelectedNode(hydratedNode);
                     if (node.type !== 'founded') {
                         setActiveNodeIds(prev => prev.some(id => id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node.id]);
@@ -2063,6 +2074,7 @@ const App: React.FC = () => {
 
     // Blocked types must never trigger an API call.
     if (isBlockedType) {
+      setPeekedNode(null);
       setSelectedNode(node);
       if (node.type !== 'founded') {
         setActiveNodeIds(prev => prev.some(id => id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node.id]);
@@ -2070,49 +2082,33 @@ const App: React.FC = () => {
       return;
     }
 
-    // Touch interaction: Tap 1 selects and highlights, Tap 2 triggers the API
-    if (isTouchInteraction && !isAlreadySelected) {
-      setSelectedNode(node);
-      if (node.type !== 'founded') {
-        setActiveNodeIds(prev => prev.some(id => id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node.id]);
-      }
+    // Sticky Peek logic: first tap/click on a non-cached, allowed node type enters Peek state
+    if (!isAlreadyPeeked) {
+      setSelectedNode(null);
+      setPeekedNode(node);
       return;
+    }
+
+    // Second tap/click: transition to selectedNode (Action State) immediately so cancellation preserves it there
+    setPeekedNode(null);
+    setSelectedNode(node);
+    if (node.type !== 'founded') {
+      setActiveNodeIds(prev => prev.some(id => id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node.id]);
     }
 
     const isApprovedSeed = approvedSeedsRef.current.has(normalizeArtistId(node.id)) || 
                            approvedSeedsRef.current.has(node.id.toLowerCase());
 
     // Reserve the loading slot BEFORE the modal so the spinner is ready to show
-    // the instant the user confirms. DO NOT call setSelectedNode here — that would
-    // trigger the JIT queue useEffect (which has selectedNode in its dep array),
-    // causing it to run a Firestore cache read during the modal wait and clear
-    // loadingNodeIds before the user even clicks Confirm.
     setLoadingNodeIds(prev => new Set(prev).add(node.id));
 
     const confirmed = isApprovedSeed ? true : await confirmTokenUsage('deep_cut_creation', [], [node.label || titleCaseArtistId(node.id)]);
     if (!confirmed) {
-      // User cancelled — release the loading slot
+      // User cancelled — release the loading slot but KEEP it selected (in Action state)
       setLoadingNodeIds(prev => { const next = new Set(prev); next.delete(node.id); return next; });
       return;
     }
-
-    // After confirmation: switch the panel and trigger the JIT queue.
-    // CRITICAL: Use flushSync to force React to commit the spinner state to the
-    // DOM synchronously before the JIT useEffect fires. Without this, React 18's
-    // automatic batching coalesces setSelectedNode with the JIT's setDetailsCache
-    // call (which returns instantly from the Firestore SDK's in-memory document
-    // cache) into a single render — meaning the intermediate state where
-    // details=null and isLoading=true (the spinner) is never painted to the DOM.
-    // flushSync breaks this batch: the browser paints the spinner on this call,
-    // then the JIT's updates land in a separate render cycle.
-    flushSync(() => {
-      setSelectedNode(node);
-      if (node.type !== 'founded') {
-        setActiveNodeIds(prev => prev.some(id => id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node.id]);
-      }
-    });
-
-  }, [confirmTokenUsage, selectedNode, loadingNodeIds, isSmallScreen]);
+  }, [confirmTokenUsage, selectedNode, peekedNode, loadingNodeIds, isSmallScreen]);
 
   const handleToggleStack = useCallback(async (node: Node, link?: string) => {
     if (!user) {
@@ -6314,6 +6310,14 @@ const App: React.FC = () => {
       : { ...selectedNode, isLoading: isLoadingNode };
   }, [selectedNode, formattedGraphData, loadingNodeIds]);
 
+  const formattedPeekedNode = useMemo(() => {
+    if (!peekedNode || !formattedGraphData) return peekedNode;
+    const match = formattedGraphData.nodes.find(n => n.id === peekedNode.id);
+    return match 
+      ? { ...peekedNode, label: match.label } 
+      : peekedNode;
+  }, [peekedNode, formattedGraphData]);
+
   const formattedActiveNodes = useMemo(() => {
     if (!activeNodes || !formattedGraphData) return activeNodes;
     return activeNodes.map(node => {
@@ -6410,7 +6414,7 @@ const App: React.FC = () => {
                   } catch (err: any) { setError(err.message); }
                 }; r.readAsText(f);
               }}
-              onNodeClick={handleNodeClick} selectedNode={formattedSelectedNode} activeNodes={formattedActiveNodes}
+              onNodeClick={handleNodeClick} selectedNode={formattedSelectedNode} peekedNode={formattedPeekedNode} activeNodes={formattedActiveNodes}
               detailsCache={detailsCache} loadingNodeIds={loadingNodeIds} onCloseNode={handleCloseNode}
               onRefreshNode={handleRefreshNode} detailsError={detailsError} systemError={error}
               onLogoClick={() => {

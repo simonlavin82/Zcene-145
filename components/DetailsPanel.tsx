@@ -683,29 +683,54 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     }
                                 </p>
                             </div>
-                        ) : (
+                        ) : isLoading ? (
                             <div className="flex flex-col items-center justify-center text-center py-12 space-y-8 h-full bg-zinc-900">
-                                {isLoading ? (
-                                    <LoadingSpinner 
-                                        steps={DETAIL_THINKING_STEPS}
-                                        subtext="Typically takes 20–30 seconds to dig for details."
-                                    />
-                                ) : isGlobalLoading ? (
-                                    <LoadingSpinner 
-                                        steps={["Waiting for the Spiderweb to settle...", "Mapping relationships first...", "Synchronising nodes..."]}
-                                        subtext="Graph mapping takes priority. Details will follow."
-                                    />
-                                ) : (
-                                    <LoadingSpinner 
-                                        steps={["Queued for background synthesis...", "Awaiting active slot in worker queue...", "Serialised processing active..."]}
-                                        subtext="Serialised processing preserves synthesis integrity."
-                                    />
-                                )}
+                                <LoadingSpinner 
+                                    steps={DETAIL_THINKING_STEPS}
+                                    subtext="Typically takes 20–30 seconds to dig for details."
+                                />
                                 <button 
                                     onClick={onClose}
                                     className="rounded-xl border border-zinc-600 px-6 py-2 text-sm font-medium text-zinc-300 transition-colors active:bg-zinc-800"
                                 >
                                     Cancel
+                                </button>
+                            </div>
+                        ) : isGlobalLoading ? (
+                            <div className="flex flex-col items-center justify-center text-center py-12 space-y-8 h-full bg-zinc-900">
+                                <LoadingSpinner 
+                                    steps={["Waiting for the Spiderweb to settle...", "Mapping relationships first...", "Synchronising nodes..."]}
+                                    subtext="Graph mapping takes priority. Details will follow."
+                                />
+                                <button 
+                                    onClick={onClose}
+                                    className="rounded-xl border border-zinc-600 px-6 py-2 text-sm font-medium text-zinc-300 transition-colors active:bg-zinc-800"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center text-center py-12 px-6 space-y-6 h-full bg-zinc-900 text-zinc-300">
+                                <div className="w-16 h-16 rounded-full bg-zinc-850 flex items-center justify-center border border-zinc-800/50 shadow-inner">
+                                    <span className="material-symbols-outlined text-zinc-400 !text-3xl select-none">
+                                        music_note
+                                    </span>
+                                </div>
+                                <div className="space-y-2">
+                                    <h4 className="text-xl font-bold tracking-tight text-white">{node.label || node.id}</h4>
+                                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#a855f7]">
+                                        Deep Cut Synthesis Required
+                                    </p>
+                                </div>
+                                <p className="text-sm text-zinc-400 max-w-xs leading-relaxed">
+                                    Explore biographical context, personnel details, and critical insights with an AI-generated Deep Cut.
+                                </p>
+                                <button
+                                    onClick={() => onNodeClick(node)}
+                                    className="flex items-center justify-center gap-2 px-6 py-2.5 bg-primary hover:bg-white active:scale-95 text-brand-black font-semibold text-xs rounded-xl shadow-lg transition-all duration-200"
+                                >
+                                    <span className="material-symbols-outlined !text-[16px]">bolt</span>
+                                    Generate Deep Cut
                                 </button>
                             </div>
                         )

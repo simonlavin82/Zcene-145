@@ -21,6 +21,7 @@ interface MusicGraphProps {
   seedArtists: string[];
   onNodeClick: (node: Node | null) => void;
   selectedNode: Node | null;
+  peekedNode?: Node | null;
   isSmallScreen: boolean;
   activeFilters: Record<FilterKeys, boolean>;
   searchQuery: string;
@@ -100,7 +101,7 @@ const computeNodeDepths = (nodes: Node[], links: Link[], seedArtistSet: Set<stri
 };
 
 const MusicGraph: React.FC<MusicGraphProps> = ({
-  data, libraryArtists, seedArtists, onNodeClick, selectedNode, isSmallScreen,
+  data, libraryArtists, seedArtists, onNodeClick, selectedNode, peekedNode, isSmallScreen,
   activeFilters, searchQuery, toggleFilter,
   legendConfig, legendOrder,
   legendRef, onInteraction, onLegendInteraction, onExtendNode, onRemoveNode, isGuest,
@@ -176,15 +177,17 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   const onNodeClickRef = useRef(onNodeClick);
   const onInteractionRef = useRef(onInteraction);
   const selectedNodeRef = useRef(selectedNode);
+  const peekedNodeRef = useRef(peekedNode);
 
   useEffect(() => {
     onNodeClickRef.current = onNodeClick;
     onInteractionRef.current = onInteraction;
     selectedNodeRef.current = selectedNode;
+    peekedNodeRef.current = peekedNode;
     
     // No longer kicking the simulation on selection to maintain absolute stability.
     // The selectedNodePos useEffect handles the button positioning even when simulation is idle.
-  }, [onNodeClick, onInteraction, selectedNode]);
+  }, [onNodeClick, onInteraction, selectedNode, peekedNode]);
 
   // NOTE: The details useMemo + simulation restart was removed.
   // Previously, this restarted the simulation every time detailsCache changed
@@ -297,11 +300,12 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   const prevLayoutSignatureRef = useRef<string>("");
   useEffect(() => {
     visibleNodesRef.current = visibleNodes;
-  }, [visibleNodes, selectedNode]);
+  }, [visibleNodes, selectedNode, peekedNode]);
 
   const selectionHighlightIds = useMemo(() => {
-    if (!selectedNode) return null;
-    const selectedIdStr = String(selectedNode.id);
+    const activeInteractionNode = selectedNode || peekedNode;
+    if (!activeInteractionNode) return null;
+    const selectedIdStr = String(activeInteractionNode.id);
     const highlighted = new Set<string>([selectedIdStr, selectedIdStr.toLowerCase(), normalizeArtistId(selectedIdStr)]);
     
     const primaryConnections = new Set<string>();
@@ -329,7 +333,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             primaryConnections.add(normalizeArtistId(sourceId));
         }
     });
-    if (selectedNode.type !== 'artist') return highlighted;
+    if (activeInteractionNode.type !== 'artist') return highlighted;
     visibleLinks.forEach(link => {
         const sourceId = String(typeof link.source === 'string' ? link.source : (link.source as Node).id);
         const targetId = String(typeof link.target === 'string' ? link.target : (link.target as Node).id);
@@ -348,7 +352,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         }
     });
     return highlighted;
-  }, [selectedNode, visibleLinks, visibleNodes]);
+  }, [selectedNode, peekedNode, visibleLinks, visibleNodes]);
 
   const selectionHighlightIdsRef = useRef<Set<string> | null>(null);
   useEffect(() => {
@@ -602,6 +606,12 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     };
 
     const clearNodeHover = () => {
+        const activeNode = selectedNodeRef.current || peekedNodeRef.current;
+        if (activeNode) {
+            triggerNodeHover(activeNode);
+            return;
+        }
+
         setHoveredNodeId(null);
         activeHoveredNodeRef.current = null;
         setHoveredLink(null);
@@ -685,7 +695,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 container.attr("transform", event.transform); 
                 
                 // 1. Update selected node pos during zoom/pan
-                const currentSelected = selectedNodeRef.current;
+                const currentSelected = selectedNodeRef.current || peekedNodeRef.current;
                 if (currentSelected && svgRef.current) {
                     const node = visibleNodesRef.current.find(n => isSameNodeId(n.id, currentSelected.id));
                     if (node && !isNaN(node.x!) && !isNaN(node.y!)) {
@@ -832,7 +842,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     });
 
                 // Update selected node position for the "Add" button
-                const currentSelected = selectedNodeRef.current;
+                const currentSelected = selectedNodeRef.current || peekedNodeRef.current;
                 if (currentSelected && svgRef.current) {
                     // Use the live nodes from the simulation to avoid stale closures
                     const nodes = simulation.nodes();
@@ -1313,8 +1323,9 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
   // Ensure selectedNodePos is updated when selection changes, even if simulation is idle
   useEffect(() => {
-    if (selectedNode && svgRef.current) {
-        const node = visibleNodes.find(n => isSameNodeId(n.id, selectedNode.id));
+    const activeNode = selectedNode || peekedNode;
+    if (activeNode && svgRef.current) {
+        const node = visibleNodes.find(n => isSameNodeId(n.id, activeNode.id));
         if (node && !isNaN(node.x!) && !isNaN(node.y!)) {
             const transform = d3.zoomTransform(svgRef.current);
             setSelectedNodePos({
@@ -1327,18 +1338,29 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     } else {
         setSelectedNodePos(null);
     }
-  }, [selectedNode, visibleNodes, dimensions]);
+  }, [selectedNode, peekedNode, visibleNodes, dimensions]);
 
-  // Set tracking target when selectedNode changes
+  // Set tracking target when selectedNode or peekedNode changes
   useEffect(() => {
-      if (selectedNode) {
+      const activeNode = selectedNode || peekedNode;
+      if (activeNode) {
           isTrackingRef.current = true;
-          targetNodeIdRef.current = selectedNode.id;
+          targetNodeIdRef.current = activeNode.id;
       } else {
           isTrackingRef.current = false;
           targetNodeIdRef.current = null;
       }
-  }, [selectedNode]);
+  }, [selectedNode, peekedNode]);
+
+  // Pin Hover Box and highlight connections when selectedNode or peekedNode changes
+  useEffect(() => {
+    const activeNode = selectedNode || peekedNode;
+    if (activeNode) {
+      triggerNodeHoverRef.current(activeNode);
+    } else {
+      clearNodeHoverRef.current();
+    }
+  }, [selectedNode, peekedNode]);
 
   // Unified D3 Timer Lerp Camera
   // Fluidly interpolates the camera to track the active node (physics bouncing or CSS resizing)
@@ -1398,18 +1420,23 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     nodeElements.select("path")
         .transition().duration(300)
         .attr("stroke-width", d => {
-            const isSelected = selectedNode ? isSameNodeId(selectedNode.id, d.id) : false;
+            const activeNode = selectedNode || peekedNode;
+            const isSelected = activeNode ? isSameNodeId(activeNode.id, d.id) : false;
             const isSeed = seedArtists.some(a => normalizeArtistId(a) === d.id);
             if (isSelected) return 4;
             return isSeed ? 3 : 2;
         })
         .attr("stroke", d => {
-            const isSelected = selectedNode ? isSameNodeId(selectedNode.id, d.id) : false;
+            const activeNode = selectedNode || peekedNode;
+            const isSelected = activeNode ? isSameNodeId(activeNode.id, d.id) : false;
             const isSeed = seedArtists.some(a => normalizeArtistId(a) === d.id);
             if (isSelected) return '#F6E468';
             return isSeed ? '#F6E468' : '#1F1F1E';
         })
-        .attr("filter", d => selectedNode && isSameNodeId(selectedNode.id, d.id) ? "url(#node-glow)" : null);
+        .attr("filter", d => {
+            const activeNode = selectedNode || peekedNode;
+            return activeNode && isSameNodeId(activeNode.id, d.id) ? "url(#node-glow)" : null;
+        });
     container.select(".link-group").selectAll<SVGLineElement, Link>("line.visual-line")
         .transition().duration(300)
         .attr("stroke-opacity", (d: any) => {
@@ -1453,6 +1480,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                         zIndex: 40,
                         display: 'flex',
                         flexDirection: 'column',
+                        alignItems: 'flex-start',
                         gap: '8px'
                     }}
                 >
@@ -1461,16 +1489,17 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                             initial={{ scale: 0, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             exit={{ scale: 0, opacity: 0 }}
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
                             onClick={(e) => {
                                 e.stopPropagation();
                                 if (onExtendNode) onExtendNode(selectedNode);
                             }}
-                            className="w-8 h-8 bg-primary text-brand-black rounded-full flex items-center justify-center shadow-lg border border-brand-black/20 pointer-events-auto"
+                            className="h-8 px-3 bg-primary text-brand-black rounded-full flex items-center justify-center gap-1.5 shadow-lg border border-brand-black/20 pointer-events-auto transition-transform"
                             title="Extend from this artist"
                         >
-                            <Plus className="w-5 h-5" />
+                            <Plus className="w-4 h-4 shrink-0" />
+                            <span className="text-[10px] font-bold tracking-wider uppercase select-none">Explore</span>
                         </motion.button>
                     )}
                     <motion.button
