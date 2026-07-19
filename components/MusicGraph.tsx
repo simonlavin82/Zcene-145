@@ -140,6 +140,8 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   const localLegendRef = useRef<HTMLDivElement | null>(null);
   const isTrackingRef = useRef(false);
   const targetNodeIdRef = useRef<string | null>(null);
+  const dragEndTimeRef = useRef<number>(0);
+  const prevVisibleNodesLengthRef = useRef<number>(0);
 
   const setLegendRef = useCallback((node: HTMLDivElement | null) => {
     localLegendRef.current = node;
@@ -734,6 +736,8 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
     svg.on("click", (event) => { 
         if (event.target === svgRef.current) {
+            // Ignore background clicks that happen immediately after a drag event finishes
+            if (Date.now() - dragEndTimeRef.current < 100) return;
             onNodeClickRef.current(null);
             clearNodeHover();
         }
@@ -1063,6 +1067,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                             if (!event.active) simulation.alphaTarget(0);
                             d.fx = event.x;
                             d.fy = event.y;
+                            dragEndTimeRef.current = Date.now();
                         })
                     );
                 g.append("path");
@@ -1264,16 +1269,24 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     const isLayoutChange = prevLayoutSignatureRef.current !== layoutSignature;
     prevLayoutSignatureRef.current = layoutSignature;
 
-    if (isLayoutChange) {
-        // Unpin all nodes so they can adjust to the new layout structure
-        visibleNodes.forEach(n => {
-            n.fx = null;
-            n.fy = null;
-        });
+    // Check if the number of nodes actually changed, rather than just their properties (like active state)
+    const isLengthChange = visibleNodes.length !== prevVisibleNodesLengthRef.current;
+    prevVisibleNodesLengthRef.current = visibleNodes.length;
 
-        // Filter changes wake the simulation gently (alpha = 0.2) to maintain the spatial mental map.
-        // Structural changes (new artist searches or extensions) reset simulation with full alpha (1.0).
-        const restartAlpha = isStructuralChange ? 1.0 : 0.2;
+    if (isLayoutChange) {
+        // Only trigger a high-energy restart and unpin nodes if the graph structure was actually modified
+        // (nodes added/removed). If it was just a metadata change (like selecting a node which changes its class),
+        // use a gentle wake (alpha = 0.2) and preserve pinned positions to prevent gravity wells.
+        const restartAlpha = isLengthChange ? (isStructuralChange ? 1.0 : 0.2) : 0.2;
+
+        if (isLengthChange) {
+            // Unpin all nodes so they can adjust to the new layout structure
+            visibleNodes.forEach(n => {
+                n.fx = null;
+                n.fy = null;
+            });
+        }
+
         simulation.alpha(restartAlpha).alphaTarget(0).restart();
     }
   // Removed `dimensions` to isolate physics from container resizes

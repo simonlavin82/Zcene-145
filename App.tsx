@@ -1047,6 +1047,7 @@ const App: React.FC = () => {
   const [stack, setStack] = useState<StackItem[]>([]);
   const [lastViewedStackCount, setLastViewedStackCount] = useState<number>(0);
   const [baseGraph, setBaseGraph] = useState<GraphData | null>(null);
+  const hasAutoSelectedRef = useRef<string | null>(null);
   const healedDetailsCacheRef = useRef<Map<string, NodeDetails>>(new Map());
   const [detailsCache, setDetailsCacheState] = useState<Map<string, NodeDetails>>(new Map());
   const setDetailsCache = useCallback((updater: Map<string, NodeDetails> | ((prev: Map<string, NodeDetails>) => Map<string, NodeDetails>)) => {
@@ -4498,7 +4499,8 @@ const App: React.FC = () => {
                 setActiveNodeIds(resolvedActiveNodes);
                 
                 // Synchronously auto-select/hydrate the first active node if nothing is selected
-                if (!selectedNode && resolvedActiveNodes.length > 0) {
+                if (!selectedNode && resolvedActiveNodes.length > 0 && hasAutoSelectedRef.current !== currentProjectId) {
+                  hasAutoSelectedRef.current = currentProjectId;
                   const defaultNodeId = resolvedActiveNodes[0];
                   const defaultNode = g.nodes.find((n: any) => n.id.toLowerCase() === defaultNodeId.toLowerCase() || normalizeArtistId(n.id) === normalizeArtistId(defaultNodeId));
                   if (defaultNode) {
@@ -4954,7 +4956,8 @@ const App: React.FC = () => {
         setIsLoading(false);
 
         // Auto-hydrate the Deep Cut panel on load if nothing is selected
-        if (!selectedNode) {
+        if (!selectedNode && hasAutoSelectedRef.current !== currentProjectId) {
+          hasAutoSelectedRef.current = currentProjectId;
           const seeds = (seedArtists || '').split('::').map(s => s.trim().toLowerCase());
           const firstSeedNode = graphData.nodes.find(n => 
             n.type === 'artist' && seeds.includes(n.id.toLowerCase())
