@@ -9,6 +9,12 @@ import { normalizeArtistId } from '../services/artistCacheService';
 
 type FilterKeys = 'genre' | 'label' | 'country' | 'founded' | 'seed' | 'recommended';
 
+// Define static virtual space to isolate physics from container resizes
+const VIRTUAL_WIDTH = 2000;
+const VIRTUAL_HEIGHT = 2000;
+const VIRTUAL_CENTER_X = VIRTUAL_WIDTH / 2;
+const VIRTUAL_CENTER_Y = VIRTUAL_HEIGHT / 2;
+
 interface MusicGraphProps {
   data: GraphData;
   libraryArtists: string[];
@@ -217,8 +223,8 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   const handleCenter = () => {
     if (svgRef.current && zoomRef.current && dimensions.width > 0) {
         const k = 0.5;
-        const tx = (dimensions.width / 2) * (1 - k);
-        const ty = (dimensions.height / 2) * (1 - k);
+        const tx = (dimensions.width / 2) - VIRTUAL_CENTER_X * k;
+        const ty = (dimensions.height / 2) - VIRTUAL_CENTER_Y * k;
         d3.select(svgRef.current).transition().duration(750).call(zoomRef.current.transform as any, d3.zoomIdentity.translate(tx, ty).scale(k));
     }
   };
@@ -366,14 +372,12 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     setHighlightedNodes(newHighlighted);
   }, [searchQuery, visibleNodes]);
 
-  // Observation A: When a search yields exactly one match, smoothly pan and
-  // zoom the D3 viewport to centre that node in the visible canvas frame.
+  const prevHighlightedRef = useRef<string | null>(null);
+
   useEffect(() => {
+    if (!svgRef.current || !zoomRef.current || highlightedNodes.size === 0) return;
     if (
-      highlightedNodes.size !== 1 ||
-      !svgRef.current ||
-      !zoomRef.current ||
-      dimensions.width === 0 ||
+      dimensions.width === 0 || 
       dimensions.height === 0
     ) return;
 
@@ -388,9 +392,13 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     const ty = height / 2 - targetScale * node.y!;
     const newTransform = d3.zoomIdentity.translate(tx, ty).scale(targetScale);
 
+    const isHighlightChange = prevHighlightedRef.current !== matchedId;
+    prevHighlightedRef.current = matchedId;
+    const duration = isHighlightChange ? 600 : 0;
+
     d3.select(svgRef.current)
-      .transition()
-      .duration(600)
+      .transition() // Using transition(0) interrupts any ongoing animation and locks instantly
+      .duration(duration)
       .ease(d3.easeCubicOut)
       .call(zoomRef.current.transform as any, newTransform);
   }, [highlightedNodes, visibleNodes, dimensions]);
@@ -405,12 +413,6 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     if (svgRef.current?.parentElement) resizeObserver.observe(svgRef.current.parentElement);
     return () => resizeObserver.disconnect();
   }, []);
-
-  // Define static virtual space to isolate physics from container resizes
-  const VIRTUAL_WIDTH = 2000;
-  const VIRTUAL_HEIGHT = 2000;
-  const VIRTUAL_CENTER_X = VIRTUAL_WIDTH / 2;
-  const VIRTUAL_CENTER_Y = VIRTUAL_HEIGHT / 2;
 
   useEffect(() => {
     if (!svgRef.current || dimensions.width === 0) return;
@@ -1327,18 +1329,16 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     const isSelectionChange = lastCenteredNodeIdRef.current !== selectedNode.id;
     lastCenteredNodeIdRef.current = selectedNode.id;
 
-    if (isSelectionChange) {
-      // Smooth eased transition when the user selects a new node
-      d3.select(svgRef.current)
-        .transition()
-        .duration(600)
-        .ease(d3.easeCubicOut)
-        .call(zoomRef.current.transform as any, newTransform);
-    } else {
-      // Instant update on resize so the graph tracks the sidebar transition in real-time
-      d3.select(svgRef.current)
-        .call(zoomRef.current.transform as any, newTransform);
-    }
+    const animationDuration = isSelectionChange ? 600 : 0;
+
+    // By explicitly using a transition(0), D3 interrupts any currently playing 
+    // smooth-pan animations, forcing an immediate, synchronous snap to the new transform.
+    // This eliminates camera "drifting" or "lag" when the UI flexbox resizes rapidly.
+    d3.select(svgRef.current)
+      .transition()
+      .duration(animationDuration)
+      .ease(d3.easeCubicOut)
+      .call(zoomRef.current.transform as any, newTransform);
   }, [selectedNode, dimensions]);
 
   useEffect(() => {
