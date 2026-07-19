@@ -1521,7 +1521,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             )}
         </AnimatePresence>
 
-        {hoveredLink && (
+        {hoveredLink && !selectedNode && (
             <div
                 style={
                     typeof window !== 'undefined' && window.innerWidth >= 1024
