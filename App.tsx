@@ -1398,6 +1398,7 @@ const App: React.FC = () => {
   const discoveryFiltersRef = useRef<DiscoveryFilters>({});
   const lastViewedStackCountRef = useRef<number>(0);
   const currentCacheKeyRef = useRef<string | null>(null);
+  const lastSyncedDocRef = useRef<string>('');
   const evictedNodeIdsRef = useRef<Set<string>>(new Set());
   const approvedSeedsRef = useRef<Set<string>>(new Set());
 
@@ -4721,6 +4722,19 @@ const App: React.FC = () => {
         console.error("Failed to parse project data:", err);
       }
 
+      // Update the last synced payload to prevent the autosave hook from running on load
+      const snapPayload = {
+        seedArtists: data.seedArtists || '',
+        discoveryFilters: typeof data.discoveryFilters === 'string' ? data.discoveryFilters : JSON.stringify(data.discoveryFilters || {}),
+        lastViewedStackCount: data.lastViewedStackCount || 0,
+        activeNodes: data.activeNodes || [],
+        isMagazineViewOpen: data.isMagazineViewOpen || false,
+        chatHistories: typeof data.chatHistories === 'string' ? data.chatHistories : JSON.stringify(data.chatHistories || []),
+        canvasLayout: data.canvasLayout || '[]',
+        graphData: data.graphData || '{}'
+      };
+      lastSyncedDocRef.current = JSON.stringify(snapPayload);
+
       isProjectLoadingRef.current = false;
       return true; // Found
     };
@@ -4897,6 +4911,27 @@ const App: React.FC = () => {
     if (!user || !isFirebaseReady || !isAuthInitialized || !currentProjectId || isGuest) return;
     if (!graphData || isProjectLoadingRef.current) return;
 
+    // Build canvas layout and payload for dirty comparison
+    const canvasLayout = graphData.nodes
+      .filter(n => n.type === 'artist')
+      .map(n => ({ nodeId: n.id, x: n.x, y: n.y, fx: n.fx ?? null, fy: n.fy ?? null }));
+
+    const currentPayload = {
+      seedArtists,
+      discoveryFilters: JSON.stringify(discoveryFilters),
+      lastViewedStackCount,
+      activeNodes: activeNodes.map(n => n.id),
+      isMagazineViewOpen: isMagazineViewOpen && activeNodes.length > 0,
+      chatHistories: JSON.stringify(Array.from(chatHistories.entries())),
+      canvasLayout: JSON.stringify(canvasLayout),
+      graphData: JSON.stringify(graphData)
+    };
+
+    if (lastSyncedDocRef.current && JSON.stringify(currentPayload) === lastSyncedDocRef.current) {
+      console.log('[Autosave] Skipping write: local state is identical to last synced Firestore state');
+      return;
+    }
+
     const timer = setTimeout(async () => {
       const projectPath = `users/${user.uid}/projects/${currentProjectId}`;
       try {
@@ -4904,11 +4939,6 @@ const App: React.FC = () => {
 
         console.log(`[Database Reporter] Attempting PROJECT SAVE | Path: ${projectPath}`);
         
-        // Phase 05: Build lightweight canvas layout — artist nodes only (x/y/fx/fy)
-        const canvasLayout = graphData.nodes
-          .filter(n => n.type === 'artist')
-          .map(n => ({ nodeId: n.id, x: n.x, y: n.y, fx: n.fx ?? null, fy: n.fy ?? null }));
-
         const docPayload: Record<string, any> = {
           seedArtists,
           discoveryFilters: JSON.stringify(discoveryFilters),
@@ -4949,7 +4979,23 @@ const App: React.FC = () => {
         await setDoc(doc(db, projectPath), docPayload, { merge: true });
         console.log(`[Database Reporter] SUCCESS: Project synced.`);
 
-        console.log(`[Database Reporter] SUCCESS: Project synced (mock).`);
+        // Update the last synced payload ref
+        let updatedPayload = currentPayload;
+        try {
+          if (lastSyncedDocRef.current) {
+            const parsed = JSON.parse(lastSyncedDocRef.current);
+            updatedPayload = {
+              ...parsed,
+              ...currentPayload
+            };
+            if (!docPayload.graphData) {
+              updatedPayload.graphData = parsed.graphData;
+              updatedPayload.canvasLayout = parsed.canvasLayout;
+            }
+          }
+        } catch (e) {}
+        lastSyncedDocRef.current = JSON.stringify(updatedPayload);
+
         setTimeout(() => { isHydratingSessionRef.current = false; }, 1000);
       } catch (err) {
         console.error(`[Database Reporter] PROJECT SAVE FAILED: ${projectPath}`);
