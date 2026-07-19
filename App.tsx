@@ -4487,6 +4487,31 @@ const App: React.FC = () => {
               // Restore active nodes
               if (data.activeNodes && Array.isArray(data.activeNodes)) {
                 setActiveNodeIds(data.activeNodes);
+                
+                // Synchronously auto-select/hydrate the first active node if nothing is selected
+                if (!selectedNode && data.activeNodes.length > 0) {
+                  const defaultNodeId = data.activeNodes[0];
+                  const defaultNode = g.nodes.find(n => n.id.toLowerCase() === defaultNodeId.toLowerCase() || normalizeArtistId(n.id) === normalizeArtistId(defaultNodeId));
+                  if (defaultNode) {
+                    const normId = normalizeArtistId(defaultNode.id);
+                    const cachedDetails = detailsCacheRef.current.get(normId) || detailsCacheRef.current.get(defaultNode.id.toLowerCase());
+                    if (cachedDetails && cachedDetails.summary && !cachedDetails._isSentinel) {
+                      const hydratedNode = {
+                        ...defaultNode,
+                        bio: cachedDetails.summary,
+                        summary: cachedDetails.summary,
+                        genre: cachedDetails.details?.genre || "",
+                        origin: cachedDetails.details?.origin || "",
+                        founded: cachedDetails.details?.founded || "",
+                        name: cachedDetails.details?.artist || defaultNode.id,
+                        imageUrl: cachedDetails.imageUrl || ""
+                      };
+                      setSelectedNode(hydratedNode);
+                    } else {
+                      setSelectedNode(defaultNode);
+                    }
+                  }
+                }
               }
 
               loadedFromGraphData = true;

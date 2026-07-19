@@ -1316,6 +1316,19 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         if (systemError) return [];
         let result = [...activeNodes];
 
+        // Component-Level Primacy: If activeNodes is empty but we have a selectedNode that is locked,
+        // display the selectedNode card immediately instead of flashing the spinner.
+        if (result.length === 0 && selectedNode) {
+            const normId = normalizeArtistId(selectedNode.id);
+            const details = detailsCache.get(selectedNode.id) || 
+                            detailsCache.get(selectedNode.id.toLowerCase()) || 
+                            detailsCache.get(normId);
+            const isLocked = !!(details && details.summary && details.summary.trim().length > 5 && !details._isSentinel);
+            if (isLocked) {
+                result = [selectedNode];
+            }
+        }
+
         // Filter
         if (isMagazineViewOpen && magazineSearchQuery.trim()) {
             const query = magazineSearchQuery.toLowerCase().trim();
