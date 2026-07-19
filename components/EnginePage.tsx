@@ -666,49 +666,29 @@ const LOCALIZED_LOADING_DOCUMENTATION = `
 `;
 
 const PHYSICS_STABILIZATION_DOCUMENTATION = `
-Zcene's D3.js physics engine is intentionally stabilized to prevent jitter.
-This section documents the specific anti-patterns that were identified and
-eliminated to guarantee a smooth Spiderweb experience.
+Zcene's D3.js physics engine is intentionally stabilized to prevent jitter and positional snaps.
+This section documents the specific anti-patterns and stabilization layers that guarantee a smooth Spiderweb experience.
 
-1. ROOT CAUSE OF JITTER (RESOLVED — MusicGraph.tsx):
-   The primary source of physics jitter was a useMemo + useEffect pattern
-   that called simulationRef.current.alpha(0.15).restart() whenever
-   the detailsCache Map prop changed.
+1. THE LIVE COORDINATE HANDSHAKE (MusicGraph.tsx):
+   - Problem: When the background Firestore sync downloaded fresh graphData JSON (e.g. after a deep cut curation finished), App.tsx passed these newly parsed nodes down to MusicGraph. D3 would accept these nodes and overwrite its live, high-framerate physics coordinates with the 3-5 second old stale JSON coordinates, causing nodes to violently "Time-travel Snap" back to their old positions.
+   - Fix: Right before calling simulation.nodes(visibleNodes), the engine performs a Live Coordinate Handshake. It reads the live momentum and position (x, y, vx, vy, fx, fy) from the active simulation and maps them. It then iterates over the incoming JSON visibleNodes and overwrites their stale coordinates with the live physics data. This allows network updates to seamlessly inject into the web without disturbing active nodes.
 
-   The Problem:
-   - App.tsx updates the cache via: setDetailsCache(prev => new Map(prev).set(...))
-   - new Map(prev) creates a brand-new Map object reference on every write.
-   - The useMemo([selectedNode, detailsCache]) recomputed on every reference change.
-   - The useEffect fired, restarting the physics simulation on EVERY node click.
-   - Result: All nodes re-settled from their current positions on every interaction.
+2. SELECTION LIFECYCLE & RESTART DECOUPLING (MusicGraph.tsx):
+   - Problem: Previously, mutating the active node list (even just selecting an already existing node) triggered a high-energy simulation.alpha(1.0).restart(). This blast caused the physics gravity well to violently drag the unpinned node toward the center of the screen, pulling the Spring Camera with it and causing a visual "jump".
+   - Fix: The simulation restart is decoupled. A prevVisibleNodesLengthRef tracks the physical structure of the web. The simulation now only fires a 1.0 high-energy restart if nodes are added or removed. If a node is merely selected (a metadata/CSS change), the graph uses a gentle alpha(0.2) wake. Pinned coordinates are respected, and the camera glides smoothly.
 
-   The Fix:
-   The details useMemo and its restart useEffect were deleted entirely.
-   The D3 tick handler already computes node positions from live x/y properties
-   attached directly to node objects; no simulation restart is needed for
-   correct layout after a cache hydration event.
+3. REVERSION BUG & AUTO-HYDRATION DEFANGING (App.tsx):
+   - Problem: The Re-hydration Hook automatically reverted the selection to the Seed Artist if the selection became null.
+   - Fix: The Re-hydration and Background Sync hooks are wrapped with a hasAutoSelectedRef so they only auto-select ONCE per project load. If the user intentionally clicks the background to clear the selection, the panel now gracefully closes without reverting to the seed.
 
-2. SECONDARY RESTART (PRESERVE WITH CAUTION):
-   A second restart exists at MusicGraph.tsx:
-     useEffect(() => {
-       if (isActive && simulationRef.current) {
-         simulationRef.current.alpha(0.3).restart();
-       }
-     }, [isActive]);
-   This fires only when the graph tab becomes active (isActive toggles).
-   It is intentional — it re-energizes the simulation when the user switches
-   back to the Spiderweb tab after the sim has cooled. Do not remove it.
+4. INTERACTION SAFEGUARDS & CLICK DAMPENING (MusicGraph.tsx):
+   - Problem: If a user clicked a bouncing node and their cursor slipped slightly off the circle during the click, the browser registered an SVG background click, nullifying the selection accidentally.
+   - Fix: A dragEndTimeRef tracks the timestamp of the last drag/physics interaction. The system ignores SVG background clicks that occur within 100ms of a drag terminating, shielding the UX from micro-slips.
 
-3. GOVERNING RULE FOR FUTURE DEVELOPERS:
-   NEVER call simulationRef.current.restart() or .alpha() in response to:
-   - detailsCache Map changes
-   - loadingNodeIds Set changes
-   - selectedNode changes
-   - Any prop that updates more frequently than the isActive tab toggle.
-   Doing so will re-introduce the jitter regression.
-
-4. ALPHA VALUES (Reference):
-   - Initial layout: alpha(0.15) — gentle, approachable
+5. ALPHA VALUES (Reference):
+   - Structural Layout Change (Length Delta): alpha(1.0) — high energy wake
+   - Metadata Selection Change: alpha(0.2) — gentle wake, respects pins
+   - Initial layout: alpha(0.15) — approachable initialization
    - Tab re-activation: alpha(0.3) — moderate re-energization
    - Interactive drag: alphaTarget(0.2) on drag start, alphaTarget(0) on end
    - alphaDecay(0.1) and alphaMin(0.01) ensure the sim halts quickly
