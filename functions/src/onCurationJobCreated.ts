@@ -393,14 +393,24 @@ export const onCurationJobCreated = onDocumentCreated({
         ? graphObj.nodes.filter((n: any) => n.type === 'artist').map((n: any) => normalizeArtistId(n.id))
         : [];
 
+      // Derive the seed artist IDs to pre-populate activeNodes (the "DEEP CUTS" queue on the dashboard).
+      // The backend never previously wrote activeNodes, leaving it as [] from project creation,
+      // which caused the dashboard to always show DEEP CUTS: 0 for backend-generated projects.
+      const seedArtistIds = (inputPayload.artists || '')
+        .split('::')
+        .map((a: string) => normalizeArtistId(a.trim()))
+        .filter((id: string) => id && artistIds.includes(id));
+
       await updateProjectStatus(jobData.userId, inputPayload.projectId, {
         status: "completed",
         graphData: JSON.stringify(result.graphData),
         artistIds: artistIds,
+        activeNodes: seedArtistIds,
         activeJobId: null,
         detailsCache: result.detailsCache
       });
     }
+
 
   } catch (error: any) {
     console.error(`[Curation Backend] Failed processing job ${jobId}:`, error);

@@ -357,8 +357,22 @@ const Dashboard: React.FC<DashboardProps> = ({
                       const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
                       const displayTitle = project.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene");
                       
-                      const deepCutsCount = (project.activeNodes || []).length;
-                      
+                      // Derive deep cuts count: prefer the persisted activeNodes queue.
+                      // For stale documents where activeNodes was never written by the backend
+                      // (legacy projects always have activeNodes: []), fall back to counting
+                      // how many seed artists are present in the graphData — which is always
+                      // at least 1 for a mapped project.
+                      let deepCutsCount = (project.activeNodes || []).length;
+                      if (deepCutsCount === 0 && project.graphData) {
+                        try {
+                          const pg = typeof project.graphData === 'string' ? JSON.parse(project.graphData) : project.graphData;
+                          if (pg && Array.isArray(pg.nodes)) {
+                            const seedSet = new Set(seedList.map((s: string) => normalizeArtistId(s)));
+                            deepCutsCount = pg.nodes.filter((n: any) => (n.type === 'artist' || !n.type) && seedSet.has(normalizeArtistId(n.id))).length;
+                          }
+                        } catch (e) { /* ignore */ }
+                      }
+
                       let recommendedCount = 0;
                       if (project.graphData) {
                         try {
@@ -517,7 +531,18 @@ const Dashboard: React.FC<DashboardProps> = ({
                         const formattedDate = formatProjectTimestamp(project.updatedAt);
                         const isMapped = !!project.graphData;
                         
-                        const deepCutsCount = (project.activeNodes || []).length;
+                        // Derive deep cuts count: prefer the persisted activeNodes queue.
+                        // Fallback for stale documents: count seed artists present in graphData.
+                        let deepCutsCount = (project.activeNodes || []).length;
+                        if (deepCutsCount === 0 && project.graphData) {
+                          try {
+                            const pg = typeof project.graphData === 'string' ? JSON.parse(project.graphData) : project.graphData;
+                            if (pg && Array.isArray(pg.nodes)) {
+                              const seedSet = new Set(seedList.map((s: string) => normalizeArtistId(s)));
+                              deepCutsCount = pg.nodes.filter((n: any) => (n.type === 'artist' || !n.type) && seedSet.has(normalizeArtistId(n.id))).length;
+                            }
+                          } catch (e) { /* ignore */ }
+                        }
                         
                         let recommendedCount = 0;
                         if (project.graphData) {
