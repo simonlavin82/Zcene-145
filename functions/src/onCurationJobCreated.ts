@@ -102,7 +102,9 @@ async function updateProjectStatus(userId: string, projectId: string, updates: a
 
 export const onCurationJobCreated = onDocumentCreated({
   document: "curationJobs/{jobId}",
-  secrets: ["GEMINI_API_KEY"]
+  secrets: ["GEMINI_API_KEY"],
+  timeoutSeconds: 540,
+  memory: "1GiB",
 }, async (event) => {
   const snapshot = event.data;
   if (!snapshot) {
@@ -307,8 +309,13 @@ export const onCurationJobCreated = onDocumentCreated({
           const seedDetailsEntry = detailsCacheEntries.find(entry => normalizeArtistId(entry[0]) === seedNorm);
           const seedDetails = seedDetailsEntry ? seedDetailsEntry[1] : null;
 
-          // Run Sanity Check
-          validateArtistDetailsSchema(seedNorm, seedDetails);
+          // Run Sanity Check — non-fatal: log and skip this seed's cache write rather than aborting the entire job
+          try {
+            validateArtistDetailsSchema(seedNorm, seedDetails);
+          } catch (validationErr: any) {
+            console.warn(`[Curation Backend] Seed cache write skipped for "${seedNorm}" — schema validation failed: ${validationErr.message}`);
+            continue;
+          }
 
           await db.collection("artists").doc(seedNorm).set({
             cacheKey: seedNorm,
@@ -337,8 +344,13 @@ export const onCurationJobCreated = onDocumentCreated({
           const recDetailsEntry = detailsCacheEntries.find(entry => normalizeArtistId(entry[0]) === recNorm);
           const recDetails = recDetailsEntry ? recDetailsEntry[1] : null;
 
-          // Run Sanity Check
-          validateArtistDetailsSchema(recNorm, recDetails);
+          // Run Sanity Check — non-fatal: log and skip this recommendation's cache write rather than aborting the entire job
+          try {
+            validateArtistDetailsSchema(recNorm, recDetails);
+          } catch (validationErr: any) {
+            console.warn(`[Curation Backend] Recommendation cache write skipped for "${recNorm}" — schema validation failed: ${validationErr.message}`);
+            continue;
+          }
 
           await db.collection("artists").doc(recNorm).set({
             cacheKey: recNorm,

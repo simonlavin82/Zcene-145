@@ -525,7 +525,20 @@ export const writeArtistCacheMany = async (
           console.log(`[ArtistCache] Created Canonical: ${compositeCanonicalId} (${nodes.length} nodes, ${links.length} links)`);
         } else {
           const existing = canonicalSnap.data();
-          if (forceOverwrite || (existing && (!existing.cacheVersion || existing.cacheVersion < 2 || (preserveFullGraph && existing.isDeep !== true)))) {
+
+          // Break the version gate: if the incoming graph is richer (more artist nodes)
+          // than what is stored, always overwrite — a full graph must replace a stale truncated one.
+          let existingArtistCount = 0;
+          if (existing?.graphData) {
+            try {
+              const existingGraph = JSON.parse(existing.graphData);
+              existingArtistCount = (existingGraph.nodes || []).filter((n: any) => n.type === 'artist').length;
+            } catch (e) { /* ignore parse errors on stale doc */ }
+          }
+          const incomingArtistCount = nodes.filter(n => n.type === 'artist').length;
+          const isRicherGraph = incomingArtistCount > existingArtistCount;
+
+          if (forceOverwrite || isRicherGraph || (existing && (!existing.cacheVersion || existing.cacheVersion < 2 || (preserveFullGraph && existing.isDeep !== true)))) {
             // ── UPGRADE PATH (Case B) ─────────────────────────────────────────
             const updatePayload: any = {
               cacheKey: compositeCanonicalId,
@@ -543,11 +556,12 @@ export const writeArtistCacheMany = async (
             }
             enforceArtistCacheSchema(updatePayload);
             await updateDoc(canonicalDocRef, updatePayload);
-            console.log(`[ArtistCache] Upgraded/Overwritten Canonical doc: ${compositeCanonicalId} → cacheVersion 2`);
+            console.log(`[ArtistCache] Upgraded/Overwritten Canonical doc: ${compositeCanonicalId} → cacheVersion 2 (incoming: ${incomingArtistCount} artists, existing: ${existingArtistCount} artists)`);
           } else {
-            console.log(`[ArtistCache] Skipping write for Canonical "${compositeCanonicalId}" — doc already at v${existing?.cacheVersion || 2}.`);
+            console.log(`[ArtistCache] Skipping write for Canonical "${compositeCanonicalId}" — doc already at v${existing?.cacheVersion || 2} with ${existingArtistCount} artist nodes (incoming also has ${incomingArtistCount}).`);
           }
         }
+
 
         if (isAlias) {
           const aliasDocRef = doc(db, 'artists', compositeArtistId);
