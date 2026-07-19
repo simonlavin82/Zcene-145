@@ -4356,16 +4356,23 @@ const App: React.FC = () => {
     };
 
     const handleSnap = async (snap: any): Promise<boolean> => {
-      if (isHydratingSessionRef.current) {
-        console.log('[ProjectLoader] Bypassing snapshot handle because local session is saving/hydrating');
-        return false;
-      }
       if (!isMounted || !snap.exists()) {
         isProjectLoadingRef.current = false;
         return false;
       }
 
       const data = snap.data();
+      const statusChanged = data.status !== projectStatus;
+      const jobChanged = data.activeJobId !== activeJobId;
+      const incomingHasGraph = data.graphData && typeof data.graphData === 'string' && data.graphData.trim().length > 20;
+      const localHasGraph = graphDataRef.current && graphDataRef.current.nodes && graphDataRef.current.nodes.length > 0;
+      
+      const isCriticalUpdate = statusChanged || jobChanged || (incomingHasGraph && !localHasGraph);
+
+      if (isHydratingSessionRef.current && !isCriticalUpdate) {
+        console.log('[ProjectLoader] Bypassing snapshot handle because local session is saving/hydrating and update is non-critical');
+        return false;
+      }
 
       // Guard against race condition: if local state is already populated (e.g. from a cache hit or manual generation),
       // do not let a snapshot with empty graph/seeds overwrite it, because the local save has not synced to Firestore yet.
@@ -4427,62 +4434,67 @@ const App: React.FC = () => {
         let hydratedNodes: Node[] = [];
         if (data.graphData && typeof data.graphData === 'string' && data.graphData.trim().length > 20) {
           try {
-            console.log('[ProjectLoader] Hydrating directly from project graphData');
-            const g = normalizeGraphData(JSON.parse(data.graphData));
-            g.links = g.links.map((l: any) => ({
-              ...l,
-              source: typeof l.source === 'object' ? l.source.id : l.source,
-              target: typeof l.target === 'object' ? l.target.id : l.target,
-            }));
+            const parsed = JSON.parse(data.graphData);
+            if (parsed && parsed.nodes && parsed.nodes.length > 0) {
+              console.log('[ProjectLoader] Hydrating directly from project graphData');
+              const g = normalizeGraphData(parsed);
+              g.links = g.links.map((l: any) => ({
+                ...l,
+                source: typeof l.source === 'object' ? l.source.id : l.source,
+                target: typeof l.target === 'object' ? l.target.id : l.target,
+              }));
 
-            // Re-apply saved canvas positions
-            if (data.canvasLayout) {
-              try {
-                const positions: Array<{ nodeId: string; x?: number; y?: number; fx?: number | null; fy?: number | null }> = JSON.parse(data.canvasLayout);
-                positions.forEach(ref => {
-                  const node = g.nodes.find((n: any) => n.id === ref.nodeId);
-                  if (node) { node.x = ref.x; node.y = ref.y; node.fx = ref.fx ?? null; node.fy = ref.fy ?? null; }
-                });
-              } catch (e) { console.warn('[ProjectLoader] canvasLayout parse failed:', e); }
-            }
-
-            g.nodes.forEach((n: any) => { n.fx = n.fx ?? null; n.fy = n.fy ?? null; });
-            setGraphData((prev: any) => isGraphEqual(prev, g) ? prev : g);
-
-            if (data.detailsCache) {
-              try {
-                const rawMap = new Map<string, NodeDetails>(JSON.parse(data.detailsCache));
-                const newCacheMap = new Map<string, NodeDetails>();
-                rawMap.forEach((v, k) => {
-                  newCacheMap.set(k, v);
-                  newCacheMap.set(k.toLowerCase(), v);
-                  newCacheMap.set(normalizeArtistId(k), v);
-                  
-                  // Synchronously write to detailsCacheRef.current so immediate selection is safe
-                  detailsCacheRef.current.set(k, v);
-                  detailsCacheRef.current.set(k.toLowerCase(), v);
-                  detailsCacheRef.current.set(normalizeArtistId(k), v);
-                });
-                setDetailsCache((prev) => {
-                  const merged = new Map(prev);
-                  newCacheMap.forEach((v, k) => merged.set(k, v));
-                  return merged;
-                });
-              } catch (e) {
-                console.error("[ProjectLoader] Details cache parse fail", e);
+              // Re-apply saved canvas positions
+              if (data.canvasLayout) {
+                try {
+                  const positions: Array<{ nodeId: string; x?: number; y?: number; fx?: number | null; fy?: number | null }> = JSON.parse(data.canvasLayout);
+                  positions.forEach(ref => {
+                    const node = g.nodes.find((n: any) => n.id === ref.nodeId);
+                    if (node) { node.x = ref.x; node.y = ref.y; node.fx = ref.fx ?? null; node.fy = ref.fy ?? null; }
+                  });
+                } catch (e) { console.warn('[ProjectLoader] canvasLayout parse failed:', e); }
               }
+
+              g.nodes.forEach((n: any) => { n.fx = n.fx ?? null; n.fy = n.fy ?? null; });
+              setGraphData((prev: any) => isGraphEqual(prev, g) ? prev : g);
+
+              if (data.detailsCache) {
+                try {
+                  const rawMap = new Map<string, NodeDetails>(JSON.parse(data.detailsCache));
+                  const newCacheMap = new Map<string, NodeDetails>();
+                  rawMap.forEach((v, k) => {
+                    newCacheMap.set(k, v);
+                    newCacheMap.set(k.toLowerCase(), v);
+                    newCacheMap.set(normalizeArtistId(k), v);
+                    
+                    // Synchronously write to detailsCacheRef.current so immediate selection is safe
+                    detailsCacheRef.current.set(k, v);
+                    detailsCacheRef.current.set(k.toLowerCase(), v);
+                    detailsCacheRef.current.set(normalizeArtistId(k), v);
+                  });
+                  setDetailsCache((prev) => {
+                    const merged = new Map(prev);
+                    newCacheMap.forEach((v, k) => merged.set(k, v));
+                    return merged;
+                  });
+                } catch (e) {
+                  console.error("[ProjectLoader] Details cache parse fail", e);
+                }
+              }
+
+              // ── FIRESTORE-FIRST: batch-load all node biographies before marking load complete
+              await batchHydrateDetailsCache(g.nodes, g.links);
+              hydratedNodes = g.nodes;
+
+              // Restore active nodes
+              if (data.activeNodes && Array.isArray(data.activeNodes)) {
+                setActiveNodeIds(data.activeNodes);
+              }
+
+              loadedFromGraphData = true;
+            } else {
+              console.warn('[ProjectLoader] Project document contains empty graph. Falling back to Phase 1 cache lookup.');
             }
-
-            // ── FIRESTORE-FIRST: batch-load all node biographies before marking load complete
-            await batchHydrateDetailsCache(g.nodes, g.links);
-            hydratedNodes = g.nodes;
-
-            // Restore active nodes
-            if (data.activeNodes && Array.isArray(data.activeNodes)) {
-              setActiveNodeIds(data.activeNodes);
-            }
-
-            loadedFromGraphData = true;
           } catch (e) {
             console.error('[ProjectLoader] Failed to hydrate directly from graphData:', e);
           }
@@ -4908,25 +4920,28 @@ const App: React.FC = () => {
           updatedAt: serverTimestamp(),
         };
 
-        if (currentCacheKey) {
-          // Legacy path: preserve the compound cacheKey if it was set in the current session
-          // (e.g. session started before Phase 1 was deployed). Write it for backward compatibility.
-          docPayload.cacheKey = currentCacheKey;
-          docPayload.canvasLayout = JSON.stringify(canvasLayout);
-        } else {
-          // Phase 1+: derive the artistIds array from all artist nodes currently in the graph.
-          // Each entry points to an individual /artists/{id} Firestore document.
-          const currentArtistList = graphData.nodes
-            .filter((n: any) => n.type === 'artist')
-            .map((n: any) => n.id);
-
-          if (currentArtistList.length > 0) {
-            docPayload.artistIds = currentArtistList.map((name: string) => normalizeArtistId(name));
+        const hasGraphNodes = graphData && graphData.nodes && graphData.nodes.length > 0;
+        if (hasGraphNodes && projectStatus !== 'curating') {
+          if (currentCacheKey) {
+            // Legacy path: preserve the compound cacheKey if it was set in the current session
+            // (e.g. session started before Phase 1 was deployed). Write it for backward compatibility.
+            docPayload.cacheKey = currentCacheKey;
             docPayload.canvasLayout = JSON.stringify(canvasLayout);
-            docPayload.graphData = JSON.stringify(graphData);
           } else {
-            // No artists present yet — fall back to full blob (should be rare)
-            docPayload.graphData = JSON.stringify(graphData);
+            // Phase 1+: derive the artistIds array from all artist nodes currently in the graph.
+            // Each entry points to an individual /artists/{id} Firestore document.
+            const currentArtistList = graphData.nodes
+              .filter((n: any) => n.type === 'artist')
+              .map((n: any) => n.id);
+
+            if (currentArtistList.length > 0) {
+              docPayload.artistIds = currentArtistList.map((name: string) => normalizeArtistId(name));
+              docPayload.canvasLayout = JSON.stringify(canvasLayout);
+              docPayload.graphData = JSON.stringify(graphData);
+            } else {
+              // No artists present yet — fall back to full blob (should be rare)
+              docPayload.graphData = JSON.stringify(graphData);
+            }
           }
         }
 
