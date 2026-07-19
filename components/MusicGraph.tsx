@@ -406,6 +406,12 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     return () => resizeObserver.disconnect();
   }, []);
 
+  // Define static virtual space to isolate physics from container resizes
+  const VIRTUAL_WIDTH = 2000;
+  const VIRTUAL_HEIGHT = 2000;
+  const VIRTUAL_CENTER_X = VIRTUAL_WIDTH / 2;
+  const VIRTUAL_CENTER_Y = VIRTUAL_HEIGHT / 2;
+
   useEffect(() => {
     if (!svgRef.current || dimensions.width === 0) return;
     const svg = d3.select(svgRef.current);
@@ -728,7 +734,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             });
         svg.call(zoom);
         zoomRef.current = zoom;
-        svg.call(zoom.transform, d3.zoomIdentity.translate(dimensions.width/4, dimensions.height/4).scale(0.5));
+        svg.call(zoom.transform, d3.zoomIdentity.translate(dimensions.width/2 - VIRTUAL_CENTER_X * 0.5, dimensions.height/2 - VIRTUAL_CENTER_Y * 0.5).scale(0.5));
     }
 
     svg.on("click", (event) => { 
@@ -894,9 +900,9 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 }
             }
 
-            // Fallback placement near the center of the viewport
-            n.x = width / 2 + (Math.random() - 0.5) * 100;
-            n.y = height / 2 + (Math.random() - 0.5) * 100;
+            // Fallback placement near the virtual center
+            n.x = VIRTUAL_CENTER_X + (Math.random() - 0.5) * 100;
+            n.y = VIRTUAL_CENTER_Y + (Math.random() - 0.5) * 100;
             n.vx = 0;
             n.vy = 0;
         }
@@ -933,14 +939,14 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     forceX.strength((d: Node) => {
         const isSeed = d.type === 'artist' && (seedArtistSet.has(d.id.toLowerCase()) || seedArtistSet.has(normalizeArtistId(d.id)));
         return isSeed ? seedStrength : globalGravityStrength;
-    }).x(width / 2);
+    }).x(VIRTUAL_CENTER_X);
 
     forceY.strength((d: Node) => {
         const isSeed = d.type === 'artist' && (seedArtistSet.has(d.id.toLowerCase()) || seedArtistSet.has(normalizeArtistId(d.id)));
         return isSeed ? seedStrength : globalGravityStrength;
-    }).y(height / 2);
+    }).y(VIRTUAL_CENTER_Y);
 
-    simulation.force('center', d3.forceCenter(width / 2, height / 2).strength(0.005));
+    simulation.force('center', d3.forceCenter(VIRTUAL_CENTER_X, VIRTUAL_CENTER_Y).strength(0.005));
 
     // 2 & 3. Balanced Repulsion: Spaced but cohesive
     chargeForce.strength((d: Node) => {
@@ -1275,7 +1281,8 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         const restartAlpha = isStructuralChange ? 1.0 : 0.2;
         simulation.alpha(restartAlpha).alphaTarget(0).restart();
     }
-  }, [dimensions, visibleNodes, visibleLinks, seedArtists, activeFilters]);
+  // Removed `dimensions` to isolate physics from container resizes
+  }, [visibleNodes, visibleLinks, seedArtists, activeFilters]);
 
   // Ensure selectedNodePos is updated when selection changes, even if simulation is idle
   useEffect(() => {
