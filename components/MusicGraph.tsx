@@ -282,6 +282,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   
   const visibleNodesRef = useRef(visibleNodes);
   const prevArtistIdsRef = useRef<Set<string>>(new Set());
+  const prevLayoutSignatureRef = useRef<string>("");
   useEffect(() => {
     visibleNodesRef.current = visibleNodes;
   }, [visibleNodes, selectedNode]);
@@ -1247,10 +1248,17 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     }
     prevArtistIdsRef.current = currentArtistIds;
 
-    // Filter changes wake the simulation gently (alpha = 0.2) to maintain the spatial mental map.
-    // Structural changes (new artist searches or extensions) reset simulation with full alpha (1.0).
-    const restartAlpha = isStructuralChange ? 1.0 : 0.2;
-    simulation.alpha(restartAlpha).alphaTarget(0).restart();
+    // Check if layout or filters structurally changed (ignoring pure dimension resizes)
+    const layoutSignature = `${visibleNodes.map(n => n.id).join(',')}|${visibleLinks.map(l => `${nodeId(l.source)}-${nodeId(l.target)}`).join(',')}|${seedArtists.join(',')}|${JSON.stringify(activeFilters)}`;
+    const isLayoutChange = prevLayoutSignatureRef.current !== layoutSignature;
+    prevLayoutSignatureRef.current = layoutSignature;
+
+    if (isLayoutChange) {
+        // Filter changes wake the simulation gently (alpha = 0.2) to maintain the spatial mental map.
+        // Structural changes (new artist searches or extensions) reset simulation with full alpha (1.0).
+        const restartAlpha = isStructuralChange ? 1.0 : 0.2;
+        simulation.alpha(restartAlpha).alphaTarget(0).restart();
+    }
   }, [dimensions, visibleNodes, visibleLinks, seedArtists, activeFilters]);
 
   // Ensure selectedNodePos is updated when selection changes, even if simulation is idle
@@ -1270,6 +1278,33 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         setSelectedNodePos(null);
     }
   }, [selectedNode, visibleNodes, dimensions]);
+
+  // Smoothly center the selected node in the viewport when selected or when dimensions change
+  useEffect(() => {
+    if (
+      !selectedNode || 
+      !svgRef.current || 
+      !zoomRef.current || 
+      dimensions.width === 0 || 
+      dimensions.height === 0
+    ) return;
+
+    const node = visibleNodesRef.current.find(n => isSameNodeId(n.id, selectedNode.id));
+    if (!node || isNaN(node.x ?? NaN) || isNaN(node.y ?? NaN)) return;
+
+    const { width, height } = dimensions;
+    const transform = d3.zoomTransform(svgRef.current);
+    const k = transform.k; // Preserves current zoom level
+    const tx = width / 2 - k * node.x!;
+    const ty = height / 2 - k * node.y!;
+    const newTransform = d3.zoomIdentity.translate(tx, ty).scale(k);
+
+    d3.select(svgRef.current)
+      .transition()
+      .duration(600)
+      .ease(d3.easeCubicOut)
+      .call(zoomRef.current.transform as any, newTransform);
+  }, [selectedNode, dimensions]);
 
   useEffect(() => {
     if (!svgRef.current) return;
