@@ -77,12 +77,16 @@ real-time intelligence and global scalability.
      to an event-driven queue. Upon a new document in 'curationJobs', a gen2 
      Cloud Function manages the heavy lifting of calling Gemini, scraping YouTube 
      playability, and formatting metadata, fully offloading the client browser.
-   - Stateful Project Orchestration: When a curation job begins, the frontend 
-     immediately saves the project status as 'curating', recording seedArtists 
-     and activeJobId. Even if the browser tab is closed, the background Cloud 
-     Function writes the completed graphData and artistIds directly to the 
-     project document upon completion, allowing seamless session restoration 
-     on page reload.
+   - Stateful Project Orchestration: When a curation job begins, the frontend
+      immediately saves the project status as 'curating', recording seedArtists
+      and activeJobId. Even if the browser tab is closed, the background Cloud
+      Function writes the completed graphData, artistIds, detailsCache, and
+      activeNodes directly to the project document upon completion, allowing
+      seamless session restoration on page reload. The activeNodes field is
+      seeded with the normalized IDs of the seed artists confirmed present in
+      the generated graph, so the Deep Cut panel opens to the correct artist
+      on the user's first load without any user interaction.
+
    - Global Deployment: Serves at sub-second speeds by leveraging 
      Google's global edge network.
 
@@ -143,7 +147,9 @@ the entire dataset, the app evolves existing visual structures.
    and probes the global 'artists' collection concurrently for all seeds.
    - Cache HIT: Graph structure + Deep Cut metadata are returned instantly. 
      Phases 02 and 03 are bypassed entirely. D3 Phase 04 begins immediately, 
-     and artist canvas positions from the project's canvasLayout are restored.
+     artist canvas positions from the project's canvasLayout are restored, and
+     the Deep Cut activeNodes queue is initialised via the Seed-Fallback loader
+     (see Section 7) so the panel opens to the correct artist on first render.
    - Proactive Deep Cache: Upon generating a graph, the Cloud Function proactively 
      hydrates and caches full profile details (biographies, YouTube IDs, discographies) 
      for both the seeds and all recommended peer bands (isDeep: true). This ensures 
@@ -185,32 +191,68 @@ the entire dataset, the app evolves existing visual structures.
    - Mobile Dynamic Landing Routing: Initializes the mobile viewport directly on the 
      'SPIDERWEB' canvas tab if the loaded project contains seed artists.
 
-7. UNIFIED PROJECT CONTEXT & STATE-SYNCHRONIZATION (App.tsx / GraphPage.tsx / EnginePage.tsx):
-   Zcene enforces a single, unified project state that orchestrates project identity 
+7. UNIFIED PROJECT CONTEXT, ACTIVE NODES SYNCHRONIZATION & STATE-LOADING (App.tsx / GraphPage.tsx):
+   Zcene enforces a single, unified project state that orchestrates project identity
    and curation status to eliminate loading jitter and flickering.
-   - Synchronous Pre-population: Project identity (seedArtists, projectName, status, and activeJobId) 
-     is synchronously pre-populated from the local dashboard 'projects' list during routing, 
+   - Synchronous Pre-population: Project identity (seedArtists, projectName, status, and activeJobId)
+     is synchronously pre-populated from the local dashboard 'projects' list during routing,
      preventing the header from briefly clearing or flickering.
-   - Auto-Hydration: The Deep Cut details panel automatically hydrates upon loading a completed project 
-     by auto-selecting the first seed artist node and triggering the local details loader.
-   - Hydration Spinner Safeguard: To prevent race conditions where the Deep Cut panel momentarily flickers 
-     to the "Create Your Zcene" onboarding state before details are loaded, the panel renders the LoadingSpinner 
-     if seed artists are present in the project context.
-   - Graceful Degradation Protocol: Any node with a displayable biography (summary length > 5 characters) 
-     must be rendered immediately from cache, bypassing all loaders. Necessary data validation, revalidation, 
-     or cache self-healing is executed strictly in the background (via 'triggerBackgroundRevalidation') 
-     without blocking the user, clearing the panel, or triggering the foreground loading overlay. If the JIT 
-     details queue revalidation fails for an already displayable node, the exception is bypassed silently 
-     without writing sentinels or toasting error alerts.
-   - Canonical Graph Caching: Global shared artist cache documents (/artists/{id}) store the complete, 
-     canonical compiled graph returned by the model rather than pruned sub-graph snippets. This guarantees 
-     that both single-seed and multi-seed projects consistently reference the full master network.
-   - Sentinel Resolution: Cache entries marked as sentinel slots (_isSentinel: true) are flagged as corrupt; 
-     clicking a sentinel node bypasses the early-return cache checks and triggers JIT re-evaluation.
-   - Silent Re-validation: Metadata re-validation checks operate fully in the background. 
-     User-facing toasts for 'Cache Incomplete' (curation incomplete) warnings are suppressed 
+   - Auto-Hydration: The Deep Cut details panel automatically hydrates upon loading a completed project
+     by auto-selecting the first activeNodes entry and triggering the local details loader.
+   - SEED-FALLBACK LOADER (CRITICAL — App.tsx: handleProjectSnapshot):
+     The project loader runs across four code branches (graphData-direct, Phase 1 per-artist cache,
+     legacy cacheKey format, very-legacy blob format). Every branch calls
+     setActiveNodeIds() with a resolved value. For projects generated via the backend Cloud
+     Function prior to the activeNodes fix, data.activeNodes is always [] because the field
+     was never written by the backend — producing a permanent "DEEP CUTS: 0" indicator and a
+     flickering panel (briefly showing 1 from a prior state, then reverting to 0 when the
+     Firestore snapshot arrives). The Seed-Fallback pattern resolves this at all 6 call sites:
+
+       let resolvedActiveNodes = data.activeNodes;
+       if (resolvedActiveNodes.length === 0 && graphNodes.length > 0) {
+         const seedSet = new Set(seedArtists.map(normalizeArtistId));
+         resolvedActiveNodes = graphNodes
+           .filter(n => (n.type === 'artist' || !n.type) && seedSet.has(normalizeArtistId(n.id)))
+           .map(n => n.id);
+       }
+       setActiveNodeIds(resolvedActiveNodes);
+
+     This computes the correct queue on the fly from the already-loaded graph, producing a
+     stable non-zero count on first render with no flicker or revert. The first resolved node
+     is also used to auto-select and hydrate the Details panel synchronously.
+   - BACKEND ACTIVENODES WRITE (onCurationJobCreated.ts):
+     The Cloud Function now writes activeNodes: [seedArtistId, ...] to the project document
+     on job completion, so future loads restore the queue from Firestore directly without
+     needing the fallback. The fallback remains in place for legacy project documents that
+     pre-date this fix and for any edge case where the backend write is partial.
+   - DASHBOARD FALLBACK (Dashboard.tsx):
+     The dashboard project card's deepCutsCount also applies an identical seed-intersection
+     fallback when project.activeNodes is empty, ensuring the DEEP CUTS chip always reflects
+     at least the number of seed artists present in the graphData — applied to both the card
+     view and the list view render paths.
+   - Hydration Spinner Safeguard: To prevent race conditions where the Deep Cut panel
+     momentarily flickers to the "Create Your Zcene" onboarding state before details are
+     loaded, the panel renders the LoadingSpinner if seed artists are present in the project
+     context.
+   - Graceful Degradation Protocol: Any node with a displayable biography (summary length > 5
+     characters) must be rendered immediately from cache, bypassing all loaders. Necessary
+     data validation, revalidation, or cache self-healing is executed strictly in the
+     background (via 'triggerBackgroundRevalidation') without blocking the user, clearing the
+     panel, or triggering the foreground loading overlay. If the JIT details queue revalidation
+     fails for an already displayable node, the exception is bypassed silently without writing
+     sentinels or toasting error alerts.
+   - Canonical Graph Caching: Global shared artist cache documents (/artists/{id}) store the
+     complete, canonical compiled graph returned by the model rather than pruned sub-graph
+     snippets. This guarantees that both single-seed and multi-seed projects consistently
+     reference the full master network.
+   - Sentinel Resolution: Cache entries marked as sentinel slots (_isSentinel: true) are
+     flagged as corrupt; clicking a sentinel node bypasses the early-return cache checks and
+     triggers JIT re-evaluation.
+   - Silent Re-validation: Metadata re-validation checks operate fully in the background.
+     User-facing toasts for 'Cache Incomplete' (curation incomplete) warnings are suppressed
      to prevent developer-level notification noise.
 `;
+
 
 const PHYSICS_ENGINE_DOCUMENTATION = `
 The spiderweb is powered by a D3.js force-directed simulation (d3-force) 
@@ -350,12 +392,18 @@ const DATA_SYNTHESIS_PERSISTENCE_DOCUMENTATION = `
 To prevent data rot, API failures, and visual rendering regressions, the synthesis and persistence pipeline is governed by the following rules:
 
 1. ATOMICITY MANDATE (Direct Writes):
-   - All synthesized seed artist documents must bundle 'graphData' and 'detailsCache' 
-     in a single, atomic database write (either setDoc or updateDoc).
-   - Writing 'graphData' (Phase 2 graph synthesis) as a fire-and-forget promise 
-     prior to details extraction is strictly banned. 
-   - This ensures that Firestore documents are never committed in a fragmented, 
+   - All synthesized seed artist documents must bundle 'graphData', 'detailsCache',
+     and 'activeNodes' in a single, atomic database write (either setDoc or updateDoc).
+   - Writing 'graphData' (Phase 2 graph synthesis) as a fire-and-forget promise
+     prior to details extraction is strictly banned.
+   - 'activeNodes' must be computed from the finished graphData (seed artist IDs
+     intersected with confirmed graph nodes) and included in the same write.
+     Omitting activeNodes from the completion write leaves the project document
+     with activeNodes: [] (set at creation time), causing the Deep Cut panel to
+     permanently display 0 and flicker on every subsequent project load.
+   - This ensures that Firestore documents are never committed in a fragmented,
      "half-made" state that bypasses schema validation.
+
 
 2. API GATEWAY MUTUAL EXCLUSIVITY RULE:
    - Tool calls (specifically Google Search grounding) and structured output 
