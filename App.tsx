@@ -4284,6 +4284,11 @@ const App: React.FC = () => {
       // consistent for all rendering components.
       results.forEach((v, k) => {
         const existing = detailsCacheRef.current.get(k);
+        const isExistingLocked = existing && existing.summary && existing.summary.trim().length > 5 && !existing._isSentinel;
+        if (isExistingLocked) {
+          console.log(`[Batch Hydration] Bypassing ref sync for locked artist: ${k}`);
+          return;
+        }
         detailsCacheRef.current.set(k,
           (existing && existing.imageUrl && !v.imageUrl)
             ? { ...v, imageUrl: existing.imageUrl }
@@ -4296,6 +4301,11 @@ const App: React.FC = () => {
         const merged = new Map(prev);
         results.forEach((v, k) => {
           const existing = prev.get(k);
+          const isExistingLocked = existing && existing.summary && existing.summary.trim().length > 5 && !existing._isSentinel;
+          if (isExistingLocked) {
+            console.log(`[Batch Hydration] Bypassing state merge for locked artist: ${k}`);
+            return;
+          }
           if (existing && existing.imageUrl && !v.imageUrl) {
             console.log(`[Batch Hydration] Bypassing overwrite for ${k} because local cache has imageUrl but database is missing it`);
             merged.set(k, { ...v, imageUrl: existing.imageUrl });
@@ -5534,7 +5544,7 @@ const App: React.FC = () => {
   }, [currentProjectId]);
 
   useEffect(() => {
-    if (isLoading) return;
+    if (isLoading || isProjectLoadingRef.current) return;
     const fetch = async () => {
       // 1. Block Automated Background Fetches: ✦
       // ONLY process the actively selected node to prevent neighbor chain-fetching
