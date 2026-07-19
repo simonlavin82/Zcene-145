@@ -288,6 +288,10 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     chatHistory, onSendMessage, isChatLoading, isFullScreenMode = false, isHero = false, isInStack, onToggleStack, onToggleMagazineView, isGuest = false, onAuthRequest, user,
     userTaste, isAdmin = false
 }) => {
+    const isLocked = useMemo(() => {
+        return !!(details && details.summary && details.summary.trim().length > 5 && !details._isSentinel);
+    }, [details]);
+
     const [chatInput, setChatInput] = useState('');
     const [isListening, setIsListening] = useState(false);
     const [imageError, setImageError] = useState(false);
@@ -644,7 +648,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                 </div>
 
                 <div className={`px-4 space-y-10 flex-grow min-h-0 relative ${isFullScreenMode ? 'py-4 md:px-8' : 'py-8'}`}>
-                    {isLoading && details && (
+                    {isLoading && !isLocked && details && (
                         <div className="absolute inset-0 bg-zinc-900/90 backdrop-blur-sm z-30 flex flex-col items-center justify-center text-center space-y-8 h-full bg-zinc-900">
                             <LoadingSpinner 
                                 steps={DETAIL_THINKING_STEPS}
@@ -658,7 +662,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             </button>
                         </div>
                     )}
-                    {!details && (
+                    {(!details || !isLocked) && (
                         <div className="flex flex-col items-center justify-center text-center py-12 space-y-8 h-full bg-zinc-900">
                             {isLoading ? (
                                 <LoadingSpinner 

@@ -1086,21 +1086,8 @@ const App: React.FC = () => {
     if (!graphData || !graphData.nodes) return [];
     return activeNodeIds
       .map(id => graphData.nodes.find(n => n.id.toLowerCase() === id.toLowerCase() || normalizeArtistId(n.id) === normalizeArtistId(id) || isArtistIdMatch(n.id, id)))
-      .filter((n): n is Node => {
-        if (!n || n.type !== 'artist') return false;
-        
-        // Include nodes actively generating so their cards render the spinner
-        const isGenerating = loadingNodeIds.has(n.id) || 
-                             loadingNodeIds.has(n.id.toLowerCase()) || 
-                             loadingNodeIds.has(normalizeArtistId(n.id));
-        if (isGenerating) return true;
-
-        const details = detailsCache.get(n.id) || 
-                        detailsCache.get(n.id.toLowerCase()) || 
-                        detailsCache.get(normalizeArtistId(n.id));
-        return !!(details && details.summary && details.summary.trim().length > 5 && !(details as any)._isSentinel);
-      });
-  }, [activeNodeIds, graphData, detailsCache, loadingNodeIds]);
+      .filter((n): n is Node => !!n && n.type === 'artist');
+  }, [activeNodeIds, graphData]);
   const [isStackDialogOpen, setIsStackDialogOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const isAdmin = useMemo(() => {
@@ -5614,6 +5601,8 @@ const App: React.FC = () => {
                               detailsCache.get(simpleId) || 
                               detailsCache.get(n.id.toLowerCase());
 
+        const isLocked = !!(cachedDetails && cachedDetails.summary && cachedDetails.summary.trim().length > 5 && !cachedDetails._isSentinel);
+
         const isCorruptOrStale = checkIsProfileStaleOrCorrupt(cachedDetails) &&
                                  !healedNodeIdsRef.current.has(simpleId) &&
                                  !healedNodeIdsRef.current.has(disambiguatedCacheId) &&
@@ -5628,7 +5617,8 @@ const App: React.FC = () => {
                          detailsCache.has(disambiguatedCacheId) || 
                          (detailsCache.has(n.id.toLowerCase()) && !isSimpleKeyMismatched);
 
-        return (!isCached || isCorruptOrStale) && 
+        return !isLocked &&
+               (!isCached || isCorruptOrStale) && 
                !fetchingNodeIdsRef.current.has(n.id) &&
                isSelected &&
                (!hasHydratedBio || isCorruptOrStale);
