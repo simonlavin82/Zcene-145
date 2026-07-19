@@ -1829,6 +1829,13 @@ const App: React.FC = () => {
       return;
     }
 
+    // STATE 1: Sticky Peek (First Click / Tap on any node)
+    if (!isAlreadyPeeked) {
+      setSelectedNode(null);
+      setPeekedNode(node);
+      return;
+    }
+
     const isTransitioning = loadingNodeIds.has(node.id) || 
                             fetchingNodeIdsRef.current.has(node.id) || 
                             loadingNodeIds.has(node.id.toLowerCase()) || 

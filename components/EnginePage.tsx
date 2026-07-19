@@ -721,6 +721,27 @@ AI API credit utilization.
      simulating the full token warning and ledger logging behaviors.
 `;
 
+const STICKY_PEEK_ACTION_GATEWAY_DOCUMENTATION = `
+Zcene implements a cross-platform 'Sticky Peek + Action Gateway' interaction model to unify hover and click behaviors, eliminate layout jitter, and provide a clutter-free, premium visual aesthetic.
+
+1. STATE 1: THE 'STICKY PEEK' (Primary Interaction):
+   - Trigger: Single click (Desktop) or single tap (Mobile) on any node.
+   - Behavior: Instantly pins the floating 'Hover Box' (info snippet) and yellow connection highlights to the selected node, locking the D3 camera focus. This state persists until the user explicitly clicks the SVG background.
+   - Purpose: Provides identical, friction-free connection tracing and information peeks across all platforms without triggering paid network API transactions.
+
+2. STATE 2: THE 'ACTION GATEWAY' (Secondary Interaction):
+   - Trigger: A second click/tap on the already-selected (peeked) node.
+   - Behavior: Automatically hides/dismisses the floating hover box to clear visual clutter, opens the sidebar Details Panel, and displays the node action overlay (+ Explore / - buttons).
+   - API Gateways:
+     - Blocked & Cached nodes: Bypasses the token quota modal and enters State 2 instantly.
+     - Uncached nodes: Triggers the JIT details queue and presents the Token Quota Confirmation warning. If canceled, the node remains in State 2 (with + Explore button and sidebar details card visible) to allow easy re-initiation.
+
+3. PINNED MOUSE EVENT LOCKING (D3 Mouseleave Bypass):
+   - In D3's 'mouseleave' event handler, the system queries the active ref states (selectedNodeRef.current and peekedNodeRef.current).
+   - If the cursor leaves a node that is currently peeked or selected, the clearNodeHover command is bypassed. This keeps connection lines and hover snippet elements locked and stable.
+   - When hovering over other nodes, temporary transient highlights are drawn, and leaving those transient nodes gracefully restores the pinned node's visual state.
+`;
+
 const SitemapNode: React.FC<{ title: string; description: string; children?: React.ReactNode }> = ({ title, description, children }) => (
     <li>
         <div className="font-medium text-white pt-4 hover:text-primary transition-colors cursor-default">{title}</div>
@@ -1036,6 +1057,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
         { id: 'architecture', title: 'Architecture' },
         { id: 'graph-intelligence', title: 'Graph Intelligence' },
         { id: 'visualization-engine', title: 'Visualization Engine' },
+        { id: 'sticky-peek-gateway', title: 'Sticky Peek + Action Gateway' },
         { id: 'sharing-flow', title: 'Sharing & Collaboration' },
         { id: 'system-resilience', title: 'System Resilience' },
         { id: 'error-messaging-reference', title: 'Error Messaging Reference' },
@@ -1231,6 +1253,12 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                     <section id="visualization-engine">
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">Visualization Engine</h2>
                         <CodeBlock title="Physics & D3 Constants" content={PHYSICS_ENGINE_DOCUMENTATION} />
+                    </section>
+
+                    {/* ── STICKY PEEK + ACTION GATEWAY ── */}
+                    <section id="sticky-peek-gateway">
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">Sticky Peek + Action Gateway</h2>
+                        <CodeBlock title="Interaction Model & State Machine" content={STICKY_PEEK_ACTION_GATEWAY_DOCUMENTATION} />
                     </section>
 
                     {/* ── SHARING FLOW ── */}

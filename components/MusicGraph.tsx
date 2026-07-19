@@ -1176,7 +1176,11 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         })
         .on("mouseleave", (event, d) => {
             if (!isSmallScreen) {
-                clearNodeHoverRef.current();
+                const isPinned = (selectedNodeRef.current && isSameNodeId(selectedNodeRef.current.id, d.id)) ||
+                                 (peekedNodeRef.current && isSameNodeId(peekedNodeRef.current.id, d.id));
+                if (!isPinned) {
+                    clearNodeHoverRef.current();
+                }
             }
         });
 

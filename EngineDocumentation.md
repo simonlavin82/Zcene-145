@@ -714,3 +714,45 @@ Key design decisions:
 *   **`/api/gemini/*wildcard` syntax:** Express v5 / `path-to-regexp` v8 requires a named parameter prefixed with `*` (`*wildcard`) instead of the legacy bare wildcard (`/*`) pattern.
 *   **Security parity:** The credential strip (`authorization`, `cookie`, `host`, `connection`, `content-length`) is retained and extended relative to the previous implementation. The `x-goog-api-key` injection is unchanged.
 
+---
+
+## 10. Sticky Peek + Action Gateway Interaction Model
+
+This section documents the cross-platform unified interaction design implemented to resolve visual clutter, prevent graph "jumping," and align the desktop hover actions with mobile state-based triggers.
+
+### 10.1 Unified Interaction Flow
+
+```
+                     Node Click / Tap 1
+  [ Idle State ] ───────────────────────────► [ STATE 1: Sticky Peek ]
+        ▲                                             │
+        │                                             │ Node Click / Tap 2
+        │ Background Click                            ▼
+        └───────────────────────────────────── [ STATE 2: Action Gateway ]
+```
+
+1.  **State 1: Sticky Peek (Primary Interaction):**
+    *   **Trigger:** Single click on desktop, or single tap on mobile viewports.
+    *   **State configuration:** `setPeekedNode(node)` is called, while `selectedNode` remains `null`. The Details Panel remains closed.
+    *   **Visual cues:** The D3 force simulation camera glides and locks onto the node, the floating hover box (info snippet) pins to the node, and all first-degree connection lines/constellations highlight in yellow.
+2.  **State 2: Action Gateway (Secondary Interaction):**
+    *   **Trigger:** A second click or tap on the already peeked node.
+    *   **State configuration:** `setSelectedNode(node)` is called, and `peekedNode` resets to `null`.
+    *   **Visual cues:** The floating hover box is automatically dismissed to prevent overlap and clear graph canvas clutter. The sidebar Details Panel mounts, and the node renders its action overlays (including the custom pill-shaped `+ Explore` button and `-` remove button).
+    *   **Persistent Highlights (Sticky Connections):** The yellow connection lines highlighted during State 1 remain fully highlighted and visible throughout State 2 to prevent visual fragmentation.
+
+### 10.2 Mouseleave Locking & Event Safeguards
+
+*   **D3 Event Integration:** To ensure that State 1 pins the hover box permanently, D3's standard `mouseleave` event listener is updated to dynamically evaluate:
+    ```typescript
+    const isPinned = (selectedNodeRef.current && isSameNodeId(selectedNodeRef.current.id, d.id)) ||
+                     (peekedNodeRef.current && isSameNodeId(peekedNodeRef.current.id, d.id));
+    if (!isPinned) {
+        clearNodeHoverRef.current();
+    }
+    ```
+    If the node is currently in the Peek or Action State, the clear action is completely bypassed, forcing the hover container to stay locked to the node.
+*   **Transient Hover Restorations:** If a user hovers over a peer node `n2` while node `d` is pinned, the UI transiently updates to show `n2`'s connections and hover box. Once the cursor leaves `n2`, the `clearNodeHover` callback executes and detects that `d` is still peeked or selected, calling `triggerNodeHover(d)` to restore the pinned highlights instantly.
+*   **Smart Quota Cancel State Preservation:** If the user enters the Action state and triggers the Token Quota Warning but chooses to cancel, the graph does **not** reset to the Peek State. The node remains in the Action State (State 2) with the `+ Explore` action overlay visible, allowing the user to easily click it again.
+
+

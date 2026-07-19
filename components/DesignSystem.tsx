@@ -2858,7 +2858,36 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                 </div>
                             </div>
-                                                         <div className="p-8 bg-zinc-900/50 rounded-xl border border-zinc-800">
+
+                            <div className="space-y-6 pt-6">
+                                <h3 className="text-xl font-medium text-white">Sticky Peek + Action Gateway Model</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="p-6 bg-zinc-900/50 border border-zinc-800 rounded-xl space-y-4">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-2 h-2 rounded-full bg-primary" />
+                                            <h4 className="text-base font-semibold text-zinc-200 uppercase tracking-widest">State 1: Sticky Peek</h4>
+                                        </div>
+                                        <p className="text-sm text-zinc-400 leading-relaxed">
+                                            <strong>Trigger:</strong> Click (desktop) or Tap 1 (mobile) on any node.
+                                            <br /><br />
+                                            <strong>Behavior:</strong> Pins the hover box (info snippet) and yellow connection highlights, locking focus. The state remains active and locked even if the mouse leaves the node (mouseleave is bypassed via refs) until the user clicks the canvas background.
+                                        </p>
+                                    </div>
+                                    <div className="p-6 bg-zinc-900/50 border border-zinc-800 rounded-xl space-y-4">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-2 h-2 rounded-full bg-primary" />
+                                            <h4 className="text-base font-semibold text-zinc-200 uppercase tracking-widest">State 2: Action Gateway</h4>
+                                        </div>
+                                        <p className="text-sm text-zinc-400 leading-relaxed">
+                                            <strong>Trigger:</strong> Click 2 (desktop) or Tap 2 (mobile) on the already peeked node.
+                                            <br /><br />
+                                            <strong>Behavior:</strong> Automatically dismisses/hides the floating hover box to reduce visual clutter, opens the sidebar Details Panel, and displays the node action overlays (<code>+ Explore</code> pill-button and <code>-</code> remove button).
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="p-8 bg-zinc-900/50 rounded-xl border border-zinc-800">
                                 <h3 className="text-xl font-medium text-white mb-4">Mobile Gesture Safety</h3>
                                 <p className="text-sm text-zinc-400 leading-relaxed mb-8 max-w-3xl">
                                     To protect the active graph state and prevent session loss, Zcene suppresses native browser refresh gestures on mobile and contains swipe navigation within the Deep Cut carousel.
