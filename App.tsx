@@ -1121,6 +1121,7 @@ const App: React.FC = () => {
     onSelect: (choice: string | 'synthesis' | 'cancel') => void;
     onSearchLiveAI?: () => void;
     isSearchingLive?: boolean;
+    hasSearchedLive?: boolean;
   } | null>(null);
 
   const confirmTokenUsage = useCallback((
@@ -2417,12 +2418,12 @@ const App: React.FC = () => {
           try {
             const liveCandidates = await resolveArtistCandidatesViaAI(rawInput);
             setDisambiguationDialog(prev => prev
-              ? { ...prev, isSearchingLive: false, candidates: liveCandidates }
+              ? { ...prev, isSearchingLive: false, hasSearchedLive: true, candidates: liveCandidates }
               : null
             );
           } catch {
             setDisambiguationDialog(prev => prev
-              ? { ...prev, isSearchingLive: false, candidates: [] }
+              ? { ...prev, isSearchingLive: false, hasSearchedLive: true, candidates: [] }
               : null
             );
           }
@@ -2436,6 +2437,7 @@ const App: React.FC = () => {
             query: rawInput,
             candidates: cacheCandidates,     // 0, 1, or N — modal handles all cases
             isSearchingLive: false,
+            hasSearchedLive: false,
             onSearchLiveAI: fireSearchLiveAI, // always available — user can always escalate
             onSelect: (c) => { setDisambiguationDialog(null); resolve(c); }
           });
@@ -6506,6 +6508,7 @@ const App: React.FC = () => {
               onSelectDisambiguation={(choice) => disambiguationDialog?.onSelect(choice)}
               onSearchLiveAIDisambiguation={disambiguationDialog?.onSearchLiveAI}
               isSearchingLiveDisambiguation={disambiguationDialog?.isSearchingLive}
+              hasSearchedLiveDisambiguation={disambiguationDialog?.hasSearchedLive}
             />
           )}
         </div>

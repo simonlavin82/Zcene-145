@@ -663,6 +663,8 @@ export interface DisambiguationModalProps {
   onSearchLiveAI?: () => void;
   /** True while the Flash probe is in-flight. Disables all buttons and shows a spinner. */
   isSearchingLive?: boolean;
+  /** True after the Flash probe has completed. Distinguishes live search results from pre-probe cache states. */
+  hasSearchedLive?: boolean;
 }
 
 export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
@@ -672,10 +674,11 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
   onSelect,
   onSearchLiveAI,
   isSearchingLive = false,
+  hasSearchedLive = false,
 }) => {
   if (!isOpen) return null;
 
-  // ── STATE A: Searching (probe in-flight) ─────────────────────────────────
+  // ── STATE 4: Searching (probe in-flight) ─────────────────────────────────
   if (isSearchingLive) {
     return (
       <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in-down" style={{ animationDuration: '200ms' }}>
@@ -698,7 +701,105 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
     );
   }
 
-  // ── STATE B: Search Prompt (cache miss, probe not yet triggered) ──────────
+  // ── POST-PROBE STATES (hasSearchedLive === true) ─────────────────────────
+  if (hasSearchedLive) {
+    // STATE 6: Probe returned 0 candidates (or probe failed/found no extra acts)
+    if (candidates.length === 0) {
+      return (
+        <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in-down" style={{ animationDuration: '200ms' }}>
+          <div className="w-full max-w-md rounded-none bg-zinc-900 border border-zinc-600 p-8 shadow-2xl relative overflow-hidden flex flex-col gap-6" onClick={e => e.stopPropagation()}>
+            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-primary/30 via-primary to-primary/30" />
+            <div className="flex flex-col gap-2">
+              <h3 className="text-xl font-bold text-zinc-100 uppercase tracking-wider flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary">search_off</span>
+                No Additional Acts Found
+              </h3>
+              <p className="text-sm text-zinc-400">
+                Our live search found no additional distinct regional acts for <span className="text-primary font-semibold">"{query}"</span>. Would you like to proceed with unconstrained graph synthesis?
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 pt-2 border-t border-zinc-800">
+              <button
+                onClick={() => onSelect('synthesis')}
+                className="w-full py-3 px-4 bg-primary/20 hover:bg-primary/30 text-primary font-semibold border border-primary/40 hover:border-primary transition-all text-xs uppercase tracking-wider rounded-xl"
+              >
+                Synthesize Fresh Graph for "{query}"
+              </button>
+              <button
+                onClick={() => onSelect('cancel')}
+                className="w-full py-2.5 px-4 bg-transparent hover:bg-zinc-800/20 text-zinc-500 hover:text-zinc-400 font-medium transition-all text-xs uppercase tracking-wider rounded-xl"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // STATE 5: Probe returned 1 or more distinct live candidates
+    return (
+      <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in-down" style={{ animationDuration: '200ms' }}>
+        <div className="w-full max-w-md rounded-none bg-zinc-900 border border-zinc-600 p-8 shadow-2xl relative overflow-hidden flex flex-col gap-6" onClick={e => e.stopPropagation()}>
+          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-primary/30 via-primary to-primary/30" />
+          <div className="flex flex-col gap-2">
+            <h3 className="text-xl font-bold text-zinc-100 uppercase tracking-wider flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary">psychology</span>
+              Live AI Discovery Results
+            </h3>
+            <p className="text-sm text-zinc-400">
+              We found the following distinct acts for <span className="text-primary font-semibold">"{query}"</span>. Select one to pin its regional identity:
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-3 max-h-[280px] overflow-y-auto pr-1">
+            {candidates.map((cand) => (
+              <button
+                key={cand.id}
+                onClick={() => onSelect(cand.id)}
+                className="w-full text-left p-4 bg-zinc-800/40 hover:bg-zinc-800 border border-zinc-700/50 hover:border-primary transition-all duration-200 flex flex-col gap-1 group"
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="text-zinc-200 group-hover:text-primary font-medium transition-colors text-sm">
+                    {cand.label || cand.id}
+                  </span>
+                  <span className="material-symbols-outlined text-zinc-600 group-hover:text-primary transition-colors text-[14px]">
+                    arrow_forward_ios
+                  </span>
+                </div>
+                {(cand.genre || cand.origin) && (
+                  <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-1 text-[10px] text-zinc-500 group-hover:text-zinc-400 transition-colors uppercase tracking-wider font-semibold">
+                    {cand.origin && <span>{cand.origin}</span>}
+                    {cand.origin && cand.genre && <span>•</span>}
+                    {cand.genre && <span>{cand.genre}</span>}
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex flex-col gap-2 pt-2 border-t border-zinc-800">
+            <button
+              onClick={() => onSelect('synthesis')}
+              className="w-full py-2.5 px-4 bg-zinc-800/30 hover:bg-zinc-800 text-zinc-300 hover:text-zinc-100 font-semibold border border-zinc-700/30 hover:border-zinc-700 transition-all text-xs uppercase tracking-wider rounded-xl"
+            >
+              Synthesize Unconstrained Graph
+            </button>
+            <button
+              onClick={() => onSelect('cancel')}
+              className="w-full py-2.5 px-4 bg-transparent hover:bg-zinc-800/20 text-zinc-500 hover:text-zinc-400 font-medium transition-all text-xs uppercase tracking-wider rounded-xl"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── PRE-PROBE CACHE STATES (hasSearchedLive === false) ────────────────────
+
+  // STATE 1: Cache Miss Prompt (0 candidates in cache before probe)
   if (candidates.length === 0) {
     return (
       <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in-down" style={{ animationDuration: '200ms' }}>
@@ -741,9 +842,9 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
     );
   }
 
-  // ── STATE C: Single Candidate — "Look What I Found" ──────────────────────
+  // STATE 2: Single Candidate — "Look What I Found"
   // Cache returned exactly 1 record. Ask the user to confirm before proceeding.
-  // Provides "Not this one — Search Live AI" as the escape to the live probe.
+  // Clicking the candidate card accepts it. No redundant "Continue with..." button.
   if (candidates.length === 1) {
     const cand = candidates[0];
     return (
@@ -795,12 +896,6 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
               </button>
             )}
             <button
-              onClick={() => onSelect('synthesis')}
-              className="w-full py-2.5 px-4 bg-zinc-800/30 hover:bg-zinc-800 text-zinc-300 hover:text-zinc-100 font-semibold border border-zinc-700/30 hover:border-zinc-700 transition-all text-xs uppercase tracking-wider rounded-xl"
-            >
-              Continue with "{query}"
-            </button>
-            <button
               onClick={() => onSelect('cancel')}
               className="w-full py-2.5 px-4 bg-transparent hover:bg-zinc-800/20 text-zinc-500 hover:text-zinc-400 font-medium transition-all text-xs uppercase tracking-wider rounded-xl"
             >
@@ -812,9 +907,8 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
     );
   }
 
-  // ── STATE D: Multiple Candidates — "Which Did You Mean?" ─────────────────
-  // Cache returned >1 records, or live probe returned multiple results.
-  // The user selects one, or can escalate further via Search Live AI.
+  // STATE 3: Multiple Cached Candidates — "Which Did You Mean?"
+  // Cache returned >1 records. User selects one, or escalates via Search Live AI.
   return (
     <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in-down" style={{ animationDuration: '200ms' }}>
       <div className="w-full max-w-md rounded-none bg-zinc-900 border border-zinc-600 p-8 shadow-2xl relative overflow-hidden flex flex-col gap-6" onClick={e => e.stopPropagation()}>
@@ -868,12 +962,6 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
             </button>
           )}
           <button
-            onClick={() => onSelect('synthesis')}
-            className="w-full py-2.5 px-4 bg-zinc-800/30 hover:bg-zinc-800 text-zinc-300 hover:text-zinc-100 font-semibold border border-zinc-700/30 hover:border-zinc-700 transition-all text-xs uppercase tracking-wider rounded-xl"
-          >
-            Create New Graph for "{query}"
-          </button>
-          <button
             onClick={() => onSelect('cancel')}
             className="w-full py-2.5 px-4 bg-transparent hover:bg-zinc-800/20 text-zinc-500 hover:text-zinc-400 font-medium transition-all text-xs uppercase tracking-wider rounded-xl"
           >
@@ -884,6 +972,7 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
     </div>
   );
 };
+
 
 
 
