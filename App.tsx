@@ -3621,7 +3621,7 @@ const App: React.FC = () => {
     // This catches any edge case where Phase 02's validation gates (isGraphDataPresent / filtersMatch)
     // returned false for non-critical reasons (e.g. missing link context, filter mismatch).
     // If we find a valid graphData document for ALL artists, we load from cache and return.
-    if (!bypassToken && artistList.length >= 1) {
+    if (!skipCacheLookup && !bypassToken && artistList.length >= 1) {
       try {
         const hardGuardResults = await Promise.allSettled(
           artistList.map(async (name) => {
