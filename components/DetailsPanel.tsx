@@ -654,12 +654,6 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 steps={DETAIL_THINKING_STEPS}
                                 subtext="Typically takes 20–30 seconds to dig for details."
                             />
-                            <button 
-                                onClick={onClose}
-                                className="rounded-xl border border-zinc-600 px-6 py-2 text-sm font-medium text-zinc-300 transition-colors active:bg-zinc-800"
-                            >
-                                Cancel
-                            </button>
                         </div>
                     )}
                     {(!details || !isLocked) && (
@@ -689,12 +683,6 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     steps={DETAIL_THINKING_STEPS}
                                     subtext="Typically takes 20–30 seconds to dig for details."
                                 />
-                                <button 
-                                    onClick={onClose}
-                                    className="rounded-xl border border-zinc-600 px-6 py-2 text-sm font-medium text-zinc-300 transition-colors active:bg-zinc-800"
-                                >
-                                    Cancel
-                                </button>
                             </div>
                         ) : isGlobalLoading ? (
                             <div className="flex flex-col items-center justify-center text-center py-12 space-y-8 h-full bg-zinc-900">
@@ -702,12 +690,6 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     steps={["Waiting for the Spiderweb to settle...", "Mapping relationships first...", "Synchronising nodes..."]}
                                     subtext="Graph mapping takes priority. Details will follow."
                                 />
-                                <button 
-                                    onClick={onClose}
-                                    className="rounded-xl border border-zinc-600 px-6 py-2 text-sm font-medium text-zinc-300 transition-colors active:bg-zinc-800"
-                                >
-                                    Cancel
-                                </button>
                             </div>
                         ) : (
                             <div className="flex flex-col items-center justify-center text-center py-12 px-6 space-y-6 h-full bg-zinc-900 text-zinc-300">

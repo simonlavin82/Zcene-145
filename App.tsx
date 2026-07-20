@@ -6,6 +6,7 @@ import { AlertCircle, AlertTriangle, X, CheckCircle2, Key } from 'lucide-react';
 import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project, ArtistCacheEntry, COST_PER_AI_CALL } from './types';
 import { generateGraphData, fetchNodeDetails, extendGraphFromNode, resolveArtistCandidatesViaAI } from './services/geminiService';
 import { normalizeArtistId, readArtistCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, titleCaseArtistId, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema } from './services/artistCacheService';
+import { normalizeCountry } from './utils/normalization';
 import { auth, signInWithGoogle, logout, onAuthStateChanged, User, db, handleFirestoreError, OperationType } from './services/firebase';
 import { translateError, translateToast } from './services/errorTranslationLayer';
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, getDocFromServer, serverTimestamp, addDoc, getDoc, getDocs, orderBy, where, writeBatch, getDocFromCache, updateDoc, increment, limit } from 'firebase/firestore';
@@ -1121,6 +1122,7 @@ const App: React.FC = () => {
     query: string;
     candidates: DisambiguationCandidate[];
     onSelect: (choice: string | 'synthesis' | 'cancel') => void;
+    isLiveAISuggestions?: boolean;
   } | null>(null);
 
   const confirmTokenUsage = useCallback((
@@ -2353,7 +2355,9 @@ const App: React.FC = () => {
     isHydratingSessionRef.current = true;
     isProjectLoadingRef.current = true;
     setIsLoading(true);
-    let controller: AbortController | null = null;
+    if (abortControllerRef.current) abortControllerRef.current.abort();
+    let controller = new AbortController();
+    abortControllerRef.current = controller;
     let isLockReleasedByAutosave = false;
     let bypassToken = bypassTokenConfirmation;
     const prevActiveNodeIds = activeNodeIds;
@@ -2428,32 +2432,65 @@ const App: React.FC = () => {
         if (choice === 'cancel') return;
 
         if (choice === 'synthesis') {
+          // --- FRONT-LOADED TOKEN QUOTA GATE ---
+          // Ensure absolutely zero API tokens or network dispatches occur before user accepts cost.
+          if (!bypassToken) {
+            const confirmed = await confirmTokenUsage(isLiveSynthesisTemp ? 'live_synthesis' : 'generation', [], artistList);
+            if (!confirmed) {
+              setIsLoading(false);
+              isHydratingSessionRef.current = false;
+              isProjectLoadingRef.current = false;
+              return;
+            }
+          }
+
           // --- FLASH MODEL VALIDATION GATE ---
           setIsLoading(true);
-          const flashCandidates = await resolveArtistCandidatesViaAI(rawInput);
+          const flashCandidates = await resolveArtistCandidatesViaAI(rawInput, controller?.signal);
           setIsLoading(false);
 
-          if (flashCandidates && flashCandidates.length > 0) {
-            const flashChoice = await new Promise<string | 'synthesis' | 'cancel'>((resolve) => {
-              setDisambiguationDialog({
-                isOpen: true,
-                query: rawInput,
-                candidates: flashCandidates,
-                onSelect: (c) => { setDisambiguationDialog(null); resolve(c); },
-                isLiveAISuggestions: true
-              });
+          // Always mount the modal to act as a mandatory verification gate
+          const flashChoice = await new Promise<string | 'synthesis' | 'cancel'>((resolve) => {
+            setDisambiguationDialog({
+              isOpen: true,
+              query: rawInput,
+              candidates: flashCandidates || [],
+              onSelect: (c) => { setDisambiguationDialog(null); resolve(c); },
+              isLiveAISuggestions: true
             });
+          });
 
-            if (flashChoice === 'cancel') return;
+          if (flashChoice === 'cancel') return;
 
-            if (flashChoice !== 'synthesis') {
-              const selectedCand = flashCandidates.find(c => c.id === flashChoice);
-              if (selectedCand) {
-                const probeKey = normalizeArtistId(rawInput);
-                activeDisambiguationHints[probeKey] = 
-                  `[MANDATORY DISAMBIGUATION CONSTRAINT: The user explicitly selected the following regional entity: "${selectedCand.label}" from ${selectedCand.origin} (${selectedCand.genre}). You MUST synthesize this specific act and NO OTHER.]`;
-                console.log(`[Flash Validation Hint Injected for ${probeKey}]:`, activeDisambiguationHints[probeKey]);
-              }
+          if (flashChoice.startsWith('override::')) {
+            const userInputCountry = flashChoice.split('::')[1];
+            const normalizedCountry = normalizeCountry(userInputCountry);
+            
+            // Check for collision against cache
+            const cacheHit = cacheCandidates.find(c => 
+              c.origin && c.origin.toLowerCase().includes(normalizedCountry.toLowerCase())
+            );
+
+            if (cacheHit) {
+              console.log(`[Disambiguation Override] Cache collision detected for ${normalizedCountry}. Routing to ${cacheHit.id}`);
+              resolvedArtistSeeds[i] = normalizeArtistId(cacheHit.id);
+              hasDisambiguated = true;
+              const nonSelected = cacheCandidates.filter(c => c.id !== cacheHit.id);
+              nonSelected.forEach(ns => mergeAndCleanupArtists(cacheHit.id, ns.id));
+              continue; // proceed to next artist in loop
+            } else {
+              const probeKey = normalizeArtistId(rawInput);
+              activeDisambiguationHints[probeKey] = 
+                `[MANDATORY DISAMBIGUATION CONSTRAINT: The user explicitly requested the regional variant of "${rawInput}" originating from or associated with "${userInputCountry}". You MUST synthesize this specific regional act and NO OTHER.]`;
+              console.log(`[Disambiguation Override Hint Injected for ${probeKey}]:`, activeDisambiguationHints[probeKey]);
+            }
+          } else if (flashChoice !== 'synthesis') {
+            const selectedCand = (flashCandidates || []).find(c => c.id === flashChoice);
+            if (selectedCand) {
+              const probeKey = normalizeArtistId(rawInput);
+              activeDisambiguationHints[probeKey] = 
+                `[MANDATORY DISAMBIGUATION CONSTRAINT: The user explicitly selected the following regional entity: "${selectedCand.label}" from ${selectedCand.origin} (${selectedCand.genre}). You MUST synthesize this specific act and NO OTHER.]`;
+              console.log(`[Flash Validation Hint Injected for ${probeKey}]:`, activeDisambiguationHints[probeKey]);
             }
           }
 
@@ -2480,9 +2517,9 @@ const App: React.FC = () => {
 
           // We immediately re-invoke handleGenerateGraph with:
           //   - skipCacheLookup = true (bypass local Firestore cache)
-          //   - bypassTokenConfirmation = false (trigger API Token Authorization Modal)
+          //   - bypassTokenConfirmation = true (we already confirmed it above!)
           //   - bypassDisambiguation = true (break STAGE 0 re-entry loop)
-          handleGenerateGraph(artists, isRegeneration, graphToEnhance, true, false, overrideFilters, activeDisambiguationHints, true);
+          handleGenerateGraph(artists, isRegeneration, graphToEnhance, true, true, overrideFilters, activeDisambiguationHints, true);
           return;
         } else {
           // User accepted a specific candidate card from the cache.
@@ -2818,10 +2855,7 @@ const App: React.FC = () => {
         console.warn("[Front Gate Cache] Read failed, falling through:", err);
       }
     }
-    if (abortControllerRef.current) abortControllerRef.current.abort();
-    controller = new AbortController();
-    abortControllerRef.current = controller;
-
+    // AbortController is now initialized at the start of the function.
     setActiveNodeIds(prev => {
       const currentActiveIds = new Set(prev.map(id => id.toLowerCase()));
       const nextActive = [...prev];
@@ -3759,6 +3793,10 @@ const App: React.FC = () => {
               updatedAt: serverTimestamp()
             });
           } catch (e) {
+            if (controller?.signal.aborted) {
+              console.log("[Kill-Switch] Task cancelled. Blocking Firestore persistence.");
+              return;
+            }
             await setDoc(doc(db, projectPath), {
               status: 'curating',
               activeJobId: jobId,
@@ -3956,6 +3994,10 @@ const App: React.FC = () => {
           }
 
           // Write to Firestore
+          if (controller?.signal.aborted) {
+            console.log("[Kill-Switch] Task cancelled. Blocking Firestore persistence.");
+            return;
+          }
           await writeArtistCacheMany(artistList, final, user?.uid, activeDiscoveryFilters, true, true, fetchedDetailsMap);
         };
 
@@ -6368,7 +6410,29 @@ const App: React.FC = () => {
     }
   }, [previousWorkspace, currentProjectId, navigate]);
 
-  const handleCancel = useCallback(() => { if (abortControllerRef.current) { abortControllerRef.current.abort(); setIsLoading(false); abortControllerRef.current = null; } }, []);
+  const handleCancel = useCallback(() => { 
+    if (abortControllerRef.current) { 
+      // 1. Sever active network requests
+      abortControllerRef.current.abort(); 
+      abortControllerRef.current = null; 
+    }
+    
+    // 2. Unconditionally clear global UI loading states (Spiderweb)
+    setIsLoading(false); 
+    
+    // 3. Clear node-specific loading states (Deep Cut / DetailsPanel)
+    setLoadingNodeIds(new Set()); 
+    fetchingNodeIdsRef.current.clear();
+    
+    // 4. Release all async pipeline locks
+    isHydratingSessionRef.current = false;
+    isProjectLoadingRef.current = false;
+    isFetchingDetailsRef.current = false;
+    
+    // 5. Clear active Cloud Run jobs & modals
+    setActiveJobId(null);
+    setDisambiguationDialog(null);
+  }, []);
 
   const formattedGraphData = useMemo(() => {
     if (!graphData) return null;

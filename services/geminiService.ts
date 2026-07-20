@@ -713,8 +713,18 @@ export const resolveArtistCandidatesViaAI = async (
   signal?: AbortSignal
 ): Promise<Array<{ id: string; label: string; origin: string; genre: string }>> => {
   if (isLocal) {
-    console.log(`[Disambiguation Probe] Bypassed in sandbox mode for "${artistName}"`);
-    return [];
+    console.log(`[Disambiguation Probe] Intercepted in sandbox mode for "${artistName}"`);
+    if (artistName.toLowerCase() === 'i wish i') {
+      return [
+        { id: 'i-wish-i-united-kingdom', label: 'I Wish I', origin: 'United Kingdom', genre: 'Indie Pop' },
+        { id: 'i-wish-i-australia', label: 'I Wish I', origin: 'Australia', genre: 'Metalcore' },
+        { id: 'i-wish-i-united-states', label: 'I Wish I', origin: 'United States', genre: 'Screamo' }
+      ];
+    }
+    // Return a generic mock single candidate for other searches to test STATE B
+    return [
+      { id: `${artistName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-mock`, label: artistName, origin: 'Local Sandbox', genre: 'Mock Genre' }
+    ];
   }
 
   const baseUrl = typeof window !== 'undefined'
