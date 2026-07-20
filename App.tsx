@@ -2411,22 +2411,53 @@ const App: React.FC = () => {
         isHydratingSessionRef.current = false;
         isProjectLoadingRef.current = false;
 
-        // Step 2: Show the verification modal — always.
-        // The modal presents candidates if found in cache, or prompts for live AI search.
-        const choice = await new Promise<string | 'synthesis' | 'cancel'>((resolve) => {
-          setDisambiguationDialog({
-            isOpen: true,
-            query: rawInput,
-            candidates: cacheCandidates, // 0, 1, or N — modal handles all cases
-            onSelect: (c) => { setDisambiguationDialog(null); resolve(c); }
+        let choice: string | 'synthesis' | 'cancel' = 'synthesis';
+
+        // Step 2: Show the verification modal if we have cached candidates.
+        if (cacheCandidates.length > 0) {
+          choice = await new Promise<string | 'synthesis' | 'cancel'>((resolve) => {
+            setDisambiguationDialog({
+              isOpen: true,
+              query: rawInput,
+              candidates: cacheCandidates, 
+              onSelect: (c) => { setDisambiguationDialog(null); resolve(c); }
+            });
           });
-        });
+        }
 
         if (choice === 'cancel') return;
 
         if (choice === 'synthesis') {
+          // --- FLASH MODEL VALIDATION GATE ---
+          setIsLoading(true);
+          const flashCandidates = await resolveArtistCandidatesViaAI(rawInput);
+          setIsLoading(false);
+
+          if (flashCandidates && flashCandidates.length > 0) {
+            const flashChoice = await new Promise<string | 'synthesis' | 'cancel'>((resolve) => {
+              setDisambiguationDialog({
+                isOpen: true,
+                query: rawInput,
+                candidates: flashCandidates,
+                onSelect: (c) => { setDisambiguationDialog(null); resolve(c); },
+                isLiveAISuggestions: true
+              });
+            });
+
+            if (flashChoice === 'cancel') return;
+
+            if (flashChoice !== 'synthesis') {
+              const selectedCand = flashCandidates.find(c => c.id === flashChoice);
+              if (selectedCand) {
+                const probeKey = normalizeArtistId(rawInput);
+                activeDisambiguationHints[probeKey] = 
+                  `[MANDATORY DISAMBIGUATION CONSTRAINT: The user explicitly selected the following regional entity: "${selectedCand.label}" from ${selectedCand.origin} (${selectedCand.genre}). You MUST synthesize this specific act and NO OTHER.]`;
+                console.log(`[Flash Validation Hint Injected for ${probeKey}]:`, activeDisambiguationHints[probeKey]);
+              }
+            }
+          }
+
           // Direct Wire to Live Generative Synthesis & Rejection Constraint Injection:
-          // Clicking "Search Live AI" / "Not This One..." directly resolves choice to 'synthesis'.
           // Extract rejected metadata from cacheCandidates and inject negative constraint hint for Gemini 3.1 Pro:
           if (cacheCandidates && cacheCandidates.length > 0) {
             const rejectedDescriptions = cacheCandidates.map(c => 
@@ -2434,10 +2465,16 @@ const App: React.FC = () => {
             ).join(', ');
 
             const probeKey = normalizeArtistId(rawInput);
-            activeDisambiguationHints[probeKey] = 
+            // Append or create rejection hint
+            const rejectionHint = 
               `[DISAMBIGUATION REJECTION CONSTRAINTS: The user explicitly rejected the cached artist ` +
               `candidate(s): ${rejectedDescriptions}. Synthesize a DIFFERENT regional or genre act ` +
               `sharing the name "${rawInput}". Do NOT synthesize any of the rejected candidates.]`;
+            
+            activeDisambiguationHints[probeKey] = activeDisambiguationHints[probeKey] 
+              ? activeDisambiguationHints[probeKey] + '\n' + rejectionHint 
+              : rejectionHint;
+            
             console.log(`[Disambiguation Rejection Hint Injected for ${probeKey}]:`, activeDisambiguationHints[probeKey]);
           }
 

@@ -659,6 +659,7 @@ export interface DisambiguationModalProps {
   query: string;
   candidates: DisambiguationCandidate[];
   onSelect: (choice: string | 'synthesis' | 'cancel') => void;
+  isLiveAISuggestions?: boolean;
 }
 
 export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
@@ -666,6 +667,7 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
   query,
   candidates,
   onSelect,
+  isLiveAISuggestions,
 }) => {
   if (!isOpen) return null;
 
@@ -715,11 +717,13 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
 
           <div className="flex flex-col gap-2">
             <h3 className="text-xl font-bold text-zinc-100 uppercase tracking-wider flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary">travel_explore</span>
-              Look What I Found
+              <span className="material-symbols-outlined text-primary">{isLiveAISuggestions ? 'auto_awesome' : 'travel_explore'}</span>
+              {isLiveAISuggestions ? 'Live AI Validation' : 'Look What I Found'}
             </h3>
             <p className="text-sm text-zinc-400">
-              We found this in our index for <span className="text-primary font-semibold">"{query}"</span>. Is this the artist you're looking for?
+              {isLiveAISuggestions
+                ? <>We ran a quick live check and found a distinct regional entity for <span className="text-primary font-semibold">"{query}"</span>. Is this the act you mean?</>
+                : <>We found this in our index for <span className="text-primary font-semibold">"{query}"</span>. Is this the artist you're looking for?</>}
             </p>
           </div>
 
@@ -751,8 +755,8 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
               onClick={() => onSelect('synthesis')}
               className="w-full py-3 px-4 bg-primary/10 hover:bg-primary/20 text-primary font-semibold border border-primary/40 hover:border-primary transition-all text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2"
             >
-              <span className="material-symbols-outlined text-[16px]">search</span>
-              Not This One — Search Live AI
+              <span className="material-symbols-outlined text-[16px]">{isLiveAISuggestions ? 'search' : 'search'}</span>
+              {isLiveAISuggestions ? 'Not This One — Synthesize Anyway' : 'Not This One — Search Live AI'}
             </button>
             <button
               onClick={() => onSelect('cancel')}
@@ -776,11 +780,13 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
 
         <div className="flex flex-col gap-2">
           <h3 className="text-xl font-bold text-zinc-100 uppercase tracking-wider flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary">psychology</span>
-            Disambiguation
+            <span className="material-symbols-outlined text-primary">{isLiveAISuggestions ? 'auto_awesome' : 'psychology'}</span>
+            {isLiveAISuggestions ? 'Live AI Validation' : 'Disambiguation'}
           </h3>
           <p className="text-sm text-zinc-400">
-            We found multiple distinct artists matching <span className="text-primary font-semibold">"{query}"</span>. Which one did you mean?
+            {isLiveAISuggestions
+              ? <>Our live model identified multiple regional entities matching <span className="text-primary font-semibold">"{query}"</span>. Please specify which one you mean to avoid token waste.</>
+              : <>We found multiple distinct artists matching <span className="text-primary font-semibold">"{query}"</span>. Which one did you mean?</>}
           </p>
         </div>
 
@@ -816,7 +822,7 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
             className="w-full py-3 px-4 bg-primary/10 hover:bg-primary/20 text-primary font-semibold border border-primary/40 hover:border-primary transition-all text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2"
           >
             <span className="material-symbols-outlined text-[16px]">search</span>
-            Not What I'm Looking For — Search Live AI
+            {isLiveAISuggestions ? "None of These — Synthesize Anyway" : "Not What I'm Looking For — Search Live AI"}
           </button>
           <button
             onClick={() => onSelect('cancel')}
