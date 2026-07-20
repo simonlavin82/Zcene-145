@@ -4679,10 +4679,10 @@ const App: React.FC = () => {
             // Restore active nodes — with seed-fallback for stale documents
             if (data.activeNodes && Array.isArray(data.activeNodes)) {
               let resolvedActiveNodes = data.activeNodes;
-              if (resolvedActiveNodes.length === 0 && g.nodes.length > 0) {
+              if (resolvedActiveNodes.length === 0 && hydratedNodes.length > 0) {
                 const seedList = (data.seedArtists || '').split('::').map((s: string) => s.trim()).filter(Boolean);
                 const seedSet = new Set(seedList.map((s: string) => normalizeArtistId(s)));
-                resolvedActiveNodes = g.nodes
+                resolvedActiveNodes = hydratedNodes
                   .filter((n: any) => (n.type === 'artist' || !n.type) && seedSet.has(normalizeArtistId(n.id)))
                   .map((n: any) => n.id);
               }
