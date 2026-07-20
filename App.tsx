@@ -2384,10 +2384,16 @@ const App: React.FC = () => {
       return;
     }
 
-    // ─── STAGE 0: UNIFIED DISAMBIGUATION GATE ──────────────────────────────────
-    // Constitutional rule: Cache is always checked first (Stage 0a).
-    // The live AI probe (Stage 0b) fires ONLY on explicit "Search Live AI" click — never automatically.
-    // ───────────────────────────────────────────────────────────────────────────────
+    // ─── STAGE 0: UNIFIED DISAMBIGUATION GATE ─────────────────────────────────
+    // Constitutional rule: Cache is always interrogated first.
+    // The live AI probe fires ONLY on explicit "Search Live AI" click — never automatically.
+    //
+    // Every artist search ALWAYS passes through this checkpoint.
+    // The modal is shown regardless of how many cache records are found:
+    //   0 candidates → "No records found" + Search Live AI + Continue
+    //   1 candidate  → "Look what I found — is this correct?" + Not this one + Continue
+    //   >1 candidates → "Multiple found — which did you mean?" + Not what I'm looking for + Continue
+    // ─────────────────────────────────────────────────────────────────────────────
     let resolvedArtistSeeds = [...artistList];
     let activeDisambiguationHints: Record<string, string> = disambiguationHints || {};
     let hasDisambiguated = false;
@@ -2397,86 +2403,69 @@ const App: React.FC = () => {
         const rawInput = artists.split('::').map(s => s.trim()).filter(Boolean)[i] || artistList[i];
         const searchId = artistList[i];
 
-        // ── STAGE 0a: Cache Disambiguation Gate (existing — UNCHANGED) ────────
+        // Step 1: Interrogate the Firestore cache first (always).
         const cacheCandidates = await searchDisambiguationCandidates(searchId);
-        if (cacheCandidates.length > 1) {
-          setIsLoading(false);
-          isHydratingSessionRef.current = false;
-          isProjectLoadingRef.current = false;
 
-          const choice = await new Promise<string | 'synthesis' | 'cancel'>((resolve) => {
-            setDisambiguationDialog({
-              isOpen: true,
-              query: rawInput,
-              candidates: cacheCandidates,
-              onSelect: (c) => { setDisambiguationDialog(null); resolve(c); }
-              // No onSearchLiveAI — cache path never needs the live probe
-            });
+        setIsLoading(false);
+        isHydratingSessionRef.current = false;
+        isProjectLoadingRef.current = false;
+
+        // Shared onSearchLiveAI callback — wired into the modal for all cache states.
+        // Fires the Gemini Flash probe ONLY when the user explicitly clicks "Search Live AI".
+        const fireSearchLiveAI = async () => {
+          setDisambiguationDialog(prev => prev ? { ...prev, isSearchingLive: true } : null);
+          try {
+            const liveCandidates = await resolveArtistCandidatesViaAI(rawInput);
+            setDisambiguationDialog(prev => prev
+              ? { ...prev, isSearchingLive: false, candidates: liveCandidates }
+              : null
+            );
+          } catch {
+            setDisambiguationDialog(prev => prev
+              ? { ...prev, isSearchingLive: false, candidates: [] }
+              : null
+            );
+          }
+        };
+
+        // Step 2: Show the verification modal — always.
+        // The modal adapts its presentation based on how many candidates were found.
+        const choice = await new Promise<string | 'synthesis' | 'cancel'>((resolve) => {
+          setDisambiguationDialog({
+            isOpen: true,
+            query: rawInput,
+            candidates: cacheCandidates,     // 0, 1, or N — modal handles all cases
+            isSearchingLive: false,
+            onSearchLiveAI: fireSearchLiveAI, // always available — user can always escalate
+            onSelect: (c) => { setDisambiguationDialog(null); resolve(c); }
           });
+        });
 
-          if (choice === 'cancel') return;
-          if (choice !== 'synthesis') {
-            resolvedArtistSeeds[i] = normalizeArtistId(choice);
-            hasDisambiguated = true;
+        if (choice === 'cancel') return;
+
+        if (choice !== 'synthesis') {
+          // User selected a specific candidate (from cache or from live probe).
+          // Detect which source the selection came from to apply the right post-processing.
+          const isFromCacheSelection = cacheCandidates.some(c => c.id === choice);
+
+          resolvedArtistSeeds[i] = normalizeArtistId(choice);
+          hasDisambiguated = true;
+
+          if (isFromCacheSelection) {
+            // Cache selection: merge any duplicate cached docs for non-selected candidates.
             const nonSelected = cacheCandidates.filter(c => c.id !== choice);
             nonSelected.forEach(ns => mergeAndCleanupArtists(choice, ns.id));
-          }
-          continue;
-        }
-
-        // ── STAGE 0b: Cache Miss Gate — user-triggered probe only ─────────────
-        // Runs when the cache returned 0 candidates (guaranteed cache miss).
-        // The DisambiguationModal is shown in "search prompt" mode. The probe fires
-        // ONLY when the user clicks the "Search Live AI" button. Never automatic.
-        if (cacheCandidates.length === 0) {
-          setIsLoading(false);
-          isHydratingSessionRef.current = false;
-          isProjectLoadingRef.current = false;
-
-          const choice = await new Promise<string | 'synthesis' | 'cancel'>((resolve) => {
-            setDisambiguationDialog({
-              isOpen: true,
-              query: rawInput,
-              candidates: [],
-              isSearchingLive: false,
-              onSearchLiveAI: async () => {
-                // User explicitly clicked "Search Live AI" — fire the Flash probe
-                setDisambiguationDialog(prev => prev ? { ...prev, isSearchingLive: true } : null);
-                try {
-                  const liveCandidates = await resolveArtistCandidatesViaAI(rawInput);
-                  // Update modal in-place with probe results.
-                  // If 0 or 1 candidate returned, modal remains in "search prompt" state.
-                  setDisambiguationDialog(prev => prev
-                    ? { ...prev, isSearchingLive: false, candidates: liveCandidates }
-                    : null
-                  );
-                } catch (e) {
-                  // Silent fail — revert modal to search-prompt state
-                  setDisambiguationDialog(prev => prev
-                    ? { ...prev, isSearchingLive: false, candidates: [] }
-                    : null
-                  );
-                }
-              },
-              onSelect: (c) => { setDisambiguationDialog(null); resolve(c); }
-            });
-          });
-
-          if (choice === 'cancel') return;
-
-          if (choice !== 'synthesis') {
-            // User selected a specific live-probe candidate. Record the constraint hint
-            // so generateGraphData can anchor synthesis to the correct regional entity.
+          } else {
+            // Live probe selection: record a disambiguation constraint hint so
+            // generateGraphData anchors synthesis to the correct regional entity.
             const probeKey = normalizeArtistId(rawInput);
             activeDisambiguationHints[probeKey] =
               `[disambiguation resolved: the user confirmed they are searching for the artist ` +
               `identified as "${choice}". Synthesize ONLY the musical act matching this identity. ` +
               `Do NOT synthesize any other regional or genre variant with the same name.]`;
-            hasDisambiguated = true;
-            resolvedArtistSeeds[i] = choice;
           }
-          // choice === 'synthesis' means the user clicked "Continue with [query]" — fall through
         }
+        // choice === 'synthesis': user clicked "Continue with [query]" — no constraint, fall through.
       }
     }
 
