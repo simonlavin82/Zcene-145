@@ -673,45 +673,12 @@ An identical `VITE_USE_MOCKS !== 'false'` guard is applied inside `server.js`'s 
 
 **Previous implementation:** A two-stage `http-proxy-middleware` chain using `pathRewrite: { '^/api/gemini': '' }` and a `proxyReq` hook for key injection. Under Node.js v24 and Express v5 (which uses `path-to-regexp` v8+), wildcard route patterns were rejected at startup, and the `http-proxy-middleware` stream pipeline produced indefinite hangs for large POST payloads from the GenAI SDK.
 
-**Current implementation:** Replaced with a native async Express route handler using Node's built-in `fetch` API with half-duplex body streaming:
+**Current implementation:** Replaced with a native async Express route handler using Node's built-in `fetch` API  3. **Step 3 — Direct Live Gemini Pro Synthesis & Rejection Constraint Injection:**
+   When `choice === 'synthesis'`, the modal closes instantly. If candidate cards were rejected, STAGE 0 packages their origin and genre metadata into a **Negative Disambiguation Constraint Hint** (e.g. `[DISAMBIGUATION REJECTION CONSTRAINTS: User explicitly rejected 'I Wish I' from Italy (Screamo). Synthesize a DIFFERENT act named 'I Wish I'...]`). `handleGenerateGraph` re-invokes itself with `skipCacheLookup = true`, `bypassDisambiguation = true`, and `bypassTokenConfirmation = false`. The decoupled guard skips STAGE 0 re-entry, displays the API Token Authorization Modal, and dispatches `generateGraphDataViaCloudJob` with `disambiguationHints` passed in `inputPayload` to `/curationJobs`. The backend Cloud Function worker injects the negative constraint into Gemini 3.1 Pro system instructions. Deep Cut responses are extracted using regex codeblock matching (`match(/```(?:json)?\s*([\s\S]*?)\s*```/i)`) and sanitized with `sanitizeBioText()` to clean `\n*` artifacts.
 
-```javascript
-app.all('/api/gemini/*wildcard', async (req, res) => {
-  const headers = { ...req.headers };
-  // Credential strip: remove auth, cookie, host, connection, content-length
-  delete headers['authorization']; delete headers['cookie'];
-  delete headers['host']; delete headers['connection']; delete headers['content-length'];
+#### Universal Country-Suffixed Composite Key Write-Back & JIT Redirect Alignment
 
-  if (GEMINI_API_KEY) headers['x-goog-api-key'] = GEMINI_API_KEY;
-
-  const targetPath = req.originalUrl.replace(/^\/api\/gemini/, '');
-  const targetUrl  = `https://generativelanguage.googleapis.com${targetPath}`;
-
-  const fetchOptions = { method: req.method, headers };
-  if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
-    fetchOptions.body   = req;   // stream the raw IncomingMessage body directly
-    fetchOptions.duplex = 'half';
-  }
-
-  const response = await fetch(targetUrl, fetchOptions);
-  res.status(response.status);
-  response.headers.forEach((value, key) => {
-    if (key.toLowerCase() !== 'transfer-encoding') res.setHeader(key, value);
-  });
-  const reader = response.body.getReader();
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    res.write(value);
-  }
-  res.end();
-});
-```
-
-Key design decisions:
-*   **`req` as body stream:** Passing the Express `IncomingMessage` directly as `fetchOptions.body` with `duplex: 'half'` forwards the raw POST payload without buffering it into memory, preserving streaming semantics for large JSON bodies.
-*   **`transfer-encoding` header exclusion:** Google's API returns chunked transfer-encoding headers that conflict with Express's response pipeline; these are stripped before forwarding headers to the client.
-*   **`/api/gemini/*wildcard` syntax:** Express v5 / `path-to-regexp` v8 requires a named parameter prefixed with `*` (`*wildcard`) instead of the legacy bare wildcard (`/*`) pattern.
+After successful live synthesis, `writeArtistCacheMany()` computes a **Universal Country-Suffixed Composite Cache Key** (e.g. `i-wish-i-italy` or `i-wish-i-united-states`) using `extractCountrySlug()` (which extracts the final country segment from comma-separated origins like `"San Diego, CA, United States"` → `"united-states"`). Legacy bare-root documents (`/artists/{artistId}`) lacking a `redirectTo` field are automatically converted into alias pointers pointing to the composite canonical key. All background JIT detail updates (`updateDoc`) resolve the target document ID via `getArtistDocWithRedirect()` before writing, ensuring JIT detail updates always write to the canonical suffixed document instead of mutating bare-root documents. Subsequent prefix searches for the artist name populate State B or State C with distinct keyed candidates automatically without collisions.egexp` v8 requires a named parameter prefixed with `*` (`*wildcard`) instead of the legacy bare wildcard (`/*`) pattern.
 *   **Security parity:** The credential strip (`authorization`, `cookie`, `host`, `connection`, `content-length`) is retained and extended relative to the previous implementation. The `x-goog-api-key` injection is unchanged.
 
 ### 9.9 Direct-Wire Human-in-the-Loop Disambiguation (STAGE 0)

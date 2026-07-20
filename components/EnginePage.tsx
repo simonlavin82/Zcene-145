@@ -267,11 +267,13 @@ the entire dataset, the app evolves existing visual structures.
       - 1 cache hit -> "Look What I Found" (single card). Clicking card accepts candidate.
         Escape: "Not This One — Search Live AI" -> Direct Live Synthesis + Cancel.
       - >1 cache hits -> "Disambiguation" (list of cards). Clicking card accepts candidate.
-    - Step 3 (Direct Live Synthesis & Rejection Constraint Injection): Clicking Search Live AI closes the modal instantly.
+    - Step 3 (Direct Live Synthesis & Cloud Rejection Constraint Propagation): Clicking Search Live AI closes the modal instantly.
       STAGE 0 packages rejected card metadata into a negative constraint hint for Gemini 3.1 Pro.
       handleGenerateGraph re-invokes with skipCacheLookup = true, bypassDisambiguation = true,
       and bypassTokenConfirmation = false. The decoupled guard skips STAGE 0 re-entry, displays
-      the API Token Authorization Modal, and dispatches live Gemini 3.1 Pro synthesis with prompt constraints.
+      the API Token Authorization Modal, and dispatches generateGraphDataViaCloudJob with disambiguationHints
+      passed in inputPayload to /curationJobs. Deep Cut responses are parsed via regex codeblock extraction
+      and sanitized with sanitizeBioText() to strip \n* artifacts.
 
     Self-healing, Universal Composite Keys & JIT Redirect Alignment: Every successful live synthesis
     writes a Universal Country-Suffixed Composite Cache Key (e.g. "i-wish-i-italy", "i-wish-i-united-states") via

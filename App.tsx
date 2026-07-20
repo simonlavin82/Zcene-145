@@ -70,7 +70,8 @@ const generateGraphDataViaCloudJob = async (
   signal?: AbortSignal,
   onDetailsCacheReceived?: (detailsCacheJson: string) => void,
   projectId?: string,
-  jobId?: string
+  jobId?: string,
+  disambiguationHints?: Record<string, string>
 ): Promise<GraphData> => {
   const finalJobId = jobId || `job-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
   const jobRef = doc(db, 'curationJobs', finalJobId);
@@ -83,7 +84,8 @@ const generateGraphDataViaCloudJob = async (
     inputPayload: {
       artists,
       filters,
-      projectId
+      projectId,
+      disambiguationHints
     },
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
@@ -3752,7 +3754,8 @@ const App: React.FC = () => {
             }
           },
           currentProjectId || undefined,
-          jobId
+          jobId,
+          activeDisambiguationHints
         );
       } else {
         graphPromise = generateGraphData(artists, pruned, activeDiscoveryFilters, user?.uid, controller?.signal, activeDisambiguationHints);

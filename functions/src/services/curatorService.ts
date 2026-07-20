@@ -399,7 +399,8 @@ export const generateGraphDataBackend = async (
   artists: string,
   filters?: DiscoveryFilters,
   cachedSubgraphsContext?: string,
-  baseGraph?: GraphData
+  baseGraph?: GraphData,
+  disambiguationHints?: Record<string, string>
 ): Promise<GraphData> => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -476,6 +477,12 @@ export const generateGraphDataBackend = async (
       if (filters.foundedAfter) reminder += ` founded after ${filters.foundedAfter};`;
       if (filters.foundedBefore) reminder += ` founded before ${filters.foundedBefore};`;
       userPrompt += reminder;
+  }
+
+  // [Disambiguation Gate] Inject user-confirmed identity constraint when present.
+  if (disambiguationHints && Object.keys(disambiguationHints).length > 0) {
+    const hintBlock = Object.values(disambiguationHints).join('\n');
+    systemInstruction += `\n\nDISAMBIGUATION CONSTRAINTS (MANDATORY — DO NOT OVERRIDE):\n${hintBlock}`;
   }
 
   const response = await ai.models.generateContent({

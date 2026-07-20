@@ -1275,6 +1275,28 @@ export const extendGraphFromNode = async (node: Node, baseGraph: GraphData): Pro
   }
 };
 
+/**
+ * Sanitizes Deep Cut biography and summary text:
+ * - Strips raw codeblock wrappers (```json ... ```)
+ * - Converts raw escaped newlines (\n*) into formatted bullet points
+ * - Cleans trailing Markdown symbols and citations
+ */
+export const sanitizeBioText = (rawText?: string): string => {
+  if (!rawText || typeof rawText !== 'string') return '';
+
+  let text = rawText.trim();
+  // Strip raw codeblock fences if present
+  text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+
+  // Convert raw escaped newlines and bullets (\n* or \n-) into formatted line breaks
+  text = text.replace(/\\n\*/g, '\n• ').replace(/\\n-/g, '\n• ').replace(/\\n\n/g, '\n\n');
+
+  // Strip citations like [1], [2]
+  text = text.replace(/\[\d+\]/g, '').replace(/\(\d+\)/g, '').trim();
+
+  return text;
+};
+
 export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArtists: string, originHint?: string | null): Promise<NodeDetails> => {
     if (isLocal) {
         return generateMockNodeDetails(node);
@@ -1353,10 +1375,9 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
         throw new Error("Empty response from AI details service.");
     }
 
-    let cleanedJsonText = jsonText.trim();
-    if (cleanedJsonText.startsWith('```')) {
-        cleanedJsonText = cleanedJsonText.replace(/^```(?:json)?\n?/i, '').replace(/```$/, '').trim();
-    }
+    // Extract JSON payload using regex codeblock extractor (handles preamble text gracefully)
+    const codeblockMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+    let cleanedJsonText = codeblockMatch ? codeblockMatch[1].trim() : jsonText.replace(/^```(?:json)?\n?/i, '').replace(/```$/, '').trim();
 
     let details: NodeDetails;
     try {
@@ -1377,7 +1398,7 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
             // string (> 40 chars), treat it as the biography and construct a minimal
             // valid NodeDetails so the queue can write to detailsCache and stop
             // re-queueing instead of throwing a terminal format exception.
-            const rawProse = cleanedJsonText.trim();
+            const rawProse = sanitizeBioText(cleanedJsonText);
             if (rawProse.length > 40) {
                 console.warn(
                     `[Deep Cut Parse] JSON repair failed — response appears to be grounding prose (${rawProse.length} chars). ` +
@@ -1385,15 +1406,21 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
                 );
                 details = {
                     summary: rawProse,
-                    details: { genre: "", origin: "", founded: "", notableArtists: [] },
+                    details: {
+                        artist: node.label || node.id,
+                        genre: "",
+                        origin: originHint || "",
+                        founded: "",
+                        notableArtists: []
+                    },
+                    members: [],
                     links: [],
                     discography: [],
-                    members: [],
-                    recommendationReason: "",
-                } as unknown as NodeDetails;
+                    tourInfo: "",
+                    recommendationReason: "Synthesised from live cultural archives via Google Search grounding."
+                };
             } else {
-                console.error("Failed to parse AI details JSON (even after repair):", repaired);
-                throw new Error("Invalid data format from AI details service.");
+                throw new Error(`Failed to parse AI details JSON: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
             }
         }
     }
@@ -1410,7 +1437,7 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
 
     const sanitizeString = (str: any): string => {
         if (typeof str !== 'string') return "";
-        return str.replace(/\[\d+\]/g, '').replace(/\(\d+\)/g, '').trim();
+        return sanitizeBioText(str);
     };
 
     const hydratedDetails: NodeDetails = {

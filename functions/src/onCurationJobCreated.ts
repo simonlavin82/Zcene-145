@@ -183,7 +183,8 @@ export const onCurationJobCreated = onDocumentCreated({
           inputPayload.artists,
           inputPayload.filters,
           inputPayload.cachedSubgraphsContext,
-          inputPayload.baseGraph
+          inputPayload.baseGraph,
+          inputPayload.disambiguationHints
         );
 
         // Structural Integrity Guard: Verify that we received a valid, rich graph from the model
