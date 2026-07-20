@@ -255,10 +255,11 @@ the entire dataset, the app evolves existing visual structures.
 10. DIRECT-WIRE HUMAN-IN-THE-LOOP DISAMBIGUATION (STAGE 0) — AUTHORITATIVE GOVERNANCE:
     Constitutional Rule: The cache is ALWAYS interrogated first. Every search passes
     through an explicit human-in-the-loop verification checkpoint before synthesis occurs.
-    Accepting a candidate loads the cached record. Clicking "Search Live AI" / "Not This One..."
-    directly closes the modal and dispatches the live Gemini 3.1 Pro generative synthesis
-    pipeline with cache lookup skipped (skipCacheLookup = true), STAGE 0 re-entry bypassed
-    (bypassDisambiguation = true), and token authorization enabled (bypassTokenConfirmation = false).
+    Accepting a candidate re-invokes the pipeline with Phase 02 cache lookups active (skipCacheLookup = false), 
+    ensuring full graphs instantly hydrate or partial Flash stubs are seamlessly handed off to Gemini. 
+    Clicking "Search Live AI" / "Not This One..." directly closes the modal and dispatches the live 
+    Gemini 3.1 Pro generative synthesis pipeline with cache lookup explicitly skipped (skipCacheLookup = true), 
+    STAGE 0 re-entry bypassed (bypassDisambiguation = true), and token authorization enabled (bypassTokenConfirmation = false).
 
     State Machine & Verification Pipeline:
     - Step 1 (Cache Interrogation): searchDisambiguationCandidates() queries global /artists.
