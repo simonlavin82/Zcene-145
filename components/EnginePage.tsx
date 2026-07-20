@@ -273,10 +273,11 @@ the entire dataset, the app evolves existing visual structures.
       and bypassTokenConfirmation = false. The decoupled guard skips STAGE 0 re-entry, displays
       the API Token Authorization Modal, and dispatches live Gemini 3.1 Pro synthesis with prompt constraints.
 
-    Self-healing & Universal Composite Keys: Every successful live synthesis writes a Universal
-    Country-Suffixed Composite Cache Key (e.g. "i-wish-i-italy", "i-wish-i-united-states") via
-    writeArtistCacheMany(). Bare alias pointers are preserved, allowing regional variants to co-exist
-    as peer records. Future searches populate State B or C with distinct candidates automatically.
+    Self-healing, Universal Composite Keys & JIT Redirect Alignment: Every successful live synthesis
+    writes a Universal Country-Suffixed Composite Cache Key (e.g. "i-wish-i-italy", "i-wish-i-united-states") via
+    writeArtistCacheMany() using extractCountrySlug(). Legacy bare root documents are healed into alias pointers,
+    and all JIT updateDoc sites resolve via getArtistDocWithRedirect() to target composite canonical documents.
+    Future searches populate State B or C with distinct candidates automatically without collisions.
 `;
 
 

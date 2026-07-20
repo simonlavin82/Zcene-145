@@ -59,6 +59,24 @@ export const buildCompositeCacheKey = (artistId: string, filters?: DiscoveryFilt
   return parts.join('-').replace(/\s+/g, '-').toLowerCase();
 };
 
+/**
+ * Extracts a clean, normalized country slug from origin strings.
+ * e.g. "San Diego, CA, United States" -> "united-states"
+ * e.g. "London, England, United Kingdom" -> "united-kingdom"
+ * e.g. "Italy" -> "italy"
+ */
+export const extractCountrySlug = (originStr?: string): string => {
+  if (!originStr || typeof originStr !== 'string' || originStr.trim().length === 0) {
+    return 'global';
+  }
+
+  const parts = originStr.split(',').map(s => s.trim()).filter(Boolean);
+  const rawCountry = parts.length > 0 ? parts[parts.length - 1] : originStr;
+  const slug = normalizeArtistId(rawCountry);
+
+  return slug || 'global';
+};
+
 
 /**
  * Title cases a raw kebab-case or snake-case artist ID string.
@@ -476,9 +494,9 @@ export const writeArtistCacheMany = async (
 
       let countryNorm = "";
       if (connectedCountries.length > 0) {
-        countryNorm = normalizeArtistId(connectedCountries[0]);
+        countryNorm = extractCountrySlug(connectedCountries[0]);
       } else if (artistDetails?.details?.origin) {
-        countryNorm = normalizeArtistId(artistDetails.details.origin);
+        countryNorm = extractCountrySlug(artistDetails.details.origin);
       }
       if (!countryNorm) countryNorm = "global";
 
@@ -560,13 +578,13 @@ export const writeArtistCacheMany = async (
           }
         }
 
-        // Bare root alias pointer protection:
-        // Create a pointer at /artists/{artistId} ONLY if no document exists there yet.
-        // If an alias or canonical document already exists at the bare root, leave it untouched
-        // so multiple country-suffixed variants (e.g. i-wish-i-italy and i-wish-i-united-states) co-exist as peers.
+        // Bare root alias pointer protection & legacy healing:
+        // Create or convert a pointer at /artists/{artistId} IF no document exists OR if a legacy document exists lacking a redirectTo field.
         const bareArtistIdRef = doc(db, 'artists', artistId);
         const bareSnap = await getDoc(bareArtistIdRef);
-        if (!bareSnap.exists()) {
+        const bareData = bareSnap.exists() ? bareSnap.data() : null;
+
+        if (!bareSnap.exists() || (bareData && !bareData.redirectTo && bareSnap.id !== compositeCanonicalId)) {
           await setDoc(bareArtistIdRef, {
             cacheKey: artistId,
             artistId: artistId,
@@ -578,7 +596,7 @@ export const writeArtistCacheMany = async (
             hitCount: 0,
             redirectTo: compositeCanonicalId
           });
-          console.log(`[ArtistCache] Created Initial Bare Alias Pointer: ${artistId} -> ${compositeCanonicalId}`);
+          console.log(`[ArtistCache] Created/Healed Bare Alias Pointer: ${artistId} -> ${compositeCanonicalId}`);
         }
       } catch (e: any) {
         console.warn(`[ArtistCache] Write failed for "${compositeArtistId}" (${e.code ?? 'unknown'}): ${e.message}`);

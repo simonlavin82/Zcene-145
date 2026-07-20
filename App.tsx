@@ -5652,8 +5652,12 @@ const App: React.FC = () => {
         cachedAt: serverTimestamp()
       };
       enforceArtistCacheSchema(updatePayload);
-      await updateDoc(doc(db, 'artists', cacheId), updatePayload);
-      console.log("[Revalidation] Successfully updated stale cache in Firestore for: " + cacheId);
+
+      // Resolve target snapshot via redirect before updating to avoid overwriting bare root alias docs
+      const targetSnap = await getArtistDocWithRedirect(cacheId);
+      const targetDocId = targetSnap.exists() ? targetSnap.id : cacheId;
+      await updateDoc(doc(db, 'artists', targetDocId), updatePayload);
+      console.log("[Revalidation] Successfully updated stale cache in Firestore for: " + targetDocId);
     } catch (e: any) {
       console.warn("[Revalidation] Background refresh failed for: " + cacheId, e.message);
     }
