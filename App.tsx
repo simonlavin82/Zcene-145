@@ -2321,7 +2321,7 @@ const App: React.FC = () => {
     rawArtists: string,
     isRegeneration: boolean = false,
     graphToEnhance?: GraphData | null,
-    bypassCacheValidation: boolean = false,
+    skipCacheLookup: boolean = false,
     bypassTokenConfirmation: boolean = false,
     overrideFilters?: DiscoveryFilters,
     disambiguationHints?: Record<string, string>
@@ -2368,7 +2368,7 @@ const App: React.FC = () => {
       // Only gate if it's a manual action (regeneration or fresh start)
       // Imports (via deep links) are allowed for guests
       console.log(`[Lazy Registration] Queueing generateGraph for guest. User: ${!!user}`);
-      setPendingAuthAction({ type: 'generateGraph', payload: { artists, isRegeneration, graphToEnhance, bypassCacheValidation } });
+      setPendingAuthAction({ type: 'generateGraph', payload: { artists, isRegeneration, graphToEnhance, skipCacheLookup } });
       handleLogin();
       return;
     }
@@ -2424,9 +2424,9 @@ const App: React.FC = () => {
         if (choice === 'synthesis') {
           // Direct Wire to Live Generative Synthesis:
           // Clicking "Search Live AI" / "Not This One..." directly resolves choice to 'synthesis'.
-          // We immediately re-invoke handleGenerateGraph with bypassCacheValidation = true and bypassToken = true
-          // to trigger live Gemini 3.1 Pro synthesis directly, bypassing all local/Firestore cache.
-          handleGenerateGraph(artists, isRegeneration, graphToEnhance, true, true, overrideFilters, activeDisambiguationHints);
+          // We immediately re-invoke handleGenerateGraph with skipCacheLookup = true and bypassTokenConfirmation = false
+          // to prompt for token authorization and trigger live Gemini 3.1 Pro synthesis directly.
+          handleGenerateGraph(artists, isRegeneration, graphToEnhance, true, false, overrideFilters, activeDisambiguationHints);
           return;
         } else {
           // User accepted a specific candidate card from the cache.
@@ -2532,7 +2532,8 @@ const App: React.FC = () => {
 
     // --- STRICT FRONT-GATE CACHE CHECK ---
     // If this is a fresh search for a single artist without special filters, check the cache immediately
-    if (artistList.length === 1 && !hasActiveFilters) {
+    // Skip entirely if skipCacheLookup is true (e.g. user explicitly rejected cache hit in disambiguation gate)
+    if (!skipCacheLookup && artistList.length === 1 && !hasActiveFilters) {
       const searchId = artistList[0];
       const searchIdLower = searchId.toLowerCase();
       
@@ -2610,7 +2611,7 @@ const App: React.FC = () => {
             });
           }
           
-          if (data && (bypassCacheValidation || isQualified)) {
+          if (data && isQualified) {
             if (parsedGraph && parsedGraph.nodes && parsedGraph.nodes.length > 0) {
               const rationaleVal = data.synthesisRationale || parsedGraph.synthesisRationale;
               if (rationaleVal) {
@@ -2854,7 +2855,7 @@ const App: React.FC = () => {
           const resolvedArtists = mappedSeeds.join('::');
           setSeedArtists(resolvedArtists);
           console.log(`[Phase 02 Cache] Redirect detected, restarting generation with: ${resolvedArtists}`);
-          handleGenerateGraph(resolvedArtists, isRegeneration, graphToEnhance, bypassCacheValidation, bypassTokenConfirmation, overrideFilters);
+          handleGenerateGraph(resolvedArtists, isRegeneration, graphToEnhance, skipCacheLookup, bypassTokenConfirmation, overrideFilters);
           return;
         }
 
@@ -2863,13 +2864,13 @@ const App: React.FC = () => {
         enrichmentRequired = [];
         fullHits = [];
 
-        const allArtistsCached = normalizedArtistList.every(name => {
+        const allArtistsCached = !skipCacheLookup && normalizedArtistList.every(name => {
           const normName = name.toLowerCase();
           const entry = baseCacheResult.cached.get(name) || baseCacheResult.cached.get(normName);
           return entry && isGraphDataPresent(entry) && isCacheEntryFullyQualified(entry, artistList.length === 1);
         });
 
-        const allCompositeCached = normalizedArtistList.every(name => {
+        const allCompositeCached = !skipCacheLookup && normalizedArtistList.every(name => {
           const normName = name.toLowerCase();
           const entry = compositeCacheResult.cached.get(name) || compositeCacheResult.cached.get(normName);
           return entry && isGraphDataPresent(entry) && isCacheEntryFullyQualified(entry, artistList.length === 1);
@@ -2886,7 +2887,7 @@ const App: React.FC = () => {
         if (allArtistsCached) {
           // For single-artist queries: skip confirmCacheChoice entirely — load directly from cache.
           // This prevents the cache-choice modal appearing for known artists.
-          const skipChoiceModal = artistList.length === 1 || bypassCacheValidation || allCompositeCached;
+          const skipChoiceModal = artistList.length === 1 || allCompositeCached;
           const choice = skipChoiceModal ? 'cache' : await confirmCacheChoice(artistList);
           if (choice === 'cancel' || controller.signal.aborted) {
             isHydratingSessionRef.current = false;
@@ -2898,7 +2899,7 @@ const App: React.FC = () => {
 
           if (choice === 'synthesis') {
             console.log("[Phase 02 Cache] Option B chosen: forcing net-new AI generation.");
-            handleGenerateGraph(artists, true, null, bypassCacheValidation, true);
+            handleGenerateGraph(artists, true, null, true, true);
             return;
           }
 
@@ -3102,7 +3103,7 @@ const App: React.FC = () => {
           const filtersMatch = bypassChoiceConfirmation ? true : (entry ? areFiltersEqual(entry.filters, activeDiscoveryFilters) : false);
           const isQualified = bypassChoiceConfirmation ? true : validation?.isFullyQualified;
 
-          if (forceMockHit || (entry && filtersMatch && (bypassCacheValidation || isQualified))) {
+          if (!skipCacheLookup && (forceMockHit || (entry && filtersMatch && isQualified))) {
             fullHits.push(name);
             const finalEntry: ArtistCacheEntry = entry || {
               artistId: normalizeArtistId(name),
@@ -3162,7 +3163,7 @@ const App: React.FC = () => {
         // Single-artist queries without filters are already handled by the Front Gate cache check.
         // Thus, any full hit reaching Phase 2 is by definition multi-artist or filtered.
         const allDeep = Array.from(cached.values()).every(entry => entry.isDeep === true);
-        const choice = (allDeep || bypassCacheValidation || bypassChoiceConfirmation) ? 'cache' : await confirmCacheChoice(artistList);
+        const choice = (allDeep || bypassChoiceConfirmation) ? 'cache' : await confirmCacheChoice(artistList);
         if (choice === 'cancel' || controller.signal.aborted) {
           isHydratingSessionRef.current = false;
           setIsLoading(false);
@@ -3173,7 +3174,7 @@ const App: React.FC = () => {
 
         if (choice === 'synthesis') {
           console.log("[Phase 02 Cache] Option B chosen: forcing net-new AI generation.");
-          handleGenerateGraph(artists, true, null, bypassCacheValidation, true);
+          handleGenerateGraph(artists, true, null, true, true);
           return;
         }
 

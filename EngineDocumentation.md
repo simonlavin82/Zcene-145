@@ -718,7 +718,7 @@ Key design decisions:
 
 #### Constitutional Rule
 
-> **Cache is always interrogated first. Every artist search passes through an explicit human-in-the-loop verification checkpoint before synthesis occurs. Accepting a candidate loads the cached record. Clicking "Search Live AI" / "Not This One..." directly resolves the modal and dispatches the live Gemini 3.1 Pro generative synthesis pipeline with cache-bypassing (`bypassCacheValidation = true`). This is a binding architectural law.**
+> **Cache is always interrogated first. Every artist search passes through an explicit human-in-the-loop verification checkpoint before synthesis occurs. Accepting a candidate loads the cached record. Clicking "Search Live AI" / "Not This One..." directly resolves the modal and dispatches the live Gemini 3.1 Pro generative synthesis pipeline with cache lookup skipped (`skipCacheLookup = true`) and token authorization enabled (`bypassTokenConfirmation = false`). This is a binding architectural law.**
 
 #### State Machine & Render Matrix
 
@@ -741,7 +741,7 @@ The `DisambiguationModal` component in `SharedModals.tsx` implements 3 direct, c
    - **Live Synthesis Rejection:** Clicking `Search Live AI` / `Not This One...` resolves choice to `'synthesis'`.
 
 3. **Step 3 — Direct Live Gemini Pro Synthesis:**
-   When `choice === 'synthesis'`, the modal closes instantly and `handleGenerateGraph` re-invokes itself with `bypassCacheValidation = true`. The engine proceeds directly to Phase 2 (Token Confirmation / Live Generation) with full loading overlays, dispatching `generateGraphData` to live Gemini 3.1 Pro without intermediate modal interception traps or double-prompts.
+   When `choice === 'synthesis'`, the modal closes instantly and `handleGenerateGraph` re-invokes itself with `skipCacheLookup = true` and `bypassTokenConfirmation = false`. The engine prompts for token authorization and proceeds directly to Phase 2 with full loading overlays, dispatching `generateGraphData` to live Gemini 3.1 Pro without intermediate modal interception traps, front-gate cache traps, or double-prompts.
 
 #### Cache Write-Back Alignment
 

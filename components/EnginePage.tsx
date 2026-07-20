@@ -257,7 +257,8 @@ the entire dataset, the app evolves existing visual structures.
     through an explicit human-in-the-loop verification checkpoint before synthesis occurs.
     Accepting a candidate loads the cached record. Clicking "Search Live AI" / "Not This One..."
     directly closes the modal and dispatches the live Gemini 3.1 Pro generative synthesis
-    pipeline with cache-bypassing (bypassCacheValidation = true). This is a binding law.
+    pipeline with cache lookup skipped (skipCacheLookup = true) and token authorization enabled
+    (bypassTokenConfirmation = false). This is a binding law.
 
     State Machine & Verification Pipeline:
     - Step 1 (Cache Interrogation): searchDisambiguationCandidates() queries global /artists.
@@ -268,9 +269,9 @@ the entire dataset, the app evolves existing visual structures.
       - >1 cache hits -> "Disambiguation" (list of cards). Clicking card accepts candidate.
         Escape: "Not What I'm Looking For — Search Live AI" -> Direct Live Synthesis + Cancel.
     - Step 3 (Direct Live Synthesis): Clicking Search Live AI closes the modal instantly.
-      handleGenerateGraph re-invokes with bypassCacheValidation = true, bypassing Firestore
-      cache and dispatching live Gemini 3.1 Pro synthesis directly. Zero intermediate modal
-      loops or dead-end screens.
+      handleGenerateGraph re-invokes with skipCacheLookup = true and bypassTokenConfirmation = false,
+      prompting for token authorization and dispatching live Gemini 3.1 Pro synthesis directly.
+      Zero intermediate modal loops, front-gate cache traps, or dead-end screens.
 
     Self-healing: Every successful live synthesis writes a country-anchored composite cache key
     (e.g. "oblivion-italy") via writeArtistCacheMany(). Future searches for the same artist name
