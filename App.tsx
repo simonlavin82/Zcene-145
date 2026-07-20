@@ -2416,12 +2416,15 @@ const App: React.FC = () => {
         const fireSearchLiveAI = async () => {
           setDisambiguationDialog(prev => prev ? { ...prev, isSearchingLive: true } : null);
           try {
+            console.log(`[Disambiguation Probe] Triggering Gemini Flash probe for "${rawInput}"...`);
             const liveCandidates = await resolveArtistCandidatesViaAI(rawInput);
+            console.log(`[Disambiguation Probe] Returned ${liveCandidates.length} candidate(s) for "${rawInput}":`, liveCandidates);
             setDisambiguationDialog(prev => prev
               ? { ...prev, isSearchingLive: false, hasSearchedLive: true, candidates: liveCandidates }
               : null
             );
-          } catch {
+          } catch (err) {
+            console.error(`[Disambiguation Probe] Probe failed for "${rawInput}":`, err);
             setDisambiguationDialog(prev => prev
               ? { ...prev, isSearchingLive: false, hasSearchedLive: true, candidates: [] }
               : null
@@ -2445,7 +2448,14 @@ const App: React.FC = () => {
 
         if (choice === 'cancel') return;
 
-        if (choice !== 'synthesis') {
+        if (choice === 'synthesis') {
+          // If the user rejected the cache hit (or chose unconstrained synthesis),
+          // force bypassCacheValidation = true so we don't re-fetch the rejected cache item.
+          if (cacheCandidates.length > 0) {
+            handleGenerateGraph(artists, isRegeneration, graphToEnhance, true, true, overrideFilters, activeDisambiguationHints);
+            return;
+          }
+        } else {
           // User selected a specific candidate (from cache or from live probe).
           // Detect which source the selection came from to apply the right post-processing.
           const isFromCacheSelection = cacheCandidates.some(c => c.id === choice);
@@ -2467,13 +2477,12 @@ const App: React.FC = () => {
               `Do NOT synthesize any other regional or genre variant with the same name.]`;
           }
         }
-        // choice === 'synthesis': user clicked "Continue with [query]" — no constraint, fall through.
       }
     }
 
     if (hasDisambiguated) {
       const newArtistsStr = resolvedArtistSeeds.join('::');
-      handleGenerateGraph(newArtistsStr, isRegeneration, graphToEnhance, bypassCacheValidation, true, overrideFilters, activeDisambiguationHints);
+      handleGenerateGraph(newArtistsStr, isRegeneration, graphToEnhance, true, true, overrideFilters, activeDisambiguationHints);
       return;
     }
 

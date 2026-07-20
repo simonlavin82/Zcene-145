@@ -762,7 +762,7 @@ Respond in strict JSON only — no prose, no markdown, no citation markers.`;
   try {
     const response = await fetch(targetUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-proxy-key': 'backend-proxy-key' },
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': 'backend-proxy-key' },
       body: JSON.stringify(requestBody),
       signal: combinedSignal
     });
