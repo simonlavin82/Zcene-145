@@ -257,18 +257,19 @@ export const TokenConfirmationDialog: React.FC<{
 
   return (
     <div 
-      className="fixed inset-0 bg-black/60 z-[130] flex items-center justify-center p-4 animate-fade-in-down" 
+      className="fixed inset-0 bg-black/60 z-[130] flex items-center justify-center p-4 animate-fade-in-down pointer-events-auto" 
       style={{ animationDuration: '200ms' }}
       onClick={onClose}
     >
       <div 
-        className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-hidden" 
+        className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-hidden animate-fade-in-down" 
+        style={{ animationDuration: '200ms' }}
         onClick={e => e.stopPropagation()}
       >
         <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary !text-[18px]">info</span>
-            <h3 className="text-base font-medium text-white">
+            <h3 className="text-lg font-medium text-white">
               {type === 'live_synthesis' ? 'Confirm Live Synthesis' : 'Token Quota Warning'}
             </h3>
           </div>
@@ -675,21 +676,29 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
   // ── STATE A: Cache Miss (0 candidates in cache) ───────────────────────────
   if (candidates.length === 0) {
     return (
-      <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in-down" style={{ animationDuration: '200ms' }}>
-        <div className="w-full max-w-md rounded-none bg-zinc-900 border border-zinc-600 p-8 shadow-2xl relative overflow-hidden flex flex-col gap-6" onClick={e => e.stopPropagation()}>
-          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-primary/30 via-primary to-primary/30" />
-          <div className="flex flex-col gap-2">
-            <h3 className="text-xl font-bold text-zinc-100 uppercase tracking-wider flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary">{isLiveAISuggestions ? 'auto_awesome' : 'psychology'}</span>
-              {isLiveAISuggestions ? 'Live AI Validation' : 'Disambiguation'}
-            </h3>
+      <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/60 animate-fade-in-down pointer-events-auto" style={{ animationDuration: '200ms' }} onClick={() => onSelect('cancel')}>
+        <div className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-hidden animate-fade-in-down" style={{ animationDuration: '200ms' }} onClick={e => e.stopPropagation()}>
+          <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary !text-[18px]">{isLiveAISuggestions ? 'auto_awesome' : 'psychology'}</span>
+              <h3 className="text-lg font-medium text-white">
+                {isLiveAISuggestions ? 'Live AI Validation' : 'Disambiguation'}
+              </h3>
+            </div>
+            <button onClick={() => onSelect('cancel')} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none">
+              <span className="material-symbols-outlined !text-[18px]">close</span>
+            </button>
+          </header>
+
+          <div className="p-5 flex flex-col gap-6">
             <p className="text-sm text-zinc-400">
               {isLiveAISuggestions 
                 ? <>No specific regional variants were identified for <span className="text-primary font-semibold">"{query}"</span> by the AI probe. Proceed with open synthesis?</>
                 : <>No cached records found for <span className="text-primary font-semibold">"{query}"</span>. This artist may be new to the platform, or multiple regional acts share this name.</>}
             </p>
           </div>
-          <div className="flex flex-col gap-3 pt-2 border-t border-zinc-800">
+
+          <footer className="p-4 bg-zinc-900 border-t border-zinc-700 flex flex-col gap-2">
             {isLiveAISuggestions ? (
               <form onSubmit={(e) => { e.preventDefault(); if (overrideInput.trim()) onSelect(`override::${overrideInput.trim()}`); }} className="flex flex-col gap-2 w-full">
                 <input 
@@ -723,7 +732,7 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
             >
               Cancel
             </button>
-          </div>
+          </footer>
         </div>
       </div>
     );
@@ -734,21 +743,26 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
   if (candidates.length === 1) {
     const cand = candidates[0];
     return (
-      <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in-down" style={{ animationDuration: '200ms' }}>
-        <div className="w-full max-w-md rounded-none bg-zinc-900 border border-zinc-600 p-8 shadow-2xl relative overflow-hidden flex flex-col gap-6" onClick={e => e.stopPropagation()}>
-          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-primary/30 via-primary to-primary/30" />
+      <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/60 animate-fade-in-down pointer-events-auto" style={{ animationDuration: '200ms' }} onClick={() => onSelect('cancel')}>
+        <div className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-hidden animate-fade-in-down" style={{ animationDuration: '200ms' }} onClick={e => e.stopPropagation()}>
+          <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary !text-[18px]">{isLiveAISuggestions ? 'auto_awesome' : 'travel_explore'}</span>
+              <h3 className="text-lg font-medium text-white">
+                {isLiveAISuggestions ? 'Live AI Validation' : 'Look What I Found'}
+              </h3>
+            </div>
+            <button onClick={() => onSelect('cancel')} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none">
+              <span className="material-symbols-outlined !text-[18px]">close</span>
+            </button>
+          </header>
 
-          <div className="flex flex-col gap-2">
-            <h3 className="text-xl font-bold text-zinc-100 uppercase tracking-wider flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary">{isLiveAISuggestions ? 'auto_awesome' : 'travel_explore'}</span>
-              {isLiveAISuggestions ? 'Live AI Validation' : 'Look What I Found'}
-            </h3>
+          <div className="p-5 flex flex-col gap-6">
             <p className="text-sm text-zinc-400">
               {isLiveAISuggestions
                 ? <>We ran a quick live check and found a distinct regional entity for <span className="text-primary font-semibold">"{query}"</span>. Is this the act you mean?</>
                 : <>We found this in our index for <span className="text-primary font-semibold">"{query}"</span>. Is this the artist you're looking for?</>}
             </p>
-          </div>
 
           {/* Single candidate card — clicking accepts cached candidate */}
           <button
@@ -772,8 +786,9 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
               arrow_forward_ios
             </span>
           </button>
-
-          <div className="flex flex-col gap-2 pt-2 border-t border-zinc-800">
+          </div>
+          
+          <footer className="p-4 bg-zinc-900 border-t border-zinc-700 flex flex-col gap-2">
             {isLiveAISuggestions ? (
               <form onSubmit={(e) => { e.preventDefault(); if (overrideInput.trim()) onSelect(`override::${overrideInput.trim()}`); }} className="flex flex-col gap-2 w-full">
                 <input 
@@ -807,7 +822,7 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
             >
               Cancel
             </button>
-          </div>
+          </footer>
         </div>
       </div>
     );
@@ -816,22 +831,26 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
   // ── STATE C: Multiple Cached Candidates — "Which Did You Mean?" ───────────
   // Cache returned >1 records. User selects one or requests live AI search.
   return (
-    <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in-down" style={{ animationDuration: '200ms' }}>
-      <div className="w-full max-w-md rounded-none bg-zinc-900 border border-zinc-600 p-8 shadow-2xl relative overflow-hidden flex flex-col gap-6" onClick={e => e.stopPropagation()}>
-        {/* Border glow accent */}
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-primary/30 via-primary to-primary/30" />
+    <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/60 animate-fade-in-down pointer-events-auto" style={{ animationDuration: '200ms' }} onClick={() => onSelect('cancel')}>
+      <div className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-hidden animate-fade-in-down" style={{ animationDuration: '200ms' }} onClick={e => e.stopPropagation()}>
+        <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary !text-[18px]">{isLiveAISuggestions ? 'auto_awesome' : 'psychology'}</span>
+            <h3 className="text-lg font-medium text-white">
+              {isLiveAISuggestions ? 'Live AI Validation' : 'Disambiguation'}
+            </h3>
+          </div>
+          <button onClick={() => onSelect('cancel')} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none">
+            <span className="material-symbols-outlined !text-[18px]">close</span>
+          </button>
+        </header>
 
-        <div className="flex flex-col gap-2">
-          <h3 className="text-xl font-bold text-zinc-100 uppercase tracking-wider flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary">{isLiveAISuggestions ? 'auto_awesome' : 'psychology'}</span>
-            {isLiveAISuggestions ? 'Live AI Validation' : 'Disambiguation'}
-          </h3>
+        <div className="p-5 flex flex-col gap-6">
           <p className="text-sm text-zinc-400">
             {isLiveAISuggestions
               ? <>Our live model identified multiple regional entities matching <span className="text-primary font-semibold">"{query}"</span>. Please specify which one you mean to avoid token waste.</>
               : <>We found multiple distinct artists matching <span className="text-primary font-semibold">"{query}"</span>. Which one did you mean?</>}
           </p>
-        </div>
 
         <div className="flex flex-col gap-3 max-h-[280px] overflow-y-auto pr-1">
           {candidates.map((cand) => (
@@ -859,7 +878,8 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
           ))}
         </div>
 
-        <div className="flex flex-col gap-2 pt-2 border-t border-zinc-800">
+        </div>
+        <footer className="p-4 bg-zinc-900 border-t border-zinc-700 flex flex-col gap-2">
           {isLiveAISuggestions ? (
             <form onSubmit={(e) => { e.preventDefault(); if (overrideInput.trim()) onSelect(`override::${overrideInput.trim()}`); }} className="flex flex-col gap-2 w-full">
               <input 
@@ -893,7 +913,7 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
           >
             Cancel
           </button>
-        </div>
+        </footer>
       </div>
     </div>
   );

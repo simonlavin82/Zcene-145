@@ -293,12 +293,12 @@ the entire dataset, the app evolves existing visual structures.
       are normalized to standard global variants (e.g., "UK" maps to "United Kingdom"). Before routing the
       override to the Pro generation job, an aggressive cache deduplication check fires to ensure the 
       override doesn't duplicate existing variants, cleanly routing to existing records if found.
-      The normalized override acts as a strict injected constraint (`activeDisambiguationHints`) in the 
+      The normalized override acts as a strict injected constraint (activeDisambiguationHints) in the 
       system instruction, making the generative model adhere strictly to the user's specified origin.
     - Global State-Reset Cancellation Model: Because complex generative pipelines span multi-stage cloud 
-      fetching and long-running Firestore jobs, simply calling `abortController.abort()` isn't enough.
-      The cancellation handler triggers a deep, synchronous React component state flush: clearing `isLoading`,
-      flushing `loadingNodeIds`, nullifying active `fetch` timeouts and `activeJobId`. This instantly unlocks 
+      fetching and long-running Firestore jobs, simply calling abortController.abort() isn't enough.
+      The cancellation handler triggers a deep, synchronous React component state flush: clearing isLoading,
+      flushing loadingNodeIds, nullifying active fetch timeouts and activeJobId. This instantly unlocks 
       the UI and kills all visual spinners, resolving unresponsive locked overlays completely and cleanly.
       False affordances have been stripped from individual loading overlays where mid-flight granular aborts 
       were unsafe.

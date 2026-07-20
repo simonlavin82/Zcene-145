@@ -2533,7 +2533,7 @@ const App: React.FC = () => {
 
     if (hasDisambiguated) {
       const newArtistsStr = resolvedArtistSeeds.join('::');
-      handleGenerateGraph(newArtistsStr, isRegeneration, graphToEnhance, true, true, overrideFilters, activeDisambiguationHints, true);
+      handleGenerateGraph(newArtistsStr, isRegeneration, graphToEnhance, false, true, overrideFilters, activeDisambiguationHints, true);
       return;
     }
 
