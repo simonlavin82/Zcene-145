@@ -23,6 +23,47 @@ export const titleCaseArtistId = (id: string): string => {
     .join(' ');
 };
 
+export const extractCountrySlug = (originStr?: string): string => {
+  if (!originStr || typeof originStr !== 'string' || originStr.trim().length === 0) {
+    return 'global';
+  }
+
+  const parts = originStr.split(',').map(s => s.trim()).filter(Boolean);
+  const rawCountry = parts.length > 0 ? parts[parts.length - 1] : originStr;
+  const slug = normalizeArtistId(rawCountry);
+
+  return slug || 'global';
+};
+
+export const buildCompositeCacheKey = (artistId: string, filters?: DiscoveryFilters): string => {
+  if (!filters) return artistId;
+  const parts: string[] = [artistId];
+  
+  if (filters.foundedAfter) {
+    parts.push(`after:${filters.foundedAfter}`);
+  }
+  if (filters.foundedBefore) {
+    parts.push(`before:${filters.foundedBefore}`);
+  }
+  if (filters.includeOrigins && filters.includeOrigins.length > 0) {
+    const sorted = [...filters.includeOrigins].map(s => s.trim().toLowerCase()).sort();
+    parts.push(`inc_origins:${sorted.join(',')}`);
+  }
+  if (filters.excludeOrigins && filters.excludeOrigins.length > 0) {
+    const sorted = [...filters.excludeOrigins].map(s => s.trim().toLowerCase()).sort();
+    parts.push(`exc_origins:${sorted.join(',')}`);
+  }
+  if (filters.includeGenres && filters.includeGenres.length > 0) {
+    const sorted = [...filters.includeGenres].map(s => s.trim().toLowerCase()).sort();
+    parts.push(`inc_genres:${sorted.join(',')}`);
+  }
+  
+  if (parts.length === 1) return artistId;
+  
+  return parts.join('-').replace(/\s+/g, '-').toLowerCase();
+};
+
+
 export const normalizeGraphData = (graph: GraphData): GraphData => {
   if (!graph || !graph.nodes) return graph;
 

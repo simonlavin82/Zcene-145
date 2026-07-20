@@ -72,6 +72,7 @@ export interface NodeDetails {
   tourDates?: string[];
   tourCachedAt?: string;
   synthesisRationale?: string;
+  _isSentinel?: boolean;
 }
 
 export interface ParsedArtist {

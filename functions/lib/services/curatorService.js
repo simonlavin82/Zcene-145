@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.checkVideoPlayability = exports.scrapeVideoIdBackend = exports.fetchNodeDetailsBackend = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = exports.NODE_DETAILS_SCHEMA = exports.generateGraphDataBackend = exports.GENERATE_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = exports.GRAPH_RESPONSE_SCHEMA = exports.extractArtistSubGraph = exports.normalizeGraphData = exports.titleCaseArtistId = exports.normalizeArtistId = void 0;
+exports.checkVideoPlayability = exports.scrapeVideoIdBackend = exports.fetchNodeDetailsBackend = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = exports.NODE_DETAILS_SCHEMA = exports.generateGraphDataBackend = exports.GENERATE_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = exports.GRAPH_RESPONSE_SCHEMA = exports.extractArtistSubGraph = exports.normalizeGraphData = exports.buildCompositeCacheKey = exports.extractCountrySlug = exports.titleCaseArtistId = exports.normalizeArtistId = void 0;
 const genai_1 = require("@google/genai");
 // --- UTILITIES PORTED FROM artistCacheService.ts ---
 const normalizeArtistId = (name) => name
@@ -23,6 +23,43 @@ const titleCaseArtistId = (id) => {
         .join(' ');
 };
 exports.titleCaseArtistId = titleCaseArtistId;
+const extractCountrySlug = (originStr) => {
+    if (!originStr || typeof originStr !== 'string' || originStr.trim().length === 0) {
+        return 'global';
+    }
+    const parts = originStr.split(',').map(s => s.trim()).filter(Boolean);
+    const rawCountry = parts.length > 0 ? parts[parts.length - 1] : originStr;
+    const slug = (0, exports.normalizeArtistId)(rawCountry);
+    return slug || 'global';
+};
+exports.extractCountrySlug = extractCountrySlug;
+const buildCompositeCacheKey = (artistId, filters) => {
+    if (!filters)
+        return artistId;
+    const parts = [artistId];
+    if (filters.foundedAfter) {
+        parts.push(`after:${filters.foundedAfter}`);
+    }
+    if (filters.foundedBefore) {
+        parts.push(`before:${filters.foundedBefore}`);
+    }
+    if (filters.includeOrigins && filters.includeOrigins.length > 0) {
+        const sorted = [...filters.includeOrigins].map(s => s.trim().toLowerCase()).sort();
+        parts.push(`inc_origins:${sorted.join(',')}`);
+    }
+    if (filters.excludeOrigins && filters.excludeOrigins.length > 0) {
+        const sorted = [...filters.excludeOrigins].map(s => s.trim().toLowerCase()).sort();
+        parts.push(`exc_origins:${sorted.join(',')}`);
+    }
+    if (filters.includeGenres && filters.includeGenres.length > 0) {
+        const sorted = [...filters.includeGenres].map(s => s.trim().toLowerCase()).sort();
+        parts.push(`inc_genres:${sorted.join(',')}`);
+    }
+    if (parts.length === 1)
+        return artistId;
+    return parts.join('-').replace(/\s+/g, '-').toLowerCase();
+};
+exports.buildCompositeCacheKey = buildCompositeCacheKey;
 const normalizeGraphData = (graph) => {
     if (!graph || !graph.nodes)
         return graph;
@@ -346,7 +383,7 @@ ABSOLUTELY CRITICAL FINAL CHECK: Before you output the JSON, verify that for EVE
 
 IMPORTANT: Ensure that any double quotes within string values are properly escaped (e.g., "Artist \\"Name\\""). The final output must be perfectly valid JSON. Your entire response MUST be ONLY the raw JSON object, without any surrounding text, explanations, or markdown code fences.`;
 // --- CORE CURATOR LOGIC ---
-const generateGraphDataBackend = async (artists, filters, cachedSubgraphsContext, baseGraph) => {
+const generateGraphDataBackend = async (artists, filters, cachedSubgraphsContext, baseGraph, disambiguationHints) => {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
         throw new Error("GEMINI_API_KEY is not defined in environment secrets.");
@@ -416,6 +453,11 @@ const generateGraphDataBackend = async (artists, filters, cachedSubgraphsContext
         if (filters.foundedBefore)
             reminder += ` founded before ${filters.foundedBefore};`;
         userPrompt += reminder;
+    }
+    // [Disambiguation Gate] Inject user-confirmed identity constraint when present.
+    if (disambiguationHints && Object.keys(disambiguationHints).length > 0) {
+        const hintBlock = Object.values(disambiguationHints).join('\n');
+        systemInstruction += `\n\nDISAMBIGUATION CONSTRAINTS (MANDATORY — DO NOT OVERRIDE):\n${hintBlock}`;
     }
     const response = await ai.models.generateContent({
         model: currentModel,

@@ -158,7 +158,7 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
             else {
                 console.log("[Curation Backend] Executing live Gemini AI graph synthesis...");
                 // Run backend curation synthesis
-                const finalGraph = await (0, curatorService_1.generateGraphDataBackend)(inputPayload.artists, inputPayload.filters, inputPayload.cachedSubgraphsContext, inputPayload.baseGraph);
+                const finalGraph = await (0, curatorService_1.generateGraphDataBackend)(inputPayload.artists, inputPayload.filters, inputPayload.cachedSubgraphsContext, inputPayload.baseGraph, inputPayload.disambiguationHints);
                 // Structural Integrity Guard: Verify that we received a valid, rich graph from the model
                 const artistNodesCount = finalGraph.nodes?.filter(n => n.type === 'artist' || !n.type).length || 0;
                 const minimumRequiredArtists = 2; // Seed artist + at least 1 recommendation
@@ -278,8 +278,34 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                         console.warn(`[Curation Backend] Seed cache write skipped for "${seedNorm}" — schema validation failed: ${validationErr.message}`);
                         continue;
                     }
-                    await db.collection("artists").doc(seedNorm).set({
-                        cacheKey: seedNorm,
+                    // Find connected country nodes in finalGraph
+                    const connectedCountries = (finalGraph.links || [])
+                        .filter((l) => {
+                        const sId = typeof l.source === 'string' ? l.source : l.source.id;
+                        const tId = typeof l.target === 'string' ? l.target : l.target.id;
+                        return sId.toLowerCase() === seedNorm.toLowerCase() || tId.toLowerCase() === seedNorm.toLowerCase();
+                    })
+                        .map((l) => {
+                        const sId = typeof l.source === 'string' ? l.source : l.source.id;
+                        const tId = typeof l.target === 'string' ? l.target : l.target.id;
+                        const otherId = sId.toLowerCase() === seedNorm.toLowerCase() ? tId : sId;
+                        return (finalGraph.nodes || []).find((n) => n.id.toLowerCase() === otherId.toLowerCase());
+                    })
+                        .filter((n) => n && n.type === 'country')
+                        .map((n) => n.label || n.id);
+                    let countryNorm = "";
+                    if (connectedCountries.length > 0) {
+                        countryNorm = (0, curatorService_1.extractCountrySlug)(connectedCountries[0]);
+                    }
+                    else if (seedDetails?.details?.origin) {
+                        countryNorm = (0, curatorService_1.extractCountrySlug)(seedDetails.details.origin);
+                    }
+                    if (!countryNorm)
+                        countryNorm = "global";
+                    const disambiguatedCanonicalId = `${seedNorm}-${countryNorm}`;
+                    const compositeCanonicalId = (0, curatorService_1.buildCompositeCacheKey)(disambiguatedCanonicalId, inputPayload.filters || undefined);
+                    await db.collection("artists").doc(compositeCanonicalId).set({
+                        cacheKey: compositeCanonicalId,
                         artistId: seedNorm,
                         seedArtists: seed,
                         graphData: JSON.stringify(finalGraph),
@@ -291,7 +317,25 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                         isDeep: true, // Marked Deep!
                         synthesisRationale: finalGraph.synthesisRationale || null
                     });
-                    console.log(`[Curation Backend] Wrote DEEP global cache for seed: ${seedNorm}`);
+                    console.log(`[Curation Backend] Wrote DEEP global cache for seed: ${compositeCanonicalId}`);
+                    // Create/Heal Bare Root Alias Pointer
+                    const bareArtistIdRef = db.collection("artists").doc(seedNorm);
+                    const bareSnap = await bareArtistIdRef.get();
+                    const bareData = bareSnap.exists ? bareSnap.data() : null;
+                    if (!bareSnap.exists || (bareData && !bareData.redirectTo && bareSnap.id !== compositeCanonicalId)) {
+                        await bareArtistIdRef.set({
+                            cacheKey: seedNorm,
+                            artistId: seedNorm,
+                            seedArtists: seed,
+                            graphData: JSON.stringify({ nodes: [], links: [] }),
+                            filters: {},
+                            cacheVersion: 2,
+                            cachedAt: firestore_2.FieldValue.serverTimestamp(),
+                            hitCount: 0,
+                            redirectTo: compositeCanonicalId
+                        });
+                        console.log(`[Curation Backend] Created Bare Alias Pointer: ${seedNorm} -> ${compositeCanonicalId}`);
+                    }
                 }
                 // Proactively cache each recommended artist as a deep cache entry as well!
                 const seedNorms = new Set(artistList.map((a) => (0, curatorService_1.normalizeArtistId)(a)));
@@ -309,20 +353,64 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                         console.warn(`[Curation Backend] Recommendation cache write skipped for "${recNorm}" — schema validation failed: ${validationErr.message}`);
                         continue;
                     }
-                    await db.collection("artists").doc(recNorm).set({
-                        cacheKey: recNorm,
+                    // Find connected country nodes in finalGraph
+                    const connectedCountries = (finalGraph.links || [])
+                        .filter((l) => {
+                        const sId = typeof l.source === 'string' ? l.source : l.source.id;
+                        const tId = typeof l.target === 'string' ? l.target : l.target.id;
+                        return sId.toLowerCase() === recNorm.toLowerCase() || tId.toLowerCase() === recNorm.toLowerCase();
+                    })
+                        .map((l) => {
+                        const sId = typeof l.source === 'string' ? l.source : l.source.id;
+                        const tId = typeof l.target === 'string' ? l.target : l.target.id;
+                        const otherId = sId.toLowerCase() === recNorm.toLowerCase() ? tId : sId;
+                        return (finalGraph.nodes || []).find((n) => n.id.toLowerCase() === otherId.toLowerCase());
+                    })
+                        .filter((n) => n && n.type === 'country')
+                        .map((n) => n.label || n.id);
+                    let countryNorm = "";
+                    if (connectedCountries.length > 0) {
+                        countryNorm = (0, curatorService_1.extractCountrySlug)(connectedCountries[0]);
+                    }
+                    else if (recDetails?.details?.origin) {
+                        countryNorm = (0, curatorService_1.extractCountrySlug)(recDetails.details.origin);
+                    }
+                    if (!countryNorm)
+                        countryNorm = "global";
+                    const disambiguatedCanonicalId = `${recNorm}-${countryNorm}`;
+                    const compositeCanonicalId = (0, curatorService_1.buildCompositeCacheKey)(disambiguatedCanonicalId, inputPayload.filters || undefined);
+                    await db.collection("artists").doc(compositeCanonicalId).set({
+                        cacheKey: compositeCanonicalId,
                         artistId: recNorm,
                         seedArtists: recArtist,
                         graphData: JSON.stringify(finalGraph),
                         detailsCache: sanitizeUndefinedProperties(recDetails), // Save as structured object!
-                        filters: null,
+                        filters: null, // Note: active filters are not strictly carried for proactive rec entries unless we explicitly want to
                         cacheVersion: 2,
                         cachedAt: firestore_2.FieldValue.serverTimestamp(),
                         hitCount: 0,
                         isDeep: true, // Marked Deep!
                         synthesisRationale: null
                     });
-                    console.log(`[Curation Backend] Proactively cached DEEP entry for recommendation: ${recNorm}`);
+                    console.log(`[Curation Backend] Proactively cached DEEP entry for recommendation: ${compositeCanonicalId}`);
+                    // Create/Heal Bare Root Alias Pointer
+                    const bareArtistIdRef = db.collection("artists").doc(recNorm);
+                    const bareSnap = await bareArtistIdRef.get();
+                    const bareData = bareSnap.exists ? bareSnap.data() : null;
+                    if (!bareSnap.exists || (bareData && !bareData.redirectTo && bareSnap.id !== compositeCanonicalId)) {
+                        await bareArtistIdRef.set({
+                            cacheKey: recNorm,
+                            artistId: recNorm,
+                            seedArtists: recArtist,
+                            graphData: JSON.stringify({ nodes: [], links: [] }),
+                            filters: {},
+                            cacheVersion: 2,
+                            cachedAt: firestore_2.FieldValue.serverTimestamp(),
+                            hitCount: 0,
+                            redirectTo: compositeCanonicalId
+                        });
+                        console.log(`[Curation Backend] Created Bare Alias Pointer: ${recNorm} -> ${compositeCanonicalId}`);
+                    }
                 }
                 result = {
                     graphData: finalGraph,
