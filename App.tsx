@@ -2832,7 +2832,7 @@ const App: React.FC = () => {
 
       let bypassChoiceConfirmation = false;
 
-      if (!bypassToken && !isLiveSynthesis) {
+      if (!skipCacheLookup && !bypassToken && !isLiveSynthesis) {
         const normalizedArtistList = artistList.map(name => name.toLowerCase());
         const compositeCacheResult = await readArtistCacheMany(normalizedArtistList, user?.uid, activeDiscoveryFilters);
         const baseCacheResult = await readArtistCacheMany(normalizedArtistList, user?.uid);
