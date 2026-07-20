@@ -113,6 +113,8 @@ interface GraphPageProps {
     candidates: DisambiguationCandidate[];
   } | null;
   onSelectDisambiguation: (choice: string | 'synthesis' | 'cancel') => void;
+  onSearchLiveAIDisambiguation?: () => void;
+  isSearchingLiveDisambiguation?: boolean;
 }
 
 const DEFAULT_LEFT_PANEL_WIDTH = 320;
@@ -540,7 +542,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
   isDeleteAccountModalOpen, setIsDeleteAccountModalOpen,
   isStackDialogOpen, setIsStackDialogOpen,
   isMenuOpen, setIsMenuOpen,
-  disambiguationDialog, onSelectDisambiguation
+  disambiguationDialog, onSelectDisambiguation, onSearchLiveAIDisambiguation, isSearchingLiveDisambiguation
 }) => {
   const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
   const [isDetailsPanelCollapsed, setIsDetailsPanelCollapsed] = useState(true);
@@ -1759,6 +1761,8 @@ const GraphPage: React.FC<GraphPageProps> = ({
           query={disambiguationDialog?.query || ''}
           candidates={disambiguationDialog?.candidates || []}
           onSelect={onSelectDisambiguation}
+          onSearchLiveAI={onSearchLiveAIDisambiguation}
+          isSearchingLive={isSearchingLiveDisambiguation}
         />
     </div>
   );

@@ -714,6 +714,73 @@ Key design decisions:
 *   **`/api/gemini/*wildcard` syntax:** Express v5 / `path-to-regexp` v8 requires a named parameter prefixed with `*` (`*wildcard`) instead of the legacy bare wildcard (`/*`) pattern.
 *   **Security parity:** The credential strip (`authorization`, `cookie`, `host`, `connection`, `content-length`) is retained and extended relative to the previous implementation. The `x-goog-api-key` injection is unchanged.
 
+### 9.9 Disambiguation Gate & Fallback Law (STAGE 0a + STAGE 0b)
+
+#### Constitutional Rule
+
+> **Cache is always interrogated first. The live AI probe fires only on explicit user action — a deliberate "Search Live AI" click. No probe runs without that click. This is a binding architectural law.**
+
+This law governs all future extensions to the disambiguation system. Any implementation that calls `resolveArtistCandidatesViaAI()` automatically — without a direct user trigger — is a constitutional violation and must be reverted.
+
+#### STAGE 0a — Cache Disambiguation Gate (existing)
+
+**Location:** `handleGenerateGraph()` in `App.tsx` — fires before the Token Confirmation Dialog and before any AI synthesis.
+
+**Mechanism:** `searchDisambiguationCandidates(searchId)` issues a Firestore prefix-range query against the global `/artists` collection. If more than 1 document matches the normalized slug, the `DisambiguationModal` is shown with cache-sourced candidates. The user selects the correct identity; non-selected duplicates are merged via `mergeAndCleanupArtists()`. The `onSearchLiveAI` callback is **not** passed on this path — the live probe is never needed when cache data is available.
+
+**Bypass:** `bypassToken = true` (programmatic recursive calls after resolution).
+
+#### STAGE 0b — Cache Miss Gate (user-triggered probe)
+
+**Location:** `handleGenerateGraph()` in `App.tsx` — runs immediately after STAGE 0a when it returns 0 candidates (guaranteed cache miss).
+
+**Mechanism:** The `DisambiguationModal` is shown in **"search prompt" mode** (empty candidates list). Three user actions are available:
+
+1. **"🔍 Search Live AI"** — The user explicitly opts in. This triggers `resolveArtistCandidatesViaAI()` via the `onSearchLiveAI` callback wired into the modal. The function dispatches a structured, minimal-schema request to Gemini Flash (`gemini-2.0-flash`) via the standard `/api/gemini` proxy (model: `gemini-2.0-flash`, max output tokens: 512, 10-second timeout). The prompt returns up to 5 candidates: `{ name, country, genre, activeYears }`. The modal re-renders in-place with the returned candidates. If the probe returns 0 or 1 candidate, the modal stays in "search prompt" mode — the user retains all three actions.
+
+2. **"Continue with [query]"** — The user skips disambiguation. Pipeline proceeds to PHASE 02 (Token Confirmation) exactly as before this feature was added. Zero-regression fallback.
+
+3. **"Cancel"** — Pipeline aborts. All active states are rolled back. No token is consumed.
+
+**Probe failure handling:** Any network error, parse failure, abort signal, or 10-second timeout inside `resolveArtistCandidatesViaAI()` returns `[]` silently. The modal reverts to "search prompt" mode. The pipeline is never blocked by a probe failure.
+
+**Sandbox safety:** `resolveArtistCandidatesViaAI()` returns `[]` immediately when `isLocal === true`, logging `[Disambiguation Probe] Bypassed in sandbox mode`. No network call, no billing risk during development.
+
+#### Disambiguation Constraint Propagation
+
+When the user selects a specific candidate (from either STAGE 0a cache or STAGE 0b live probe), a disambiguation hint is written into `activeDisambiguationHints` (a plain `Record<string, string>` local to `handleGenerateGraph`). This map is forwarded as an optional sixth parameter to `generateGraphData()`:
+
+```typescript
+generateGraphData(artists, pruned, activeDiscoveryFilters, user?.uid, signal, activeDisambiguationHints)
+```
+
+Inside `generateGraphData`, the hint is appended to the Gemini Pro system instruction after all filter rules:
+
+```
+DISAMBIGUATION CONSTRAINTS (MANDATORY — DO NOT OVERRIDE):
+[disambiguation resolved: the user confirmed they are searching for the artist identified
+as "[resolved-id]". Synthesize ONLY the musical act matching this identity.
+Do NOT synthesize any other regional or genre variant with the same name.]
+```
+
+The `disambiguationHints` parameter is optional and backward-compatible. All existing callers that do not pass it receive identical behavior.
+
+#### Cache Write-Back Alignment
+
+After successful synthesis for a disambiguated artist, `writeArtistCacheMany()` in `artistCacheService.ts` constructs a **country-anchored composite cache key** (e.g. `oblivion-italy`) using the graph topology traversal described in §9.2. Subsequent searches for the same artist name will therefore populate STAGE 0a with distinct keyed candidates, making STAGE 0b unnecessary on repeat visits. The disambiguation system is self-healing: every successful live-probe resolution contributes to making the cache-side gate more complete over time.
+
+#### DisambiguationModal Render States
+
+The `DisambiguationModal` component in `SharedModals.tsx` implements three mutually exclusive render states governed by its props:
+
+| State | Condition | Renders |
+|---|---|---|
+| **Search Prompt** | `candidates.length === 0 && !isSearchingLive` | "No cached records found" + 🔍 Search Live AI + Continue + Cancel |
+| **Searching** | `isSearchingLive === true` | Spinner + "Searching live music database…" |
+| **Candidate Selection** | `candidates.length > 0` | Existing candidate card list + Create New Graph + Cancel |
+
+All new props (`onSearchLiveAI`, `isSearchingLive`) are optional. All existing call sites that do not pass them continue to render State C (Candidate Selection) unchanged.
+
 ---
 
 ## 10. Sticky Peek + Action Gateway Interaction Model

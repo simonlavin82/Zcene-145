@@ -694,12 +694,129 @@ const generateMockNodeDetails = (node: Node): NodeDetails => {
   };
 };
 
+// --- DISAMBIGUATION PROBE ---
+
+/**
+ * [Disambiguation Gate — STAGE 0b]
+ * Lightweight Gemini Flash probe that enumerates all distinct musical acts sharing
+ * a given name across regions and eras. Used ONLY when the user explicitly requests
+ * a live search via the "Search Live AI" button in the DisambiguationModal.
+ *
+ * Constitutional rule: This function is NEVER called automatically.
+ * It fires exclusively from an explicit user interaction.
+ *
+ * Returns [] immediately in sandbox/local mode (isLocal = true).
+ * Returns [] silently on any network failure, parse error, or timeout.
+ */
+export const resolveArtistCandidatesViaAI = async (
+  artistName: string,
+  signal?: AbortSignal
+): Promise<Array<{ id: string; label: string; origin: string; genre: string }>> => {
+  if (isLocal) {
+    console.log(`[Disambiguation Probe] Bypassed in sandbox mode for "${artistName}"`);
+    return [];
+  }
+
+  const baseUrl = typeof window !== 'undefined'
+    ? window.location.origin + '/api/gemini'
+    : 'http://localhost:8080/api/gemini';
+
+  const model = 'gemini-2.0-flash';
+  const targetUrl = `${baseUrl}/v1beta/models/${model}:generateContent`;
+
+  const systemInstruction = `You are a music database disambiguation assistant.
+Given an artist or band name, enumerate every distinct musical act that has used this exact name, across all countries, regions, and eras.
+Return ONLY acts with genuinely distinct identities — do not list lineup variations or reissue editions of the same act.
+If only one clear act exists globally, return exactly one entry.
+Maximum 5 entries.
+Respond in strict JSON only — no prose, no markdown, no citation markers.`;
+
+  const userPrompt = `List all distinct musical artists or bands named "${artistName}". Return a JSON array of objects with fields: name (string), country (string, country of origin), genre (string, primary genre), activeYears (string, e.g. "1992–2004" or "2010–present").`;
+
+  const requestBody = {
+    contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+    systemInstruction: { parts: [{ text: systemInstruction }] },
+    generationConfig: {
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: 'ARRAY',
+        items: {
+          type: 'OBJECT',
+          properties: {
+            name: { type: 'STRING' },
+            country: { type: 'STRING' },
+            genre: { type: 'STRING' },
+            activeYears: { type: 'STRING' }
+          },
+          required: ['name', 'country', 'genre']
+        }
+      },
+      maxOutputTokens: 512
+    }
+  };
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  const combinedSignal = signal || controller.signal;
+
+  try {
+    const response = await fetch(targetUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-proxy-key': 'backend-proxy-key' },
+      body: JSON.stringify(requestBody),
+      signal: combinedSignal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      console.warn(`[Disambiguation Probe] API returned ${response.status} for "${artistName}"`);
+      return [];
+    }
+
+    const json = await response.json();
+    const rawText = json?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    if (!rawText) return [];
+
+    let parsed: Array<{ name: string; country: string; genre: string; activeYears?: string }> = [];
+    try {
+      parsed = JSON.parse(rawText);
+    } catch {
+      try {
+        parsed = JSON.parse(repairJson(rawText));
+      } catch {
+        console.warn(`[Disambiguation Probe] JSON parse failed for "${artistName}"`);
+        return [];
+      }
+    }
+
+    if (!Array.isArray(parsed) || parsed.length === 0) return [];
+
+    // Map to DisambiguationCandidate shape
+    return parsed.map(c => ({
+      id: `${c.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${c.country.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+      label: c.name,
+      origin: c.country + (c.activeYears ? ` · ${c.activeYears}` : ''),
+      genre: c.genre
+    }));
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if ((err as any)?.name !== 'AbortError') {
+      console.warn(`[Disambiguation Probe] Failed for "${artistName}":`, err);
+    }
+    return [];
+  }
+};
+
+// --- GRAPH DATA GENERATION ---
+
 export const generateGraphData = async (
   artists: string,
   baseGraph?: GraphData,
   filters?: DiscoveryFilters,
   activeUserId?: string | null,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  disambiguationHints?: Record<string, string>
 ): Promise<GraphData> => {
   if (isLocal) {
     // Add artificial delay to simulate network latency and show loading states during local testing
@@ -811,7 +928,7 @@ export const generateGraphData = async (
           filterRules += "\n\nFINAL VERIFICATION: Before generating JSON, audit your list. Ensure all filters are strictly obeyed. If an artist violates any of the rules above, DELETE them from your response.";
           
           systemInstruction += filterRules;
-          
+
           // Also reinforce in the user prompt
           let reminder = `\n\nREMINDER: All new artists MUST meet the active filters:`;
           if (filters.foundedAfter) reminder += ` founded after ${filters.foundedAfter};`;
@@ -820,6 +937,15 @@ export const generateGraphData = async (
           if (filters.excludeOrigins && filters.excludeOrigins.length > 0) reminder += ` origins NOT in ${filters.excludeOrigins.join(', ')};`;
           if (filters.includeGenres && filters.includeGenres.length > 0) reminder += ` genres in ${filters.includeGenres.join(', ')};`;
           userPrompt += reminder;
+      }
+
+      // [Disambiguation Gate] Inject user-confirmed identity constraint when present.
+      // This pins the synthesis to the exact regional/genre entity the user selected
+      // via the DisambiguationModal "Search Live AI" probe, preventing Gemini from
+      // defaulting to the highest-frequency training-data match for an ambiguous name.
+      if (disambiguationHints && Object.keys(disambiguationHints).length > 0) {
+          const hintBlock = Object.values(disambiguationHints).join('\n');
+          systemInstruction += `\n\nDISAMBIGUATION CONSTRAINTS (MANDATORY — DO NOT OVERRIDE):\n${hintBlock}`;
       }
 
       // Format standard REST request body

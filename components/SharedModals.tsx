@@ -659,16 +659,89 @@ export interface DisambiguationModalProps {
   query: string;
   candidates: DisambiguationCandidate[];
   onSelect: (choice: string | 'synthesis' | 'cancel') => void;
+  /** Called when the user explicitly clicks "Search Live AI". Never fires automatically. */
+  onSearchLiveAI?: () => void;
+  /** True while the Flash probe is in-flight. Disables all buttons and shows a spinner. */
+  isSearchingLive?: boolean;
 }
 
 export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
   isOpen,
   query,
   candidates,
-  onSelect
+  onSelect,
+  onSearchLiveAI,
+  isSearchingLive = false,
 }) => {
   if (!isOpen) return null;
 
+  // ── STATE A: Searching (probe in-flight) ─────────────────────────────────
+  if (isSearchingLive) {
+    return (
+      <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in-down" style={{ animationDuration: '200ms' }}>
+        <div className="w-full max-w-md rounded-none bg-zinc-900 border border-zinc-600 p-8 shadow-2xl relative overflow-hidden flex flex-col gap-6" onClick={e => e.stopPropagation()}>
+          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-primary/30 via-primary to-primary/30" />
+          <div className="flex flex-col gap-2">
+            <h3 className="text-xl font-bold text-zinc-100 uppercase tracking-wider flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary">psychology</span>
+              Disambiguation
+            </h3>
+            <p className="text-sm text-zinc-400">
+              Searching live music database for <span className="text-primary font-semibold">"{query}"</span>…
+            </p>
+          </div>
+          <div className="flex items-center justify-center py-6">
+            <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── STATE B: Search Prompt (cache miss, probe not yet triggered) ──────────
+  if (candidates.length === 0) {
+    return (
+      <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in-down" style={{ animationDuration: '200ms' }}>
+        <div className="w-full max-w-md rounded-none bg-zinc-900 border border-zinc-600 p-8 shadow-2xl relative overflow-hidden flex flex-col gap-6" onClick={e => e.stopPropagation()}>
+          <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-primary/30 via-primary to-primary/30" />
+          <div className="flex flex-col gap-2">
+            <h3 className="text-xl font-bold text-zinc-100 uppercase tracking-wider flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary">psychology</span>
+              Disambiguation
+            </h3>
+            <p className="text-sm text-zinc-400">
+              No cached records found for <span className="text-primary font-semibold">"{query}"</span>. This artist may be new to the platform, or multiple regional acts share this name.
+            </p>
+          </div>
+          <div className="flex flex-col gap-3 pt-2 border-t border-zinc-800">
+            {onSearchLiveAI && (
+              <button
+                onClick={onSearchLiveAI}
+                className="w-full py-3 px-4 bg-primary/10 hover:bg-primary/20 text-primary font-semibold border border-primary/40 hover:border-primary transition-all text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2"
+              >
+                <span className="material-symbols-outlined text-[16px]">search</span>
+                Search Live AI
+              </button>
+            )}
+            <button
+              onClick={() => onSelect('synthesis')}
+              className="w-full py-2.5 px-4 bg-zinc-800/30 hover:bg-zinc-800 text-zinc-300 hover:text-zinc-100 font-semibold border border-zinc-700/30 hover:border-zinc-700 transition-all text-xs uppercase tracking-wider rounded-xl"
+            >
+              Continue with "{query}"
+            </button>
+            <button
+              onClick={() => onSelect('cancel')}
+              className="w-full py-2.5 px-4 bg-transparent hover:bg-zinc-800/20 text-zinc-500 hover:text-zinc-400 font-medium transition-all text-xs uppercase tracking-wider rounded-xl"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── STATE C: Candidate Selection (candidates known — existing behavior) ───
   return (
     <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in-down" style={{ animationDuration: '200ms' }}>
       <div className="w-full max-w-md rounded-none bg-zinc-900 border border-zinc-600 p-8 shadow-2xl relative overflow-hidden flex flex-col gap-6" onClick={e => e.stopPropagation()}>
@@ -681,7 +754,7 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
             Disambiguation
           </h3>
           <p className="text-sm text-zinc-400">
-            We found multiple canonical artists in our index matching <span className="text-primary font-semibold">"{query}"</span>. Which one did you mean?
+            We found multiple distinct artists matching <span className="text-primary font-semibold">"{query}"</span>. Which one did you mean?
           </p>
         </div>
 
@@ -729,6 +802,8 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
     </div>
   );
 };
+
+
 
 
 

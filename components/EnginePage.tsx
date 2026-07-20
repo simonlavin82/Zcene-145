@@ -251,6 +251,46 @@ the entire dataset, the app evolves existing visual structures.
    - Silent Re-validation: Metadata re-validation checks operate fully in the background.
      User-facing toasts for 'Cache Incomplete' (curation incomplete) warnings are suppressed
      to prevent developer-level notification noise.
+
+10. DISAMBIGUATION GATE & FALLBACK LAW (STAGE 0a + STAGE 0b) — AUTHORITATIVE GOVERNANCE:
+    Constitutional Rule: The cache is ALWAYS interrogated first. The live AI probe fires
+    ONLY on explicit user action — a deliberate "Search Live AI" click. No probe runs
+    automatically. This is a binding architectural law. Any implementation that fires
+    resolveArtistCandidatesViaAI() without a direct user trigger is a violation.
+
+    Before any token authorization or graph synthesis, the engine runs a two-stage
+    disambiguation check per seed artist:
+
+    Stage 0a — Cache Gate (existing):
+    searchDisambiguationCandidates() queries the global /artists Firestore collection via
+    prefix-range. If > 1 cached document shares the query slug, the DisambiguationModal
+    is shown with cache-sourced candidates. The user selects the canonical identity.
+    Non-selected duplicates are deduped via mergeAndCleanupArtists().
+    The live probe is never offered on this path — cache data is always sufficient.
+
+    Stage 0b — Cache Miss Gate (user-triggered, never automatic):
+    If Stage 0a returns 0 candidates (guaranteed cache miss), the DisambiguationModal
+    is shown in "search prompt" mode with three explicit user actions:
+      1. "Search Live AI" — triggers resolveArtistCandidatesViaAI() (Gemini Flash,
+         gemini-2.0-flash, 512 token budget, 10s timeout). Modal updates in-place
+         with up to 5 regional candidates. User selects one.
+      2. "Continue with [query]" — skips the probe entirely. Pipeline proceeds to
+         PHASE 02 Token Confirmation exactly as before. Zero-regression fallback.
+      3. "Cancel" — aborts cleanly. Full state rollback. No token consumed.
+
+    On selection: a disambiguation constraint hint is injected into the Gemini Pro
+    system instruction to anchor synthesis to the user-confirmed identity:
+    "Synthesize ONLY the musical act matching [resolved-id]. Do NOT synthesize any
+    other regional or genre variant with the same name."
+
+    Probe failure: resolveArtistCandidatesViaAI() returns [] on any failure (network
+    error, parse failure, abort, timeout). Modal reverts to search-prompt mode. Pipeline
+    is never blocked by a probe failure. Sandbox mode (isLocal=true): probe bypassed.
+
+    Self-healing: Every successful disambiguation writes a country-anchored composite
+    cache key (e.g. "oblivion-italy") via writeArtistCacheMany(). Future searches for
+    the same artist name populate Stage 0a with distinct candidates, making Stage 0b
+    unnecessary on repeat visits.
 `;
 
 

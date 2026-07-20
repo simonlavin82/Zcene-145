@@ -4,7 +4,7 @@ import { flushSync } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { AlertCircle, AlertTriangle, X, CheckCircle2, Key } from 'lucide-react';
 import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project, ArtistCacheEntry, COST_PER_AI_CALL } from './types';
-import { generateGraphData, fetchNodeDetails, extendGraphFromNode } from './services/geminiService';
+import { generateGraphData, fetchNodeDetails, extendGraphFromNode, resolveArtistCandidatesViaAI } from './services/geminiService';
 import { normalizeArtistId, readArtistCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, titleCaseArtistId, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema } from './services/artistCacheService';
 import { auth, signInWithGoogle, logout, onAuthStateChanged, User, db, handleFirestoreError, OperationType } from './services/firebase';
 import { translateError, translateToast } from './services/errorTranslationLayer';
@@ -1119,6 +1119,8 @@ const App: React.FC = () => {
     query: string;
     candidates: DisambiguationCandidate[];
     onSelect: (choice: string | 'synthesis' | 'cancel') => void;
+    onSearchLiveAI?: () => void;
+    isSearchingLive?: boolean;
   } | null>(null);
 
   const confirmTokenUsage = useCallback((
@@ -2323,7 +2325,8 @@ const App: React.FC = () => {
     graphToEnhance?: GraphData | null,
     bypassCacheValidation: boolean = false,
     bypassTokenConfirmation: boolean = false,
-    overrideFilters?: DiscoveryFilters
+    overrideFilters?: DiscoveryFilters,
+    disambiguationHints?: Record<string, string>
   ) => {
     // Normalize empty graph to null to eliminate ghost-enhancement API path
     if (graphToEnhance && (!graphToEnhance.nodes || graphToEnhance.nodes.length === 0)) {
@@ -2381,52 +2384,105 @@ const App: React.FC = () => {
       return;
     }
 
-    // --- STAGE 0: DISAMBIGUATION CHECK ---
+    // ─── STAGE 0: UNIFIED DISAMBIGUATION GATE ──────────────────────────────────
+    // Constitutional rule: Cache is always checked first (Stage 0a).
+    // The live AI probe (Stage 0b) fires ONLY on explicit "Search Live AI" click — never automatically.
+    // ───────────────────────────────────────────────────────────────────────────────
     let resolvedArtistSeeds = [...artistList];
+    let activeDisambiguationHints: Record<string, string> = disambiguationHints || {};
     let hasDisambiguated = false;
+
     if (!bypassToken) {
       for (let i = 0; i < artistList.length; i++) {
+        const rawInput = artists.split('::').map(s => s.trim()).filter(Boolean)[i] || artistList[i];
         const searchId = artistList[i];
-        const candidates = await searchDisambiguationCandidates(searchId);
-        if (candidates.length > 1) {
+
+        // ── STAGE 0a: Cache Disambiguation Gate (existing — UNCHANGED) ────────
+        const cacheCandidates = await searchDisambiguationCandidates(searchId);
+        if (cacheCandidates.length > 1) {
           setIsLoading(false);
           isHydratingSessionRef.current = false;
           isProjectLoadingRef.current = false;
-          
+
           const choice = await new Promise<string | 'synthesis' | 'cancel'>((resolve) => {
             setDisambiguationDialog({
               isOpen: true,
-              query: searchId,
-              candidates,
-              onSelect: (c) => {
-                setDisambiguationDialog(null);
-                resolve(c);
-              }
+              query: rawInput,
+              candidates: cacheCandidates,
+              onSelect: (c) => { setDisambiguationDialog(null); resolve(c); }
+              // No onSearchLiveAI — cache path never needs the live probe
             });
           });
 
-          if (choice === 'cancel') {
-            return;
-          }
-          if (choice === 'synthesis') {
-            // Keep the raw searchId so synthesis generates it from scratch
-          } else {
+          if (choice === 'cancel') return;
+          if (choice !== 'synthesis') {
             resolvedArtistSeeds[i] = normalizeArtistId(choice);
             hasDisambiguated = true;
-            
-            // Auto-Merge legacy/duplicate records into selected canonical ID
-            const nonSelectedCandidates = candidates.filter(c => c.id !== choice);
-            nonSelectedCandidates.forEach(nonSelected => {
-              mergeAndCleanupArtists(choice, nonSelected.id);
-            });
+            const nonSelected = cacheCandidates.filter(c => c.id !== choice);
+            nonSelected.forEach(ns => mergeAndCleanupArtists(choice, ns.id));
           }
+          continue;
+        }
+
+        // ── STAGE 0b: Cache Miss Gate — user-triggered probe only ─────────────
+        // Runs when the cache returned 0 candidates (guaranteed cache miss).
+        // The DisambiguationModal is shown in "search prompt" mode. The probe fires
+        // ONLY when the user clicks the "Search Live AI" button. Never automatic.
+        if (cacheCandidates.length === 0) {
+          setIsLoading(false);
+          isHydratingSessionRef.current = false;
+          isProjectLoadingRef.current = false;
+
+          const choice = await new Promise<string | 'synthesis' | 'cancel'>((resolve) => {
+            setDisambiguationDialog({
+              isOpen: true,
+              query: rawInput,
+              candidates: [],
+              isSearchingLive: false,
+              onSearchLiveAI: async () => {
+                // User explicitly clicked "Search Live AI" — fire the Flash probe
+                setDisambiguationDialog(prev => prev ? { ...prev, isSearchingLive: true } : null);
+                try {
+                  const liveCandidates = await resolveArtistCandidatesViaAI(rawInput);
+                  // Update modal in-place with probe results.
+                  // If 0 or 1 candidate returned, modal remains in "search prompt" state.
+                  setDisambiguationDialog(prev => prev
+                    ? { ...prev, isSearchingLive: false, candidates: liveCandidates }
+                    : null
+                  );
+                } catch (e) {
+                  // Silent fail — revert modal to search-prompt state
+                  setDisambiguationDialog(prev => prev
+                    ? { ...prev, isSearchingLive: false, candidates: [] }
+                    : null
+                  );
+                }
+              },
+              onSelect: (c) => { setDisambiguationDialog(null); resolve(c); }
+            });
+          });
+
+          if (choice === 'cancel') return;
+
+          if (choice !== 'synthesis') {
+            // User selected a specific live-probe candidate. Record the constraint hint
+            // so generateGraphData can anchor synthesis to the correct regional entity.
+            const probeKey = normalizeArtistId(rawInput);
+            activeDisambiguationHints[probeKey] =
+              `[disambiguation resolved: the user confirmed they are searching for the artist ` +
+              `identified as "${choice}". Synthesize ONLY the musical act matching this identity. ` +
+              `Do NOT synthesize any other regional or genre variant with the same name.]`;
+            hasDisambiguated = true;
+            resolvedArtistSeeds[i] = choice;
+          }
+          // choice === 'synthesis' means the user clicked "Continue with [query]" — fall through
         }
       }
     }
 
     if (hasDisambiguated) {
       const newArtistsStr = resolvedArtistSeeds.join('::');
-      handleGenerateGraph(newArtistsStr, isRegeneration, graphToEnhance, bypassCacheValidation, true, overrideFilters);
+      handleGenerateGraph(newArtistsStr, isRegeneration, graphToEnhance, bypassCacheValidation, true, overrideFilters, activeDisambiguationHints);
       return;
     }
 
@@ -3398,7 +3454,7 @@ const App: React.FC = () => {
             }
           );
         } else {
-          partialGraphPromise = generateGraphData(toFetch.join('::'), pruned, activeDiscoveryFilters, user?.uid, controller?.signal);
+          partialGraphPromise = generateGraphData(toFetch.join('::'), pruned, activeDiscoveryFilters, user?.uid, controller?.signal, activeDisambiguationHints);
         }
         const timeoutPromise = new Promise((_, reject) =>
           setTimeout(() => reject(new Error("The AI is taking too long to respond. The request has timed out.")), 600000)
@@ -3723,7 +3779,7 @@ const App: React.FC = () => {
           jobId
         );
       } else {
-        graphPromise = generateGraphData(artists, pruned, activeDiscoveryFilters, user?.uid, controller?.signal);
+        graphPromise = generateGraphData(artists, pruned, activeDiscoveryFilters, user?.uid, controller?.signal, activeDisambiguationHints);
       }
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error("The AI is taking too long to respond. The request has timed out.")), 600000)
@@ -6459,6 +6515,8 @@ const App: React.FC = () => {
               setIsMenuOpen={setIsMenuOpen}
               disambiguationDialog={disambiguationDialog}
               onSelectDisambiguation={(choice) => disambiguationDialog?.onSelect(choice)}
+              onSearchLiveAIDisambiguation={disambiguationDialog?.onSearchLiveAI}
+              isSearchingLiveDisambiguation={disambiguationDialog?.isSearchingLive}
             />
           )}
         </div>
