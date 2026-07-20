@@ -2324,7 +2324,8 @@ const App: React.FC = () => {
     skipCacheLookup: boolean = false,
     bypassTokenConfirmation: boolean = false,
     overrideFilters?: DiscoveryFilters,
-    disambiguationHints?: Record<string, string>
+    disambiguationHints?: Record<string, string>,
+    bypassDisambiguation: boolean = false
   ) => {
     // Normalize empty graph to null to eliminate ghost-enhancement API path
     if (graphToEnhance && (!graphToEnhance.nodes || graphToEnhance.nodes.length === 0)) {
@@ -2368,7 +2369,7 @@ const App: React.FC = () => {
       // Only gate if it's a manual action (regeneration or fresh start)
       // Imports (via deep links) are allowed for guests
       console.log(`[Lazy Registration] Queueing generateGraph for guest. User: ${!!user}`);
-      setPendingAuthAction({ type: 'generateGraph', payload: { artists, isRegeneration, graphToEnhance, skipCacheLookup } });
+      setPendingAuthAction({ type: 'generateGraph', payload: { artists, isRegeneration, graphToEnhance, skipCacheLookup, bypassDisambiguation } });
       handleLogin();
       return;
     }
@@ -2396,7 +2397,7 @@ const App: React.FC = () => {
     let activeDisambiguationHints: Record<string, string> = disambiguationHints || {};
     let hasDisambiguated = false;
 
-    if (!bypassToken) {
+    if (!bypassToken && !bypassDisambiguation) {
       for (let i = 0; i < artistList.length; i++) {
         const rawInput = artists.split('::').map(s => s.trim()).filter(Boolean)[i] || artistList[i];
         const searchId = artistList[i];
@@ -2424,9 +2425,11 @@ const App: React.FC = () => {
         if (choice === 'synthesis') {
           // Direct Wire to Live Generative Synthesis:
           // Clicking "Search Live AI" / "Not This One..." directly resolves choice to 'synthesis'.
-          // We immediately re-invoke handleGenerateGraph with skipCacheLookup = true and bypassTokenConfirmation = false
-          // to prompt for token authorization and trigger live Gemini 3.1 Pro synthesis directly.
-          handleGenerateGraph(artists, isRegeneration, graphToEnhance, true, false, overrideFilters, activeDisambiguationHints);
+          // We immediately re-invoke handleGenerateGraph with:
+          //   - skipCacheLookup = true (bypass local Firestore cache)
+          //   - bypassTokenConfirmation = false (trigger API Token Authorization Modal)
+          //   - bypassDisambiguation = true (break STAGE 0 re-entry loop)
+          handleGenerateGraph(artists, isRegeneration, graphToEnhance, true, false, overrideFilters, activeDisambiguationHints, true);
           return;
         } else {
           // User accepted a specific candidate card from the cache.
@@ -2440,7 +2443,7 @@ const App: React.FC = () => {
 
     if (hasDisambiguated) {
       const newArtistsStr = resolvedArtistSeeds.join('::');
-      handleGenerateGraph(newArtistsStr, isRegeneration, graphToEnhance, true, true, overrideFilters, activeDisambiguationHints);
+      handleGenerateGraph(newArtistsStr, isRegeneration, graphToEnhance, true, true, overrideFilters, activeDisambiguationHints, true);
       return;
     }
 
