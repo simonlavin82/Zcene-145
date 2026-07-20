@@ -252,34 +252,29 @@ the entire dataset, the app evolves existing visual structures.
      User-facing toasts for 'Cache Incomplete' (curation incomplete) warnings are suppressed
      to prevent developer-level notification noise.
 
-10. HUMAN-IN-THE-LOOP DISAMBIGUATION STATE MACHINE (STAGE 0) — AUTHORITATIVE GOVERNANCE:
+10. DIRECT-WIRE HUMAN-IN-THE-LOOP DISAMBIGUATION (STAGE 0) — AUTHORITATIVE GOVERNANCE:
     Constitutional Rule: The cache is ALWAYS interrogated first. Every search passes
     through an explicit human-in-the-loop verification checkpoint before synthesis occurs.
-    The live AI probe fires ONLY on explicit user action ("Search Live AI"). Once triggered,
-    hasSearchedLive: true isolates post-probe live results, physically preventing circular
-    rejection loops. This is a binding architectural law.
+    Accepting a candidate loads the cached record. Clicking "Search Live AI" / "Not This One..."
+    directly closes the modal and dispatches the live Gemini 3.1 Pro generative synthesis
+    pipeline with cache-bypassing (bypassCacheValidation = true). This is a binding law.
 
     State Machine & Verification Pipeline:
     - Step 1 (Cache Interrogation): searchDisambiguationCandidates() queries global /artists.
-    - Step 2 (Verification Checkpoint - Always Shown):
-      - 0 cache hits -> "No cached records found" + Search Live AI + Continue + Cancel
+    - Step 2 (Human-in-the-Loop Checkpoint):
+      - 0 cache hits -> "No cached records found" + Search Live AI -> Direct Live Synthesis + Cancel.
       - 1 cache hit -> "Look What I Found" (single card). Clicking card accepts candidate.
-        Escape: "Not This One — Search Live AI" + Cancel. (No redundant Continue button).
+        Escape: "Not This One — Search Live AI" -> Direct Live Synthesis + Cancel.
       - >1 cache hits -> "Disambiguation" (list of cards). Clicking card accepts candidate.
-        Escape: "Not What I'm Looking For — Search Live AI" + Cancel. (No redundant Create button).
-    - Step 3 (Escalation to Live Probe): Clicking Search Live AI sets isSearchingLive: true
-      (in-flight spinner) and calls resolveArtistCandidatesViaAI() (Gemini Flash).
-    - Step 4 (Post-Probe Resolution, hasSearchedLive: true):
-      - >0 live candidates -> "Live AI Discovery Results" + candidate cards + Synthesize Unconstrained + Cancel.
-      - 0 live candidates -> "No Additional Acts Found" + Synthesize Fresh Graph + Cancel.
-        Zero-loop guarantee: Search Live AI button is NOT rendered once hasSearchedLive is true.
+        Escape: "Not What I'm Looking For — Search Live AI" -> Direct Live Synthesis + Cancel.
+    - Step 3 (Direct Live Synthesis): Clicking Search Live AI closes the modal instantly.
+      handleGenerateGraph re-invokes with bypassCacheValidation = true, bypassing Firestore
+      cache and dispatching live Gemini 3.1 Pro synthesis directly. Zero intermediate modal
+      loops or dead-end screens.
 
-    On selection: a disambiguation constraint hint is injected into the Gemini Pro system instruction:
-    "Synthesize ONLY the musical act matching [resolved-id]. Do NOT synthesize any other regional variant."
-
-    Self-healing: Every successful disambiguation writes a country-anchored composite cache key
+    Self-healing: Every successful live synthesis writes a country-anchored composite cache key
     (e.g. "oblivion-italy") via writeArtistCacheMany(). Future searches for the same artist name
-    populate Stage 2 or 3 with distinct candidates, enriching the index automatically.
+    populate State B or C with distinct candidates, enriching the index automatically.
 `;
 
 

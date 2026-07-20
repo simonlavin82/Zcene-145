@@ -1119,9 +1119,6 @@ const App: React.FC = () => {
     query: string;
     candidates: DisambiguationCandidate[];
     onSelect: (choice: string | 'synthesis' | 'cancel') => void;
-    onSearchLiveAI?: () => void;
-    isSearchingLive?: boolean;
-    hasSearchedLive?: boolean;
   } | null>(null);
 
   const confirmTokenUsage = useCallback((
@@ -2411,37 +2408,13 @@ const App: React.FC = () => {
         isHydratingSessionRef.current = false;
         isProjectLoadingRef.current = false;
 
-        // Shared onSearchLiveAI callback — wired into the modal for all cache states.
-        // Fires the Gemini Flash probe ONLY when the user explicitly clicks "Search Live AI".
-        const fireSearchLiveAI = async () => {
-          setDisambiguationDialog(prev => prev ? { ...prev, isSearchingLive: true } : null);
-          try {
-            console.log(`[Disambiguation Probe] Triggering Gemini Flash probe for "${rawInput}"...`);
-            const liveCandidates = await resolveArtistCandidatesViaAI(rawInput);
-            console.log(`[Disambiguation Probe] Returned ${liveCandidates.length} candidate(s) for "${rawInput}":`, liveCandidates);
-            setDisambiguationDialog(prev => prev
-              ? { ...prev, isSearchingLive: false, hasSearchedLive: true, candidates: liveCandidates }
-              : null
-            );
-          } catch (err) {
-            console.error(`[Disambiguation Probe] Probe failed for "${rawInput}":`, err);
-            setDisambiguationDialog(prev => prev
-              ? { ...prev, isSearchingLive: false, hasSearchedLive: true, candidates: [] }
-              : null
-            );
-          }
-        };
-
         // Step 2: Show the verification modal — always.
-        // The modal adapts its presentation based on how many candidates were found.
+        // The modal presents candidates if found in cache, or prompts for live AI search.
         const choice = await new Promise<string | 'synthesis' | 'cancel'>((resolve) => {
           setDisambiguationDialog({
             isOpen: true,
             query: rawInput,
-            candidates: cacheCandidates,     // 0, 1, or N — modal handles all cases
-            isSearchingLive: false,
-            hasSearchedLive: false,
-            onSearchLiveAI: fireSearchLiveAI, // always available — user can always escalate
+            candidates: cacheCandidates, // 0, 1, or N — modal handles all cases
             onSelect: (c) => { setDisambiguationDialog(null); resolve(c); }
           });
         });
@@ -2449,33 +2422,18 @@ const App: React.FC = () => {
         if (choice === 'cancel') return;
 
         if (choice === 'synthesis') {
-          // If the user rejected the cache hit (or chose unconstrained synthesis),
-          // force bypassCacheValidation = true so we don't re-fetch the rejected cache item.
-          if (cacheCandidates.length > 0) {
-            handleGenerateGraph(artists, isRegeneration, graphToEnhance, true, true, overrideFilters, activeDisambiguationHints);
-            return;
-          }
+          // Direct Wire to Live Generative Synthesis:
+          // Clicking "Search Live AI" / "Not This One..." directly resolves choice to 'synthesis'.
+          // We immediately re-invoke handleGenerateGraph with bypassCacheValidation = true and bypassToken = true
+          // to trigger live Gemini 3.1 Pro synthesis directly, bypassing all local/Firestore cache.
+          handleGenerateGraph(artists, isRegeneration, graphToEnhance, true, true, overrideFilters, activeDisambiguationHints);
+          return;
         } else {
-          // User selected a specific candidate (from cache or from live probe).
-          // Detect which source the selection came from to apply the right post-processing.
-          const isFromCacheSelection = cacheCandidates.some(c => c.id === choice);
-
+          // User accepted a specific candidate card from the cache.
           resolvedArtistSeeds[i] = normalizeArtistId(choice);
           hasDisambiguated = true;
-
-          if (isFromCacheSelection) {
-            // Cache selection: merge any duplicate cached docs for non-selected candidates.
-            const nonSelected = cacheCandidates.filter(c => c.id !== choice);
-            nonSelected.forEach(ns => mergeAndCleanupArtists(choice, ns.id));
-          } else {
-            // Live probe selection: record a disambiguation constraint hint so
-            // generateGraphData anchors synthesis to the correct regional entity.
-            const probeKey = normalizeArtistId(rawInput);
-            activeDisambiguationHints[probeKey] =
-              `[disambiguation resolved: the user confirmed they are searching for the artist ` +
-              `identified as "${choice}". Synthesize ONLY the musical act matching this identity. ` +
-              `Do NOT synthesize any other regional or genre variant with the same name.]`;
-          }
+          const nonSelected = cacheCandidates.filter(c => c.id !== choice);
+          nonSelected.forEach(ns => mergeAndCleanupArtists(choice, ns.id));
         }
       }
     }
@@ -6515,9 +6473,6 @@ const App: React.FC = () => {
               setIsMenuOpen={setIsMenuOpen}
               disambiguationDialog={disambiguationDialog}
               onSelectDisambiguation={(choice) => disambiguationDialog?.onSelect(choice)}
-              onSearchLiveAIDisambiguation={disambiguationDialog?.onSearchLiveAI}
-              isSearchingLiveDisambiguation={disambiguationDialog?.isSearchingLive}
-              hasSearchedLiveDisambiguation={disambiguationDialog?.hasSearchedLive}
             />
           )}
         </div>

@@ -714,58 +714,38 @@ Key design decisions:
 *   **`/api/gemini/*wildcard` syntax:** Express v5 / `path-to-regexp` v8 requires a named parameter prefixed with `*` (`*wildcard`) instead of the legacy bare wildcard (`/*`) pattern.
 *   **Security parity:** The credential strip (`authorization`, `cookie`, `host`, `connection`, `content-length`) is retained and extended relative to the previous implementation. The `x-goog-api-key` injection is unchanged.
 
-### 9.9 Human-in-the-Loop Disambiguation State Machine (STAGE 0)
+### 9.9 Direct-Wire Human-in-the-Loop Disambiguation (STAGE 0)
 
 #### Constitutional Rule
 
-> **Cache is always interrogated first. Every search passes through an explicit human-in-the-loop verification checkpoint before synthesis occurs. The live AI probe fires ONLY on explicit user action ("Search Live AI"). Once triggered, `hasSearchedLive: true` isolates post-probe live results, physically preventing circular rejection loops. This is a binding architectural law.**
+> **Cache is always interrogated first. Every artist search passes through an explicit human-in-the-loop verification checkpoint before synthesis occurs. Accepting a candidate loads the cached record. Clicking "Search Live AI" / "Not This One..." directly resolves the modal and dispatches the live Gemini 3.1 Pro generative synthesis pipeline with cache-bypassing (`bypassCacheValidation = true`). This is a binding architectural law.**
 
 #### State Machine & Render Matrix
 
-The `DisambiguationModal` component in `SharedModals.tsx` implements a 6-state machine driven by three state variables: `candidates.length`, `isSearchingLive`, and `hasSearchedLive`.
+The `DisambiguationModal` component in `SharedModals.tsx` implements 3 direct, clean verification states:
 
-| State | `hasSearchedLive` | `candidates.length` | Icon & Header | Rendered Controls & Behavior |
-|---|---|---|---|---|
-| **State 1: Cache Miss Prompt** | `false` | `0` | 🧠 *Disambiguation* | "No cached records found". Buttons: `🔍 Search Live AI`, `Continue with [query]`, `Cancel`. |
-| **State 2: Look What I Found** | `false` | `1` | 🧭 *Look What I Found* | Single candidate confirm card. Clicking card accepts candidate. Buttons: `🔍 Not This One — Search Live AI`, `Cancel`. **(No redundant Continue button)**. |
-| **State 3: Multiple Cached** | `false` | `>1` | 🧠 *Disambiguation* | List of cached candidate cards. Clicking card accepts candidate. Buttons: `🔍 Not What I'm Looking For — Search Live AI`, `Cancel`. **(No redundant Create New Graph button)**. |
-| **State 4: Searching** | — | — | 🧠 *Disambiguation* | In-flight loading spinner (`isSearchingLive: true`). All buttons disabled. |
-| **State 5: Live AI Results** | `true` | `>0` | 🧠 *Live AI Discovery Results* | List of live-probe candidate cards. Buttons: `Synthesize Unconstrained Graph`, `Cancel`. **(No Search Live AI button — zero-loop guarantee)**. |
-| **State 6: No Extra Acts Found** | `true` | `0` | 🔍 *No Additional Acts Found* | "Our live search found no additional distinct regional acts for [query]". Buttons: `Synthesize Fresh Graph for [query]`, `Cancel`. **(No Search Live AI button — zero-loop guarantee)**. |
+| State | Condition | Icon & Header | User Controls & Behavior |
+|---|---|---|---|
+| **State A: Cache Miss** | `candidates.length === 0` | 🧠 *Disambiguation* | "No cached records found". Buttons: `🔍 Search Live AI` -> Direct Live Synthesis; `Cancel` -> Abort. |
+| **State B: Single Candidate** | `candidates.length === 1` | 🧭 *Look What I Found* | Single candidate confirm card -> Accept cached record; `🔍 Not This One — Search Live AI` -> Direct Live Synthesis; `Cancel` -> Abort. |
+| **State C: Multiple Cached** | `candidates.length > 1` | 🧠 *Disambiguation* | List of cached candidate cards -> Accept candidate; `🔍 Not What I'm Looking For — Search Live AI` -> Direct Live Synthesis; `Cancel` -> Abort. |
 
-#### Human-in-the-Loop Verification Pipeline (`App.tsx`)
+#### Direct-Wire Pipeline (`App.tsx`)
 
 1. **Step 1 — Cache Interrogation:**
-   `searchDisambiguationCandidates(searchId)` executes a Firestore prefix-range query against the `/artists` collection.
+   `searchDisambiguationCandidates(searchId)` executes a Firestore prefix-range query against `/artists`.
 
-2. **Step 2 — Verification Checkpoint (Always Shown):**
-   `setDisambiguationDialog` mounts the modal with `candidates: cacheCandidates`, `isSearchingLive: false`, `hasSearchedLive: false`. The user reviews the cache findings before any synthesis occurs:
-   - Clicking a candidate card resolves the seed to `normalizeArtistId(choice)`. For cache selections, non-selected duplicate records are cleaned up via `mergeAndCleanupArtists()`.
-   - Clicking `Search Live AI` fires `fireSearchLiveAI()`.
+2. **Step 2 — Human-in-the-Loop Checkpoint:**
+   `setDisambiguationDialog` mounts the modal with `candidates: cacheCandidates`:
+   - **Candidate Selection:** Clicking a candidate card accepts that identity, returning `normalizeArtistId(choice)`. Duplicate cached records are deduped via `mergeAndCleanupArtists()`.
+   - **Live Synthesis Rejection:** Clicking `Search Live AI` / `Not This One...` resolves choice to `'synthesis'`.
 
-3. **Step 3 — Escalation to Live Probe:**
-   `fireSearchLiveAI()` sets `isSearchingLive: true` (State 4 spinner), calls `resolveArtistCandidatesViaAI(rawInput)` (`gemini-2.0-flash`, 10s timeout, JSON array schema), and on completion sets `isSearchingLive: false, hasSearchedLive: true, candidates: liveCandidates`.
-
-4. **Step 4 — Post-Probe Resolution:**
-   With `hasSearchedLive: true`, the modal renders either State 5 (Live Candidates) or State 6 (No Extra Acts Found).
-   - Selecting a live candidate pins its identity constraint hint into `activeDisambiguationHints[probeKey]` for `generateGraphData()`.
-   - Selecting `Synthesize Unconstrained Graph` / `Synthesize Fresh Graph` proceeds to full synthesis without constraint.
-   - Selecting `Cancel` aborts cleanly with state rollback.
-
-#### Disambiguation Constraint Propagation
-
-When a live-probe candidate is selected, a constraint hint is injected into the Gemini Pro system instruction:
-
-```
-DISAMBIGUATION CONSTRAINTS (MANDATORY — DO NOT OVERRIDE):
-[disambiguation resolved: the user confirmed they are searching for the artist identified
-as "[resolved-id]". Synthesize ONLY the musical act matching this identity.
-Do NOT synthesize any other regional or genre variant with the same name.]
-```
+3. **Step 3 — Direct Live Gemini Pro Synthesis:**
+   When `choice === 'synthesis'`, the modal closes instantly and `handleGenerateGraph` re-invokes itself with `bypassCacheValidation = true`. The engine proceeds directly to Phase 2 (Token Confirmation / Live Generation) with full loading overlays, dispatching `generateGraphData` to live Gemini 3.1 Pro without intermediate modal interception traps or double-prompts.
 
 #### Cache Write-Back Alignment
 
-After successful synthesis, `writeArtistCacheMany()` writes a **country-anchored composite cache key** (e.g. `oblivion-italy`). Subsequent searches for the artist name will populate Stage 2 or 3 with distinct keyed candidates. The disambiguation engine is self-healing: every confirmed live resolution enriches the local cache for future users.
+After successful live synthesis, `writeArtistCacheMany()` writes a **country-anchored composite cache key** (e.g. `oblivion-italy`). Subsequent searches for the artist name will populate State B or State C with distinct keyed candidates. The disambiguation engine is self-healing: every live resolution enriches the local cache automatically.
 
 ---
 
