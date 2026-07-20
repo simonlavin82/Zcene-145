@@ -2429,7 +2429,14 @@ const App: React.FC = () => {
           });
         }
 
-        if (choice === 'cancel') return;
+        if (choice === 'cancel') {
+          setIsLoading(false);
+          isHydratingSessionRef.current = false;
+          isProjectLoadingRef.current = false;
+          setActiveNodeIds(prevActiveNodeIds);
+          setSeedArtists(prevSeedArtists);
+          return;
+        }
 
         if (choice === 'synthesis') {
           // --- FRONT-LOADED TOKEN QUOTA GATE ---
@@ -2460,7 +2467,14 @@ const App: React.FC = () => {
             });
           });
 
-          if (flashChoice === 'cancel') return;
+          if (flashChoice === 'cancel') {
+            setIsLoading(false);
+            isHydratingSessionRef.current = false;
+            isProjectLoadingRef.current = false;
+            setActiveNodeIds(prevActiveNodeIds);
+            setSeedArtists(prevSeedArtists);
+            return;
+          }
 
           if (flashChoice.startsWith('override::')) {
             const userInputCountry = flashChoice.split('::')[1];

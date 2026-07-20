@@ -706,7 +706,7 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
                   placeholder="Can't find your version? Enter country/region"
                   value={overrideInput}
                   onChange={e => setOverrideInput(e.target.value)}
-                  className="w-full bg-zinc-900/50 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-primary/50 transition-colors"
+                  className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2.5 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200"
                 />
                 <button
                   type="submit"
@@ -796,7 +796,7 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
                   placeholder="Can't find your version? Enter country/region"
                   value={overrideInput}
                   onChange={e => setOverrideInput(e.target.value)}
-                  className="w-full bg-zinc-900/50 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-primary/50 transition-colors"
+                  className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2.5 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200"
                 />
                 <button
                   type="submit"
@@ -887,7 +887,7 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
                 placeholder="Can't find your version? Enter country/region"
                 value={overrideInput}
                 onChange={e => setOverrideInput(e.target.value)}
-                className="w-full bg-zinc-900/50 border border-zinc-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-primary/50 transition-colors"
+                className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2.5 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200"
               />
               <button
                 type="submit"
