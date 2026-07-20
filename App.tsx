@@ -2423,8 +2423,22 @@ const App: React.FC = () => {
         if (choice === 'cancel') return;
 
         if (choice === 'synthesis') {
-          // Direct Wire to Live Generative Synthesis:
+          // Direct Wire to Live Generative Synthesis & Rejection Constraint Injection:
           // Clicking "Search Live AI" / "Not This One..." directly resolves choice to 'synthesis'.
+          // Extract rejected metadata from cacheCandidates and inject negative constraint hint for Gemini 3.1 Pro:
+          if (cacheCandidates && cacheCandidates.length > 0) {
+            const rejectedDescriptions = cacheCandidates.map(c => 
+              `"${c.label}"${c.origin ? ` from ${c.origin}` : ''}${c.genre ? ` (${c.genre})` : ''}`
+            ).join(', ');
+
+            const probeKey = normalizeArtistId(rawInput);
+            activeDisambiguationHints[probeKey] = 
+              `[DISAMBIGUATION REJECTION CONSTRAINTS: The user explicitly rejected the cached artist ` +
+              `candidate(s): ${rejectedDescriptions}. Synthesize a DIFFERENT regional or genre act ` +
+              `sharing the name "${rawInput}". Do NOT synthesize any of the rejected candidates.]`;
+            console.log(`[Disambiguation Rejection Hint Injected for ${probeKey}]:`, activeDisambiguationHints[probeKey]);
+          }
+
           // We immediately re-invoke handleGenerateGraph with:
           //   - skipCacheLookup = true (bypass local Firestore cache)
           //   - bypassTokenConfirmation = false (trigger API Token Authorization Modal)

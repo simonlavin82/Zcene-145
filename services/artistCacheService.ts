@@ -469,21 +469,24 @@ export const writeArtistCacheMany = async (
       const canonicalId = canonicalNode ? normalizeArtistId(canonicalNode.id) : artistId;
       const canonicalName = canonicalNode?.label ?? canonicalNode?.id ?? name;
       
-      let disambiguatedCanonicalId = canonicalId;
-      if (connectedCountries.length > 0) {
-        const countryNorm = normalizeArtistId(connectedCountries[0]);
-        if (countryNorm) disambiguatedCanonicalId = `${canonicalId}-${countryNorm}`;
-      }
+      const artistDetails = detailsMap?.get(canonicalId) || 
+                            detailsMap?.get(artistId) || 
+                            detailsMap?.get(canonicalName.toLowerCase()) || 
+                            detailsMap?.get(name.toLowerCase());
 
-      let disambiguatedArtistId = artistId;
+      let countryNorm = "";
       if (connectedCountries.length > 0) {
-        const countryNorm = normalizeArtistId(connectedCountries[0]);
-        if (countryNorm) disambiguatedArtistId = `${artistId}-${countryNorm}`;
+        countryNorm = normalizeArtistId(connectedCountries[0]);
+      } else if (artistDetails?.details?.origin) {
+        countryNorm = normalizeArtistId(artistDetails.details.origin);
       }
+      if (!countryNorm) countryNorm = "global";
+
+      const disambiguatedCanonicalId = `${canonicalId}-${countryNorm}`;
+      const disambiguatedArtistId = `${artistId}-${countryNorm}`;
 
       const compositeCanonicalId = buildCompositeCacheKey(disambiguatedCanonicalId, filters);
       const compositeArtistId = buildCompositeCacheKey(disambiguatedArtistId, filters);
-      const isAlias = compositeCanonicalId !== compositeArtistId;
 
       const { nodes, links } = preserveFullGraph
         ? { nodes: normalizedGraph.nodes, links: normalizedGraph.links }
@@ -497,11 +500,6 @@ export const writeArtistCacheMany = async (
       try {
         const canonicalDocRef = doc(db, 'artists', compositeCanonicalId);
         const canonicalSnap = await getDoc(canonicalDocRef);
-
-        const artistDetails = detailsMap?.get(canonicalId) || 
-                              detailsMap?.get(artistId) || 
-                              detailsMap?.get(canonicalName.toLowerCase()) || 
-                              detailsMap?.get(name.toLowerCase());
 
         if (!canonicalSnap.exists()) {
           // ── CREATE PATH ─────────────────────────────────────────────────────
@@ -522,7 +520,7 @@ export const writeArtistCacheMany = async (
           }
           enforceArtistCacheSchema(setPayload);
           await setDoc(canonicalDocRef, setPayload);
-          console.log(`[ArtistCache] Created Canonical: ${compositeCanonicalId} (${nodes.length} nodes, ${links.length} links)`);
+          console.log(`[ArtistCache] Created Universal Canonical: ${compositeCanonicalId} (${nodes.length} nodes, ${links.length} links)`);
         } else {
           const existing = canonicalSnap.data();
 
@@ -562,25 +560,25 @@ export const writeArtistCacheMany = async (
           }
         }
 
-
-        if (isAlias) {
-          const aliasDocRef = doc(db, 'artists', compositeArtistId);
-          const aliasSnap = await getDoc(aliasDocRef);
-          
-          if (!aliasSnap.exists()) {
-            await setDoc(aliasDocRef, {
-              cacheKey: compositeArtistId,
-              artistId: artistId,
-              seedArtists: name,
-              graphData: JSON.stringify({ nodes: [], links: [] }),
-              filters: {},
-              cacheVersion: 2,
-              cachedAt: serverTimestamp(),
-              hitCount: 0,
-              redirectTo: compositeCanonicalId
-            });
-            console.log(`[ArtistCache] Created Alias Redirect: ${compositeArtistId} -> ${compositeCanonicalId}`);
-          }
+        // Bare root alias pointer protection:
+        // Create a pointer at /artists/{artistId} ONLY if no document exists there yet.
+        // If an alias or canonical document already exists at the bare root, leave it untouched
+        // so multiple country-suffixed variants (e.g. i-wish-i-italy and i-wish-i-united-states) co-exist as peers.
+        const bareArtistIdRef = doc(db, 'artists', artistId);
+        const bareSnap = await getDoc(bareArtistIdRef);
+        if (!bareSnap.exists()) {
+          await setDoc(bareArtistIdRef, {
+            cacheKey: artistId,
+            artistId: artistId,
+            seedArtists: name,
+            graphData: JSON.stringify({ nodes: [], links: [] }),
+            filters: {},
+            cacheVersion: 2,
+            cachedAt: serverTimestamp(),
+            hitCount: 0,
+            redirectTo: compositeCanonicalId
+          });
+          console.log(`[ArtistCache] Created Initial Bare Alias Pointer: ${artistId} -> ${compositeCanonicalId}`);
         }
       } catch (e: any) {
         console.warn(`[ArtistCache] Write failed for "${compositeArtistId}" (${e.code ?? 'unknown'}): ${e.message}`);

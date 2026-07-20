@@ -740,12 +740,12 @@ The `DisambiguationModal` component in `SharedModals.tsx` implements 3 direct, c
    - **Candidate Selection:** Clicking a candidate card accepts that identity, returning `normalizeArtistId(choice)`. Duplicate cached records are deduped via `mergeAndCleanupArtists()`.
    - **Live Synthesis Rejection:** Clicking `Search Live AI` / `Not This One...` resolves choice to `'synthesis'`.
 
-3. **Step 3 — Direct Live Gemini Pro Synthesis:**
-   When `choice === 'synthesis'`, the modal closes instantly and `handleGenerateGraph` re-invokes itself with `skipCacheLookup = true`, `bypassDisambiguation = true`, and `bypassTokenConfirmation = false`. The decoupled guard (`if (!bypassToken && !bypassDisambiguation)`) skips STAGE 0 re-entry, displays the API Token Authorization Modal, and proceeds directly to Phase 2 with full loading overlays, dispatching `generateGraphData` to live Gemini 3.1 Pro.
+3. **Step 3 — Direct Live Gemini Pro Synthesis & Rejection Constraint Injection:**
+   When `choice === 'synthesis'`, the modal closes instantly. If candidate cards were rejected, STAGE 0 packages their origin and genre metadata into a **Negative Disambiguation Constraint Hint** (e.g. `[DISAMBIGUATION REJECTION CONSTRAINTS: User explicitly rejected 'I Wish I' from Italy (Screamo). Synthesize a DIFFERENT act named 'I Wish I'...]`). `handleGenerateGraph` re-invokes itself with `skipCacheLookup = true`, `bypassDisambiguation = true`, and `bypassTokenConfirmation = false`. The decoupled guard skips STAGE 0 re-entry, displays the API Token Authorization Modal, and dispatches `generateGraphData` with the negative constraint injected into Gemini 3.1 Pro system instructions.
 
-#### Cache Write-Back Alignment
+#### Universal Country-Suffixed Composite Key Write-Back Alignment
 
-After successful live synthesis, `writeArtistCacheMany()` writes a **country-anchored composite cache key** (e.g. `oblivion-italy`). Subsequent searches for the artist name will populate State B or State C with distinct keyed candidates. The disambiguation engine is self-healing: every live resolution enriches the local cache automatically.
+After successful live synthesis, `writeArtistCacheMany()` writes a **Universal Country-Suffixed Composite Cache Key** (e.g. `i-wish-i-italy` or `i-wish-i-united-states`) for every canonical artist record in Firestore. Bare-root alias pointer documents (`/artists/{artistId}`) are written ONLY on initial creation, preserving existing pointers so multiple country-suffixed variants co-exist as peer records. Subsequent prefix searches for the artist name will populate State B or State C with distinct keyed candidates. The disambiguation engine is self-healing: every live resolution enriches the local cache automatically without collisions.
 
 ---
 

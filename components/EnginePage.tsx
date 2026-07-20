@@ -267,15 +267,16 @@ the entire dataset, the app evolves existing visual structures.
       - 1 cache hit -> "Look What I Found" (single card). Clicking card accepts candidate.
         Escape: "Not This One — Search Live AI" -> Direct Live Synthesis + Cancel.
       - >1 cache hits -> "Disambiguation" (list of cards). Clicking card accepts candidate.
-        Escape: "Not What I'm Looking For — Search Live AI" -> Direct Live Synthesis + Cancel.
-    - Step 3 (Direct Live Synthesis): Clicking Search Live AI closes the modal instantly.
+    - Step 3 (Direct Live Synthesis & Rejection Constraint Injection): Clicking Search Live AI closes the modal instantly.
+      STAGE 0 packages rejected card metadata into a negative constraint hint for Gemini 3.1 Pro.
       handleGenerateGraph re-invokes with skipCacheLookup = true, bypassDisambiguation = true,
       and bypassTokenConfirmation = false. The decoupled guard skips STAGE 0 re-entry, displays
-      the API Token Authorization Modal, and dispatches live Gemini 3.1 Pro synthesis directly.
+      the API Token Authorization Modal, and dispatches live Gemini 3.1 Pro synthesis with prompt constraints.
 
-    Self-healing: Every successful live synthesis writes a country-anchored composite cache key
-    (e.g. "oblivion-italy") via writeArtistCacheMany(). Future searches for the same artist name
-    populate State B or C with distinct candidates, enriching the index automatically.
+    Self-healing & Universal Composite Keys: Every successful live synthesis writes a Universal
+    Country-Suffixed Composite Cache Key (e.g. "i-wish-i-italy", "i-wish-i-united-states") via
+    writeArtistCacheMany(). Bare alias pointers are preserved, allowing regional variants to co-exist
+    as peer records. Future searches populate State B or C with distinct candidates automatically.
 `;
 
 
