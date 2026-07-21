@@ -6404,7 +6404,7 @@ const App: React.FC = () => {
       } finally { isFetchingDetailsRef.current = false; }
     };
     fetch();
-  }, [activeNodeIds, activeNodes, detailsCache, graphData, seedArtists, selectedNode, urlOriginHint, humanizeError, user, isLoading, incrementDeepCutsOpenedCount, triggerBackgroundRevalidation]);
+  }, [activeNodeIds, activeNodes, detailsCache, graphData, seedArtists, selectedNode, urlOriginHint, humanizeError, user, isLoading, incrementDeepCutsOpenedCount, triggerBackgroundRevalidation, explicitGenerationQueue, loadingNodeIds]);
 
   const handleViewChange = useCallback((newView: View) => {
     if (newView === View.Graph && !graphData) setGraphData({ nodes: [], links: [] });
