@@ -4766,12 +4766,9 @@ const App: React.FC = () => {
               // written by the backend (legacy projects have activeNodes: [] from creation).
               if (data.activeNodes && Array.isArray(data.activeNodes)) {
                 let resolvedActiveNodes = data.activeNodes;
-                if (resolvedActiveNodes.length === 0 && g.nodes.length > 0) {
-                  const seedList = (data.seedArtists || '').split('::').map((s: string) => s.trim()).filter(Boolean);
-                  const seedSet = new Set(seedList.map((s: string) => normalizeArtistId(s)));
-                  resolvedActiveNodes = g.nodes
-                    .filter((n: any) => (n.type === 'artist' || !n.type) && seedSet.has(normalizeArtistId(n.id)))
-                    .map((n: any) => n.id);
+                const availableArtists = g.nodes.filter((n: any) => (n.type === 'artist' || !n.type)).map((n: any) => n.id);
+                if (resolvedActiveNodes.length <= 1 && availableArtists.length > resolvedActiveNodes.length) {
+                  resolvedActiveNodes = availableArtists;
                 }
                 setActiveNodeIds(resolvedActiveNodes);
                 
@@ -4838,7 +4835,7 @@ const App: React.FC = () => {
               console.log(`[ProjectLoader] Intercepting Phase 1 loading for complex query. Multi-artist: ${isMultiArtistIncoming}, Filtered: ${hasActiveFiltersIncoming}. Handing over to handleGenerateGraph.`);
               if (data.activeNodes && Array.isArray(data.activeNodes)) {
                 let resolvedActiveNodes = data.activeNodes;
-                if (resolvedActiveNodes.length === 0 && data.seedArtists) {
+                if (resolvedActiveNodes.length <= 1 && data.seedArtists) {
                   const seedList = data.seedArtists.split('::').map((s: string) => normalizeArtistId(s.trim())).filter(Boolean);
                   resolvedActiveNodes = seedList.slice(0, 1); // pass through; handleGenerateGraph will compute graph
                 }
@@ -4890,12 +4887,9 @@ const App: React.FC = () => {
 
             if (data.activeNodes && Array.isArray(data.activeNodes)) {
               let resolvedActiveNodes = data.activeNodes;
-              if (resolvedActiveNodes.length === 0 && hydratedNodes.length > 0) {
-                 const seedList = (data.seedArtists || '').split('::').map((s: string) => s.trim()).filter(Boolean);
-                 const seedSet = new Set(seedList.map((s: string) => normalizeArtistId(s)));
-                 resolvedActiveNodes = hydratedNodes
-                   .filter((n: any) => (n.type === 'artist' || !n.type) && seedSet.has(normalizeArtistId(n.id)))
-                   .map((n: any) => n.id);
+              const availableArtists = hydratedNodes.filter((n: any) => (n.type === 'artist' || !n.type)).map((n: any) => n.id);
+              if (resolvedActiveNodes.length <= 1 && availableArtists.length > resolvedActiveNodes.length) {
+                 resolvedActiveNodes = availableArtists;
               }
               setActiveNodeIds(resolvedActiveNodes);
             }
@@ -4952,12 +4946,9 @@ const App: React.FC = () => {
 
               if (data.activeNodes && Array.isArray(data.activeNodes)) {
                 let resolvedActiveNodes = data.activeNodes;
-                if (resolvedActiveNodes.length === 0 && g.nodes.length > 0) {
-                   const seedList = (data.seedArtists || '').split('::').map((s: string) => s.trim()).filter(Boolean);
-                   const seedSet = new Set(seedList.map((s: string) => normalizeArtistId(s)));
-                   resolvedActiveNodes = g.nodes
-                     .filter((n: any) => (n.type === 'artist' || !n.type) && seedSet.has(normalizeArtistId(n.id)))
-                     .map((n: any) => n.id);
+                const availableArtists = g.nodes.filter((n: any) => (n.type === 'artist' || !n.type)).map((n: any) => n.id);
+                if (resolvedActiveNodes.length <= 1 && availableArtists.length > resolvedActiveNodes.length) {
+                   resolvedActiveNodes = availableArtists;
                 }
                 setActiveNodeIds(resolvedActiveNodes);
               }
@@ -4978,12 +4969,9 @@ const App: React.FC = () => {
                   hydratedNodes = g.nodes;
                     if (data.activeNodes && Array.isArray(data.activeNodes)) {
                       let resolvedActiveNodes = data.activeNodes;
-                      if (resolvedActiveNodes.length === 0 && g.nodes.length > 0) {
-                         const seedList = (data.seedArtists || '').split('::').map((s: string) => s.trim()).filter(Boolean);
-                         const seedSet = new Set(seedList.map((s: string) => normalizeArtistId(s)));
-                         resolvedActiveNodes = g.nodes
-                           .filter((n: any) => (n.type === 'artist' || !n.type) && seedSet.has(normalizeArtistId(n.id)))
-                           .map((n: any) => n.id);
+                      const availableArtists = g.nodes.filter((n: any) => (n.type === 'artist' || !n.type)).map((n: any) => n.id);
+                      if (resolvedActiveNodes.length <= 1 && availableArtists.length > resolvedActiveNodes.length) {
+                         resolvedActiveNodes = availableArtists;
                       }
                       setActiveNodeIds(resolvedActiveNodes);
                     }
@@ -5034,12 +5022,9 @@ const App: React.FC = () => {
 
             if (data.activeNodes && Array.isArray(data.activeNodes)) {
               let resolvedActiveNodes = data.activeNodes;
-              if (resolvedActiveNodes.length === 0 && g.nodes.length > 0) {
-                 const seedList = (data.seedArtists || '').split('::').map((s: string) => s.trim()).filter(Boolean);
-                 const seedSet = new Set(seedList.map((s: string) => normalizeArtistId(s)));
-                 resolvedActiveNodes = g.nodes
-                   .filter((n: any) => (n.type === 'artist' || !n.type) && seedSet.has(normalizeArtistId(n.id)))
-                   .map((n: any) => n.id);
+              const availableArtists = g.nodes.filter((n: any) => (n.type === 'artist' || !n.type)).map((n: any) => n.id);
+              if (resolvedActiveNodes.length <= 1 && availableArtists.length > resolvedActiveNodes.length) {
+                 resolvedActiveNodes = availableArtists;
               }
               setActiveNodeIds(resolvedActiveNodes);
             }
