@@ -285,7 +285,7 @@ the entire dataset, the app evolves existing visual structures.
     documents are healed into alias pointers across both frontend and backend writes.
 
     Suffix-Deduplication Safeguard: To prevent runaway recursive keys (e.g., "i-wish-i-united-states-united-states"),
-    all region concatenation logic now utilizes `.endsWith()` deduplication checks. This ensures that countryNorm
+    all region concatenation logic now utilizes '.endsWith()' deduplication checks. This ensures that countryNorm
     suffixes are never double-appended during frontend cache lookups, backend curation, or cache hydration loops.
 
 11. HYBRID AI PROBING & GLOBAL STATE-RESET PIPELINE:
