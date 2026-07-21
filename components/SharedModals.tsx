@@ -918,11 +918,11 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
             )}
           </div>
           
-          <footer className="p-3 sm:p-4 bg-zinc-900 border-t border-zinc-700 flex items-center justify-end gap-3">
+          <footer className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2">
             <button
               type="button"
               onClick={() => onSelect('cancel')}
-              className="px-4 py-2 text-zinc-400 hover:text-white text-sm font-medium rounded-xl hover:bg-zinc-800 transition-colors"
+              className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors"
             >
               Cancel
             </button>
@@ -930,15 +930,15 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
               <button
                 type="button"
                 onClick={() => onSelect('synthesis')}
-                className="px-6 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
+                className="px-4 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 active:scale-95 transition-all shadow-md cursor-pointer"
               >
-                <span className="material-symbols-outlined text-[18px]">search</span>
+                <span className="material-symbols-outlined !text-[16px]">search</span>
                 Not This One — Search Live AI
               </button>
             ) : (
               <button
                 type="submit"
-                className="px-6 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all shadow-md cursor-pointer whitespace-nowrap"
+                className="px-4 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 active:scale-95 transition-all shadow-md cursor-pointer whitespace-nowrap"
               >
                 {overrideInput.trim() ? 'Synthesize with override' : 'Confirm Selection'}
               </button>
@@ -1019,18 +1019,19 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
           )}
         </div>
 
-        <footer className="p-3 sm:p-4 bg-zinc-900 border-t border-zinc-700 flex items-center justify-end gap-3">
+        <footer className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2">
           <button
             type="button"
             onClick={() => onSelect('cancel')}
-            className="px-4 py-2 text-zinc-400 hover:text-white text-sm font-medium rounded-xl hover:bg-zinc-800 transition-colors"
+            className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors"
           >
             Cancel
           </button>
           <button
             type="submit"
-            className="px-6 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all shadow-md cursor-pointer whitespace-nowrap"
+            className="px-4 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 active:scale-95 transition-all shadow-md cursor-pointer whitespace-nowrap"
           >
+            {!isLiveAISuggestions && <span className="material-symbols-outlined !text-[16px]">search</span>}
             {isLiveAISuggestions 
               ? (overrideInput.trim() ? 'Proceed' : 'Proceed without origin')
               : (overrideInput.trim() ? 'Synthesize with override' : 'Search Live AI')}
