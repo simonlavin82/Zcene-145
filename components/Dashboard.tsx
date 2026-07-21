@@ -224,7 +224,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   return (
     <div 
-      className="absolute inset-0 flex flex-col overflow-hidden bg-background-dark text-zinc-200 font-display"
+      className="h-full w-full overflow-y-auto bg-background-dark text-zinc-200 font-display flex flex-col relative"
       style={{
         backgroundImage: 'url("https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg")',
         backgroundSize: 'cover',
@@ -256,8 +256,8 @@ const Dashboard: React.FC<DashboardProps> = ({
       />
 
       
-      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 overflow-y-auto relative z-10">
-        <div className="w-full space-y-8">
+      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow">
+          <div className="w-full space-y-8">
           <div className="flex flex-col items-center justify-center text-center md:flex-row md:justify-between md:items-center gap-4">
             <h1 className="text-lg font-semibold uppercase tracking-wider text-zinc-200">YOUR ZCENES</h1>
             
