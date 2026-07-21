@@ -1244,16 +1244,30 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         });
 
     const nodeId = (n: any) => String(typeof n === 'string' ? n : n.id);
-
     container.select(".link-group").selectAll<SVGLineElement, Link>("line.visual-line")
         .data(visibleLinks, (d: any) => `${nodeId(d.source)}-${nodeId(d.target)}`)
         .join("line")
         .attr("class", "visual-line")
-        .attr("stroke", "#e4e4e7")
+        .attr("stroke", (d: any) => {
+            const activeNode = selectedNode || peekedNode || activeHoveredNodeRef.current;
+            if (activeNode) {
+                const s = nodeId(d.source);
+                const t = nodeId(d.target);
+                if (isSameNodeId(s, activeNode.id) || isSameNodeId(t, activeNode.id)) {
+                    return "#F6E468";
+                }
+            }
+            return "#e4e4e7";
+        })
         .attr("stroke-width", 1)
         .attr("stroke-opacity", (d: any) => {
+            const activeNode = selectedNode || peekedNode || activeHoveredNodeRef.current;
             const s = nodeId(d.source);
             const t = nodeId(d.target);
+            if (activeNode && (isSameNodeId(s, activeNode.id) || isSameNodeId(t, activeNode.id))) {
+                return 0.9;
+            }
+
             const sNode = visibleNodes.find(n => n.id === s);
             const tNode = visibleNodes.find(n => n.id === t);
             const isLinkFilteredOut = (node: Node | undefined) => {
@@ -1265,7 +1279,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
             const selHighlight = selectionHighlightIdsRef.current;
             const hlNodes = highlightedNodesRef.current;
-            if (selHighlight) return (selHighlight.has(s) && selHighlight.has(t)) ? 0.6 : 0.05;
+            if (selHighlight) return (selHighlight.has(s) && selHighlight.has(t)) ? 0.3 : 0.05;
             if (hlNodes.size > 0) return (hlNodes.has(s) && hlNodes.has(t)) ? 0.6 : 0.05;
             return 0.4;
         })
@@ -1443,7 +1457,16 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         });
     container.select(".link-group").selectAll<SVGLineElement, Link>("line.visual-line")
         .transition().duration(300)
+        .attr("stroke", (d: any) => {
+            const activeNode = selectedNode || peekedNode || activeHoveredNodeRef.current;
+            if (!activeNode) return "#e4e4e7";
+            const s = typeof d.source === 'string' ? d.source : d.source.id;
+            const t = typeof d.target === 'string' ? d.target : d.target.id;
+            const isFirstDegree = isSameNodeId(s, activeNode.id) || isSameNodeId(t, activeNode.id);
+            return isFirstDegree ? "#F6E468" : "#e4e4e7";
+        })
         .attr("stroke-opacity", (d: any) => {
+            const activeNode = selectedNode || peekedNode || activeHoveredNodeRef.current;
             const s = typeof d.source === 'string' ? d.source : d.source.id;
             const t = typeof d.target === 'string' ? d.target : d.target.id;
             
@@ -1456,11 +1479,16 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             };
             if (isLinkFilteredOut(sNode) || isLinkFilteredOut(tNode)) return 0.05;
 
-            if (selectionHighlightIds) return (selectionHighlightIds.has(s) && selectionHighlightIds.has(t)) ? 0.6 : 0.05;
+            if (activeNode) {
+                const isFirstDegree = isSameNodeId(s, activeNode.id) || isSameNodeId(t, activeNode.id);
+                if (isFirstDegree) return 0.9;
+            }
+
+            if (selectionHighlightIds) return (selectionHighlightIds.has(s) && selectionHighlightIds.has(t)) ? 0.3 : 0.05;
             if (highlightedNodes.size > 0) return (highlightedNodes.has(s) && highlightedNodes.has(t)) ? 0.6 : 0.05;
             return 0.3;
         });
-  }, [selectionHighlightIds, highlightedNodes, activeFilters, visibleNodes]);
+  }, [selectionHighlightIds, highlightedNodes, activeFilters, visibleNodes, selectedNode, peekedNode]);
 
   return (
     <div 

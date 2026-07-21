@@ -780,13 +780,15 @@ const STICKY_PEEK_ACTION_GATEWAY_DOCUMENTATION = `
 Zcene implements a cross-platform 'Sticky Peek + Action Gateway' interaction model to unify hover and click behaviors, eliminate layout jitter, and provide a clutter-free, premium visual aesthetic.
 
 1. STATE 1: THE 'STICKY PEEK' (Primary Interaction):
-   - Trigger: Single click (Desktop) or single tap (Mobile) on any node.
-   - Behavior: Instantly pins the floating 'Hover Box' (info snippet) and yellow connection highlights to the selected node, locking the D3 camera focus. This state persists until the user explicitly clicks the SVG background.
+   - Trigger: Single click (Desktop) or single tap (Mobile touch viewports) on any node.
+   - Behavior: Instantly sets active node focus, pins the floating 'Hover Box' (info snippet) banner, and illuminates yellow connection lines (#F6E468 at 0.9 opacity) to all 1st-degree related nodes while locking D3 camera focus. This state persists until the user explicitly clicks/taps the SVG background.
+   - Mobile Touch & Line Highlighting: Touch viewports execute synchronous node hover and line highlighting logic on single tap, guaranteeing mobile visual feature parity with desktop hover.
    - Purpose: Provides identical, friction-free connection tracing and information peeks across all platforms without triggering paid network API transactions.
 
 2. STATE 2: THE 'ACTION GATEWAY' (Secondary Interaction):
    - Trigger: A second click/tap on the already-selected (peeked) node.
-   - Behavior: Automatically hides/dismisses the floating hover box to clear visual clutter, opens the sidebar Details Panel, and displays the node action overlay (+ Explore / - buttons).
+   - Behavior: Automatically hides/dismisses the floating hover box to clear visual clutter, opens the sidebar Details Panel, and displays the node action overlay (+ Explore / - buttons) over the node.
+   - Persistent Yellow Highlights: All yellow 1st-degree connection lines highlighted during State 1 remain illuminated throughout State 2 to maintain graph context.
    - API Gateways:
      - Blocked & Cached nodes: Bypasses the token quota modal and enters State 2 instantly.
      - Uncached nodes: Triggers the JIT details queue and presents the Token Quota Confirmation warning. If canceled, the node remains in State 2 (with + Explore button and sidebar details card visible) to allow easy re-initiation.
@@ -798,7 +800,7 @@ Zcene implements a cross-platform 'Sticky Peek + Action Gateway' interaction mod
 
 4. DEEP CUT PAGINATION BYPASS:
    - When navigating artists in the Deep Cut pagination carousel (via <, >, or dot indicators), the graph automatically bypasses the Sticky Peek state (State 1) and transitions directly to the Action Gateway (State 2) by passing the forceActionState=true flag to handleNodeClick.
-   - This ensures that the floating hover box is immediately dismissed and connection lines/explore button are shown, maintaining visual focus on details rather than graph overlay cards.
+   - This ensures that the floating hover box is immediately dismissed while yellow connection lines and explore button overlays are shown, maintaining visual focus on details rather than graph overlay cards.
 `;
 
 const SitemapNode: React.FC<{ title: string; description: string; children?: React.ReactNode }> = ({ title, description, children }) => (

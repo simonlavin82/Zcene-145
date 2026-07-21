@@ -2905,9 +2905,9 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <h4 className="text-base font-semibold text-zinc-200 uppercase tracking-widest">State 1: Sticky Peek</h4>
                                         </div>
                                         <p className="text-sm text-zinc-400 leading-relaxed">
-                                            <strong>Trigger:</strong> Click (desktop) or Tap 1 (mobile) on any node.
+                                            <strong>Trigger:</strong> Click (desktop) or Single Tap (mobile touch viewports) on any node.
                                             <br /><br />
-                                            <strong>Behavior:</strong> Pins the hover box (info snippet) and yellow connection highlights, locking focus. The state remains active and locked even if the mouse leaves the node (mouseleave is bypassed via refs) until the user clicks the canvas background.
+                                            <strong>Behavior:</strong> Instantly sets active node focus, pins the hover box (info snippet), and illuminates yellow connection lines (<code>#F6E468</code> at 0.9 opacity) to all 1st-degree related nodes while locking camera focus. On desktop, hover states lock via ref bypass until background click; on mobile, single-tap instantly triggers this full visual highlight.
                                         </p>
                                     </div>
                                     <div className="p-6 bg-zinc-900/50 border border-zinc-800 rounded-xl space-y-4">
@@ -2916,9 +2916,9 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <h4 className="text-base font-semibold text-zinc-200 uppercase tracking-widest">State 2: Action Gateway</h4>
                                         </div>
                                         <p className="text-sm text-zinc-400 leading-relaxed">
-                                            <strong>Trigger:</strong> Click 2 (desktop) or Tap 2 (mobile) on the already peeked node.
+                                            <strong>Trigger:</strong> Click 2 (desktop) or Tap 2 (mobile) on the already peeked node (or Deep Cut pagination selection).
                                             <br /><br />
-                                            <strong>Behavior:</strong> Automatically dismisses/hides the floating hover box to reduce visual clutter, opens the sidebar Details Panel, and displays the node action overlays (<code>+ Explore</code> pill-button and <code>-</code> remove button).
+                                            <strong>Behavior:</strong> Automatically dismisses/hides the floating hover box to reduce visual clutter, opens the sidebar Details Panel, and displays node action overlays (<code>+ Explore</code> pill-button and <code>-</code> remove button) over the node. All 1st-degree yellow connection lines remain illuminated to maintain visual context.
                                         </p>
                                     </div>
                                 </div>

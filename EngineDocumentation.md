@@ -731,14 +731,14 @@ This section documents the cross-platform unified interaction design implemented
 ```
 
 1.  **State 1: Sticky Peek (Primary Interaction):**
-    *   **Trigger:** Single click on desktop, or single tap on mobile viewports.
+    *   **Trigger:** Single click on desktop, or single tap on mobile touch viewports.
     *   **State configuration:** `setPeekedNode(node)` is called, while `selectedNode` remains `null`. The Details Panel remains closed.
-    *   **Visual cues:** The D3 force simulation camera glides and locks onto the node, the floating hover box (info snippet) pins to the node, and all first-degree connection lines/constellations highlight in yellow.
+    *   **Visual cues:** The D3 force simulation camera glides and locks onto the node, the floating hover box (info snippet) pins to the node, and all first-degree connection lines highlight in yellow (`#F6E468` at 0.9 opacity) across both desktop and mobile viewports.
 2.  **State 2: Action Gateway (Secondary Interaction):**
-    *   **Trigger:** A second click or tap on the already peeked node.
+    *   **Trigger:** A second click or tap on the already peeked node (or selecting an item from pagination).
     *   **State configuration:** `setSelectedNode(node)` is called, and `peekedNode` resets to `null`.
     *   **Visual cues:** The floating hover box is automatically dismissed to prevent overlap and clear graph canvas clutter. The sidebar Details Panel mounts, and the node renders its action overlays (including the custom pill-shaped `+ Explore` button and `-` remove button).
-    *   **Persistent Highlights (Sticky Connections):** The yellow connection lines highlighted during State 1 remain fully highlighted and visible throughout State 2 to prevent visual fragmentation.
+    *   **Persistent Highlights (Sticky Connections):** The yellow connection lines highlighted during State 1 remain fully illuminated and visible throughout State 2 to prevent visual fragmentation on both mobile and desktop screens.
 
 ### 10.2 Mouseleave Locking & Event Safeguards
 
