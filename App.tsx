@@ -990,6 +990,7 @@ const App: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const currentProjectIdRef = useRef<string | null>(null);
+  const hasAutoQueuedRef = useRef(false);
   const [currentProjectOwnerId, setCurrentProjectOwnerId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string>('');
   const [projectStatus, setProjectStatus] = useState<string | null>(null);
@@ -4593,21 +4594,6 @@ const App: React.FC = () => {
         });
         return merged;
       });
-
-      // Automatically queue successfully hydrated nodes into the active deep cut panel
-      const newHydratedIds = Array.from(results.keys())
-          .filter(k => results.get(k)?.summary && results.get(k)!.summary.trim().length > 5 && !results.get(k)!._isSentinel);
-      
-      if (newHydratedIds.length > 0) {
-         setActiveNodeIds(prev => {
-             const updated = new Set(prev);
-             newHydratedIds.forEach(id => {
-                const originalNode = nodes.find(n => n.id.toLowerCase() === id.toLowerCase() || normalizeArtistId(n.id) === id);
-                if (originalNode) updated.add(originalNode.id);
-             });
-             return Array.from(updated);
-         });
-      }
     }
   }, []);
 
@@ -4908,19 +4894,22 @@ const App: React.FC = () => {
               if (data.activeNodes.length > 0) {
                 // User explicitly saved a session queue
                 setActiveNodeIds(data.activeNodes);
-              } else if (hydratedNodes.length > 0) {
-                // Ensure seeds are included, but DO NOT overwrite what batchHydrateDetailsCache just added
+              } else if (hydratedNodes.length > 0 && !hasAutoQueuedRef.current) {
+                hasAutoQueuedRef.current = true;
+                
                 const seedList = (data.seedArtists || '').split('::').map((s: string) => s.trim()).filter(Boolean);
                 const seedSet = new Set(seedList.map((s: string) => normalizeArtistId(s)));
+                
+                const preHydratedIds = hydratedNodes.filter((n: any) => {
+                   const cached = detailsCacheRef.current.get(n.id) || detailsCacheRef.current.get(normalizeArtistId(n.id)) || detailsCacheRef.current.get(n.id.toLowerCase());
+                   return cached && cached.summary && cached.summary.trim().length > 5 && !cached._isSentinel;
+                }).map((n: any) => n.id);
+
                 const seedIds = hydratedNodes
                   .filter((n: any) => (n.type === 'artist' || !n.type) && seedSet.has(normalizeArtistId(n.id)))
                   .map((n: any) => n.id);
                   
-                setActiveNodeIds(prev => {
-                  const updated = new Set(prev);
-                  seedIds.forEach(id => updated.add(id));
-                  return Array.from(updated);
-                });
+                setActiveNodeIds(Array.from(new Set([...preHydratedIds, ...seedIds])));
               }
             }
 
@@ -4977,18 +4966,21 @@ const App: React.FC = () => {
               if (data.activeNodes && Array.isArray(data.activeNodes)) {
                 if (data.activeNodes.length > 0) {
                   setActiveNodeIds(data.activeNodes);
-                } else if (g.nodes.length > 0) {
+                } else if (g.nodes.length > 0 && !hasAutoQueuedRef.current) {
+                  hasAutoQueuedRef.current = true;
                   const seedList = (data.seedArtists || '').split('::').map((s: string) => s.trim()).filter(Boolean);
                   const seedSet = new Set(seedList.map((s: string) => normalizeArtistId(s)));
+                  
+                  const preHydratedIds = g.nodes.filter((n: any) => {
+                     const cached = detailsCacheRef.current.get(n.id) || detailsCacheRef.current.get(normalizeArtistId(n.id)) || detailsCacheRef.current.get(n.id.toLowerCase());
+                     return cached && cached.summary && cached.summary.trim().length > 5 && !cached._isSentinel;
+                  }).map((n: any) => n.id);
+
                   const seedIds = g.nodes
                     .filter((n: any) => (n.type === 'artist' || !n.type) && seedSet.has(normalizeArtistId(n.id)))
                     .map((n: any) => n.id);
                     
-                  setActiveNodeIds(prev => {
-                    const updated = new Set(prev);
-                    seedIds.forEach(id => updated.add(id));
-                    return Array.from(updated);
-                  });
+                  setActiveNodeIds(Array.from(new Set([...preHydratedIds, ...seedIds])));
                 }
               }
 
@@ -5009,18 +5001,21 @@ const App: React.FC = () => {
                     if (data.activeNodes && Array.isArray(data.activeNodes)) {
                       if (data.activeNodes.length > 0) {
                         setActiveNodeIds(data.activeNodes);
-                      } else if (g.nodes.length > 0) {
+                      } else if (g.nodes.length > 0 && !hasAutoQueuedRef.current) {
+                        hasAutoQueuedRef.current = true;
                         const seedList = (data.seedArtists || '').split('::').map((s: string) => s.trim()).filter(Boolean);
                         const seedSet = new Set(seedList.map((s: string) => normalizeArtistId(s)));
+                        
+                        const preHydratedIds = g.nodes.filter((n: any) => {
+                           const cached = detailsCacheRef.current.get(n.id) || detailsCacheRef.current.get(normalizeArtistId(n.id)) || detailsCacheRef.current.get(n.id.toLowerCase());
+                           return cached && cached.summary && cached.summary.trim().length > 5 && !cached._isSentinel;
+                        }).map((n: any) => n.id);
+
                         const seedIds = g.nodes
                           .filter((n: any) => (n.type === 'artist' || !n.type) && seedSet.has(normalizeArtistId(n.id)))
                           .map((n: any) => n.id);
                           
-                        setActiveNodeIds(prev => {
-                          const updated = new Set(prev);
-                          seedIds.forEach(id => updated.add(id));
-                          return Array.from(updated);
-                        });
+                        setActiveNodeIds(Array.from(new Set([...preHydratedIds, ...seedIds])));
                       }
                     }
 
@@ -5071,19 +5066,15 @@ const App: React.FC = () => {
             if (data.activeNodes && Array.isArray(data.activeNodes)) {
               if (data.activeNodes.length > 0) {
                 setActiveNodeIds(data.activeNodes);
-              } else if (g.nodes.length > 0) {
+              } else if (g.nodes.length > 0 && !hasAutoQueuedRef.current) {
+                hasAutoQueuedRef.current = true;
                 const seedList = (data.seedArtists || '').split('::').map((s: string) => s.trim()).filter(Boolean);
                 const seedSet = new Set(seedList.map((s: string) => normalizeArtistId(s)));
                 const seedIds = g.nodes
                   .filter((n: any) => (n.type === 'artist' || !n.type) && seedSet.has(normalizeArtistId(n.id)))
                   .map((n: any) => n.id);
                   
-                setActiveNodeIds(prev => {
-                  const updated = new Set(prev);
-                  preHydratedIds.forEach(id => updated.add(id));
-                  seedIds.forEach(id => updated.add(id));
-                  return Array.from(updated);
-                });
+                setActiveNodeIds(Array.from(new Set([...preHydratedIds, ...seedIds])));
               }
             }
 
