@@ -597,9 +597,11 @@ export const GenerativeRationaleModal: React.FC<{
   // Sanitize literal escape sequences from the JSON payload
   let sanitizedRationale = cleanRationale.replace(/\\n/g, '\n');
 
-  // Detect and clean up stray newline characters immediately following list markers (- or *)
-  // This prevents bullets from rendering isolated on their own line.
-  sanitizedRationale = sanitizedRationale.replace(/(^|\n)(\s*[\*\-]\s*)\n+/g, '$1$2');
+  // 1. Convert non-standard '•' bullets (and any following newlines/spaces) to standard markdown '- '
+  sanitizedRationale = sanitizedRationale.replace(/(^|\n)[ \t]*•[ \t]*[\n]*[ \t]*/g, '$1- ');
+
+  // 2. Clean up stray newlines immediately following standard markdown list markers (- or *)
+  sanitizedRationale = sanitizedRationale.replace(/(^|\n)([ \t]*[-*][ \t]*)[\n]+[ \t]*/g, '$1$2');
 
   const cleanRationaleLines = sanitizedRationale.split('\n').filter(line => {
     if (isFallback && line.trim().startsWith('[')) return false;
