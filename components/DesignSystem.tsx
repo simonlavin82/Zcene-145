@@ -1627,7 +1627,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         The folder compartment relies on absolute positioning of the index tab relative to the compartment container. The left edge of the tab is offset by <code>left-[-1px]</code>, overlaying and hiding the container's top-left corner border. By enforcing a solid <code>border-zinc-800</code> on both components, the seam merges perfectly.
                                     </p>
                                     <p className="text-sm text-zinc-400 leading-relaxed mt-3">
-                                        To prevent massive empty space voids in compartments with few cards (e.g. only 1 or 2 projects), the compartment box container utilizes a universal <code>w-fit max-w-full</code> layout class. Individual project cards carry a stable width of <code>w-full sm:w-[320px] min-h-[160px]</code> with zero elasticity (no <code>flex-grow</code> or <code>flex-shrink</code>), and the inner grid wrapper applies dynamic count-mapped grid tracks (e.g. <code>grid-cols-1 sm:grid-cols-2</code>) with a <code>w-fit</code> width property to preserve padding and break circular dependencies.
+                                        To prevent massive empty space voids in compartments with few cards while avoiding horizontal card squashing, the compartment box container utilizes a universal <code>w-fit max-w-full</code> layout class. Individual project cards carry a stable width of <code>w-full sm:w-[360px] h-[180px]</code> with zero elasticity (no <code>flex-grow</code> or <code>flex-shrink</code>), and the inner grid wrapper applies dynamic count-mapped grid tracks (e.g. <code>grid-cols-1 sm:grid-cols-2 lg:grid-cols-3</code>) with <code>gap-5</code> to balance folder container width.
                                     </p>
                                     <div className="space-y-4 pt-2">
                                         <div>
@@ -1668,7 +1668,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             {/* Cards inside this parent record crate compartment */}
                                             <div className="grid grid-cols-1 gap-4 w-fit">
                                                 {/* Inner Mock Card */}
-                                                <div className="bg-zinc-900 border border-zinc-700/50 p-5 flex flex-col justify-between min-h-[160px] w-full sm:w-[320px] shadow-xl">
+                                                <div className="bg-zinc-900 border border-zinc-700/50 p-5 flex flex-col justify-between min-h-[160px] w-full sm:w-[360px] shadow-xl">
                                                     <div className="space-y-3">
                                                         <h3 className="text-sm font-medium text-white truncate">Grayscale</h3>
                                                         <p className="font-mono text-[10px] text-zinc-400">Edited 05/07/2026</p>
