@@ -1767,9 +1767,9 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <div className="bg-zinc-900 border border-zinc-700/50 rounded-none p-5 flex flex-col justify-between min-h-[160px] shadow-xl">
                                             {/* Card Header */}
                                             <div className="space-y-4">
-                                                <div className="flex items-start justify-between gap-3">
+                                                <div className="flex items-center justify-between gap-3">
                                                     <h3 className="text-base font-medium text-white truncate">Midwest Emo Roots</h3>
-                                                    <div className="p-1.5 rounded-lg text-zinc-600 flex items-center justify-center">
+                                                    <div className="w-7 h-7 -mr-1.5 rounded-lg text-zinc-600 flex items-center justify-center">
                                                         <span className="material-symbols-outlined !text-xl">more_vert</span>
                                                     </div>
                                                 </div>

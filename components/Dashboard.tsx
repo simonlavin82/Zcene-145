@@ -394,14 +394,14 @@ const Dashboard: React.FC<DashboardProps> = ({
                           className="group relative bg-zinc-900 border border-zinc-700/50 rounded-none p-5 hover:border-primary/50 transition-all cursor-pointer flex flex-col justify-between w-full sm:w-[320px] h-[180px] shadow-xl"
                         >
                           <div className="space-y-4">
-                            <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-center justify-between gap-3">
                               <h3 className="text-base font-medium text-white group-hover:text-primary transition-colors truncate">
                                 {displayTitle}
                               </h3>
                               <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                                 <button
                                   onClick={() => setActiveMenuId(activeMenuId === project.id ? null : project.id)}
-                                  className="p-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800/80 transition-all cursor-pointer flex items-center justify-center"
+                                  className="w-7 h-7 -mr-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800/80 transition-all cursor-pointer flex items-center justify-center"
                                 >
                                   <span className="material-symbols-outlined !text-xl">more_vert</span>
                                 </button>
@@ -613,7 +613,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                               <div className="flex items-center justify-end relative">
                                 <button
                                   onClick={() => setActiveMenuId(activeMenuId === project.id ? null : project.id)}
-                                  className="p-1 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer flex items-center justify-center"
+                                  className="w-7 h-7 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer flex items-center justify-center"
                                 >
                                   <span className="material-symbols-outlined !text-xl">more_vert</span>
                                 </button>
