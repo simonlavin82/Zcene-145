@@ -1135,6 +1135,42 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 </div>
                             </div>
 
+                            {/* Secondary Buttons */}
+                            <div>
+                                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
+                                    <h3 className="text-xl font-medium text-zinc-200">Secondary Buttons</h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Radius: 12px / rounded-xl</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Height: 38px</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Padding: px-4 py-2</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Font: 14px / text-sm</span>
+                                    </div>
+                                </div>
+                                <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
+                                    Secondary and ghost action buttons used for modal dismissal (e.g. Cancel buttons in Dialogs), secondary form controls, or non-primary actions. Designed to maintain visual hierarchy next to Primary CTAs without creating competing noise.
+                                </p>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
+                                    <div className="space-y-4">
+                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Default Status</p>
+                                        <button className="w-full px-4 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent">
+                                            Cancel
+                                        </button>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover / Active Status</p>
+                                        <button className="w-full px-4 py-2 text-white bg-zinc-800 text-sm font-medium rounded-xl transition-colors border border-zinc-700">
+                                            Cancel
+                                        </button>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Disabled Status</p>
+                                        <button disabled className="w-full px-4 py-2 text-zinc-600 text-sm font-medium rounded-xl opacity-50 cursor-not-allowed border border-transparent">
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
                             {/* Support Outline */}
                             <div>
                                 <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
@@ -1161,38 +1197,6 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <button className="rounded-xl border border-primary bg-primary/20 px-4 py-2 font-medium text-primary text-sm">
                                             Support
                                         </button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Editorial Cards */}
-                            <div>
-                                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
-                                    <h3 className="text-xl font-medium text-zinc-200">Editorial Action Cards</h3>
-                                    <div className="flex flex-wrap gap-2">
-                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Radius: 12px / rounded-xl</span>
-                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Height: 38px</span>
-                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Padding: px-4 py-2</span>
-                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Font: 14px / text-sm (icon: 18px)</span>
-                                    </div>
-                                </div>
-                                <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
-                                    Used exclusively within the Deep Cut panel for artist catalog links. These feature a distinct 'rounded-xl' (12px) radius.
-                                </p>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
-                                     <div className="space-y-4">
-                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Default Status</p>
-                                        <div className="flex items-center justify-center px-4 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm gap-3">
-                                            <span className="material-symbols-outlined !text-[18px]">shopping_bag</span>
-                                            <span>Shop on Bandcamp</span>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-4">
-                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Active / Press Status</p>
-                                        <div className="flex items-center justify-center px-4 py-2 bg-white text-brand-black rounded-xl font-medium text-sm gap-3">
-                                            <span className="material-symbols-outlined !text-[18px]">shopping_bag</span>
-                                            <span>Shop on Bandcamp</span>
-                                        </div>
                                     </div>
                                 </div>
                             </div>
