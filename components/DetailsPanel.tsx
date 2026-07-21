@@ -226,6 +226,7 @@ interface NodeDetailsCardProps {
   onRefresh: () => void;
   onClose: () => void;
   onNodeClick: (node: Node | null, forceActionState?: boolean) => void;
+  onGenerateDeepCut?: (node: Node) => void;
   onNavigate: (view: View) => void;
   chatHistory: ChatMessage[];
   onSendMessage: (message: string) => void;
@@ -284,7 +285,7 @@ const isTourCacheStale = (tourCachedAtString: string | undefined): boolean => {
 };
 
 const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
-    node, details, isLoading, isGlobalLoading, graphData, libraryArtists, seedArtists, onAddArtist, isSmallScreen, onRefresh, onClose, onNodeClick, onNavigate,
+    node, details, isLoading, isGlobalLoading, graphData, libraryArtists, seedArtists, onAddArtist, isSmallScreen, onRefresh, onClose, onNodeClick, onGenerateDeepCut, onNavigate,
     chatHistory, onSendMessage, isChatLoading, isFullScreenMode = false, isHero = false, isInStack, onToggleStack, onToggleMagazineView, isGuest = false, onAuthRequest, user,
     userTaste, isAdmin = false
 }) => {
@@ -708,7 +709,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     Explore biographical context, personnel details, and critical insights with an AI-generated Deep Cut.
                                 </p>
                                 <button
-                                    onClick={() => onNodeClick(node)}
+                                    onClick={() => onGenerateDeepCut ? onGenerateDeepCut(node) : onNodeClick(node)}
                                     className="flex items-center justify-center gap-2 px-6 py-2.5 bg-primary hover:bg-white active:scale-95 text-brand-black font-semibold text-xs rounded-xl shadow-lg transition-all duration-200"
                                 >
                                     <span className="material-symbols-outlined !text-[16px]">bolt</span>
@@ -1202,6 +1203,7 @@ interface DetailsPanelProps {
   onToggleCollapse: () => void;
   isSmallScreen: boolean;
   onNodeClick: (node: Node | null, forceActionState?: boolean) => void;
+  onGenerateDeepCut?: (node: Node) => void;
   onNavigate: (view: View) => void;
   isGlobalLoading: boolean;
   onCancelGlobalLoading: () => void;
@@ -1224,7 +1226,7 @@ interface DetailsPanelProps {
 export const DetailsPanel: React.FC<DetailsPanelProps> = ({
   selectedNode, activeNodes, detailsCache, loadingNodeIds, onCloseNode, onRefreshNode,
   error, systemError, graphData, libraryArtists, seedArtists, onAddArtist, isCollapsed, onToggleCollapse,
-  isSmallScreen, onNodeClick, onNavigate, isGlobalLoading, onCancelGlobalLoading, unreadCount, isActive, collapseBtnRef,
+  isSmallScreen, onNodeClick, onGenerateDeepCut, onNavigate, isGlobalLoading, onCancelGlobalLoading, unreadCount, isActive, collapseBtnRef,
   isMagazineViewOpen, onMagazineViewToggle, chatHistories, onUpdateChatHistories, stack, onToggleStack,
   isGuest = false, onAuthRequest, user, userTaste, isAdmin = false
 }) => {
@@ -1687,6 +1689,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 onRefresh={() => onRefreshNode(node.id)}
                                                 onClose={() => onCloseNode(node.id)}
                                                 onNodeClick={onNodeClick}
+                                                onGenerateDeepCut={onGenerateDeepCut}
                                                 onNavigate={onNavigate}
                                                 chatHistory={chatHistories.get(node.id) || []}
                                                 onSendMessage={(msg) => handleSendMessage(node.id, msg)}

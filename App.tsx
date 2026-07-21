@@ -1065,6 +1065,7 @@ const App: React.FC = () => {
     });
   }, []);
   const [loadingNodeIds, setLoadingNodeIds] = useState<Set<string>>(new Set());
+  const [explicitGenerationQueue, setExplicitGenerationQueue] = useState<Set<string>>(new Set());
   const [detailsError, setDetailsError] = useState<string | null>(null);
   const [urlOriginHint, setUrlOriginHint] = useState<string | null>(null);
   const [chatHistories, setChatHistories] = useState<Map<string, ChatMessage[]>>(new Map());
@@ -2120,6 +2121,19 @@ const App: React.FC = () => {
       return;
     }
   }, [confirmTokenUsage, selectedNode, peekedNode, loadingNodeIds, isSmallScreen]);
+
+  const handleGenerateDeepCut = useCallback(async (node: Node) => {
+    const isApprovedSeed = approvedSeedsRef.current.has(normalizeArtistId(node.id)) || 
+                           approvedSeedsRef.current.has(node.id.toLowerCase());
+
+    const confirmed = isApprovedSeed ? true : await confirmTokenUsage('deep_cut_creation', [], [node.label || titleCaseArtistId(node.id)]);
+    if (!confirmed) {
+      return;
+    }
+
+    setExplicitGenerationQueue(prev => new Set(prev).add(node.id));
+    setLoadingNodeIds(prev => new Set(prev).add(node.id));
+  }, [confirmTokenUsage]);
 
   const handleToggleStack = useCallback(async (node: Node, link?: string) => {
     if (!user) {
@@ -6039,6 +6053,17 @@ const App: React.FC = () => {
                      triggerBackgroundRevalidation(node, disambiguatedCacheId);
                    }
                 } else {
+                   const isExplicit = explicitGenerationQueue.has(node.id) || explicitGenerationQueue.has(node.id.toLowerCase()) || explicitGenerationQueue.has(simpleId);
+                   if (!isExplicit) {
+                       console.log(`[Queue] Node ${node.id} requires synthesis but is not in explicit queue. Skipping API fetch.`);
+                       fetchingNodeIdsRef.current.delete(node.id);
+                       fetchingNodeIdsRef.current.delete(node.id.toLowerCase());
+                       fetchingNodeIdsRef.current.delete(disambiguatedCacheId);
+                       fetchingNodeIdsRef.current.delete(simpleId);
+                       setLoadingNodeIds(prev => { const next = new Set(prev); next.delete(node.id); return next; });
+                       continue;
+                   }
+                   
                    // Individual node timeout (45s) to prevent the whole queue from hanging
                    const nodeDetailsPromise = fetchNodeDetails(node, graphData, seedArtists, urlOriginHint);
                    const timeoutPromise = new Promise((_, reject) =>
@@ -6102,6 +6127,8 @@ const App: React.FC = () => {
                 if (disambiguatedCacheId !== simpleId) {
                   healedDetailsCacheRef.current.set(disambiguatedCacheId, details);
                 }
+
+                setExplicitGenerationQueue(prev => { const next = new Set(prev); next.delete(node.id); return next; });
 
                 setDetailsCache(prev => {
                   const updated = new Map(prev);
@@ -6575,7 +6602,7 @@ const App: React.FC = () => {
                   } catch (err: any) { setError(err.message); }
                 }; r.readAsText(f);
               }}
-              onNodeClick={handleNodeClick} selectedNode={formattedSelectedNode} peekedNode={formattedPeekedNode} activeNodes={formattedActiveNodes}
+              onNodeClick={handleNodeClick} onGenerateDeepCut={handleGenerateDeepCut} selectedNode={formattedSelectedNode} peekedNode={formattedPeekedNode} activeNodes={formattedActiveNodes}
               detailsCache={detailsCache} loadingNodeIds={loadingNodeIds} onCloseNode={handleCloseNode}
               onRefreshNode={handleRefreshNode} detailsError={detailsError} systemError={error}
               onLogoClick={() => {
