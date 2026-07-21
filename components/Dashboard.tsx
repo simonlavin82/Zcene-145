@@ -311,7 +311,7 @@ const Dashboard: React.FC<DashboardProps> = ({
               <button 
                 onClick={onCreateProject}
                 disabled={isCreatingProject}
-                className="group relative bg-zinc-900 border-2 border-dashed border-zinc-700 rounded-none p-5 flex flex-col items-center justify-center gap-3 transition-all h-[180px] w-full sm:w-[360px] hover:border-primary/50 disabled:opacity-50 cursor-pointer overflow-hidden"
+                className="group relative bg-zinc-900 border-2 border-dashed border-zinc-700 rounded-none p-5 flex flex-col items-center justify-center gap-3 transition-all h-[180px] w-full max-w-[360px] sm:w-[360px] hover:border-primary/50 disabled:opacity-50 cursor-pointer overflow-hidden"
               >
                 <div className="w-10 h-10 rounded-full bg-zinc-800 group-hover:bg-primary group-hover:text-brand-black flex items-center justify-center text-zinc-550 transition-all relative z-10">
                   {isCreatingProject ? (
@@ -330,17 +330,17 @@ const Dashboard: React.FC<DashboardProps> = ({
               {sortedBucketKeys.map((bucketKey) => {
                 const projectsInBucket = groupedProjects[bucketKey] || [];
                 const count = projectsInBucket.length;
-                let gridColsClass = "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3";
+                let gridColsClass = "grid-cols-1 md:grid-cols-2 xl:grid-cols-3";
                 if (count === 1) {
                   gridColsClass = "grid-cols-1";
                 } else if (count === 2) {
-                  gridColsClass = "grid-cols-1 sm:grid-cols-2";
+                  gridColsClass = "grid-cols-1 md:grid-cols-2";
                 }
 
                 return (
                   <div 
                     key={bucketKey} 
-                    className="w-fit max-w-full bg-zinc-950 rounded-tr-xl rounded-b-xl rounded-tl-none border border-zinc-800 p-4 relative flex-shrink-0"
+                    className="w-fit max-w-full bg-zinc-950 rounded-tr-xl rounded-b-xl rounded-tl-none border border-zinc-800 p-4 relative flex-shrink-0 min-w-0"
                   >
                     {/* Unified Folder Index Tab */}
                     <div className="w-[160px] bg-zinc-950 border-t border-l border-r border-zinc-800 rounded-t-lg text-[9px] font-mono absolute -top-[22px] left-[-1px] px-3 py-1 flex items-center h-[22.5px] z-10 select-none">
@@ -350,7 +350,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     </div>
 
                     {/* Cards inside this parent record crate compartment */}
-                    <div className={`grid ${gridColsClass} gap-5 w-fit`}>
+                    <div className={`grid ${gridColsClass} gap-5 w-fit max-w-full`}>
                       {projectsInBucket.map((project) => {
                       const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
                       const displayTitle = project.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene");
@@ -389,7 +389,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <motion.div
                           key={project.id}
                           onClick={() => onSelectProject(project.id)}
-                          className="group relative bg-zinc-900 border border-zinc-700/50 rounded-none p-5 hover:border-primary/50 transition-all cursor-pointer flex flex-col justify-between w-full sm:w-[360px] h-[180px] shadow-xl"
+                          className="group relative bg-zinc-900 border border-zinc-700/50 rounded-none p-5 hover:border-primary/50 transition-all cursor-pointer flex flex-col justify-between w-full max-w-[360px] sm:w-[360px] h-[180px] shadow-xl"
                         >
                           <div className="space-y-4">
                             <div className="flex items-center justify-between gap-3">
