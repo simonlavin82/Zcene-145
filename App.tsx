@@ -4593,6 +4593,21 @@ const App: React.FC = () => {
         });
         return merged;
       });
+
+      // Automatically queue successfully hydrated nodes into the active deep cut panel
+      const newHydratedIds = Array.from(results.keys())
+          .filter(k => results.get(k)?.summary && results.get(k)!.summary.trim().length > 5 && !results.get(k)!._isSentinel);
+      
+      if (newHydratedIds.length > 0) {
+         setActiveNodeIds(prev => {
+             const updated = new Set(prev);
+             newHydratedIds.forEach(id => {
+                const originalNode = nodes.find(n => n.id.toLowerCase() === id.toLowerCase() || normalizeArtistId(n.id) === id);
+                if (originalNode) updated.add(originalNode.id);
+             });
+             return Array.from(updated);
+         });
+      }
     }
   }, []);
 
@@ -5009,6 +5024,8 @@ const App: React.FC = () => {
             await batchHydrateDetailsCache(g.nodes, g.links);
             hydratedNodes = g.nodes;
 
+            let preHydratedIds: string[] = [];
+
             if (data.detailsCache) {
               try {
                 const rawMap = new Map<string, NodeDetails>(JSON.parse(data.detailsCache));
@@ -5017,6 +5034,12 @@ const App: React.FC = () => {
                   newCacheMap.set(k, v);
                   newCacheMap.set(k.toLowerCase(), v);
                   newCacheMap.set(normalizeArtistId(k), v);
+                  
+                  // Collect valid node IDs for the active queue
+                  const node = g.nodes.find((n: any) => n.id === k || n.id.toLowerCase() === k.toLowerCase() || normalizeArtistId(n.id) === normalizeArtistId(k));
+                  if (node && v.summary && v.summary.trim().length > 5 && !v._isSentinel) {
+                     preHydratedIds.push(node.id);
+                  }
                 });
                 setDetailsCache((prev) => {
                   if (prev.size !== newCacheMap.size) return newCacheMap;
@@ -5028,11 +5051,17 @@ const App: React.FC = () => {
             if (data.activeNodes && Array.isArray(data.activeNodes)) {
               let resolvedActiveNodes = data.activeNodes;
               if (resolvedActiveNodes.length === 0 && g.nodes.length > 0) {
-                const seedList = (data.seedArtists || '').split('::').map((s: string) => s.trim()).filter(Boolean);
-                const seedSet = new Set(seedList.map((s: string) => normalizeArtistId(s)));
-                resolvedActiveNodes = g.nodes
-                  .filter((n: any) => (n.type === 'artist' || !n.type) && seedSet.has(normalizeArtistId(n.id)))
-                  .map((n: any) => n.id);
+                if (preHydratedIds.length > 0) {
+                  // Eliminate friction: Pre-populate the deep cut queue with all available deep cuts
+                  resolvedActiveNodes = Array.from(new Set(preHydratedIds));
+                } else {
+                  // Fallback: seed artists only
+                  const seedList = (data.seedArtists || '').split('::').map((s: string) => s.trim()).filter(Boolean);
+                  const seedSet = new Set(seedList.map((s: string) => normalizeArtistId(s)));
+                  resolvedActiveNodes = g.nodes
+                    .filter((n: any) => (n.type === 'artist' || !n.type) && seedSet.has(normalizeArtistId(n.id)))
+                    .map((n: any) => n.id);
+                }
               }
               setActiveNodeIds(resolvedActiveNodes);
             }
