@@ -1065,7 +1065,7 @@ const App: React.FC = () => {
     });
   }, []);
   const [loadingNodeIds, setLoadingNodeIds] = useState<Set<string>>(new Set());
-  const [explicitGenerationQueue, setExplicitGenerationQueue] = useState<Set<string>>(new Set());
+
   const [detailsError, setDetailsError] = useState<string | null>(null);
   const [urlOriginHint, setUrlOriginHint] = useState<string | null>(null);
   const [chatHistories, setChatHistories] = useState<Map<string, ChatMessage[]>>(new Map());
@@ -2131,9 +2131,114 @@ const App: React.FC = () => {
       return;
     }
 
-    setExplicitGenerationQueue(prev => new Set(prev).add(node.id));
+    // 1. Show Loading UI immediately
     setLoadingNodeIds(prev => new Set(prev).add(node.id));
-  }, [confirmTokenUsage]);
+
+    try {
+      const simpleArtistId = normalizeArtistId(node.id);
+      let disambiguatedCacheId = simpleArtistId;
+
+      // 2. Perform Multi-Origin Slug Suffix Calculation
+      if (graphData) {
+        const connectedCountries = graphData.links
+          .filter((l: any) => (typeof l.source === 'object' ? l.source.id : l.source) === node.id || 
+                       (typeof l.target === 'object' ? l.target.id : l.target) === node.id)
+          .map((l: any) => {
+            const connectedId = (typeof l.source === 'object' ? l.source.id : l.source) === node.id 
+              ? (typeof l.target === 'object' ? l.target : null) 
+              : (typeof l.source === 'object' ? l.source : null);
+            return graphData.nodes.find((n: any) => n.id === (connectedId?.id || connectedId));
+          })
+          .filter((no: any) => no && no.type === 'country')
+          .map((no: any) => no.label || no.id);
+          
+        if (connectedCountries.length > 0) {
+          const countryNorm = normalizeArtistId(connectedCountries[0]);
+          if (countryNorm) disambiguatedCacheId = simpleArtistId.endsWith(`-${countryNorm}`) ? simpleArtistId : `${simpleArtistId}-${countryNorm}`;
+        }
+      }
+
+      // 3. Direct API Dispatch
+      const params = new URLSearchParams(window.location.search);
+      const urlOriginHint = params.get('origin');
+      
+      const details = await fetchNodeDetails(node, graphData, seedArtists, urlOriginHint);
+      
+      // 4. Update UI Cache
+      healedDetailsCacheRef.current.set(node.id, details);
+      healedDetailsCacheRef.current.set(simpleArtistId, details);
+      healedDetailsCacheRef.current.set(disambiguatedCacheId, details);
+      
+      setDetailsCache(prev => {
+        const next = new Map(prev);
+        next.set(node.id, details);
+        return next;
+      });
+
+      setSelectedNode(prev => {
+        if (prev && (normalizeArtistId(prev.id) === simpleArtistId || prev.id.toLowerCase() === node.id.toLowerCase())) {
+          return {
+            ...prev,
+            bio: details.summary,
+            summary: details.summary,
+            genre: details.details?.genre || "",
+            origin: details.details?.origin || "",
+            founded: details.details?.founded || "",
+          };
+        }
+        return prev;
+      });
+
+      // 5. Safe Split-Document Write-Back
+      if (disambiguatedCacheId !== simpleArtistId) {
+        const simpleDocRef = doc(db, 'artists', simpleArtistId);
+        const simpleSnap = await getDoc(simpleDocRef);
+        
+        if (simpleSnap.exists()) {
+          const simpleData = simpleSnap.data();
+          if (simpleData && !simpleData.redirectTo) {
+            // Use updateDoc (or setDoc with merge) to preserve existing graphData/filters on the stub
+            await setDoc(simpleDocRef, {
+              artistId: simpleArtistId,
+              cacheKey: simpleArtistId,
+              redirectTo: disambiguatedCacheId,
+              cacheVersion: 2,
+              cachedAt: serverTimestamp()
+            }, { merge: true });
+          }
+        }
+      }
+
+      // 6. Write the canonical Deep Cache payload
+      const normalizedGraph = normalizeGraphData(graphData);
+      const canonicalNode = normalizedGraph.nodes.find(
+        (n: any) => n.type === 'artist' && (n.id.trim().toLowerCase() === node.id.trim().toLowerCase() || normalizeArtistId(n.id) === disambiguatedCacheId)
+      );
+      
+      const setPayload = {
+        cacheKey: disambiguatedCacheId,
+        artistId: simpleArtistId,
+        seedArtists: details.details?.artist || canonicalNode?.label || node.id,
+        graphData: JSON.stringify(normalizedGraph),
+        filters: discoveryFiltersRef.current || {},
+        cacheVersion: 2,
+        cachedAt: serverTimestamp(),
+        hitCount: 0,
+        isDeep: true,
+        detailsCache: details,
+        synthesisRationale: details.synthesisRationale || null
+      };
+      
+      enforceArtistCacheSchema(setPayload);
+      await setDoc(doc(db, 'artists', disambiguatedCacheId), setPayload);
+
+    } catch (err) {
+      console.error("[Manual Generation] Failed to fetch and write split document:", err);
+      showToast("Generation failed. Please try again.");
+    } finally {
+      setLoadingNodeIds(prev => { const next = new Set(prev); next.delete(node.id); return next; });
+    }
+  }, [confirmTokenUsage, graphData, seedArtists, showToast]);
 
   const handleToggleStack = useCallback(async (node: Node, link?: string) => {
     if (!user) {
@@ -6053,16 +6158,13 @@ const App: React.FC = () => {
                      triggerBackgroundRevalidation(node, disambiguatedCacheId);
                    }
                 } else {
-                   const isExplicit = explicitGenerationQueue.has(node.id) || explicitGenerationQueue.has(node.id.toLowerCase()) || explicitGenerationQueue.has(simpleId);
-                   if (!isExplicit) {
-                       console.log(`[Queue] Node ${node.id} requires synthesis but is not in explicit queue. Skipping API fetch.`);
-                       fetchingNodeIdsRef.current.delete(node.id);
-                       fetchingNodeIdsRef.current.delete(node.id.toLowerCase());
-                       fetchingNodeIdsRef.current.delete(disambiguatedCacheId);
-                       fetchingNodeIdsRef.current.delete(simpleId);
-                       setLoadingNodeIds(prev => { const next = new Set(prev); next.delete(node.id); return next; });
-                       continue;
-                   }
+                   console.log(`[Queue] Node ${node.id} requires synthesis. The background queue does not perform automated live synthesis. Skipping API fetch.`);
+                   fetchingNodeIdsRef.current.delete(node.id);
+                   fetchingNodeIdsRef.current.delete(node.id.toLowerCase());
+                   fetchingNodeIdsRef.current.delete(disambiguatedCacheId);
+                   fetchingNodeIdsRef.current.delete(simpleId);
+                   setLoadingNodeIds(prev => { const next = new Set(prev); next.delete(node.id); return next; });
+                   continue;
                    
                    // Individual node timeout (45s) to prevent the whole queue from hanging
                    const nodeDetailsPromise = fetchNodeDetails(node, graphData, seedArtists, urlOriginHint);
@@ -6128,7 +6230,7 @@ const App: React.FC = () => {
                   healedDetailsCacheRef.current.set(disambiguatedCacheId, details);
                 }
 
-                setExplicitGenerationQueue(prev => { const next = new Set(prev); next.delete(node.id); return next; });
+
 
                 setDetailsCache(prev => {
                   const updated = new Map(prev);
@@ -6404,7 +6506,7 @@ const App: React.FC = () => {
       } finally { isFetchingDetailsRef.current = false; }
     };
     fetch();
-  }, [activeNodeIds, activeNodes, detailsCache, graphData, seedArtists, selectedNode, urlOriginHint, humanizeError, user, isLoading, incrementDeepCutsOpenedCount, triggerBackgroundRevalidation, explicitGenerationQueue, loadingNodeIds]);
+  }, [activeNodeIds, activeNodes, detailsCache, graphData, seedArtists, selectedNode, urlOriginHint, humanizeError, user, isLoading, incrementDeepCutsOpenedCount, triggerBackgroundRevalidation, loadingNodeIds]);
 
   const handleViewChange = useCallback((newView: View) => {
     if (newView === View.Graph && !graphData) setGraphData({ nodes: [], links: [] });
