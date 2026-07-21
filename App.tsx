@@ -990,7 +990,6 @@ const App: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const currentProjectIdRef = useRef<string | null>(null);
-  const hasAutoQueuedRef = useRef(false);
   const [currentProjectOwnerId, setCurrentProjectOwnerId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string>('');
   const [projectStatus, setProjectStatus] = useState<string | null>(null);
@@ -4889,28 +4888,16 @@ const App: React.FC = () => {
               console.warn(`[ProjectLoader] All artistIds cache-missed — graph will be empty until regenerated.`);
             }
 
-            // Restore active nodes — with seed-fallback for stale documents
             if (data.activeNodes && Array.isArray(data.activeNodes)) {
-              if (data.activeNodes.length > 0) {
-                // User explicitly saved a session queue
-                setActiveNodeIds(data.activeNodes);
-              } else if (hydratedNodes.length > 0 && !hasAutoQueuedRef.current) {
-                hasAutoQueuedRef.current = true;
-                
-                const seedList = (data.seedArtists || '').split('::').map((s: string) => s.trim()).filter(Boolean);
-                const seedSet = new Set(seedList.map((s: string) => normalizeArtistId(s)));
-                
-                const preHydratedIds = hydratedNodes.filter((n: any) => {
-                   const cached = detailsCacheRef.current.get(n.id) || detailsCacheRef.current.get(normalizeArtistId(n.id)) || detailsCacheRef.current.get(n.id.toLowerCase());
-                   return cached && cached.summary && cached.summary.trim().length > 5 && !cached._isSentinel;
-                }).map((n: any) => n.id);
-
-                const seedIds = hydratedNodes
-                  .filter((n: any) => (n.type === 'artist' || !n.type) && seedSet.has(normalizeArtistId(n.id)))
-                  .map((n: any) => n.id);
-                  
-                setActiveNodeIds(Array.from(new Set([...preHydratedIds, ...seedIds])));
+              let resolvedActiveNodes = data.activeNodes;
+              if (resolvedActiveNodes.length === 0 && hydratedNodes.length > 0) {
+                 const seedList = (data.seedArtists || '').split('::').map((s: string) => s.trim()).filter(Boolean);
+                 const seedSet = new Set(seedList.map((s: string) => normalizeArtistId(s)));
+                 resolvedActiveNodes = hydratedNodes
+                   .filter((n: any) => (n.type === 'artist' || !n.type) && seedSet.has(normalizeArtistId(n.id)))
+                   .map((n: any) => n.id);
               }
+              setActiveNodeIds(resolvedActiveNodes);
             }
 
 
@@ -4964,24 +4951,15 @@ const App: React.FC = () => {
               }
 
               if (data.activeNodes && Array.isArray(data.activeNodes)) {
-                if (data.activeNodes.length > 0) {
-                  setActiveNodeIds(data.activeNodes);
-                } else if (g.nodes.length > 0 && !hasAutoQueuedRef.current) {
-                  hasAutoQueuedRef.current = true;
-                  const seedList = (data.seedArtists || '').split('::').map((s: string) => s.trim()).filter(Boolean);
-                  const seedSet = new Set(seedList.map((s: string) => normalizeArtistId(s)));
-                  
-                  const preHydratedIds = g.nodes.filter((n: any) => {
-                     const cached = detailsCacheRef.current.get(n.id) || detailsCacheRef.current.get(normalizeArtistId(n.id)) || detailsCacheRef.current.get(n.id.toLowerCase());
-                     return cached && cached.summary && cached.summary.trim().length > 5 && !cached._isSentinel;
-                  }).map((n: any) => n.id);
-
-                  const seedIds = g.nodes
-                    .filter((n: any) => (n.type === 'artist' || !n.type) && seedSet.has(normalizeArtistId(n.id)))
-                    .map((n: any) => n.id);
-                    
-                  setActiveNodeIds(Array.from(new Set([...preHydratedIds, ...seedIds])));
+                let resolvedActiveNodes = data.activeNodes;
+                if (resolvedActiveNodes.length === 0 && g.nodes.length > 0) {
+                   const seedList = (data.seedArtists || '').split('::').map((s: string) => s.trim()).filter(Boolean);
+                   const seedSet = new Set(seedList.map((s: string) => normalizeArtistId(s)));
+                   resolvedActiveNodes = g.nodes
+                     .filter((n: any) => (n.type === 'artist' || !n.type) && seedSet.has(normalizeArtistId(n.id)))
+                     .map((n: any) => n.id);
                 }
+                setActiveNodeIds(resolvedActiveNodes);
               }
 
             } else {
@@ -4999,24 +4977,15 @@ const App: React.FC = () => {
                   setGraphData((prev: any) => isGraphEqual(prev, g) ? prev : g);
                   hydratedNodes = g.nodes;
                     if (data.activeNodes && Array.isArray(data.activeNodes)) {
-                      if (data.activeNodes.length > 0) {
-                        setActiveNodeIds(data.activeNodes);
-                      } else if (g.nodes.length > 0 && !hasAutoQueuedRef.current) {
-                        hasAutoQueuedRef.current = true;
-                        const seedList = (data.seedArtists || '').split('::').map((s: string) => s.trim()).filter(Boolean);
-                        const seedSet = new Set(seedList.map((s: string) => normalizeArtistId(s)));
-                        
-                        const preHydratedIds = g.nodes.filter((n: any) => {
-                           const cached = detailsCacheRef.current.get(n.id) || detailsCacheRef.current.get(normalizeArtistId(n.id)) || detailsCacheRef.current.get(n.id.toLowerCase());
-                           return cached && cached.summary && cached.summary.trim().length > 5 && !cached._isSentinel;
-                        }).map((n: any) => n.id);
-
-                        const seedIds = g.nodes
-                          .filter((n: any) => (n.type === 'artist' || !n.type) && seedSet.has(normalizeArtistId(n.id)))
-                          .map((n: any) => n.id);
-                          
-                        setActiveNodeIds(Array.from(new Set([...preHydratedIds, ...seedIds])));
+                      let resolvedActiveNodes = data.activeNodes;
+                      if (resolvedActiveNodes.length === 0 && g.nodes.length > 0) {
+                         const seedList = (data.seedArtists || '').split('::').map((s: string) => s.trim()).filter(Boolean);
+                         const seedSet = new Set(seedList.map((s: string) => normalizeArtistId(s)));
+                         resolvedActiveNodes = g.nodes
+                           .filter((n: any) => (n.type === 'artist' || !n.type) && seedSet.has(normalizeArtistId(n.id)))
+                           .map((n: any) => n.id);
                       }
+                      setActiveNodeIds(resolvedActiveNodes);
                     }
 
                 }
@@ -5064,18 +5033,15 @@ const App: React.FC = () => {
             }
 
             if (data.activeNodes && Array.isArray(data.activeNodes)) {
-              if (data.activeNodes.length > 0) {
-                setActiveNodeIds(data.activeNodes);
-              } else if (g.nodes.length > 0 && !hasAutoQueuedRef.current) {
-                hasAutoQueuedRef.current = true;
-                const seedList = (data.seedArtists || '').split('::').map((s: string) => s.trim()).filter(Boolean);
-                const seedSet = new Set(seedList.map((s: string) => normalizeArtistId(s)));
-                const seedIds = g.nodes
-                  .filter((n: any) => (n.type === 'artist' || !n.type) && seedSet.has(normalizeArtistId(n.id)))
-                  .map((n: any) => n.id);
-                  
-                setActiveNodeIds(Array.from(new Set([...preHydratedIds, ...seedIds])));
+              let resolvedActiveNodes = data.activeNodes;
+              if (resolvedActiveNodes.length === 0 && g.nodes.length > 0) {
+                 const seedList = (data.seedArtists || '').split('::').map((s: string) => s.trim()).filter(Boolean);
+                 const seedSet = new Set(seedList.map((s: string) => normalizeArtistId(s)));
+                 resolvedActiveNodes = g.nodes
+                   .filter((n: any) => (n.type === 'artist' || !n.type) && seedSet.has(normalizeArtistId(n.id)))
+                   .map((n: any) => n.id);
               }
+              setActiveNodeIds(resolvedActiveNodes);
             }
 
           }

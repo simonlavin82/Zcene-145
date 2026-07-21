@@ -445,7 +445,7 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                 status: "completed",
                 graphData: JSON.stringify(result.graphData),
                 artistIds: artistIds,
-                activeNodes: seedArtistIds,
+                activeNodes: artistIds, // Native bulk queue population!
                 activeJobId: null,
                 detailsCache: result.detailsCache
             });
