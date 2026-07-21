@@ -663,17 +663,7 @@ export interface DisambiguationModalProps {
   isLiveAISuggestions?: boolean;
 }
 
-export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
-  isOpen,
-  query,
-  candidates,
-  onSelect,
-  isLiveAISuggestions,
-}) => {
-  const [overrideInput, setOverrideInput] = useState('');
-  if (!isOpen) return null;
-
-const COMMON_COUNTRIES = [
+export const COMMON_COUNTRIES = [
   'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Argentina', 'Armenia', 'Australia', 'Austria', 'Azerbaijan',
   'Bahamas', 'Bahrain', 'Bangladesh', 'Barbados', 'Belarus', 'Belgium', 'Belize', 'Benin', 'Bhutan', 'Bolivia',
   'Bosnia and Herzegovina', 'Botswana', 'Brazil', 'Brunei', 'Bulgaria', 'Burkina Faso', 'Burundi',
@@ -705,12 +695,12 @@ const COMMON_COUNTRIES = [
   'Zambia', 'Zimbabwe'
 ];
 
-interface CountryFilterDropdownProps {
+export interface CountryFilterDropdownProps {
   value: string;
   onChange: (value: string) => void;
 }
 
-const CountryFilterDropdown: React.FC<CountryFilterDropdownProps> = ({ value, onChange }) => {
+export const CountryFilterDropdown: React.FC<CountryFilterDropdownProps> = ({ value, onChange }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const filtered = useMemo(() => {
@@ -784,6 +774,16 @@ const CountryFilterDropdown: React.FC<CountryFilterDropdownProps> = ({ value, on
   );
 };
 
+export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
+  isOpen,
+  query,
+  candidates,
+  onSelect,
+  isLiveAISuggestions,
+}) => {
+  const [overrideInput, setOverrideInput] = useState('');
+  if (!isOpen) return null;
+
   // ── STATE A: Cache Miss (0 candidates in cache) ───────────────────────────
   if (candidates.length === 0) {
     return (
@@ -837,11 +837,8 @@ const CountryFilterDropdown: React.FC<CountryFilterDropdownProps> = ({ value, on
             </button>
             <button
               type="submit"
-              className="px-5 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 hover:bg-white active:scale-95 transition-all shadow-md cursor-pointer whitespace-nowrap"
+              className="px-6 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all shadow-md cursor-pointer whitespace-nowrap"
             >
-              <span className="material-symbols-outlined !text-[16px]">
-                {overrideInput.trim() ? 'check' : 'arrow_forward'}
-              </span>
               {isLiveAISuggestions 
                 ? (overrideInput.trim() ? 'Proceed' : 'Proceed without origin')
                 : (overrideInput.trim() ? 'Synthesize with override' : 'Search Live AI')}
@@ -931,14 +928,11 @@ const CountryFilterDropdown: React.FC<CountryFilterDropdownProps> = ({ value, on
             </button>
             <button
               type="submit"
-              className="px-5 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 hover:bg-white active:scale-95 transition-all shadow-md cursor-pointer whitespace-nowrap"
+              className="px-6 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all shadow-md cursor-pointer whitespace-nowrap"
             >
-              <span className="material-symbols-outlined !text-[16px]">
-                {overrideInput.trim() ? 'check' : 'arrow_forward'}
-              </span>
-              {isLiveAISuggestions 
-                ? (overrideInput.trim() ? 'Proceed' : 'Proceed without origin')
-                : (overrideInput.trim() ? 'Synthesize with override' : 'Confirm')}
+              {overrideInput.trim() 
+                ? 'Synthesize with override' 
+                : (isLiveAISuggestions ? 'Confirm Selection' : 'Confirm')}
             </button>
           </footer>
         </form>
@@ -1026,11 +1020,8 @@ const CountryFilterDropdown: React.FC<CountryFilterDropdownProps> = ({ value, on
           </button>
           <button
             type="submit"
-            className="px-5 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 hover:bg-white active:scale-95 transition-all shadow-md cursor-pointer whitespace-nowrap"
+            className="px-6 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all shadow-md cursor-pointer whitespace-nowrap"
           >
-            <span className="material-symbols-outlined !text-[16px]">
-              {overrideInput.trim() ? 'check' : 'arrow_forward'}
-            </span>
             {isLiveAISuggestions 
               ? (overrideInput.trim() ? 'Proceed' : 'Proceed without origin')
               : (overrideInput.trim() ? 'Synthesize with override' : 'Search Live AI')}
@@ -1040,10 +1031,6 @@ const CountryFilterDropdown: React.FC<CountryFilterDropdownProps> = ({ value, on
     </div>
   );
 };
-
-
-
-
 
 
 

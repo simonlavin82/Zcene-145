@@ -13,6 +13,7 @@ import Header from './Header';
 import { AdminViewToggle } from './ui/AdminViewToggle';
 import { InfoTooltip } from './ui/InfoTooltip';
 import { TelemetryOverviewCards, DiscoveryLedgerTable, UserTelemetry } from './UsageAnalyticsPage';
+import { CountryFilterDropdown } from './SharedModals';
 
 const ColorSwatch: React.FC<{ name: string; hex: string; className?: string; style?: React.CSSProperties; description?: string }> = ({ name, hex, className = "", style, description }) => {
     return (
@@ -68,6 +69,24 @@ const BadgeDisplay: React.FC<{
         <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block w-fit mt-auto">App Implementation: {implementation}</p>
     </div>
 );
+
+const InteractiveFilterableSelectDemo: React.FC = () => {
+  const [selectedCountry, setSelectedCountry] = useState('United States');
+  return (
+    <div className="space-y-4 overflow-visible">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-zinc-500 uppercase tracking-widest font-semibold">Searchable &amp; Filterable Country Select</p>
+        <span className="text-[10px] font-mono text-primary bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">Interactive Demo</span>
+      </div>
+      <div className="relative overflow-visible">
+        <CountryFilterDropdown value={selectedCountry} onChange={setSelectedCountry} />
+      </div>
+      <p className="text-xs text-zinc-500 leading-relaxed">
+        Fully interactive search dropdown component used in the Live AI Validation modal. Type any query to filter the ~200 international country directory in real time, or click to select directly.
+      </p>
+    </div>
+  );
+};
 
 interface TypographyScaleRowProps {
     role: string;
@@ -2026,33 +2045,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </p>
                                     </div>
 
-                                    <div className="space-y-4">
-                                        <p className="text-xs text-zinc-500 uppercase tracking-widest font-semibold">Searchable &amp; Filterable Country Select</p>
-                                        <div className="relative">
-                                            <div className="relative flex items-center">
-                                                <input 
-                                                    type="text" 
-                                                    placeholder="Type origin country..."
-                                                    defaultValue="United States"
-                                                    readOnly
-                                                    className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2.5 pl-4 pr-10 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
-                                                />
-                                                <span className="material-symbols-outlined pointer-events-none absolute right-3 text-zinc-400 !text-[18px]">arrow_drop_down</span>
-                                            </div>
-                                            <div className="mt-1 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl p-1 text-xs space-y-0.5">
-                                                <div className="px-3 py-1.5 bg-primary/10 text-primary font-semibold rounded-lg flex items-center justify-between">
-                                                    <span>United States</span>
-                                                    <span className="material-symbols-outlined !text-[14px]">check</span>
-                                                </div>
-                                                <div className="px-3 py-1.5 text-zinc-300 hover:text-white hover:bg-zinc-800 rounded-lg flex items-center justify-between">
-                                                    <span>United Kingdom</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <p className="text-xs text-zinc-500 leading-relaxed">
-                                            Interactive filterable search dropdown component used in Live AI Validation modal to type or select built-in countries/regions cleanly.
-                                        </p>
-                                    </div>
+                                    <InteractiveFilterableSelectDemo />
                                 </div>
                             </div>
 
