@@ -918,41 +918,30 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
             )}
           </div>
           
-          <footer className={`p-3 sm:p-4 bg-zinc-900 border-t border-zinc-700 flex ${!isLiveAISuggestions ? 'flex-col gap-2' : 'items-center justify-end gap-3'}`}>
+          <footer className="p-3 sm:p-4 bg-zinc-900 border-t border-zinc-700 flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => onSelect('cancel')}
+              className="px-4 py-2 text-zinc-400 hover:text-white text-sm font-medium rounded-xl hover:bg-zinc-800 transition-colors"
+            >
+              Cancel
+            </button>
             {!isLiveAISuggestions ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => onSelect('synthesis')}
-                  className="w-full py-3 bg-primary text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <span className="material-symbols-outlined text-[18px]">search</span>
-                  Not This One — Search Live AI
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onSelect('cancel')}
-                  className="w-full py-3 text-zinc-400 hover:text-white text-sm font-medium rounded-xl hover:bg-zinc-800 transition-colors"
-                >
-                  Cancel
-                </button>
-              </>
+              <button
+                type="button"
+                onClick={() => onSelect('synthesis')}
+                className="px-6 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all shadow-md cursor-pointer flex items-center justify-center gap-2"
+              >
+                <span className="material-symbols-outlined text-[18px]">search</span>
+                Not This One — Search Live AI
+              </button>
             ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={() => onSelect('cancel')}
-                  className="px-4 py-2 text-zinc-400 hover:text-white text-sm font-medium rounded-xl hover:bg-zinc-800 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-6 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all shadow-md cursor-pointer whitespace-nowrap"
-                >
-                  {overrideInput.trim() ? 'Synthesize with override' : 'Confirm Selection'}
-                </button>
-              </>
+              <button
+                type="submit"
+                className="px-6 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all shadow-md cursor-pointer whitespace-nowrap"
+              >
+                {overrideInput.trim() ? 'Synthesize with override' : 'Confirm Selection'}
+              </button>
             )}
           </footer>
         </form>
