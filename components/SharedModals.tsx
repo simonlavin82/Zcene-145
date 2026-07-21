@@ -677,7 +677,19 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
   if (candidates.length === 0) {
     return (
       <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/60 animate-fade-in-down pointer-events-auto" style={{ animationDuration: '200ms' }} onClick={() => onSelect('cancel')}>
-        <div className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-hidden animate-fade-in-down" style={{ animationDuration: '200ms' }} onClick={e => e.stopPropagation()}>
+        <form 
+          onSubmit={(e) => { 
+            e.preventDefault(); 
+            if (overrideInput.trim()) {
+              onSelect(`override::${overrideInput.trim()}`);
+            } else {
+              onSelect('synthesis');
+            }
+          }} 
+          className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-hidden animate-fade-in-down" 
+          style={{ animationDuration: '200ms' }} 
+          onClick={e => e.stopPropagation()}
+        >
           <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-primary !text-[18px]">{isLiveAISuggestions ? 'auto_awesome' : 'psychology'}</span>
@@ -685,22 +697,20 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
                 {isLiveAISuggestions ? 'Live AI Validation' : 'Disambiguation'}
               </h3>
             </div>
-            <button onClick={() => onSelect('cancel')} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none">
+            <button type="button" onClick={() => onSelect('cancel')} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none">
               <span className="material-symbols-outlined !text-[18px]">close</span>
             </button>
           </header>
 
-          <div className="p-5 flex flex-col gap-6">
-            <p className="text-sm text-zinc-400">
+          <div className="p-5 flex flex-col gap-4">
+            <p className="text-sm text-zinc-400 leading-relaxed">
               {isLiveAISuggestions 
                 ? <>No specific regional variants were identified for <span className="text-primary font-semibold">"{query}"</span> by the AI probe. Proceed with open synthesis?</>
                 : <>No cached records found for <span className="text-primary font-semibold">"{query}"</span>. This artist may be new to the platform, or multiple regional acts share this name.</>}
             </p>
-          </div>
 
-          <footer className="p-4 bg-zinc-900 border-t border-zinc-700 flex flex-col gap-2">
-            {isLiveAISuggestions ? (
-              <form onSubmit={(e) => { e.preventDefault(); if (overrideInput.trim()) onSelect(`override::${overrideInput.trim()}`); }} className="flex flex-col gap-2 w-full">
+            {isLiveAISuggestions && (
+              <div className="flex flex-col gap-2 pt-1">
                 <input 
                   type="text" 
                   placeholder="Can't find your version? Enter country/region"
@@ -708,32 +718,29 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
                   onChange={e => setOverrideInput(e.target.value)}
                   className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2.5 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200"
                 />
-                <button
-                  type="submit"
-                  disabled={!overrideInput.trim()}
-                  className="w-full bg-primary text-brand-black px-6 py-2 rounded-xl font-medium shadow-lg text-sm flex items-center justify-center gap-2 hover:bg-white active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <span className="material-symbols-outlined text-[16px]">search</span>
-                  Synthesize with override
-                </button>
-              </form>
-            ) : (
-              <button
-                onClick={() => onSelect('synthesis')}
-                className="w-full bg-primary text-brand-black px-6 py-2 rounded-xl font-medium shadow-lg text-sm flex items-center justify-center gap-2 hover:bg-white active:scale-95 transition-all duration-200"
-              >
-                <span className="material-symbols-outlined text-[16px]">search</span>
-                Search Live AI
-              </button>
+              </div>
             )}
+          </div>
+
+          <footer className="p-3 sm:p-4 bg-zinc-900 border-t border-zinc-700 flex items-center justify-end gap-3">
             <button
+              type="button"
               onClick={() => onSelect('cancel')}
-              className="w-full border py-1.5 px-3 transition-all text-sm flex items-center justify-center gap-1.5 rounded-xl border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:text-white hover:bg-zinc-800 hover:border-zinc-700"
+              className="px-4 py-2 text-zinc-400 hover:text-white text-sm font-medium rounded-xl hover:bg-zinc-800 transition-colors"
             >
               Cancel
             </button>
+            <button
+              type="submit"
+              className="px-5 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 hover:bg-white active:scale-95 transition-all shadow-md cursor-pointer"
+            >
+              <span className="material-symbols-outlined !text-[16px]">search</span>
+              {isLiveAISuggestions 
+                ? (overrideInput.trim() ? 'Synthesize with override' : 'Synthesize')
+                : 'Search Live AI'}
+            </button>
           </footer>
-        </div>
+        </form>
       </div>
     );
   }
@@ -744,7 +751,19 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
     const cand = candidates[0];
     return (
       <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/60 animate-fade-in-down pointer-events-auto" style={{ animationDuration: '200ms' }} onClick={() => onSelect('cancel')}>
-        <div className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-hidden animate-fade-in-down" style={{ animationDuration: '200ms' }} onClick={e => e.stopPropagation()}>
+        <form 
+          onSubmit={(e) => { 
+            e.preventDefault(); 
+            if (overrideInput.trim()) {
+              onSelect(`override::${overrideInput.trim()}`);
+            } else {
+              onSelect(cand.id);
+            }
+          }}
+          className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-hidden animate-fade-in-down" 
+          style={{ animationDuration: '200ms' }} 
+          onClick={e => e.stopPropagation()}
+        >
           <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-primary !text-[18px]">{isLiveAISuggestions ? 'auto_awesome' : 'travel_explore'}</span>
@@ -752,45 +771,44 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
                 {isLiveAISuggestions ? 'Live AI Validation' : 'Look What I Found'}
               </h3>
             </div>
-            <button onClick={() => onSelect('cancel')} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none">
+            <button type="button" onClick={() => onSelect('cancel')} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none">
               <span className="material-symbols-outlined !text-[18px]">close</span>
             </button>
           </header>
 
-          <div className="p-5 flex flex-col gap-6">
-            <p className="text-sm text-zinc-400">
+          <div className="p-5 flex flex-col gap-4">
+            <p className="text-sm text-zinc-400 leading-relaxed">
               {isLiveAISuggestions
                 ? <>We ran a quick live check and found a distinct regional entity for <span className="text-primary font-semibold">"{query}"</span>. Is this the act you mean?</>
                 : <>We found this in our index for <span className="text-primary font-semibold">"{query}"</span>. Is this the artist you're looking for?</>}
             </p>
 
-          {/* Single candidate card — clicking accepts cached candidate */}
-          <button
-            onClick={() => onSelect(cand.id)}
-            className="w-full text-left p-4 bg-zinc-900/50 hover:bg-zinc-800 border border-zinc-700 hover:border-primary/50 transition-all duration-200 flex items-center gap-4 group rounded-xl"
-          >
-            <span className="material-symbols-outlined text-zinc-500 group-hover:text-primary transition-colors text-2xl flex-shrink-0">check_circle</span>
-            <div className="flex flex-col gap-0.5 min-w-0">
-              <span className="text-zinc-100 group-hover:text-primary font-semibold transition-colors text-sm truncate">
-                {cand.label || cand.id}
+            {/* Single candidate card — clicking accepts cached candidate */}
+            <button
+              type="button"
+              onClick={() => onSelect(cand.id)}
+              className="w-full text-left p-4 bg-zinc-900/50 hover:bg-zinc-800 border border-zinc-700 hover:border-primary/50 transition-all duration-200 flex items-center gap-4 group rounded-xl"
+            >
+              <span className="material-symbols-outlined text-zinc-500 group-hover:text-primary transition-colors text-2xl flex-shrink-0">check_circle</span>
+              <div className="flex flex-col gap-0.5 min-w-0">
+                <span className="text-zinc-100 group-hover:text-primary font-semibold transition-colors text-sm truncate">
+                  {cand.label || cand.id}
+                </span>
+                {(cand.genre || cand.origin) && (
+                  <div className="flex flex-wrap gap-x-2 text-[10px] text-zinc-500 group-hover:text-zinc-400 transition-colors uppercase tracking-wider font-semibold">
+                    {cand.origin && <span>{cand.origin}</span>}
+                    {cand.origin && cand.genre && <span>•</span>}
+                    {cand.genre && <span>{cand.genre}</span>}
+                  </div>
+                )}
+              </div>
+              <span className="material-symbols-outlined text-zinc-600 group-hover:text-primary transition-colors text-[14px] ml-auto flex-shrink-0">
+                arrow_forward_ios
               </span>
-              {(cand.genre || cand.origin) && (
-                <div className="flex flex-wrap gap-x-2 text-[10px] text-zinc-500 group-hover:text-zinc-400 transition-colors uppercase tracking-wider font-semibold">
-                  {cand.origin && <span>{cand.origin}</span>}
-                  {cand.origin && cand.genre && <span>•</span>}
-                  {cand.genre && <span>{cand.genre}</span>}
-                </div>
-              )}
-            </div>
-            <span className="material-symbols-outlined text-zinc-600 group-hover:text-primary transition-colors text-[14px] ml-auto flex-shrink-0">
-              arrow_forward_ios
-            </span>
-          </button>
-          </div>
-          
-          <footer className="p-4 bg-zinc-900 border-t border-zinc-700 flex flex-col gap-2">
-            {isLiveAISuggestions ? (
-              <form onSubmit={(e) => { e.preventDefault(); if (overrideInput.trim()) onSelect(`override::${overrideInput.trim()}`); }} className="flex flex-col gap-2 w-full">
+            </button>
+
+            {isLiveAISuggestions && (
+              <div className="flex flex-col gap-2 pt-1">
                 <input 
                   type="text" 
                   placeholder="Can't find your version? Enter country/region"
@@ -798,32 +816,31 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
                   onChange={e => setOverrideInput(e.target.value)}
                   className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2.5 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200"
                 />
-                <button
-                  type="submit"
-                  disabled={!overrideInput.trim()}
-                  className="w-full bg-primary text-brand-black px-6 py-2 rounded-xl font-medium shadow-lg text-sm flex items-center justify-center gap-2 hover:bg-white active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <span className="material-symbols-outlined text-[16px]">search</span>
-                  Synthesize with override
-                </button>
-              </form>
-            ) : (
-              <button
-                onClick={() => onSelect('synthesis')}
-                className="w-full bg-primary text-brand-black px-6 py-2 rounded-xl font-medium shadow-lg text-sm flex items-center justify-center gap-2 hover:bg-white active:scale-95 transition-all duration-200"
-              >
-                <span className="material-symbols-outlined text-[16px]">search</span>
-                Not This One — Search Live AI
-              </button>
+              </div>
             )}
+          </div>
+          
+          <footer className="p-3 sm:p-4 bg-zinc-900 border-t border-zinc-700 flex items-center justify-end gap-3">
             <button
+              type="button"
               onClick={() => onSelect('cancel')}
-              className="w-full border py-1.5 px-3 transition-all text-sm flex items-center justify-center gap-1.5 rounded-xl border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:text-white hover:bg-zinc-800 hover:border-zinc-700"
+              className="px-4 py-2 text-zinc-400 hover:text-white text-sm font-medium rounded-xl hover:bg-zinc-800 transition-colors"
             >
               Cancel
             </button>
+            <button
+              type="submit"
+              className="px-5 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 hover:bg-white active:scale-95 transition-all shadow-md cursor-pointer"
+            >
+              <span className="material-symbols-outlined !text-[16px]">
+                {overrideInput.trim() ? 'search' : 'check'}
+              </span>
+              {overrideInput.trim() 
+                ? 'Synthesize with override' 
+                : (isLiveAISuggestions ? 'Confirm Selection' : 'Confirm')}
+            </button>
           </footer>
-        </div>
+        </form>
       </div>
     );
   }
@@ -832,7 +849,19 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
   // Cache returned >1 records. User selects one or requests live AI search.
   return (
     <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/60 animate-fade-in-down pointer-events-auto" style={{ animationDuration: '200ms' }} onClick={() => onSelect('cancel')}>
-      <div className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-hidden animate-fade-in-down" style={{ animationDuration: '200ms' }} onClick={e => e.stopPropagation()}>
+      <form 
+        onSubmit={(e) => { 
+          e.preventDefault(); 
+          if (overrideInput.trim()) {
+            onSelect(`override::${overrideInput.trim()}`);
+          } else {
+            onSelect('synthesis');
+          }
+        }}
+        className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-hidden animate-fade-in-down" 
+        style={{ animationDuration: '200ms' }} 
+        onClick={e => e.stopPropagation()}
+      >
         <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary !text-[18px]">{isLiveAISuggestions ? 'auto_awesome' : 'psychology'}</span>
@@ -840,48 +869,47 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
               {isLiveAISuggestions ? 'Live AI Validation' : 'Disambiguation'}
             </h3>
           </div>
-          <button onClick={() => onSelect('cancel')} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none">
+          <button type="button" onClick={() => onSelect('cancel')} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none">
             <span className="material-symbols-outlined !text-[18px]">close</span>
           </button>
         </header>
 
-        <div className="p-5 flex flex-col gap-6">
-          <p className="text-sm text-zinc-400">
+        <div className="p-5 flex flex-col gap-4">
+          <p className="text-sm text-zinc-400 leading-relaxed">
             {isLiveAISuggestions
               ? <>Our live model identified multiple regional entities matching <span className="text-primary font-semibold">"{query}"</span>. Please specify which one you mean to avoid token waste.</>
               : <>We found multiple distinct artists matching <span className="text-primary font-semibold">"{query}"</span>. Which one did you mean?</>}
           </p>
 
-        <div className="flex flex-col gap-3 max-h-[280px] overflow-y-auto pr-1">
-          {candidates.map((cand) => (
-            <button
-              key={cand.id}
-              onClick={() => onSelect(cand.id)}
-              className="w-full text-left p-4 bg-zinc-900/50 hover:bg-zinc-800 border border-zinc-700 hover:border-primary/50 transition-all duration-200 flex flex-col gap-1 group rounded-xl"
-            >
-              <div className="flex items-center justify-between w-full">
-                <span className="text-zinc-200 group-hover:text-primary font-medium transition-colors text-sm">
-                  {cand.label || cand.id}
-                </span>
-                <span className="material-symbols-outlined text-zinc-600 group-hover:text-primary transition-colors text-[14px]">
-                  arrow_forward_ios
-                </span>
-              </div>
-              {(cand.genre || cand.origin) && (
-                <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-1 text-[10px] text-zinc-500 group-hover:text-zinc-400 transition-colors uppercase tracking-wider font-semibold">
-                  {cand.origin && <span>{cand.origin}</span>}
-                  {cand.origin && cand.genre && <span>•</span>}
-                  {cand.genre && <span>{cand.genre}</span>}
+          <div className="flex flex-col gap-3 max-h-[240px] overflow-y-auto pr-1">
+            {candidates.map((cand) => (
+              <button
+                type="button"
+                key={cand.id}
+                onClick={() => onSelect(cand.id)}
+                className="w-full text-left p-4 bg-zinc-900/50 hover:bg-zinc-800 border border-zinc-700 hover:border-primary/50 transition-all duration-200 flex flex-col gap-1 group rounded-xl"
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="text-zinc-200 group-hover:text-primary font-medium transition-colors text-sm">
+                    {cand.label || cand.id}
+                  </span>
+                  <span className="material-symbols-outlined text-zinc-600 group-hover:text-primary transition-colors text-[14px]">
+                    arrow_forward_ios
+                  </span>
                 </div>
-              )}
-            </button>
-          ))}
-        </div>
+                {(cand.genre || cand.origin) && (
+                  <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-1 text-[10px] text-zinc-500 group-hover:text-zinc-400 transition-colors uppercase tracking-wider font-semibold">
+                    {cand.origin && <span>{cand.origin}</span>}
+                    {cand.origin && cand.genre && <span>•</span>}
+                    {cand.genre && <span>{cand.genre}</span>}
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
 
-        </div>
-        <footer className="p-4 bg-zinc-900 border-t border-zinc-700 flex flex-col gap-2">
-          {isLiveAISuggestions ? (
-            <form onSubmit={(e) => { e.preventDefault(); if (overrideInput.trim()) onSelect(`override::${overrideInput.trim()}`); }} className="flex flex-col gap-2 w-full">
+          {isLiveAISuggestions && (
+            <div className="flex flex-col gap-2 pt-1">
               <input 
                 type="text" 
                 placeholder="Can't find your version? Enter country/region"
@@ -889,32 +917,29 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
                 onChange={e => setOverrideInput(e.target.value)}
                 className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2.5 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200"
               />
-              <button
-                type="submit"
-                disabled={!overrideInput.trim()}
-                className="w-full bg-primary text-brand-black px-6 py-2 rounded-xl font-medium shadow-lg text-sm flex items-center justify-center gap-2 hover:bg-white active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <span className="material-symbols-outlined text-[16px]">search</span>
-                Synthesize with override
-              </button>
-            </form>
-          ) : (
-            <button
-              onClick={() => onSelect('synthesis')}
-              className="w-full bg-primary text-brand-black px-6 py-2 rounded-xl font-medium shadow-lg text-sm flex items-center justify-center gap-2 hover:bg-white active:scale-95 transition-all duration-200"
-            >
-              <span className="material-symbols-outlined text-[16px]">search</span>
-              Not What I'm Looking For — Search Live AI
-            </button>
+            </div>
           )}
+        </div>
+
+        <footer className="p-3 sm:p-4 bg-zinc-900 border-t border-zinc-700 flex items-center justify-end gap-3">
           <button
+            type="button"
             onClick={() => onSelect('cancel')}
-            className="w-full border py-1.5 px-3 transition-all text-sm flex items-center justify-center gap-1.5 rounded-xl border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:text-white hover:bg-zinc-800 hover:border-zinc-700"
+            className="px-4 py-2 text-zinc-400 hover:text-white text-sm font-medium rounded-xl hover:bg-zinc-800 transition-colors"
           >
             Cancel
           </button>
+          <button
+            type="submit"
+            className="px-5 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 hover:bg-white active:scale-95 transition-all shadow-md cursor-pointer"
+          >
+            <span className="material-symbols-outlined !text-[16px]">search</span>
+            {overrideInput.trim() 
+              ? 'Synthesize with override' 
+              : 'Search Live AI'}
+          </button>
         </footer>
-      </div>
+      </form>
     </div>
   );
 };
