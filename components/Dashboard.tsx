@@ -306,24 +306,33 @@ const Dashboard: React.FC<DashboardProps> = ({
           </div>
 
           {projects.length === 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-fit">
-              {/* Standalone Add New Card */}
-              <button 
-                onClick={onCreateProject}
-                disabled={isCreatingProject}
-                className="group relative bg-zinc-900 border-2 border-dashed border-zinc-700 rounded-none p-5 flex flex-col items-center justify-center gap-3 transition-all h-[180px] w-full max-w-[360px] sm:w-[360px] hover:border-primary/50 disabled:opacity-50 cursor-pointer overflow-hidden"
-              >
-                <div className="w-10 h-10 rounded-full bg-zinc-800 group-hover:bg-primary group-hover:text-brand-black flex items-center justify-center text-zinc-550 transition-all relative z-10">
-                  {isCreatingProject ? (
-                    <span className="material-symbols-outlined animate-spin !text-2xl">progress_activity</span>
-                  ) : (
-                    <span className="material-symbols-outlined !text-2xl">add</span>
-                  )}
+            <div className="w-fit max-w-full bg-zinc-950/40 rounded-tr-xl rounded-b-xl rounded-tl-none border border-dashed border-zinc-800/80 p-4 relative flex-shrink-0 min-w-0">
+              {/* Folder Tab Header */}
+              <div className="w-[160px] bg-zinc-950/60 border-t border-l border-r border-dashed border-zinc-800/80 rounded-t-lg text-[9px] font-mono absolute -top-[22px] left-[-1px] px-3 py-1 flex items-center h-[22.5px] z-10 select-none">
+                <div className="truncate text-ellipsis whitespace-nowrap uppercase tracking-widest text-zinc-400 font-medium flex items-center gap-1.5">
+                  <span className="material-symbols-outlined !text-[12px] text-primary">add</span>
+                  NEW ZCENE
                 </div>
-                <span className="text-sm font-medium text-zinc-550 group-hover:text-zinc-350 transition-colors relative z-10">
-                  {isCreatingProject ? 'Creating Zcene...' : 'Create New Zcene'}
-                </span>
-              </button>
+              </div>
+
+              <div className="grid grid-cols-1 gap-5 w-fit max-w-full">
+                <button 
+                  onClick={onCreateProject}
+                  disabled={isCreatingProject}
+                  className="group relative bg-zinc-900 border-2 border-dashed border-zinc-700 rounded-none p-5 flex flex-col items-center justify-center gap-3 transition-all h-[180px] w-full max-w-[360px] sm:w-[360px] hover:border-primary/50 disabled:opacity-50 cursor-pointer overflow-hidden"
+                >
+                  <div className="w-10 h-10 rounded-full bg-zinc-800 group-hover:bg-primary group-hover:text-brand-black flex items-center justify-center text-zinc-550 transition-all relative z-10">
+                    {isCreatingProject ? (
+                      <span className="material-symbols-outlined animate-spin !text-2xl">progress_activity</span>
+                    ) : (
+                      <span className="material-symbols-outlined !text-2xl">add</span>
+                    )}
+                  </div>
+                  <span className="text-sm font-medium text-zinc-550 group-hover:text-zinc-350 transition-colors relative z-10 font-sans">
+                    {isCreatingProject ? 'Creating Zcene...' : 'Create New Zcene'}
+                  </span>
+                </button>
+              </div>
             </div>
           ) : view === 'grid' ? (
             <div className="w-full flex flex-wrap gap-x-8 gap-y-10 items-start">
@@ -470,23 +479,37 @@ const Dashboard: React.FC<DashboardProps> = ({
               );
             })}
               
-              {/* Standalone Add New Card */}
-              <button 
-                onClick={onCreateProject}
-                disabled={isCreatingProject}
-                className="group relative bg-zinc-900 border-2 border-dashed border-zinc-700 rounded-none p-5 flex flex-col items-center justify-center gap-3 transition-all h-[180px] w-full max-w-[360px] sm:w-[360px] hover:border-primary/50 disabled:opacity-50 cursor-pointer overflow-hidden flex-shrink-0"
+              {/* Standalone Add New Crate Folder */}
+              <div 
+                className="w-fit max-w-full bg-zinc-950/40 rounded-tr-xl rounded-b-xl rounded-tl-none border border-dashed border-zinc-800/80 p-4 relative flex-shrink-0 min-w-0"
               >
-                <div className="w-10 h-10 rounded-full bg-zinc-800 group-hover:bg-primary group-hover:text-brand-black flex items-center justify-center text-zinc-550 transition-all relative z-10">
-                  {isCreatingProject ? (
-                    <span className="material-symbols-outlined animate-spin !text-2xl">progress_activity</span>
-                  ) : (
-                    <span className="material-symbols-outlined !text-2xl">add</span>
-                  )}
+                {/* Folder Tab Header */}
+                <div className="w-[160px] bg-zinc-950/60 border-t border-l border-r border-dashed border-zinc-800/80 rounded-t-lg text-[9px] font-mono absolute -top-[22px] left-[-1px] px-3 py-1 flex items-center h-[22.5px] z-10 select-none">
+                  <div className="truncate text-ellipsis whitespace-nowrap uppercase tracking-widest text-zinc-400 font-medium flex items-center gap-1.5">
+                    <span className="material-symbols-outlined !text-[12px] text-primary">add</span>
+                    NEW ZCENE
+                  </div>
                 </div>
-                <span className="text-sm font-medium text-zinc-550 group-hover:text-zinc-350 transition-colors relative z-10 font-sans">
-                  {isCreatingProject ? 'Creating Zcene...' : 'Create New Zcene'}
-                </span>
-              </button>
+
+                <div className="grid grid-cols-1 gap-5 w-fit max-w-full">
+                  <button 
+                    onClick={onCreateProject}
+                    disabled={isCreatingProject}
+                    className="group relative bg-zinc-900 border-2 border-dashed border-zinc-700 rounded-none p-5 flex flex-col items-center justify-center gap-3 transition-all h-[180px] w-full max-w-[360px] sm:w-[360px] hover:border-primary/50 disabled:opacity-50 cursor-pointer overflow-hidden"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-zinc-800 group-hover:bg-primary group-hover:text-brand-black flex items-center justify-center text-zinc-550 transition-all relative z-10">
+                      {isCreatingProject ? (
+                        <span className="material-symbols-outlined animate-spin !text-2xl">progress_activity</span>
+                      ) : (
+                        <span className="material-symbols-outlined !text-2xl">add</span>
+                      )}
+                    </div>
+                    <span className="text-sm font-medium text-zinc-550 group-hover:text-zinc-350 transition-colors relative z-10 font-sans">
+                      {isCreatingProject ? 'Creating Zcene...' : 'Create New Zcene'}
+                    </span>
+                  </button>
+                </div>
+              </div>
             </div>
           ) : (
             /* High-Contrast Tabular List View */
