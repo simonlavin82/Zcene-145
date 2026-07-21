@@ -803,9 +803,59 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                     {/* 4. LAYOUT & SPACING */}
                     <section id="layout-spacing">
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Layout & Spacing</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                             <SpacingExample title="Panel Gaps" gapClass="gap-3" gapLabel="gap-3 (12px)" usage="Standard gap between sidebars and center graph area." />
-                             <SpacingExample title="Tight List" gapClass="gap-1.5" gapLabel="gap-1.5 (6px)" usage="Used for artist seed lists." />
+                        
+                        <div className="space-y-12">
+                            <p className="text-base text-zinc-300 leading-relaxed max-w-3xl">
+                                Zcene enforces a strict architectural layout strategy dividing content into **Standard Container Layouts** for auxiliary/dashboard views and **Full-Width Canvas Layouts** for the interactive graph engine.
+                            </p>
+
+                            {/* Viewport Container Layout Rules */}
+                            <div className="p-8 bg-zinc-900/50 rounded-xl border border-zinc-800 space-y-6">
+                                <h3 className="text-xl font-medium text-primary">Layout Container & Padding Guidelines</h3>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <div className="p-6 bg-zinc-950 rounded-xl border border-zinc-800 space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <h4 className="text-base font-semibold text-white">Auxiliary & Dashboard Views</h4>
+                                            <span className="px-2.5 py-1 text-[10px] font-mono uppercase bg-primary/20 text-primary border border-primary/40 rounded-full">Standard Container</span>
+                                        </div>
+                                        <p className="text-sm text-zinc-400 leading-relaxed">
+                                            All non-interactive auxiliary views (Dashboard, Help, Analytics, Engine Docs, Design System) utilize a centered max-width container with responsive horizontal padding to keep content framed with comfortable viewport margins.
+                                        </p>
+                                        <div className="p-3 bg-zinc-900 rounded-lg border border-zinc-800 font-mono text-xs text-amber-300 overflow-x-auto">
+                                            container mx-auto px-4 sm:px-6 lg:px-8
+                                        </div>
+                                        <ul className="text-xs text-zinc-400 space-y-1.5 list-disc list-inside">
+                                            <li><strong className="text-zinc-200">Mobile (&lt;640px):</strong> <code className="text-zinc-300">px-4</code> (16px horizontal margin)</li>
+                                            <li><strong className="text-zinc-200">Tablet (sm: 640px+):</strong> <code className="text-zinc-300">sm:px-6</code> (24px horizontal margin)</li>
+                                            <li><strong className="text-zinc-200">Desktop (lg: 1024px+):</strong> <code className="text-zinc-300">lg:px-8</code> (32px horizontal margin)</li>
+                                        </ul>
+                                    </div>
+
+                                    <div className="p-6 bg-zinc-950 rounded-xl border border-zinc-800 space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <h4 className="text-base font-semibold text-white">Interactive Graph Engine (<code className="text-sm">App.tsx</code>)</h4>
+                                            <span className="px-2.5 py-1 text-[10px] font-mono uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 rounded-full">Full-Width Canvas</span>
+                                        </div>
+                                        <p className="text-sm text-zinc-400 leading-relaxed">
+                                            The interactive D3 spiderweb graph engine bypasses standard layout containers to occupy 100% of the viewport width and height.
+                                        </p>
+                                        <div className="p-3 bg-zinc-900 rounded-lg border border-zinc-800 font-mono text-xs text-emerald-300 overflow-x-auto">
+                                            absolute inset-0 w-full h-full
+                                        </div>
+                                        <ul className="text-xs text-zinc-400 space-y-1.5 list-disc list-inside">
+                                            <li><strong className="text-zinc-200">Canvas Engine:</strong> Strictly edge-to-edge unconstrained viewport.</li>
+                                            <li><strong className="text-zinc-200">Interactive Controls:</strong> Floating overlay panels anchored at viewport edges.</li>
+                                            <li><strong className="text-zinc-200">Drawer Sidebars:</strong> Dynamic sliding panels overlaying active D3 canvas.</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <SpacingExample title="Panel Gaps" gapClass="gap-3" gapLabel="gap-3 (12px)" usage="Standard gap between sidebars and center graph area." />
+                                <SpacingExample title="Tight List" gapClass="gap-1.5" gapLabel="gap-1.5 (6px)" usage="Used for artist seed lists." />
+                            </div>
                         </div>
                     </section>
 

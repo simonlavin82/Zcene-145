@@ -256,7 +256,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       />
 
       
-      <main className={`flex-1 overflow-y-auto ${isSmallScreen ? 'px-4' : 'px-6 lg:px-8'} py-8 relative z-10`}>
+      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 overflow-y-auto relative z-10">
         <div className="w-full space-y-8">
           <div className="flex flex-col items-center justify-center text-center md:flex-row md:justify-between md:items-center gap-4">
             <h1 className="text-lg font-semibold uppercase tracking-wider text-zinc-200">YOUR ZCENES</h1>
