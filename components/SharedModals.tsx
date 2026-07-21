@@ -674,35 +674,35 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
   if (!isOpen) return null;
 
 const COMMON_COUNTRIES = [
-  'United States',
-  'United Kingdom',
-  'Japan',
-  'Germany',
-  'France',
-  'Canada',
-  'Australia',
-  'Sweden',
-  'Brazil',
-  'Mexico',
-  'Jamaica',
-  'Italy',
-  'Spain',
-  'Netherlands',
-  'Norway',
-  'South Korea',
-  'Puerto Rico',
-  'Argentina',
-  'Ireland',
-  'New Zealand',
-  'Finland',
-  'Denmark',
-  'Belgium',
-  'Nigeria',
-  'South Africa',
-  'Colombia',
-  'Chile',
-  'Poland',
-  'Iceland'
+  'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Argentina', 'Armenia', 'Australia', 'Austria', 'Azerbaijan',
+  'Bahamas', 'Bahrain', 'Bangladesh', 'Barbados', 'Belarus', 'Belgium', 'Belize', 'Benin', 'Bhutan', 'Bolivia',
+  'Bosnia and Herzegovina', 'Botswana', 'Brazil', 'Brunei', 'Bulgaria', 'Burkina Faso', 'Burundi',
+  'Cambodia', 'Cameroon', 'Canada', 'Cape Verde', 'Central African Republic', 'Chad', 'Chile', 'China', 'Colombia',
+  'Comoros', 'Congo', 'Costa Rica', 'Croatia', 'Cuba', 'Cyprus', 'Czech Republic',
+  'Denmark', 'Djibouti', 'Dominica', 'Dominican Republic',
+  'Ecuador', 'Egypt', 'El Salvador', 'Equatorial Guinea', 'Eritrea', 'Estonia', 'Eswatini', 'Ethiopia',
+  'Fiji', 'Finland', 'France',
+  'Gabon', 'Gambia', 'Georgia', 'Germany', 'Ghana', 'Greece', 'Grenada', 'Guatemala', 'Guinea', 'Guyana',
+  'Haiti', 'Honduras', 'Hungary',
+  'Iceland', 'India', 'Indonesia', 'Iran', 'Iraq', 'Ireland', 'Israel', 'Italy', 'Ivory Coast',
+  'Jamaica', 'Japan', 'Jordan',
+  'Kazakhstan', 'Kenya', 'Kiribati', 'Kuwait', 'Kyrgyzstan',
+  'Laos', 'Latvia', 'Lebanon', 'Lesotho', 'Liberia', 'Libya', 'Liechtenstein', 'Lithuania', 'Luxembourg',
+  'Madagascar', 'Malawi', 'Malaysia', 'Maldives', 'Mali', 'Malta', 'Marshall Islands', 'Mauritania', 'Mauritius', 'Mexico',
+  'Micronesia', 'Moldova', 'Monaco', 'Mongolia', 'Montenegro', 'Morocco', 'Mozambique', 'Myanmar',
+  'Namibia', 'Nauru', 'Nepal', 'Netherlands', 'New Zealand', 'Nicaragua', 'Niger', 'Nigeria', 'North Korea', 'North Macedonia', 'Norway',
+  'Oman',
+  'Pakistan', 'Palau', 'Palestine', 'Panama', 'Papua New Guinea', 'Paraguay', 'Peru', 'Philippines', 'Poland', 'Portugal', 'Puerto Rico',
+  'Qatar',
+  'Romania', 'Russia', 'Rwanda',
+  'Saint Kitts and Nevis', 'Saint Lucia', 'Saint Vincent and the Grenadines', 'Samoa', 'San Marino', 'Sao Tome and Principe', 'Saudi Arabia',
+  'Senegal', 'Serbia', 'Seychelles', 'Sierra Leone', 'Singapore', 'Slovakia', 'Slovenia', 'Solomon Islands', 'Somalia', 'South Africa',
+  'South Korea', 'South Sudan', 'Spain', 'Sri Lanka', 'Sudan', 'Suriname', 'Sweden', 'Switzerland', 'Syria',
+  'Taiwan', 'Tajikistan', 'Tanzania', 'Thailand', 'Timor-Leste', 'Togo', 'Tonga', 'Trinidad and Tobago', 'Tunisia', 'Turkey', 'Turkmenistan', 'Tuvalu',
+  'Uganda', 'Ukraine', 'United Arab Emirates', 'United Kingdom', 'United States', 'Uruguay', 'Uzbekistan',
+  'Vanuatu', 'Vatican City', 'Venezuela', 'Vietnam',
+  'Yemen',
+  'Zambia', 'Zimbabwe'
 ];
 
 interface CountryFilterDropdownProps {
@@ -720,11 +720,11 @@ const CountryFilterDropdown: React.FC<CountryFilterDropdownProps> = ({ value, on
   }, [value]);
 
   return (
-    <div className="relative w-full">
+    <div className="relative w-full overflow-visible">
       <div className="relative flex items-center">
         <input 
           type="text" 
-          placeholder="Can't find your version? Select or type country/region"
+          placeholder="Type origin country..."
           value={value}
           onFocus={() => setIsOpen(true)}
           onChange={e => {
@@ -746,8 +746,8 @@ const CountryFilterDropdown: React.FC<CountryFilterDropdownProps> = ({ value, on
 
       {isOpen && (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute left-0 right-0 top-full mt-1.5 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl max-h-48 overflow-y-auto z-50 scrollbar-thin py-1">
+          <div className="fixed inset-0 z-[1190]" onClick={() => setIsOpen(false)} />
+          <div className="absolute left-0 right-0 top-full mt-1.5 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl max-h-48 overflow-y-auto z-[1200] scrollbar-thin py-1">
             {filtered.length > 0 ? (
               filtered.map((country) => {
                 const isSelected = value.toLowerCase().trim() === country.toLowerCase();
@@ -774,7 +774,7 @@ const CountryFilterDropdown: React.FC<CountryFilterDropdownProps> = ({ value, on
               })
             ) : (
               <div className="px-4 py-2.5 text-xs text-zinc-500 font-mono italic">
-                Custom region "{value}" (press Enter or Synthesize to submit)
+                Custom region "{value}" (press Proceed to submit)
               </div>
             )}
           </div>
@@ -797,7 +797,7 @@ const CountryFilterDropdown: React.FC<CountryFilterDropdownProps> = ({ value, on
               onSelect('synthesis');
             }
           }} 
-          className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-hidden animate-fade-in-down" 
+          className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-visible animate-fade-in-down relative z-[1150]" 
           style={{ animationDuration: '200ms' }} 
           onClick={e => e.stopPropagation()}
         >
@@ -813,15 +813,15 @@ const CountryFilterDropdown: React.FC<CountryFilterDropdownProps> = ({ value, on
             </button>
           </header>
 
-          <div className="p-5 flex flex-col gap-4">
+          <div className="p-5 flex flex-col gap-4 overflow-visible">
             <p className="text-sm text-zinc-400 leading-relaxed">
               {isLiveAISuggestions 
-                ? <>No specific regional variants were identified for <span className="text-primary font-semibold">"{query}"</span> by the AI probe. Proceed with open synthesis?</>
+                ? <>No specific regional variants were identified for <span className="text-primary font-semibold">"{query}"</span> by the AI probe. Proceed by typing origin country below.</>
                 : <>No cached records found for <span className="text-primary font-semibold">"{query}"</span>. This artist may be new to the platform, or multiple regional acts share this name.</>}
             </p>
 
             {isLiveAISuggestions && (
-              <div className="flex flex-col gap-2 pt-1">
+              <div className="flex flex-col gap-2 pt-1 overflow-visible">
                 <CountryFilterDropdown value={overrideInput} onChange={setOverrideInput} />
               </div>
             )}
@@ -837,12 +837,14 @@ const CountryFilterDropdown: React.FC<CountryFilterDropdownProps> = ({ value, on
             </button>
             <button
               type="submit"
-              className="px-5 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 hover:bg-white active:scale-95 transition-all shadow-md cursor-pointer"
+              className="px-5 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 hover:bg-white active:scale-95 transition-all shadow-md cursor-pointer whitespace-nowrap"
             >
-              <span className="material-symbols-outlined !text-[16px]">search</span>
+              <span className="material-symbols-outlined !text-[16px]">
+                {overrideInput.trim() ? 'check' : 'arrow_forward'}
+              </span>
               {isLiveAISuggestions 
-                ? (overrideInput.trim() ? 'Synthesize with override' : 'Synthesize')
-                : 'Search Live AI'}
+                ? (overrideInput.trim() ? 'Proceed' : 'Proceed without origin')
+                : (overrideInput.trim() ? 'Synthesize with override' : 'Search Live AI')}
             </button>
           </footer>
         </form>
@@ -865,7 +867,7 @@ const CountryFilterDropdown: React.FC<CountryFilterDropdownProps> = ({ value, on
               onSelect(cand.id);
             }
           }}
-          className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-hidden animate-fade-in-down" 
+          className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-visible animate-fade-in-down relative z-[1150]" 
           style={{ animationDuration: '200ms' }} 
           onClick={e => e.stopPropagation()}
         >
@@ -881,7 +883,7 @@ const CountryFilterDropdown: React.FC<CountryFilterDropdownProps> = ({ value, on
             </button>
           </header>
 
-          <div className="p-5 flex flex-col gap-4">
+          <div className="p-5 flex flex-col gap-4 overflow-visible">
             <p className="text-sm text-zinc-400 leading-relaxed">
               {isLiveAISuggestions
                 ? <>We ran a quick live check and found a distinct regional entity for <span className="text-primary font-semibold">"{query}"</span>. Is this the act you mean?</>
@@ -913,7 +915,7 @@ const CountryFilterDropdown: React.FC<CountryFilterDropdownProps> = ({ value, on
             </button>
 
             {isLiveAISuggestions && (
-              <div className="flex flex-col gap-2 pt-1">
+              <div className="flex flex-col gap-2 pt-1 overflow-visible">
                 <CountryFilterDropdown value={overrideInput} onChange={setOverrideInput} />
               </div>
             )}
@@ -929,14 +931,14 @@ const CountryFilterDropdown: React.FC<CountryFilterDropdownProps> = ({ value, on
             </button>
             <button
               type="submit"
-              className="px-5 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 hover:bg-white active:scale-95 transition-all shadow-md cursor-pointer"
+              className="px-5 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 hover:bg-white active:scale-95 transition-all shadow-md cursor-pointer whitespace-nowrap"
             >
               <span className="material-symbols-outlined !text-[16px]">
-                {overrideInput.trim() ? 'search' : 'check'}
+                {overrideInput.trim() ? 'check' : 'arrow_forward'}
               </span>
-              {overrideInput.trim() 
-                ? 'Synthesize with override' 
-                : (isLiveAISuggestions ? 'Confirm Selection' : 'Confirm')}
+              {isLiveAISuggestions 
+                ? (overrideInput.trim() ? 'Proceed' : 'Proceed without origin')
+                : (overrideInput.trim() ? 'Synthesize with override' : 'Confirm')}
             </button>
           </footer>
         </form>
@@ -957,7 +959,7 @@ const CountryFilterDropdown: React.FC<CountryFilterDropdownProps> = ({ value, on
             onSelect('synthesis');
           }
         }}
-        className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-hidden animate-fade-in-down" 
+        className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-visible animate-fade-in-down relative z-[1150]" 
         style={{ animationDuration: '200ms' }} 
         onClick={e => e.stopPropagation()}
       >
@@ -973,7 +975,7 @@ const CountryFilterDropdown: React.FC<CountryFilterDropdownProps> = ({ value, on
           </button>
         </header>
 
-        <div className="p-5 flex flex-col gap-4">
+        <div className="p-5 flex flex-col gap-4 overflow-visible">
           <p className="text-sm text-zinc-400 leading-relaxed">
             {isLiveAISuggestions
               ? <>Our live model identified multiple regional entities matching <span className="text-primary font-semibold">"{query}"</span>. Please specify which one you mean to avoid token waste.</>
@@ -1008,7 +1010,7 @@ const CountryFilterDropdown: React.FC<CountryFilterDropdownProps> = ({ value, on
           </div>
 
           {isLiveAISuggestions && (
-            <div className="flex flex-col gap-2 pt-1">
+            <div className="flex flex-col gap-2 pt-1 overflow-visible">
               <CountryFilterDropdown value={overrideInput} onChange={setOverrideInput} />
             </div>
           )}
@@ -1024,12 +1026,14 @@ const CountryFilterDropdown: React.FC<CountryFilterDropdownProps> = ({ value, on
           </button>
           <button
             type="submit"
-            className="px-5 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 hover:bg-white active:scale-95 transition-all shadow-md cursor-pointer"
+            className="px-5 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 hover:bg-white active:scale-95 transition-all shadow-md cursor-pointer whitespace-nowrap"
           >
-            <span className="material-symbols-outlined !text-[16px]">search</span>
-            {overrideInput.trim() 
-              ? 'Synthesize with override' 
-              : 'Search Live AI'}
+            <span className="material-symbols-outlined !text-[16px]">
+              {overrideInput.trim() ? 'check' : 'arrow_forward'}
+            </span>
+            {isLiveAISuggestions 
+              ? (overrideInput.trim() ? 'Proceed' : 'Proceed without origin')
+              : (overrideInput.trim() ? 'Synthesize with override' : 'Search Live AI')}
           </button>
         </footer>
       </form>

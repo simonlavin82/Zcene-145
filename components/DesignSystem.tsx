@@ -2032,7 +2032,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <div className="relative flex items-center">
                                                 <input 
                                                     type="text" 
-                                                    placeholder="Select or type country/region"
+                                                    placeholder="Type origin country..."
                                                     defaultValue="United States"
                                                     readOnly
                                                     className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2.5 pl-4 pr-10 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
@@ -2050,7 +2050,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             </div>
                                         </div>
                                         <p className="text-xs text-zinc-500 leading-relaxed">
-                                            Interactive filterable search dropdown component used in Live AI Validation modal to type or select built-in regions cleanly.
+                                            Interactive filterable search dropdown component used in Live AI Validation modal to type or select built-in countries/regions cleanly.
                                         </p>
                                     </div>
                                 </div>
