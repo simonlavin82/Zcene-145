@@ -446,7 +446,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                     <section id="typography">
                         <h2 className="text-3xl font-medium text-white border-b-2 border-primary/50 pb-2 mb-8">Typography Scale</h2>
                         <p className="text-sm text-zinc-400 mb-12 max-w-2xl leading-relaxed">
-                            Our typography system balances 1990s aesthetic impact with modern legibility. We use heavy weights (Bold) for large titles and thematic headers to maintain character, while opting for lighter weights (Normal/Medium) for body copy and UI elements to ensure a premium, professional feel.
+                            Our typography system balances 1990s aesthetic impact with modern legibility. We use heavy weights (Bold) for large headlines while employing medium weights (Medium 500) and wide tracking (tracking-widest) for all-caps section markers and panel headers ("YOUR ZCENES", "ARTISTS", "SPIDERWEB", "DEEP CUT") to ensure category labels act as understated structural markers without competing with main project titles or brand logos.
                         </p>
                         <div className="space-y-16">
                             {/* Font Families */}
@@ -476,7 +476,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                      <TypographyScaleRow role="Hero Title (H1)" sample="Be the Author" className="text-7xl font-bold tracking-tighter" classSpec="text-7xl font-bold" pixelSize="72px" weight="Bold (700)" usage="Landing page headlines. Retains heavy weight for thematic character." />
                                      <TypographyScaleRow role="Section Title (H2)" sample="Discover Music" className="text-5xl font-bold tracking-tight" classSpec="text-5xl font-bold" pixelSize="48px" weight="Bold (700)" usage="Major section headers. Retains heavy weight for thematic character." />
                                      <TypographyScaleRow role="Lead / Subtitle" sample="Combine the power of AI..." className="text-2xl font-medium" classSpec="text-2xl font-medium" pixelSize="24px" weight="Medium (500)" usage="Introductory text." />
-                                     <TypographyScaleRow role="Panel Title (H3)" sample="Deep Cut" className="text-lg font-semibold uppercase tracking-wider" classSpec="text-lg font-semibold uppercase tracking-wider" pixelSize="18px" weight="Semibold (600)" usage="Panel headers. Softer weight with tracking for improved hierarchy." />
+                                     <TypographyScaleRow role="Panel Title (H3)" sample="Deep Cut" className="text-lg font-medium uppercase tracking-widest" classSpec="text-lg font-medium uppercase tracking-widest" pixelSize="18px" weight="Medium (500)" usage="Panel and dashboard headers. Refined weight with wide tracking for improved hierarchy." />
                                      <TypographyScaleRow role="Body (Content)" sample="The quick brown fox jumps over the lazy dog." className="text-base text-zinc-300 leading-relaxed font-normal" classSpec="text-base font-normal" pixelSize="16px" weight="Regular (400)" usage="Standard Body Copy, bios, and descriptions." />
                                      <TypographyScaleRow role="Data Value" sample="Emo / Indie Rock" className="text-sm font-normal text-zinc-200" classSpec="text-sm font-normal" pixelSize="14px" weight="Regular" usage="Key data points within cards and details panels. Kept static at 14px across all breakpoints to ensure optimum scannability without layout fracturing." />
                                      <TypographyScaleRow role="Body (Small)" sample="The quick brown fox jumps over the lazy dog." className="text-sm text-zinc-400 font-normal" classSpec="text-sm font-normal" pixelSize="14px" weight="Regular (400)" usage="Compact UI Elements." />
@@ -497,7 +497,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                      <TypographyScaleRow role="Hero Title (H1)" sample="Be the Author" className="text-4xl font-bold tracking-tighter" classSpec="text-4xl font-bold" pixelSize="36px" weight="Bold (700)" usage="Landing page headlines." />
                                      <TypographyScaleRow role="Section Title (H2)" sample="Discover Music" className="text-3xl font-bold tracking-tight" classSpec="text-3xl font-bold" pixelSize="30px" weight="Bold (700)" usage="Major section headers." />
                                      <TypographyScaleRow role="Lead / Subtitle" sample="Combine the power of AI..." className="text-lg font-medium" classSpec="text-lg font-medium" pixelSize="18px" weight="Medium (500)" usage="Introductory text." />
-                                     <TypographyScaleRow role="Panel Title (H3)" sample="Deep Cut" className="text-base font-semibold uppercase tracking-wider" classSpec="text-base font-semibold uppercase tracking-wider" pixelSize="16px" weight="Semibold (600)" usage="Panel headers." />
+                                     <TypographyScaleRow role="Panel Title (H3)" sample="Deep Cut" className="text-base font-medium uppercase tracking-widest" classSpec="text-base font-medium uppercase tracking-widest" pixelSize="16px" weight="Medium (500)" usage="Panel headers." />
                                      <TypographyScaleRow role="Body (Content)" sample="The quick brown fox jumps over the lazy dog." className="text-sm text-zinc-300 font-normal" classSpec="text-sm font-normal" pixelSize="14px" weight="Regular (400)" usage="Max readability." />
                                 </div>
                             </div>
@@ -512,7 +512,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 </div>
                                 <div className="space-y-6">
                                      <TypographyScaleRow role="Caption / Tiny" sample="METADATA • 2025" className="text-xs font-medium uppercase tracking-widest text-zinc-500" classSpec="text-xs" pixelSize="12px" weight="Medium (500)" usage="Metadata, tags, and timestamps (Same on all breakpoints)." />
-                                     <TypographyScaleRow role="Micro / Label" sample="GENRE" className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500" classSpec="text-[10px] font-bold" pixelSize="10px" weight="Bold (700)" usage="High-density metadata labels and small caps headers." />
+                                     <TypographyScaleRow role="Micro / Label" sample="GENRE" className="text-[10px] font-medium uppercase tracking-[0.2em] text-zinc-500" classSpec="text-[10px] font-medium" pixelSize="10px" weight="Medium (500)" usage="High-density metadata labels and small caps category headers." />
                                 </div>
                             </div>
 
@@ -2812,12 +2812,12 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="space-y-6">
                                      <h3 className="text-xl font-medium text-zinc-200">Desktop (lg+)</h3>
                                     <div className="p-6 bg-zinc-950 rounded-xl border border-zinc-800 aspect-video relative flex gap-2">
-                                        <div className="w-1/4 h-full bg-zinc-900 border border-zinc-800 rounded-xl flex items-center justify-center text-[10px] text-zinc-600 font-semibold uppercase tracking-widest">Artists</div>
+                                         <div className="w-1/4 h-full bg-zinc-900 border border-zinc-800 rounded-xl flex items-center justify-center text-[10px] text-zinc-600 font-medium uppercase tracking-widest">Artists</div>
                                         <div className="flex-grow h-full bg-zinc-900 border border-zinc-800 rounded-xl flex flex-col">
-                                            <div className="flex-grow flex items-center justify-center text-[10px] text-zinc-600 font-semibold uppercase tracking-widest">Spiderweb</div>
+                                            <div className="flex-grow flex items-center justify-center text-[10px] text-zinc-600 font-medium uppercase tracking-widest">Spiderweb</div>
                                             <div className="h-8 bg-zinc-800 border-t border-zinc-700 mx-2 mb-2 rounded-xl flex items-center justify-center text-[8px] text-zinc-500">Ad Space</div>
                                         </div>
-                                        <div className="w-1/4 h-full bg-zinc-900 border border-zinc-800 rounded-xl flex items-center justify-center text-[10px] text-zinc-600 font-semibold uppercase tracking-widest">Deep Cut</div>
+                                        <div className="w-1/4 h-full bg-zinc-900 border border-zinc-800 rounded-xl flex items-center justify-center text-[10px] text-zinc-600 font-medium uppercase tracking-widest">Deep Cut</div>
                                     </div>
                                     <p className="text-sm text-zinc-400 leading-relaxed">
                                         Three-column flexible layout. Panels support custom width dragging via manual handlers. Central column adapts its width for responsive ad placement using ResizeObserver. Left panel automatically collapses when a node is selected on the D3 graph to yield space to the canvas.
@@ -2832,7 +2832,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <div className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center justify-center text-[8px] text-zinc-600">TAB 2</div>
                                             <div className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center justify-center text-[8px] text-zinc-600">TAB 3</div>
                                         </div>
-                                        <div className="flex-grow bg-zinc-900 border border-zinc-800 rounded-xl flex items-center justify-center text-[10px] text-zinc-600 font-semibold uppercase tracking-widest">Panel View</div>
+                                        <div className="flex-grow bg-zinc-900 border border-zinc-800 rounded-xl flex items-center justify-center text-[10px] text-zinc-600 font-medium uppercase tracking-widest">Panel View</div>
                                         <div className="h-6 bg-zinc-800 border-t border-zinc-700 mt-2 rounded-xl flex items-center justify-center text-[8px] text-zinc-500">Fixed Footer Ad</div>
                                     </div>
                                     <p className="text-sm text-zinc-400 leading-relaxed">

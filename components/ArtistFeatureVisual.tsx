@@ -17,7 +17,7 @@ const ArtistFeatureVisual: React.FC<{ className?: string }> = ({ className }) =>
                 {/* Header (Matching App's Panel Header) */}
                 <div className="h-12 flex-shrink-0 border-b border-zinc-600/50 flex items-center justify-between px-4 bg-zinc-900 relative z-[60]">
                     <div className="flex items-center gap-2 overflow-hidden">
-                        <h2 className="text-base text-white font-semibold uppercase tracking-wider whitespace-nowrap">Artists</h2>
+                        <h2 className="text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Artists</h2>
                         <span className="h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border transition-all duration-500 shadow-sm bg-brand-black text-primary border-primary/50">
                             2
                         </span>
@@ -58,7 +58,7 @@ const ArtistFeatureVisual: React.FC<{ className?: string }> = ({ className }) =>
                         </div>
 
                         <div className="px-4 pt-2 pb-4">
-                            <h3 className="text-[10px] font-bold mb-2 uppercase tracking-widest text-zinc-500">Seed Artists</h3>
+                            <h3 className="text-[10px] font-medium mb-2 uppercase tracking-widest text-zinc-500">Seed Artists</h3>
                             <div className="space-y-1">
                                 <div className="flex items-center gap-1 group">
                                     <div className="flex items-center gap-3 flex-grow overflow-hidden text-left p-2 rounded-xl bg-zinc-700/60 text-white backdrop-blur-sm transition-all border border-transparent">

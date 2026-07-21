@@ -18,7 +18,7 @@ const CollectionIntelligenceVisual: React.FC<{ className?: string }> = ({ classN
                 {/* Header (Matching DetailsPanel Header) */}
                 <div className="h-12 flex-shrink-0 border-b border-zinc-600/50 flex items-center justify-between px-4 bg-zinc-900 relative z-20">
                     <div className="flex items-center gap-2">
-                        <h2 className="text-base text-white font-semibold uppercase tracking-wider whitespace-nowrap">Deep Cut</h2>
+                        <h2 className="text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Deep Cut</h2>
                         <span className="h-5 w-5 flex flex-shrink-0 items-center justify-center text-[9px] font-bold border rounded-md transition-all duration-500 bg-brand-black text-primary border-primary/50">
                             4
                         </span>

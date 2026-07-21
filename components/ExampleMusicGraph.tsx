@@ -466,7 +466,7 @@ const ExampleMusicGraph: React.FC = () => {
                 {/* Header (Matching GraphPage Spiderweb Header) */}
                 <div className="h-12 px-4 flex-shrink-0 border-b border-zinc-600/50 flex items-center justify-between overflow-hidden bg-zinc-900 relative z-20">
                     <div className="flex items-center gap-2">
-                        <h2 className="text-sm sm:text-base text-white font-semibold uppercase tracking-wider whitespace-nowrap">Spiderweb</h2>
+                        <h2 className="text-sm sm:text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Spiderweb</h2>
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                         <div className="relative flex items-center gap-2">

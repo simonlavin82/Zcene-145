@@ -722,7 +722,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                         <div className="space-y-10 text-zinc-300 pb-16">
                             {/* Compatibility Meter */}
                             <div className="flex flex-col gap-1.5 w-full">
-                                <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">
+                                <div className="flex items-center justify-between text-[10px] font-medium uppercase tracking-[0.2em] text-zinc-400">
                                     <span>MY TASTE</span>
                                     {tasteCompatibility.hasTasteData ? (
                                         <span className="font-mono text-[#a855f7] font-bold">
@@ -1422,7 +1422,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     <div className="px-4 flex flex-col gap-3">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                                <h2 className="text-base text-white font-semibold uppercase tracking-wider">Deep Cut</h2>
+                                <h2 className="text-base text-white font-medium uppercase tracking-widest">Deep Cut</h2>
                                 <span className="h-5 w-5 flex items-center justify-center text-[9px] font-bold border rounded-md bg-zinc-800 text-zinc-500 border-zinc-700">
                                     {activeNodes.length}
                                 </span>
@@ -1472,7 +1472,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                         <div className="max-w-[1400px] mx-auto w-full h-full px-4 md:px-6 lg:px-8 flex items-center justify-between relative">
                             <div className="flex items-center gap-4 overflow-hidden w-full">
                                 <div className="flex items-center gap-2">
-                                    <h2 className="text-base text-white font-semibold uppercase tracking-wider whitespace-nowrap">Deep Cut</h2>
+                                    <h2 className="text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Deep Cut</h2>
                                     <span className={`h-5 w-5 flex flex-shrink-0 items-center justify-center text-[9px] font-bold border rounded-md transition-all duration-500 ${unreadCount > 0 ? 'bg-brand-black text-primary border-primary/50' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>
                                         {activeNodes.length}
                                     </span>
@@ -1527,7 +1527,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                         {!isCollapsed && (
                             <div className="flex items-center gap-4 overflow-hidden">
                                 <div className="flex items-center gap-2">
-                                    <h2 className="text-base text-white font-semibold uppercase tracking-wider whitespace-nowrap">Deep Cut</h2>
+                                    <h2 className="text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Deep Cut</h2>
                                     <span className={`h-5 w-5 flex flex-shrink-0 items-center justify-center text-[9px] font-bold border rounded-md transition-all duration-500 ${unreadCount > 0 ? 'bg-brand-black text-primary border-primary/50' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>
                                         {activeNodes.length}
                                     </span>
