@@ -415,11 +415,13 @@ Serial Fetch & Backoff Strategy in App.tsx and OS-level stability logic.
    - Markdown Bio Styling Parity: The synthesis rationale payload is parsed and rendered natively via standard Markdown components using the .markdown-bio design guidelines. This ensures bullet points, paragraph spacing, and bold key term highlighting maintain consistent scannability aesthetics with the Deep Cut biographies.
    - Generative Formatting Source Controls: The core generation template strictly commands the AI model to output tightly packed bullet lists (no double newlines between list items) and to emit standard JSON string encodings, strictly prohibiting raw \`\\\\n\` literals or malformed symbols to avoid layout breakages.
    - Frontend Rendering Sanitization & Layout Constraints: The SharedModals renderer enforces a robust RegEx normalization pass to scrub stray \`•\` characters and collapse broken loose-list spacing, while the root CSS uses \`list-outside pl-4\` to ensure markdown-rendered \`<p>\` blocks stay perfectly inline with their bullet markers.
+   - Regression Prevention (The "Why"): Previous iterations used \`list-inside\` which forced markdown loose-lists (where text is wrapped in \`<p>\` tags) to drop below the bullet point. The strict AI prompt prevents loose lists entirely, while \`list-outside\` serves as a visual safeguard for legacy databases. Future styling must NEVER revert markdown lists to \`list-inside\`.
 
 10. AUTOMATIC DEEP CUT BACKGROUND BATCH-HYDRATION (App.tsx):
     - Active Node Initialization: When a project is loaded from cache (via handleSnap or initial mount), the frontend actively maps all available artist IDs from the graph's nodes array directly into the \`activeNodeIds\` state queue.
     - Client-Side Sparse Queue Fallback: To support legacy or cached projects where the database's \`activeNodes\` array was hardcoded or sparse (e.g., length <= 1), the loader gracefully falls back to injecting all discovered graph artists, ensuring the Deep Cut panel always opens fully populated without requiring manual user clicks on the spiderweb.
     - Continuous Session Sync: Auto-queueing strictly runs as a one-time initialization event. During the active session, the \`activeNodeIds\` queue safely mutates in isolation, respecting the user's manual curation (such as deleting or prioritizing nodes) without disruptive background overwrites.
+    - Regression Prevention (The "Why"): Previously, cached projects loaded with empty queues, forcing users to manually click every node to re-hydrate the Deep Cut panel. This frontend fallback ensures legacy databases hydrate gracefully, while continuous session sync prevents auto-population from overwriting deliberate user deletions during an active session.
 `;
 
 const SHARING_FLOW_DOCUMENTATION = `
@@ -462,6 +464,7 @@ To prevent data rot, API failures, and visual rendering regressions, the synthes
    - Omitting activeNodes from the completion write leaves the project document
      with activeNodes: [] (set at creation time), causing the Deep Cut panel to
      permanently display 0 and flicker on every subsequent project load.
+   - Regression Prevention (The "Why"): Fragmented backend writes meant the frontend had to guess queue state. By computing the full native queue server-side from \`graphData\` and bundling it atomically, we prevent race conditions where the UI flashes empty before hydration. Ensure all future Cloud Function updates maintain this atomic multi-field \`updateDoc\`.
    - This ensures that Firestore documents are never committed in a fragmented,
      "half-made" state that bypasses schema validation.
 
