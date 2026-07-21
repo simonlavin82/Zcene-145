@@ -2005,99 +2005,53 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <h3 className="text-xl font-medium text-zinc-200">Dropdowns & Selects</h3>
                                     <div className="flex flex-wrap gap-2">
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Radius: 12px / rounded-xl</span>
-                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Height: 38px / py-2</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Height: 38px / py-2.5</span>
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Padding: px-4</span>
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Font: 14px / text-sm</span>
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-12 bg-zinc-900/30 p-8 rounded-none border border-zinc-800">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-zinc-900/30 p-8 rounded-none border border-zinc-800">
                                     <div className="space-y-4">
-                                        <p className="text-xs text-zinc-500 uppercase tracking-widest">Standard Select</p>
+                                        <p className="text-xs text-zinc-500 uppercase tracking-widest font-semibold">Standard Select</p>
                                         <div className="relative">
-                                            <select className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-zinc-300 py-2 px-4 text-sm focus:ring-1 focus:ring-primary focus:outline-none">
+                                            <select className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-zinc-300 py-2.5 px-4 text-sm focus:ring-1 focus:ring-primary focus:outline-none cursor-pointer">
                                                 <option>Sort by Relevance</option>
                                                 <option>Sort by Date</option>
                                                 <option>Sort by Name</option>
                                             </select>
                                             <span className="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 !text-[18px]">arrow_drop_down</span>
                                         </div>
-                                    </div>
-                                    <div className="space-y-4">
-                                        <p className="text-xs text-zinc-500 uppercase tracking-widest">Implementation Note</p>
-                                        <p className="text-sm text-zinc-400 leading-relaxed">
-                                            Select elements use the same responsive padding and font-size logic as text inputs. We use a custom <strong>arrow_drop_down</strong> icon positioned absolutely to maintain brand consistency across browsers.
+                                        <p className="text-xs text-zinc-500 leading-relaxed">
+                                            Native select input styled with a custom <strong>arrow_drop_down</strong> icon for browser-native dropdown menus.
                                         </p>
                                     </div>
-                                </div>
 
-                                {/* Dropdown Blueprint Section */}
-                                <div className="mt-8 p-6 bg-zinc-950 border border-dashed border-zinc-800 rounded-xl space-y-6">
-                                    <h4 className="text-xs font-semibold text-primary uppercase tracking-widest flex items-center gap-2">
-                                        <span className="material-symbols-outlined !text-[14px]">architecture</span>
-                                        Dropdown Blueprint & Detailed Specification
-                                    </h4>
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-                                        {/* Visual Blueprint Diagram */}
-                                        <div className="p-6 bg-zinc-900/50 rounded-lg border border-zinc-800 flex flex-col items-center justify-center relative min-h-[160px] overflow-hidden">
-                                            <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:14px_24px] pointer-events-none" />
-                                            
-                                            {/* Blueprint Container */}
-                                            <div className="relative w-full max-w-[240px] h-[38px] bg-zinc-950 border border-zinc-800 rounded-xl flex items-center justify-between px-4 z-10 shadow-lg">
-                                                {/* Left padding indicator line */}
-                                                <div className="absolute left-0 top-0 bottom-0 w-4 bg-primary/10 border-r border-dashed border-primary/30 flex items-center justify-center">
-                                                    <span className="text-[7px] text-primary font-mono select-none">px-4</span>
+                                    <div className="space-y-4">
+                                        <p className="text-xs text-zinc-500 uppercase tracking-widest font-semibold">Searchable &amp; Filterable Country Select</p>
+                                        <div className="relative">
+                                            <div className="relative flex items-center">
+                                                <input 
+                                                    type="text" 
+                                                    placeholder="Select or type country/region"
+                                                    defaultValue="United States"
+                                                    readOnly
+                                                    className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2.5 pl-4 pr-10 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+                                                />
+                                                <span className="material-symbols-outlined pointer-events-none absolute right-3 text-zinc-400 !text-[18px]">arrow_drop_down</span>
+                                            </div>
+                                            <div className="mt-1 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl p-1 text-xs space-y-0.5">
+                                                <div className="px-3 py-1.5 bg-primary/10 text-primary font-semibold rounded-lg flex items-center justify-between">
+                                                    <span>United States</span>
+                                                    <span className="material-symbols-outlined !text-[14px]">check</span>
                                                 </div>
-                                                
-                                                <span className="text-xs font-semibold text-zinc-300 ml-4 select-none">Most Recent</span>
-                                                
-                                                {/* Right-aligned icon with padding indicator */}
-                                                <div className="flex items-center gap-1.5">
-                                                    <span className="material-symbols-outlined text-zinc-400 !text-[20px] bg-zinc-800/80 p-0.5 rounded border border-zinc-700/50">arrow_drop_down</span>
-                                                    {/* Right padding indicator line */}
-                                                    <div className="absolute right-0 top-0 bottom-0 w-4 bg-primary/10 border-l border-dashed border-primary/30 flex items-center justify-center">
-                                                        <span className="text-[7px] text-primary font-mono select-none">px-4</span>
-                                                    </div>
+                                                <div className="px-3 py-1.5 text-zinc-300 hover:text-white hover:bg-zinc-800 rounded-lg flex items-center justify-between">
+                                                    <span>United Kingdom</span>
                                                 </div>
                                             </div>
-                                            <div className="mt-4 text-[10px] text-zinc-500 font-mono flex gap-4 z-10">
-                                                <span>Height: 38px</span>
-                                                <span>Radius: 12px (rounded-xl)</span>
-                                            </div>
                                         </div>
-                                        
-                                        {/* Specification Labels */}
-                                        <div className="space-y-4 z-10 text-xs">
-                                            <div className="border-l-2 border-primary pl-3 py-0.5">
-                                                <p className="font-semibold text-zinc-200 uppercase tracking-wider text-[10px]">Outer Structure</p>
-                                                <p className="text-zinc-400 mt-1 font-mono">
-                                                    Height: <code className="text-primary bg-zinc-900 px-1 py-0.5 rounded text-[10px]">h-[38px]</code> (38px)
-                                                </p>
-                                                <p className="text-zinc-400 mt-0.5 font-mono">
-                                                    Corner Radius: <code className="text-primary bg-zinc-900 px-1 py-0.5 rounded text-[10px]">rounded-xl</code> (12px)
-                                                </p>
-                                                <p className="text-zinc-400 mt-0.5 font-mono">
-                                                    Border: <code className="text-primary bg-zinc-900 px-1 py-0.5 rounded text-[10px]">border-zinc-800</code>
-                                                </p>
-                                            </div>
-                                            <div className="border-l-2 border-primary pl-3 py-0.5">
-                                                <p className="font-semibold text-zinc-200 uppercase tracking-wider text-[10px]">Internal Structure</p>
-                                                <p className="text-zinc-400 mt-1 font-mono">
-                                                    Horizontal Padding: <code className="text-primary bg-zinc-900 px-1 py-0.5 rounded text-[10px]">px-4</code> for alignment buffer
-                                                </p>
-                                            </div>
-                                            <div className="border-l-2 border-primary pl-3 py-0.5">
-                                                <p className="font-semibold text-zinc-200 uppercase tracking-wider text-[10px]">Icon Spec & Alignment</p>
-                                                <p className="text-zinc-400 mt-1 font-mono">
-                                                    Icon: Material-symbols <code className="text-primary bg-zinc-900 px-1 py-0.5 rounded text-[10px]">'arrow_drop_down'</code>
-                                                </p>
-                                                <p className="text-zinc-400 mt-0.5 font-mono">
-                                                    Sizing: exactly <code className="text-primary bg-zinc-900 px-1 py-0.5 rounded text-[10px]">20px</code>
-                                                </p>
-                                                <p className="text-zinc-400 mt-0.5 font-mono">
-                                                    Position: positioned right-aligned (absolute or flex layout)
-                                                </p>
-                                            </div>
-                                        </div>
+                                        <p className="text-xs text-zinc-500 leading-relaxed">
+                                            Interactive filterable search dropdown component used in Live AI Validation modal to type or select built-in regions cleanly.
+                                        </p>
                                     </div>
                                 </div>
                             </div>

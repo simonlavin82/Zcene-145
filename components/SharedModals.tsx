@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { StackItem, Node, UserTaste } from '../types';
 import { StackIcon } from './Icons';
 import Markdown from 'react-markdown';
@@ -673,6 +673,117 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
   const [overrideInput, setOverrideInput] = useState('');
   if (!isOpen) return null;
 
+const COMMON_COUNTRIES = [
+  'United States',
+  'United Kingdom',
+  'Japan',
+  'Germany',
+  'France',
+  'Canada',
+  'Australia',
+  'Sweden',
+  'Brazil',
+  'Mexico',
+  'Jamaica',
+  'Italy',
+  'Spain',
+  'Netherlands',
+  'Norway',
+  'South Korea',
+  'Puerto Rico',
+  'Argentina',
+  'Ireland',
+  'New Zealand',
+  'Finland',
+  'Denmark',
+  'Belgium',
+  'Nigeria',
+  'South Africa',
+  'Colombia',
+  'Chile',
+  'Poland',
+  'Iceland'
+];
+
+interface CountryFilterDropdownProps {
+  value: string;
+  onChange: (value: string) => void;
+}
+
+const CountryFilterDropdown: React.FC<CountryFilterDropdownProps> = ({ value, onChange }) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const filtered = useMemo(() => {
+    if (!value.trim()) return COMMON_COUNTRIES;
+    const q = value.toLowerCase().trim();
+    return COMMON_COUNTRIES.filter(c => c.toLowerCase().includes(q));
+  }, [value]);
+
+  return (
+    <div className="relative w-full">
+      <div className="relative flex items-center">
+        <input 
+          type="text" 
+          placeholder="Can't find your version? Select or type country/region"
+          value={value}
+          onFocus={() => setIsOpen(true)}
+          onChange={e => {
+            onChange(e.target.value);
+            setIsOpen(true);
+          }}
+          className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2.5 pl-4 pr-10 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200"
+        />
+        <button
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          className="absolute right-2.5 text-zinc-400 hover:text-white p-1 rounded-lg transition-colors flex items-center justify-center cursor-pointer"
+        >
+          <span className="material-symbols-outlined !text-[18px]">
+            {isOpen ? 'arrow_drop_up' : 'arrow_drop_down'}
+          </span>
+        </button>
+      </div>
+
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+          <div className="absolute left-0 right-0 top-full mt-1.5 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl max-h-48 overflow-y-auto z-50 scrollbar-thin py-1">
+            {filtered.length > 0 ? (
+              filtered.map((country) => {
+                const isSelected = value.toLowerCase().trim() === country.toLowerCase();
+                return (
+                  <button
+                    type="button"
+                    key={country}
+                    onClick={() => {
+                      onChange(country);
+                      setIsOpen(false);
+                    }}
+                    className={`w-full px-4 py-2 text-left text-xs font-medium transition-colors flex items-center justify-between cursor-pointer ${
+                      isSelected 
+                        ? 'bg-primary/10 text-primary font-semibold' 
+                        : 'text-zinc-300 hover:text-white hover:bg-zinc-800'
+                    }`}
+                  >
+                    <span>{country}</span>
+                    {isSelected && (
+                      <span className="material-symbols-outlined text-primary !text-[14px]">check</span>
+                    )}
+                  </button>
+                );
+              })
+            ) : (
+              <div className="px-4 py-2.5 text-xs text-zinc-500 font-mono italic">
+                Custom region "{value}" (press Enter or Synthesize to submit)
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
   // ── STATE A: Cache Miss (0 candidates in cache) ───────────────────────────
   if (candidates.length === 0) {
     return (
@@ -711,13 +822,7 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
 
             {isLiveAISuggestions && (
               <div className="flex flex-col gap-2 pt-1">
-                <input 
-                  type="text" 
-                  placeholder="Can't find your version? Enter country/region"
-                  value={overrideInput}
-                  onChange={e => setOverrideInput(e.target.value)}
-                  className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2.5 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200"
-                />
+                <CountryFilterDropdown value={overrideInput} onChange={setOverrideInput} />
               </div>
             )}
           </div>
@@ -809,13 +914,7 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
 
             {isLiveAISuggestions && (
               <div className="flex flex-col gap-2 pt-1">
-                <input 
-                  type="text" 
-                  placeholder="Can't find your version? Enter country/region"
-                  value={overrideInput}
-                  onChange={e => setOverrideInput(e.target.value)}
-                  className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2.5 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200"
-                />
+                <CountryFilterDropdown value={overrideInput} onChange={setOverrideInput} />
               </div>
             )}
           </div>
@@ -910,13 +1009,7 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
 
           {isLiveAISuggestions && (
             <div className="flex flex-col gap-2 pt-1">
-              <input 
-                type="text" 
-                placeholder="Can't find your version? Enter country/region"
-                value={overrideInput}
-                onChange={e => setOverrideInput(e.target.value)}
-                className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2.5 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200"
-              />
+              <CountryFilterDropdown value={overrideInput} onChange={setOverrideInput} />
             </div>
           )}
         </div>
