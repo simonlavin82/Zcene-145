@@ -1135,10 +1135,10 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 </div>
                             </div>
 
-                            {/* Dialog Secondary / Ghost Buttons */}
+                            {/* Secondary Buttons (Bordered Utility & Catalog Actions) */}
                             <div>
                                 <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
-                                    <h3 className="text-xl font-medium text-zinc-200">Dialog Secondary / Ghost Buttons</h3>
+                                    <h3 className="text-xl font-medium text-zinc-200">Secondary Buttons</h3>
                                     <div className="flex flex-wrap gap-2">
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Radius: 12px / rounded-xl</span>
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Height: 38px</span>
@@ -1147,43 +1147,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                 </div>
                                 <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
-                                    Clean text and ghost action buttons used exclusively for dialog dismissal (e.g. <strong>Cancel</strong> buttons in modals and prompt overlays). Designed to recede visually so the primary CTA retains absolute user focus.
-                                </p>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
-                                    <div className="space-y-4">
-                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Default Status</p>
-                                        <button className="w-full px-4 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent">
-                                            Cancel
-                                        </button>
-                                    </div>
-                                    <div className="space-y-4">
-                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover / Active Status</p>
-                                        <button className="w-full px-4 py-2 text-white bg-zinc-800 text-sm font-medium rounded-xl transition-colors border border-zinc-700">
-                                            Cancel
-                                        </button>
-                                    </div>
-                                    <div className="space-y-4">
-                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Disabled Status</p>
-                                        <button disabled className="w-full px-4 py-2 text-zinc-600 text-sm font-medium rounded-xl opacity-50 cursor-not-allowed border border-transparent">
-                                            Cancel
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Catalog & Utility Bordered Buttons */}
-                            <div>
-                                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
-                                    <h3 className="text-xl font-medium text-zinc-200">Catalog &amp; Utility Bordered Buttons</h3>
-                                    <div className="flex flex-wrap gap-2">
-                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Radius: 12px / rounded-xl</span>
-                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Height: 38px</span>
-                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Padding: px-4 py-2</span>
-                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Font: 14px / text-sm</span>
-                                    </div>
-                                </div>
-                                <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
-                                    Solid dark-background buttons with defined 1px borders used for secondary external catalog links (e.g. <strong>Official Website</strong>, <strong>Watch on YouTube</strong> in the Deep Cut panel) and structured utility actions. They provide distinct visual substance to distinguish catalog items from ghost dialog buttons.
+                                    Solid dark-background buttons with defined 1px borders used as our standard secondary interactive buttons across the application, including panel utility actions and external catalog links (e.g. <strong>Official Website</strong>, <strong>Watch on YouTube</strong> in the Deep Cut panel). They provide distinct visual substance and structure.
                                 </p>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
                                     <div className="space-y-4">
@@ -1206,6 +1170,42 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <span className="material-symbols-outlined !text-[18px]">public</span>
                                             <span>Official Website</span>
                                         </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Tertiary / Ghost Buttons */}
+                            <div>
+                                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
+                                    <h3 className="text-xl font-medium text-zinc-200">Tertiary / Ghost Buttons</h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Radius: 12px / rounded-xl</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Height: 38px</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Padding: px-4 py-2</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Font: 14px / text-sm</span>
+                                    </div>
+                                </div>
+                                <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
+                                    Transparent text-only buttons used for low-emphasis secondary/tertiary interactions and modal dismissals (e.g. <strong>Cancel</strong> buttons in dialogs and prompt overlays). Designed to recede visually so Primary and Secondary actions retain focus.
+                                </p>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
+                                    <div className="space-y-4">
+                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Default Status</p>
+                                        <button className="w-full px-4 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent">
+                                            Cancel
+                                        </button>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover / Active Status</p>
+                                        <button className="w-full px-4 py-2 text-white bg-zinc-800 text-sm font-medium rounded-xl transition-colors border border-zinc-700">
+                                            Cancel
+                                        </button>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Disabled Status</p>
+                                        <button disabled className="w-full px-4 py-2 text-zinc-600 text-sm font-medium rounded-xl opacity-50 cursor-not-allowed border border-transparent">
+                                            Cancel
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -1240,14 +1240,11 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 </div>
                             </div>
 
-                            {/* Utility Bordered Buttons */}
+                            {/* Utility Pill Controls */}
                             <div>
                                 <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
-                                    <h3 className="text-xl font-medium text-zinc-200">Utility Bordered Buttons</h3>
+                                    <h3 className="text-xl font-medium text-zinc-200">Utility Pill Controls</h3>
                                     <div className="flex flex-wrap gap-2">
-                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Radius: 12px / rounded-xl</span>
-                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Height: 34px</span>
-                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Padding: px-4 py-1.5</span>
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Radius: 9999px (Pill)</span>
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Height: 32px</span>
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Padding: px-4</span>
@@ -1255,21 +1252,21 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                 </div>
                                 <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
-                                    Used for secondary workflows like file imports, library access, or non-destructive actions within panels.
+                                    Pill-shaped utility buttons used for secondary workflows like file imports, library access, or non-destructive actions within compact control headers.
                                 </p>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
                                      <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Default Status</p>
                                         <button className="w-full border border-zinc-600 text-zinc-300 px-4 py-1 rounded-full font-medium text-xs">Import Library</button>
-                                    </div>
-                                    <div className="space-y-4">
+                                     </div>
+                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover Status</p>
                                         <button className="w-full border border-zinc-500 text-white px-4 py-1 rounded-full font-medium bg-zinc-800 text-xs">Import Library</button>
-                                    </div>
-                                    <div className="space-y-4">
+                                     </div>
+                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Disabled Status</p>
                                         <button disabled className="w-full border border-zinc-700 text-zinc-500 px-4 py-1 rounded-full font-medium opacity-50 cursor-not-allowed text-xs">Import Library</button>
-                                    </div>
+                                     </div>
                                 </div>
                             </div>
 
