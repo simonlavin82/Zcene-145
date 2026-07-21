@@ -4905,15 +4905,23 @@ const App: React.FC = () => {
 
             // Restore active nodes — with seed-fallback for stale documents
             if (data.activeNodes && Array.isArray(data.activeNodes)) {
-              let resolvedActiveNodes = data.activeNodes;
-              if (resolvedActiveNodes.length === 0 && hydratedNodes.length > 0) {
+              if (data.activeNodes.length > 0) {
+                // User explicitly saved a session queue
+                setActiveNodeIds(data.activeNodes);
+              } else if (hydratedNodes.length > 0) {
+                // Ensure seeds are included, but DO NOT overwrite what batchHydrateDetailsCache just added
                 const seedList = (data.seedArtists || '').split('::').map((s: string) => s.trim()).filter(Boolean);
                 const seedSet = new Set(seedList.map((s: string) => normalizeArtistId(s)));
-                resolvedActiveNodes = hydratedNodes
+                const seedIds = hydratedNodes
                   .filter((n: any) => (n.type === 'artist' || !n.type) && seedSet.has(normalizeArtistId(n.id)))
                   .map((n: any) => n.id);
+                  
+                setActiveNodeIds(prev => {
+                  const updated = new Set(prev);
+                  seedIds.forEach(id => updated.add(id));
+                  return Array.from(updated);
+                });
               }
-              setActiveNodeIds(resolvedActiveNodes);
             }
 
 
@@ -4967,15 +4975,21 @@ const App: React.FC = () => {
               }
 
               if (data.activeNodes && Array.isArray(data.activeNodes)) {
-                let resolvedActiveNodes = data.activeNodes;
-                if (resolvedActiveNodes.length === 0 && g.nodes.length > 0) {
+                if (data.activeNodes.length > 0) {
+                  setActiveNodeIds(data.activeNodes);
+                } else if (g.nodes.length > 0) {
                   const seedList = (data.seedArtists || '').split('::').map((s: string) => s.trim()).filter(Boolean);
                   const seedSet = new Set(seedList.map((s: string) => normalizeArtistId(s)));
-                  resolvedActiveNodes = g.nodes
+                  const seedIds = g.nodes
                     .filter((n: any) => (n.type === 'artist' || !n.type) && seedSet.has(normalizeArtistId(n.id)))
                     .map((n: any) => n.id);
+                    
+                  setActiveNodeIds(prev => {
+                    const updated = new Set(prev);
+                    seedIds.forEach(id => updated.add(id));
+                    return Array.from(updated);
+                  });
                 }
-                setActiveNodeIds(resolvedActiveNodes);
               }
 
             } else {
@@ -4993,15 +5007,21 @@ const App: React.FC = () => {
                   setGraphData((prev: any) => isGraphEqual(prev, g) ? prev : g);
                   hydratedNodes = g.nodes;
                     if (data.activeNodes && Array.isArray(data.activeNodes)) {
-                      let resolvedActiveNodes = data.activeNodes;
-                      if (resolvedActiveNodes.length === 0 && g.nodes.length > 0) {
+                      if (data.activeNodes.length > 0) {
+                        setActiveNodeIds(data.activeNodes);
+                      } else if (g.nodes.length > 0) {
                         const seedList = (data.seedArtists || '').split('::').map((s: string) => s.trim()).filter(Boolean);
                         const seedSet = new Set(seedList.map((s: string) => normalizeArtistId(s)));
-                        resolvedActiveNodes = g.nodes
+                        const seedIds = g.nodes
                           .filter((n: any) => (n.type === 'artist' || !n.type) && seedSet.has(normalizeArtistId(n.id)))
                           .map((n: any) => n.id);
+                          
+                        setActiveNodeIds(prev => {
+                          const updated = new Set(prev);
+                          seedIds.forEach(id => updated.add(id));
+                          return Array.from(updated);
+                        });
                       }
-                      setActiveNodeIds(resolvedActiveNodes);
                     }
 
                 }
@@ -5049,21 +5069,22 @@ const App: React.FC = () => {
             }
 
             if (data.activeNodes && Array.isArray(data.activeNodes)) {
-              let resolvedActiveNodes = data.activeNodes;
-              if (resolvedActiveNodes.length === 0 && g.nodes.length > 0) {
-                if (preHydratedIds.length > 0) {
-                  // Eliminate friction: Pre-populate the deep cut queue with all available deep cuts
-                  resolvedActiveNodes = Array.from(new Set(preHydratedIds));
-                } else {
-                  // Fallback: seed artists only
-                  const seedList = (data.seedArtists || '').split('::').map((s: string) => s.trim()).filter(Boolean);
-                  const seedSet = new Set(seedList.map((s: string) => normalizeArtistId(s)));
-                  resolvedActiveNodes = g.nodes
-                    .filter((n: any) => (n.type === 'artist' || !n.type) && seedSet.has(normalizeArtistId(n.id)))
-                    .map((n: any) => n.id);
-                }
+              if (data.activeNodes.length > 0) {
+                setActiveNodeIds(data.activeNodes);
+              } else if (g.nodes.length > 0) {
+                const seedList = (data.seedArtists || '').split('::').map((s: string) => s.trim()).filter(Boolean);
+                const seedSet = new Set(seedList.map((s: string) => normalizeArtistId(s)));
+                const seedIds = g.nodes
+                  .filter((n: any) => (n.type === 'artist' || !n.type) && seedSet.has(normalizeArtistId(n.id)))
+                  .map((n: any) => n.id);
+                  
+                setActiveNodeIds(prev => {
+                  const updated = new Set(prev);
+                  preHydratedIds.forEach(id => updated.add(id));
+                  seedIds.forEach(id => updated.add(id));
+                  return Array.from(updated);
+                });
               }
-              setActiveNodeIds(resolvedActiveNodes);
             }
 
           }
