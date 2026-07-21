@@ -594,7 +594,14 @@ export const GenerativeRationaleModal: React.FC<{
 - Scene Context: Mapped direct influences, record label history, and geographic background.
 - Overlap Insights: Unified structural connections and surrounding chronological relationships.`;
 
-  const cleanRationaleLines = cleanRationale.split('\n').filter(line => {
+  // Sanitize literal escape sequences from the JSON payload
+  let sanitizedRationale = cleanRationale.replace(/\\n/g, '\n');
+
+  // Detect and clean up stray newline characters immediately following list markers (- or *)
+  // This prevents bullets from rendering isolated on their own line.
+  sanitizedRationale = sanitizedRationale.replace(/(^|\n)(\s*[\*\-]\s*)\n+/g, '$1$2');
+
+  const cleanRationaleLines = sanitizedRationale.split('\n').filter(line => {
     if (isFallback && line.trim().startsWith('[')) return false;
     return true;
   });
