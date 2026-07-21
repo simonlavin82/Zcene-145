@@ -1135,10 +1135,10 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 </div>
                             </div>
 
-                            {/* Secondary Buttons */}
+                            {/* Dialog Secondary / Ghost Buttons */}
                             <div>
                                 <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
-                                    <h3 className="text-xl font-medium text-zinc-200">Secondary Buttons</h3>
+                                    <h3 className="text-xl font-medium text-zinc-200">Dialog Secondary / Ghost Buttons</h3>
                                     <div className="flex flex-wrap gap-2">
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Radius: 12px / rounded-xl</span>
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Height: 38px</span>
@@ -1147,7 +1147,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                 </div>
                                 <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
-                                    Secondary and ghost action buttons used for modal dismissal (e.g. Cancel buttons in Dialogs), secondary form controls, or non-primary actions. Designed to maintain visual hierarchy next to Primary CTAs without creating competing noise.
+                                    Clean text and ghost action buttons used exclusively for dialog dismissal (e.g. <strong>Cancel</strong> buttons in modals and prompt overlays). Designed to recede visually so the primary CTA retains absolute user focus.
                                 </p>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
                                     <div className="space-y-4">
@@ -1167,6 +1167,45 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <button disabled className="w-full px-4 py-2 text-zinc-600 text-sm font-medium rounded-xl opacity-50 cursor-not-allowed border border-transparent">
                                             Cancel
                                         </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Catalog & Utility Bordered Buttons */}
+                            <div>
+                                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
+                                    <h3 className="text-xl font-medium text-zinc-200">Catalog &amp; Utility Bordered Buttons</h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Radius: 12px / rounded-xl</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Height: 38px</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Padding: px-4 py-2</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Font: 14px / text-sm</span>
+                                    </div>
+                                </div>
+                                <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
+                                    Solid dark-background buttons with defined 1px borders used for secondary external catalog links (e.g. <strong>Official Website</strong>, <strong>Watch on YouTube</strong> in the Deep Cut panel) and structured utility actions. They provide distinct visual substance to distinguish catalog items from ghost dialog buttons.
+                                </p>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
+                                    <div className="space-y-4">
+                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Default Status</p>
+                                        <div className="flex items-center justify-center px-4 py-2 bg-zinc-800 text-zinc-300 border border-zinc-700 rounded-xl font-medium text-sm gap-2.5">
+                                            <span className="material-symbols-outlined !text-[18px]">public</span>
+                                            <span>Official Website</span>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover / Active Status</p>
+                                        <div className="flex items-center justify-center px-4 py-2 bg-zinc-700 text-white border border-zinc-500 rounded-xl font-medium text-sm gap-2.5">
+                                            <span className="material-symbols-outlined !text-[18px]">play_circle</span>
+                                            <span>Watch on YouTube</span>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Disabled Status</p>
+                                        <div className="flex items-center justify-center px-4 py-2 bg-zinc-900/40 text-zinc-600 border border-zinc-800/80 rounded-xl font-medium text-sm gap-2.5 opacity-50 cursor-not-allowed">
+                                            <span className="material-symbols-outlined !text-[18px]">public</span>
+                                            <span>Official Website</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
