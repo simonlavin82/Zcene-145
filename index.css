@@ -86,7 +86,7 @@
     @apply text-white font-medium;
   }
   .markdown-bio ul {
-    @apply list-disc list-inside mb-4 space-y-1;
+    @apply list-disc list-outside pl-4 mb-4 space-y-2;
   }
   .markdown-bio li {
     @apply text-zinc-400;

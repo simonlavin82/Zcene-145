@@ -618,7 +618,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <div className="markdown-bio text-sm leading-relaxed text-zinc-300">
                                         <p><strong>The Get Up Kids</strong> were a defining force in the <strong>second wave of emo</strong> during the late 1990s. Their sound balanced raw emotional intensity with infectious pop-punk melodies.</p>
                                         <p>Key stylistic traits include:</p>
-                                        <ul className="list-disc list-inside space-y-1">
+                                        <ul className="list-disc list-outside pl-4 space-y-1">
                                             <li>Interlocking guitar melodies</li>
                                             <li>Earnest, high-energy vocals</li>
                                             <li>Dynamic song structures</li>
@@ -844,7 +844,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <div className="p-3 bg-zinc-900 rounded-lg border border-zinc-800 font-mono text-xs text-amber-300 overflow-x-auto">
                                             container mx-auto px-4 sm:px-6 lg:px-8
                                         </div>
-                                        <ul className="text-xs text-zinc-400 space-y-1.5 list-disc list-inside">
+                                        <ul className="text-xs text-zinc-400 space-y-1.5 list-disc list-outside pl-4">
                                             <li><strong className="text-zinc-200">Mobile (&lt;640px):</strong> <code className="text-zinc-300">px-4</code> (16px horizontal margin)</li>
                                             <li><strong className="text-zinc-200">Tablet (sm: 640px+):</strong> <code className="text-zinc-300">sm:px-6</code> (24px horizontal margin)</li>
                                             <li><strong className="text-zinc-200">Desktop (lg: 1024px+):</strong> <code className="text-zinc-300">lg:px-8</code> (32px horizontal margin)</li>
@@ -862,7 +862,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <div className="p-3 bg-zinc-900 rounded-lg border border-zinc-800 font-mono text-xs text-emerald-300 overflow-x-auto">
                                             absolute inset-0 w-full h-full
                                         </div>
-                                        <ul className="text-xs text-zinc-400 space-y-1.5 list-disc list-inside">
+                                        <ul className="text-xs text-zinc-400 space-y-1.5 list-disc list-outside pl-4">
                                             <li><strong className="text-zinc-200">Canvas Engine:</strong> Strictly edge-to-edge unconstrained viewport.</li>
                                             <li><strong className="text-zinc-200">Interactive Controls:</strong> Floating overlay panels anchored at viewport edges.</li>
                                             <li><strong className="text-zinc-200">Drawer Sidebars:</strong> Dynamic sliding panels overlaying active D3 canvas.</li>
@@ -1476,7 +1476,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <p className="text-sm text-zinc-400 leading-relaxed">
                                         Interactive selector controls use a custom <strong>12px border-radius</strong> (<code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-xl">rounded-xl</code>) outer container and <strong>8px button frames</strong> (<code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-lg">rounded-lg</code>) — deliberately separating them from our strict <strong>0px brutalist</strong> layout containers. The active icon is highlighted by a <strong>tight square sliding badge</strong> that neatly wraps exactly one icon.
                                     </p>
-                                    <ul className="text-xs text-zinc-500 space-y-2 list-disc list-inside">
+                                    <ul className="text-xs text-zinc-500 space-y-2 list-disc list-outside pl-4">
                                         <li><strong>Icon-only minimalism:</strong> No text labels — identity is communicated purely through the Material Symbol icons (Hub = Organic, Bubble Chart = Cluster, Grid View = Grid, List = Table, Schedule = Recent, Sort By Alpha = Alphabetical).</li>
                                         <li><strong>Proportional sliding active badge:</strong> A fixed <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-xl">w-8 h-8</code> <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-xl">bg-zinc-800</code> active block with a soft <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-[6px]">rounded-[6px]</code> radius slides proportionally between positions.</li>
                                         <li><strong>Outer & Button Radius:</strong> The main outer toggle container uses a soft <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-xl">rounded-xl</code> border radius, and the button frames use a matching concentric <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-lg">rounded-lg</code> to form a unified set.</li>
@@ -3256,7 +3256,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                     <div className="p-6 bg-zinc-950 border border-zinc-800 rounded-xl space-y-4 text-xs text-zinc-500 leading-relaxed">
                                         <h4 className="font-semibold text-zinc-400 uppercase tracking-widest">Specifications</h4>
-                                        <ul className="list-disc list-inside space-y-2">
+                                        <ul className="list-disc list-outside pl-4 space-y-2">
                                             <li><strong>Concentric Radius:</strong> Outer container radius is 12px (<code>rounded-xl</code>) and inner button radius is 8px (<code>rounded-lg</code>).</li>
                                             <li><strong>Animation:</strong> Spring-based badge transition (<code>stiffness: 480</code>, <code>damping: 38</code>).</li>
                                             <li><strong>Interactive Preview:</strong> Click the buttons in the panel on the left to test live physics and transitions.</li>
@@ -3404,7 +3404,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <p className="text-sm text-zinc-400 leading-relaxed">
                                             On Desktop, the advertisement container is anchored to the bottom of the central column (Spiderweb view). It is separated from the interactive map by a 2-pixel gap and is contained within its own <strong>bg-zinc-900 rounded-none</strong> box.
                                         </p>
-                                        <ul className="list-disc list-inside text-xs text-zinc-500 space-y-1">
+                                        <ul className="list-disc list-outside pl-4 text-xs text-zinc-500 space-y-1">
                                             <li>Resizing sidebars triggers an immediate ad swap if width cross-threshold occurs.</li>
                                             <li>Forced unmount/remount via React keys prevents "glitchy" overflows.</li>
                                         </ul>
@@ -3414,7 +3414,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <p className="text-sm text-zinc-400 leading-relaxed">
                                             On Mobile, the ad is placed in a dedicated flex-shrink-0 container at the very bottom of the viewport. It sits above the system home bar and is persistent across all three dashboard views.
                                         </p>
-                                        <ul className="list-disc list-inside text-xs text-zinc-500 space-y-1">
+                                        <ul className="list-disc list-outside pl-4 text-xs text-zinc-500 space-y-1">
                                             <li>Fixed position relative to the dashboard content.</li>
                                             <li>Standardized labels using bold Zinc-500 text at 10px.</li>
                                         </ul>

@@ -411,8 +411,15 @@ Serial Fetch & Backoff Strategy in App.tsx and OS-level stability logic.
    - AbortSignal Propagation: The client-side AbortController's signal is propagated directly down to the outbound fetch wrappers. If the query times out or is manually canceled by the user, the network request is immediately aborted to prevent leaking queries.
    - Quota-Rinsing Retry Mitigation: The network layer explicitly catches AbortErrors and excludes gateway timeouts/504 errors from automated transient retries, ensuring that aborted or timed-out requests do not rinse the API key's token quota.
 
-9. ROOTS BREAKDOWN SCANNABILITY FORMATTING (SharedModals.tsx / index.css):
+9. ROOTS BREAKDOWN SCANNABILITY FORMATTING (SharedModals.tsx / index.css / curatorService.ts):
    - Markdown Bio Styling Parity: The synthesis rationale payload is parsed and rendered natively via standard Markdown components using the .markdown-bio design guidelines. This ensures bullet points, paragraph spacing, and bold key term highlighting maintain consistent scannability aesthetics with the Deep Cut biographies.
+   - Generative Formatting Source Controls: The core generation template strictly commands the AI model to output tightly packed bullet lists (no double newlines between list items) and to emit standard JSON string encodings, strictly prohibiting raw \`\\\\n\` literals or malformed symbols to avoid layout breakages.
+   - Frontend Rendering Sanitization & Layout Constraints: The SharedModals renderer enforces a robust RegEx normalization pass to scrub stray \`•\` characters and collapse broken loose-list spacing, while the root CSS uses \`list-outside pl-4\` to ensure markdown-rendered \`<p>\` blocks stay perfectly inline with their bullet markers.
+
+10. AUTOMATIC DEEP CUT BACKGROUND BATCH-HYDRATION (App.tsx):
+    - Active Node Initialization: When a project is loaded from cache (via handleSnap or initial mount), the frontend actively maps all available artist IDs from the graph's nodes array directly into the \`activeNodeIds\` state queue.
+    - Client-Side Sparse Queue Fallback: To support legacy or cached projects where the database's \`activeNodes\` array was hardcoded or sparse (e.g., length <= 1), the loader gracefully falls back to injecting all discovered graph artists, ensuring the Deep Cut panel always opens fully populated without requiring manual user clicks on the spiderweb.
+    - Continuous Session Sync: Auto-queueing strictly runs as a one-time initialization event. During the active session, the \`activeNodeIds\` queue safely mutates in isolation, respecting the user's manual curation (such as deleting or prioritizing nodes) without disruptive background overwrites.
 `;
 
 const SHARING_FLOW_DOCUMENTATION = `
@@ -446,14 +453,13 @@ designed to minimize friction for new users while rewarding existing authors.
 const DATA_SYNTHESIS_PERSISTENCE_DOCUMENTATION = `
 To prevent data rot, API failures, and visual rendering regressions, the synthesis and persistence pipeline is governed by the following rules:
 
-1. ATOMICITY MANDATE (Direct Writes):
+1. ATOMICITY MANDATE & BACKEND CLOUD FUNCTION OPTIMIZATIONS:
    - All synthesized seed artist documents must bundle 'graphData', 'detailsCache',
      and 'activeNodes' in a single, atomic database write (either setDoc or updateDoc).
    - Writing 'graphData' (Phase 2 graph synthesis) as a fire-and-forget promise
      prior to details extraction is strictly banned.
-   - 'activeNodes' must be computed from the finished graphData (seed artist IDs
-     intersected with confirmed graph nodes) and included in the same write.
-     Omitting activeNodes from the completion write leaves the project document
+   - Native Queue Generation: The backend Cloud Function (\`onCurationJobCreated\`) explicitly computes the 'activeNodes' queue natively by extracting every generated artist ID from the final graphData. This ensures that the frontend's Deep Cut panel boots fully hydrated instantly from the database payload.
+   - Omitting activeNodes from the completion write leaves the project document
      with activeNodes: [] (set at creation time), causing the Deep Cut panel to
      permanently display 0 and flicker on every subsequent project load.
    - This ensures that Firestore documents are never committed in a fragmented,

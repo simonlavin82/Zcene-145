@@ -434,13 +434,6 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
             const artistIds = graphObj.nodes
                 ? graphObj.nodes.filter((n) => n.type === 'artist').map((n) => (0, curatorService_1.normalizeArtistId)(n.id))
                 : [];
-            // Derive the seed artist IDs to pre-populate activeNodes (the "DEEP CUTS" queue on the dashboard).
-            // The backend never previously wrote activeNodes, leaving it as [] from project creation,
-            // which caused the dashboard to always show DEEP CUTS: 0 for backend-generated projects.
-            const seedArtistIds = (inputPayload.artists || '')
-                .split('::')
-                .map((a) => (0, curatorService_1.normalizeArtistId)(a.trim()))
-                .filter((id) => id && artistIds.includes(id));
             await updateProjectStatus(jobData.userId, inputPayload.projectId, {
                 status: "completed",
                 graphData: JSON.stringify(result.graphData),
