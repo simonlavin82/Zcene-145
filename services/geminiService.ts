@@ -1351,11 +1351,6 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
           ]
         }
       ],
-      tools: [
-        {
-          googleSearch: {}
-        }
-      ],
       generationConfig: {
         maxOutputTokens: 4000,
       }
