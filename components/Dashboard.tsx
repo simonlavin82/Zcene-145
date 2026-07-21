@@ -470,28 +470,23 @@ const Dashboard: React.FC<DashboardProps> = ({
               );
             })}
               
-              {/* Standalone Add New Card Container */}
-              <div 
-                className="w-full bg-zinc-950/20 rounded-xl border border-dashed border-zinc-800/60 p-4 flex items-center justify-center h-[192px] flex-shrink-0"
-                style={{ maxWidth: '100%' }}
+              {/* Standalone Add New Card */}
+              <button 
+                onClick={onCreateProject}
+                disabled={isCreatingProject}
+                className="group relative bg-zinc-900 border-2 border-dashed border-zinc-700 rounded-none p-5 flex flex-col items-center justify-center gap-3 transition-all h-[180px] w-full max-w-[360px] sm:w-[360px] hover:border-primary/50 disabled:opacity-50 cursor-pointer overflow-hidden flex-shrink-0"
               >
-                <button 
-                  onClick={onCreateProject}
-                  disabled={isCreatingProject}
-                  className="group relative bg-zinc-900 border-2 border-dashed border-zinc-700 rounded-none p-5 flex flex-col items-center justify-center gap-3 transition-all h-[160px] w-full hover:border-primary/50 disabled:opacity-50 cursor-pointer overflow-hidden"
-                >
-                  <div className="w-10 h-10 rounded-full bg-zinc-800 group-hover:bg-primary group-hover:text-brand-black flex items-center justify-center text-zinc-550 transition-all relative z-10">
-                    {isCreatingProject ? (
-                      <span className="material-symbols-outlined animate-spin !text-2xl">progress_activity</span>
-                    ) : (
-                      <span className="material-symbols-outlined !text-2xl">add</span>
-                    )}
-                  </div>
-                  <span className="text-sm font-medium text-zinc-550 group-hover:text-zinc-350 transition-colors relative z-10 font-sans">
-                    {isCreatingProject ? 'Creating Zcene...' : 'Create New Zcene'}
-                  </span>
-                </button>
-              </div>
+                <div className="w-10 h-10 rounded-full bg-zinc-800 group-hover:bg-primary group-hover:text-brand-black flex items-center justify-center text-zinc-550 transition-all relative z-10">
+                  {isCreatingProject ? (
+                    <span className="material-symbols-outlined animate-spin !text-2xl">progress_activity</span>
+                  ) : (
+                    <span className="material-symbols-outlined !text-2xl">add</span>
+                  )}
+                </div>
+                <span className="text-sm font-medium text-zinc-550 group-hover:text-zinc-350 transition-colors relative z-10 font-sans">
+                  {isCreatingProject ? 'Creating Zcene...' : 'Create New Zcene'}
+                </span>
+              </button>
             </div>
           ) : (
             /* High-Contrast Tabular List View */
