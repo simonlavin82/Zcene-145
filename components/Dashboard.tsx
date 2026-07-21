@@ -330,13 +330,11 @@ const Dashboard: React.FC<DashboardProps> = ({
               {sortedBucketKeys.map((bucketKey) => {
                 const projectsInBucket = groupedProjects[bucketKey] || [];
                 const count = projectsInBucket.length;
-                let gridColsClass = "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
+                let gridColsClass = "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3";
                 if (count === 1) {
                   gridColsClass = "grid-cols-1";
                 } else if (count === 2) {
                   gridColsClass = "grid-cols-1 sm:grid-cols-2";
-                } else if (count === 3) {
-                  gridColsClass = "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3";
                 }
 
                 return (
@@ -352,7 +350,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     </div>
 
                     {/* Cards inside this parent record crate compartment */}
-                    <div className={`grid ${gridColsClass} gap-4 w-fit`}>
+                    <div className={`grid ${gridColsClass} gap-5 w-fit`}>
                       {projectsInBucket.map((project) => {
                       const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
                       const displayTitle = project.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene");

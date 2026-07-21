@@ -1638,8 +1638,8 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </div>
                                         <div>
                                             <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Card Wrapper Classes</p>
-                                            <code className="text-xs font-mono text-primary bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 block overflow-x-auto whitespace-nowrap">
-                                                grid [cols-class] gap-4 w-fit (dynamic cols-class based on card count)
+                                            <code className="text-xs font-mono text-primary bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-3 block overflow-x-auto whitespace-nowrap">
+                                                grid gap-5 w-fit (max 3 cols: grid-cols-1 sm:grid-cols-2 lg:grid-cols-3)
                                             </code>
                                         </div>
                                         <div>
