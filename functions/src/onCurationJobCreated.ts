@@ -344,7 +344,7 @@ export const onCurationJobCreated = onDocumentCreated({
           }
           if (!countryNorm) countryNorm = "global";
 
-          const disambiguatedCanonicalId = `${seedNorm}-${countryNorm}`;
+          const disambiguatedCanonicalId = seedNorm.endsWith(`-${countryNorm}`) ? seedNorm : `${seedNorm}-${countryNorm}`;
           const compositeCanonicalId = buildCompositeCacheKey(disambiguatedCanonicalId, inputPayload.filters || undefined);
 
           await db.collection("artists").doc(compositeCanonicalId).set({
@@ -426,7 +426,7 @@ export const onCurationJobCreated = onDocumentCreated({
           }
           if (!countryNorm) countryNorm = "global";
 
-          const disambiguatedCanonicalId = `${recNorm}-${countryNorm}`;
+          const disambiguatedCanonicalId = recNorm.endsWith(`-${countryNorm}`) ? recNorm : `${recNorm}-${countryNorm}`;
           const compositeCanonicalId = buildCompositeCacheKey(disambiguatedCanonicalId, inputPayload.filters || undefined);
 
           await db.collection("artists").doc(compositeCanonicalId).set({

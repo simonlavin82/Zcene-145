@@ -1884,7 +1884,7 @@ const App: React.FC = () => {
         
       if (connectedCountries.length > 0) {
         const countryNorm = normalizeArtistId(connectedCountries[0]);
-        if (countryNorm) disambiguatedCacheId = `${simpleId}-${countryNorm}`;
+        if (countryNorm) disambiguatedCacheId = simpleId.endsWith(`-${countryNorm}`) ? simpleId : `${simpleId}-${countryNorm}`;
       }
     }
 
@@ -4336,7 +4336,7 @@ const App: React.FC = () => {
       let cacheId = simpleId;
       if (connectedCountries.length > 0) {
         const countryNorm = normalizeArtistId(connectedCountries[0]);
-        if (countryNorm) cacheId = `${simpleId}-${countryNorm}`;
+        if (countryNorm) cacheId = simpleId.endsWith(`-${countryNorm}`) ? simpleId : `${simpleId}-${countryNorm}`;
       }
       
       try {
@@ -5820,7 +5820,7 @@ const App: React.FC = () => {
             
           if (connectedCountries.length > 0) {
             const countryNorm = normalizeArtistId(connectedCountries[0]);
-            if (countryNorm) disambiguatedCacheId = `${simpleId}-${countryNorm}`;
+            if (countryNorm) disambiguatedCacheId = simpleId.endsWith(`-${countryNorm}`) ? simpleId : `${simpleId}-${countryNorm}`;
           }
         }
 
@@ -5902,7 +5902,7 @@ const App: React.FC = () => {
           let disambiguatedCacheId = simpleId;
           if (connectedCountries.length > 0) {
             const countryNorm = normalizeArtistId(connectedCountries[0]);
-            if (countryNorm) disambiguatedCacheId = `${simpleId}-${countryNorm}`;
+            if (countryNorm) disambiguatedCacheId = simpleId.endsWith(`-${countryNorm}`) ? simpleId : `${simpleId}-${countryNorm}`;
           }
 
           const cachedVal = detailsCache.get(disambiguatedCacheId) || detailsCache.get(node.id) || detailsCache.get(node.id.toLowerCase());
@@ -6140,7 +6140,7 @@ const App: React.FC = () => {
                     let canonicalId = canonicalNameFromDetails ? normalizeArtistId(canonicalNameFromDetails) : simpleId;
                     if (freshCountries.length > 0) {
                       const countryNorm = normalizeArtistId(freshCountries[0]);
-                      if (countryNorm) canonicalId = `${canonicalId}-${countryNorm}`;
+                      if (countryNorm) canonicalId = canonicalId.endsWith(`-${countryNorm}`) ? canonicalId : `${canonicalId}-${countryNorm}`;
                     }
                     const isAlias = canonicalId !== cacheId;
 

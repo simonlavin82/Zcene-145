@@ -500,8 +500,8 @@ export const writeArtistCacheMany = async (
       }
       if (!countryNorm) countryNorm = "global";
 
-      const disambiguatedCanonicalId = `${canonicalId}-${countryNorm}`;
-      const disambiguatedArtistId = `${artistId}-${countryNorm}`;
+      const disambiguatedCanonicalId = canonicalId.endsWith(`-${countryNorm}`) ? canonicalId : `${canonicalId}-${countryNorm}`;
+      const disambiguatedArtistId = artistId.endsWith(`-${countryNorm}`) ? artistId : `${artistId}-${countryNorm}`;
 
       const compositeCanonicalId = buildCompositeCacheKey(disambiguatedCanonicalId, filters);
       const compositeArtistId = buildCompositeCacheKey(disambiguatedArtistId, filters);

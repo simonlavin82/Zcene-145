@@ -302,7 +302,7 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                     }
                     if (!countryNorm)
                         countryNorm = "global";
-                    const disambiguatedCanonicalId = `${seedNorm}-${countryNorm}`;
+                    const disambiguatedCanonicalId = seedNorm.endsWith(`-${countryNorm}`) ? seedNorm : `${seedNorm}-${countryNorm}`;
                     const compositeCanonicalId = (0, curatorService_1.buildCompositeCacheKey)(disambiguatedCanonicalId, inputPayload.filters || undefined);
                     await db.collection("artists").doc(compositeCanonicalId).set({
                         cacheKey: compositeCanonicalId,
@@ -377,7 +377,7 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                     }
                     if (!countryNorm)
                         countryNorm = "global";
-                    const disambiguatedCanonicalId = `${recNorm}-${countryNorm}`;
+                    const disambiguatedCanonicalId = recNorm.endsWith(`-${countryNorm}`) ? recNorm : `${recNorm}-${countryNorm}`;
                     const compositeCanonicalId = (0, curatorService_1.buildCompositeCacheKey)(disambiguatedCanonicalId, inputPayload.filters || undefined);
                     await db.collection("artists").doc(compositeCanonicalId).set({
                         cacheKey: compositeCanonicalId,
