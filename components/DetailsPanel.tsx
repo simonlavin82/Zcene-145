@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import Markdown from 'react-markdown';
 import { Node, NodeDetails, GraphData, View, ChatMessage, StackItem, UserTaste, COST_PER_AI_CALL } from '../types';
 import { streamNodeChat, fetchLiveTourData } from '../services/geminiService';
-import { normalizeArtistId, titleCaseArtistId, cleanArtistDisplayName, getArtistDocWithRedirect, enforceArtistCacheSchema } from '../services/artistCacheService';
+import { normalizeArtistId, titleCaseArtistId, cleanArtistDisplayName, isNodeInSeedList, getArtistDocWithRedirect, enforceArtistCacheSchema } from '../services/artistCacheService';
 import { analyticsService } from '../services/analyticsService';
 import { Spinner, HelpIcon, MicIcon, LoadingSpinner, DETAIL_THINKING_STEPS, StackIcon } from './Icons';
 import { TokenConfirmationDialog, FullItineraryDialog } from './SharedModals';
@@ -375,14 +375,13 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     const prevHistoryLength = useRef(chatHistory.length);
 
     const libraryArtistSet = useMemo(() => new Set(libraryArtists.map(a => normalizeArtistId(a))), [libraryArtists]);
-    const seedArtistSet = useMemo(() => new Set(seedArtists.map(a => normalizeArtistId(a))), [seedArtists]);
 
     const isArtistNode = node.type === 'artist';
     const isLabelNode = node.type === 'label';
     const normalizedArtistNodeId = isArtistNode ? normalizeArtistId(node.id) : '';
 
     const isLibraryArtist = isArtistNode && libraryArtistSet.has(normalizedArtistNodeId);
-    const isSeedArtist = isArtistNode && seedArtistSet.has(normalizedArtistNodeId);
+    const isSeedArtist = isArtistNode && isNodeInSeedList(node.id || node.label || '', seedArtists);
     const isAiSuggestion = isArtistNode && !isSeedArtist;
     const isManualAdd = isArtistNode && isSeedArtist && !isLibraryArtist;
 
@@ -915,7 +914,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     </h4>
                                     <div className="flex flex-wrap gap-2">
                                         {details.details.notableArtists.map(artistName => {
-                                            const isAlreadySeed = seedArtistSet.has(normalizeArtistId(artistName));
+                                            const isAlreadySeed = isNodeInSeedList(artistName, seedArtists);
                                             if (isGuest) {
                                               return (
                                                 <div 

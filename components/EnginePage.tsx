@@ -317,6 +317,20 @@ the entire dataset, the app evolves existing visual structures.
       the UI and kills all visual spinners, resolving unresponsive locked overlays completely and cleanly.
       False affordances have been stripped from individual loading overlays where mid-flight granular aborts 
       were unsafe.
+
+12. ROBUST CANONICAL SEED & ALIAS MATCHING & UX TITLE CLEANUP:
+    - Universal Seed & Alias Matching (isEntitySeedMatch / checkSeedMatch / isNodeInSeedList):
+      To bridge backend curation (which generates regional and alias records) and frontend graph rendering,
+      a centralized bidirectional matching layer is enforced. Instead of ad-hoc strict equality checks, all
+      components use isNodeInSeedList(nodeIdOrLabel, seedList) exported from services/artistCacheService.ts.
+      This utility evaluates exact matches, normalized canonical strings, and bidirectional country prefix/suffix
+      patterns (e.g., matching "buggin-united-states" to "buggin" or vice versa).
+    - UX Title & Seed Label Cleanup (cleanArtistDisplayName):
+      While the system utilizes disambiguated IDs (e.g., "buggin-united-states") under the hood for Firestore
+      keys and cache routing, the UI presentation layer strips clunky country suffixes and slugs. The
+      cleanArtistDisplayName helper checks against known regional suffixes and cross-references active graph
+      topology nodes to return pristine, human-readable canonical display titles in the browser header, seed
+      pills, toasts, and project titles.
 `;
 
 
@@ -369,6 +383,15 @@ Zcene provides two primary view modes to balance discovery and clarity:
      recommended artists occupy the outer discovery ring.
    - Result: A clean, symmetrical "cluster" layout that eliminates 
      overlapping clusters and emphasizes artist-attribute relationships.
+
+3. PRIMARY SEED VISUAL ANCHOR INTEGRATION:
+   - Canonical Seed Anchoring: To ensure primary seed artists (e.g., Buggin) are visually distinguished
+     from standard AI recommendations, the visualization engine maps disambiguated session routing keys
+     (e.g., "buggin-united-states") to short canonical graph node IDs ("buggin") via isNodeInSeedList.
+   - Symbol & Force Differentiation: Primary seeds render as prominent yellow circle anchors (#F6E468,
+     d3.symbolCircle with 3px stroke border) while AI recommendations render as purple stars (#A855F7,
+     d3.symbolStar). In the D3 force simulation, primary seed nodes exert moderated repulsion (-800 vs -500)
+     and stronger central anchoring gravity, establishing solid centers of gravity for spiderweb networks.
 `;
 
 const RESILIENCE_DOCUMENTATION = `

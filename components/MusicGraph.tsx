@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Plus, Minus, Loader2 } from 'lucide-react';
 import { GraphData, Node, Link, GraphSettings, NodeDetails } from '../types';
 import { LegendSymbol } from './Icons';
-import { normalizeArtistId } from '../services/artistCacheService';
+import { normalizeArtistId, isNodeInSeedList } from '../services/artistCacheService';
 
 type FilterKeys = 'genre' | 'label' | 'country' | 'founded' | 'seed' | 'recommended';
 
@@ -46,7 +46,8 @@ const isSameNodeId = (id1: any, id2: any): boolean => {
   return s1 === s2 || normalizeArtistId(s1) === normalizeArtistId(s2);
 };
 
-const computeNodeDepths = (nodes: Node[], links: Link[], seedArtistSet: Set<string>): Map<string, number> => {
+const computeNodeDepths = (nodes: Node[], links: Link[], seedArtistsOrSet: Set<string> | string[]): Map<string, number> => {
+  const seedList = Array.isArray(seedArtistsOrSet) ? seedArtistsOrSet : Array.from(seedArtistsOrSet);
   const depths = new Map<string, number>();
   const adj = new Map<string, string[]>();
   
@@ -68,8 +69,7 @@ const computeNodeDepths = (nodes: Node[], links: Link[], seedArtistSet: Set<stri
   
   // Seed nodes get depth 0
   nodes.forEach(n => {
-    const normId = normalizeArtistId(n.id);
-    const isSeed = n.type === 'artist' && (seedArtistSet.has(n.id.toLowerCase()) || seedArtistSet.has(normId));
+    const isSeed = n.type === 'artist' && isNodeInSeedList(n.id || n.label || '', seedList);
     if (isSeed) {
       depths.set(n.id, 0);
       queue.push(n.id);
@@ -245,7 +245,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     // 1. Identify visible artists based on filters (Seed/Recommended)
     const visibleArtists = data.nodes.filter(node => {
         if (node.type !== 'artist') return false;
-        const isSeed = seedArtistSet.has(node.id.toString().toLowerCase());
+        const isSeed = isNodeInSeedList(node.id || node.label || '', seedArtists);
         return (isSeed && activeFilters.seed) || (!isSeed && activeFilters.recommended);
     });
     const visibleArtistIds = new Set<string>(visibleArtists.map(n => String(n.id).toLowerCase()));
@@ -968,12 +968,12 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     const seedStrength = numSeeds > 1 ? 0.15 : 0.4;
 
     forceX.strength((d: Node) => {
-        const isSeed = d.type === 'artist' && (seedArtistSet.has(d.id.toLowerCase()) || seedArtistSet.has(normalizeArtistId(d.id)));
+        const isSeed = d.type === 'artist' && isNodeInSeedList(d.id || d.label || '', seedArtists);
         return isSeed ? seedStrength : globalGravityStrength;
     }).x(VIRTUAL_CENTER_X);
 
     forceY.strength((d: Node) => {
-        const isSeed = d.type === 'artist' && (seedArtistSet.has(d.id.toLowerCase()) || seedArtistSet.has(normalizeArtistId(d.id)));
+        const isSeed = d.type === 'artist' && isNodeInSeedList(d.id || d.label || '', seedArtists);
         return isSeed ? seedStrength : globalGravityStrength;
     }).y(VIRTUAL_CENTER_Y);
 
@@ -982,7 +982,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     // 2 & 3. Balanced Repulsion: Spaced but cohesive
     chargeForce.strength((d: Node) => {
         if (d.type === 'artist') {
-            const isSeed = seedArtistSet.has(d.id.toLowerCase()) || seedArtistSet.has(normalizeArtistId(d.id));
+            const isSeed = isNodeInSeedList(d.id || d.label || '', seedArtists);
             return isSeed ? -800 : -500; // Moderated repulsion
         }
         
@@ -1013,7 +1013,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     simulation.force('x', forceX).force('y', forceY);
 
     // BFS depth computation
-    const depths = computeNodeDepths(visibleNodes, visibleLinks, seedArtistSet);
+    const depths = computeNodeDepths(visibleNodes, visibleLinks, seedArtists);
 
     // Condensed dynamic link distances (with density scaling)
     (simulation.force("link") as d3.ForceLink<Node, Link>).distance(d => {
@@ -1069,9 +1069,9 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         return 0.35; // Firm artist-to-artist connection
     });
 
-    const getNodeColor = (node: Node, seedArtistSet: Set<string>) => {
+    const getNodeColor = (node: Node) => {
         if (node.type === 'artist') {
-            return seedArtistSet.has(node.id.toLowerCase()) ? '#F6E468' : '#A855F7'; // Yellow for seed, Purple for AI
+            return isNodeInSeedList(node.id || node.label || '', seedArtists) ? '#F6E468' : '#A855F7'; // Yellow for seed, Purple for AI
         }
         switch (node.type) {
             case 'genre': return '#3B82F6'; // Blue
@@ -1188,12 +1188,12 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         .attr("class", d => `node-element ${d.isLoading || d.isPending ? 'animate-pulse' : ''}`);
 
     nodeElements.select("path")
-        .attr("stroke-width", d => seedArtistSet.has(d.id.toLowerCase()) ? 3 : 2)
-        .attr("stroke", d => seedArtistSet.has(d.id.toLowerCase()) ? '#F6E468' : '#1F1F1E')
-        .attr("fill", d => getNodeColor(d, seedArtistSet))
+        .attr("stroke-width", d => isNodeInSeedList(d.id || d.label || '', seedArtists) ? 3 : 2)
+        .attr("stroke", d => isNodeInSeedList(d.id || d.label || '', seedArtists) ? '#F6E468' : '#1F1F1E')
+        .attr("fill", d => getNodeColor(d))
         .attr("opacity", d => d.isLoading || d.isPending ? 0.35 : 1)
         .attr("d", d => {
-            const isSeed = seedArtistSet.has(d.id.toLowerCase());
+            const isSeed = isNodeInSeedList(d.id || d.label || '', seedArtists);
             const area = 350;
             
             if (d.type === 'artist') return isSeed ? d3.symbol().type(d3.symbolCircle).size(area)() : d3.symbol().type(d3.symbolStar).size(area + 50)();
@@ -1440,14 +1440,14 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         .attr("stroke-width", d => {
             const activeNode = selectedNode || peekedNode;
             const isSelected = activeNode ? isSameNodeId(activeNode.id, d.id) : false;
-            const isSeed = seedArtists.some(a => normalizeArtistId(a) === d.id);
+            const isSeed = isNodeInSeedList(d.id || d.label || '', seedArtists);
             if (isSelected) return 4;
             return isSeed ? 3 : 2;
         })
         .attr("stroke", d => {
             const activeNode = selectedNode || peekedNode;
             const isSelected = activeNode ? isSameNodeId(activeNode.id, d.id) : false;
-            const isSeed = seedArtists.some(a => normalizeArtistId(a) === d.id);
+            const isSeed = isNodeInSeedList(d.id || d.label || '', seedArtists);
             if (isSelected) return '#F6E468';
             return isSeed ? '#F6E468' : '#1F1F1E';
         })

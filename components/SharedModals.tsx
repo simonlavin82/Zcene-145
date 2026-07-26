@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { StackItem, Node, UserTaste } from '../types';
 import { StackIcon } from './Icons';
 import Markdown from 'react-markdown';
+import { isNodeInSeedList } from '../services/artistCacheService';
 
 // --- My Stack Dialog Component ---
 export const MyStackDialog: React.FC<{
@@ -42,9 +43,7 @@ export const MyStackDialog: React.FC<{
                 ) : (
                     [...stack].reverse().map(item => {
                         const isArtist = item.type === 'artist';
-                        const normalizeId = (s: string) => s.toLowerCase().replace(/[-_]/g, ' ').trim();
-                        const normalizedSeedSet = new Set(seedArtists.map(a => normalizeId(a)));
-                        const isSeedArtist = isArtist && normalizedSeedSet.has(normalizeId(item.id));
+                        const isSeedArtist = isArtist && isNodeInSeedList(item.id || (item as any).name || '', seedArtists);
                         
                         return (
                             <div key={item.id} className="group bg-zinc-900/60 border border-zinc-700/50 p-4 rounded-xl flex items-center justify-between gap-4 hover:border-zinc-500 transition-colors">

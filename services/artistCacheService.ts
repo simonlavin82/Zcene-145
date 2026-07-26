@@ -163,6 +163,28 @@ export const cleanArtistDisplayName = (rawIdOrName?: string | null, graphNodes?:
   return cleaned;
 };
 
+/**
+ * Universal seed matching utility bridging backend curation and frontend graph rendering.
+ * Reliably maps disambiguated session routing keys (e.g., buggin-united-states) to short canonical
+ * graph node IDs (e.g., buggin) or display titles for correct D3 shape, color, force simulation, and UI drawers.
+ */
+export const isNodeInSeedList = (nodeIdOrLabel?: string | null, seedList?: string[] | null): boolean => {
+  if (!nodeIdOrLabel || !seedList || !Array.isArray(seedList) || seedList.length === 0) return false;
+  const targetNorm = normalizeArtistId(nodeIdOrLabel);
+  const targetClean = cleanArtistDisplayName(nodeIdOrLabel).toLowerCase();
+
+  return seedList.some(seed => {
+    if (!seed || typeof seed !== 'string') return false;
+    if (seed === nodeIdOrLabel) return true;
+    const seedNorm = normalizeArtistId(seed);
+    if (seedNorm === targetNorm) return true;
+    if (seed.toLowerCase() === nodeIdOrLabel.toLowerCase() || cleanArtistDisplayName(seed).toLowerCase() === targetClean) return true;
+    if (seedNorm.startsWith(`${targetNorm}-`) || targetNorm.startsWith(`${seedNorm}-`)) return true;
+    if (seedNorm.includes(`-${targetNorm}-`) || seedNorm.endsWith(`-${targetNorm}`) || targetNorm.includes(`-${seedNorm}-`) || targetNorm.endsWith(`-${seedNorm}`)) return true;
+    return false;
+  });
+};
+
 
 
 /**
