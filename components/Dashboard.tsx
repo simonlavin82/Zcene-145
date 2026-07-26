@@ -319,7 +319,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 <button 
                   onClick={onCreateProject}
                   disabled={isCreatingProject}
-                  className="group relative bg-zinc-900 border-2 border-dashed border-zinc-700 rounded-none p-5 flex flex-col items-center justify-center gap-3 transition-all h-[180px] w-full max-w-[360px] hover:border-primary/50 disabled:opacity-50 cursor-pointer overflow-hidden"
+                  className="group relative bg-zinc-900 border-2 border-dashed border-zinc-700 rounded-none p-5 flex flex-col items-center justify-center gap-3 transition-all h-[180px] w-full sm:max-w-[360px] hover:border-primary/50 disabled:opacity-50 cursor-pointer overflow-hidden"
                 >
                   <div className="w-10 h-10 rounded-full bg-zinc-800 group-hover:bg-primary group-hover:text-brand-black flex items-center justify-center text-zinc-550 transition-all relative z-10">
                     {isCreatingProject ? (
@@ -398,7 +398,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <motion.div
                           key={project.id}
                           onClick={() => onSelectProject(project.id)}
-                          className="group relative bg-zinc-900 border border-zinc-700/50 rounded-none p-5 hover:border-primary/50 transition-all cursor-pointer flex flex-col justify-between w-full max-w-[360px] h-[180px] shadow-xl"
+                          className="group relative bg-zinc-900 border border-zinc-700/50 rounded-none p-5 hover:border-primary/50 transition-all cursor-pointer flex flex-col justify-between w-full sm:max-w-[360px] h-[180px] shadow-xl"
                         >
                           <div className="space-y-4">
                             <div className="flex items-center justify-between gap-3">
@@ -495,7 +495,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                   <button 
                     onClick={onCreateProject}
                     disabled={isCreatingProject}
-                    className="group relative bg-zinc-900 border-2 border-dashed border-zinc-700 rounded-none p-5 flex flex-col items-center justify-center gap-3 transition-all h-[180px] w-full max-w-[360px] hover:border-primary/50 disabled:opacity-50 cursor-pointer overflow-hidden"
+                    className="group relative bg-zinc-900 border-2 border-dashed border-zinc-700 rounded-none p-5 flex flex-col items-center justify-center gap-3 transition-all h-[180px] w-full sm:max-w-[360px] hover:border-primary/50 disabled:opacity-50 cursor-pointer overflow-hidden"
                   >
                     <div className="w-10 h-10 rounded-full bg-zinc-800 group-hover:bg-primary group-hover:text-brand-black flex items-center justify-center text-zinc-550 transition-all relative z-10">
                       {isCreatingProject ? (
