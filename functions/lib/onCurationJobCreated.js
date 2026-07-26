@@ -356,6 +356,8 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                         cachedAt: firestore_2.FieldValue.serverTimestamp(),
                         hitCount: 0,
                         isDeep: true, // Marked Deep!
+                        isPrimarySeed: true,
+                        hasUniqueSpiderweb: !isSeedLabel,
                         synthesisRationale: finalGraph.synthesisRationale || null
                     });
                     console.log(`[Curation Backend] Wrote DEEP global cache for seed (${collName}): ${compositeCanonicalId}`);
@@ -430,20 +432,38 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                         countryNorm = "global";
                     const disambiguatedCanonicalId = recNorm.endsWith(`-${countryNorm}`) ? recNorm : `${recNorm}-${countryNorm}`;
                     const compositeCanonicalId = (0, curatorService_1.buildCompositeCacheKey)(disambiguatedCanonicalId, inputPayload.filters || undefined);
-                    await db.collection(collName).doc(compositeCanonicalId).set({
-                        cacheKey: compositeCanonicalId,
-                        [idFieldKey]: recNorm,
-                        seedArtists: recArtist,
-                        graphData: isLabel ? null : JSON.stringify(finalGraph),
-                        detailsCache: isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(recDetails), // Save as structured object!
-                        filters: null, // Note: active filters are not strictly carried for proactive rec entries unless we explicitly want to
-                        cacheVersion: 2,
-                        cachedAt: firestore_2.FieldValue.serverTimestamp(),
-                        hitCount: 0,
-                        isDeep: true, // Marked Deep!
-                        synthesisRationale: null
-                    });
-                    console.log(`[Curation Backend] Proactively cached DEEP entry for recommendation (${collName}): ${compositeCanonicalId}`);
+                    const recDocRef = db.collection(collName).doc(compositeCanonicalId);
+                    const recSnap = await recDocRef.get();
+                    if (!recSnap.exists) {
+                        await recDocRef.set({
+                            cacheKey: compositeCanonicalId,
+                            [idFieldKey]: recNorm,
+                            seedArtists: recArtist,
+                            graphData: null,
+                            detailsCache: isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(recDetails), // Save as structured object!
+                            filters: null, // Note: active filters are not strictly carried for proactive rec entries unless we explicitly want to
+                            cacheVersion: 2,
+                            cachedAt: firestore_2.FieldValue.serverTimestamp(),
+                            hitCount: 0,
+                            isDeep: true, // Marked Deep!
+                            isPrimarySeed: false,
+                            hasUniqueSpiderweb: false,
+                            synthesisRationale: null
+                        });
+                        console.log(`[Curation Backend] Proactively created DEEP entry for recommendation (${collName}): ${compositeCanonicalId}`);
+                    }
+                    else {
+                        const updatePayload = {
+                            detailsCache: isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(recDetails),
+                            cachedAt: firestore_2.FieldValue.serverTimestamp(),
+                            cacheVersion: 2,
+                            [idFieldKey]: recNorm,
+                            cacheKey: compositeCanonicalId,
+                            isDeep: true
+                        };
+                        await recDocRef.update(sanitizeUndefinedProperties(updatePayload));
+                        console.log(`[Curation Backend] Proactively updated detailsCache for recommendation (${collName}): ${compositeCanonicalId}`);
+                    }
                     // Create/Heal Bare Root Alias Pointer
                     const bareArtistIdRef = db.collection(collName).doc(recNorm);
                     const bareSnap = await bareArtistIdRef.get();

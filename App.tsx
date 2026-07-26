@@ -890,7 +890,7 @@ const validateCacheEntry = (data: any, isSingleArtist: boolean = false): CacheVa
   }
 
   // 1. graphData exists, parses cleanly, and contains nodes
-  if (!data.graphData) {
+  if (!data.graphData || data.isPrimarySeed === false || data.hasUniqueSpiderweb === false) {
     return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
   }
 
@@ -898,6 +898,19 @@ const validateCacheEntry = (data: any, isSingleArtist: boolean = false): CacheVa
     const graph = typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData;
     if (!graph || !graph.nodes || !Array.isArray(graph.nodes) || graph.nodes.length === 0) {
       return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
+    }
+
+    // Topology sanity check against legacy polluted records (e.g., Buggin loaded with Spaced's graph)
+    if (data.isPrimarySeed === undefined && graph.links && Array.isArray(graph.links)) {
+      const targetId = normalizeArtistId(data.artistId || data.seedArtists || "");
+      const myLinks = graph.links.filter((l: any) => {
+        const sId = typeof l.source === 'string' ? l.source : (l.source as any)?.id || "";
+        const tId = typeof l.target === 'string' ? l.target : (l.target as any)?.id || "";
+        return normalizeArtistId(sId) === targetId || normalizeArtistId(tId) === targetId;
+      });
+      if (myLinks.length < 3 && graph.nodes.length > 5) {
+        return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
+      }
     }
 
     // Check for peer bands
@@ -2256,7 +2269,6 @@ const App: React.FC = () => {
         cacheKey: disambiguatedCacheId,
         artistId: simpleArtistId,
         seedArtists: details.details?.artist || canonicalNode?.label || node.id,
-        graphData: JSON.stringify(normalizedGraph),
         filters: discoveryFiltersRef.current || {},
         cacheVersion: 2,
         cachedAt: serverTimestamp(),
@@ -2267,7 +2279,18 @@ const App: React.FC = () => {
       };
       
       if (!isLabel) enforceArtistCacheSchema(setPayload);
-      await setDoc(doc(db, collName, disambiguatedCacheId), stripUndefinedProperties(setPayload));
+      const targetDocRef = doc(db, collName, disambiguatedCacheId);
+      const targetSnap = await getDoc(targetDocRef);
+      if (!targetSnap.exists()) {
+        if (!isLabel) {
+          (setPayload as any).graphData = null;
+          (setPayload as any).isPrimarySeed = false;
+          (setPayload as any).hasUniqueSpiderweb = false;
+        }
+        await setDoc(targetDocRef, stripUndefinedProperties(setPayload));
+      } else {
+        await updateDoc(targetDocRef, stripUndefinedProperties(setPayload));
+      }
 
     } catch (err) {
       console.error("[Manual Generation] Failed to fetch and write split document:", err);
@@ -3770,7 +3793,7 @@ const App: React.FC = () => {
               ...detailsCache
             ]);
             const allEntityNamesToCache = Array.from(new Set([...toFetch, ...freshData.nodes.filter(n => n.type === 'artist' || n.type === 'label').map(n => n.label || n.id)]));
-            await writeArtistCacheMany(allEntityNamesToCache, freshData, user?.uid, activeDiscoveryFilters, true, true, combinedDetailsMap);
+            await writeArtistCacheMany(allEntityNamesToCache, freshData, user?.uid, activeDiscoveryFilters, true, true, combinedDetailsMap, toFetch);
           };
 
           runUpfrontFetchAndWrite()
@@ -4192,7 +4215,7 @@ const App: React.FC = () => {
             ...detailsCache
           ]);
           const allEntityNamesToCache = Array.from(new Set([...artistList, ...final.nodes.filter(n => n.type === 'artist' || n.type === 'label').map(n => n.label || n.id)]));
-          await writeArtistCacheMany(allEntityNamesToCache, final, user?.uid, activeDiscoveryFilters, true, true, combinedDetailsMap);
+          await writeArtistCacheMany(allEntityNamesToCache, final, user?.uid, activeDiscoveryFilters, true, true, combinedDetailsMap, artistList);
         };
 
         runUpfrontFetchAndWrite()
@@ -5796,7 +5819,7 @@ const App: React.FC = () => {
             ...detailsCache
           ]);
           const allEntityNamesToCache = Array.from(new Set([...discoveredArtistNames, ...mergedGraph.nodes.filter(n => n.type === 'artist' || n.type === 'label').map(n => n.label || n.id)]));
-          await writeArtistCacheMany(allEntityNamesToCache, mergedGraph, user?.uid, discoveryFilters, true, false, combinedDetailsMap);
+          await writeArtistCacheMany(allEntityNamesToCache, mergedGraph, user?.uid, discoveryFilters, true, false, combinedDetailsMap, discoveredArtistNames);
           console.log(`[Node Extension] Global cache double-write confirmed for: ${allEntityNamesToCache.join(', ')}`);
         } catch (e) {
           console.error('[Node Extension] Global cache double-write failed:', e);
