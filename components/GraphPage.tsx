@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { GraphData, Node, ParsedArtist, View, NodeDetails, Link, ChatMessage, StackItem, DiscoveryFilters, UserTaste } from '../types';
 import { User } from '../services/firebase';
 import { motion, AnimatePresence } from 'motion/react';
-import { normalizeArtistId, titleCaseArtistId } from '../services/artistCacheService';
+import { normalizeArtistId, titleCaseArtistId, cleanArtistDisplayName } from '../services/artistCacheService';
 import HelpPage from './HelpPage';
 import Header from './Header';
 import MusicGraph from './MusicGraph';
@@ -1337,9 +1337,9 @@ const GraphPage: React.FC<GraphPageProps> = ({
                       <span className={`material-symbols-outlined !text-[18px] transition-colors ${artist.enabled ? 'text-primary' : 'text-zinc-600'}`}>
                         {artist.enabled ? 'check_circle' : 'radio_button_unchecked'}
                       </span>
-                      <span className="text-sm select-none truncate">{titleCaseArtistId(artist.name)}</span>
+                      <span className="text-sm select-none truncate">{cleanArtistDisplayName(artist.name, data?.nodes)}</span>
                     </button>
-                    <button onClick={() => handleRemoveArtist(artist.name)} className="flex-shrink-0 text-zinc-500 w-8 h-8 flex items-center justify-center rounded-xl hover:text-red-400 transition-colors leading-none" title={`Remove ${titleCaseArtistId(artist.name)}`}><span className="material-symbols-outlined !text-[18px]">remove_circle</span></button>
+                    <button onClick={() => handleRemoveArtist(artist.name)} className="flex-shrink-0 text-zinc-500 w-8 h-8 flex items-center justify-center rounded-xl hover:text-red-400 transition-colors leading-none" title={`Remove ${cleanArtistDisplayName(artist.name, data?.nodes)}`}><span className="material-symbols-outlined !text-[18px]">remove_circle</span></button>
                   </div>
                 ))}
               </div>
@@ -1610,10 +1610,10 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                             const isAlreadySeed = selectedSeedArtists.some(s => normalizeArtistId(s.name) === normalizedArtist);
                                             if (isAlreadySeed) {
                                                 setSelectedSeedArtists(prev => prev.filter(s => normalizeArtistId(s.name) !== normalizedArtist));
-                                                onShowToast(`Removed ${titleCaseArtistId(artist)} from seed list`);
+                                                onShowToast(`Removed ${cleanArtistDisplayName(artist, data?.nodes)} from seed list`);
                                             } else {
                                                 setSelectedSeedArtists(prev => [...prev, { name: artist, enabled: true }]);
-                                                onShowToast(`Added ${titleCaseArtistId(artist)} to seed list`);
+                                                onShowToast(`Added ${cleanArtistDisplayName(artist, data?.nodes)} to seed list`);
                                             }
                                         }}
                                         isCollapsed={false} 
@@ -1722,10 +1722,10 @@ const GraphPage: React.FC<GraphPageProps> = ({
                               const isAlreadySeed = selectedSeedArtists.some(s => normalizeArtistId(s.name) === normalizedArtist);
                               if (isAlreadySeed) {
                                   setSelectedSeedArtists(prev => prev.filter(s => normalizeArtistId(s.name) !== normalizedArtist));
-                                  onShowToast(`Removed ${titleCaseArtistId(artist)} from seed list`);
+                                  onShowToast(`Removed ${cleanArtistDisplayName(artist, data?.nodes)} from seed list`);
                               } else {
                                   setSelectedSeedArtists(prev => [...prev, { name: artist, enabled: true }]);
-                                  onShowToast(`Added ${titleCaseArtistId(artist)} to seed list`);
+                                  onShowToast(`Added ${cleanArtistDisplayName(artist, data?.nodes)} to seed list`);
                               }
                          }} 
                          isCollapsed={isDetailsPanelCollapsed} 

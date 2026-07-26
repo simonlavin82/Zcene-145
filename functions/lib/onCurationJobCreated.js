@@ -95,6 +95,23 @@ function sanitizeLabelProfile(details) {
     };
 }
 /**
+ * Robust matching helper to reconcile disambiguated seed strings (e.g., "buggin-united-states")
+ * with canonical AI node IDs or names (e.g., "buggin"). Supports prefix/suffix stripping.
+ */
+function isEntitySeedMatch(seedNorm, candidateNorm) {
+    if (!seedNorm || !candidateNorm)
+        return false;
+    const s = (0, curatorService_1.normalizeArtistId)(seedNorm);
+    const c = (0, curatorService_1.normalizeArtistId)(candidateNorm);
+    if (s === c)
+        return true;
+    if (s.startsWith(`${c}-`) || c.startsWith(`${s}-`))
+        return true;
+    if (s.includes(`-${c}-`) || s.endsWith(`-${c}`) || c.includes(`-${s}-`) || c.endsWith(`-${s}`))
+        return true;
+    return false;
+}
+/**
  * Stateful Project UX Upgrade: Update the user's project document status
  * to reflect in-progress background curation and write back completed graphData.
  */
@@ -299,11 +316,11 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                 // Write-back cache entries for the seed entities (deep cache: isDeep: true)
                 for (const seed of artistList) {
                     const seedNorm = (0, curatorService_1.normalizeArtistId)(seed);
-                    const seedNode = (finalGraph.nodes || []).find((n) => (0, curatorService_1.normalizeArtistId)(n.id) === seedNorm || (0, curatorService_1.normalizeArtistId)(n.label || '') === seedNorm);
+                    const seedNode = (finalGraph.nodes || []).find((n) => isEntitySeedMatch(seedNorm, n.id) || isEntitySeedMatch(seedNorm, n.label || ''));
                     const isSeedLabel = seedNode?.type === 'label';
                     const collName = isSeedLabel ? "labels" : "artists";
                     const idFieldKey = isSeedLabel ? "labelId" : "artistId";
-                    const seedDetailsEntry = detailsCacheEntries.find(entry => (0, curatorService_1.normalizeArtistId)(entry[0]) === seedNorm);
+                    const seedDetailsEntry = detailsCacheEntries.find(entry => isEntitySeedMatch(seedNorm, entry[0]));
                     const seedDetails = seedDetailsEntry ? seedDetailsEntry[1] : null;
                     // Run Sanity Check — non-fatal: log and skip this seed's cache write rather than aborting the entire job
                     try {
@@ -324,13 +341,13 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                         .filter((l) => {
                         const sId = typeof l.source === 'string' ? l.source : l.source.id;
                         const tId = typeof l.target === 'string' ? l.target : l.target.id;
-                        return sId.toLowerCase() === seedNorm.toLowerCase() || tId.toLowerCase() === seedNorm.toLowerCase();
+                        return isEntitySeedMatch(seedNorm, sId) || isEntitySeedMatch(seedNorm, tId);
                     })
                         .map((l) => {
                         const sId = typeof l.source === 'string' ? l.source : l.source.id;
                         const tId = typeof l.target === 'string' ? l.target : l.target.id;
-                        const otherId = sId.toLowerCase() === seedNorm.toLowerCase() ? tId : sId;
-                        return (finalGraph.nodes || []).find((n) => n.id.toLowerCase() === otherId.toLowerCase());
+                        const otherId = isEntitySeedMatch(seedNorm, sId) ? tId : sId;
+                        return (finalGraph.nodes || []).find((n) => isEntitySeedMatch(otherId, n.id));
                     })
                         .filter((n) => n && n.type === 'country')
                         .map((n) => n.label || n.id);
@@ -381,14 +398,14 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                     }
                 }
                 // Proactively cache each recommended entity (artist or label) as a deep cache entry as well!
-                const seedNorms = new Set(artistList.map((a) => (0, curatorService_1.normalizeArtistId)(a)));
+                const seedNorms = artistList.map((a) => (0, curatorService_1.normalizeArtistId)(a));
                 for (const entityObj of recommendedEntities) {
                     const recArtist = entityObj.name;
                     const recNorm = (0, curatorService_1.normalizeArtistId)(recArtist);
                     const isLabel = entityObj.type === 'label';
-                    if (seedNorms.has(recNorm))
+                    if (seedNorms.some((s) => isEntitySeedMatch(s, recNorm)))
                         continue; // Already seeds
-                    const recDetailsEntry = detailsCacheEntries.find(entry => (0, curatorService_1.normalizeArtistId)(entry[0]) === recNorm);
+                    const recDetailsEntry = detailsCacheEntries.find(entry => isEntitySeedMatch(recNorm, entry[0]));
                     const recDetails = recDetailsEntry ? recDetailsEntry[1] : null;
                     if (isLabel && !recDetails) {
                         console.warn(`[Curation Backend] Label cache write skipped for "${recNorm}" — missing detailsCache.`);
@@ -411,13 +428,13 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                         .filter((l) => {
                         const sId = typeof l.source === 'string' ? l.source : l.source.id;
                         const tId = typeof l.target === 'string' ? l.target : l.target.id;
-                        return sId.toLowerCase() === recNorm.toLowerCase() || tId.toLowerCase() === recNorm.toLowerCase();
+                        return isEntitySeedMatch(recNorm, sId) || isEntitySeedMatch(recNorm, tId);
                     })
                         .map((l) => {
                         const sId = typeof l.source === 'string' ? l.source : l.source.id;
                         const tId = typeof l.target === 'string' ? l.target : l.target.id;
-                        const otherId = sId.toLowerCase() === recNorm.toLowerCase() ? tId : sId;
-                        return (finalGraph.nodes || []).find((n) => n.id.toLowerCase() === otherId.toLowerCase());
+                        const otherId = isEntitySeedMatch(recNorm, sId) ? tId : sId;
+                        return (finalGraph.nodes || []).find((n) => isEntitySeedMatch(otherId, n.id));
                     })
                         .filter((n) => n && n.type === 'country')
                         .map((n) => n.label || n.id);

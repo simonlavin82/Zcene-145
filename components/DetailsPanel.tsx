@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import Markdown from 'react-markdown';
 import { Node, NodeDetails, GraphData, View, ChatMessage, StackItem, UserTaste, COST_PER_AI_CALL } from '../types';
 import { streamNodeChat, fetchLiveTourData } from '../services/geminiService';
-import { normalizeArtistId, titleCaseArtistId, getArtistDocWithRedirect, enforceArtistCacheSchema } from '../services/artistCacheService';
+import { normalizeArtistId, titleCaseArtistId, cleanArtistDisplayName, getArtistDocWithRedirect, enforceArtistCacheSchema } from '../services/artistCacheService';
 import { analyticsService } from '../services/analyticsService';
 import { Spinner, HelpIcon, MicIcon, LoadingSpinner, DETAIL_THINKING_STEPS, StackIcon } from './Icons';
 import { TokenConfirmationDialog, FullItineraryDialog } from './SharedModals';
@@ -15,10 +15,7 @@ const SENTINEL_INSIGHT = 'No insight provided.';
 export const getArtistDisplayName = (details: any, node: any): string => {
   const rawArtist = details?.details?.artist || node?.label || node?.id || '';
   if (!rawArtist) return '';
-  if (rawArtist === rawArtist.toLowerCase()) {
-    return titleCaseArtistId(rawArtist);
-  }
-  return rawArtist;
+  return cleanArtistDisplayName(rawArtist);
 };
 
 const checkIsProfileIncomplete = (node: Node, details: NodeDetails | null | undefined): boolean => {
@@ -1605,7 +1602,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                                         ? 'w-1.5 h-1.5 bg-primary/80 animate-pulse' 
                                                                         : 'w-1 h-1 bg-zinc-600 active:bg-zinc-400'
                                                             }`}
-                                                            title={`${node.label || titleCaseArtistId(node.id)}${isLoading ? ' (Generating...)' : ''}`}
+                                                            title={`${cleanArtistDisplayName(node.label || node.id)}${isLoading ? ' (Generating...)' : ''}`}
                                                         />
                                                     );
                                                 })}

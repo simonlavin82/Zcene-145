@@ -106,6 +106,20 @@ function sanitizeLabelProfile(details: any): any {
 }
 
 /**
+ * Robust matching helper to reconcile disambiguated seed strings (e.g., "buggin-united-states")
+ * with canonical AI node IDs or names (e.g., "buggin"). Supports prefix/suffix stripping.
+ */
+function isEntitySeedMatch(seedNorm: string, candidateNorm: string): boolean {
+  if (!seedNorm || !candidateNorm) return false;
+  const s = normalizeArtistId(seedNorm);
+  const c = normalizeArtistId(candidateNorm);
+  if (s === c) return true;
+  if (s.startsWith(`${c}-`) || c.startsWith(`${s}-`)) return true;
+  if (s.includes(`-${c}-`) || s.endsWith(`-${c}`) || c.includes(`-${s}-`) || c.endsWith(`-${s}`)) return true;
+  return false;
+}
+
+/**
  * Stateful Project UX Upgrade: Update the user's project document status
  * to reflect in-progress background curation and write back completed graphData.
  */
@@ -338,12 +352,12 @@ export const onCurationJobCreated = onDocumentCreated({
         // Write-back cache entries for the seed entities (deep cache: isDeep: true)
         for (const seed of artistList) {
           const seedNorm = normalizeArtistId(seed);
-          const seedNode = (finalGraph.nodes || []).find((n: any) => normalizeArtistId(n.id) === seedNorm || normalizeArtistId(n.label || '') === seedNorm);
+          const seedNode = (finalGraph.nodes || []).find((n: any) => isEntitySeedMatch(seedNorm, n.id) || isEntitySeedMatch(seedNorm, n.label || ''));
           const isSeedLabel = seedNode?.type === 'label';
           const collName = isSeedLabel ? "labels" : "artists";
           const idFieldKey = isSeedLabel ? "labelId" : "artistId";
           
-          const seedDetailsEntry = detailsCacheEntries.find(entry => normalizeArtistId(entry[0]) === seedNorm);
+          const seedDetailsEntry = detailsCacheEntries.find(entry => isEntitySeedMatch(seedNorm, entry[0]));
           const seedDetails = seedDetailsEntry ? seedDetailsEntry[1] : null;
 
           // Run Sanity Check — non-fatal: log and skip this seed's cache write rather than aborting the entire job
@@ -364,13 +378,13 @@ export const onCurationJobCreated = onDocumentCreated({
             .filter((l: any) => {
               const sId = typeof l.source === 'string' ? l.source : (l.source as any).id;
               const tId = typeof l.target === 'string' ? l.target : (l.target as any).id;
-              return sId.toLowerCase() === seedNorm.toLowerCase() || tId.toLowerCase() === seedNorm.toLowerCase();
+              return isEntitySeedMatch(seedNorm, sId) || isEntitySeedMatch(seedNorm, tId);
             })
             .map((l: any) => {
               const sId = typeof l.source === 'string' ? l.source : (l.source as any).id;
               const tId = typeof l.target === 'string' ? l.target : (l.target as any).id;
-              const otherId = sId.toLowerCase() === seedNorm.toLowerCase() ? tId : sId;
-              return (finalGraph.nodes || []).find((n: any) => n.id.toLowerCase() === otherId.toLowerCase());
+              const otherId = isEntitySeedMatch(seedNorm, sId) ? tId : sId;
+              return (finalGraph.nodes || []).find((n: any) => isEntitySeedMatch(otherId, n.id));
             })
             .filter((n: any) => n && n.type === 'country')
             .map((n: any) => n!.label || n!.id);
@@ -426,15 +440,15 @@ export const onCurationJobCreated = onDocumentCreated({
         }
 
         // Proactively cache each recommended entity (artist or label) as a deep cache entry as well!
-        const seedNorms = new Set(artistList.map((a: string) => normalizeArtistId(a)));
+        const seedNorms = artistList.map((a: string) => normalizeArtistId(a));
         for (const entityObj of recommendedEntities) {
           const recArtist = entityObj.name;
           const recNorm = normalizeArtistId(recArtist);
           const isLabel = entityObj.type === 'label';
 
-          if (seedNorms.has(recNorm)) continue; // Already seeds
+          if (seedNorms.some((s: string) => isEntitySeedMatch(s, recNorm))) continue; // Already seeds
           
-          const recDetailsEntry = detailsCacheEntries.find(entry => normalizeArtistId(entry[0]) === recNorm);
+          const recDetailsEntry = detailsCacheEntries.find(entry => isEntitySeedMatch(recNorm, entry[0]));
           const recDetails = recDetailsEntry ? recDetailsEntry[1] : null;
 
           if (isLabel && !recDetails) {
@@ -460,13 +474,13 @@ export const onCurationJobCreated = onDocumentCreated({
             .filter((l: any) => {
               const sId = typeof l.source === 'string' ? l.source : (l.source as any).id;
               const tId = typeof l.target === 'string' ? l.target : (l.target as any).id;
-              return sId.toLowerCase() === recNorm.toLowerCase() || tId.toLowerCase() === recNorm.toLowerCase();
+              return isEntitySeedMatch(recNorm, sId) || isEntitySeedMatch(recNorm, tId);
             })
             .map((l: any) => {
               const sId = typeof l.source === 'string' ? l.source : (l.source as any).id;
               const tId = typeof l.target === 'string' ? l.target : (l.target as any).id;
-              const otherId = sId.toLowerCase() === recNorm.toLowerCase() ? tId : sId;
-              return (finalGraph.nodes || []).find((n: any) => n.id.toLowerCase() === otherId.toLowerCase());
+              const otherId = isEntitySeedMatch(recNorm, sId) ? tId : sId;
+              return (finalGraph.nodes || []).find((n: any) => isEntitySeedMatch(otherId, n.id));
             })
             .filter((n: any) => n && n.type === 'country')
             .map((n: any) => n!.label || n!.id);

@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { AlertCircle, AlertTriangle, X, CheckCircle2, Key } from 'lucide-react';
 import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project, ArtistCacheEntry, COST_PER_AI_CALL } from './types';
 import { generateGraphData, fetchNodeDetails, extendGraphFromNode, resolveArtistCandidatesViaAI } from './services/geminiService';
-import { normalizeArtistId, readArtistCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, getEntityDocWithRedirect, getLabelDocWithRedirect, getAnyEntityDocWithRedirect, titleCaseArtistId, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema, stripUndefinedProperties } from './services/artistCacheService';
+import { normalizeArtistId, readArtistCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, getEntityDocWithRedirect, getLabelDocWithRedirect, getAnyEntityDocWithRedirect, titleCaseArtistId, cleanArtistDisplayName, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema, stripUndefinedProperties } from './services/artistCacheService';
 import { normalizeCountry } from './utils/normalization';
 import { auth, signInWithGoogle, logout, onAuthStateChanged, User, db, handleFirestoreError, OperationType } from './services/firebase';
 import { translateError, translateToast } from './services/errorTranslationLayer';
@@ -1242,7 +1242,7 @@ const App: React.FC = () => {
 
           if (matchedDocId) {
             console.log(`[Contextual Resolve] Mapped "${name}" to entity ID "${matchedDocId}" matching filters`);
-            return titleCaseArtistId(matchedDocId);
+            return cleanArtistDisplayName(matchedDocId);
           }
         } catch (err) {
           console.warn(`[Contextual Resolve] Failed for "${name}":`, err);
@@ -1276,7 +1276,7 @@ const App: React.FC = () => {
         }
       });
 
-      return Array.from(matches).map(id => titleCaseArtistId(id));
+      return Array.from(matches).map(id => cleanArtistDisplayName(id));
     } catch (err) {
       console.warn("[Disambiguation] Prefix match lookup failed:", err);
       return [];
@@ -1333,7 +1333,7 @@ const App: React.FC = () => {
         if (!candidatesMap.has(candidateKey)) {
           candidatesMap.set(candidateKey, {
             id: docId,
-            label: titleCaseArtistId(labelVal),
+            label: cleanArtistDisplayName(labelVal),
             origin: originVal,
             genre: genreVal
           });
@@ -1691,21 +1691,26 @@ const App: React.FC = () => {
     }
     if (!name) return 'Untitled Zcene';
     
-    if (name === name.toLowerCase()) {
-      return titleCaseArtistId(name);
+    return cleanArtistDisplayName(name, graphData?.nodes);
+  }, [projectName, seedArtists, graphData]);
+
+  useEffect(() => {
+    if (displayProjectName && displayProjectName !== 'Untitled Zcene') {
+      document.title = `${displayProjectName} - Zcene`;
+    } else {
+      document.title = 'Zcene - Own Music Discovery';
     }
-    return name;
-  }, [projectName, seedArtists]);
+  }, [displayProjectName]);
 
   useEffect(() => {
     if (seedArtists && (!projectName || projectName === 'Untitled Zcene')) {
       const first = seedArtists.split('::')[0]?.trim();
       if (first) {
-        const formatted = first === first.toLowerCase() ? titleCaseArtistId(first) : first;
+        const formatted = cleanArtistDisplayName(first, graphData?.nodes);
         handleUpdateProjectName(formatted);
       }
     }
-  }, [seedArtists, projectName, handleUpdateProjectName]);
+  }, [seedArtists, projectName, handleUpdateProjectName, graphData]);
 
   const handleUpdateProfile = useCallback(async (updates: any) => {
     if (!user) return;

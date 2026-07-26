@@ -112,6 +112,57 @@ export const titleCaseArtistId = (id: string): string => {
     .join(' ');
 };
 
+/**
+ * Presentation utility that cleanly formats artist titles without clunky country routing suffixes
+ * (e.g., "-united-states", "-global", " United States", " Global", etc.), cross-referencing
+ * graph topology nodes when available to return pristine human-readable titles.
+ */
+export const cleanArtistDisplayName = (rawIdOrName?: string | null, graphNodes?: Node[] | null): string => {
+  if (!rawIdOrName || typeof rawIdOrName !== 'string') return '';
+  const trimmed = rawIdOrName.trim();
+  if (!trimmed) return '';
+
+  // 1. Known common country routing suffixes and slugs in display or kebab case
+  const countrySuffixes = [
+    'united states', 'united kingdom', 'global', 'australia', 'canada', 'germany', 'france',
+    'japan', 'sweden', 'italy', 'spain', 'brazil', 'mexico', 'netherlands', 'belgium',
+    'norway', 'finland', 'denmark', 'ireland', 'new zealand', 'poland', 'austria',
+    'switzerland', 'uk', 'usa', 'us'
+  ];
+
+  let cleaned = trimmed;
+  // If kebab/snake case, convert to spaced words first for suffix checking
+  const spaced = trimmed.replace(/[-_]+/g, ' ').trim();
+  const lowerSpaced = spaced.toLowerCase();
+
+  for (const suffix of countrySuffixes) {
+    if (lowerSpaced.endsWith(` ${suffix}`)) {
+      // Strip the suffix and any preceding hyphen/space
+      const suffixLen = suffix.length;
+      const baseSpaced = spaced.slice(0, spaced.length - suffixLen).trim().replace(/[-_]$/, '').trim();
+      if (baseSpaced.length > 0) {
+        cleaned = baseSpaced;
+        break;
+      }
+    }
+  }
+
+  // 2. If graphNodes are available, check if there is an exact artist or label node matching the cleaned string
+  if (graphNodes && graphNodes.length > 0) {
+    const foundNode = findCanonicalNodeForArtist(cleaned, graphNodes) || findCanonicalNodeForArtist(trimmed, graphNodes);
+    if (foundNode && foundNode.label) {
+      return foundNode.label;
+    }
+  }
+
+  // If the result is purely lowercase or was kebab case, apply titleCaseArtistId
+  if (cleaned === cleaned.toLowerCase() || cleaned.includes('-') || cleaned.includes('_')) {
+    return titleCaseArtistId(cleaned);
+  }
+
+  return cleaned;
+};
+
 
 
 /**
@@ -559,9 +610,18 @@ export const writeArtistCacheMany = async (
         const canonicalDocRef = doc(db, collName, compositeCanonicalId);
         const canonicalSnap = await getDoc(canonicalDocRef);
 
+      const checkSeedMatch = (s: string, targetId: string, targetName: string) => {
+        if (!s) return false;
+        const normS = normalizeArtistId(s);
+        const normT = normalizeArtistId(targetId);
+        if (normS === normT || s.toLowerCase() === targetName.toLowerCase()) return true;
+        if (normS.startsWith(`${normT}-`) || normT.startsWith(`${normS}-`)) return true;
+        if (normS.includes(`-${normT}-`) || normS.endsWith(`-${normT}`) || normT.includes(`-${normS}-`) || normT.endsWith(`-${normS}`)) return true;
+        return false;
+      };
       const isPrimarySeed = seedArtistNames 
-        ? seedArtistNames.some(s => normalizeArtistId(s) === artistId || s.toLowerCase() === name.toLowerCase())
-        : artistNames.some(s => normalizeArtistId(s) === artistId || s.toLowerCase() === name.toLowerCase());
+        ? seedArtistNames.some(s => checkSeedMatch(s, artistId, name))
+        : artistNames.some(s => checkSeedMatch(s, artistId, name));
 
       if (!canonicalSnap.exists()) {
         // ── CREATE PATH ─────────────────────────────────────────────────────
@@ -1045,6 +1105,21 @@ export const findCanonicalNodeForArtist = (name: string, nodes: Node[]): Node | 
   
   // 2. Try exact normalized match on Label
   found = artistNodes.find(n => n.label && normalizeArtistId(n.label) === normSearch);
+  if (found) return found;
+
+  // 2.5 Try prefix/suffix or country slug match (e.g. "buggin-united-states" vs "buggin")
+  found = artistNodes.find(n => {
+    const normId = normalizeArtistId(n.id);
+    const normLabel = n.label ? normalizeArtistId(n.label) : '';
+    const checkPair = (a: string, b: string) => {
+      if (!a || !b) return false;
+      if (a === b) return true;
+      if (a.startsWith(`${b}-`) || b.startsWith(`${a}-`)) return true;
+      if (a.includes(`-${b}-`) || a.endsWith(`-${b}`) || b.includes(`-${a}-`) || b.endsWith(`-${a}`)) return true;
+      return false;
+    };
+    return checkPair(normSearch, normId) || (normLabel ? checkPair(normSearch, normLabel) : false);
+  });
   if (found) return found;
   
   // 3. Try partial/fuzzy match (surnames or word boundaries)

@@ -4,7 +4,7 @@ import ViewToggle from './ViewToggle';
 import { Project, StackItem } from '../types';
 import { User } from 'firebase/auth';
 import { motion } from 'framer-motion';
-import { normalizeArtistId } from '../services/artistCacheService';
+import { normalizeArtistId, cleanArtistDisplayName } from '../services/artistCacheService';
 
 
 const formatProjectTimestamp = (updatedAt: any): string => {
@@ -95,7 +95,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   const handleRenameClick = (project: Project) => {
     const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
-    const displayTitle = project.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene");
+    const displayTitle = cleanArtistDisplayName(project.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene"));
     const newName = window.prompt("Rename Zcene", displayTitle);
     if (newName !== null) {
       const trimmed = newName.trim();
@@ -137,7 +137,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
     const getProjectDisplayTitle = (p: Project) => {
       const seedList = p.seedArtists ? p.seedArtists.split('::').filter(Boolean) : [];
-      return (p.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene")).toLowerCase();
+      return cleanArtistDisplayName(p.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene")).toLowerCase();
     };
 
     const getProjectTimestamp = (p: Project): number => {
@@ -180,7 +180,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const sortedBucketKeys = React.useMemo(() => {
     const getProjectDisplayTitle = (p: Project) => {
       const seedList = p.seedArtists ? p.seedArtists.split('::').filter(Boolean) : [];
-      return (p.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene")).toLowerCase();
+      return cleanArtistDisplayName(p.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene")).toLowerCase();
     };
 
     const getProjectTimestamp = (p: Project): number => {
@@ -360,9 +360,9 @@ const Dashboard: React.FC<DashboardProps> = ({
 
                     {/* Cards inside this parent record crate compartment */}
                     <div className={`grid ${gridColsClass} gap-5 w-full md:w-fit max-w-full`}>
-                      {projectsInBucket.map((project) => {
+                      {projectsInBucket.map((project, idx) => {
                       const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
-                      const displayTitle = project.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene");
+                      const displayTitle = cleanArtistDisplayName(project.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene"));
                       
                       // Derive deep cuts count: prefer the persisted activeNodes queue.
                       // For stale documents where activeNodes was never written by the backend
@@ -389,9 +389,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                             const artistNodes = parsedGraph.nodes.filter((n: any) => n.type === 'artist' || !n.type);
                             recommendedCount = artistNodes.filter((n: any) => !seedSet.has(normalizeArtistId(n.id))).length;
                           }
-                        } catch (e) {
-                          console.warn(`Failed to parse graphData for project ${project.id}:`, e);
-                        }
+                        } catch (e) { /* ignore */ }
                       }
                       
                       return (
@@ -543,7 +541,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
                       {groupedProjects[bucketKey].map((project, index) => {
                         const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
-                        const displayTitle = project.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene");
+                        const displayTitle = cleanArtistDisplayName(project.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene"));
                         const formattedDate = formatProjectTimestamp(project.updatedAt);
                         const isMapped = !!project.graphData;
                         
