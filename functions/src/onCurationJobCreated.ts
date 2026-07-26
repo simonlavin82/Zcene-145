@@ -202,24 +202,31 @@ export const onCurationJobCreated = onDocumentCreated({
           .map((a: string) => a.trim())
           .filter(Boolean);
 
-        // Gather all artist nodes in the final graph (both seeds and recommendations)
-        const recommendedArtists = finalGraph.nodes
-          .filter(n => n.type === 'artist')
-          .map(n => n.id);
+        // Gather all artist and label nodes in the final graph (seeds, recommendations, and labels)
+        const recommendedEntities = finalGraph.nodes
+          .filter((n: any) => n.type === 'artist' || n.type === 'label')
+          .map((n: any) => ({
+            id: n.id,
+            name: n.label || n.id,
+            type: n.type || 'artist'
+          }));
 
-        console.log(`[Curation Backend] Hydrating details for ${recommendedArtists.length} artists in the graph:`, recommendedArtists);
+        console.log(`[Curation Backend] Hydrating details for ${recommendedEntities.length} entities in the graph:`, recommendedEntities.map((e: any) => `${e.name} (${e.type})`));
 
         const detailsCacheEntries: [string, any][] = [];
 
-        // Fetch details for each artist sequentially with 200ms delay to prevent rate limiting
-        for (let i = 0; i < recommendedArtists.length; i++) {
-          const artistName = recommendedArtists[i];
+        // Fetch details for each entity sequentially with 200ms delay to prevent rate limiting
+        for (let i = 0; i < recommendedEntities.length; i++) {
+          const entityObj = recommendedEntities[i];
+          const artistName = entityObj.name;
           const artistNormId = normalizeArtistId(artistName);
+          const isLabel = entityObj.type === 'label';
 
           // 1. Check local Firestore Cache first
           let details: any = null;
           try {
-            const cacheDoc = await db.collection("artists").doc(artistNormId).get();
+            const collName = isLabel ? "labels" : "artists";
+            const cacheDoc = await db.collection(collName).doc(artistNormId).get();
             if (cacheDoc.exists) {
               const cacheData = cacheDoc.data();
               if (cacheData && cacheData.detailsCache) {
@@ -260,22 +267,24 @@ export const onCurationJobCreated = onDocumentCreated({
                 await new Promise(resolve => setTimeout(resolve, 200));
               }
 
-              console.log(`[Curation Backend] Cache miss. Hydrating details for: ${artistName} (${i + 1}/${recommendedArtists.length})...`);
-              const tempNode = { id: artistName, type: 'artist' as const, group: 1 };
+              console.log(`[Curation Backend] Cache miss. Hydrating details for ${isLabel ? 'label' : 'artist'}: ${artistName} (${i + 1}/${recommendedEntities.length})...`);
+              const tempNode = { id: artistName, type: entityObj.type as any, group: 1 };
               details = await fetchNodeDetailsBackend(tempNode, finalGraph, inputPayload.artists);
 
-              // 3. Scrape YouTube and validate video ID
-              if (details.youtubeVideoId) {
-                const playable = await checkVideoPlayability(details.youtubeVideoId);
-                if (!playable) {
-                  details.youtubeVideoId = null;
-                }
-              } else if (details.youtubeSearchQuery) {
-                const scrapedId = await scrapeVideoIdBackend(artistName, artistNormId);
-                if (scrapedId) {
-                  const playable = await checkVideoPlayability(scrapedId);
-                  if (playable) {
-                    details.youtubeVideoId = scrapedId;
+              // 3. Scrape YouTube and validate video ID (only for artists; labels do not have music videos)
+              if (!isLabel) {
+                if (details.youtubeVideoId) {
+                  const playable = await checkVideoPlayability(details.youtubeVideoId);
+                  if (!playable) {
+                    details.youtubeVideoId = null;
+                  }
+                } else if (details.youtubeSearchQuery) {
+                  const scrapedId = await scrapeVideoIdBackend(artistName, artistNormId);
+                  if (scrapedId) {
+                    const playable = await checkVideoPlayability(scrapedId);
+                    if (playable) {
+                      details.youtubeVideoId = scrapedId;
+                    }
                   }
                 }
               }
@@ -384,15 +393,35 @@ export const onCurationJobCreated = onDocumentCreated({
           }
         }
 
-        // Proactively cache each recommended artist as a deep cache entry as well!
+        // Proactively cache each recommended entity (artist or label) as a deep cache entry as well!
         const seedNorms = new Set(artistList.map((a: string) => normalizeArtistId(a)));
-        for (const recArtist of recommendedArtists) {
-          if (seedNorms.has(normalizeArtistId(recArtist))) continue; // Already seeds
-          
+        for (const entityObj of recommendedEntities) {
+          const recArtist = entityObj.name;
           const recNorm = normalizeArtistId(recArtist);
+          const isLabel = entityObj.type === 'label';
+
+          if (!isLabel && seedNorms.has(recNorm)) continue; // Already seeds
           
           const recDetailsEntry = detailsCacheEntries.find(entry => normalizeArtistId(entry[0]) === recNorm);
           const recDetails = recDetailsEntry ? recDetailsEntry[1] : null;
+
+          if (isLabel) {
+            if (!recDetails) {
+              console.warn(`[Curation Backend] Label cache write skipped for "${recNorm}" — missing detailsCache.`);
+              continue;
+            }
+            await db.collection("labels").doc(recNorm).set({
+              cacheKey: recNorm,
+              labelId: recNorm,
+              detailsCache: sanitizeUndefinedProperties(recDetails),
+              cacheVersion: 2,
+              cachedAt: FieldValue.serverTimestamp(),
+              hitCount: 0,
+              isDeep: true,
+            });
+            console.log(`[Curation Backend] Proactively cached DEEP label entry for recommendation: ${recNorm}`);
+            continue;
+          }
 
           // Run Sanity Check — non-fatal: log and skip this recommendation's cache write rather than aborting the entire job
           try {
@@ -486,15 +515,15 @@ export const onCurationJobCreated = onDocumentCreated({
 
     if (inputPayload?.projectId && jobData.userId && result?.graphData) {
       const graphObj = typeof result.graphData === 'string' ? JSON.parse(result.graphData) : result.graphData;
-      const artistIds = graphObj.nodes
-        ? graphObj.nodes.filter((n: any) => n.type === 'artist').map((n: any) => normalizeArtistId(n.id))
+      const entityIds = graphObj.nodes
+        ? graphObj.nodes.filter((n: any) => n.type === 'artist' || n.type === 'label').map((n: any) => normalizeArtistId(n.id))
         : [];
 
       await updateProjectStatus(jobData.userId, inputPayload.projectId, {
         status: "completed",
         graphData: JSON.stringify(result.graphData),
-        artistIds: artistIds,
-        activeNodes: artistIds, // Native bulk queue population!
+        artistIds: entityIds,
+        activeNodes: entityIds, // Native bulk queue population (both artists and labels)!
         activeJobId: null,
         detailsCache: result.detailsCache
       });

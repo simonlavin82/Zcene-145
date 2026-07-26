@@ -2380,11 +2380,14 @@ const App: React.FC = () => {
         docPayload.cacheKey = currentCacheKey;
         docPayload.canvasLayout = JSON.stringify(canvasLayout);
       } else {
-        // Phase 1+: write individual artist ID references + canvas layout.
-        // Each ID points to its own isolated /artists/{id} Firestore document.
+        // Phase 1+: write individual entity ID references + canvas layout.
+        // Each ID points to its own isolated /artists/{id} or /labels/{id} Firestore document.
+        const allEntityIds = graphData.nodes
+          .filter((n: any) => n.type === 'artist' || n.type === 'label')
+          .map((n: any) => normalizeArtistId(n.id));
         const seedList = seedArtists.split('::').map((a: string) => a.trim()).filter(Boolean);
         const normalizedIds = seedList.map((name: string) => normalizeArtistId(name));
-        docPayload.artistIds = normalizedIds;
+        docPayload.artistIds = allEntityIds.length > 0 ? allEntityIds : normalizedIds;
         docPayload.canvasLayout = JSON.stringify(canvasLayout);
         docPayload.graphData = JSON.stringify(graphData);
       }

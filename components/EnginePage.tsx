@@ -491,10 +491,12 @@ To prevent data rot, API failures, and visual rendering regressions, the synthes
      reliable JSON structure output, preventing parser failures and empty 
      metadata fallbacks.
 
-5. DUAL-COLLECTION UNIVERSAL CACHING (/artists vs /labels):
+5. DUAL-COLLECTION UNIVERSAL CACHING (/artists vs /labels) & SIMULTANEOUS PRE-CACHING:
    - The global shared cache splits entities cleanly between two Firestore collections: /artists (for bands, musicians, and musical acts) and /labels (for record labels and publishing houses).
    - Label entities use normalized canonical slugs (bypassing multi-origin country suffixes like -united-states or -united-kingdom) because record labels represent global publishing organizations without country-specific disambiguation requirements.
-   - Any manual deep cut generation or background JIT detail fetch for a record label node writes directly to /labels/{labelSlug} with cacheVersion: 2, ensuring instant O(1) cache hits across any Zcene project that references the label.
+   - Simultaneous Batch Pre-Caching: When a new Zcene project is mapped or initialized (via backend curation job or frontend graph mapping), the curation engine simultaneously extracts both artist nodes and record label nodes from the Spiderweb graph data.
+   - For every entity in the graph, the pipeline queries its respective global collection (/artists or /labels). On a cache miss, it sequentially batch-synthesizes missing profiles (while skipping YouTube music video scraping for labels) and atomically writes them directly to /labels/{labelSlug} or /artists/{id} with isDeep: true before the project finishes saving.
+   - Guaranteed Instant Cache Hits: By the time the Spiderweb graph finishes rendering on the client, all corresponding global /labels/{canonicalId} and /artists/{id} documents already exist in Firestore, ensuring that clicking any node results in an instant O(1) global cache hit with zero modal generation flows required.
 
 6. STRICT PAYLOAD SANITIZATION (stripUndefinedProperties):
    - The Google Cloud Firestore JavaScript SDK strictly forbids properties with value undefined in document payloads, throwing an immediate client-side synchronous error (Unsupported field value: undefined).
