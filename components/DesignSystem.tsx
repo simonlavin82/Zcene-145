@@ -1686,7 +1686,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         The folder compartment relies on absolute positioning of the index tab relative to the compartment container. The left edge of the tab is offset by <code>left-[-1px]</code>, overlaying and hiding the container's top-left corner border. By enforcing a solid <code>border-zinc-800</code> on both components, the seam merges perfectly.
                                     </p>
                                     <p className="text-sm text-zinc-400 leading-relaxed mt-3">
-                                        To prevent massive trailing voids on ultra-wide desktop monitors while guaranteeing strict container margins on mobile and tablet screens, crate folders use <code>w-full md:w-fit max-w-full min-w-0</code>. Card grid columns are mapped responsively (1 column on mobile, 2 columns on <code>md:</code> 768px+, 3 columns on <code>xl:</code> 1280px+) with <code>w-full md:max-w-[360px]</code> card bounds to eliminate edge clipping.
+                                        To prevent massive trailing voids on ultra-wide desktop monitors while guaranteeing strict container margins on mobile and tablet screens, crate folders use <code>w-full md:w-fit max-w-full min-w-0</code>. Card grid columns are mapped responsively (1 column on mobile, 2 columns on <code>md:</code> 768px+, 3 columns on <code>xl:</code> 1280px+) with <code>w-full md:w-[360px]</code> card bounds to eliminate edge clipping.
                                     </p>
                                     <div className="space-y-4 pt-2">
                                         <div>
@@ -1727,7 +1727,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             {/* Cards inside this parent record crate compartment */}
                                             <div className="grid grid-cols-1 gap-4 w-full md:w-fit">
                                                 {/* Inner Mock Card */}
-                                                <div className="bg-zinc-900 border border-zinc-700/50 p-5 flex flex-col justify-between min-h-[160px] w-full md:max-w-[360px] shadow-xl">
+                                                <div className="bg-zinc-900 border border-zinc-700/50 p-5 flex flex-col justify-between min-h-[160px] w-full md:w-[360px] shadow-xl">
                                                     <div className="space-y-3">
                                                         <h3 className="text-sm font-medium text-white truncate">Grayscale</h3>
                                                         <p className="font-mono text-[10px] text-zinc-400">Edited 05/07/2026</p>
