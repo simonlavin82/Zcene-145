@@ -73,6 +73,28 @@ function sanitizeUndefinedProperties(obj) {
     return obj;
 }
 /**
+ * Strips artist-centric fields from a label profile before caching in Firestore.
+ */
+function sanitizeLabelProfile(details) {
+    if (!details)
+        return null;
+    let parsed = typeof details === 'string' ? JSON.parse(details) : details;
+    if (!parsed || typeof parsed !== 'object')
+        return null;
+    const cleanDetails = {
+        genre: parsed.details?.genre || null,
+        origin: parsed.details?.origin || null,
+        founded: parsed.details?.founded || null,
+        notableArtists: parsed.details?.notableArtists || [],
+    };
+    return {
+        summary: parsed.summary || parsed.bio || parsed.description || "",
+        details: cleanDetails,
+        discography: Array.isArray(parsed.discography) ? parsed.discography : [],
+        links: Array.isArray(parsed.links) ? parsed.links : [],
+    };
+}
+/**
  * Stateful Project UX Upgrade: Update the user's project document status
  * to reflect in-progress background curation and write back completed graphData.
  */
@@ -327,8 +349,8 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                         cacheKey: compositeCanonicalId,
                         [idFieldKey]: seedNorm,
                         seedArtists: seed,
-                        graphData: JSON.stringify(finalGraph),
-                        detailsCache: sanitizeUndefinedProperties(seedDetails), // Save as structured object!
+                        graphData: isSeedLabel ? null : JSON.stringify(finalGraph),
+                        detailsCache: isSeedLabel ? sanitizeLabelProfile(seedDetails) : sanitizeUndefinedProperties(seedDetails), // Save as structured object!
                         filters: inputPayload.filters || null,
                         cacheVersion: 2,
                         cachedAt: firestore_2.FieldValue.serverTimestamp(),
@@ -346,7 +368,7 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                             cacheKey: seedNorm,
                             [idFieldKey]: seedNorm,
                             seedArtists: seed,
-                            graphData: JSON.stringify({ nodes: [], links: [] }),
+                            graphData: isSeedLabel ? null : JSON.stringify({ nodes: [], links: [] }),
                             filters: {},
                             cacheVersion: 2,
                             cachedAt: firestore_2.FieldValue.serverTimestamp(),
@@ -412,8 +434,8 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                         cacheKey: compositeCanonicalId,
                         [idFieldKey]: recNorm,
                         seedArtists: recArtist,
-                        graphData: JSON.stringify(finalGraph),
-                        detailsCache: sanitizeUndefinedProperties(recDetails), // Save as structured object!
+                        graphData: isLabel ? null : JSON.stringify(finalGraph),
+                        detailsCache: isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(recDetails), // Save as structured object!
                         filters: null, // Note: active filters are not strictly carried for proactive rec entries unless we explicitly want to
                         cacheVersion: 2,
                         cachedAt: firestore_2.FieldValue.serverTimestamp(),
@@ -431,7 +453,7 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                             cacheKey: recNorm,
                             [idFieldKey]: recNorm,
                             seedArtists: recArtist,
-                            graphData: JSON.stringify({ nodes: [], links: [] }),
+                            graphData: isLabel ? null : JSON.stringify({ nodes: [], links: [] }),
                             filters: {},
                             cacheVersion: 2,
                             cachedAt: firestore_2.FieldValue.serverTimestamp(),

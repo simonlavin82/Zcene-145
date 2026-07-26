@@ -565,7 +565,7 @@ export const writeArtistCacheMany = async (
             cacheKey: compositeCanonicalId,
             [idFieldKey]: canonicalId,
             seedArtists: canonicalName,
-            graphData: JSON.stringify({ nodes, links, synthesisRationale: normalizedGraph.synthesisRationale }),
+            graphData: isLabel ? null : JSON.stringify({ nodes, links, synthesisRationale: normalizedGraph.synthesisRationale }),
             synthesisRationale: normalizedGraph.synthesisRationale || null,
             filters: filters || {},
             cacheVersion: 2,
@@ -574,7 +574,7 @@ export const writeArtistCacheMany = async (
             isDeep: preserveFullGraph || false,
           };
           if (artistDetails) {
-            setPayload.detailsCache = typeof artistDetails === 'string' ? JSON.parse(artistDetails) : artistDetails;
+            setPayload.detailsCache = isLabel ? sanitizeLabelProfile(artistDetails) : (typeof artistDetails === 'string' ? JSON.parse(artistDetails) : artistDetails);
           } else if (isLabel) {
             console.warn(`[LabelCache] Creating canonical label "${compositeCanonicalId}" without detailsCache because artistDetails was missing/undefined.`);
           }
@@ -601,7 +601,7 @@ export const writeArtistCacheMany = async (
               cacheKey: compositeCanonicalId,
               [idFieldKey]: canonicalId,
               seedArtists: canonicalName,
-              graphData: JSON.stringify({ nodes, links, synthesisRationale: normalizedGraph.synthesisRationale }),
+              graphData: isLabel ? null : JSON.stringify({ nodes, links, synthesisRationale: normalizedGraph.synthesisRationale }),
               synthesisRationale: normalizedGraph.synthesisRationale || null,
               filters: filters || {},
               cacheVersion: 2,
@@ -609,7 +609,7 @@ export const writeArtistCacheMany = async (
               isDeep: preserveFullGraph || false,
             };
             if (artistDetails) {
-              updatePayload.detailsCache = typeof artistDetails === 'string' ? JSON.parse(artistDetails) : artistDetails;
+              updatePayload.detailsCache = isLabel ? sanitizeLabelProfile(artistDetails) : (typeof artistDetails === 'string' ? JSON.parse(artistDetails) : artistDetails);
             }
             if (!isLabel) enforceArtistCacheSchema(updatePayload);
             await updateDoc(canonicalDocRef, stripUndefinedProperties(updatePayload));
@@ -617,7 +617,7 @@ export const writeArtistCacheMany = async (
           } else if (artistDetails) {
             // Update detailsCache if it was missing or stale
             const updatePayload: any = {
-              detailsCache: typeof artistDetails === 'string' ? JSON.parse(artistDetails) : artistDetails,
+              detailsCache: isLabel ? sanitizeLabelProfile(artistDetails) : (typeof artistDetails === 'string' ? JSON.parse(artistDetails) : artistDetails),
               cachedAt: serverTimestamp(),
               cacheVersion: 2,
               [idFieldKey]: canonicalId,
@@ -642,7 +642,7 @@ export const writeArtistCacheMany = async (
             cacheKey: artistId,
             [idFieldKey]: artistId,
             seedArtists: name,
-            graphData: JSON.stringify({ nodes: [], links: [] }),
+            graphData: isLabel ? null : JSON.stringify({ nodes: [], links: [] }),
             filters: {},
             cacheVersion: 2,
             cachedAt: serverTimestamp(),
@@ -1047,6 +1047,27 @@ export const findCanonicalNodeForArtist = (name: string, nodes: Node[]): Node | 
   if (found) return found;
 
   return undefined;
+};
+
+/**
+ * Strips artist-centric fields from a label profile before caching in Firestore.
+ */
+export const sanitizeLabelProfile = (details: any): any => {
+  if (!details) return null;
+  let parsed = typeof details === 'string' ? JSON.parse(details) : details;
+  if (!parsed || typeof parsed !== 'object') return null;
+  const cleanDetails = {
+    genre: parsed.details?.genre || null,
+    origin: parsed.details?.origin || null,
+    founded: parsed.details?.founded || null,
+    notableArtists: parsed.details?.notableArtists || [],
+  };
+  return {
+    summary: parsed.summary || parsed.bio || parsed.description || "",
+    details: cleanDetails,
+    discography: Array.isArray(parsed.discography) ? parsed.discography : [],
+    links: Array.isArray(parsed.links) ? parsed.links : [],
+  };
 };
 
 /**

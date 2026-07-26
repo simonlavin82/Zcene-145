@@ -117,7 +117,7 @@ export interface ArtistCacheEntry {
   cacheKey?: string;       // Composite cache key
   seedArtists?: string;    // Canonical name as returned by the AI, e.g. "End It"
   seedLabels?: string;
-  graphData: string;       // JSON-stringified GraphData map {"nodes":[], "links":[]}
+  graphData?: string | null; // Optional for labels (labels do not own graph blobs)
   cacheVersion: number;    // Schema version
   cachedAt: any;           // serverTimestamp()
   hitCount: number;

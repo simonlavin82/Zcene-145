@@ -721,57 +721,59 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
                     {details && (
                         <div className="space-y-10 text-zinc-300 pb-16">
-                            {/* Compatibility Meter */}
-                            <div className="flex flex-col gap-1.5 w-full">
-                                <div className="flex items-center justify-between text-[10px] font-medium uppercase tracking-[0.2em] text-zinc-400">
-                                    <span>MY TASTE</span>
-                                    {tasteCompatibility.hasTasteData ? (
-                                        <span className="font-mono text-[#a855f7] font-bold">
-                                            {tasteCompatibility.matches}/{tasteCompatibility.totalActive} Hits
-                                        </span>
-                                    ) : (
-                                        <span className="text-zinc-500 normal-case font-medium">Empty Taste Profile</span>
-                                    )}
-                                </div>
-                                <div className="grid grid-cols-3 gap-1.5 w-full">
-                                    {tasteCompatibility.criteria.map((c) => {
-                                        let bgClass = '';
-                                        let borderClass = '';
-                                        if (c.active) {
-                                            if (c.matched) {
-                                                bgClass = 'bg-[#a855f7]';
-                                                borderClass = 'border-[#a855f7]';
+                            {/* Compatibility Meter (Hidden for Labels) */}
+                            {!isLabelNode && (
+                                <div className="flex flex-col gap-1.5 w-full">
+                                    <div className="flex items-center justify-between text-[10px] font-medium uppercase tracking-[0.2em] text-zinc-400">
+                                        <span>MY TASTE</span>
+                                        {tasteCompatibility.hasTasteData ? (
+                                            <span className="font-mono text-[#a855f7] font-bold">
+                                                {tasteCompatibility.matches}/{tasteCompatibility.totalActive} Hits
+                                            </span>
+                                        ) : (
+                                            <span className="text-zinc-500 normal-case font-medium">Empty Taste Profile</span>
+                                        )}
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-1.5 w-full">
+                                        {tasteCompatibility.criteria.map((c) => {
+                                            let bgClass = '';
+                                            let borderClass = '';
+                                            if (c.active) {
+                                                if (c.matched) {
+                                                    bgClass = 'bg-[#a855f7]';
+                                                    borderClass = 'border-[#a855f7]';
+                                                } else {
+                                                    bgClass = 'bg-transparent';
+                                                    borderClass = 'border-[#52525b] border-solid';
+                                                }
                                             } else {
                                                 bgClass = 'bg-transparent';
-                                                borderClass = 'border-[#52525b] border-solid';
+                                                borderClass = 'border-[#52525b] border-dashed';
                                             }
-                                        } else {
-                                            bgClass = 'bg-transparent';
-                                            borderClass = 'border-[#52525b] border-dashed';
-                                        }
-                                        return (
-                                            <div 
-                                                key={c.id} 
-                                                className={`h-2 border transition-all duration-300 ${bgClass} ${borderClass}`}
-                                                title={`${c.name}: ${c.active ? (c.matched ? 'Matched' : 'Unmatched') : 'Not Configured'}`}
-                                            />
-                                        );
-                                    })}
+                                            return (
+                                                <div 
+                                                    key={c.id} 
+                                                    className={`h-2 border transition-all duration-300 ${bgClass} ${borderClass}`}
+                                                    title={`${c.name}: ${c.active ? (c.matched ? 'Matched' : 'Unmatched') : 'Not Configured'}`}
+                                                />
+                                            );
+                                        })}
+                                    </div>
+                                    <div className="flex justify-between text-[8px] font-mono tracking-widest text-zinc-500 uppercase select-none">
+                                        {tasteCompatibility.criteria.map((c) => {
+                                            let textClass = 'text-zinc-600';
+                                            if (c.active) {
+                                                textClass = c.matched ? 'text-[#a855f7] font-bold' : 'text-zinc-400';
+                                            }
+                                            return (
+                                                <span key={c.id} className={textClass}>
+                                                    {c.name}
+                                                </span>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
-                                <div className="flex justify-between text-[8px] font-mono tracking-widest text-zinc-500 uppercase select-none">
-                                    {tasteCompatibility.criteria.map((c) => {
-                                        let textClass = 'text-zinc-600';
-                                        if (c.active) {
-                                            textClass = c.matched ? 'text-[#a855f7] font-bold' : 'text-zinc-400';
-                                        }
-                                        return (
-                                            <span key={c.id} className={textClass}>
-                                                {c.name}
-                                            </span>
-                                        );
-                                    })}
-                                </div>
-                            </div>
+                            )}
 
                             {details.imageUrl && !imageError && (
                                 <div className={`aspect-video w-full bg-zinc-800 overflow-hidden relative border border-zinc-800/50 shadow-2xl transition-opacity duration-700 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}>
@@ -838,7 +840,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                         <p className="text-sm font-normal text-zinc-200">{details.details.founded}</p>
                                     </div>
                                 )}
-                                {(() => {
+                                {!isLabelNode && (() => {
                                     return (
                                         <div>
                                             <h4 className="font-bold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">
@@ -902,7 +904,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 </div>
                             </div>
 
-                            {details.members && details.members.length > 0 && (
+                            {!isLabelNode && details.members && details.members.length > 0 && (
                                 <div>
                                     <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-widest">Personnel</h4>
                                     <p className="text-base text-zinc-400">{details.members.join(' • ')}</p>
@@ -911,7 +913,9 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
                             {details.details?.notableArtists && details.details.notableArtists.length > 0 && (
                                 <div>
-                                    <h4 className="font-semibold text-zinc-500 mb-3 text-[10px] uppercase tracking-widest">Scene Circle</h4>
+                                    <h4 className="font-semibold text-zinc-500 mb-3 text-[10px] uppercase tracking-widest">
+                                        {isLabelNode ? 'Released Artists / Scene Circle' : 'Scene Circle'}
+                                    </h4>
                                     <div className="flex flex-wrap gap-2">
                                         {details.details.notableArtists.map(artistName => {
                                             const isAlreadySeed = seedArtistSet.has(normalizeArtistId(artistName));
@@ -947,7 +951,9 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
                             {details.discography && details.discography.length > 0 && (
                                 <div>
-                                    <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-widest">Essential Listening</h4>
+                                    <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-widest">
+                                        {isLabelNode ? 'Key Catalog Releases' : 'Essential Listening'}
+                                    </h4>
                                     <div className="grid grid-cols-1 gap-2">
                                         {details.discography.map((album, i) => (
                                             <div key={i} className="flex justify-between items-baseline border-b border-zinc-800/50 pb-1">
@@ -962,7 +968,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             {links.purchase.length > 0 && (
                                 <div className="p-5 bg-primary/5 border-2 border-primary/20 relative">
                                     <div className="absolute -top-3 left-4 bg-zinc-900 px-2 text-[10px] font-semibold uppercase tracking-widest text-primary rounded-none">
-                                        Artist Catalog
+                                        {isLabelNode ? 'Label Catalog' : 'Artist Catalog'}
                                     </div>
                                     <div className="flex flex-col gap-3">
                                         {links.purchase.map((link, i) => {
@@ -991,8 +997,8 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                             );
                                         })}
 
-                                        {/* Watch on YouTube button styled identically to Official Website */}
-                                        {(() => {
+                                        {/* Watch on YouTube button (Hidden for labels) */}
+                                        {!isLabelNode && (() => {
                                             const artistDisplay = getArtistDisplayName(details, node);
                                             const youtubeVideoId = details.youtubeVideoId;
                                             const youtubeUrl = youtubeVideoId && youtubeVideoId.length === 11
