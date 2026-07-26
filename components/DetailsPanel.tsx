@@ -599,7 +599,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 </button>
                             )}
 
-                            {isArtistNode && details && isAdmin && (
+                            {(isArtistNode || isLabelNode) && details && isAdmin && (
                                 checkIsProfileIncomplete(node, details) ? (
                                     <button
                                         onClick={onRefresh}

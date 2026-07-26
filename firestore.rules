@@ -231,6 +231,40 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // --- Global Label Cache ---
+    // Dedicated collection storing Deep Cut biographies and discographies for record labels.
+    // Keyed by canonical normalized slug for O(1) global lookup across all Zcene projects.
+    match /labels/{cacheKey} {
+      allow read: if true;
+
+      allow create: if isSignedIn() &&
+                       (
+                         (
+                           incoming().keys().hasAll(['cacheKey', 'labelId', 'hitCount']) &&
+                           incoming().cacheKey == cacheKey &&
+                           incoming().hitCount == 0
+                         ) ||
+                         (
+                           incoming().keys().hasAll(['cacheKey', 'redirectTo']) &&
+                           incoming().cacheKey == cacheKey &&
+                           incoming().redirectTo is string &&
+                           incoming().redirectTo != ""
+                         )
+                       );
+
+      allow update: if isSignedIn() &&
+                       (
+                         request.resource.data.diff(resource.data).affectedKeys()
+                           .hasOnly(['detailsCache', 'hitCount', 'cachedAt', 'cacheVersion', 'labelId', 'cacheKey', 'isDeep'])
+                       ) || (
+                         'redirectTo' in incoming() &&
+                         incoming().redirectTo is string &&
+                         incoming().redirectTo != ""
+                       );
+
+      allow delete: if isAdmin();
+    }
+
     // --- Curation Jobs ---
     match /curationJobs/{jobId} {
       // Users can only read their own curation jobs, admins can read all

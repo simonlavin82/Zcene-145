@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { AlertCircle, AlertTriangle, X, CheckCircle2, Key } from 'lucide-react';
 import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project, ArtistCacheEntry, COST_PER_AI_CALL } from './types';
 import { generateGraphData, fetchNodeDetails, extendGraphFromNode, resolveArtistCandidatesViaAI } from './services/geminiService';
-import { normalizeArtistId, readArtistCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, titleCaseArtistId, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema } from './services/artistCacheService';
+import { normalizeArtistId, readArtistCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, getEntityDocWithRedirect, getLabelDocWithRedirect, getAnyEntityDocWithRedirect, titleCaseArtistId, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema } from './services/artistCacheService';
 import { normalizeCountry } from './utils/normalization';
 import { auth, signInWithGoogle, logout, onAuthStateChanged, User, db, handleFirestoreError, OperationType } from './services/firebase';
 import { translateError, translateToast } from './services/errorTranslationLayer';
@@ -1086,13 +1086,14 @@ const App: React.FC = () => {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [currentCacheKey, setCurrentCacheKey] = useState<string | null>(null);
+  const [supportsLabelDeepCuts, setSupportsLabelDeepCuts] = useState<boolean>(true);
   const healedNodeIdsRef = useRef<Set<string>>(new Set());
 
   const activeNodes = useMemo(() => {
     if (!graphData || !graphData.nodes) return [];
     return activeNodeIds
       .map(id => graphData.nodes.find(n => n.id.toLowerCase() === id.toLowerCase() || normalizeArtistId(n.id) === normalizeArtistId(id) || isArtistIdMatch(n.id, id)))
-      .filter((n): n is Node => !!n && n.type === 'artist');
+      .filter((n): n is Node => !!n && (n.type === 'artist' || n.type === 'label'));
   }, [activeNodeIds, graphData]);
   const [isStackDialogOpen, setIsStackDialogOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -1395,6 +1396,7 @@ const App: React.FC = () => {
   const lastSyncedDocRef = useRef<string>('');
   const evictedNodeIdsRef = useRef<Set<string>>(new Set());
   const approvedSeedsRef = useRef<Set<string>>(new Set());
+  const handleGenerateDeepCutRef = useRef<((node: Node) => Promise<void>) | null>(null);
 
   useEffect(() => { currentProjectOwnerIdRef.current = currentProjectOwnerId; }, [currentProjectOwnerId]);
   useEffect(() => { projectNameRef.current = projectName; }, [projectName]);
@@ -1480,6 +1482,7 @@ const App: React.FC = () => {
     setDetailsCache(new Map());
     setChatHistories(new Map());
     setCurrentCacheKey(null);
+    setSupportsLabelDeepCuts(true);
 
     // Update route immediately
     navigate(`/z/${newId}`);
@@ -1498,6 +1501,8 @@ const App: React.FC = () => {
         lastViewedStackCount: 0,
         isMagazineViewOpen: false,
         authorId: user.uid,
+        supportsLabelDeepCuts: true,
+        schemaVersion: 2,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
@@ -1552,9 +1557,9 @@ const App: React.FC = () => {
     setIsSharing(true);
     const path = 'sharedZcenes';
     try {
-      // Build lightweight canvas layout — artist positions only
+      // Build lightweight canvas layout — artist and label positions
       const canvasLayout = graphData!.nodes
-        .filter(n => n.type === 'artist')
+        .filter(n => n.type === 'artist' || n.type === 'label')
         .map(n => ({ nodeId: n.id, x: n.x, y: n.y, fx: n.fx ?? null, fy: n.fy ?? null }));
 
       const sharePayload: Record<string, any> = {
@@ -1828,7 +1833,7 @@ const App: React.FC = () => {
       (peekedNode.type === 'artist' && node.type === 'artist' && isArtistIdMatch(peekedNode.id, node.id))
     );
 
-    const isBlockedType = node.type === 'founded' || node.type === 'country';
+    const isBlockedType = node.type === 'founded' || node.type === 'country' || node.type === 'genre';
 
     if (isAlreadySelected) {
       return;
@@ -1961,7 +1966,7 @@ const App: React.FC = () => {
     if (!isEvicted) {
         try {
             const standardizedId = normalizeArtistId(node.id);
-            globalDoc = await getArtistDocWithRedirect(standardizedId);
+            globalDoc = await getEntityDocWithRedirect(standardizedId, node.type === 'label' ? 'label' : 'artist');
         
         if (globalDoc.exists()) {
             const data = globalDoc.data();
@@ -2108,6 +2113,11 @@ const App: React.FC = () => {
       setActiveNodeIds(prev => prev.some(id => id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node.id]);
     }
 
+    if (node.type === 'label' && !supportsLabelDeepCuts) {
+      showToast("⚠️ Legacy project structure detected: Label deep cuts require a newly created Zcene project.");
+      return;
+    }
+
     const isApprovedSeed = approvedSeedsRef.current.has(normalizeArtistId(node.id)) || 
                            approvedSeedsRef.current.has(node.id.toLowerCase());
 
@@ -2120,9 +2130,20 @@ const App: React.FC = () => {
       setLoadingNodeIds(prev => { const next = new Set(prev); next.delete(node.id); return next; });
       return;
     }
-  }, [confirmTokenUsage, selectedNode, peekedNode, loadingNodeIds, isSmallScreen]);
+
+    if (handleGenerateDeepCutRef.current) {
+      approvedSeedsRef.current.add(normalizeArtistId(node.id));
+      approvedSeedsRef.current.add(node.id.toLowerCase());
+      await handleGenerateDeepCutRef.current(node);
+    }
+  }, [confirmTokenUsage, selectedNode, peekedNode, loadingNodeIds, isSmallScreen, supportsLabelDeepCuts, showToast]);
 
   const handleGenerateDeepCut = useCallback(async (node: Node) => {
+    if (node.type === 'label' && !supportsLabelDeepCuts) {
+      showToast("⚠️ Legacy project structure detected: Label deep cuts require a newly created Zcene project.");
+      return;
+    }
+
     const isApprovedSeed = approvedSeedsRef.current.has(normalizeArtistId(node.id)) || 
                            approvedSeedsRef.current.has(node.id.toLowerCase());
 
@@ -2172,6 +2193,11 @@ const App: React.FC = () => {
       setDetailsCache(prev => {
         const next = new Map(prev);
         next.set(node.id, details);
+        next.set(node.id.toLowerCase(), details);
+        next.set(simpleArtistId, details);
+        if (disambiguatedCacheId !== simpleArtistId) {
+          next.set(disambiguatedCacheId, details);
+        }
         return next;
       });
 
@@ -2190,8 +2216,9 @@ const App: React.FC = () => {
       });
 
       // 5. Safe Split-Document Write-Back
+      const collName = node.type === 'label' ? 'labels' : 'artists';
       if (disambiguatedCacheId !== simpleArtistId) {
-        const simpleDocRef = doc(db, 'artists', simpleArtistId);
+        const simpleDocRef = doc(db, collName, simpleArtistId);
         const simpleSnap = await getDoc(simpleDocRef);
         
         if (simpleSnap.exists()) {
@@ -2212,10 +2239,19 @@ const App: React.FC = () => {
       // 6. Write the canonical Deep Cache payload
       const normalizedGraph = normalizeGraphData(graphData);
       const canonicalNode = normalizedGraph.nodes.find(
-        (n: any) => n.type === 'artist' && (n.id.trim().toLowerCase() === node.id.trim().toLowerCase() || normalizeArtistId(n.id) === disambiguatedCacheId)
+        (n: any) => (n.type === 'artist' || n.type === 'label') && (n.id.trim().toLowerCase() === node.id.trim().toLowerCase() || normalizeArtistId(n.id) === disambiguatedCacheId)
       );
       
-      const setPayload = {
+      const isLabel = node.type === 'label' || canonicalNode?.type === 'label';
+      const setPayload = isLabel ? {
+        cacheKey: disambiguatedCacheId,
+        labelId: simpleArtistId,
+        cacheVersion: 2,
+        cachedAt: serverTimestamp(),
+        hitCount: 0,
+        isDeep: true,
+        detailsCache: details,
+      } : {
         cacheKey: disambiguatedCacheId,
         artistId: simpleArtistId,
         seedArtists: details.details?.artist || canonicalNode?.label || node.id,
@@ -2229,8 +2265,8 @@ const App: React.FC = () => {
         synthesisRationale: details.synthesisRationale || null
       };
       
-      enforceArtistCacheSchema(setPayload);
-      await setDoc(doc(db, 'artists', disambiguatedCacheId), setPayload);
+      if (!isLabel) enforceArtistCacheSchema(setPayload);
+      await setDoc(doc(db, collName, disambiguatedCacheId), setPayload);
 
     } catch (err) {
       console.error("[Manual Generation] Failed to fetch and write split document:", err);
@@ -2239,6 +2275,8 @@ const App: React.FC = () => {
       setLoadingNodeIds(prev => { const next = new Set(prev); next.delete(node.id); return next; });
     }
   }, [confirmTokenUsage, graphData, seedArtists, showToast]);
+
+  useEffect(() => { handleGenerateDeepCutRef.current = handleGenerateDeepCut; }, [handleGenerateDeepCut]);
 
   const handleToggleStack = useCallback(async (node: Node, link?: string) => {
     if (!user) {
@@ -2314,10 +2352,10 @@ const App: React.FC = () => {
     const newDocRef = doc(collection(db, 'users', user.uid, 'projects'));
     const newId = newDocRef.id;
 
-    // Phase 05: Build lightweight canvas layout — artist nodes only (x/y/fx/fy).
-    // Heavy graphData and detailsCache live in the global 'artists' cache, referenced by cacheKey.
+    // Phase 05: Build lightweight canvas layout — artist and label nodes (x/y/fx/fy).
+    // Heavy graphData and detailsCache live in the global cache, referenced by cacheKey.
     const canvasLayout = graphData.nodes
-      .filter(n => n.type === 'artist')
+      .filter(n => n.type === 'artist' || n.type === 'label')
       .map(n => ({ nodeId: n.id, x: n.x, y: n.y, fx: n.fx ?? null, fy: n.fy ?? null }));
 
     const path = `users/${user.uid}/projects/${newId}`;
@@ -2764,9 +2802,9 @@ const App: React.FC = () => {
       const searchIdLower = searchId.toLowerCase();
       
       try {
-        let cacheDoc = await getArtistDocWithRedirect(searchId);
+        let cacheDoc = await getAnyEntityDocWithRedirect(searchId);
         if (!cacheDoc.exists()) {
-          cacheDoc = await getArtistDocWithRedirect(searchIdLower);
+          cacheDoc = await getAnyEntityDocWithRedirect(searchIdLower);
         }
         
         if (!cacheDoc.exists()) {
@@ -3829,7 +3867,7 @@ const App: React.FC = () => {
       try {
         const hardGuardResults = await Promise.allSettled(
           artistList.map(async (name) => {
-            const snap = await getArtistDocWithRedirect(normalizeArtistId(name));
+            const snap = await getAnyEntityDocWithRedirect(normalizeArtistId(name));
             if (!snap.exists()) return null;
             const d = snap.data();
             if (!d) return null;
@@ -4131,6 +4169,7 @@ const App: React.FC = () => {
             console.log("[Kill-Switch] Task cancelled. Blocking Firestore persistence.");
             return;
           }
+          setSupportsLabelDeepCuts(true);
           await writeArtistCacheMany(artistList, final, user?.uid, activeDiscoveryFilters, true, true, fetchedDetailsMap);
         };
 
@@ -4428,7 +4467,7 @@ const App: React.FC = () => {
   // the load cycle complete. This completely prevents the deep cut queue
   // from ever falling through to a live Gemini proxy call for known artists.
   const batchHydrateDetailsCache = useCallback(async (nodes: any[], links: any[] = []): Promise<void> => {
-    const artistNodes = nodes.filter((n: any) => n.type === 'artist' || !n.type);
+    const artistNodes = nodes.filter((n: any) => n.type === 'artist' || n.type === 'label' || !n.type);
     if (!artistNodes.length) return;
 
     const results = new Map<string, NodeDetails>();
@@ -4459,11 +4498,11 @@ const App: React.FC = () => {
       }
       
       try {
-        let snap = await getArtistDocWithRedirect(cacheId);
+        let snap = await getEntityDocWithRedirect(cacheId, n.type === 'label' ? 'label' : 'artist');
         
         // If the country-disambiguated doc does not exist, check the simple ID with context verification
         if (!snap.exists() && cacheId !== simpleId) {
-          const fallbackSnap = await getArtistDocWithRedirect(simpleId);
+          const fallbackSnap = await getEntityDocWithRedirect(simpleId, n.type === 'label' ? 'label' : 'artist');
           if (fallbackSnap.exists()) {
             const data = fallbackSnap.data();
             if (data?.detailsCache) {
@@ -4678,6 +4717,7 @@ const App: React.FC = () => {
       if (data.name !== undefined) setProjectName(data.name);
       setProjectStatus(data.status || null);
       setActiveJobId(data.activeJobId || null);
+      setSupportsLabelDeepCuts(data.supportsLabelDeepCuts === true || data.schemaVersion >= 2);
       if (data.status === 'curating') {
         setIsLoading(true);
       }
@@ -5229,9 +5269,9 @@ const App: React.FC = () => {
           hasAutoSelectedRef.current = currentProjectId;
           const seeds = (seedArtists || '').split('::').map(s => s.trim().toLowerCase());
           const firstSeedNode = graphData.nodes.find(n => 
-            n.type === 'artist' && seeds.includes(n.id.toLowerCase())
+            (n.type === 'artist' || n.type === 'label') && seeds.includes(n.id.toLowerCase())
           );
-          const defaultNode = firstSeedNode || graphData.nodes.find(n => n.type === 'artist');
+          const defaultNode = firstSeedNode || graphData.nodes.find(n => n.type === 'artist' || n.type === 'label');
           if (defaultNode) {
             console.log(`[Re-hydration Hook] Auto-selecting seed node for hydration:`, defaultNode.id);
             handleNodeClick(defaultNode);
@@ -5258,7 +5298,7 @@ const App: React.FC = () => {
 
     // Build canvas layout and payload for dirty comparison
     const canvasLayout = graphData.nodes
-      .filter(n => n.type === 'artist')
+      .filter(n => n.type === 'artist' || n.type === 'label')
       .map(n => ({ nodeId: n.id, x: n.x, y: n.y, fx: n.fx ?? null, fy: n.fy ?? null }));
 
     const currentPayload = {
@@ -5292,6 +5332,8 @@ const App: React.FC = () => {
           isMagazineViewOpen: isMagazineViewOpen && activeNodes.length > 0,
           chatHistories: JSON.stringify(Array.from(chatHistories.entries())),
           authorId: user.uid,
+          supportsLabelDeepCuts: supportsLabelDeepCuts,
+          schemaVersion: supportsLabelDeepCuts ? 2 : 1,
           updatedAt: serverTimestamp(),
         };
 
@@ -5306,7 +5348,7 @@ const App: React.FC = () => {
             // Phase 1+: derive the artistIds array from all artist nodes currently in the graph.
             // Each entry points to an individual /artists/{id} Firestore document.
             const currentArtistList = graphData.nodes
-              .filter((n: any) => n.type === 'artist')
+              .filter((n: any) => n.type === 'artist' || n.type === 'label')
               .map((n: any) => n.id);
 
             if (currentArtistList.length > 0) {
@@ -5697,8 +5739,8 @@ const App: React.FC = () => {
     try {
       const extension = await extendGraphFromNode(node, graphData);
 
-      // Identify newly discovered artists in the extension
-      const discoveredArtistNodes = extension.nodes.filter(n => n.type === 'artist');
+      // Identify newly discovered artists and labels in the extension
+      const discoveredArtistNodes = extension.nodes.filter(n => n.type === 'artist' || n.type === 'label');
       const discoveredArtistNames = discoveredArtistNodes.map(n => n.id);
 
       const filteredNodes = graphData.nodes.filter(n => n.id !== loadingNodeId);
@@ -5714,7 +5756,7 @@ const App: React.FC = () => {
       // Double-Write to Global Cache: Await global cache writes before updating canvas graphData state.
       // This prevents the project canvas auto-save from racing ahead before the cache entries exist.
       if (discoveredArtistNames.length > 0) {
-        showToast("Saving new artists to global cache...");
+        showToast("Saving new discoveries to global cache...");
         try {
           await writeArtistCacheMany(discoveredArtistNames, mergedGraph, user?.uid, discoveryFilters, true);
           console.log(`[Node Extension] Global cache double-write confirmed for: ${discoveredArtistNames.join(', ')}`);
@@ -5726,7 +5768,7 @@ const App: React.FC = () => {
       setGraphData(mergedGraph);
 
       // Show toast for the new discovery
-      const newArtist = extension.nodes.find(n => n.type === 'artist');
+      const newArtist = extension.nodes.find(n => n.type === 'artist' || n.type === 'label');
       if (newArtist) {
         showToast(`Discovered ${newArtist.id}`);
       }
@@ -5861,9 +5903,10 @@ const App: React.FC = () => {
       enforceArtistCacheSchema(updatePayload);
 
       // Resolve target snapshot via redirect before updating to avoid overwriting bare root alias docs
-      const targetSnap = await getArtistDocWithRedirect(cacheId);
+      const collName = node.type === 'label' ? 'labels' : 'artists';
+      const targetSnap = await getEntityDocWithRedirect(cacheId, node.type === 'label' ? 'label' : 'artist');
       const targetDocId = targetSnap.exists() ? targetSnap.id : cacheId;
-      await updateDoc(doc(db, 'artists', targetDocId), updatePayload);
+      await updateDoc(doc(db, collName, targetDocId), updatePayload);
       console.log("[Revalidation] Successfully updated stale cache in Firestore for: " + targetDocId);
     } catch (e: any) {
       console.warn("[Revalidation] Background refresh failed for: " + cacheId, e.message);
@@ -6066,11 +6109,11 @@ const App: React.FC = () => {
                 if (!isEvicted) {
                   try {
                     let cacheId = disambiguatedCacheId;
-                    let cacheDoc = await getArtistDocWithRedirect(cacheId);
+                    let cacheDoc = await getEntityDocWithRedirect(cacheId, node.type === 'label' ? 'label' : 'artist');
                     
                     if (!cacheDoc.exists() && cacheId !== simpleId) {
                       // Try simple ID fallback
-                      const fallbackSnap = await getArtistDocWithRedirect(simpleId);
+                      const fallbackSnap = await getEntityDocWithRedirect(simpleId, node.type === 'label' ? 'label' : 'artist');
                       if (fallbackSnap.exists()) {
                         const data = fallbackSnap.data();
                         if (data && data.detailsCache && validateCacheEntry(data, true).isFullyQualified) {
@@ -6315,11 +6358,12 @@ const App: React.FC = () => {
                     let targetDocId = cacheId;
                     let docExists = existingSnap.exists();
 
+                    const collName = node.type === 'label' ? 'labels' : 'artists';
                     // If we have a disambiguated ID (e.g. "needtobreathe-united-states"), we should check if
                     // there is an existing legacy or simple record at "needtobreathe" and merge it.
                     if (cacheId !== simpleArtistId) {
                       try {
-                        const simpleDocRef = doc(db, 'artists', simpleArtistId);
+                        const simpleDocRef = doc(db, collName, simpleArtistId);
                         const simpleSnap = await getDoc(simpleDocRef);
                         if (simpleSnap.exists()) {
                           const simpleData = simpleSnap.data();
@@ -6374,12 +6418,12 @@ const App: React.FC = () => {
                         synthesisRationale: details.synthesisRationale || null
                       };
                       enforceArtistCacheSchema(updatePayload);
-                      await updateDoc(doc(db, 'artists', targetDocId), updatePayload);
+                      await updateDoc(doc(db, collName, targetDocId), updatePayload);
                       console.log(`[Deep Cut Queue] Write-back: Successfully updated detailsCache + cachedAt for: ${targetDocId}`);
                     } else if (!fallbackDetails) {
                       const normalizedGraph = normalizeGraphData(graphData);
                       const canonicalNode = normalizedGraph.nodes.find(
-                        n => n.type === 'artist' && (n.id.trim().toLowerCase() === node.id.trim().toLowerCase() || normalizeArtistId(n.id) === targetDocId)
+                        n => (n.type === 'artist' || n.type === 'label') && (n.id.trim().toLowerCase() === node.id.trim().toLowerCase() || normalizeArtistId(n.id) === targetDocId)
                       );
                       const canonicalName = canonicalNode?.label ?? canonicalNode?.id ?? node.id;
 
@@ -6397,12 +6441,12 @@ const App: React.FC = () => {
                         synthesisRationale: details.synthesisRationale || null
                       };
                       enforceArtistCacheSchema(setPayload);
-                      await setDoc(doc(db, 'artists', targetDocId), setPayload);
+                      await setDoc(doc(db, collName, targetDocId), setPayload);
                       console.log(`[Deep Cut Queue] JIT cached Canonical node (full context): ${targetDocId}`);
                     }
                       
                     if (isAlias) {
-                      const aliasDocRef = doc(db, 'artists', cacheId);
+                      const aliasDocRef = doc(db, collName, cacheId);
                       await setDoc(aliasDocRef, {
                         cacheKey: cacheId,
                         artistId: cacheId,

@@ -109,7 +109,7 @@ export const normalizeGraphData = (graph: GraphData): GraphData => {
     const originalId = node.id;
     let normalizedId = originalId.trim();
     
-    if (node.type === 'artist') {
+    if (node.type === 'artist' || node.type === 'label') {
       normalizedId = normalizeArtistId(originalId);
     } else {
       normalizedId = normalizedId.toLowerCase();
@@ -120,7 +120,7 @@ export const normalizeGraphData = (graph: GraphData): GraphData => {
     idMap.set(normalizeArtistId(originalId), normalizedId); // accent-insensitive fallback
 
     let label = node.label || originalId.trim();
-    if (node.type === 'artist') {
+    if (node.type === 'artist' || node.type === 'label') {
       label = titleCaseArtistId(label);
     }
 
@@ -194,7 +194,7 @@ export const extractArtistSubGraph = (
 
   // Find the canonical artist node from the full graph
   const artistNode = fullGraph.nodes.find(
-    n => n.type === 'artist' && (normalizeArtistId(n.id) === artistNameNorm || isArtistIdMatch(n.id, artistName))
+    n => (n.type === 'artist' || n.type === 'label') && (normalizeArtistId(n.id) === artistNameNorm || isArtistIdMatch(n.id, artistName))
   );
 
   if (!artistNode) {
@@ -221,7 +221,7 @@ export const extractArtistSubGraph = (
       const otherNorm = normalizeArtistId(otherId);
       
       const otherNode = fullGraph.nodes.find(n => normalizeArtistId(n.id) === otherNorm);
-      if (otherNode && otherNode.type === 'artist' && !seedsNorm.has(otherNorm)) {
+      if (otherNode && (otherNode.type === 'artist' || otherNode.type === 'label') && !seedsNorm.has(otherNorm)) {
         peerArtistIds.add(otherNode.id);
       }
     }
@@ -316,7 +316,7 @@ export const eagerNormalizeCacheEntry = (entry: ArtistCacheEntry): ArtistCacheEn
       const graph = JSON.parse(entry.graphData);
       if (graph && graph.nodes) {
         graph.nodes.forEach((n: any) => {
-          if (n.type === 'artist') {
+          if (n.type === 'artist' || n.type === 'label') {
             n.label = titleCaseArtistId(n.label || n.id);
           }
         });
@@ -390,7 +390,13 @@ export const readArtistCacheMany = async (
       const artistId = normalizeArtistId(name);
       const compositeId = buildCompositeCacheKey(artistId, filters);
       try {
-        const snap = await getArtistDocWithRedirect(compositeId);
+        let snap = await getArtistDocWithRedirect(compositeId);
+        if (!snap.exists()) {
+          const labelSnap = await getLabelDocWithRedirect(compositeId);
+          if (labelSnap.exists()) {
+            snap = labelSnap;
+          }
+        }
         if (snap.exists()) {
           console.log(`[ArtistCache] HIT (Resolved): ${compositeId}`);
           return { name, entry: snap.data() as ArtistCacheEntry };
@@ -460,8 +466,15 @@ export const writeArtistCacheMany = async (
   }
 
   const normalizedGraph = normalizeGraphData(fullGraph);
+  const allEntitiesToCache = Array.from(new Set([
+    ...artistNames,
+    ...normalizedGraph.nodes
+      .filter(n => n && (n.type === 'artist' || n.type === 'label'))
+      .map(n => n.id)
+  ]));
+
   await Promise.allSettled(
-    artistNames.map(async name => {
+    allEntitiesToCache.map(async name => {
       const artistId = normalizeArtistId(name);
       
       // Find the canonical node in the full returned graph
@@ -500,28 +513,37 @@ export const writeArtistCacheMany = async (
       }
       if (!countryNorm) countryNorm = "global";
 
-      const disambiguatedCanonicalId = canonicalId.endsWith(`-${countryNorm}`) ? canonicalId : `${canonicalId}-${countryNorm}`;
-      const disambiguatedArtistId = artistId.endsWith(`-${countryNorm}`) ? artistId : `${artistId}-${countryNorm}`;
+      const isLabel = canonicalNode?.type === 'label';
+      const disambiguatedCanonicalId = isLabel ? canonicalId : (canonicalId.endsWith(`-${countryNorm}`) ? canonicalId : `${canonicalId}-${countryNorm}`);
+      const disambiguatedArtistId = isLabel ? artistId : (artistId.endsWith(`-${countryNorm}`) ? artistId : `${artistId}-${countryNorm}`);
 
-      const compositeCanonicalId = buildCompositeCacheKey(disambiguatedCanonicalId, filters);
-      const compositeArtistId = buildCompositeCacheKey(disambiguatedArtistId, filters);
+      const compositeCanonicalId = isLabel ? canonicalId : buildCompositeCacheKey(disambiguatedCanonicalId, filters);
+      const compositeArtistId = isLabel ? artistId : buildCompositeCacheKey(disambiguatedArtistId, filters);
 
       const { nodes, links } = preserveFullGraph
         ? { nodes: normalizedGraph.nodes, links: normalizedGraph.links }
         : extractArtistSubGraph(canonicalNode ? canonicalNode.id : name, normalizedGraph, artistNames);
 
-      if (nodes.length === 0) {
+      if (nodes.length === 0 && !isLabel) {
         console.warn(`[ArtistCache] Skipping write for "${name}" (canonical: "${compositeCanonicalId}") — artist node not found in graph.`);
         return;
       }
 
       try {
-        const canonicalDocRef = doc(db, 'artists', compositeCanonicalId);
+        const collName = isLabel ? 'labels' : 'artists';
+        const canonicalDocRef = doc(db, collName, compositeCanonicalId);
         const canonicalSnap = await getDoc(canonicalDocRef);
 
         if (!canonicalSnap.exists()) {
           // ── CREATE PATH ─────────────────────────────────────────────────────
-          const setPayload: any = {
+          const setPayload: any = isLabel ? {
+            cacheKey: compositeCanonicalId,
+            labelId: canonicalId,
+            cacheVersion: 2,
+            cachedAt: serverTimestamp(),
+            hitCount: 0,
+            isDeep: preserveFullGraph || false,
+          } : {
             cacheKey: compositeCanonicalId,
             artistId: canonicalId,
             seedArtists: canonicalName,
@@ -536,67 +558,94 @@ export const writeArtistCacheMany = async (
           if (artistDetails) {
             setPayload.detailsCache = typeof artistDetails === 'string' ? JSON.parse(artistDetails) : artistDetails;
           }
-          enforceArtistCacheSchema(setPayload);
+          if (!isLabel) enforceArtistCacheSchema(setPayload);
           await setDoc(canonicalDocRef, setPayload);
-          console.log(`[ArtistCache] Created Universal Canonical: ${compositeCanonicalId} (${nodes.length} nodes, ${links.length} links)`);
+          console.log(`[${isLabel ? 'LabelCache' : 'ArtistCache'}] Created Universal Canonical: ${compositeCanonicalId}`);
         } else {
           const existing = canonicalSnap.data();
 
-          // Break the version gate: if the incoming graph is richer (more artist nodes)
-          // than what is stored, always overwrite — a full graph must replace a stale truncated one.
-          let existingArtistCount = 0;
-          if (existing?.graphData) {
-            try {
-              const existingGraph = JSON.parse(existing.graphData);
-              existingArtistCount = (existingGraph.nodes || []).filter((n: any) => n.type === 'artist').length;
-            } catch (e) { /* ignore parse errors on stale doc */ }
-          }
-          const incomingArtistCount = nodes.filter(n => n.type === 'artist').length;
-          const isRicherGraph = incomingArtistCount > existingArtistCount;
-
-          if (forceOverwrite || isRicherGraph || (existing && (!existing.cacheVersion || existing.cacheVersion < 2 || (preserveFullGraph && existing.isDeep !== true)))) {
-            // ── UPGRADE PATH (Case B) ─────────────────────────────────────────
-            const updatePayload: any = {
-              cacheKey: compositeCanonicalId,
-              artistId: canonicalId,
-              seedArtists: canonicalName,
-              graphData: JSON.stringify({ nodes, links, synthesisRationale: normalizedGraph.synthesisRationale }),
-              synthesisRationale: normalizedGraph.synthesisRationale || null,
-              filters: filters || {},
-              cacheVersion: 2,
-              cachedAt: serverTimestamp(),
-              isDeep: preserveFullGraph || false,
-            };
+          if (isLabel) {
             if (artistDetails) {
-              updatePayload.detailsCache = typeof artistDetails === 'string' ? JSON.parse(artistDetails) : artistDetails;
+              const updatePayload: any = {
+                detailsCache: typeof artistDetails === 'string' ? JSON.parse(artistDetails) : artistDetails,
+                cachedAt: serverTimestamp(),
+                cacheVersion: 2,
+                labelId: canonicalId,
+                cacheKey: compositeCanonicalId,
+                isDeep: preserveFullGraph || false,
+              };
+              await updateDoc(canonicalDocRef, updatePayload);
+              console.log(`[LabelCache] Updated detailsCache for canonical label: ${compositeCanonicalId}`);
             }
-            enforceArtistCacheSchema(updatePayload);
-            await updateDoc(canonicalDocRef, updatePayload);
-            console.log(`[ArtistCache] Upgraded/Overwritten Canonical doc: ${compositeCanonicalId} → cacheVersion 2 (incoming: ${incomingArtistCount} artists, existing: ${existingArtistCount} artists)`);
           } else {
-            console.log(`[ArtistCache] Skipping write for Canonical "${compositeCanonicalId}" — doc already at v${existing?.cacheVersion || 2} with ${existingArtistCount} artist nodes (incoming also has ${incomingArtistCount}).`);
+            // Break the version gate: if the incoming graph is richer (more artist nodes)
+            // than what is stored, always overwrite — a full graph must replace a stale truncated one.
+            let existingArtistCount = 0;
+            if (existing?.graphData) {
+              try {
+                const existingGraph = JSON.parse(existing.graphData);
+                existingArtistCount = (existingGraph.nodes || []).filter((n: any) => n.type === 'artist' || n.type === 'label').length;
+              } catch (e) { /* ignore parse errors on stale doc */ }
+            }
+            const incomingArtistCount = nodes.filter(n => n.type === 'artist' || n.type === 'label').length;
+            const isRicherGraph = incomingArtistCount > existingArtistCount;
+
+            if (forceOverwrite || isRicherGraph || (existing && (!existing.cacheVersion || existing.cacheVersion < 2 || (preserveFullGraph && existing.isDeep !== true)))) {
+              // ── UPGRADE PATH (Case B) ─────────────────────────────────────────
+              const updatePayload: any = {
+                cacheKey: compositeCanonicalId,
+                artistId: canonicalId,
+                seedArtists: canonicalName,
+                graphData: JSON.stringify({ nodes, links, synthesisRationale: normalizedGraph.synthesisRationale }),
+                synthesisRationale: normalizedGraph.synthesisRationale || null,
+                filters: filters || {},
+                cacheVersion: 2,
+                cachedAt: serverTimestamp(),
+                isDeep: preserveFullGraph || false,
+              };
+              if (artistDetails) {
+                updatePayload.detailsCache = typeof artistDetails === 'string' ? JSON.parse(artistDetails) : artistDetails;
+              }
+              enforceArtistCacheSchema(updatePayload);
+              await updateDoc(canonicalDocRef, updatePayload);
+              console.log(`[ArtistCache] Upgraded/Overwritten Canonical doc: ${compositeCanonicalId} → cacheVersion 2 (incoming: ${incomingArtistCount} artists, existing: ${existingArtistCount} artists)`);
+            } else {
+              console.log(`[ArtistCache] Skipping write for Canonical "${compositeCanonicalId}" — doc already at v${existing?.cacheVersion || 2} with ${existingArtistCount} artist nodes (incoming also has ${incomingArtistCount}).`);
+            }
           }
         }
 
         // Bare root alias pointer protection & legacy healing:
-        // Create or convert a pointer at /artists/{artistId} IF no document exists OR if a legacy document exists lacking a redirectTo field.
-        const bareArtistIdRef = doc(db, 'artists', artistId);
-        const bareSnap = await getDoc(bareArtistIdRef);
-        const bareData = bareSnap.exists() ? bareSnap.data() : null;
+        if (!isLabel) {
+          const bareArtistIdRef = doc(db, collName, artistId);
+          const bareSnap = await getDoc(bareArtistIdRef);
+          const bareData = bareSnap.exists() ? bareSnap.data() : null;
 
-        if (!bareSnap.exists() || (bareData && !bareData.redirectTo && bareSnap.id !== compositeCanonicalId)) {
-          await setDoc(bareArtistIdRef, {
-            cacheKey: artistId,
-            artistId: artistId,
-            seedArtists: name,
-            graphData: JSON.stringify({ nodes: [], links: [] }),
-            filters: {},
-            cacheVersion: 2,
-            cachedAt: serverTimestamp(),
-            hitCount: 0,
-            redirectTo: compositeCanonicalId
-          });
-          console.log(`[ArtistCache] Created/Healed Bare Alias Pointer: ${artistId} -> ${compositeCanonicalId}`);
+          if (!bareSnap.exists() || (bareData && !bareData.redirectTo && bareSnap.id !== compositeCanonicalId)) {
+            await setDoc(bareArtistIdRef, {
+              cacheKey: artistId,
+              artistId: artistId,
+              seedArtists: name,
+              graphData: JSON.stringify({ nodes: [], links: [] }),
+              filters: {},
+              cacheVersion: 2,
+              cachedAt: serverTimestamp(),
+              hitCount: 0,
+              redirectTo: compositeCanonicalId
+            });
+            console.log(`[ArtistCache] Created/Healed Bare Alias Pointer: ${artistId} -> ${compositeCanonicalId}`);
+          }
+        } else if (artistId !== compositeCanonicalId) {
+          const bareArtistIdRef = doc(db, collName, artistId);
+          const bareSnap = await getDoc(bareArtistIdRef);
+          const bareData = bareSnap.exists() ? bareSnap.data() : null;
+          if (!bareSnap.exists() || (bareData && !bareData.redirectTo)) {
+            await setDoc(bareArtistIdRef, {
+              cacheKey: artistId,
+              redirectTo: compositeCanonicalId
+            });
+            console.log(`[LabelCache] Created Bare Alias Pointer: ${artistId} -> ${compositeCanonicalId}`);
+          }
         }
       } catch (e: any) {
         console.warn(`[ArtistCache] Write failed for "${compositeArtistId}" (${e.code ?? 'unknown'}): ${e.message}`);
@@ -704,11 +753,11 @@ export const assembleGraphFromCache = (
  * Increments the hit counter on a per-artist cache entry for analytics.
  * Fire-and-forget — failures are silently ignored.
  */
-export const incrementCacheHit = async (artistId: string, activeUserId?: string | null): Promise<void> => {
+export const incrementCacheHit = async (artistId: string, activeUserId?: string | null, entityType = 'artist'): Promise<void> => {
   try {
-    const snap = await getArtistDocWithRedirect(artistId);
+    const snap = await getEntityDocWithRedirect(artistId, entityType);
     if (snap.exists()) {
-      await updateDoc(doc(db, 'artists', snap.id), {
+      await updateDoc(doc(db, entityType === 'label' ? 'labels' : 'artists', snap.id), {
         hitCount: increment(1),
       });
     }
@@ -726,10 +775,12 @@ export const incrementCacheHit = async (artistId: string, activeUserId?: string 
  * Do NOT use for new cache writes. Use `readArtistCacheMany` instead.
  */
 export const readLegacyArtistCache = async (
-  cacheKey: string
+  cacheKey: string,
+  entityType = 'artist'
 ): Promise<{ graphData: string; detailsCache: string } | null> => {
   try {
-    const snap = await getDoc(doc(db, 'artists', cacheKey));
+    const collName = entityType === 'label' ? 'labels' : 'artists';
+    const snap = await getDoc(doc(db, collName, cacheKey));
     if (snap.exists()) {
       const data = snap.data();
       console.log(`[ArtistCache] Legacy HIT: ${cacheKey}`);
@@ -739,7 +790,7 @@ export const readLegacyArtistCache = async (
         const graph = JSON.parse(graphDataStr);
         if (graph && graph.nodes) {
           graph.nodes.forEach((n: any) => {
-            if (n.type === 'artist') {
+            if (n.type === 'artist' || n.type === 'label') {
               n.label = titleCaseArtistId(n.label || n.id);
             }
           });
@@ -807,20 +858,23 @@ export const isCacheExpired = (cachedAt: any): boolean => {
 };
 
 /**
- * Reads a document from the global artist cache, resolving redirects.
+ * Reads a document from the global entity cache ('artists' or 'labels'), resolving redirects.
  * If the doc has a `redirectTo` field, fetches and returns the canonical doc snapshot instead.
  * Supports up to 3 levels of redirects to prevent infinite loops.
  */
-export const getArtistDocWithRedirect = async (
-  artistId: string,
+export const getEntityDocWithRedirect = async (
+  entityId: string,
+  entityType = 'artist',
   depth = 0
 ): Promise<DocumentSnapshot> => {
+  const collName = entityType === 'label' ? 'labels' : 'artists';
+  const apiPath = entityType === 'label' ? '/api/label/' : '/api/artist/';
   try {
-    const url = `/api/artist/${artistId}`;
+    const url = `${apiPath}${entityId}`;
     const response = await fetch(url);
     if (!response.ok) {
       // Fallback to client-side direct read if proxy endpoint fails or returns 404
-      const docRef = doc(db, 'artists', artistId);
+      const docRef = doc(db, collName, entityId);
       const snap = await getDoc(docRef);
       if (snap.exists()) {
         const data = snap.data();
@@ -831,24 +885,24 @@ export const getArtistDocWithRedirect = async (
             console.log(`[Redirect Suffix Cleaner] Normalized redirect: ${targetId} -> ${match[1]}`);
             targetId = match[1];
           }
-          console.log(`[Client-Side Redirect] Redirecting ${artistId} -> ${targetId}`);
-          return getArtistDocWithRedirect(targetId, depth + 1);
+          console.log(`[Client-Side Redirect] Redirecting ${entityId} -> ${targetId}`);
+          return getEntityDocWithRedirect(targetId, entityType, depth + 1);
         }
         return snap;
       }
 
-      // Prefix match lookup fallback: check if any document has a cacheKey starting with artistId
+      // Prefix match lookup fallback: check if any document has a cacheKey starting with entityId
       if (depth === 0) {
         const { collection, query, where, getDocs } = await import('firebase/firestore');
         const q = query(
-          collection(db, 'artists'),
-          where('cacheKey', '>=', artistId),
-          where('cacheKey', '<=', artistId + '\uf8ff')
+          collection(db, collName),
+          where('cacheKey', '>=', entityId),
+          where('cacheKey', '<=', entityId + '\uf8ff')
         );
         const qSnap = await getDocs(q);
         const validDocs = qSnap.docs.filter(d => !d.data().redirectTo);
         if (validDocs.length > 0) {
-          console.log(`[Client-Side Prefix Match] Resolved ${artistId} -> ${validDocs[0].id}`);
+          console.log(`[Client-Side Prefix Match] Resolved ${entityId} -> ${validDocs[0].id}`);
           return validDocs[0];
         }
       }
@@ -863,11 +917,11 @@ export const getArtistDocWithRedirect = async (
         console.log(`[Redirect Suffix Cleaner Proxy] Normalized redirect: ${targetId} -> ${match[1]}`);
         targetId = match[1];
       }
-      console.log(`[Client-Side Redirect Proxy] Redirecting ${artistId} -> ${targetId}`);
-      return getArtistDocWithRedirect(targetId, depth + 1);
+      console.log(`[Client-Side Redirect Proxy] Redirecting ${entityId} -> ${targetId}`);
+      return getEntityDocWithRedirect(targetId, entityType, depth + 1);
     }
     
-    let canonicalId = artistId;
+    let canonicalId = entityId;
     if (data && data.cacheKey) {
       canonicalId = data.cacheKey;
     }
@@ -882,8 +936,8 @@ export const getArtistDocWithRedirect = async (
       get: (fieldPath: string) => (data as any)[fieldPath],
     } as unknown as DocumentSnapshot;
   } catch (error) {
-    console.warn(`[Proxy Fetch] Failed for ${artistId}, falling back to direct Firestore read:`, error);
-    const docRef = doc(db, 'artists', artistId);
+    console.warn(`[Proxy Fetch] Failed for ${entityId}, falling back to direct Firestore read:`, error);
+    const docRef = doc(db, collName, entityId);
     const snap = await getDoc(docRef);
     if (snap.exists()) {
       const data = snap.data();
@@ -894,25 +948,25 @@ export const getArtistDocWithRedirect = async (
           console.log(`[Redirect Suffix Cleaner Catch] Normalized redirect: ${targetId} -> ${match[1]}`);
           targetId = match[1];
         }
-        console.log(`[Client-Side Redirect] Redirecting ${artistId} -> ${targetId}`);
-        return getArtistDocWithRedirect(targetId, depth + 1);
+        console.log(`[Client-Side Redirect] Redirecting ${entityId} -> ${targetId}`);
+        return getEntityDocWithRedirect(targetId, entityType, depth + 1);
       }
       return snap;
     }
 
-    // Prefix match lookup fallback: check if any document has a cacheKey starting with artistId
+    // Prefix match lookup fallback: check if any document has a cacheKey starting with entityId
     if (depth === 0) {
       try {
         const { collection, query, where, getDocs } = await import('firebase/firestore');
         const q = query(
-          collection(db, 'artists'),
-          where('cacheKey', '>=', artistId),
-          where('cacheKey', '<=', artistId + '\uf8ff')
+          collection(db, collName),
+          where('cacheKey', '>=', entityId),
+          where('cacheKey', '<=', entityId + '\uf8ff')
         );
         const qSnap = await getDocs(q);
         const validDocs = qSnap.docs.filter(d => !d.data().redirectTo);
         if (validDocs.length > 0) {
-          console.log(`[Client-Side Prefix Match (Catch)] Resolved ${artistId} -> ${validDocs[0].id}`);
+          console.log(`[Client-Side Prefix Match (Catch)] Resolved ${entityId} -> ${validDocs[0].id}`);
           return validDocs[0];
         }
       } catch (innerErr) {
@@ -923,12 +977,36 @@ export const getArtistDocWithRedirect = async (
   }
 };
 
+export const getArtistDocWithRedirect = async (
+  artistId: string,
+  depth = 0
+): Promise<DocumentSnapshot> => getEntityDocWithRedirect(artistId, 'artist', depth);
+
+export const getLabelDocWithRedirect = async (
+  labelId: string,
+  depth = 0
+): Promise<DocumentSnapshot> => getEntityDocWithRedirect(labelId, 'label', depth);
+
+export const getAnyEntityDocWithRedirect = async (
+  entityId: string,
+  depth = 0
+): Promise<DocumentSnapshot> => {
+  let snap = await getArtistDocWithRedirect(entityId, depth);
+  if (!snap.exists()) {
+    const labelSnap = await getLabelDocWithRedirect(entityId, depth);
+    if (labelSnap.exists()) {
+      snap = labelSnap;
+    }
+  }
+  return snap;
+};
+
 /**
  * Helper to identify the canonical/matching node in the returned graph data.
  */
 export const findCanonicalNodeForArtist = (name: string, nodes: Node[]): Node | undefined => {
   const normSearch = normalizeArtistId(name);
-  const artistNodes = nodes.filter(n => n.type === 'artist');
+  const artistNodes = nodes.filter(n => n.type === 'artist' || n.type === 'label');
   
   // 1. Try exact normalized match on ID
   let found = artistNodes.find(n => normalizeArtistId(n.id) === normSearch);

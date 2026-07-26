@@ -392,7 +392,7 @@ async function checkVideoPlayability(videoId) {
  * Asynchronously heals a document by re-synthesizing details via Gemini
  * and updating the Firestore record with the new dataset.
  */
-async function triggerReSynthesis(artistId, originalData) {
+async function triggerReSynthesis(artistId, originalData, collectionName = 'artists') {
   if (!GEMINI_API_KEY) {
     console.error(`[Re-Synthesis] Failed: GEMINI_API_KEY is not defined.`);
     return;
@@ -494,11 +494,11 @@ async function triggerReSynthesis(artistId, originalData) {
 
     try {
       enforceArtistCacheSchemaServer(finalPayload);
-      await db.collection('artists').doc(cleanCanonicalId).set(finalPayload, { merge: true });
-      console.log(`[Re-Synthesis] Mock healed profile for canonical artist: ${cleanCanonicalId}`);
+      await db.collection(collectionName).doc(cleanCanonicalId).set(finalPayload, { merge: true });
+      console.log(`[Re-Synthesis] Mock healed profile for canonical entity (${collectionName}): ${cleanCanonicalId}`);
 
       if (cleanIsAlias) {
-        await db.collection('artists').doc(artistId).set({
+        await db.collection(collectionName).doc(artistId).set({
           cacheKey: artistId,
           artistId: artistId,
           seedArtists: originalData.seedArtists || artistId,
@@ -606,12 +606,12 @@ async function triggerReSynthesis(artistId, originalData) {
     // Update Firestore at canonicalId using Admin SDK
     try {
       enforceArtistCacheSchemaServer(finalPayload);
-      await db.collection('artists').doc(canonicalId).set(finalPayload, { merge: true });
-      console.log(`[Re-Synthesis] Successfully healed profile for canonical artist: ${canonicalId}`);
+      await db.collection(collectionName).doc(canonicalId).set(finalPayload, { merge: true });
+      console.log(`[Re-Synthesis] Successfully healed profile for canonical entity (${collectionName}): ${canonicalId}`);
 
       if (isAlias) {
         // Write alias redirect doc
-        await db.collection('artists').doc(artistId).set({
+        await db.collection(collectionName).doc(artistId).set({
           cacheKey: artistId,
           artistId: artistId,
           seedArtists: originalData.seedArtists || artistId,
@@ -635,15 +635,15 @@ async function triggerReSynthesis(artistId, originalData) {
   }
 }
 
-// REST route to retrieve artist cache from proxy with playability check
-app.get('/api/artist/:id', async (req, res) => {
-  const artistId = req.params.id;
+// Shared helper to retrieve entity cache from proxy with playability check
+async function handleEntityGet(req, res, collectionName = 'artists') {
+  const entityId = req.params.id;
   try {
-    const docRef = db.collection('artists').doc(artistId);
+    const docRef = db.collection(collectionName).doc(entityId);
     const docSnap = await docRef.get();
     
     if (!docSnap.exists) {
-      return res.status(404).json({ error: 'Artist not found' });
+      return res.status(404).json({ error: `${collectionName === 'labels' ? 'Label' : 'Artist'} not found` });
     }
     
     const data = docSnap.data();
@@ -656,12 +656,12 @@ app.get('/api/artist/:id', async (req, res) => {
         console.log(`[Proxy Redirect Suffix Cleaner] Normalized redirect: ${canonicalId} -> ${match[1]}`);
         canonicalId = match[1];
       }
-      console.log(`[Proxy] Redirecting artist read: ${artistId} -> ${canonicalId}`);
+      console.log(`[Proxy] Redirecting read (${collectionName}): ${entityId} -> ${canonicalId}`);
       let currentId = canonicalId;
       let depth = 0;
       let currentSnap = docSnap;
       while (depth < 3) {
-        const canonicalRef = db.collection('artists').doc(currentId);
+        const canonicalRef = db.collection(collectionName).doc(currentId);
         const nextSnap = await canonicalRef.get();
         if (!nextSnap.exists) break;
         currentSnap = nextSnap;
@@ -687,7 +687,7 @@ app.get('/api/artist/:id', async (req, res) => {
       try {
         details = JSON.parse(data.detailsCache);
       } catch (e) {
-        console.warn(`[Proxy] Failed to parse detailsCache JSON for ${artistId}:`, e.message);
+        console.warn(`[Proxy] Failed to parse detailsCache JSON for ${entityId}:`, e.message);
       }
     }
 
@@ -695,7 +695,7 @@ app.get('/api/artist/:id', async (req, res) => {
     if (videoId) {
       const playable = await checkVideoPlayability(videoId);
       if (!playable) {
-        console.warn(`[Edge Proxy] Unplayable YouTube Video ID: "${videoId}" for artist "${artistId}". Pruning and triggering re-synthesis...`);
+        console.warn(`[Edge Proxy] Unplayable YouTube Video ID: "${videoId}" for entity "${entityId}" (${collectionName}). Pruning and triggering re-synthesis...`);
         // Prune the video ID on-the-fly from the payload returned to the client
         if (details) {
           details.youtubeVideoId = null;
@@ -706,7 +706,7 @@ app.get('/api/artist/:id', async (req, res) => {
         }
         
         // Trigger async re-synthesis task (non-blocking)
-        triggerReSynthesis(artistId, data).catch(err => {
+        triggerReSynthesis(entityId, data, collectionName).catch(err => {
           console.error(`[Edge Proxy] Background re-synthesis trigger failed:`, err);
         });
       }
@@ -714,13 +714,30 @@ app.get('/api/artist/:id', async (req, res) => {
     
     return res.json(data);
   } catch (error) {
-    console.error(`[Proxy] Error retrieving artist ${artistId}:`, error);
+    console.error(`[Proxy] Error retrieving entity ${entityId} from ${collectionName}:`, error);
     return res.status(500).json({ error: 'Internal server error' });
   }
-});
+}
+
+app.get('/api/artist/:id', (req, res) => handleEntityGet(req, res, 'artists'));
+app.get('/api/label/:id', (req, res) => handleEntityGet(req, res, 'labels'));
 
 // REST route to check video playability for client JIT verification
 app.get('/api/artist/validate-video/:videoId', async (req, res) => {
+  const videoId = req.params.videoId;
+  if (!videoId || videoId.length !== 11) {
+    return res.json({ playable: false });
+  }
+  try {
+    const playable = await checkVideoPlayability(videoId);
+    return res.json({ playable });
+  } catch (err) {
+    console.error(`[Proxy] Error validating video ${videoId}:`, err);
+    return res.json({ playable: false });
+  }
+});
+
+app.get('/api/label/validate-video/:videoId', async (req, res) => {
   const videoId = req.params.videoId;
   if (!videoId || videoId.length !== 11) {
     return res.json({ playable: false });
