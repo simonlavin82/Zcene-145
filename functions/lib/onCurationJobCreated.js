@@ -472,14 +472,15 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
         else {
             throw new Error(`Unsupported jobType: ${jobType}`);
         }
-        // Complete job
+        // Complete job with 24-hour TTL expiration policy
         await jobDocRef.update({
             status: "completed",
             result,
             updatedAt: firestore_2.FieldValue.serverTimestamp(),
-            completedAt: firestore_2.FieldValue.serverTimestamp()
+            completedAt: firestore_2.FieldValue.serverTimestamp(),
+            expireAt: firestore_2.Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000)
         });
-        console.log(`[Curation Backend] Successfully completed job ${jobId}`);
+        console.log(`[Curation Backend] Successfully completed job ${jobId} (set TTL expireAt +24h)`);
         if (inputPayload?.projectId && jobData.userId && result?.graphData) {
             const graphObj = typeof result.graphData === 'string' ? JSON.parse(result.graphData) : result.graphData;
             const artistEntityIds = graphObj.nodes
@@ -515,7 +516,8 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                 stack: error.stack || null
             },
             updatedAt: firestore_2.FieldValue.serverTimestamp(),
-            completedAt: firestore_2.FieldValue.serverTimestamp()
+            completedAt: firestore_2.FieldValue.serverTimestamp(),
+            expireAt: firestore_2.Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000)
         });
         if (jobData?.inputPayload?.projectId && jobData?.userId) {
             await updateProjectStatus(jobData.userId, jobData.inputPayload.projectId, {

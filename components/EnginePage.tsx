@@ -62,8 +62,10 @@ real-time intelligence and global scalability.
 
 1. AI ORCHESTRATION (Google AI Studio):
    The platform leverages Google Gemini models for all musical intelligence. 
-   - Gemini 1.5 Flash: Powers the high-speed graph expansion and 
-     conversational chat, ensuring near-instant discovery loops.
+   - Gemini 3.1 Pro Preview: Powers all high-fidelity generative graph synthesis and 
+     Stage 0 live AI searches, ensuring rich, interconnected musical network topology.
+   - Gemini 2.5 Flash / Gemini 3 Flash: Standardized for high-speed Deep Cut node 
+     details extraction, conversational chat ("Consult AI"), and background hydration.
    - AI Studio Integration: Native environment for rapid prompt engineering, 
      schema definition, and secure API key management during 
      the prototype-to-production lifecycle.
@@ -86,7 +88,13 @@ real-time intelligence and global scalability.
       seeded with the normalized IDs of the seed artists confirmed present in
       the generated graph, so the Deep Cut panel opens to the correct artist
       on the user's first load without any user interaction.
-
+   - Curation Job TTL Expiration Policy (expireAt): All curation job documents in
+     '/curationJobs' are tagged with a 24-hour Firestore Time-to-Live (TTL) timestamp
+     upon creation, completion, or failure. This ensures completed and failed jobs
+     are autonomously purged by Firestore without requiring manual intervention.
+     Crucially, we implement a 24-hour TTL rather than immediate deletion upon
+     completion to prevent real-time WebSocket snapshot coalescing and to allow
+     reconnecting clients or refreshed tabs to recover their curation state cleanly.
    - Global Deployment: Serves at sub-second speeds by leveraging 
      Google's global edge network.
 
@@ -95,15 +103,18 @@ real-time intelligence and global scalability.
      enabling users to save and persist their music discovery projects.
    - Cloud Firestore: A NoSQL real-time database used to store Project 
      states, seed artists, graph snapshots, and discovery filters.
-   - Global Artist Cache: A top-level 'artists' Firestore collection acts as 
-     a permanent, site-wide cache for computed graph structures and enriched 
-     Deep Cut metadata, keyed by a normalized artist+filter identifier. 
-     Projects store only a lightweight cacheKey reference and artist canvas 
-     positions, dramatically reducing document size and Gemini API usage.
-   - Rules Engine: Attribute-Based Access Control (ABAC) ensures every 
-     music discovery journey remains private and secure. The global cache 
-     collection is publicly readable but write-protected: only a CREATE 
-     (cache miss) is permitted per key, preventing cache poisoning.
+   - Universal Dual-Collection Cache (/artists vs /labels): Two top-level Firestore
+     collections act as permanent, site-wide caches for discovery entities. Primary
+     drivers (/artists) store computed graph structures and enriched Deep Cut metadata,
+     while secondary deep cuts (/labels) store lightweight publishing house cards
+     with graphData explicitly set to null.
+   - Rules Engine & ABAC Security: Attribute-Based Access Control ensures every 
+     music discovery journey remains private and secure. Both global cache collections
+     are publicly readable but write-protected: authenticated users may CREATE new
+     entries on a cache miss, and may UPDATE existing entries strictly to perform
+     telemetry write-backs (hitCount, detailsCache, cachedAt) or upgrade legacy
+     cache versions (< 2) to version 2. Arbitrary graph overwrites are blocked
+     to prevent cache poisoning.
 `;
 
 const GRAPH_INTELLIGENCE_DOCUMENTATION = `
@@ -364,10 +375,13 @@ const RESILIENCE_DOCUMENTATION = `
 Zcene handles AI model constraints (Rate Limits/Hallucinations) using a 
 Serial Fetch & Backoff Strategy in App.tsx and OS-level stability logic.
 
-1. SERIAL QUEUEING:
-   Details (Deep Cut) are fetched one-at-a-time rather than in parallel. 
-   This stays within the 15 RPM (Requests Per Minute) free tier limits 
-   of Flash-series models.
+1. SERVER-SIDE BATCH PRE-CACHING & O(1) CLIENT READS:
+   While serial queueing and rate-limit throttling were historically managed on the client,
+   our current pipeline executes Simultaneous Batch Pre-Caching on the backend Cloud Function
+   (onCurationJobCreated). During project generation, the backend pre-fetches and writes all
+   artist and label profiles directly to '/artists' and '/labels'. Consequently, when a user
+   clicks a node on the client canvas, it resolves via an instant O(1) global cache hit,
+   bypassing client-side serial API fetching entirely.
 
 2. RETRY LOGIC (Backoff):
    If a 429 (Resource Exhausted) or 500 error occurs:
@@ -429,9 +443,9 @@ Zcene enables collaborative discovery via project sharing. The flow is
 designed to minimize friction for new users while rewarding existing authors.
 
 1. URL-BASED SHARING:
-   Every 'Share' operation generates a unique document ID in the Global 
-   Shared collection. This ID is appended to the URL as a query parameter 
-   (#/app?shareId=...).
+   Every 'Share' operation generates a unique document ID in the '/sharedZcenes' 
+   collection. This ID is appended to the URL as a query parameter (/app?id=...) 
+   or accessed directly via path-based routing (/z/{shareId}).
 
 2. READ-ONLY PREVIEW:
    - Anonymous/Logged-out: Users see a "Guest Mode" watermark. They can 

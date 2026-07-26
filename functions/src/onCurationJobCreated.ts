@@ -1,6 +1,6 @@
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { getApps, initializeApp } from "firebase-admin/app";
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { getFirestore, FieldValue, Timestamp } from "firebase-admin/firestore";
 import { translateError } from "./services/errorTranslationLayer";
 import {
   generateGraphDataBackend,
@@ -526,14 +526,15 @@ export const onCurationJobCreated = onDocumentCreated({
       throw new Error(`Unsupported jobType: ${jobType}`);
     }
 
-    // Complete job
+    // Complete job with 24-hour TTL expiration policy
     await jobDocRef.update({
       status: "completed",
       result,
       updatedAt: FieldValue.serverTimestamp(),
-      completedAt: FieldValue.serverTimestamp()
+      completedAt: FieldValue.serverTimestamp(),
+      expireAt: Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000)
     });
-    console.log(`[Curation Backend] Successfully completed job ${jobId}`);
+    console.log(`[Curation Backend] Successfully completed job ${jobId} (set TTL expireAt +24h)`);
 
     if (inputPayload?.projectId && jobData.userId && result?.graphData) {
       const graphObj = typeof result.graphData === 'string' ? JSON.parse(result.graphData) : result.graphData;
@@ -574,7 +575,8 @@ export const onCurationJobCreated = onDocumentCreated({
         stack: error.stack || null
       },
       updatedAt: FieldValue.serverTimestamp(),
-      completedAt: FieldValue.serverTimestamp()
+      completedAt: FieldValue.serverTimestamp(),
+      expireAt: Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000)
     });
 
     if (jobData?.inputPayload?.projectId && jobData?.userId) {

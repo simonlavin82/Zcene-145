@@ -89,7 +89,8 @@ const generateGraphDataViaCloudJob = async (
       disambiguationHints
     },
     createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp()
+    updatedAt: serverTimestamp(),
+    expireAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
   });
 
   return new Promise((resolve, reject) => {
