@@ -504,6 +504,31 @@ To prevent data rot, API failures, and visual rendering regressions, the synthes
    - Before any payload is transmitted to Firestore via setDoc or updateDoc, it MUST be wrapped with stripUndefinedProperties(...) (exported from services/artistCacheService.ts). This utility recursively traverses objects and arrays to strip any property whose value is strictly undefined, preventing serialization exceptions and silent generation failures.
 `;
 
+const ARCHITECTURAL_SEPARATION_DOCUMENTATION = `
+To maintain strict data cleanliness and prevent schema bloat across our global datasets, Zcene enforces a fundamental architectural separation between artists and record labels based on their core roles:
+
+1. PRIMARY DRIVERS (ARTISTS & GRAPH OWNERSHIP):
+   - Canonical artist documents (/artists/{id}) serve as the primary discovery anchors and initiate every Zcene project.
+   - Because artists represent the focal point of musical networks, global artist documents strictly own the spiderweb D3 graph payload ('graphData'), storing the interconnected network of artists, scenes, and labels.
+
+2. SECONDARY DEEP CUTS (LABELS & LIGHTWEIGHT CARDS):
+   - Users never seed a project around a record label. Labels are purely contextual secondary entities encountered while exploring an artist's network or deep cuts.
+   - Record labels do not need, nor should they store, graph blobs or spiderweb structures. Therefore, when persisting documents to /labels/{labelId}, the pipeline explicitly sets 'graphData: null' (or omits graph blobs entirely).
+
+3. STRICT PAYLOAD SANITIZATION (sanitizeLabelProfile):
+   - Before caching any record label profile in Firestore, the dataset MUST pass through the 'sanitizeLabelProfile' filter (exported from services/artistCacheService.ts).
+   - This utility strips out all artist-centric noise and interactive widgets that do not apply to publishing houses, including:
+     * YouTube music video IDs and search queries ('youtubeVideoId', 'youtubeSearchQuery')
+     * Active touring status, ticket URLs, and cached tour dates ('tourDates', 'tourCachedAt', 'tourInfo')
+     * Band roster and personnel lists ('members')
+   - A global label document in /labels is strictly standardized to contain only:
+     * Core Metadata: founded year, origin, genre, and notable artists (Scene Circle / Released Artists).
+     * Narrative History: high-impact bio summary ('summary').
+     * Essential Listening: key catalog album releases ('discography').
+     * Clean External Links: official website, Bandcamp, Discogs, and store URLs ('links').
+`;
+
+
 const DEEP_CUT_INTELLIGENCE_DOCUMENTATION = `
 Zcene's "Curator Insights" use a Variety-First strategy to ensure every 
 artist recommendation feels bespoke, snappy, and avoiding AI linguistic decay.
@@ -1486,6 +1511,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                     <section id="data-synthesis">
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">Data Synthesis & Persistence</h2>
                         <CodeBlock title="Atomicity, API Gateway & Sanitization Specification" content={DATA_SYNTHESIS_PERSISTENCE_DOCUMENTATION} />
+                        <CodeBlock title="Architectural Separation: Artists vs. Labels & Simultaneous Pre-Caching" content={ARCHITECTURAL_SEPARATION_DOCUMENTATION} />
                         <CodeBlock title="Cache Validation & Qualification Rules" content={CACHE_VALIDATION_DOCUMENTATION} />
                     </section>
 
