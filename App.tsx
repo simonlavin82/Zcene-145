@@ -2382,12 +2382,16 @@ const App: React.FC = () => {
       } else {
         // Phase 1+: write individual entity ID references + canvas layout.
         // Each ID points to its own isolated /artists/{id} or /labels/{id} Firestore document.
-        const allEntityIds = graphData.nodes
-          .filter((n: any) => n.type === 'artist' || n.type === 'label')
+        const artistEntityIds = graphData.nodes
+          .filter((n: any) => n.type === 'artist')
+          .map((n: any) => normalizeArtistId(n.id));
+        const labelEntityIds = graphData.nodes
+          .filter((n: any) => n.type === 'label')
           .map((n: any) => normalizeArtistId(n.id));
         const seedList = seedArtists.split('::').map((a: string) => a.trim()).filter(Boolean);
         const normalizedIds = seedList.map((name: string) => normalizeArtistId(name));
-        docPayload.artistIds = allEntityIds.length > 0 ? allEntityIds : normalizedIds;
+        docPayload.artistIds = artistEntityIds.length > 0 ? artistEntityIds : normalizedIds;
+        docPayload.labelIds = labelEntityIds;
         docPayload.canvasLayout = JSON.stringify(canvasLayout);
         docPayload.graphData = JSON.stringify(graphData);
       }
@@ -3622,7 +3626,7 @@ const App: React.FC = () => {
           return n;
         });
         setGraphData(optimisticGraph);
-        const optimisticActiveIds = Array.from(cached.values()).map(entry => entry.artistId).filter(Boolean);
+        const optimisticActiveIds = Array.from(cached.values()).map(entry => entry.artistId || (entry as any).labelId || entry.cacheKey).filter(Boolean);
         if (optimisticActiveIds.length > 0) {
           setActiveNodeIds(optimisticActiveIds);
         }
@@ -3764,7 +3768,8 @@ const App: React.FC = () => {
               ...healedDetailsCacheRef.current,
               ...detailsCache
             ]);
-            await writeArtistCacheMany(toFetch, freshData, user?.uid, activeDiscoveryFilters, true, true, combinedDetailsMap);
+            const allEntityNamesToCache = Array.from(new Set([...toFetch, ...freshData.nodes.filter(n => n.type === 'artist' || n.type === 'label').map(n => n.label || n.id)]));
+            await writeArtistCacheMany(allEntityNamesToCache, freshData, user?.uid, activeDiscoveryFilters, true, true, combinedDetailsMap);
           };
 
           runUpfrontFetchAndWrite()
@@ -4185,7 +4190,8 @@ const App: React.FC = () => {
             ...healedDetailsCacheRef.current,
             ...detailsCache
           ]);
-          await writeArtistCacheMany(artistList, final, user?.uid, activeDiscoveryFilters, true, true, combinedDetailsMap);
+          const allEntityNamesToCache = Array.from(new Set([...artistList, ...final.nodes.filter(n => n.type === 'artist' || n.type === 'label').map(n => n.label || n.id)]));
+          await writeArtistCacheMany(allEntityNamesToCache, final, user?.uid, activeDiscoveryFilters, true, true, combinedDetailsMap);
         };
 
         runUpfrontFetchAndWrite()
@@ -4717,6 +4723,8 @@ const App: React.FC = () => {
         } catch (e) {}
       } else if (data.artistIds && Array.isArray(data.artistIds) && data.artistIds.length > 0) {
         incomingGraphEmpty = false;
+      } else if (data.labelIds && Array.isArray(data.labelIds) && data.labelIds.length > 0) {
+        incomingGraphEmpty = false;
       } else if (data.cacheKey) {
         incomingGraphEmpty = false;
       } else if (data.status === 'curating') {
@@ -4864,7 +4872,9 @@ const App: React.FC = () => {
         }
 
         if (!loadedFromGraphData) {
-          if (data.artistIds && Array.isArray(data.artistIds) && data.artistIds.length > 0) {
+          const hasEntityIds = (data.artistIds && Array.isArray(data.artistIds) && data.artistIds.length > 0) ||
+                               (data.labelIds && Array.isArray(data.labelIds) && data.labelIds.length > 0);
+          if (hasEntityIds) {
             // Check if it's a complex configuration (multi-artist or has active filters)
             let parsedFilters: DiscoveryFilters = {};
             if (data.discoveryFilters) {
@@ -4884,7 +4894,7 @@ const App: React.FC = () => {
               (parsedFilters.includeGenres && parsedFilters.includeGenres.length > 0) ||
               (parsedFilters.additionalInstructions && parsedFilters.additionalInstructions.trim().length > 0)
             );
-            const isMultiArtistIncoming = data.artistIds.length > 1 || (data.seedArtists && data.seedArtists.includes('::'));
+            const isMultiArtistIncoming = (data.artistIds && data.artistIds.length > 1) || (data.seedArtists && data.seedArtists.includes('::'));
 
             if (isMultiArtistIncoming || hasActiveFiltersIncoming) {
               console.log(`[ProjectLoader] Intercepting Phase 1 loading for complex query. Multi-artist: ${isMultiArtistIncoming}, Filtered: ${hasActiveFiltersIncoming}. Handing over to handleGenerateGraph.`);
@@ -4897,16 +4907,18 @@ const App: React.FC = () => {
                 setActiveNodeIds(resolvedActiveNodes);
               }
 
-              handleGenerateGraph(data.seedArtists || data.artistIds.join('::'), false, null, false, false, parsedFilters);
+              handleGenerateGraph(data.seedArtists || (data.artistIds || []).join('::'), false, null, false, false, parsedFilters);
               return true;
             }
 
-            // --- PHASE 1 FORMAT: hydrate from individual per-artist /artists/{id} docs ---
-            console.log(`[ProjectLoader] Phase 1 format. Hydrating from artistIds: [${data.artistIds.join(', ')}]`);
+            // --- PHASE 1 FORMAT: hydrate from individual per-artist /artists/{id} and /labels/{id} docs ---
+            const allLookupIds = Array.from(new Set([
+              ...(data.artistIds || []),
+              ...(data.labelIds || [])
+            ]));
+            console.log(`[ProjectLoader] Phase 1 format. Hydrating from entity IDs: [${allLookupIds.join(', ')}]`);
             const { cached, missing } = await readArtistCacheMany(
-              // artistIds are already normalized slugs — reconstruct display names from seedArtists
-              // but pass the slugs directly as lookup keys via a thin wrapper
-              data.artistIds.map((id: string) => id), // IDs are normalized slugs; readArtistCacheMany uses normalizeArtistId internally
+              allLookupIds,
               user?.uid
             );
 
@@ -5093,7 +5105,7 @@ const App: React.FC = () => {
         // handleGenerateGraph's Front Gate Cache path (validateCacheEntry on seed doc only).
         if (hydratedNodes.length > 0) {
           const seedIds = new Set(
-            (data.seedArtists ? data.seedArtists.split('::') : (data.artistIds || []))
+            (data.seedArtists ? data.seedArtists.split('::') : [...(data.artistIds || []), ...(data.labelIds || [])])
               .map((s: string) => normalizeArtistId(s.trim()))
               .filter(Boolean)
           );
@@ -5363,11 +5375,15 @@ const App: React.FC = () => {
             // Phase 1+: derive the artistIds array from all artist nodes currently in the graph.
             // Each entry points to an individual /artists/{id} Firestore document.
             const currentArtistList = graphData.nodes
-              .filter((n: any) => n.type === 'artist' || n.type === 'label')
-              .map((n: any) => n.id);
+              .filter((n: any) => n.type === 'artist')
+              .map((n: any) => normalizeArtistId(n.id));
+            const currentLabelList = graphData.nodes
+              .filter((n: any) => n.type === 'label')
+              .map((n: any) => normalizeArtistId(n.id));
 
-            if (currentArtistList.length > 0) {
-              docPayload.artistIds = currentArtistList.map((name: string) => normalizeArtistId(name));
+            if (currentArtistList.length > 0 || currentLabelList.length > 0) {
+              docPayload.artistIds = currentArtistList;
+              docPayload.labelIds = currentLabelList;
               docPayload.canvasLayout = JSON.stringify(canvasLayout);
               docPayload.graphData = JSON.stringify(graphData);
             } else {
@@ -5778,8 +5794,9 @@ const App: React.FC = () => {
             ...healedDetailsCacheRef.current,
             ...detailsCache
           ]);
-          await writeArtistCacheMany(discoveredArtistNames, mergedGraph, user?.uid, discoveryFilters, true, false, combinedDetailsMap);
-          console.log(`[Node Extension] Global cache double-write confirmed for: ${discoveredArtistNames.join(', ')}`);
+          const allEntityNamesToCache = Array.from(new Set([...discoveredArtistNames, ...mergedGraph.nodes.filter(n => n.type === 'artist' || n.type === 'label').map(n => n.label || n.id)]));
+          await writeArtistCacheMany(allEntityNamesToCache, mergedGraph, user?.uid, discoveryFilters, true, false, combinedDetailsMap);
+          console.log(`[Node Extension] Global cache double-write confirmed for: ${allEntityNamesToCache.join(', ')}`);
         } catch (e) {
           console.error('[Node Extension] Global cache double-write failed:', e);
         }

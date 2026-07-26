@@ -460,14 +460,21 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
         console.log(`[Curation Backend] Successfully completed job ${jobId}`);
         if (inputPayload?.projectId && jobData.userId && result?.graphData) {
             const graphObj = typeof result.graphData === 'string' ? JSON.parse(result.graphData) : result.graphData;
-            const entityIds = graphObj.nodes
+            const artistEntityIds = graphObj.nodes
+                ? graphObj.nodes.filter((n) => n.type === 'artist').map((n) => (0, curatorService_1.normalizeArtistId)(n.id))
+                : [];
+            const labelEntityIds = graphObj.nodes
+                ? graphObj.nodes.filter((n) => n.type === 'label').map((n) => (0, curatorService_1.normalizeArtistId)(n.id))
+                : [];
+            const allEntityIds = graphObj.nodes
                 ? graphObj.nodes.filter((n) => n.type === 'artist' || n.type === 'label').map((n) => (0, curatorService_1.normalizeArtistId)(n.id))
                 : [];
             await updateProjectStatus(jobData.userId, inputPayload.projectId, {
                 status: "completed",
                 graphData: JSON.stringify(result.graphData),
-                artistIds: entityIds,
-                activeNodes: entityIds, // Native bulk queue population (both artists and labels)!
+                artistIds: artistEntityIds,
+                labelIds: labelEntityIds,
+                activeNodes: allEntityIds, // Native bulk queue population (both artists and labels)!
                 activeJobId: null,
                 detailsCache: result.detailsCache
             });

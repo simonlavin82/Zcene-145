@@ -516,15 +516,22 @@ export const onCurationJobCreated = onDocumentCreated({
 
     if (inputPayload?.projectId && jobData.userId && result?.graphData) {
       const graphObj = typeof result.graphData === 'string' ? JSON.parse(result.graphData) : result.graphData;
-      const entityIds = graphObj.nodes
+      const artistEntityIds = graphObj.nodes
+        ? graphObj.nodes.filter((n: any) => n.type === 'artist').map((n: any) => normalizeArtistId(n.id))
+        : [];
+      const labelEntityIds = graphObj.nodes
+        ? graphObj.nodes.filter((n: any) => n.type === 'label').map((n: any) => normalizeArtistId(n.id))
+        : [];
+      const allEntityIds = graphObj.nodes
         ? graphObj.nodes.filter((n: any) => n.type === 'artist' || n.type === 'label').map((n: any) => normalizeArtistId(n.id))
         : [];
 
       await updateProjectStatus(jobData.userId, inputPayload.projectId, {
         status: "completed",
         graphData: JSON.stringify(result.graphData),
-        artistIds: entityIds,
-        activeNodes: entityIds, // Native bulk queue population (both artists and labels)!
+        artistIds: artistEntityIds,
+        labelIds: labelEntityIds,
+        activeNodes: allEntityIds, // Native bulk queue population (both artists and labels)!
         activeJobId: null,
         detailsCache: result.detailsCache
       });

@@ -112,8 +112,11 @@ export interface CanvasNodeRef {
  *     They are computed dynamically by the D3 graph state engine at render time.
  */
 export interface ArtistCacheEntry {
-  artistId: string;        // Normalized Firestore-safe slug, e.g. "end-it"
-  seedArtists: string;     // Canonical name as returned by the AI, e.g. "End It"
+  artistId?: string;       // Normalized Firestore-safe slug, e.g. "end-it"
+  labelId?: string;        // Normalized label slug, e.g. "relapse-records"
+  cacheKey?: string;       // Composite cache key
+  seedArtists?: string;    // Canonical name as returned by the AI, e.g. "End It"
+  seedLabels?: string;
   graphData: string;       // JSON-stringified GraphData map {"nodes":[], "links":[]}
   cacheVersion: number;    // Schema version
   cachedAt: any;           // serverTimestamp()
@@ -131,6 +134,8 @@ export interface Project {
   // --- Phase 1+: per-artist reference fields ---
   /** Array of normalized artist IDs pointing to individual /artists/{id} cache docs. */
   artistIds?: string[];     // e.g. ['buggin', 'end-it', 'spaced']
+  /** Array of normalized label IDs pointing to individual /labels/{id} cache docs. */
+  labelIds?: string[];      // e.g. ['relapse-records', 'armageddon-label']
   canvasLayout?: string;    // JSON CanvasNodeRef[] — artist positions only
   // --- DEPRECATED (Phase 1): compound cacheKey — kept for backward-compatible reads of old project docs ---
   /** @deprecated Use `artistIds` instead. Retained for backward-compatible hydration of legacy projects. */

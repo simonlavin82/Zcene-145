@@ -330,6 +330,8 @@ export const eagerNormalizeCacheEntry = (entry: ArtistCacheEntry): ArtistCacheEn
   
   if (entry.seedArtists) {
     entry.seedArtists = titleCaseArtistId(entry.seedArtists);
+  } else if ((entry as any).seedLabels) {
+    (entry as any).seedLabels = titleCaseArtistId((entry as any).seedLabels);
   }
   
   if (entry.graphData) {
@@ -439,9 +441,10 @@ export const readArtistCacheMany = async (
         const normalizedEntry = eagerNormalizeCacheEntry(entry);
         cached.set(name, normalizedEntry);
         cached.set(name.toLowerCase(), normalizedEntry);
-        if (normalizedEntry.artistId) {
-          cached.set(normalizedEntry.artistId, normalizedEntry);
-          cached.set(normalizedEntry.artistId.toLowerCase(), normalizedEntry);
+        const entityId = normalizedEntry.artistId || (normalizedEntry as any).labelId || normalizedEntry.cacheKey;
+        if (entityId) {
+          cached.set(entityId, normalizedEntry);
+          cached.set(entityId.toLowerCase(), normalizedEntry);
         }
       } else {
         missing.push(name);
@@ -535,11 +538,11 @@ export const writeArtistCacheMany = async (
       if (!countryNorm) countryNorm = "global";
 
       const isLabel = canonicalNode?.type === 'label';
-      const disambiguatedCanonicalId = isLabel ? canonicalId : (canonicalId.endsWith(`-${countryNorm}`) ? canonicalId : `${canonicalId}-${countryNorm}`);
-      const disambiguatedArtistId = isLabel ? artistId : (artistId.endsWith(`-${countryNorm}`) ? artistId : `${artistId}-${countryNorm}`);
+      const disambiguatedCanonicalId = canonicalId.endsWith(`-${countryNorm}`) ? canonicalId : `${canonicalId}-${countryNorm}`;
+      const disambiguatedArtistId = artistId.endsWith(`-${countryNorm}`) ? artistId : `${artistId}-${countryNorm}`;
 
-      const compositeCanonicalId = isLabel ? canonicalId : buildCompositeCacheKey(disambiguatedCanonicalId, filters);
-      const compositeArtistId = isLabel ? artistId : buildCompositeCacheKey(disambiguatedArtistId, filters);
+      const compositeCanonicalId = buildCompositeCacheKey(disambiguatedCanonicalId, filters);
+      const compositeArtistId = buildCompositeCacheKey(disambiguatedArtistId, filters);
 
       const { nodes, links } = preserveFullGraph
         ? { nodes: normalizedGraph.nodes, links: normalizedGraph.links }
@@ -708,7 +711,7 @@ export const assembleGraphFromCache = (
     
     // Enforce Safe Fallback Graph State: If we have zero metadata connections and only 1 node, inject a placeholder
     if (entryLinks.length === 0 && entryNodes.length === 1) {
-       const artistIdStr = entry.artistId.trim().toLowerCase();
+       const artistIdStr = (entry.artistId || (entry as any).labelId || '').trim().toLowerCase();
        const fallbackId = 'Cached Profile';
        const fallbackKey = fallbackId.toLowerCase();
        if (!nodeMap.has(fallbackKey)) {
@@ -717,7 +720,7 @@ export const assembleGraphFromCache = (
        const linkKey = `${artistIdStr}→${fallbackKey}`;
        if (!linkSet.has(linkKey)) {
           linkSet.add(linkKey);
-          links.push({ source: normalizeArtistId(entry.seedArtists || entry.artistId), target: fallbackKey, value: 1 });
+          links.push({ source: normalizeArtistId(entry.seedArtists || (entry as any).seedLabels || entry.artistId || (entry as any).labelId || ''), target: fallbackKey, value: 1 });
        }
     }
   });
