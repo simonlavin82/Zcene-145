@@ -2160,7 +2160,7 @@ const App: React.FC = () => {
       let disambiguatedCacheId = simpleArtistId;
 
       // 2. Perform Multi-Origin Slug Suffix Calculation
-      if (graphData) {
+      if (graphData && node.type !== 'label') {
         const connectedCountries = graphData.links
           .filter((l: any) => (typeof l.source === 'object' ? l.source.id : l.source) === node.id || 
                        (typeof l.target === 'object' ? l.target.id : l.target) === node.id)
