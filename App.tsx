@@ -3758,7 +3758,13 @@ const App: React.FC = () => {
             }
 
             // Write to Firestore
-            await writeArtistCacheMany(toFetch, freshData, user?.uid, activeDiscoveryFilters, true, true, fetchedDetailsMap);
+            const combinedDetailsMap = new Map([
+              ...fetchedDetailsMap,
+              ...detailsCacheRef.current,
+              ...healedDetailsCacheRef.current,
+              ...detailsCache
+            ]);
+            await writeArtistCacheMany(toFetch, freshData, user?.uid, activeDiscoveryFilters, true, true, combinedDetailsMap);
           };
 
           runUpfrontFetchAndWrite()
@@ -4173,7 +4179,13 @@ const App: React.FC = () => {
             return;
           }
           setSupportsLabelDeepCuts(true);
-          await writeArtistCacheMany(artistList, final, user?.uid, activeDiscoveryFilters, true, true, fetchedDetailsMap);
+          const combinedDetailsMap = new Map([
+            ...fetchedDetailsMap,
+            ...detailsCacheRef.current,
+            ...healedDetailsCacheRef.current,
+            ...detailsCache
+          ]);
+          await writeArtistCacheMany(artistList, final, user?.uid, activeDiscoveryFilters, true, true, combinedDetailsMap);
         };
 
         runUpfrontFetchAndWrite()
@@ -5761,7 +5773,12 @@ const App: React.FC = () => {
       if (discoveredArtistNames.length > 0) {
         showToast("Saving new discoveries to global cache...");
         try {
-          await writeArtistCacheMany(discoveredArtistNames, mergedGraph, user?.uid, discoveryFilters, true);
+          const combinedDetailsMap = new Map([
+            ...detailsCacheRef.current,
+            ...healedDetailsCacheRef.current,
+            ...detailsCache
+          ]);
+          await writeArtistCacheMany(discoveredArtistNames, mergedGraph, user?.uid, discoveryFilters, true, false, combinedDetailsMap);
           console.log(`[Node Extension] Global cache double-write confirmed for: ${discoveredArtistNames.join(', ')}`);
         } catch (e) {
           console.error('[Node Extension] Global cache double-write failed:', e);

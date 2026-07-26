@@ -578,6 +578,8 @@ export const writeArtistCacheMany = async (
           };
           if (artistDetails) {
             setPayload.detailsCache = typeof artistDetails === 'string' ? JSON.parse(artistDetails) : artistDetails;
+          } else if (isLabel) {
+            console.warn(`[LabelCache] Creating canonical label "${compositeCanonicalId}" without detailsCache because artistDetails was missing/undefined.`);
           }
           if (!isLabel) enforceArtistCacheSchema(setPayload);
           await setDoc(canonicalDocRef, stripUndefinedProperties(setPayload));
@@ -597,6 +599,8 @@ export const writeArtistCacheMany = async (
               };
               await updateDoc(canonicalDocRef, stripUndefinedProperties(updatePayload));
               console.log(`[LabelCache] Updated detailsCache for canonical label: ${compositeCanonicalId}`);
+            } else {
+              console.warn(`[LabelCache] Skipped updateDoc for canonical label "${compositeCanonicalId}" because artistDetails was missing/undefined in detailsMap.`);
             }
           } else {
             // Break the version gate: if the incoming graph is richer (more artist nodes)
