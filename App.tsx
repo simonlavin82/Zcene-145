@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { AlertCircle, AlertTriangle, X, CheckCircle2, Key } from 'lucide-react';
 import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project, ArtistCacheEntry, COST_PER_AI_CALL } from './types';
 import { generateGraphData, fetchNodeDetails, extendGraphFromNode, resolveArtistCandidatesViaAI } from './services/geminiService';
-import { normalizeArtistId, readArtistCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, getEntityDocWithRedirect, getLabelDocWithRedirect, getAnyEntityDocWithRedirect, titleCaseArtistId, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema } from './services/artistCacheService';
+import { normalizeArtistId, readArtistCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, getEntityDocWithRedirect, getLabelDocWithRedirect, getAnyEntityDocWithRedirect, titleCaseArtistId, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema, stripUndefinedProperties } from './services/artistCacheService';
 import { normalizeCountry } from './utils/normalization';
 import { auth, signInWithGoogle, logout, onAuthStateChanged, User, db, handleFirestoreError, OperationType } from './services/firebase';
 import { translateError, translateToast } from './services/errorTranslationLayer';
@@ -2225,13 +2225,13 @@ const App: React.FC = () => {
           const simpleData = simpleSnap.data();
           if (simpleData && !simpleData.redirectTo) {
             // Use updateDoc (or setDoc with merge) to preserve existing graphData/filters on the stub
-            await setDoc(simpleDocRef, {
+            await setDoc(simpleDocRef, stripUndefinedProperties({
               artistId: simpleArtistId,
               cacheKey: simpleArtistId,
               redirectTo: disambiguatedCacheId,
               cacheVersion: 2,
               cachedAt: serverTimestamp()
-            }, { merge: true });
+            }), { merge: true });
           }
         }
       }
@@ -2266,7 +2266,7 @@ const App: React.FC = () => {
       };
       
       if (!isLabel) enforceArtistCacheSchema(setPayload);
-      await setDoc(doc(db, collName, disambiguatedCacheId), setPayload);
+      await setDoc(doc(db, collName, disambiguatedCacheId), stripUndefinedProperties(setPayload));
 
     } catch (err) {
       console.error("[Manual Generation] Failed to fetch and write split document:", err);
@@ -5906,7 +5906,7 @@ const App: React.FC = () => {
       const collName = node.type === 'label' ? 'labels' : 'artists';
       const targetSnap = await getEntityDocWithRedirect(cacheId, node.type === 'label' ? 'label' : 'artist');
       const targetDocId = targetSnap.exists() ? targetSnap.id : cacheId;
-      await updateDoc(doc(db, collName, targetDocId), updatePayload);
+      await updateDoc(doc(db, collName, targetDocId), stripUndefinedProperties(updatePayload));
       console.log("[Revalidation] Successfully updated stale cache in Firestore for: " + targetDocId);
     } catch (e: any) {
       console.warn("[Revalidation] Background refresh failed for: " + cacheId, e.message);
@@ -6396,13 +6396,13 @@ const App: React.FC = () => {
                             }
                             
                             // Convert the base document into a redirect to the disambiguated document
-                            await setDoc(simpleDocRef, {
+                            await setDoc(simpleDocRef, stripUndefinedProperties({
                               artistId: simpleArtistId,
                               cacheKey: simpleArtistId,
                               redirectTo: cacheId,
                               cacheVersion: 2,
                               cachedAt: serverTimestamp()
-                            });
+                            }));
                             console.log(`[Reconciliation] Converted base document "${simpleArtistId}" into a redirect to "${cacheId}".`);
                           }
                         }
@@ -6418,7 +6418,7 @@ const App: React.FC = () => {
                         synthesisRationale: details.synthesisRationale || null
                       };
                       enforceArtistCacheSchema(updatePayload);
-                      await updateDoc(doc(db, collName, targetDocId), updatePayload);
+                      await updateDoc(doc(db, collName, targetDocId), stripUndefinedProperties(updatePayload));
                       console.log(`[Deep Cut Queue] Write-back: Successfully updated detailsCache + cachedAt for: ${targetDocId}`);
                     } else if (!fallbackDetails) {
                       const normalizedGraph = normalizeGraphData(graphData);
@@ -6441,19 +6441,19 @@ const App: React.FC = () => {
                         synthesisRationale: details.synthesisRationale || null
                       };
                       enforceArtistCacheSchema(setPayload);
-                      await setDoc(doc(db, collName, targetDocId), setPayload);
+                      await setDoc(doc(db, collName, targetDocId), stripUndefinedProperties(setPayload));
                       console.log(`[Deep Cut Queue] JIT cached Canonical node (full context): ${targetDocId}`);
                     }
                       
                     if (isAlias) {
                       const aliasDocRef = doc(db, collName, cacheId);
-                      await setDoc(aliasDocRef, {
+                      await setDoc(aliasDocRef, stripUndefinedProperties({
                         cacheKey: cacheId,
                         artistId: cacheId,
                         redirectTo: canonicalId,
                         cacheVersion: 2,
                         cachedAt: serverTimestamp()
-                      });
+                      }));
                       console.log(`[Deep Cut Queue] Created Alias Redirect: ${cacheId} -> ${canonicalId}`);
                     }
                   } catch (e: any) {

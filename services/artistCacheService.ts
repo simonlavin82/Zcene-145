@@ -28,6 +28,27 @@ export const normalizeArtistId = (name: string): string =>
     .substring(0, 256);
 
 /**
+ * Recursively removes any property whose value is strictly `undefined` from an object or array.
+ * Required before passing objects to Firestore SDK (`setDoc`, `updateDoc`, `addDoc`) which
+ * throws synchronous validation exceptions on `undefined` values.
+ */
+export const stripUndefinedProperties = <T>(obj: T): T => {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(stripUndefinedProperties) as unknown as T;
+  }
+  const cleaned: any = {};
+  for (const [key, value] of Object.entries(obj as Record<string, any>)) {
+    if (value !== undefined) {
+      cleaned[key] = stripUndefinedProperties(value);
+    }
+  }
+  return cleaned;
+};
+
+/**
  * Builds a deterministic composite cache key from an artistId and any active DiscoveryFilters.
  * Ensures that changes in filters trigger a cache miss.
  */
@@ -559,7 +580,7 @@ export const writeArtistCacheMany = async (
             setPayload.detailsCache = typeof artistDetails === 'string' ? JSON.parse(artistDetails) : artistDetails;
           }
           if (!isLabel) enforceArtistCacheSchema(setPayload);
-          await setDoc(canonicalDocRef, setPayload);
+          await setDoc(canonicalDocRef, stripUndefinedProperties(setPayload));
           console.log(`[${isLabel ? 'LabelCache' : 'ArtistCache'}] Created Universal Canonical: ${compositeCanonicalId}`);
         } else {
           const existing = canonicalSnap.data();
@@ -574,7 +595,7 @@ export const writeArtistCacheMany = async (
                 cacheKey: compositeCanonicalId,
                 isDeep: preserveFullGraph || false,
               };
-              await updateDoc(canonicalDocRef, updatePayload);
+              await updateDoc(canonicalDocRef, stripUndefinedProperties(updatePayload));
               console.log(`[LabelCache] Updated detailsCache for canonical label: ${compositeCanonicalId}`);
             }
           } else {
@@ -607,7 +628,7 @@ export const writeArtistCacheMany = async (
                 updatePayload.detailsCache = typeof artistDetails === 'string' ? JSON.parse(artistDetails) : artistDetails;
               }
               enforceArtistCacheSchema(updatePayload);
-              await updateDoc(canonicalDocRef, updatePayload);
+              await updateDoc(canonicalDocRef, stripUndefinedProperties(updatePayload));
               console.log(`[ArtistCache] Upgraded/Overwritten Canonical doc: ${compositeCanonicalId} → cacheVersion 2 (incoming: ${incomingArtistCount} artists, existing: ${existingArtistCount} artists)`);
             } else {
               console.log(`[ArtistCache] Skipping write for Canonical "${compositeCanonicalId}" — doc already at v${existing?.cacheVersion || 2} with ${existingArtistCount} artist nodes (incoming also has ${incomingArtistCount}).`);
@@ -622,7 +643,7 @@ export const writeArtistCacheMany = async (
           const bareData = bareSnap.exists() ? bareSnap.data() : null;
 
           if (!bareSnap.exists() || (bareData && !bareData.redirectTo && bareSnap.id !== compositeCanonicalId)) {
-            await setDoc(bareArtistIdRef, {
+            await setDoc(bareArtistIdRef, stripUndefinedProperties({
               cacheKey: artistId,
               artistId: artistId,
               seedArtists: name,
@@ -632,7 +653,7 @@ export const writeArtistCacheMany = async (
               cachedAt: serverTimestamp(),
               hitCount: 0,
               redirectTo: compositeCanonicalId
-            });
+            }));
             console.log(`[ArtistCache] Created/Healed Bare Alias Pointer: ${artistId} -> ${compositeCanonicalId}`);
           }
         } else if (artistId !== compositeCanonicalId) {
@@ -640,10 +661,10 @@ export const writeArtistCacheMany = async (
           const bareSnap = await getDoc(bareArtistIdRef);
           const bareData = bareSnap.exists() ? bareSnap.data() : null;
           if (!bareSnap.exists() || (bareData && !bareData.redirectTo)) {
-            await setDoc(bareArtistIdRef, {
+            await setDoc(bareArtistIdRef, stripUndefinedProperties({
               cacheKey: artistId,
               redirectTo: compositeCanonicalId
-            });
+            }));
             console.log(`[LabelCache] Created Bare Alias Pointer: ${artistId} -> ${compositeCanonicalId}`);
           }
         }

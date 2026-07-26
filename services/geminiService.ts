@@ -3,7 +3,7 @@ import { GoogleGenAI, Type, GenerateContentResponse, ThinkingLevel } from "@goog
 import { GraphData, Node, NodeDetails, Link, ChatMessage, DiscoveryFilters } from "../types";
 import { db } from './firebase';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { normalizeArtistId, extractArtistSubGraph, readArtistCacheMany, normalizeGraphData } from './artistCacheService';
+import { normalizeArtistId, extractArtistSubGraph, readArtistCacheMany, normalizeGraphData, stripUndefinedProperties } from './artistCacheService';
 
 // --- EXPORTED CONSTANTS FOR SOURCE PAGE VISIBILITY ---
 
@@ -1479,13 +1479,14 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
         })),
         members: (details.members || []).map(sanitizeString),
         recommendationReason: sanitizeString(details.recommendationReason || ""),
-        youtubeVideoId: typeof details.youtubeVideoId === 'string' && details.youtubeVideoId.trim().length === 11
-            ? details.youtubeVideoId.trim()
-            : undefined,
-        youtubeSearchQuery: typeof details.youtubeSearchQuery === 'string' && details.youtubeSearchQuery.trim().length > 0
-            ? sanitizeString(details.youtubeSearchQuery.trim())
-            : undefined,
     };
+
+    if (typeof details.youtubeVideoId === 'string' && details.youtubeVideoId.trim().length === 11) {
+        hydratedDetails.youtubeVideoId = details.youtubeVideoId.trim();
+    }
+    if (typeof details.youtubeSearchQuery === 'string' && details.youtubeSearchQuery.trim().length > 0) {
+        hydratedDetails.youtubeSearchQuery = sanitizeString(details.youtubeSearchQuery.trim());
+    }
 
     if (!hydratedDetails.details) hydratedDetails.details = {};
 
@@ -1503,7 +1504,7 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
         hydratedDetails.groundingLinks = Array.from(uniqueLinks.values());
     }
     
-    return hydratedDetails;
+    return stripUndefinedProperties(hydratedDetails);
 };
 
 export const streamNodeChat = async (

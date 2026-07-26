@@ -490,6 +490,16 @@ To prevent data rot, API failures, and visual rendering regressions, the synthes
    - This model offers the optimal speed-to-fidelity ratio and guarantees 
      reliable JSON structure output, preventing parser failures and empty 
      metadata fallbacks.
+
+5. DUAL-COLLECTION UNIVERSAL CACHING (/artists vs /labels):
+   - The global shared cache splits entities cleanly between two Firestore collections: /artists (for bands, musicians, and musical acts) and /labels (for record labels and publishing houses).
+   - Label entities use normalized canonical slugs (bypassing multi-origin country suffixes like -united-states or -united-kingdom) because record labels represent global publishing organizations without country-specific disambiguation requirements.
+   - Any manual deep cut generation or background JIT detail fetch for a record label node writes directly to /labels/{labelSlug} with cacheVersion: 2, ensuring instant O(1) cache hits across any Zcene project that references the label.
+
+6. STRICT PAYLOAD SANITIZATION (stripUndefinedProperties):
+   - The Google Cloud Firestore JavaScript SDK strictly forbids properties with value undefined in document payloads, throwing an immediate client-side synchronous error (Unsupported field value: undefined).
+   - In AI-generated metadata (such as NodeDetails), optional properties (e.g. youtubeVideoId or youtubeSearchQuery) are frequently missing for non-musical entities like record labels.
+   - Before any payload is transmitted to Firestore via setDoc or updateDoc, it MUST be wrapped with stripUndefinedProperties(...) (exported from services/artistCacheService.ts). This utility recursively traverses objects and arrays to strip any property whose value is strictly undefined, preventing serialization exceptions and silent generation failures.
 `;
 
 const DEEP_CUT_INTELLIGENCE_DOCUMENTATION = `
