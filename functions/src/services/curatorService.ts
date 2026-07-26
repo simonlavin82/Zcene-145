@@ -73,7 +73,7 @@ export const normalizeGraphData = (graph: GraphData): GraphData => {
     const originalId = node.id;
     let normalizedId = originalId.trim();
     
-    if (node.type === 'artist') {
+    if (node.type === 'artist' || node.type === 'label') {
       normalizedId = normalizeArtistId(originalId);
     } else {
       normalizedId = normalizedId.toLowerCase();
@@ -84,7 +84,7 @@ export const normalizeGraphData = (graph: GraphData): GraphData => {
     idMap.set(normalizeArtistId(originalId), normalizedId);
 
     let label = node.label || originalId.trim();
-    if (node.type === 'artist') {
+    if (node.type === 'artist' || node.type === 'label') {
       label = titleCaseArtistId(label);
     }
 
@@ -137,7 +137,7 @@ export const extractArtistSubGraph = (
   };
 
   const artistNode = fullGraph.nodes.find(
-    n => n.type === 'artist' && (normalizeArtistId(n.id) === artistNameNorm || isArtistIdMatch(n.id, artistName))
+    n => (n.type === 'artist' || n.type === 'label') && (normalizeArtistId(n.id) === artistNameNorm || isArtistIdMatch(n.id, artistName))
   );
 
   if (!artistNode) {
@@ -162,7 +162,7 @@ export const extractArtistSubGraph = (
       const otherNorm = normalizeArtistId(otherId);
       
       const otherNode = fullGraph.nodes.find(n => normalizeArtistId(n.id) === otherNorm);
-      if (otherNode && otherNode.type === 'artist' && !seedsNorm.has(otherNorm)) {
+      if (otherNode && (otherNode.type === 'artist' || otherNode.type === 'label') && !seedsNorm.has(otherNorm)) {
         peerArtistIds.add(otherNode.id);
       }
     }
@@ -188,7 +188,7 @@ export const extractArtistSubGraph = (
       const otherId = sIsKeptArtist ? t : s;
       const otherLower = otherId.trim().toLowerCase();
       const otherNode = fullGraph.nodes.find(n => n.id.trim().toLowerCase() === otherLower);
-      if (otherNode && otherNode.type !== 'artist') {
+      if (otherNode && (otherNode.type !== 'artist' && otherNode.type !== 'label')) {
         metadataNodeIds.add(otherNode.id);
       }
     }
@@ -603,10 +603,10 @@ export const generateGraphDataBackend = async (
       return !nodesToRemove.has(s) && !nodesToRemove.has(t);
   });
 
-  const artistIdsInFilteredNodes = new Set(filteredNodes.filter(n => n.type === 'artist').map(n => n.id));
+  const artistIdsInFilteredNodes = new Set(filteredNodes.filter(n => n.type === 'artist' || n.type === 'label').map(n => n.id));
   
   filteredNodes = filteredNodes.filter(n => {
-      if (n.type === 'artist') return true;
+      if (n.type === 'artist' || n.type === 'label') return true;
       return filteredLinks.some(l => {
           const s = typeof l.source === 'string' ? l.source : (l.source as Node).id;
           const t = typeof l.target === 'string' ? l.target : (l.target as Node).id;

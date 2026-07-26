@@ -67,7 +67,7 @@ const normalizeGraphData = (graph) => {
     const normalizedNodes = graph.nodes.map(node => {
         const originalId = node.id;
         let normalizedId = originalId.trim();
-        if (node.type === 'artist') {
+        if (node.type === 'artist' || node.type === 'label') {
             normalizedId = (0, exports.normalizeArtistId)(originalId);
         }
         else {
@@ -77,7 +77,7 @@ const normalizeGraphData = (graph) => {
         idMap.set(originalId.toLowerCase(), normalizedId);
         idMap.set((0, exports.normalizeArtistId)(originalId), normalizedId);
         let label = node.label || originalId.trim();
-        if (node.type === 'artist') {
+        if (node.type === 'artist' || node.type === 'label') {
             label = (0, exports.titleCaseArtistId)(label);
         }
         return {
@@ -117,7 +117,7 @@ const extractArtistSubGraph = (artistName, fullGraph, allSeeds = []) => {
         const nb = (0, exports.normalizeArtistId)(b);
         return na === nb || na.startsWith(nb + '-') || nb.startsWith(na + '-');
     };
-    const artistNode = fullGraph.nodes.find(n => n.type === 'artist' && ((0, exports.normalizeArtistId)(n.id) === artistNameNorm || isArtistIdMatch(n.id, artistName)));
+    const artistNode = fullGraph.nodes.find(n => (n.type === 'artist' || n.type === 'label') && ((0, exports.normalizeArtistId)(n.id) === artistNameNorm || isArtistIdMatch(n.id, artistName)));
     if (!artistNode) {
         return { nodes: [], links: [] };
     }
@@ -134,7 +134,7 @@ const extractArtistSubGraph = (artistName, fullGraph, allSeeds = []) => {
             const otherId = sNorm === artistNodeIdNorm ? t : s;
             const otherNorm = (0, exports.normalizeArtistId)(otherId);
             const otherNode = fullGraph.nodes.find(n => (0, exports.normalizeArtistId)(n.id) === otherNorm);
-            if (otherNode && otherNode.type === 'artist' && !seedsNorm.has(otherNorm)) {
+            if (otherNode && (otherNode.type === 'artist' || otherNode.type === 'label') && !seedsNorm.has(otherNorm)) {
                 peerArtistIds.add(otherNode.id);
             }
         }
@@ -154,7 +154,7 @@ const extractArtistSubGraph = (artistName, fullGraph, allSeeds = []) => {
             const otherId = sIsKeptArtist ? t : s;
             const otherLower = otherId.trim().toLowerCase();
             const otherNode = fullGraph.nodes.find(n => n.id.trim().toLowerCase() === otherLower);
-            if (otherNode && otherNode.type !== 'artist') {
+            if (otherNode && (otherNode.type !== 'artist' && otherNode.type !== 'label')) {
                 metadataNodeIds.add(otherNode.id);
             }
         }
@@ -528,9 +528,9 @@ const generateGraphDataBackend = async (artists, filters, cachedSubgraphsContext
         const t = typeof l.target === 'string' ? l.target : l.target.id;
         return !nodesToRemove.has(s) && !nodesToRemove.has(t);
     });
-    const artistIdsInFilteredNodes = new Set(filteredNodes.filter(n => n.type === 'artist').map(n => n.id));
+    const artistIdsInFilteredNodes = new Set(filteredNodes.filter(n => n.type === 'artist' || n.type === 'label').map(n => n.id));
     filteredNodes = filteredNodes.filter(n => {
-        if (n.type === 'artist')
+        if (n.type === 'artist' || n.type === 'label')
             return true;
         return filteredLinks.some(l => {
             const s = typeof l.source === 'string' ? l.source : l.source.id;

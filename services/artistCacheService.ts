@@ -557,16 +557,10 @@ export const writeArtistCacheMany = async (
 
         if (!canonicalSnap.exists()) {
           // ── CREATE PATH ─────────────────────────────────────────────────────
-          const setPayload: any = isLabel ? {
+          const idFieldKey = isLabel ? 'labelId' : 'artistId';
+          const setPayload: any = {
             cacheKey: compositeCanonicalId,
-            labelId: canonicalId,
-            cacheVersion: 2,
-            cachedAt: serverTimestamp(),
-            hitCount: 0,
-            isDeep: preserveFullGraph || false,
-          } : {
-            cacheKey: compositeCanonicalId,
-            artistId: canonicalId,
+            [idFieldKey]: canonicalId,
             seedArtists: canonicalName,
             graphData: JSON.stringify({ nodes, links, synthesisRationale: normalizedGraph.synthesisRationale }),
             synthesisRationale: normalizedGraph.synthesisRationale || null,
@@ -586,91 +580,73 @@ export const writeArtistCacheMany = async (
           console.log(`[${isLabel ? 'LabelCache' : 'ArtistCache'}] Created Universal Canonical: ${compositeCanonicalId}`);
         } else {
           const existing = canonicalSnap.data();
+          const idFieldKey = isLabel ? 'labelId' : 'artistId';
 
-          if (isLabel) {
+          let existingArtistCount = 0;
+          if (existing?.graphData) {
+            try {
+              const existingGraph = JSON.parse(existing.graphData);
+              existingArtistCount = (existingGraph.nodes || []).filter((n: any) => n.type === 'artist' || n.type === 'label').length;
+            } catch (e) { /* ignore parse errors on stale doc */ }
+          }
+          const incomingArtistCount = nodes.filter(n => n.type === 'artist' || n.type === 'label').length;
+          const isRicherGraph = incomingArtistCount > existingArtistCount;
+
+          if (forceOverwrite || isRicherGraph || (existing && (!existing.cacheVersion || existing.cacheVersion < 2 || (preserveFullGraph && existing.isDeep !== true)))) {
+            // ── UPGRADE PATH ─────────────────────────────────────────
+            const updatePayload: any = {
+              cacheKey: compositeCanonicalId,
+              [idFieldKey]: canonicalId,
+              seedArtists: canonicalName,
+              graphData: JSON.stringify({ nodes, links, synthesisRationale: normalizedGraph.synthesisRationale }),
+              synthesisRationale: normalizedGraph.synthesisRationale || null,
+              filters: filters || {},
+              cacheVersion: 2,
+              cachedAt: serverTimestamp(),
+              isDeep: preserveFullGraph || false,
+            };
             if (artistDetails) {
-              const updatePayload: any = {
-                detailsCache: typeof artistDetails === 'string' ? JSON.parse(artistDetails) : artistDetails,
-                cachedAt: serverTimestamp(),
-                cacheVersion: 2,
-                labelId: canonicalId,
-                cacheKey: compositeCanonicalId,
-                isDeep: preserveFullGraph || false,
-              };
-              await updateDoc(canonicalDocRef, stripUndefinedProperties(updatePayload));
-              console.log(`[LabelCache] Updated detailsCache for canonical label: ${compositeCanonicalId}`);
-            } else {
-              console.warn(`[LabelCache] Skipped updateDoc for canonical label "${compositeCanonicalId}" because artistDetails was missing/undefined in detailsMap.`);
+              updatePayload.detailsCache = typeof artistDetails === 'string' ? JSON.parse(artistDetails) : artistDetails;
             }
+            if (!isLabel) enforceArtistCacheSchema(updatePayload);
+            await updateDoc(canonicalDocRef, stripUndefinedProperties(updatePayload));
+            console.log(`[${isLabel ? 'LabelCache' : 'ArtistCache'}] Upgraded/Overwritten Canonical doc: ${compositeCanonicalId} → cacheVersion 2 (incoming: ${incomingArtistCount} entities, existing: ${existingArtistCount} entities)`);
+          } else if (artistDetails) {
+            // Update detailsCache if it was missing or stale
+            const updatePayload: any = {
+              detailsCache: typeof artistDetails === 'string' ? JSON.parse(artistDetails) : artistDetails,
+              cachedAt: serverTimestamp(),
+              cacheVersion: 2,
+              [idFieldKey]: canonicalId,
+              cacheKey: compositeCanonicalId,
+              isDeep: preserveFullGraph || false,
+            };
+            await updateDoc(canonicalDocRef, stripUndefinedProperties(updatePayload));
+            console.log(`[${isLabel ? 'LabelCache' : 'ArtistCache'}] Updated detailsCache for canonical doc: ${compositeCanonicalId}`);
           } else {
-            // Break the version gate: if the incoming graph is richer (more artist nodes)
-            // than what is stored, always overwrite — a full graph must replace a stale truncated one.
-            let existingArtistCount = 0;
-            if (existing?.graphData) {
-              try {
-                const existingGraph = JSON.parse(existing.graphData);
-                existingArtistCount = (existingGraph.nodes || []).filter((n: any) => n.type === 'artist' || n.type === 'label').length;
-              } catch (e) { /* ignore parse errors on stale doc */ }
-            }
-            const incomingArtistCount = nodes.filter(n => n.type === 'artist' || n.type === 'label').length;
-            const isRicherGraph = incomingArtistCount > existingArtistCount;
-
-            if (forceOverwrite || isRicherGraph || (existing && (!existing.cacheVersion || existing.cacheVersion < 2 || (preserveFullGraph && existing.isDeep !== true)))) {
-              // ── UPGRADE PATH (Case B) ─────────────────────────────────────────
-              const updatePayload: any = {
-                cacheKey: compositeCanonicalId,
-                artistId: canonicalId,
-                seedArtists: canonicalName,
-                graphData: JSON.stringify({ nodes, links, synthesisRationale: normalizedGraph.synthesisRationale }),
-                synthesisRationale: normalizedGraph.synthesisRationale || null,
-                filters: filters || {},
-                cacheVersion: 2,
-                cachedAt: serverTimestamp(),
-                isDeep: preserveFullGraph || false,
-              };
-              if (artistDetails) {
-                updatePayload.detailsCache = typeof artistDetails === 'string' ? JSON.parse(artistDetails) : artistDetails;
-              }
-              enforceArtistCacheSchema(updatePayload);
-              await updateDoc(canonicalDocRef, stripUndefinedProperties(updatePayload));
-              console.log(`[ArtistCache] Upgraded/Overwritten Canonical doc: ${compositeCanonicalId} → cacheVersion 2 (incoming: ${incomingArtistCount} artists, existing: ${existingArtistCount} artists)`);
-            } else {
-              console.log(`[ArtistCache] Skipping write for Canonical "${compositeCanonicalId}" — doc already at v${existing?.cacheVersion || 2} with ${existingArtistCount} artist nodes (incoming also has ${incomingArtistCount}).`);
-            }
+            console.log(`[${isLabel ? 'LabelCache' : 'ArtistCache'}] Skipping write for Canonical "${compositeCanonicalId}" — doc already at v${existing?.cacheVersion || 2}.`);
           }
         }
 
         // Bare root alias pointer protection & legacy healing:
-        if (!isLabel) {
-          const bareArtistIdRef = doc(db, collName, artistId);
-          const bareSnap = await getDoc(bareArtistIdRef);
-          const bareData = bareSnap.exists() ? bareSnap.data() : null;
+        const bareArtistIdRef = doc(db, collName, artistId);
+        const bareSnap = await getDoc(bareArtistIdRef);
+        const bareData = bareSnap.exists() ? bareSnap.data() : null;
+        const idFieldKey = isLabel ? 'labelId' : 'artistId';
 
-          if (!bareSnap.exists() || (bareData && !bareData.redirectTo && bareSnap.id !== compositeCanonicalId)) {
-            await setDoc(bareArtistIdRef, stripUndefinedProperties({
-              cacheKey: artistId,
-              artistId: artistId,
-              seedArtists: name,
-              graphData: JSON.stringify({ nodes: [], links: [] }),
-              filters: {},
-              cacheVersion: 2,
-              cachedAt: serverTimestamp(),
-              hitCount: 0,
-              redirectTo: compositeCanonicalId
-            }));
-            console.log(`[ArtistCache] Created/Healed Bare Alias Pointer: ${artistId} -> ${compositeCanonicalId}`);
-          }
-        } else if (artistId !== compositeCanonicalId) {
-          const bareArtistIdRef = doc(db, collName, artistId);
-          const bareSnap = await getDoc(bareArtistIdRef);
-          const bareData = bareSnap.exists() ? bareSnap.data() : null;
-          if (!bareSnap.exists() || (bareData && !bareData.redirectTo)) {
-            await setDoc(bareArtistIdRef, stripUndefinedProperties({
-              cacheKey: artistId,
-              redirectTo: compositeCanonicalId
-            }));
-            console.log(`[LabelCache] Created Bare Alias Pointer: ${artistId} -> ${compositeCanonicalId}`);
-          }
+        if (!bareSnap.exists() || (bareData && !bareData.redirectTo && bareSnap.id !== compositeCanonicalId)) {
+          await setDoc(bareArtistIdRef, stripUndefinedProperties({
+            cacheKey: artistId,
+            [idFieldKey]: artistId,
+            seedArtists: name,
+            graphData: JSON.stringify({ nodes: [], links: [] }),
+            filters: {},
+            cacheVersion: 2,
+            cachedAt: serverTimestamp(),
+            hitCount: 0,
+            redirectTo: compositeCanonicalId
+          }));
+          console.log(`[${isLabel ? 'LabelCache' : 'ArtistCache'}] Created/Healed Bare Alias Pointer: ${artistId} -> ${compositeCanonicalId}`);
         }
       } catch (e: any) {
         console.warn(`[ArtistCache] Write failed for "${compositeArtistId}" (${e.code ?? 'unknown'}): ${e.message}`);

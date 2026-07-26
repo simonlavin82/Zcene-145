@@ -255,7 +255,7 @@ service cloud.firestore {
       allow update: if isSignedIn() &&
                        (
                          request.resource.data.diff(resource.data).affectedKeys()
-                           .hasOnly(['detailsCache', 'hitCount', 'cachedAt', 'cacheVersion', 'labelId', 'cacheKey', 'isDeep'])
+                           .hasOnly(['detailsCache', 'hitCount', 'cachedAt', 'cacheVersion', 'labelId', 'cacheKey', 'isDeep', 'graphData', 'synthesisRationale', 'filters', 'seedArtists', 'redirectTo'])
                        ) || (
                          'redirectTo' in incoming() &&
                          incoming().redirectTo is string &&

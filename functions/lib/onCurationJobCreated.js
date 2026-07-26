@@ -274,14 +274,24 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                     }
                     detailsCacheEntries.push([artistName, details]);
                 }
-                // Write-back cache entries for the seed artists (deep cache: isDeep: true)
+                // Write-back cache entries for the seed entities (deep cache: isDeep: true)
                 for (const seed of artistList) {
                     const seedNorm = (0, curatorService_1.normalizeArtistId)(seed);
+                    const seedNode = (finalGraph.nodes || []).find((n) => (0, curatorService_1.normalizeArtistId)(n.id) === seedNorm || (0, curatorService_1.normalizeArtistId)(n.label || '') === seedNorm);
+                    const isSeedLabel = seedNode?.type === 'label';
+                    const collName = isSeedLabel ? "labels" : "artists";
+                    const idFieldKey = isSeedLabel ? "labelId" : "artistId";
                     const seedDetailsEntry = detailsCacheEntries.find(entry => (0, curatorService_1.normalizeArtistId)(entry[0]) === seedNorm);
                     const seedDetails = seedDetailsEntry ? seedDetailsEntry[1] : null;
                     // Run Sanity Check — non-fatal: log and skip this seed's cache write rather than aborting the entire job
                     try {
-                        validateArtistDetailsSchema(seedNorm, seedDetails);
+                        if (!isSeedLabel) {
+                            validateArtistDetailsSchema(seedNorm, seedDetails);
+                        }
+                        else if (!seedDetails) {
+                            console.warn(`[Curation Backend] Seed label cache write skipped for "${seedNorm}" — missing detailsCache.`);
+                            continue;
+                        }
                     }
                     catch (validationErr) {
                         console.warn(`[Curation Backend] Seed cache write skipped for "${seedNorm}" — schema validation failed: ${validationErr.message}`);
@@ -313,9 +323,9 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                         countryNorm = "global";
                     const disambiguatedCanonicalId = seedNorm.endsWith(`-${countryNorm}`) ? seedNorm : `${seedNorm}-${countryNorm}`;
                     const compositeCanonicalId = (0, curatorService_1.buildCompositeCacheKey)(disambiguatedCanonicalId, inputPayload.filters || undefined);
-                    await db.collection("artists").doc(compositeCanonicalId).set({
+                    await db.collection(collName).doc(compositeCanonicalId).set({
                         cacheKey: compositeCanonicalId,
-                        artistId: seedNorm,
+                        [idFieldKey]: seedNorm,
                         seedArtists: seed,
                         graphData: JSON.stringify(finalGraph),
                         detailsCache: sanitizeUndefinedProperties(seedDetails), // Save as structured object!
@@ -326,15 +336,15 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                         isDeep: true, // Marked Deep!
                         synthesisRationale: finalGraph.synthesisRationale || null
                     });
-                    console.log(`[Curation Backend] Wrote DEEP global cache for seed: ${compositeCanonicalId}`);
+                    console.log(`[Curation Backend] Wrote DEEP global cache for seed (${collName}): ${compositeCanonicalId}`);
                     // Create/Heal Bare Root Alias Pointer
-                    const bareArtistIdRef = db.collection("artists").doc(seedNorm);
+                    const bareArtistIdRef = db.collection(collName).doc(seedNorm);
                     const bareSnap = await bareArtistIdRef.get();
                     const bareData = bareSnap.exists ? bareSnap.data() : null;
                     if (!bareSnap.exists || (bareData && !bareData.redirectTo && bareSnap.id !== compositeCanonicalId)) {
                         await bareArtistIdRef.set({
                             cacheKey: seedNorm,
-                            artistId: seedNorm,
+                            [idFieldKey]: seedNorm,
                             seedArtists: seed,
                             graphData: JSON.stringify({ nodes: [], links: [] }),
                             filters: {},
@@ -343,7 +353,7 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                             hitCount: 0,
                             redirectTo: compositeCanonicalId
                         });
-                        console.log(`[Curation Backend] Created Bare Alias Pointer: ${seedNorm} -> ${compositeCanonicalId}`);
+                        console.log(`[Curation Backend] Created Bare Alias Pointer in ${collName}: ${seedNorm} -> ${compositeCanonicalId}`);
                     }
                 }
                 // Proactively cache each recommended entity (artist or label) as a deep cache entry as well!
@@ -352,30 +362,21 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                     const recArtist = entityObj.name;
                     const recNorm = (0, curatorService_1.normalizeArtistId)(recArtist);
                     const isLabel = entityObj.type === 'label';
-                    if (!isLabel && seedNorms.has(recNorm))
+                    if (seedNorms.has(recNorm))
                         continue; // Already seeds
                     const recDetailsEntry = detailsCacheEntries.find(entry => (0, curatorService_1.normalizeArtistId)(entry[0]) === recNorm);
                     const recDetails = recDetailsEntry ? recDetailsEntry[1] : null;
-                    if (isLabel) {
-                        if (!recDetails) {
-                            console.warn(`[Curation Backend] Label cache write skipped for "${recNorm}" — missing detailsCache.`);
-                            continue;
-                        }
-                        await db.collection("labels").doc(recNorm).set({
-                            cacheKey: recNorm,
-                            labelId: recNorm,
-                            detailsCache: sanitizeUndefinedProperties(recDetails),
-                            cacheVersion: 2,
-                            cachedAt: firestore_2.FieldValue.serverTimestamp(),
-                            hitCount: 0,
-                            isDeep: true,
-                        });
-                        console.log(`[Curation Backend] Proactively cached DEEP label entry for recommendation: ${recNorm}`);
+                    if (isLabel && !recDetails) {
+                        console.warn(`[Curation Backend] Label cache write skipped for "${recNorm}" — missing detailsCache.`);
                         continue;
                     }
+                    const collName = isLabel ? "labels" : "artists";
+                    const idFieldKey = isLabel ? "labelId" : "artistId";
                     // Run Sanity Check — non-fatal: log and skip this recommendation's cache write rather than aborting the entire job
                     try {
-                        validateArtistDetailsSchema(recNorm, recDetails);
+                        if (!isLabel) {
+                            validateArtistDetailsSchema(recNorm, recDetails);
+                        }
                     }
                     catch (validationErr) {
                         console.warn(`[Curation Backend] Recommendation cache write skipped for "${recNorm}" — schema validation failed: ${validationErr.message}`);
@@ -407,9 +408,9 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                         countryNorm = "global";
                     const disambiguatedCanonicalId = recNorm.endsWith(`-${countryNorm}`) ? recNorm : `${recNorm}-${countryNorm}`;
                     const compositeCanonicalId = (0, curatorService_1.buildCompositeCacheKey)(disambiguatedCanonicalId, inputPayload.filters || undefined);
-                    await db.collection("artists").doc(compositeCanonicalId).set({
+                    await db.collection(collName).doc(compositeCanonicalId).set({
                         cacheKey: compositeCanonicalId,
-                        artistId: recNorm,
+                        [idFieldKey]: recNorm,
                         seedArtists: recArtist,
                         graphData: JSON.stringify(finalGraph),
                         detailsCache: sanitizeUndefinedProperties(recDetails), // Save as structured object!
@@ -420,15 +421,15 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                         isDeep: true, // Marked Deep!
                         synthesisRationale: null
                     });
-                    console.log(`[Curation Backend] Proactively cached DEEP entry for recommendation: ${compositeCanonicalId}`);
+                    console.log(`[Curation Backend] Proactively cached DEEP entry for recommendation (${collName}): ${compositeCanonicalId}`);
                     // Create/Heal Bare Root Alias Pointer
-                    const bareArtistIdRef = db.collection("artists").doc(recNorm);
+                    const bareArtistIdRef = db.collection(collName).doc(recNorm);
                     const bareSnap = await bareArtistIdRef.get();
                     const bareData = bareSnap.exists ? bareSnap.data() : null;
                     if (!bareSnap.exists || (bareData && !bareData.redirectTo && bareSnap.id !== compositeCanonicalId)) {
                         await bareArtistIdRef.set({
                             cacheKey: recNorm,
-                            artistId: recNorm,
+                            [idFieldKey]: recNorm,
                             seedArtists: recArtist,
                             graphData: JSON.stringify({ nodes: [], links: [] }),
                             filters: {},
@@ -437,7 +438,7 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                             hitCount: 0,
                             redirectTo: compositeCanonicalId
                         });
-                        console.log(`[Curation Backend] Created Bare Alias Pointer: ${recNorm} -> ${compositeCanonicalId}`);
+                        console.log(`[Curation Backend] Created Bare Alias Pointer in ${collName}: ${recNorm} -> ${compositeCanonicalId}`);
                     }
                 }
                 result = {
