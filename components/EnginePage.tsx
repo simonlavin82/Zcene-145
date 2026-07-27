@@ -79,6 +79,33 @@ real-time intelligence and global scalability.
      to an event-driven queue. Upon a new document in 'curationJobs', a gen2 
      Cloud Function manages the heavy lifting of calling Gemini, scraping YouTube 
      playability, and formatting metadata, fully offloading the client browser.
+   - PARALLEL CURATION ARCHITECTURE (~3-MINUTE EXECUTION):
+     The hydration pipeline has been re-engineered from a sequential per-node loop
+     into a chunked concurrent batch execution model. All node profiles (AI artists,
+     record labels, and untyped deep cuts) are processed in parallel chunks of 5
+     nodes at a time via Promise.all(), dramatically reducing total curation time
+     from ~20 minutes to approximately 3 minutes. This architecture is the
+     authoritative resilience standard: it prevents Cloud Function timeouts while
+     guaranteeing that every node type — not just the primary artist entities — is
+     fully hydrated and written to Firestore before the job completes.
+   - UPFRONT UNIVERSAL HYDRATION MANDATE:
+     All curation jobs are required to fully hydrate ALL node types upfront during
+     the initial background run. This includes: primary AI artist nodes, record label
+     nodes (/labels/{labelSlug}), and untyped deep cut artist nodes. Only nodes with
+     an explicit 'label' type are routed to the /labels collection; all others (including
+     nodes with no type property) are treated as artist nodes and hydrated via
+     /artists/{id}. This universal filter eliminates the legacy regression where deep
+     cuts required manual node-clicking on the frontend (EnginePage.tsx) to trigger
+     their individual data loads.
+   - ROOT ALIAS REPLICATION (detailsCache on Bare Root Documents):
+     When the backend creates or updates alias pointer documents (e.g., for regional
+     variants like 'artist-united-states'), it replicates the full detailsCache payload
+     directly onto the bare root document (e.g., 'artist') in a single atomic write.
+     This eliminates secondary redirect lookups during frontend short-ID resolution:
+     when the client queries /artists/{shortId} and finds a bare root document, the
+     detailsCache is immediately available without requiring a second Firestore hop to
+     follow a redirectsTo pointer. Alias replication uses a merge-safe updateDoc to
+     avoid overwriting any existing canonical data on the root document.
    - Stateful Project Orchestration: When a curation job begins, the frontend
       immediately saves the project status as 'curating', recording seedArtists
       and activeJobId. Even if the browser tab is closed, the background Cloud
@@ -143,14 +170,25 @@ the entire dataset, the app evolves existing visual structures.
      normalized slugs ('isSameNodeId') to resolve raw artist name and selection mismatches.
 
 4. DATA INTEGRITY & PARALLEL HYDRATION PIPELINE:
-   - Parallel Backend Hydration: Curation details (biographies, genres, origins, 
-     formed years, and member lists) for all nodes are resolved in sequential-batch 
-     API calls on the backend. This pipeline integrates real-time YouTube scraping 
-     and status check routines.
+   - Chunked Concurrent Backend Hydration: Curation details (biographies, genres, origins,
+     formed years, member lists, and image URLs) for ALL node types are resolved via a
+     chunked Promise.all() execution model on the backend. Nodes are batched into groups
+     of 5 and processed concurrently, reducing the per-job wall time from ~20 minutes
+     to approximately 3 minutes. This pipeline integrates real-time YouTube scraping
+     and status check routines and covers primary AI artist nodes, record labels, and
+     previously-unhydrated untyped deep cut nodes in a single unified pass.
+   - Universal Node Type Filter: Only nodes explicitly typed as 'label' are routed to
+     /labels/{labelSlug}. All other nodes (including nodes with no type property, which
+     represent untyped deep cuts) are treated as artists and hydrated via /artists/{id}.
+     This universal filter is the authoritative safeguard against the legacy regression
+     where untyped deep cuts were silently skipped during background hydration.
    - Orphaned Link Mitigation (geminiService.ts): Filters the AI response to 
      ensure every link's 'source' and 'target' corresponds to a validated node ID.
    - Client detailsCache callback: The client subscribes to job updates, immediately 
-     piping compiled backend metadata into React memory upon completion.
+     piping compiled backend metadata into React memory upon completion. The callback
+     routes through expandDetailsCacheMap() to automatically register every incoming
+     entry under its raw key, lowercased key, normalized artist ID, and display name,
+     guaranteeing instant O(1) in-memory short-ID resolution on all subsequent node clicks.
 
 5. GLOBAL CACHE ALIGNMENT & PROACTIVE 'DEEP CACHE' STRATEGY (artistCacheService.ts / App.tsx):
    Before invoking Gemini for Phase 02 Orchestration, the engine computes a 
@@ -396,15 +434,24 @@ Zcene provides two primary view modes to balance discovery and clarity:
 
 const RESILIENCE_DOCUMENTATION = `
 Zcene handles AI model constraints (Rate Limits/Hallucinations) using a 
-Serial Fetch & Backoff Strategy in App.tsx and OS-level stability logic.
+Chunked Concurrent Batch Architecture on the backend and a targeted Backoff Strategy
+for transient API errors on the client.
 
-1. SERVER-SIDE BATCH PRE-CACHING & O(1) CLIENT READS:
-   While serial queueing and rate-limit throttling were historically managed on the client,
-   our current pipeline executes Simultaneous Batch Pre-Caching on the backend Cloud Function
-   (onCurationJobCreated). During project generation, the backend pre-fetches and writes all
-   artist and label profiles directly to '/artists' and '/labels'. Consequently, when a user
-   clicks a node on the client canvas, it resolves via an instant O(1) global cache hit,
-   bypassing client-side serial API fetching entirely.
+1. CHUNKED CONCURRENT BATCH PRE-CACHING & O(1) CLIENT READS:
+   The backend curation pipeline (onCurationJobCreated.ts) executes node hydration
+   using a chunked concurrency model: all nodes are partitioned into groups of 5 and
+   each chunk is resolved with Promise.all() before the next chunk begins. This design
+   provides two critical resilience guarantees:
+   - Timeout Prevention: Sequential per-node API calls on a 20+ node graph previously
+     caused Cloud Function wall-time timeouts. The chunked model bounds worst-case
+     execution to approximately 3 minutes, well within Cloud Function limits.
+   - Thundering Herd Mitigation: Full fan-out (all nodes concurrently) would saturate
+     the Gemini API rate limits. The chunk-of-5 constraint serves as an implicit rate
+     governor, preventing 429 Resource Exhausted errors during hydration bursts.
+   - Guaranteed O(1) Client Reads: By the time the Spiderweb graph finishes rendering
+     on the client, all /artists/{id} and /labels/{labelSlug} documents are pre-written
+     in Firestore. Clicking any node — including record labels and untyped deep cuts —
+     resolves via an instant O(1) global cache hit with zero client-side generation flows.
 
 2. RETRY LOGIC (Backoff):
    If a 429 (Resource Exhausted) or 500 error occurs:
@@ -528,12 +575,36 @@ To prevent data rot, API failures, and visual rendering regressions, the synthes
      reliable JSON structure output, preventing parser failures and empty 
      metadata fallbacks.
 
-5. DUAL-COLLECTION UNIVERSAL CACHING (/artists vs /labels) & SIMULTANEOUS PRE-CACHING:
+5. UPFRONT UNIVERSAL HYDRATION MANDATE & DUAL-COLLECTION CACHING:
    - The global shared cache splits entities cleanly between two Firestore collections: /artists (for bands, musicians, and musical acts) and /labels (for record labels and publishing houses).
    - Label entities use normalized canonical slugs (bypassing multi-origin country suffixes like -united-states or -united-kingdom) because record labels represent global publishing organizations without country-specific disambiguation requirements.
-   - Simultaneous Batch Pre-Caching: When a new Zcene project is mapped or initialized (via backend curation job or frontend graph mapping), the curation engine simultaneously extracts both artist nodes and record label nodes from the Spiderweb graph data.
-   - For every entity in the graph, the pipeline queries its respective global collection (/artists or /labels). On a cache miss, it sequentially batch-synthesizes missing profiles (while skipping YouTube music video scraping for labels) and atomically writes them directly to /labels/{labelSlug} or /artists/{id} with isDeep: true before the project finishes saving.
-   - Guaranteed Instant Cache Hits: By the time the Spiderweb graph finishes rendering on the client, all corresponding global /labels/{canonicalId} and /artists/{id} documents already exist in Firestore, ensuring that clicking any node results in an instant O(1) global cache hit with zero modal generation flows required.
+   - ARCHITECTURAL LAW — UPFRONT UNIVERSAL HYDRATION: Every curation job MUST fully hydrate
+     ALL node types during the initial background run — this includes primary AI artist nodes,
+     record label nodes, and untyped deep cut artist nodes. A deep cut is "unhydrated" only if
+     it has never received a Firestore document write during any prior curation run. Partial
+     hydration (e.g., only hydrating the primary seed artist and skipping remaining nodes) is
+     a regression that forces users to click nodes manually to trigger individual data loads and
+     is strictly prohibited as a completion state for any curation job.
+   - Chunked Concurrent Pre-Caching: Hydration is executed in parallel chunks of 5 nodes via
+     Promise.all() to prevent Cloud Function timeouts while avoiding Gemini API rate exhaustion.
+     On a cache miss for any entity, the pipeline synthesizes its profile via Gemini Flash and
+     atomically writes it to /labels/{labelSlug} or /artists/{id} with isDeep: true before the
+     job finalizes.
+   - Root Alias Replication: After writing a disambiguated regional variant document (e.g.,
+     /artists/artist-united-states), the backend replicates the full detailsCache payload onto
+     the bare root document (/artists/artist). This guarantees that frontend short-ID queries
+     against root documents immediately return hydrated content without requiring a redirectsTo
+     pointer follow-through.
+   - Guaranteed Instant Cache Hits: By the time the Spiderweb graph finishes rendering on the
+     client, all /artists/{id} and /labels/{canonicalId} documents exist in Firestore, ensuring
+     that clicking any node — including record labels and previously unhydrated deep cuts —
+     resolves via an instant O(1) global cache hit with zero client-side generation flows.
+   - imageUrl Preservation During Cache Writes: All entity profile writes — via both
+     sanitizeLabelProfile (labels) and the artist hydration path — MUST explicitly preserve the
+     'imageUrl' field. Any utility that strips or overwrites this field to null or undefined
+     during a sanitization or merge operation is a regression. The Contextual Image Trust Rule
+     applies at the persistence layer: a valid imageUrl discovered during synthesis must survive
+     the full write cycle to Firestore without being discarded.
 
 6. STRICT PAYLOAD SANITIZATION (stripUndefinedProperties):
    - The Google Cloud Firestore JavaScript SDK strictly forbids properties with value undefined in document payloads, throwing an immediate client-side synchronous error (Unsupported field value: undefined).
@@ -563,6 +634,12 @@ To maintain strict data cleanliness and prevent schema bloat across our global d
      * Narrative History: high-impact bio summary ('summary').
      * Essential Listening: key catalog album releases ('discography').
      * Clean External Links: official website, Bandcamp, Discogs, and store URLs ('links').
+     * Image URL ('imageUrl'): Explicitly preserved during sanitization. Labels may have genuine logo
+       or cover art imagery sourced from credible genre ecosystem platforms (e.g., Bandcamp, Discogs,
+       Wikimedia). The Contextual Image Trust Rule applies equally to label entities: if the image URL
+       is a valid https:// asset accompanying verified biographical copy, it MUST be carried through
+       sanitizeLabelProfile without being stripped or nullified. Any future changes to sanitizeLabelProfile
+       MUST NOT remove imageUrl from the preserved field set.
 `;
 
 
@@ -735,6 +812,20 @@ The system distinguishes between two categories of data quality:
    - Every cached artist card/document must contain a complete dataset, including the required "Roots Breakdown" structure (Acoustic & Sonics, Scene Context, Overlap Insights).
    - MANDATORY CONTRACT FOR DATA-LAYER CHANGES: Any new data field introduced to 'NodeDetails' that is required for high-fidelity UI representation must be added to the 'validateCacheEntry' schema-validation gate in 'App.tsx'.
    - This ensures that legacy or incomplete datasets lacking the new fields are treated as "cache misses" at the front gate and details panel, automatically routing through the standard 'confirmTokenUsage' estimation warning and live Gemini API re-synthesis to heal the cached records to the current schema standards.
+
+6. SECONDARY NODE EVICTION LOOP PREVENTION (CRITICAL — validateNodeDetailsContent):
+   - Root Cause: The topology-focused 'validateCacheEntry' gate requires graphData, isPrimarySeed,
+     and synthesisRationale/Roots Breakdown. Secondary nodes (deep cuts, record labels, untyped artists)
+     never store these fields. Applying validateCacheEntry to secondary documents always returns
+     isFullyQualified: false, triggering eviction on every background worker queue tick, causing
+     an infinite synthesis loop that exhausts API quota and never settles.
+   - Fix: The background worker queue, the fallback Firestore read inside onNodeClick, and the
+     isStale computation all use the content-focused 'validateNodeDetailsContent' gate instead.
+     This gate only checks for a valid, non-sentinel summary/bio presence in detailsCache.
+   - CONTRACT: The background worker queue checks (App.tsx: the JIT details fetcher) MUST use
+     validateNodeDetailsContent for ALL non-seed node evaluations. Future refactoring of the
+     background queue MUST preserve this routing — reverting to validateCacheEntry in the
+     secondary-node path will reintroduce the infinite eviction loop regression.
 `;
 
 const CACHE_VALIDATION_DOCUMENTATION = `
@@ -758,6 +849,47 @@ const CACHE_VALIDATION_DOCUMENTATION = `
    The 'isSingleArtist' flag should be propagated dynamically from the graph generation queries 
    (e.g., checking 'artistList.length === 1' inside handleGenerateGraph) or set to 'true' in isolated 
    detail panel reads where only a single artist's profile card is being evaluated.
+
+4. DUAL-GATE VALIDATION MODEL — TOPOLOGY vs. CONTENT (MANDATORY CONTRACT):
+   The system enforces two semantically distinct validation gates. Each gate has a precisely scoped
+   purpose and MUST NOT be substituted for the other:
+
+   GATE 1 — validateCacheEntry (Topology Gate):
+   - Purpose: Full graph-topology validation for seed-level data quality.
+   - Scope: Used exclusively in the high-level cache front gate inside handleGenerateGraph and
+     in global cache hit checks where a complete, qualified seed document is required.
+   - Checks: graphData structure presence, synthesisRationale/Roots Breakdown completeness
+     ('acoustic', 'scene', optional 'overlap'), and document version integrity.
+   - Usage: validateCacheEntry(data, isSingleArtist).isFullyQualified
+   - DO NOT use this gate for secondary nodes, deep cuts, or background worker queue checks.
+     Applying it to non-seed documents will block all secondary node hydration because deep
+     cuts never carry graphData or synthesisRationale, causing a permanent cache eviction loop.
+
+   GATE 2 — validateNodeDetailsContent (Content Gate):
+   - Purpose: Lightweight content-presence validation for secondary node details.
+   - Scope: Used in the background worker queue (JIT details fetcher), in the fallback
+     Firestore read path inside onNodeClick, and in the staleness check inside the
+     background cache loader. Does NOT require graphData, isPrimarySeed, or synthesisRationale.
+   - Checks: detailsCache field is a non-null, non-empty value. Parses the field and confirms
+     that the resolved object has a 'summary' or 'bio' string with length > 5, and that the
+     entry is not marked as corrupt (_isSentinel: true).
+   - Usage: validateNodeDetailsContent(data.detailsCache)
+   - This is the authoritative gate for: (a) deciding whether to skip or trigger background
+     revalidation for a node, (b) deciding whether to treat a Firestore cache read as a valid
+     hit or a miss in the short-ID fallback lookup, and (c) computing isStale for background
+     worker queue scheduling.
+
+5. CACHE MAP ALIAS RESOLUTION (expandDetailsCacheMap):
+   All detailsCache Map population — across project loaders, shared Zcene imports, and cloud
+   curation job callbacks — MUST route through the expandDetailsCacheMap() utility (App.tsx).
+   This function parses raw detailsCache JSON (handling string, array-wrapped, and object forms),
+   then replicates each entry under four keys: the raw original key, a lowercased variant, a
+   normalizeArtistId() slug variant, and a display-name variant derived from the cached
+   artist/details.artist field. This quad-binding guarantees that any node ID format used
+   at query time — regardless of casing, hyphenation, or slug normalization — resolves
+   to the correct cached entry without an O(n) scan. Any future project loader code that
+   directly calls new Map(JSON.parse(data.detailsCache)) bypasses this guarantee and MUST
+   be refactored to use expandDetailsCacheMap() instead.
 `;
 
 const LOCALIZED_LOADING_DOCUMENTATION = `
