@@ -1,8 +1,7 @@
 
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import * as d3 from 'd3';
-import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Minus, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { GraphData, Node, Link, GraphSettings, NodeDetails } from '../types';
 import { LegendSymbol } from './Icons';
 import { normalizeArtistId, isNodeInSeedList } from '../services/artistCacheService';
@@ -32,8 +31,6 @@ interface MusicGraphProps {
   legendRef?: React.RefObject<HTMLDivElement | null>;
   onInteraction?: () => void;
   onLegendInteraction?: () => void;
-  onExtendNode?: (node: Node) => void;
-  onRemoveNode?: (node: Node) => void;
   isGuest?: boolean;
   detailsCache?: Map<string, NodeDetails>;
   isActive?: boolean;
@@ -104,7 +101,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   data, libraryArtists, seedArtists, onNodeClick, selectedNode, peekedNode, isSmallScreen,
   activeFilters, searchQuery, toggleFilter,
   legendConfig, legendOrder,
-  legendRef, onInteraction, onLegendInteraction, onExtendNode, onRemoveNode, isGuest,
+  legendRef, onInteraction, onLegendInteraction, isGuest,
   detailsCache, isActive = false
 }) => {
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -114,7 +111,6 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   const [highlightedNodes, setHighlightedNodes] = useState<Set<string>>(new Set());
   const [isLegendExpanded, setIsLegendExpanded] = useState(false);
   const [isCompactMode, setIsCompactMode] = useState(false);
-  const [selectedNodePos, setSelectedNodePos] = useState<{ x: number, y: number } | null>(null);
   const [hoveredLink, setHoveredLink] = useState<{
     sourceId: string;
     targetId?: string;
@@ -186,7 +182,6 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     peekedNodeRef.current = peekedNode;
     
     // No longer kicking the simulation on selection to maintain absolute stability.
-    // The selectedNodePos useEffect handles the button positioning even when simulation is idle.
   }, [onNodeClick, onInteraction, selectedNode, peekedNode]);
 
   // NOTE: The details useMemo + simulation restart was removed.
@@ -694,19 +689,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             .on("zoom", (event) => { 
                 container.attr("transform", event.transform); 
                 
-                // 1. Update selected node pos during zoom/pan
-                const currentSelected = selectedNodeRef.current || peekedNodeRef.current;
-                if (currentSelected && svgRef.current) {
-                    const node = visibleNodesRef.current.find(n => isSameNodeId(n.id, currentSelected.id));
-                    if (node && !isNaN(node.x!) && !isNaN(node.y!)) {
-                        setSelectedNodePos({
-                            x: event.transform.applyX(node.x!),
-                            y: event.transform.applyY(node.y!)
-                        });
-                    }
-                }
-                
-                // 2. Update hovered link/node coordinates during zoom/pan
+                // Update hovered link/node coordinates during zoom/pan
                 if (activeHoveredLinkRef.current && svgRef.current) {
                     const d = activeHoveredLinkRef.current.link;
                     const x1 = (d.source as any).x;
@@ -840,25 +823,6 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                         const y = isNaN(d.y) ? 0 : (d.y ?? 0);
                         return `translate(${x},${y})`;
                     });
-
-                // Update selected node position for the "Add" button
-                const currentSelected = selectedNodeRef.current || peekedNodeRef.current;
-                if (currentSelected && svgRef.current) {
-                    // Use the live nodes from the simulation to avoid stale closures
-                    const nodes = simulation.nodes();
-                    const node = nodes.find(n => isSameNodeId(n.id, currentSelected.id));
-                    if (node && !isNaN(node.x!) && !isNaN(node.y!)) {
-                        const transform = d3.zoomTransform(svgRef.current);
-                        setSelectedNodePos({
-                            x: transform.applyX(node.x!),
-                            y: transform.applyY(node.y!)
-                        });
-                    } else {
-                        setSelectedNodePos(null);
-                    }
-                } else {
-                    setSelectedNodePos(null);
-                }
             })
             .on("end", () => {
                 // Pin all nodes once the simulation settles to maintain absolute coordinate stability
@@ -1339,25 +1303,6 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   // Removed `dimensions` to isolate physics from container resizes
   }, [visibleNodes, visibleLinks, seedArtists, activeFilters]);
 
-  // Ensure selectedNodePos is updated when selection changes, even if simulation is idle
-  useEffect(() => {
-    const activeNode = selectedNode || peekedNode;
-    if (activeNode && svgRef.current) {
-        const node = visibleNodes.find(n => isSameNodeId(n.id, activeNode.id));
-        if (node && !isNaN(node.x!) && !isNaN(node.y!)) {
-            const transform = d3.zoomTransform(svgRef.current);
-            setSelectedNodePos({
-                x: transform.applyX(node.x!),
-                y: transform.applyY(node.y!)
-            });
-        } else {
-            setSelectedNodePos(null);
-        }
-    } else {
-        setSelectedNodePos(null);
-    }
-  }, [selectedNode, peekedNode, visibleNodes, dimensions]);
-
   // Set tracking target when selectedNode or peekedNode changes
   useEffect(() => {
       const activeNode = selectedNode || peekedNode;
@@ -1498,61 +1443,6 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     >
         <svg ref={svgRef} className="w-full h-full touch-none" />
         
-        <AnimatePresence mode="wait">
-            {selectedNode && selectedNodePos && !selectedNode.isLoading && !isGuest && (
-                <motion.div
-                    key={`node-actions-${selectedNode.id}`}
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                    style={{
-                        position: 'absolute',
-                        left: selectedNodePos.x + 20,
-                        top: selectedNodePos.y - 20,
-                        zIndex: 40,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'flex-start',
-                        gap: '8px'
-                    }}
-                >
-                    {selectedNode.type?.toLowerCase() === 'artist' && (
-                        <motion.button
-                            initial={{ scale: 0, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0, opacity: 0 }}
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                if (onExtendNode) onExtendNode(selectedNode);
-                            }}
-                            className="h-8 px-3 bg-primary text-brand-black rounded-full flex items-center justify-center gap-1.5 shadow-lg border border-brand-black/20 pointer-events-auto transition-transform"
-                            title="Extend from this artist"
-                        >
-                            <Plus className="w-4 h-4 shrink-0" />
-                            <span className="text-[10px] font-bold tracking-wider uppercase select-none">Explore</span>
-                        </motion.button>
-                    )}
-                    <motion.button
-                        initial={{ scale: 0, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        exit={{ scale: 0, opacity: 0 }}
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            if (onRemoveNode) onRemoveNode(selectedNode);
-                        }}
-                        className="w-8 h-8 bg-zinc-800 text-zinc-300 rounded-full flex items-center justify-center shadow-lg border border-zinc-600 pointer-events-auto hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/50 transition-colors"
-                        title="Remove this node"
-                    >
-                        <Minus className="w-5 h-5" />
-                    </motion.button>
-                </motion.div>
-            )}
-        </AnimatePresence>
-
         {hoveredLink && !selectedNode && (
             <div
                 style={

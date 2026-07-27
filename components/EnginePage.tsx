@@ -870,11 +870,11 @@ Zcene implements a cross-platform 'Sticky Peek + Action Gateway' interaction mod
 
 2. STATE 2: THE 'ACTION GATEWAY' (Secondary Interaction):
    - Trigger: A second click/tap on the already-selected (peeked) node.
-   - Behavior: Automatically hides/dismisses the floating hover box to clear visual clutter, opens the sidebar Details Panel, and displays the node action overlay (+ Explore / - buttons) over the node.
+   - Behavior: Automatically hides/dismisses the floating hover box to clear visual clutter and opens the sidebar Details Panel (which now houses the Explore button with a compass icon and node removal controls in its header, keeping the spiderweb canvas pristine).
    - Persistent Yellow Highlights: All yellow 1st-degree connection lines highlighted during State 1 remain illuminated throughout State 2 to maintain graph context.
    - API Gateways:
      - Blocked & Cached nodes: Bypasses the token quota modal and enters State 2 instantly.
-     - Uncached nodes: Triggers the JIT details queue and presents the Token Quota Confirmation warning. If canceled, the node remains in State 2 (with + Explore button and sidebar details card visible) to allow easy re-initiation.
+     - Uncached nodes: Triggers the JIT details queue and presents the Token Quota Confirmation warning. If canceled, the node remains in State 2 (with Explore button and sidebar details card visible) to allow easy re-initiation.
 
 3. PINNED MOUSE EVENT LOCKING (D3 Mouseleave Bypass):
    - In D3's 'mouseleave' event handler, the system queries the active ref states (selectedNodeRef.current and peekedNodeRef.current).

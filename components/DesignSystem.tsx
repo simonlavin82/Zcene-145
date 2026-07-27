@@ -2918,7 +2918,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <p className="text-sm text-zinc-400 leading-relaxed">
                                             <strong>Trigger:</strong> Click 2 (desktop) or Tap 2 (mobile) on the already peeked node (or Deep Cut pagination selection).
                                             <br /><br />
-                                            <strong>Behavior:</strong> Automatically dismisses/hides the floating hover box to reduce visual clutter, opens the sidebar Details Panel, and displays node action overlays (<code>+ Explore</code> pill-button and <code>-</code> remove button) over the node. All 1st-degree yellow connection lines remain illuminated to maintain visual context.
+                                            <strong>Behavior:</strong> Automatically dismisses/hides the floating hover box to reduce visual clutter and opens the sidebar Details Panel (which now houses the primary <code>Explore</code> button with a compass icon and node removal controls in its header, keeping the spiderweb canvas pristine). All 1st-degree yellow connection lines remain illuminated to maintain visual context.
                                         </p>
                                     </div>
                                 </div>

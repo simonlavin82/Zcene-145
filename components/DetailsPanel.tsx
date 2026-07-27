@@ -224,6 +224,7 @@ interface NodeDetailsCardProps {
   onClose: () => void;
   onNodeClick: (node: Node | null, forceActionState?: boolean) => void;
   onGenerateDeepCut?: (node: Node) => void;
+  onExtendNode?: (node: Node) => void;
   onNavigate: (view: View) => void;
   chatHistory: ChatMessage[];
   onSendMessage: (message: string) => void;
@@ -282,7 +283,7 @@ const isTourCacheStale = (tourCachedAtString: string | undefined): boolean => {
 };
 
 const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
-    node, details, isLoading, isGlobalLoading, graphData, libraryArtists, seedArtists, onAddArtist, isSmallScreen, onRefresh, onClose, onNodeClick, onGenerateDeepCut, onNavigate,
+    node, details, isLoading, isGlobalLoading, graphData, libraryArtists, seedArtists, onAddArtist, isSmallScreen, onRefresh, onClose, onNodeClick, onGenerateDeepCut, onExtendNode, onNavigate,
     chatHistory, onSendMessage, isChatLoading, isFullScreenMode = false, isHero = false, isInStack, onToggleStack, onToggleMagazineView, isGuest = false, onAuthRequest, user,
     userTaste, isAdmin = false
 }) => {
@@ -574,6 +575,16 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                 <div className={`px-4 pt-3 pb-3 border-b border-zinc-800/50 bg-zinc-900 z-20 flex-shrink-0 ${isFullScreenMode ? 'md:px-6' : ''}`}>
                     <div className="flex flex-col gap-2 mb-2">
                         <div className="flex items-center justify-end gap-1 flex-shrink-0">
+                            {isArtistNode && !isGuest && onExtendNode && (
+                                <button
+                                    onClick={() => onExtendNode(node)}
+                                    className="h-8 px-3 bg-primary text-brand-black rounded-xl flex items-center justify-center gap-1.5 shadow-sm font-bold transition-all duration-200 hover:opacity-90 active:scale-95 leading-none mr-auto"
+                                    title="Explore related artists in Spiderweb"
+                                >
+                                    <span className="material-symbols-outlined !text-[18px]">explore</span>
+                                    <span className="text-[10px] font-bold tracking-wider uppercase select-none">Explore</span>
+                                </button>
+                            )}
                             {(isArtistNode || isLabelNode) && (
                                 <button
                                     onClick={() => onToggleStack(node, links.purchase?.[0]?.url)}
@@ -1206,6 +1217,7 @@ interface DetailsPanelProps {
   isSmallScreen: boolean;
   onNodeClick: (node: Node | null, forceActionState?: boolean) => void;
   onGenerateDeepCut?: (node: Node) => void;
+  onExtendNode?: (node: Node) => void;
   onNavigate: (view: View) => void;
   isGlobalLoading: boolean;
   onCancelGlobalLoading: () => void;
@@ -1228,7 +1240,7 @@ interface DetailsPanelProps {
 export const DetailsPanel: React.FC<DetailsPanelProps> = ({
   selectedNode, activeNodes, detailsCache, loadingNodeIds, onCloseNode, onRefreshNode,
   error, systemError, graphData, libraryArtists, seedArtists, onAddArtist, isCollapsed, onToggleCollapse,
-  isSmallScreen, onNodeClick, onGenerateDeepCut, onNavigate, isGlobalLoading, onCancelGlobalLoading, unreadCount, isActive, collapseBtnRef,
+  isSmallScreen, onNodeClick, onGenerateDeepCut, onExtendNode, onNavigate, isGlobalLoading, onCancelGlobalLoading, unreadCount, isActive, collapseBtnRef,
   isMagazineViewOpen, onMagazineViewToggle, chatHistories, onUpdateChatHistories, stack, onToggleStack,
   isGuest = false, onAuthRequest, user, userTaste, isAdmin = false
 }) => {
@@ -1705,6 +1717,8 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 user={user}
                                                 onAuthRequest={onAuthRequest}
                                                 userTaste={userTaste}
+                                                isAdmin={isAdmin}
+                                                onExtendNode={onExtendNode}
                                             />
                                         </div>
                                     );

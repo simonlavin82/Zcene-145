@@ -899,22 +899,22 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
             <button
               type="button"
               onClick={() => onSelect(cand.id)}
-              className="w-full text-left p-4 bg-zinc-900/50 hover:bg-zinc-800 border border-zinc-700 hover:border-primary/50 transition-all duration-200 flex items-center gap-4 group rounded-xl"
+              className="w-full text-left p-5 bg-zinc-900 hover:bg-primary/10 border-2 border-primary/80 hover:border-primary transition-all duration-200 flex items-center gap-4 group rounded-xl shadow-lg cursor-pointer"
             >
-              <span className="material-symbols-outlined text-zinc-500 group-hover:text-primary transition-colors text-2xl flex-shrink-0">check_circle</span>
+              <span className="material-symbols-outlined text-primary group-hover:scale-110 transition-transform text-2xl flex-shrink-0">check_circle</span>
               <div className="flex flex-col gap-0.5 min-w-0">
-                <span className="text-zinc-100 group-hover:text-primary font-semibold transition-colors text-sm truncate">
+                <span className="text-white group-hover:text-primary font-bold transition-colors text-base truncate">
                   {cand.label || cand.id}
                 </span>
                 {(cand.genre || cand.origin) && (
-                  <div className="flex flex-wrap gap-x-2 text-[10px] text-zinc-500 group-hover:text-zinc-400 transition-colors uppercase tracking-wider font-semibold">
+                  <div className="flex flex-wrap gap-x-2 text-[10px] text-zinc-400 group-hover:text-zinc-300 transition-colors uppercase tracking-wider font-semibold">
                     {cand.origin && <span>{cand.origin}</span>}
                     {cand.origin && cand.genre && <span>•</span>}
                     {cand.genre && <span>{cand.genre}</span>}
                   </div>
                 )}
               </div>
-              <span className="material-symbols-outlined text-zinc-600 group-hover:text-primary transition-colors text-[14px] ml-auto flex-shrink-0">
+              <span className="material-symbols-outlined text-primary transition-transform group-hover:translate-x-1 text-[16px] ml-auto flex-shrink-0">
                 arrow_forward_ios
               </span>
             </button>
@@ -938,7 +938,7 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
               <button
                 type="button"
                 onClick={() => onSelect('synthesis')}
-                className="px-4 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 active:scale-95 transition-all shadow-md cursor-pointer"
+                className="px-4 py-1.5 border border-zinc-700 bg-zinc-800/50 hover:bg-zinc-800 hover:border-zinc-500 text-zinc-300 hover:text-white rounded-xl font-medium text-sm flex items-center gap-2 active:scale-95 transition-all cursor-pointer"
               >
                 <span className="material-symbols-outlined !text-[16px]">search</span>
                 Not This One — Search Live AI
@@ -1037,7 +1037,11 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
           </button>
           <button
             type="submit"
-            className="px-4 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 active:scale-95 transition-all shadow-md cursor-pointer whitespace-nowrap"
+            className={`px-4 py-1.5 rounded-xl font-medium text-sm flex items-center gap-2 active:scale-95 transition-all cursor-pointer whitespace-nowrap ${
+              !isLiveAISuggestions
+                ? 'border border-zinc-700 bg-zinc-800/50 hover:bg-zinc-800 hover:border-zinc-500 text-zinc-300 hover:text-white'
+                : 'bg-primary text-brand-black shadow-md'
+            }`}
           >
             {!isLiveAISuggestions && <span className="material-symbols-outlined !text-[16px]">search</span>}
             {isLiveAISuggestions 

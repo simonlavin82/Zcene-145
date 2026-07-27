@@ -546,7 +546,6 @@ const GraphPage: React.FC<GraphPageProps> = ({
 }) => {
   const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
   const [isDetailsPanelCollapsed, setIsDetailsPanelCollapsed] = useState(true);
-  const [nodeToRemove, setNodeToRemove] = useState<Node | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [viewedRationale, setViewedRationale] = useState<string | null>(null);
   
@@ -1208,61 +1207,6 @@ const GraphPage: React.FC<GraphPageProps> = ({
     </div>
   );
 
-  const ConfirmRemoveNodeModal = () => {
-    if (!nodeToRemove) return null;
-    return (
-      <div 
-        className="fixed inset-0 bg-black/60 z-[110] flex items-center justify-center p-4 animate-fade-in-down" 
-        style={{ animationDuration: '200ms' }}
-        onClick={() => setNodeToRemove(null)}
-      >
-        <div 
-          className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-hidden" 
-          onClick={e => e.stopPropagation()}
-        >
-          <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-red-400 !text-[18px]">warning</span>
-              <h3 className="text-base font-medium text-white">
-                Confirm Removal
-              </h3>
-            </div>
-            <button 
-              onClick={() => setNodeToRemove(null)} 
-              className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none"
-            >
-              <span className="material-symbols-outlined !text-[18px]">close</span>
-            </button>
-          </header>
-
-          <div className="p-5 space-y-4 text-sm text-zinc-400 text-left">
-            <p className="leading-relaxed">
-              Are you sure you want to remove <span className="font-semibold text-white">{nodeToRemove.label || String(nodeToRemove.id)}</span> from your current workspace?
-            </p>
-          </div>
-
-          <footer className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2">
-            <button 
-              onClick={() => setNodeToRemove(null)} 
-              className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors"
-            >
-              Cancel
-            </button>
-            <button 
-              onClick={() => {
-                if (onRemoveNode) onRemoveNode(nodeToRemove);
-                setNodeToRemove(null);
-              }} 
-              className="px-4 py-1.5 bg-red-500 text-white rounded-xl font-medium text-sm transition-opacity hover:opacity-90"
-            >
-              Confirm
-            </button>
-          </footer>
-        </div>
-      </div>
-    );
-  };
-
   const enabledArtistsCount = selectedSeedArtists.filter(a => a.enabled).length;
 
   const loadingSubtext = "Mapping your Zcene connections... This usually takes a minute or two to find the best musical paths.";
@@ -1496,7 +1440,6 @@ const GraphPage: React.FC<GraphPageProps> = ({
         <LibraryDialog isOpen={isLibraryDialogOpen} onClose={() => setIsLibraryDialogOpen(false)} libraryArtists={libraryArtists} selectedArtists={selectedSeedArtists} onArtistToggle={handleLibraryArtistToggle} uniqueGenres={uniqueGenres} artistGenreMap={artistGenreMap} fileInputRef={fileInputRef} onTriggerClear={() => setShowConfirmDelete(true)} />
         <LimitReachedDialog isOpen={showLimitDialog} onClose={() => setShowLimitDialog(false)} />
         {showConfirmDelete && <ConfirmDeleteModal />}
-        {nodeToRemove && <ConfirmRemoveNodeModal />}
         
         <Header
             user={user}
@@ -1587,7 +1530,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                         </div>
                                         <div className="mt-2.5 w-full h-px bg-zinc-700" />
                                     </div>
-                                    <div className="flex-grow relative min-h-0 bg-zinc-900" ref={mobileGraphAreaRef}>{isLoading && (<div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-md z-[90] flex flex-col items-center justify-center gap-4 pointer-events-auto"><LoadingSpinner subtext={loadingSubtext} /></div>)}{isFirstGeneration && !isLoading && (<div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none"><ZceneEmptyState onNavigate={onNavigate} /></div>)}{data.nodes.length > 0 && (<MusicGraph data={data} libraryArtists={memoizedLibraryArtists} seedArtists={memoizedSeedArtists} onNodeClick={handleNodeClickInternal} selectedNode={selectedNode} peekedNode={peekedNode} isSmallScreen={isSmallScreen} activeFilters={activeFilters} searchQuery={searchQuery} setSearchQuery={setSearchQuery} toggleFilter={toggleFilterInternal} legendConfig={legendConfig} legendOrder={legendOrder} legendRef={desktopLegendAreaRef} onInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onLegendInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onExtendNode={onExtendNode} onRemoveNode={setNodeToRemove} isGuest={isGuest} detailsCache={detailsCache} isActive={isActive} />)}</div>
+                                    <div className="flex-grow relative min-h-0 bg-zinc-900" ref={mobileGraphAreaRef}>{isLoading && (<div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-md z-[90] flex flex-col items-center justify-center gap-4 pointer-events-auto"><LoadingSpinner subtext={loadingSubtext} /></div>)}{isFirstGeneration && !isLoading && (<div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none"><ZceneEmptyState onNavigate={onNavigate} /></div>)}{data.nodes.length > 0 && (<MusicGraph data={data} libraryArtists={memoizedLibraryArtists} seedArtists={memoizedSeedArtists} onNodeClick={handleNodeClickInternal} selectedNode={selectedNode} peekedNode={peekedNode} isSmallScreen={isSmallScreen} activeFilters={activeFilters} searchQuery={searchQuery} setSearchQuery={setSearchQuery} toggleFilter={toggleFilterInternal} legendConfig={legendConfig} legendOrder={legendOrder} legendRef={desktopLegendAreaRef} onInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onLegendInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} isGuest={isGuest} detailsCache={detailsCache} isActive={isActive} />)}</div>
                                 </div>
                             </div>
                             <div className={`w-full flex-shrink-0 h-full flex flex-col min-h-0 overflow-hidden relative ${isMagazineViewOpen ? 'fixed inset-0 z-[1000] pt-0 md:pt-4' : ''}`}>
@@ -1600,6 +1543,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                         loadingNodeIds={loadingNodeIds} 
                                         onCloseNode={onCloseNode} 
                                         onRefreshNode={onRefreshNode} 
+                                        onExtendNode={onExtendNode} 
                                         error={detailsError} 
                                         systemError={systemError}
                                         graphData={data} 
@@ -1669,7 +1613,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                 <div ref={centerColumnRef} className={`flex-1 min-w-0 flex flex-col gap-4 relative z-10 transition-opacity duration-300 ${isMagazineViewOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                     <div className="flex-1 relative min-h-0 flex flex-col bg-zinc-900 border border-zinc-600/50 overflow-hidden">
                         <div className="h-12 px-4 flex-shrink-0 border-b border-zinc-600/50 flex items-center justify-between overflow-hidden"><h2 className="text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Spiderweb</h2>{!isSmallScreen && (<div className="flex items-center gap-1.5 flex-shrink-0">{SearchControl}</div>)}</div>
-                        <div className="flex-grow relative min-h-0" ref={desktopGraphAreaRef}>{isLoading && (<div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-md z-[90] flex flex-col items-center justify-center gap-4 pointer-events-auto"><LoadingSpinner subtext={loadingSubtext} /></div>)}{isFirstGeneration && !isLoading && (<div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none"><ZceneEmptyState onNavigate={onNavigate} /></div>)}{data.nodes.length > 0 && (<MusicGraph data={data} libraryArtists={memoizedLibraryArtists} seedArtists={memoizedSeedArtists} onNodeClick={handleNodeClickInternal} selectedNode={selectedNode} peekedNode={peekedNode} isSmallScreen={isSmallScreen} activeFilters={activeFilters} searchQuery={searchQuery} setSearchQuery={setSearchQuery} toggleFilter={toggleFilterInternal} legendConfig={legendConfig} legendOrder={legendOrder} legendRef={desktopLegendAreaRef} onInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onLegendInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onExtendNode={onExtendNode} onRemoveNode={setNodeToRemove} isGuest={isGuest} detailsCache={detailsCache} isActive={isActive} />)}</div>
+                        <div className="flex-grow relative min-h-0" ref={desktopGraphAreaRef}>{isLoading && (<div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-md z-[90] flex flex-col items-center justify-center gap-4 pointer-events-auto"><LoadingSpinner subtext={loadingSubtext} /></div>)}{isFirstGeneration && !isLoading && (<div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none"><ZceneEmptyState onNavigate={onNavigate} /></div>)}{data.nodes.length > 0 && (<MusicGraph data={data} libraryArtists={memoizedLibraryArtists} seedArtists={memoizedSeedArtists} onNodeClick={handleNodeClickInternal} selectedNode={selectedNode} peekedNode={peekedNode} isSmallScreen={isSmallScreen} activeFilters={activeFilters} searchQuery={searchQuery} setSearchQuery={setSearchQuery} toggleFilter={toggleFilterInternal} legendConfig={legendConfig} legendOrder={legendOrder} legendRef={desktopLegendAreaRef} onInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onLegendInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} isGuest={isGuest} detailsCache={detailsCache} isActive={isActive} />)}</div>
                     </div>
                     <div key={`ad-container-${adSize}`} className="flex-shrink-0 bg-zinc-900 border border-zinc-600/50 px-2 py-0 flex justify-center items-center overflow-hidden">
                         <div className="text-zinc-500 text-[10px] text-center max-w-full">
@@ -1712,6 +1656,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                          loadingNodeIds={loadingNodeIds} 
                          onCloseNode={nodeId => onCloseNode(nodeId)} 
                          onRefreshNode={nodeId => onRefreshNode(nodeId)} 
+                         onExtendNode={onExtendNode} 
                          error={detailsError} 
                          systemError={systemError}
                          graphData={data} 
