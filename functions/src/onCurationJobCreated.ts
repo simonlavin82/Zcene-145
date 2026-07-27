@@ -99,6 +99,7 @@ function sanitizeLabelProfile(details: any): any {
   };
   return {
     summary: parsed.summary || parsed.bio || parsed.description || "",
+    imageUrl: parsed.imageUrl || parsed.image || null,
     details: cleanDetails,
     discography: Array.isArray(parsed.discography) ? parsed.discography : [],
     links: Array.isArray(parsed.links) ? parsed.links : [],
@@ -238,8 +239,9 @@ export const onCurationJobCreated = onDocumentCreated({
           .filter(Boolean);
 
         // Gather all artist and label nodes in the final graph (seeds, recommendations, and labels)
+        // Gather all artist and label nodes in the final graph (seeds, recommendations, and labels)
         const recommendedEntities = finalGraph.nodes
-          .filter((n: any) => n.type === 'artist' || n.type === 'label')
+          .filter((n: any) => n.type === 'artist' || n.type === 'label' || !n.type)
           .map((n: any) => ({
             id: n.id,
             name: n.label || n.id,
@@ -250,97 +252,109 @@ export const onCurationJobCreated = onDocumentCreated({
 
         const detailsCacheEntries: [string, any][] = [];
 
-        // Fetch details for each entity sequentially with 200ms delay to prevent rate limiting
-        for (let i = 0; i < recommendedEntities.length; i++) {
-          const entityObj = recommendedEntities[i];
-          const artistName = entityObj.name;
-          const artistNormId = normalizeArtistId(artistName);
-          const isLabel = entityObj.type === 'label';
+        // Fetch details in concurrency chunks of 5 to reduce 20-minute run times to under 3 minutes
+        const batchSize = 5;
+        for (let i = 0; i < recommendedEntities.length; i += batchSize) {
+          const chunk = recommendedEntities.slice(i, i + batchSize);
+          console.log(`[Curation Backend] Hydrating batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(recommendedEntities.length / batchSize)} (${chunk.length} entities)...`);
+          const chunkResults = await Promise.all(
+            chunk.map(async (entityObj, idx) => {
+              const artistName = entityObj.name;
+              const artistNormId = normalizeArtistId(artistName);
+              const isLabel = entityObj.type === 'label';
 
-          // 1. Check local Firestore Cache first
-          let details: any = null;
-          try {
-            const collName = isLabel ? "labels" : "artists";
-            const cacheDoc = await db.collection(collName).doc(artistNormId).get();
-            if (cacheDoc.exists) {
-              const cacheData = cacheDoc.data();
-              if (cacheData && cacheData.detailsCache) {
-                let cachedDetails = cacheData.detailsCache;
-                if (typeof cachedDetails === 'string') {
-                  try {
-                    cachedDetails = JSON.parse(cachedDetails);
-                  } catch (e) {}
-                }
-                
-                if (cachedDetails) {
-                  // Un-nest array wrapper layer if legacy format [ [ "name", { ... } ] ]
-                  if (Array.isArray(cachedDetails) && cachedDetails.length > 0) {
-                    const match = cachedDetails.find((item: any) => normalizeArtistId(item[0]) === artistNormId);
-                    if (match && match[1]) {
-                      cachedDetails = match[1];
-                    } else {
-                      cachedDetails = Array.isArray(cachedDetails[0]) ? cachedDetails[0][1] : cachedDetails[0];
+              // 1. Check local Firestore Cache first
+              let details: any = null;
+              try {
+                const collName = isLabel ? "labels" : "artists";
+                const cacheDoc = await db.collection(collName).doc(artistNormId).get();
+                if (cacheDoc.exists) {
+                  const cacheData = cacheDoc.data();
+                  if (cacheData && cacheData.detailsCache) {
+                    let cachedDetails = cacheData.detailsCache;
+                    if (typeof cachedDetails === 'string') {
+                      try {
+                        cachedDetails = JSON.parse(cachedDetails);
+                      } catch (e) {}
                     }
+                    
+                    if (cachedDetails) {
+                      // Un-nest array wrapper layer if legacy format [ [ "name", { ... } ] ]
+                      if (Array.isArray(cachedDetails) && cachedDetails.length > 0) {
+                        const match = cachedDetails.find((item: any) => normalizeArtistId(item[0]) === artistNormId);
+                        if (match && match[1]) {
+                          cachedDetails = match[1];
+                        } else {
+                          cachedDetails = Array.isArray(cachedDetails[0]) ? cachedDetails[0][1] : cachedDetails[0];
+                        }
+                      }
+                      
+                      if (cachedDetails && cachedDetails.summary && cachedDetails.summary.length > 50) {
+                        details = cachedDetails;
+                        console.log(`[Curation Backend] Direct cache hit for details of: ${artistNormId}`);
+                      }
+                    }
+                  }
+                }
+              } catch (cacheErr) {
+                console.warn(`[Curation Backend] Direct cache lookup failed for details of: ${artistNormId}`, cacheErr);
+              }
+
+              // 2. Fetch from Gemini if cache miss
+              if (!details) {
+                try {
+                  if (idx > 0) {
+                    // Stagger concurrent requests by 150ms to prevent rate limiting
+                    await new Promise(resolve => setTimeout(resolve, idx * 150));
+                  }
+
+                  console.log(`[Curation Backend] Cache miss. Hydrating details for ${isLabel ? 'label' : 'artist'}: ${artistName}...`);
+                  const tempNode = { id: artistName, type: entityObj.type as any, group: 1 };
+                  details = await fetchNodeDetailsBackend(tempNode, finalGraph, inputPayload.artists);
+
+                  // 3. Scrape YouTube and validate video ID (only for artists; labels do not have music videos)
+                  if (!isLabel) {
+                    if (details.youtubeVideoId) {
+                      const playable = await checkVideoPlayability(details.youtubeVideoId);
+                      if (!playable) {
+                        details.youtubeVideoId = null;
+                      }
+                    }
+                    if (!details.youtubeVideoId && details.youtubeSearchQuery) {
+                      const scrapedId = await scrapeVideoIdBackend(artistName, artistNormId);
+                      if (scrapedId) {
+                        const playable = await checkVideoPlayability(scrapedId);
+                        if (playable) {
+                          details.youtubeVideoId = scrapedId;
+                        }
+                      }
+                    }
+                  }
+
+                  if (!details.details) {
+                    details.details = { genre: "", origin: "", founded: "", notableArtists: [] };
+                  }
+                  details.details.artist = details.details.artist || artistName;
+                  if (!details.synthesisRationale) {
+                    details.synthesisRationale = `[Single-Seed Analysis]\n- Acoustic & Sonics: Resolved core musical properties and stylistic lineage.\n- Scene Context: Mapped direct influences, record label history, and geographic background.\n- Overlap Insights: Unified structural connections and surrounding chronological relationships.`;
                   }
                   
-                  if (cachedDetails && cachedDetails.summary && cachedDetails.summary.length > 50) {
-                    details = cachedDetails;
-                    console.log(`[Curation Backend] Direct cache hit for details of: ${artistNormId}`);
-                  }
-                }
-              }
-            }
-          } catch (cacheErr) {
-            console.warn(`[Curation Backend] Direct cache lookup failed for details of: ${artistNormId}`, cacheErr);
-          }
-
-          // 2. Fetch from Gemini if cache miss
-          if (!details) {
-            try {
-              if (i > 0) {
-                // 200ms rate-limit backoff delay between sequential calls
-                await new Promise(resolve => setTimeout(resolve, 200));
-              }
-
-              console.log(`[Curation Backend] Cache miss. Hydrating details for ${isLabel ? 'label' : 'artist'}: ${artistName} (${i + 1}/${recommendedEntities.length})...`);
-              const tempNode = { id: artistName, type: entityObj.type as any, group: 1 };
-              details = await fetchNodeDetailsBackend(tempNode, finalGraph, inputPayload.artists);
-
-              // 3. Scrape YouTube and validate video ID (only for artists; labels do not have music videos)
-              if (!isLabel) {
-                if (details.youtubeVideoId) {
-                  const playable = await checkVideoPlayability(details.youtubeVideoId);
-                  if (!playable) {
-                    details.youtubeVideoId = null;
-                  }
-                }
-                if (!details.youtubeVideoId && details.youtubeSearchQuery) {
-                  const scrapedId = await scrapeVideoIdBackend(artistName, artistNormId);
-                  if (scrapedId) {
-                    const playable = await checkVideoPlayability(scrapedId);
-                    if (playable) {
-                      details.youtubeVideoId = scrapedId;
-                    }
-                  }
+                  console.log(`[Curation Backend] Hydration successful for: ${artistNormId}`);
+                } catch (hydrErr) {
+                  console.error(`[Curation Backend] Hydration failed for: ${artistNormId}. Skipping entity cache write.`, hydrErr);
+                  return null;
                 }
               }
 
-              if (!details.details) {
-                details.details = { genre: "", origin: "", founded: "", notableArtists: [] };
-              }
-              details.details.artist = details.details.artist || artistName;
-              if (!details.synthesisRationale) {
-                details.synthesisRationale = `[Single-Seed Analysis]\n- Acoustic & Sonics: Resolved core musical properties and stylistic lineage.\n- Scene Context: Mapped direct influences, record label history, and geographic background.\n- Overlap Insights: Unified structural connections and surrounding chronological relationships.`;
-              }
-              
-              console.log(`[Curation Backend] Hydration successful for: ${artistNormId}`);
-            } catch (hydrErr) {
-              console.error(`[Curation Backend] Hydration failed for: ${artistNormId}. Skipping entity cache write.`, hydrErr);
-              continue;
+              return [artistName, details] as [string, any];
+            })
+          );
+
+          for (const res of chunkResults) {
+            if (res) {
+              detailsCacheEntries.push(res);
             }
           }
-
-          detailsCacheEntries.push([artistName, details]);
         }
 
         // Write-back cache entries for the seed entities (deep cache: isDeep: true)
@@ -523,24 +537,29 @@ export const onCurationJobCreated = onDocumentCreated({
             console.log(`[Curation Backend] Proactively updated detailsCache for recommendation (${collName}): ${compositeCanonicalId}`);
           }
 
-          // Create/Heal Bare Root Alias Pointer
+          // Create/Heal Bare Root Alias Pointer and replicate detailsCache for immediate short-ID resolution
           const bareArtistIdRef = db.collection(collName).doc(recNorm);
           const bareSnap = await bareArtistIdRef.get();
-          const bareData = bareSnap.exists ? bareSnap.data() : null;
 
-          if (!bareSnap.exists || (bareData && !bareData.redirectTo && bareSnap.id !== compositeCanonicalId)) {
-            await bareArtistIdRef.set({
-              cacheKey: recNorm,
-              [idFieldKey]: recNorm,
-              seedArtists: recArtist,
-              graphData: isLabel ? null : JSON.stringify({ nodes: [], links: [] }),
-              filters: {},
-              cacheVersion: 2,
-              cachedAt: FieldValue.serverTimestamp(),
-              hitCount: 0,
-              redirectTo: compositeCanonicalId
-            });
-            console.log(`[Curation Backend] Created Bare Alias Pointer in ${collName}: ${recNorm} -> ${compositeCanonicalId}`);
+          const barePayload: any = {
+            cacheKey: recNorm,
+            [idFieldKey]: recNorm,
+            seedArtists: recArtist,
+            detailsCache: isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(recDetails),
+            cacheVersion: 2,
+            cachedAt: FieldValue.serverTimestamp(),
+            redirectTo: compositeCanonicalId
+          };
+
+          if (!bareSnap.exists) {
+            barePayload.graphData = isLabel ? null : JSON.stringify({ nodes: [], links: [] });
+            barePayload.filters = {};
+            barePayload.hitCount = 0;
+            await bareArtistIdRef.set(sanitizeUndefinedProperties(barePayload));
+            console.log(`[Curation Backend] Created Bare Alias Pointer & detailsCache in ${collName}: ${recNorm} -> ${compositeCanonicalId}`);
+          } else {
+            await bareArtistIdRef.update(sanitizeUndefinedProperties(barePayload)).catch(() => {});
+            console.log(`[Curation Backend] Updated Bare Alias Pointer & detailsCache in ${collName}: ${recNorm} -> ${compositeCanonicalId}`);
           }
         }
 
@@ -566,13 +585,13 @@ export const onCurationJobCreated = onDocumentCreated({
     if (inputPayload?.projectId && jobData.userId && result?.graphData) {
       const graphObj = typeof result.graphData === 'string' ? JSON.parse(result.graphData) : result.graphData;
       const artistEntityIds = graphObj.nodes
-        ? graphObj.nodes.filter((n: any) => n.type === 'artist').map((n: any) => normalizeArtistId(n.id))
+        ? graphObj.nodes.filter((n: any) => n.type === 'artist' || !n.type).map((n: any) => normalizeArtistId(n.id))
         : [];
       const labelEntityIds = graphObj.nodes
         ? graphObj.nodes.filter((n: any) => n.type === 'label').map((n: any) => normalizeArtistId(n.id))
         : [];
       const allEntityIds = graphObj.nodes
-        ? graphObj.nodes.filter((n: any) => n.type === 'artist' || n.type === 'label').map((n: any) => normalizeArtistId(n.id))
+        ? graphObj.nodes.filter((n: any) => n.type === 'artist' || n.type === 'label' || !n.type).map((n: any) => normalizeArtistId(n.id))
         : [];
 
       await updateProjectStatus(jobData.userId, inputPayload.projectId, {

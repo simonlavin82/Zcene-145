@@ -875,6 +875,42 @@ export const parseDetailsCacheSafely = (field: any): any => {
   }
 };
 
+export const validateNodeDetailsContent = (detailsCacheField: any): boolean => {
+  if (!detailsCacheField) return false;
+  try {
+    const parsed = parseDetailsCacheSafely(detailsCacheField);
+    if (!parsed || typeof parsed !== 'object') return false;
+    if (checkIsProfileStaleOrCorrupt(parsed)) return false;
+    return true;
+  } catch (e) {
+    return false;
+  }
+};
+
+export const expandDetailsCacheMap = (entries: any): Map<string, NodeDetails> => {
+  const map = new Map<string, NodeDetails>();
+  if (!entries) return map;
+  try {
+    const rawMap = new Map<string, any>(typeof entries === 'string' ? JSON.parse(entries) : entries);
+    rawMap.forEach((v, k) => {
+      map.set(k, v);
+      if (typeof k === 'string') {
+        map.set(k.toLowerCase(), v);
+        map.set(normalizeArtistId(k), v);
+      }
+      if (v?.details?.artist && typeof v.details.artist === 'string') {
+        const name = v.details.artist;
+        map.set(name, v);
+        map.set(name.toLowerCase(), v);
+        map.set(normalizeArtistId(name), v);
+      }
+    });
+  } catch (e) {
+    console.warn("Failed to expand details cache map:", e);
+  }
+  return map;
+};
+
 const validateRootsBreakdown = (rationale?: string, isSingleArtist: boolean = false): boolean => {
   if (!rationale) return false;
   const lower = rationale.toLowerCase();
@@ -1983,6 +2019,7 @@ const App: React.FC = () => {
           origin: cachedDetails.details?.origin || "",
           founded: cachedDetails.details?.founded || "",
           name: cachedDetails.details?.artist || node.id,
+          imageUrl: cachedDetails.imageUrl || cachedDetails.image || node.imageUrl || "",
           isLibrary: true
        };
        
@@ -2053,7 +2090,13 @@ const App: React.FC = () => {
                 const detailsPayload: NodeDetails = {
                     summary: bio,
                     imageUrl,
-                    details: { artist: artistName, genre, origin, founded, notableArtists },
+                    details: {
+                        artist: artistName,
+                        genre,
+                        origin,
+                        founded,
+                        notableArtists
+                    },
                     members,
                     links,
                     discography,
@@ -2071,7 +2114,7 @@ const App: React.FC = () => {
                 const isIncomplete = checkIsProfileIncomplete(node, detailsPayload) || 
                                      isBioTooShort || 
                                      isPlaceholderBio || 
-                                     !validateCacheEntry(data, true).isFullyQualified;
+                                     !validateNodeDetailsContent(data.detailsCache);
 
                 if (isDisplayable) {
                     const hydratedNode = {
@@ -2082,7 +2125,7 @@ const App: React.FC = () => {
                         origin,
                         founded,
                         name: artistName,
-                        imageUrl,
+                        imageUrl: imageUrl || node.imageUrl || "",
                         isLibrary: true
                     };
                     
@@ -3718,14 +3761,10 @@ const App: React.FC = () => {
             controller?.signal,
             (detailsCacheJson) => {
               try {
-                const rawMap = new Map<string, any>(JSON.parse(detailsCacheJson));
+                const expandedMap = expandDetailsCacheMap(detailsCacheJson);
                 setDetailsCache(prev => {
                   const next = new Map(prev);
-                  rawMap.forEach((v, k) => {
-                    next.set(k, v);
-                    next.set(k.toLowerCase(), v);
-                    next.set(normalizeArtistId(k), v);
-                  });
+                  expandedMap.forEach((v, k) => next.set(k, v));
                   return next;
                 });
               } catch (e) {
@@ -4052,14 +4091,10 @@ const App: React.FC = () => {
           controller?.signal,
           (detailsCacheJson) => {
             try {
-              const rawMap = new Map<string, any>(JSON.parse(detailsCacheJson));
+              const expandedMap = expandDetailsCacheMap(detailsCacheJson);
               setDetailsCache(prev => {
                 const next = new Map(prev);
-                rawMap.forEach((v, k) => {
-                  next.set(k, v);
-                  next.set(k.toLowerCase(), v);
-                  next.set(normalizeArtistId(k), v);
-                });
+                expandedMap.forEach((v, k) => next.set(k, v));
                 return next;
               });
             } catch (e) {
@@ -4852,17 +4887,9 @@ const App: React.FC = () => {
 
               if (data.detailsCache) {
                 try {
-                  const rawMap = new Map<string, NodeDetails>(JSON.parse(data.detailsCache));
-                  const newCacheMap = new Map<string, NodeDetails>();
-                  rawMap.forEach((v, k) => {
-                    newCacheMap.set(k, v);
-                    newCacheMap.set(k.toLowerCase(), v);
-                    newCacheMap.set(normalizeArtistId(k), v);
-                    
-                    // Synchronously write to detailsCacheRef.current so immediate selection is safe
+                  const newCacheMap = expandDetailsCacheMap(data.detailsCache);
+                  newCacheMap.forEach((v, k) => {
                     detailsCacheRef.current.set(k, v);
-                    detailsCacheRef.current.set(k.toLowerCase(), v);
-                    detailsCacheRef.current.set(normalizeArtistId(k), v);
                   });
                   setDetailsCache((prev) => {
                     const merged = new Map(prev);
@@ -5050,13 +5077,7 @@ const App: React.FC = () => {
 
               if (legacyEntry.detailsCache) {
                 try {
-                  const rawMap = new Map<string, NodeDetails>(JSON.parse(legacyEntry.detailsCache));
-                  const newCacheMap = new Map<string, NodeDetails>();
-                  rawMap.forEach((v, k) => {
-                    newCacheMap.set(k, v);
-                    newCacheMap.set(k.toLowerCase(), v);
-                    newCacheMap.set(normalizeArtistId(k), v);
-                  });
+                  const newCacheMap = expandDetailsCacheMap(legacyEntry.detailsCache);
                   setDetailsCache((prev) => {
                     if (prev.size !== newCacheMap.size) return newCacheMap;
                     return JSON.stringify(Array.from(prev.entries())) === JSON.stringify(Array.from(newCacheMap.entries())) ? prev : newCacheMap;
@@ -5120,14 +5141,8 @@ const App: React.FC = () => {
 
             if (data.detailsCache) {
               try {
-                const rawMap = new Map<string, NodeDetails>(JSON.parse(data.detailsCache));
-                const newCacheMap = new Map<string, NodeDetails>();
-                rawMap.forEach((v, k) => {
-                  newCacheMap.set(k, v);
-                  newCacheMap.set(k.toLowerCase(), v);
-                  newCacheMap.set(normalizeArtistId(k), v);
-                  
-                  // Collect valid node IDs for the active queue
+                const newCacheMap = expandDetailsCacheMap(data.detailsCache);
+                newCacheMap.forEach((v, k) => {
                   const node = g.nodes.find((n: any) => n.id === k || n.id.toLowerCase() === k.toLowerCase() || normalizeArtistId(n.id) === normalizeArtistId(k));
                   if (node && v.summary && v.summary.trim().length > 5 && !v._isSentinel) {
                      preHydratedIds.push(node.id);
@@ -5664,7 +5679,7 @@ const App: React.FC = () => {
 
             setGraphData(g);
             setSeedArtists(data.seedArtists);
-            if (data.detailsCache) setDetailsCache(new Map(JSON.parse(data.detailsCache)));
+            if (data.detailsCache) setDetailsCache(expandDetailsCacheMap(data.detailsCache));
             await batchHydrateDetailsCache(g.nodes, g.links);
             if (data.activeNodes && Array.isArray(data.activeNodes)) {
               setActiveNodeIds(data.activeNodes);
@@ -6210,7 +6225,7 @@ const App: React.FC = () => {
                       const fallbackSnap = await getEntityDocWithRedirect(simpleId, node.type === 'label' ? 'label' : 'artist');
                       if (fallbackSnap.exists()) {
                         const data = fallbackSnap.data();
-                        if (data && data.detailsCache && validateCacheEntry(data, true).isFullyQualified) {
+                        if (data && data.detailsCache && validateNodeDetailsContent(data.detailsCache)) {
                           const parsed = parseDetailsCacheSafely(data.detailsCache);
                           const cachedOrigin = parsed?.details?.origin || parsed?.origin || '';
                           const hasMismatch = connectedCountries.length > 0 && 
@@ -6230,9 +6245,9 @@ const App: React.FC = () => {
                     if (cacheDoc.exists()) {
                        const data = cacheDoc.data();
                       if (data) {
-                         isStale = isCacheExpired(data.cachedAt) || !validateCacheEntry(data, true).isFullyQualified;
+                         isStale = isCacheExpired(data.cachedAt) || !validateNodeDetailsContent(data.detailsCache);
                       }
-                      if (data && data.detailsCache && validateCacheEntry(data, true).isFullyQualified) {
+                      if (data && data.detailsCache && validateNodeDetailsContent(data.detailsCache)) {
                          try {
                              const parsed = parseDetailsCacheSafely(data.detailsCache);
                              if (parsed && (parsed.bio || parsed.summary)) {
