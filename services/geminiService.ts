@@ -236,7 +236,7 @@ export const NODE_DETAILS_SCHEMA = {
     },
     imageUrl: {
       type: Type.STRING,
-      description: "MUST be a Wikipedia Special:FilePath URL (https://en.wikipedia.org/wiki/Special:FilePath/...). Do not use image URLs from official artist sites or third-party hosts — only Wikipedia FilePath URLs are trusted by the image pipeline."
+      description: "A direct HTTPS image URL representing the artist or label, extracted from the authoritative genre-appropriate biographical source context (e.g., Wikimedia Commons, Wikipedia, Bandcamp, Discogs, Spotify, or genre-specific archives). Under the Contextual Image Trust Rule, valid images from verified biographical sources are trusted by default."
     },
     members: {
       type: Type.ARRAY,
@@ -400,12 +400,12 @@ export const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed infor
     {{/if}}
     
     USE GOOGLE SEARCH to find:
-    1. The most accurate bio and cultural significance. Use scannability techniques:
+    1. The most accurate bio and cultural significance. You MUST dynamically adapt your search strategy to target authoritative sources and knowledge bases specific to the artist's musical genre (e.g., Resident Advisor/Beatport for electronic, DownBeat/Blue Note archives for jazz, Gramophone/publisher databases for classical, or Bandcamp/Discogs/AllMusic for independent rock/punk). Avoid single-genre biases or rigid source hierarchies. Use scannability techniques:
        - Chunking: Break information into smaller, digestible units.
        - Text Segmentation: Use short paragraphs and meaningful phrases.
        - Formatting: Use bolding for key terms and bullet points where appropriate to create white space.
        - Semantic Splitting: Group related content together by meaning.
-    2. The canonical Wikipedia Special:FilePath image URL. imageUrl MUST be a Wikipedia Special:FilePath URL (https://en.wikipedia.org/wiki/Special:FilePath/...). Do not use image URLs from official artist sites or any third-party host.
+    2. A high-quality, direct HTTPS image URL representing the artist or label. Under the Contextual Image Trust Rule, if you verify and extract biographical copy from a credible source within that genre's ecosystem, the accompanying contextual image asset is trusted by default (e.g., from Wikimedia Commons, Wikipedia, Bandcamp, Discogs, Spotify, Last.fm, or genre-specific archives). Return the full, direct HTTPS image URL without truncation.
     3. Confirmed top 3 studio albums.
     4. A verified, active YouTube video for the artist. You MUST run a dedicated search query like "[Artist Name] official music video site:youtube.com" or "[Artist Name] live performance site:youtube.com" to find a real, active video URL. Extract the 11-character video ID (e.g. from watch?v=XXXXXXXXXXX) only from verified Search results. If you cannot find a verified active video ID, or if the search results do not show the full URL, you MUST return null. Never guess or hallucinate a video ID.
     
@@ -417,7 +417,7 @@ export const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed infor
     Your task is to generate a JSON object matching this structure precisely:
     {
       "summary": "A scannable bio (approx. 100 words) using Markdown: short paragraphs, bolding for key terms, and bullet points for lists. Focus on style and significance.",
-      "imageUrl": "https://en.wikipedia.org/wiki/Special:FilePath/...",
+      "imageUrl": "https://upload.wikimedia.org/... OR https://f4.bcbits.com/...",
       "members": ["Name (Role)", ...],
       "details": {
         "genre": "The primary music genre(s) as a plain string (e.g. 'Hardcore Punk', 'Post-Hardcore', 'Metalcore'). NEVER return the literal string 'Unknown', 'N/A', or leave this empty — if grounding is inconclusive, infer the genre from the bio summary text and the connected scene context provided.",
@@ -1416,15 +1416,26 @@ export const extractValidYoutubeId = (rawUrlOrId?: string | null): string | unde
 
 export const sanitizeImageUrl = (rawUrl?: string | null, sanitizeStrFn?: (s: string) => string): string | undefined => {
   if (!rawUrl || typeof rawUrl !== 'string') return undefined;
+  if (rawUrl.includes('...')) return undefined;
   let cleaned = sanitizeStrFn ? sanitizeStrFn(rawUrl) : rawUrl;
-  cleaned = cleaned.replace(/\[\d+\]/g, '').replace(/\(\d+\)/g, '').trim();
+  cleaned = cleaned.replace(/\[\d+\]/g, '').replace(/\(\d+\)/g, '').replace(/[.,;!"']+$/g, '').trim();
   if (
-    cleaned &&
-    cleaned.startsWith('https://en.wikipedia.org/wiki/Special:FilePath/') &&
-    !cleaned.includes('...') &&
-    cleaned !== 'https://en.wikipedia.org/wiki/Special:FilePath/'
+    !cleaned ||
+    cleaned.includes('..') ||
+    cleaned.toLowerCase().includes('example.com') ||
+    cleaned.toLowerCase().includes('path/to/') ||
+    cleaned.endsWith('/Special:FilePath/') ||
+    cleaned === 'https://en.wikipedia.org/wiki/Special:FilePath/'
   ) {
-    return cleaned;
+    return undefined;
+  }
+  try {
+    const parsed = new URL(cleaned);
+    if ((parsed.protocol === 'https:' || parsed.protocol === 'http:') && parsed.pathname && parsed.pathname !== '/' && parsed.pathname.length > 1) {
+      return cleaned;
+    }
+  } catch (e) {
+    return undefined;
   }
   return undefined;
 };

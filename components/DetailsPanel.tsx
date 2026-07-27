@@ -296,28 +296,24 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
     const [chatInput, setChatInput] = useState('');
     const [isListening, setIsListening] = useState(false);
-    const [imageTier, setImageTier] = useState<'youtube' | 'wikipedia' | 'placeholder'>('wikipedia');
+    const [imageTier, setImageTier] = useState<'source' | 'placeholder'>('source');
     const [imgLoaded, setImgLoaded] = useState(false);
     const [isIdCopied, setIsIdCopied] = useState(false);
     const imgRef = useRef<HTMLImageElement>(null);
 
     const currentImageUrl = useMemo(() => {
-        if (imageTier === 'wikipedia' && details?.imageUrl) {
+        if (imageTier === 'source' && details?.imageUrl) {
             return details.imageUrl;
         }
-        if (!isLabelNode && imageTier === 'youtube' && details?.youtubeVideoId) {
-            return `https://img.youtube.com/vi/${details.youtubeVideoId}/hqdefault.jpg`;
-        }
         return null;
-    }, [imageTier, details?.youtubeVideoId, details?.imageUrl, isLabelNode]);
+    }, [imageTier, details?.imageUrl]);
 
     const availableImageTiers = useMemo(() => {
-        const tiers: ('wikipedia' | 'youtube' | 'placeholder')[] = [];
-        if (details?.imageUrl) tiers.push('wikipedia');
-        if (!isLabelNode && details?.youtubeVideoId) tiers.push('youtube');
+        const tiers: ('source' | 'placeholder')[] = [];
+        if (details?.imageUrl) tiers.push('source');
         tiers.push('placeholder');
         return tiers;
-    }, [details?.imageUrl, details?.youtubeVideoId, isLabelNode]);
+    }, [details?.imageUrl]);
     
     const [tourStatus, setTourStatus] = useState<'idle' | 'cost_warning' | 'fetching' | 'resolved_summary' | 'full_itinerary_modal'>('idle');
     const [tourDates, setTourDates] = useState<string[]>([]);
@@ -491,13 +487,11 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     useEffect(() => {
         setImgLoaded(false);
         if (details?.imageUrl) {
-            setImageTier('wikipedia');
-        } else if (!isLabelNode && details?.youtubeVideoId) {
-            setImageTier('youtube');
+            setImageTier('source');
         } else {
             setImageTier('placeholder');
         }
-    }, [node.id, isLabelNode, details?.youtubeVideoId, details?.imageUrl]);
+    }, [node.id, details?.imageUrl]);
 
     useEffect(() => {
         if (imgRef.current && imgRef.current.complete && currentImageUrl) {
@@ -507,17 +501,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
     const handleImageError = () => {
         setImgLoaded(false);
-        if (imageTier === 'wikipedia') {
-            if (!isLabelNode && details?.youtubeVideoId) {
-                setImageTier('youtube');
-            } else {
-                setImageTier('placeholder');
-            }
-        } else if (imageTier === 'youtube') {
-            setImageTier('placeholder');
-        } else {
-            setImageTier('placeholder');
-        }
+        setImageTier('placeholder');
     };
 
     useEffect(() => {

@@ -592,12 +592,13 @@ artist recommendation feels bespoke, snappy, and avoiding AI linguistic decay.
 `;
 
 const DEEP_CUT_IMAGE_PIPELINE_DOCUMENTATION = `
-The Deep Cuts image rendering engine implements a precision multi-tier sourcing hierarchy, robust URL sanitization, automated self-healing for corrupt cache entries, and a zero-clutter UI without visual source tags.
+The Deep Cuts image rendering engine implements a genre-flexible contextual sourcing hierarchy, universal URL sanitization, automated self-healing for corrupt cache entries, and a zero-clutter UI without visual source tags.
 
-1. MULTI-TIER IMAGE SOURCING & ROBUST URL SANITIZATION:
-   - Tier 1 (Primary - Canonical Wikipedia Portrait): Prioritizes canonical Wikipedia Special:FilePath photos (details.imageUrl) as the primary image source for artists. All Wikipedia URLs are validated to reject template placeholders, citations, and non-FilePath strings.
-   - Tier 2 (Secondary - YouTube Video Thumbnail): Falls back to high-resolution YouTube video thumbnails (https://img.youtube.com/vi/{videoId}/hqdefault.jpg) when Wikipedia imagery is missing or fails to load. The curation backend and client hydration pipelines implement robust regex parsing to extract 11-character video IDs from full YouTube watch URLs, short links, and embed strings.
-   - Record Label Safeguard (YouTube Exclusion): Record labels (node.type === 'label') strictly exclude YouTube video thumbnails from their tier pipeline, as promotional compilation videos often feature random stills that misrepresent the label's identity.
+1. GENRE-FLEXIBLE CONTEXTUAL SOURCING & IMAGE TRUST RULE:
+   - Dynamic Genre Ecosystem Sourcing: The curation engine dynamically adapts its search strategy to target authoritative knowledge bases specific to the artist's musical genre (e.g., Resident Advisor/Beatport for electronic, DownBeat/Blue Note archives for jazz, Gramophone for classical, or Bandcamp/Discogs for independent rock/punk), avoiding single-genre bias.
+   - Contextual Image Trust Rule: If biographical copy is verified and extracted from a credible genre source, the accompanying contextual image asset is trusted by default—bypassing restrictive Special:FilePath formatting hurdles regardless of unconventional URI structures or CDN naming conventions.
+   - Universal URL Sanitization: All image URLs across frontend proxies and backend Cloud Functions are validated via universal web URI checks (http:// or https://) while cleanly rejecting template placeholders (example.com, ...), empty strings, and search citation markers.
+   - YouTube Thumbnail Retirement: Legacy YouTube video stills (hqdefault.jpg) have been completely removed from the asset hierarchy to eliminate mismatched video frames. Missing or failed images fall back directly to our curated design-system placeholder cards.
 
 2. ZERO-CLUTTER UI & SOURCE BADGE REMOVAL:
    - Dynamic Placeholder Omission: When no valid image is available (or if all sources return network errors), the generic grey placeholder box is completely omitted from the DOM, allowing the card layout to collapse cleanly without visual filler.
