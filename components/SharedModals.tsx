@@ -290,7 +290,9 @@ export const TokenConfirmationDialog: React.FC<{
                   ? 'You are initiating a live search agent lookup to check the latest real-time tour schedules for this artist.'
                   : type === 'live_synthesis'
                     ? 'You are initiating a live music graph synthesis constrained by custom filters. This requires a fresh AI synthesis pass and cannot use standard cached entries.'
-                    : 'You are initiating a net-new AI generation flow that requires contacting the live models.'}
+                    : type === 'extension'
+                      ? 'You are expanding the spiderweb network outward from this single artist. Confirming will generate one additional AI artist node and seamlessly weave it into your active session.'
+                      : 'You are initiating a net-new AI generation flow that requires contacting the live models.'}
           </p>
           <div className="bg-zinc-900/60 p-4 border border-zinc-800 space-y-2.5">
             <div className="flex justify-between font-mono text-xs border-b border-zinc-800 pb-1.5">
@@ -941,7 +943,7 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
                 className="px-4 py-1.5 border border-zinc-700 bg-zinc-800/50 hover:bg-zinc-800 hover:border-zinc-500 text-zinc-300 hover:text-white rounded-xl font-medium text-sm flex items-center gap-2 active:scale-95 transition-all cursor-pointer"
               >
                 <span className="material-symbols-outlined !text-[16px]">search</span>
-                Not This One — Search Live AI
+                None of these
               </button>
             ) : (
               <button
@@ -1046,7 +1048,7 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
             {!isLiveAISuggestions && <span className="material-symbols-outlined !text-[16px]">search</span>}
             {isLiveAISuggestions 
               ? (overrideInput.trim() ? 'Proceed' : 'Proceed without origin')
-              : (overrideInput.trim() ? 'Synthesize with override' : 'Search Live AI')}
+              : (overrideInput.trim() ? 'Synthesize with override' : 'None of these')}
           </button>
         </footer>
       </form>

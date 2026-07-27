@@ -691,7 +691,7 @@ The Google Cloud Firestore JavaScript SDK strictly forbids properties with value
 
 #### Constitutional Rule
 
-> **Cache is always interrogated first. Every artist search passes through an explicit human-in-the-loop verification checkpoint before synthesis occurs. Accepting a candidate loads the cached record. Clicking "Search Live AI" / "Not This One..." directly resolves the modal and dispatches the live Gemini 3.1 Pro generative synthesis pipeline with cache lookup skipped (`skipCacheLookup = true`), disambiguation loop bypassed (`bypassDisambiguation = true`), and token authorization enabled (`bypassTokenConfirmation = false`). This is a binding architectural law.**
+> **Cache is always interrogated first. Every artist search passes through an explicit human-in-the-loop verification checkpoint before synthesis occurs. Accepting a candidate loads the cached record. Clicking "Search Live AI" / "None of these" directly resolves the modal and dispatches the live Gemini 3.1 Pro generative synthesis pipeline with cache lookup skipped (`skipCacheLookup = true`), disambiguation loop bypassed (`bypassDisambiguation = true`), and token authorization enabled (`bypassTokenConfirmation = false`). This is a binding architectural law.**
 
 #### State Machine & Render Matrix
 
@@ -700,8 +700,8 @@ The `DisambiguationModal` component in `SharedModals.tsx` implements 3 direct, c
 | State | Condition | Icon & Header | User Controls & Behavior |
 |---|---|---|---|
 | **State A: Cache Miss** | `candidates.length === 0` | 🧠 *Disambiguation* | "No cached records found". Buttons: `🔍 Search Live AI` -> Direct Live Synthesis; `Cancel` -> Abort. |
-| **State B: Single Candidate** | `candidates.length === 1` | 🧭 *Look What I Found* | Single candidate confirm card -> Accept cached record; `🔍 Not This One — Search Live AI` -> Direct Live Synthesis; `Cancel` -> Abort. |
-| **State C: Multiple Cached** | `candidates.length > 1` | 🧠 *Disambiguation* | List of cached candidate cards -> Accept candidate; `🔍 Not What I'm Looking For — Search Live AI` -> Direct Live Synthesis; `Cancel` -> Abort. |
+| **State B: Single Candidate** | `candidates.length === 1` | 🧭 *Look What I Found* | Single candidate confirm card -> Accept cached record; `🔍 None of these` -> Direct Live Synthesis; `Cancel` -> Abort. |
+| **State C: Multiple Cached** | `candidates.length > 1` | 🧠 *Disambiguation* | List of cached candidate cards -> Accept candidate; `🔍 None of these` -> Direct Live Synthesis; `Cancel` -> Abort. |
 
 #### Direct-Wire Pipeline (`App.tsx`)
 
@@ -711,7 +711,7 @@ The `DisambiguationModal` component in `SharedModals.tsx` implements 3 direct, c
 2. **Step 2 — Human-in-the-Loop Checkpoint:**
    `setDisambiguationDialog` mounts the modal with `candidates: cacheCandidates`:
    - **Candidate Selection:** Clicking a candidate card accepts that identity, returning `normalizeArtistId(choice)`. Duplicate cached records are deduped via `mergeAndCleanupArtists()`.
-   - **Live Synthesis Rejection:** Clicking `Search Live AI` / `Not This One...` resolves choice to `'synthesis'`.
+   - **Live Synthesis Rejection:** Clicking `Search Live AI` / `None of these` resolves choice to `'synthesis'`.
 
 3. **Step 3 — Direct Live Gemini Pro Synthesis & Rejection Constraint Injection:**
    When `choice === 'synthesis'`, the modal closes instantly. If candidate cards were rejected, STAGE 0 packages their origin and genre metadata into a **Negative Disambiguation Constraint Hint** (e.g. `[DISAMBIGUATION REJECTION CONSTRAINTS: User explicitly rejected 'I Wish I' from Italy (Screamo). Synthesize a DIFFERENT act named 'I Wish I'...]`). `handleGenerateGraph` re-invokes itself with `skipCacheLookup = true`, `bypassDisambiguation = true`, and `bypassTokenConfirmation = false`. The decoupled guard skips STAGE 0 re-entry, displays the API Token Authorization Modal, and dispatches `generateGraphData` with the negative constraint injected into Gemini 3.1 Pro system instructions.

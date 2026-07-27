@@ -2589,8 +2589,8 @@ const App: React.FC = () => {
     // Every artist search ALWAYS passes through this checkpoint.
     // The modal is shown regardless of how many cache records are found:
     //   0 candidates → "No records found" + Search Live AI + Continue
-    //   1 candidate  → "Look what I found — is this correct?" + Not this one + Continue
-    //   >1 candidates → "Multiple found — which did you mean?" + Not what I'm looking for + Continue
+    //   1 candidate  → "Look what I found — is this correct?" + None of these + Continue
+    //   >1 candidates → "Multiple found — which did you mean?" + None of these + Continue
     // ─────────────────────────────────────────────────────────────────────────────
     let resolvedArtistSeeds = [...artistList];
     let activeDisambiguationHints: Record<string, string> = disambiguationHints || {};
