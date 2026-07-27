@@ -2416,7 +2416,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     >
                                         <span className="material-symbols-outlined text-primary group-hover:scale-110 transition-transform text-2xl flex-shrink-0">check_circle</span>
                                         <div className="flex flex-col gap-0.5 min-w-0">
-                                            <span className="text-white group-hover:text-primary font-bold transition-colors text-base truncate">
+                                            <span className="text-white group-hover:text-primary font-medium transition-colors text-base truncate">
                                                 Spaced
                                             </span>
                                             <div className="flex flex-wrap gap-x-2 text-[10px] text-zinc-400 group-hover:text-zinc-300 transition-colors uppercase tracking-wider font-semibold">

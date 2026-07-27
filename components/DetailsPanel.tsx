@@ -575,19 +575,6 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                 <div className={`px-4 pt-3 pb-3 border-b border-zinc-800/50 bg-zinc-900 z-20 flex-shrink-0 ${isFullScreenMode ? 'md:px-6' : ''}`}>
                     <div className="flex flex-col gap-2 mb-2">
                         <div className="flex items-center justify-end gap-1 flex-shrink-0">
-                            {isArtistNode && !isGuest && onExtendNode && (
-                                <button
-                                    onClick={() => onExtendNode(node)}
-                                    className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 active:scale-95 leading-none text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-primary group relative"
-                                    title="Explore & expand graph outward from this artist"
-                                    aria-label="Explore & expand graph outward from this artist"
-                                >
-                                    <span className="material-symbols-outlined !text-[18px]">explore</span>
-                                    <span className="absolute top-full right-0 mt-2 px-2.5 py-1 bg-zinc-950 text-zinc-200 text-[11px] font-medium rounded-lg shadow-xl border border-zinc-800 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
-                                        Explore & expand graph outward from this artist
-                                    </span>
-                                </button>
-                            )}
                             {(isArtistNode || isLabelNode) && (
                                 <button
                                     onClick={() => onToggleStack(node, links.purchase?.[0]?.url)}
@@ -595,6 +582,15 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     title={isInStack ? "Remove from My Stack" : "Save to My Stack"}
                                 >
                                     <StackIcon className="!text-[18px]" />
+                                </button>
+                            )}
+                            {isArtistNode && !isGuest && onExtendNode && (
+                                <button
+                                    onClick={() => onExtendNode(node)}
+                                    className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 active:scale-95 leading-none text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-primary"
+                                    title="Explore & expand graph outward from this artist"
+                                >
+                                    <span className="material-symbols-outlined !text-[18px]">explore</span>
                                 </button>
                             )}
                             {isArtistNode && !isGuest && (
