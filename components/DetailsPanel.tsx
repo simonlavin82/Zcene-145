@@ -605,6 +605,10 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 </button>
                             )}
 
+                            <button onClick={onClose} className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-700 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none" title="Remove Card">
+                                    <span className="material-symbols-outlined !text-[18px]">remove</span>
+                            </button>
+
                             {(isArtistNode || isLabelNode) && details && isAdmin && (
                                 checkIsProfileIncomplete(node, details) ? (
                                     <button
@@ -624,10 +628,6 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     </button>
                                 )
                             )}
-
-                            <button onClick={onClose} className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-700 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none" title="Remove Card">
-                                    <span className="material-symbols-outlined !text-[18px]">remove</span>
-                            </button>
                         </div>
                         <div className="flex flex-col gap-1 min-w-0 flex-grow">
                             <div className="flex items-center gap-2">
