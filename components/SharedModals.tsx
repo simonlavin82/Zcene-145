@@ -290,9 +290,7 @@ export const TokenConfirmationDialog: React.FC<{
                   ? 'You are initiating a live search agent lookup to check the latest real-time tour schedules for this artist.'
                   : type === 'live_synthesis'
                     ? 'You are initiating a live music graph synthesis constrained by custom filters. This requires a fresh AI synthesis pass and cannot use standard cached entries.'
-                    : type === 'extension'
-                      ? 'You are expanding the spiderweb network outward from this single artist. Confirming will generate one additional AI artist node and seamlessly weave it into your active session.'
-                      : 'You are initiating a net-new AI generation flow that requires contacting the live models.'}
+                    : 'You are initiating a net-new AI generation flow that requires contacting the live models.'}
           </p>
           <div className="bg-zinc-900/60 p-4 border border-zinc-800 space-y-2.5">
             <div className="flex justify-between font-mono text-xs border-b border-zinc-800 pb-1.5">
@@ -1052,6 +1050,63 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
           </button>
         </footer>
       </form>
+    </div>
+  );
+};
+
+export const ExploreActionDialog: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  artistName: string;
+}> = ({ isOpen, onClose, onConfirm, artistName }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div 
+      className="fixed inset-0 bg-black/60 z-[130] flex items-center justify-center p-4 animate-fade-in-down pointer-events-auto" 
+      style={{ animationDuration: '200ms' }}
+      onClick={onClose}
+    >
+      <div 
+        className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-hidden animate-fade-in-down" 
+        style={{ animationDuration: '200ms' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary !text-[18px]">explore</span>
+            <h3 className="text-lg font-medium text-white">Explore & Expand Spiderweb</h3>
+          </div>
+          <button 
+            onClick={onClose} 
+            className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none"
+          >
+            <span className="material-symbols-outlined !text-[18px]">close</span>
+          </button>
+        </header>
+
+        <div className="p-5 text-sm text-zinc-300">
+          <p className="leading-relaxed">
+            You are expanding the spiderweb graph outward from <strong className="text-white font-semibold">{artistName}</strong>. Confirming will generate one additional AI artist node directly connecting to this artist and seamlessly weave it into your active session.
+          </p>
+        </div>
+
+        <footer className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-1.5 border border-zinc-700 hover:border-zinc-500 text-zinc-300 hover:text-white rounded-xl font-medium text-sm transition-colors active:scale-95 cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-4 py-1.5 bg-primary text-brand-black rounded-xl font-semibold text-sm active:scale-95 transition-all shadow-md hover:bg-yellow-400 cursor-pointer"
+          >
+            Continue
+          </button>
+        </footer>
+      </div>
     </div>
   );
 };

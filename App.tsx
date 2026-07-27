@@ -17,7 +17,7 @@ import HelpPage from './components/HelpPage';
 import GraphPage from './components/GraphPage';
 import HomePage from './components/HomePage';
 import Dashboard from './components/Dashboard';
-import { MyStackDialog, TokenConfirmationDialog, CacheChoiceDialog, DisambiguationCandidate } from './components/SharedModals';
+import { MyStackDialog, TokenConfirmationDialog, CacheChoiceDialog, DisambiguationCandidate, ExploreActionDialog } from './components/SharedModals';
 
 import { ShareModal } from './components/ShareModal';
 import { analyticsService } from './services/analyticsService';
@@ -1140,6 +1140,29 @@ const App: React.FC = () => {
     onSelect: (choice: string | 'synthesis' | 'cancel') => void;
     isLiveAISuggestions?: boolean;
   } | null>(null);
+  const [exploreConfirmation, setExploreConfirmation] = useState<{
+    isOpen: boolean;
+    artistName: string;
+    onConfirm: () => void;
+    onCancel: () => void;
+  } | null>(null);
+
+  const confirmExploreAction = useCallback((artistName: string) => {
+    return new Promise<boolean>((resolve) => {
+      setExploreConfirmation({
+        isOpen: true,
+        artistName,
+        onConfirm: () => {
+          setExploreConfirmation(null);
+          resolve(true);
+        },
+        onCancel: () => {
+          setExploreConfirmation(null);
+          resolve(false);
+        }
+      });
+    });
+  }, []);
 
   const confirmTokenUsage = useCallback((
     type: 'generation' | 'extension' | 'deep_cut_creation' | 'partial_synthesis' | 'cache_upgrade' | 'data_quality_optimization' | 'live_tour_search' | 'live_synthesis',
@@ -5761,10 +5784,14 @@ const App: React.FC = () => {
   const handleExtendNode = useCallback(async (node: Node) => {
     if (!graphData) return;
 
+    const artistDisplayName = node.label || titleCaseArtistId(node.id);
+    const exploreConfirmed = await confirmExploreAction(artistDisplayName);
+    if (!exploreConfirmed) return;
+
     // Restoring Immersive Discovery Flow: Bypass the cache check on node expansions
     // to force open the Cost Dialogue and dispatch a live API call upon user confirmation.
 
-    const confirmed = await confirmTokenUsage('extension', [], [node.label || titleCaseArtistId(node.id)]);
+    const confirmed = await confirmTokenUsage('extension', [], [artistDisplayName]);
     if (!confirmed) return;
 
     // 1. Mark the parent node as a seed if it's an artist
@@ -5855,7 +5882,7 @@ const App: React.FC = () => {
         };
       });
     }
-  }, [graphData, seedArtists, user, discoveryFilters, showToast, humanizeError]);
+  }, [graphData, seedArtists, user, discoveryFilters, showToast, humanizeError, confirmExploreAction, confirmTokenUsage]);
 
   const handleRemoveNode = useCallback((node: Node) => {
     setGraphData(prev => {
@@ -7053,6 +7080,13 @@ const App: React.FC = () => {
         isOpen={isShareModalOpen}
         onClose={() => setIsShareModalOpen(false)}
         shareUrl={activeShareUrl || ''}
+      />
+
+      <ExploreActionDialog
+        isOpen={!!exploreConfirmation}
+        onClose={() => exploreConfirmation?.onCancel()}
+        onConfirm={() => exploreConfirmation?.onConfirm()}
+        artistName={exploreConfirmation?.artistName || ''}
       />
 
       <TokenConfirmationDialog
