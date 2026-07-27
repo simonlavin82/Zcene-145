@@ -302,16 +302,42 @@ export const onCurationJobCreated = onDocumentCreated({
 
               // 2. Fetch from Gemini if cache miss
               if (!details) {
+                if (idx > 0) {
+                  // Stagger concurrent requests by 150ms to prevent rate limiting
+                  await new Promise(resolve => setTimeout(resolve, idx * 150));
+                }
+
+                console.log(`[Curation Backend] Cache miss. Hydrating details for ${isLabel ? 'label' : 'artist'}: ${artistName}...`);
+                const tempNode = { id: artistName, type: entityObj.type as any, group: 1 };
+
+                // Change 2 — Per-node transient retry with 2-second backoff.
+                // Only retries on transient API errors (429, 503, Resource Exhausted, Service Unavailable).
+                // Does NOT retry on JSON parse failures or schema validation errors (deterministic failures).
+                const isTransientError = (err: any): boolean => {
+                  const msg = (err?.message || String(err)).toLowerCase();
+                  return /429|503|resource.?exhausted|service.?unavailable|too many requests/i.test(msg);
+                };
+
                 try {
-                  if (idx > 0) {
-                    // Stagger concurrent requests by 150ms to prevent rate limiting
-                    await new Promise(resolve => setTimeout(resolve, idx * 150));
-                  }
-
-                  console.log(`[Curation Backend] Cache miss. Hydrating details for ${isLabel ? 'label' : 'artist'}: ${artistName}...`);
-                  const tempNode = { id: artistName, type: entityObj.type as any, group: 1 };
                   details = await fetchNodeDetailsBackend(tempNode, finalGraph, inputPayload.artists);
+                } catch (firstErr: any) {
+                  if (isTransientError(firstErr)) {
+                    console.warn(`[Curation Backend] Transient error for ${artistNormId}. Retrying in 2s...`, firstErr.message);
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    try {
+                      details = await fetchNodeDetailsBackend(tempNode, finalGraph, inputPayload.artists);
+                      console.log(`[Curation Backend] Retry succeeded for: ${artistNormId}`);
+                    } catch (retryErr: any) {
+                      console.error(`[Curation Backend] Retry also failed for: ${artistNormId}. Skipping.`, retryErr.message);
+                      return null;
+                    }
+                  } else {
+                    console.error(`[Curation Backend] Hydration failed (non-transient) for: ${artistNormId}. Skipping.`, firstErr.message);
+                    return null;
+                  }
+                }
 
+                if (details) {
                   // 3. Scrape YouTube and validate video ID (only for artists; labels do not have music videos)
                   if (!isLabel) {
                     if (details.youtubeVideoId) {
@@ -338,11 +364,8 @@ export const onCurationJobCreated = onDocumentCreated({
                   if (!details.synthesisRationale) {
                     details.synthesisRationale = `[Single-Seed Analysis]\n- Acoustic & Sonics: Resolved core musical properties and stylistic lineage.\n- Scene Context: Mapped direct influences, record label history, and geographic background.\n- Overlap Insights: Unified structural connections and surrounding chronological relationships.`;
                   }
-                  
+
                   console.log(`[Curation Backend] Hydration successful for: ${artistNormId}`);
-                } catch (hydrErr) {
-                  console.error(`[Curation Backend] Hydration failed for: ${artistNormId}. Skipping entity cache write.`, hydrErr);
-                  return null;
                 }
               }
 
@@ -355,6 +378,20 @@ export const onCurationJobCreated = onDocumentCreated({
               detailsCacheEntries.push(res);
             }
           }
+        }
+
+        // Change 3 — Hydration Completeness Audit Log.
+        // Identifies any nodes that failed hydration (null result) and logs a warning.
+        // This provides operational visibility for monitoring the zero-miss hydration mandate.
+        const failedHydrationIds = recommendedEntities
+          .filter((e: any) => !detailsCacheEntries.some(entry => isEntitySeedMatch(normalizeArtistId(e.name), entry[0])))
+          .map((e: any) => e.name);
+
+        console.log(`[Curation Backend] Hydration complete. Success: ${detailsCacheEntries.length}/${recommendedEntities.length} entities.`);
+        if (failedHydrationIds.length > 0) {
+          console.warn(`[Curation Backend] ⚠️ HYDRATION INCOMPLETE — ${failedHydrationIds.length} node(s) failed and will not be pre-cached: ${failedHydrationIds.join(', ')}`);
+        } else {
+          console.log(`[Curation Backend] ✅ All ${recommendedEntities.length} entities hydrated successfully — zero-miss compliance confirmed.`);
         }
 
         // Write-back cache entries for the seed entities (deep cache: isDeep: true)
@@ -461,6 +498,15 @@ export const onCurationJobCreated = onDocumentCreated({
 
           if (isLabel && !recDetails) {
             console.warn(`[Curation Backend] Label cache write skipped for "${recNorm}" — missing detailsCache.`);
+            continue;
+          }
+
+          // Change 1 — Symmetric artist null-guard.
+          // Prevents writing a null detailsCache to Firestore when hydration failed for this artist.
+          // Without this guard, a null details entry silently writes a null Firestore document,
+          // causing the frontend to display "DEEP CUT SYNTHESIS REQUIRED" instead of pre-hydrated content.
+          if (!isLabel && !recDetails) {
+            console.warn(`[Curation Backend] Artist cache write skipped for "${recNorm}" — missing detailsCache (hydration failed or was skipped during batch).`);
             continue;
           }
 

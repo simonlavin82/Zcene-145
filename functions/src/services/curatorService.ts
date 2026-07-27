@@ -56,15 +56,61 @@ export const sanitizeImageUrl = (rawUrl?: string | null, sanitizeStrFn?: (s: str
   ) {
     return undefined;
   }
+
+  // Two-Tier Domain-Aware Image URL Validator — Genre-Contextual Edition.
+  // Tier A: Expanded allowlist covering both Contemporary/Indie/Punk and Classical/Institutional domains.
+  //         Always accepted if URL structure is valid. Covers CDN paths that lack image file extensions.
+  // Tier B: Any domain, but path MUST contain a recognizable image extension or image-suggestive segment.
+  // Reject: Any URL that passes neither tier is discarded as potential web noise.
+  const TRUSTED_IMAGE_DOMAINS = [
+    // ── CONTEMPORARY / INDIE / ELECTRONIC / PUNK / HIP-HOP ──
+    'upload.wikimedia.org',        // Wikimedia Commons
+    'commons.wikimedia.org',
+    'f4.bcbits.com',               // Bandcamp CDN (all variants)
+    'f1.bcbits.com',
+    'f2.bcbits.com',
+    'f3.bcbits.com',
+    'i.discogs.com',               // Discogs
+    'img.discogs.com',
+    'i.scdn.co',                   // Spotify
+    'lastfm.freetls.fastly.net',   // Last.fm
+    'coverartarchive.org',         // MusicBrainz Cover Art Archive
+    'assets.bandcamp.com',
+    'cdn.allmusic.com',            // AllMusic
+    // ── CLASSICAL / ORCHESTRAL / TRADITIONAL / JAZZ / OPERA ──
+    'images.hyperion-records.co.uk', // Hyperion Records (major British classical label)
+    'cdn.naxos.com',               // Naxos (world's largest classical label)
+    'www.naxos.com',
+    'images.ecmrecords.com',        // ECM Records (jazz / contemporary classical)
+    'www.ecmrecords.com',
+    'images.deutschegrammophon.com', // Deutsche Grammophon (DG)
+    'www.harmoniamundi.com',        // Harmonia Mundi (early music / baroque)
+    'images.bis.se',               // BIS Records (Nordic classical label)
+    'cdn.prestomusic.com',         // Presto Music CDN
+    'images.chandos.net',          // Chandos Records
+    'cdn.britannica.com',          // Britannica (composer & musician portraits — no ext.)
+  ];
+  const IMAGE_EXTENSIONS = /\.(jpg|jpeg|png|webp|gif|avif|bmp|tiff?)(\?|#|$)/i;
+  const IMAGE_PATH_SEGMENTS = /\/(img|image|images|photo|photos|media|assets|thumbnail|thumb|artwork)\//i;
+
   try {
     const parsed = new URL(cleaned);
-    if ((parsed.protocol === 'https:' || parsed.protocol === 'http:') && parsed.pathname && parsed.pathname !== '/' && parsed.pathname.length > 1) {
+    if (!['https:', 'http:'].includes(parsed.protocol)) return undefined;
+    if (!parsed.pathname || parsed.pathname === '/' || parsed.pathname.length <= 1) return undefined;
+
+    const host = parsed.hostname.toLowerCase();
+    const pathname = parsed.pathname;
+
+    const isFromTrustedDomain = TRUSTED_IMAGE_DOMAINS.some(d => host === d || host.endsWith(`.${d}`));
+    const looksLikeImageAsset = IMAGE_EXTENSIONS.test(pathname) || IMAGE_PATH_SEGMENTS.test(pathname);
+
+    if (isFromTrustedDomain || looksLikeImageAsset) {
       return cleaned;
     }
+    return undefined; // Neither Tier A nor Tier B — likely web noise
   } catch (e) {
     return undefined;
   }
-  return undefined;
 };
 
 export const extractCountrySlug = (originStr?: string): string => {
@@ -889,6 +935,34 @@ export const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed infor
        - Formatting: Use bolding for key terms and bullet points where appropriate to create white space.
        - Semantic Splitting: Group related content together by meaning.
     2. A high-quality, direct HTTPS image URL representing the artist or label. Under the Contextual Image Trust Rule, if you verify and extract biographical copy from a credible source within that genre's ecosystem, the accompanying contextual image asset is trusted by default (e.g., from Wikimedia Commons, Wikipedia, Bandcamp, Discogs, Spotify, Last.fm, or genre-specific archives). Return the full, direct HTTPS image URL without truncation.
+    
+    GENRE-CONTEXTUAL IMAGE SOURCING HIERARCHY (STRICTLY ENFORCED):
+    First, infer the artist's genre context from the entity name, seed artists, connected nodes, and your own knowledge. Then apply the appropriate sourcing priority:
+
+    ▸ FOR CONTEMPORARY / INDIE / ELECTRONIC / PUNK / METAL / HIP-HOP / R&B:
+      Priority 1 — Official Bandcamp artist page: band photo, header banner, or release artwork.
+      Priority 2 — Discogs artist page: press photo or release cover.
+      Priority 3 — AllMusic or Pitchfork artist entry: artist portrait or release art.
+      Priority 4 — Wikimedia Commons: if a verified artist photo exists there.
+      Priority 5 — Official label page or release page directly associated with the band.
+
+    ▸ FOR CLASSICAL / ORCHESTRAL / OPERA / EARLY MUSIC / TRADITIONAL / WORLD MUSIC:
+      Priority 1 — Wikimedia Commons: composer portrait, ensemble photo, or archival image.
+      Priority 2 — Record label catalog page (Naxos, Hyperion, Deutsche Grammophon, ECM, Harmonia Mundi, BIS, Chandos): artist photo or release cover.
+      Priority 3 — Gramophone magazine or Britannica artist entry: editorial portrait.
+      Priority 4 — Institutional archive: musicological database, national library digital collection, or publisher catalog image.
+      Priority 5 — MusicBrainz or AllMusic artist entry.
+
+    ▸ FOR JAZZ / BLUES:
+      Priority 1 — Wikimedia Commons or Blue Note/Verve/ECM label CDN.
+      Priority 2 — AllMusic or DownBeat artist entry.
+      Priority 3 — Bandcamp artist page if the artist has an independent presence.
+
+    ACCEPTED IMAGE TYPES (all genre contexts): press photos, live performance photos, official band/artist portraits, album artwork, release covers, band logos, and official band banners or headers.
+
+    FORBIDDEN IMAGE SOURCES (all genre contexts): Generic stock photo sites (Unsplash, Pexels, Shutterstock, Getty Images), news article thumbnails or decorative page headers, social media preview cards, YouTube thumbnails, unrelated landscape or nature photography, retail product listing images from general music stores where the image is incidental to a shop listing (prefer official artist/label sources over third-party retailers), or any image whose primary subject has no connection to the artist or their music.
+
+    If you cannot find ANY verified image from the priority sources above, you MUST omit imageUrl entirely (return null). An absent image is always preferable to an irrelevant or misleading one.
     3. Confirmed top 3 studio albums.
     4. A verified, active YouTube video for the artist. You MUST run a dedicated search query like "[Artist Name] official music video site:youtube.com" or "[Artist Name] live performance site:youtube.com" to find a real, active video URL. Extract the 11-character video ID (e.g. from watch?v=XXXXXXXXXXX) only from verified Search results. If you cannot find a verified active video ID, or if the search results do not show the full URL, you MUST return null. Never guess or hallucinate a video ID.
     
