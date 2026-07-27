@@ -612,6 +612,24 @@ The Deep Cuts image rendering engine implements a precision multi-tier sourcing 
    - Upward Focal Point Alignment (object-cover object-[center_25%]): Replaces default center-cropping with facial-bias positioning, aligning the focal point to the upper-mid quadrant where human heads reside in portrait photographs.
 `;
 
+const AI_PARSING_RESILIENCE_DOCUMENTATION = `
+The Zcene AI curation and client proxy pipelines implement a 4-tier defense-in-depth architecture to prevent LLM Chain-of-Thought (CoT) reasoning and raw JSON string wrapper leakage into Firestore database fields.
+
+1. ROOT-BOUND JSON EXTRACTOR (extractCleanJsonString):
+   When Google Search grounding is active, Gemini 2.5 Flash frequently emits step-by-step reasoning preambles before code blocks or trailing citations after them. Naive string checks (startsWith('\`\`\`')) fail when preceded by conversational commentary. The Root-Bound Extractor isolates markdown fences via regex and bounds root bracket depth ({/}), truncating trailing postambles exactly at root closure (depth === 0).
+
+2. STACK-BOUNDED REPAIR (repairJson):
+   When JSON responses are truncated or malformed, the stack-bounded repair loop matches opening and closing braces/brackets. Unlike naive character scanners that continue into trailing markdown or sign-offs, our repair loop terminates and breaks immediately as soon as the outer root JSON structure closes (stack.length === 0).
+
+3. ANTI-LEAKAGE PROSE GUARD & WRAPPER RESCUE:
+   In cases where Google Search grounding forces Gemini to drop JSON mode in favor of unstructured prose, the error handlers execute a Grounding Prose Fallback. To prevent raw JSON syntax wrappers ({ "summary": "..." }) or AI reasoning from being saved as band biographies:
+   - Wrapper Rescue: Detects JSON artifact prefixes ({/[ or "summary":) and regex-extracts clean bio strings.
+   - CoT Rejection: Actively rejects reasoning sentences (e.g., 'I have confirmed...', 'I will manually check...') and throws a safe formatting exception rather than writing commentary to Firestore alongside youtubeVideoId: null.
+
+4. CROSS-ENVIRONMENT SYNC:
+   This defense-in-depth parsing contract is identically enforced across client proxies (services/geminiService.ts), Cloud Functions curation jobs (functions/src/services/curatorService.ts), and Node.js server endpoints (server.js).
+`;
+
 const CONVERSATIONAL_INTELLIGENCE_DOCUMENTATION = `
 The "Consult Zcene AI" chat feature implements a zero-friction persona 
 designed for expert-friend utility.
@@ -1125,11 +1143,11 @@ const ERROR_STRATEGY_MATRIX: StrategyMatrixRow[] = [
     mitigation: "Global Error Overlay if app cannot initialise; Toast notification if transient detail fetching fails."
   },
   {
-    failureType: "Grounding JSON Mutation",
-    userImpact: "Partial artist details (no bio).",
-    component: "geminiService.ts (Prose Fallback)",
+    failureType: "Grounding JSON Mutation & CoT Leakage",
+    userImpact: "Partial artist details or CoT reasoning contamination.",
+    component: "geminiService.ts / curatorService.ts / server.js",
     persistence: "Semi-Persistent (Firestore)",
-    mitigation: "Intercepts raw prose, maps to schema, writes to database with incomplete tag. Triggers Curation incomplete Toast."
+    mitigation: "Root-Bound Extractor isolates fences; Stack-Bounded repair terminates on root close; Anti-Leakage Guard prevents unparsed JSON syntax or CoT reasoning from leaking into bio fields."
   },
   {
     failureType: "Retry Exhaustion (Sentinel)",
@@ -1572,6 +1590,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                         <CodeBlock title="Atomicity, API Gateway & Sanitization Specification" content={DATA_SYNTHESIS_PERSISTENCE_DOCUMENTATION} />
                         <CodeBlock title="Architectural Separation: Artists vs. Labels & Simultaneous Pre-Caching" content={ARCHITECTURAL_SEPARATION_DOCUMENTATION} />
                         <CodeBlock title="Cache Validation & Qualification Rules" content={CACHE_VALIDATION_DOCUMENTATION} />
+                        <CodeBlock title="AI Parsing Resilience & Anti-Leakage Defense" content={AI_PARSING_RESILIENCE_DOCUMENTATION} />
                     </section>
 
                     {/* ── CONVERSATIONAL AI ── */}

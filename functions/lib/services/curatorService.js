@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.checkVideoPlayability = exports.scrapeVideoIdBackend = exports.fetchNodeDetailsBackend = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = exports.NODE_DETAILS_SCHEMA = exports.generateGraphDataBackend = exports.GENERATE_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = exports.GRAPH_RESPONSE_SCHEMA = exports.extractArtistSubGraph = exports.normalizeGraphData = exports.buildCompositeCacheKey = exports.extractCountrySlug = exports.sanitizeImageUrl = exports.extractValidYoutubeId = exports.titleCaseArtistId = exports.normalizeArtistId = void 0;
+exports.checkVideoPlayability = exports.scrapeVideoIdBackend = exports.fetchNodeDetailsBackend = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = exports.NODE_DETAILS_SCHEMA = exports.generateGraphDataBackend = exports.GENERATE_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = exports.GRAPH_RESPONSE_SCHEMA = exports.extractCleanJsonString = exports.extractArtistSubGraph = exports.normalizeGraphData = exports.buildCompositeCacheKey = exports.extractCountrySlug = exports.sanitizeImageUrl = exports.extractValidYoutubeId = exports.titleCaseArtistId = exports.normalizeArtistId = void 0;
 const genai_1 = require("@google/genai");
 // --- UTILITIES PORTED FROM artistCacheService.ts ---
 const normalizeArtistId = (name) => name
@@ -232,7 +232,66 @@ const extractArtistSubGraph = (artistName, fullGraph, allSeeds = []) => {
     return { nodes: ownNodesMapped, links: ownLinksMapped };
 };
 exports.extractArtistSubGraph = extractArtistSubGraph;
-// --- JSON REPAIR PORTED FROM geminiService.ts ---
+// --- JSON REPAIR & CLEANING PORTED FROM geminiService.ts ---
+const extractCleanJsonString = (rawText) => {
+    if (!rawText || typeof rawText !== 'string')
+        return "";
+    let text = rawText.trim();
+    if (!text)
+        return "";
+    const match = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+    if (match && match[1]) {
+        text = match[1].trim();
+    }
+    else {
+        text = text.replace(/^```(?:json)?\n?/i, '').replace(/```$/i, '').trim();
+    }
+    const startIdx = text.search(/[{[]/);
+    if (startIdx === -1)
+        return text;
+    text = text.substring(startIdx);
+    let stack = [];
+    let inString = false;
+    let escaped = false;
+    let endIdx = -1;
+    for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        if (escaped) {
+            escaped = false;
+            continue;
+        }
+        if (char === '\\') {
+            escaped = true;
+            continue;
+        }
+        if (char === '"') {
+            inString = !inString;
+            continue;
+        }
+        if (!inString) {
+            if (char === '{' || char === '[') {
+                stack.push(char);
+            }
+            else if (char === '}' || char === ']') {
+                if (stack.length > 0) {
+                    const last = stack[stack.length - 1];
+                    if ((char === '}' && last === '{') || (char === ']' && last === '[')) {
+                        stack.pop();
+                        if (stack.length === 0) {
+                            endIdx = i;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if (endIdx !== -1) {
+        text = text.substring(0, endIdx + 1);
+    }
+    return text.trim();
+};
+exports.extractCleanJsonString = extractCleanJsonString;
 const repairJson = (json) => {
     if (!json)
         return "";
@@ -266,6 +325,10 @@ const repairJson = (json) => {
                     const last = stack[stack.length - 1];
                     if ((char === '}' && last === '{') || (char === ']' && last === '[')) {
                         stack.pop();
+                        if (stack.length === 0) {
+                            text = text.substring(0, i + 1);
+                            break;
+                        }
                     }
                 }
             }
@@ -512,10 +575,7 @@ const generateGraphDataBackend = async (artists, filters, cachedSubgraphsContext
     if (!jsonText) {
         throw new Error("The AI returned an empty response.");
     }
-    let cleanedJsonText = jsonText;
-    if (cleanedJsonText.startsWith('```')) {
-        cleanedJsonText = cleanedJsonText.replace(/^```(?:json)?\n?/i, '').replace(/```$/, '').trim();
-    }
+    const cleanedJsonText = (0, exports.extractCleanJsonString)(jsonText);
     let data;
     try {
         data = JSON.parse(cleanedJsonText);
@@ -817,10 +877,32 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint)
     if (!jsonText) {
         throw new Error("The AI returned an empty response for details.");
     }
-    let cleanedJsonText = jsonText;
-    if (cleanedJsonText.startsWith('```')) {
-        cleanedJsonText = cleanedJsonText.replace(/^```(?:json)?\n?/i, '').replace(/```$/, '').trim();
-    }
+    const cleanedJsonText = (0, exports.extractCleanJsonString)(jsonText);
+    const sanitizeBioText = (rawText) => {
+        if (!rawText || typeof rawText !== 'string')
+            return '';
+        let text = rawText.trim();
+        const match = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+        if (match && match[1]) {
+            text = match[1].trim();
+        }
+        else {
+            text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+        }
+        if (text.startsWith('{') || text.startsWith('[')) {
+            const summaryMatch = text.match(/["'](?:summary|bio|description|text)["']\s*:\s*["']([\s\S]*?)["']\s*(?:,\s*["']|\}|$)/i);
+            if (summaryMatch && summaryMatch[1]) {
+                text = summaryMatch[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\').trim();
+            }
+            else {
+                text = text.replace(/^[{[]\s*/, '').replace(/\s*[\]}]\s*$/, '').trim();
+            }
+        }
+        text = text.replace(/^(?:I have confirmed|I will manually check|I need to get|For the YouTube video|Here is the JSON|Here are the details|Note: Some details)[^.\n]*[.\n]+\s*/ig, '').trim();
+        text = text.replace(/\\n\*/g, '\n• ').replace(/\\n-/g, '\n• ').replace(/\\n\n/g, '\n\n');
+        text = text.replace(/\[\d+\]/g, '').replace(/\(\d+\)/g, '').trim();
+        return text;
+    };
     let details;
     try {
         details = JSON.parse(cleanedJsonText);
@@ -831,9 +913,13 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint)
             details = JSON.parse(repaired);
         }
         catch (repairError) {
-            if (cleanedJsonText.trim().length > 40) {
+            const rawProse = sanitizeBioText(cleanedJsonText);
+            if (rawProse.startsWith('{') || rawProse.startsWith('[') || rawProse.includes('"summary":')) {
+                throw new Error("Invalid data format from details service (unparsed JSON wrapper).");
+            }
+            if (rawProse.length > 40) {
                 details = {
-                    summary: cleanedJsonText.trim(),
+                    summary: rawProse,
                     details: { genre: "", origin: "", founded: "", notableArtists: [] },
                     links: [],
                     discography: [],
@@ -859,7 +945,7 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint)
     }));
     const hydratedDetails = {
         ...details,
-        summary: sanitizeString(details.summary || "No summary available (AI response was truncated)."),
+        summary: sanitizeBioText(details.summary || "No summary available (AI response was truncated)."),
         details: (() => {
             const d = details.details || {};
             const sanitizeMetaField = (val) => {

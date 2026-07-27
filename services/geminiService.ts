@@ -10,6 +10,74 @@ import { normalizeArtistId, extractArtistSubGraph, readArtistCacheMany, normaliz
 // --- UTILITIES ---
 
 /**
+ * Isolates and cleans JSON strings from LLM responses by:
+ * 1. Extracting fenced codeblocks (```json ... ```) to strip search grounding reasoning preambles.
+ * 2. Bounding root bracket depth to truncate trailing conversational postambles and citations.
+ */
+export const extractCleanJsonString = (rawText?: string): string => {
+    if (!rawText || typeof rawText !== 'string') return "";
+    let text = rawText.trim();
+    if (!text) return "";
+
+    // 1. Check for Markdown codeblock fences
+    const match = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+    if (match && match[1]) {
+        text = match[1].trim();
+    } else {
+        text = text.replace(/^```(?:json)?\n?/i, '').replace(/```$/i, '').trim();
+    }
+
+    // 2. Find the first occurrence of { or [
+    const startIdx = text.search(/[{[]/);
+    if (startIdx === -1) return text;
+    text = text.substring(startIdx);
+
+    // 3. Scan forward and truncate exactly when root bracket depth reaches 0
+    let stack: string[] = [];
+    let inString = false;
+    let escaped = false;
+    let endIdx = -1;
+
+    for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        if (escaped) {
+            escaped = false;
+            continue;
+        }
+        if (char === '\\') {
+            escaped = true;
+            continue;
+        }
+        if (char === '"') {
+            inString = !inString;
+            continue;
+        }
+        if (!inString) {
+            if (char === '{' || char === '[') {
+                stack.push(char);
+            } else if (char === '}' || char === ']') {
+                if (stack.length > 0) {
+                    const last = stack[stack.length - 1];
+                    if ((char === '}' && last === '{') || (char === ']' && last === '[')) {
+                        stack.pop();
+                        if (stack.length === 0) {
+                            endIdx = i;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (endIdx !== -1) {
+        text = text.substring(0, endIdx + 1);
+    }
+
+    return text.trim();
+};
+
+/**
  * Attempts to repair truncated or malformed JSON from LLM responses.
  */
 const repairJson = (json: string): string => {
@@ -46,6 +114,10 @@ const repairJson = (json: string): string => {
                     const last = stack[stack.length - 1];
                     if ((char === '}' && last === '{') || (char === ']' && last === '[')) {
                         stack.pop();
+                        if (stack.length === 0) {
+                            text = text.substring(0, i + 1);
+                            break;
+                        }
                     }
                 }
             }
@@ -788,12 +860,13 @@ Respond in strict JSON only — no prose, no markdown, no citation markers.`;
     const rawText = json?.candidates?.[0]?.content?.parts?.[0]?.text || '';
     if (!rawText) return [];
 
+    const cleanedText = extractCleanJsonString(rawText);
     let parsed: Array<{ name: string; country: string; genre: string; activeYears?: string }> = [];
     try {
-      parsed = JSON.parse(rawText);
+      parsed = JSON.parse(cleanedText);
     } catch {
       try {
-        parsed = JSON.parse(repairJson(rawText));
+        parsed = JSON.parse(repairJson(cleanedText));
       } catch {
         console.warn(`[Disambiguation Probe] JSON parse failed for "${artistName}"`);
         return [];
@@ -1019,10 +1092,7 @@ export const generateGraphData = async (
           console.warn(`AI (${currentModel}) finished with reason: ${finishReason}. Response might be truncated.`);
       }
       
-      let cleanedJsonText = jsonText.trim();
-      if (cleanedJsonText.startsWith('```')) {
-          cleanedJsonText = cleanedJsonText.replace(/^```(?:json)?\n?/i, '').replace(/```$/, '').trim();
-      }
+      const cleanedJsonText = extractCleanJsonString(jsonText);
 
       let data: GraphData;
       try {
@@ -1272,10 +1342,7 @@ export const extendGraphFromNode = async (node: Node, baseGraph: GraphData): Pro
 
   if (!jsonText) throw new Error("Empty response from AI.");
   
-  let cleanedJsonText = jsonText.trim();
-  if (cleanedJsonText.startsWith('```')) {
-    cleanedJsonText = cleanedJsonText.replace(/^```(?:json)?\n?/i, '').replace(/```$/, '').trim();
-  }
+  const cleanedJsonText = extractCleanJsonString(jsonText);
 
   try {
     return normalizeGraphData(JSON.parse(cleanedJsonText) as GraphData);
@@ -1288,6 +1355,8 @@ export const extendGraphFromNode = async (node: Node, baseGraph: GraphData): Pro
 /**
  * Sanitizes Deep Cut biography and summary text:
  * - Strips raw codeblock wrappers (```json ... ```)
+ * - Extracts summary text if wrapped in unparsed JSON ({ "summary": "..." })
+ * - Filters out Chain-of-Thought search reasoning preambles
  * - Converts raw escaped newlines (\n*) into formatted bullet points
  * - Cleans trailing Markdown symbols and citations
  */
@@ -1296,7 +1365,27 @@ export const sanitizeBioText = (rawText?: string): string => {
 
   let text = rawText.trim();
   // Strip raw codeblock fences if present
-  text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+  const match = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (match && match[1]) {
+      text = match[1].trim();
+  } else {
+      text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+  }
+
+  // If text is a raw JSON string wrapper like {"summary": "..."} or {"bio": "..."}, extract the string!
+  if (text.startsWith('{') || text.startsWith('[')) {
+      const summaryMatch = text.match(/["'](?:summary|bio|description|text)["']\s*:\s*["']([\s\S]*?)["']\s*(?:,\s*["']|\}|$)/i);
+      if (summaryMatch && summaryMatch[1]) {
+          text = summaryMatch[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\').trim();
+      }
+  }
+
+  // Filter out common Chain-of-Thought search grounding reasoning prefixes
+  let prevText;
+  do {
+      prevText = text;
+      text = text.replace(/^(?:I have confirmed|I will manually check|I will check|I need to check|I need to get|To answer your request|For the YouTube video|Here is the JSON|Here are the details|Here is the information|Note: Some details|Based on the search)[^.\n]*[.\n]+\s*/ig, '').trim();
+  } while (text !== prevText && text.length > 0);
 
   // Convert raw escaped newlines and bullets (\n* or \n-) into formatted line breaks
   text = text.replace(/\\n\*/g, '\n• ').replace(/\\n-/g, '\n• ').replace(/\\n\n/g, '\n\n');
@@ -1413,9 +1502,8 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
         throw new Error("Empty response from AI details service.");
     }
 
-    // Extract JSON payload using regex codeblock extractor (handles preamble text gracefully)
-    const codeblockMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-    let cleanedJsonText = codeblockMatch ? codeblockMatch[1].trim() : jsonText.replace(/^```(?:json)?\n?/i, '').replace(/```$/, '').trim();
+    // Extract JSON payload using root-bound codeblock extractor (handles preamble and postamble text gracefully)
+    const cleanedJsonText = extractCleanJsonString(jsonText);
 
     let details: NodeDetails;
     try {
@@ -1437,6 +1525,10 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
             // valid NodeDetails so the queue can write to detailsCache and stop
             // re-queueing instead of throwing a terminal format exception.
             const rawProse = sanitizeBioText(cleanedJsonText);
+            // Anti-Leakage Guard: Never treat raw JSON syntax wrappers or CoT reasoning as bio prose!
+            if (rawProse.startsWith('{') || rawProse.startsWith('[') || rawProse.includes('":') || rawProse.includes('": ')) {
+                throw new Error(`Failed to parse AI details JSON (rejected unparsed JSON wrapper in prose fallback).`);
+            }
             if (rawProse.length > 40) {
                 console.warn(
                     `[Deep Cut Parse] JSON repair failed — response appears to be grounding prose (${rawProse.length} chars). ` +

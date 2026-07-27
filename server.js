@@ -35,6 +35,66 @@ if (!GEMINI_API_KEY) {
   console.warn("WARNING: GEMINI_API_KEY is not set in the environment. The API proxy will likely fail.");
 }
 
+const extractCleanJsonString = (rawText) => {
+  if (!rawText || typeof rawText !== 'string') return "";
+  let text = rawText.trim();
+  if (!text) return "";
+
+  const match = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (match && match[1]) {
+    text = match[1].trim();
+  } else {
+    text = text.replace(/^```(?:json)?\n?/i, '').replace(/```$/i, '').trim();
+  }
+
+  const startIdx = text.search(/[{[]/);
+  if (startIdx === -1) return text;
+  text = text.substring(startIdx);
+
+  let stack = [];
+  let inString = false;
+  let escaped = false;
+  let endIdx = -1;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === '\\') {
+      escaped = true;
+      continue;
+    }
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (!inString) {
+      if (char === '{' || char === '[') {
+        stack.push(char);
+      } else if (char === '}' || char === ']') {
+        if (stack.length > 0) {
+          const last = stack[stack.length - 1];
+          if ((char === '}' && last === '{') || (char === ']' && last === '[')) {
+            stack.pop();
+            if (stack.length === 0) {
+              endIdx = i;
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (endIdx !== -1) {
+    text = text.substring(0, endIdx + 1);
+  }
+
+  return text.trim();
+};
+
 // Proxy all requests starting with /api/gemini/ to the Google GenAI API
 app.all('/api/gemini/*wildcard', async (req, res) => {
   const headers = { ...req.headers };
@@ -539,11 +599,8 @@ async function triggerReSynthesis(artistId, originalData, collectionName = 'arti
       throw new Error("No text candidate returned from Gemini");
     }
 
-    let cleanText = candidateText.trim();
-    if (cleanText.startsWith('```')) {
-      cleanText = cleanText.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
-    }
-    const synthesizedDetails = JSON.parse(cleanText.trim());
+    const cleanText = extractCleanJsonString(candidateText);
+    const synthesizedDetails = JSON.parse(cleanText);
     
     const sanitizeString = (str) => {
       if (typeof str !== 'string') return "";
@@ -824,7 +881,8 @@ If you cannot find a clear YouTube video ID for this artist, return null for the
       return res.json({ youtubeVideoId: null });
     }
 
-    const scraped = JSON.parse(candidateText.trim());
+    const cleanCandidateText = extractCleanJsonString(candidateText);
+    const scraped = JSON.parse(cleanCandidateText);
     let videoId = scraped.youtubeVideoId;
     if (typeof videoId === 'string') {
       const cleaned = videoId.replace(/['"`]/g, '').trim();
