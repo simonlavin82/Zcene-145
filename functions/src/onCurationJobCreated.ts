@@ -313,7 +313,8 @@ export const onCurationJobCreated = onDocumentCreated({
                   if (!playable) {
                     details.youtubeVideoId = null;
                   }
-                } else if (details.youtubeSearchQuery) {
+                }
+                if (!details.youtubeVideoId && details.youtubeSearchQuery) {
                   const scrapedId = await scrapeVideoIdBackend(artistName, artistNormId);
                   if (scrapedId) {
                     const playable = await checkVideoPlayability(scrapedId);
@@ -334,15 +335,8 @@ export const onCurationJobCreated = onDocumentCreated({
               
               console.log(`[Curation Backend] Hydration successful for: ${artistNormId}`);
             } catch (hydrErr) {
-              console.error(`[Curation Backend] Hydration failed for: ${artistNormId}. Using sentinel fallback.`, hydrErr);
-              details = {
-                summary: `Failed to curate details for ${artistName}.`,
-                details: { artist: artistName, genre: "", origin: "", founded: "", notableArtists: [] },
-                members: [],
-                links: [],
-                discography: [],
-                recommendationReason: "",
-              };
+              console.error(`[Curation Backend] Hydration failed for: ${artistNormId}. Skipping entity cache write.`, hydrErr);
+              continue;
             }
           }
 

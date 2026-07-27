@@ -825,7 +825,22 @@ If you cannot find a clear YouTube video ID for this artist, return null for the
     }
 
     const scraped = JSON.parse(candidateText.trim());
-    const videoId = scraped.youtubeVideoId;
+    let videoId = scraped.youtubeVideoId;
+    if (typeof videoId === 'string') {
+      const cleaned = videoId.replace(/['"`]/g, '').trim();
+      const vMatch = cleaned.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+      const shortMatch = cleaned.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+      const embedMatch = cleaned.match(/embed\/([a-zA-Z0-9_-]{11})/);
+      if (vMatch) videoId = vMatch[1];
+      else if (shortMatch) videoId = shortMatch[1];
+      else if (embedMatch) videoId = embedMatch[1];
+      else if (!/^[a-zA-Z0-9_-]{11}$/.test(cleaned)) {
+        const anyMatch = cleaned.match(/(?:v=|youtu\.be\/|embed\/|^)([a-zA-Z0-9_-]{11})(?:[&/?]|$)|\b([a-zA-Z0-9_-]{11})\b/);
+        videoId = anyMatch ? (anyMatch[1] || anyMatch[2]) : null;
+      } else {
+        videoId = cleaned;
+      }
+    }
 
     // Resolve redirect if present (up to 3 redirects)
     let targetId = artistId;

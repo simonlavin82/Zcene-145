@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.checkVideoPlayability = exports.scrapeVideoIdBackend = exports.fetchNodeDetailsBackend = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = exports.NODE_DETAILS_SCHEMA = exports.generateGraphDataBackend = exports.GENERATE_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = exports.GRAPH_RESPONSE_SCHEMA = exports.extractArtistSubGraph = exports.normalizeGraphData = exports.buildCompositeCacheKey = exports.extractCountrySlug = exports.titleCaseArtistId = exports.normalizeArtistId = void 0;
+exports.checkVideoPlayability = exports.scrapeVideoIdBackend = exports.fetchNodeDetailsBackend = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = exports.NODE_DETAILS_SCHEMA = exports.generateGraphDataBackend = exports.GENERATE_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = exports.GRAPH_RESPONSE_SCHEMA = exports.extractArtistSubGraph = exports.normalizeGraphData = exports.buildCompositeCacheKey = exports.extractCountrySlug = exports.sanitizeImageUrl = exports.extractValidYoutubeId = exports.titleCaseArtistId = exports.normalizeArtistId = void 0;
 const genai_1 = require("@google/genai");
 // --- UTILITIES PORTED FROM artistCacheService.ts ---
 const normalizeArtistId = (name) => name
@@ -23,6 +23,42 @@ const titleCaseArtistId = (id) => {
         .join(' ');
 };
 exports.titleCaseArtistId = titleCaseArtistId;
+const extractValidYoutubeId = (rawUrlOrId) => {
+    if (!rawUrlOrId || typeof rawUrlOrId !== 'string')
+        return undefined;
+    const cleaned = rawUrlOrId.replace(/['"`]/g, '').trim();
+    if (!cleaned || cleaned.toLowerCase() === 'null' || cleaned.toLowerCase() === 'undefined')
+        return undefined;
+    const vMatch = cleaned.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+    const shortMatch = cleaned.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+    const embedMatch = cleaned.match(/embed\/([a-zA-Z0-9_-]{11})/);
+    if (vMatch)
+        return vMatch[1];
+    if (shortMatch)
+        return shortMatch[1];
+    if (embedMatch)
+        return embedMatch[1];
+    if (/^[a-zA-Z0-9_-]{11}$/.test(cleaned))
+        return cleaned;
+    const anyMatch = cleaned.match(/(?:v=|youtu\.be\/|embed\/|^)([a-zA-Z0-9_-]{11})(?:[&/?]|$)|\b([a-zA-Z0-9_-]{11})\b/);
+    const cand = anyMatch ? (anyMatch[1] || anyMatch[2]) : undefined;
+    return cand && cand.length === 11 ? cand : undefined;
+};
+exports.extractValidYoutubeId = extractValidYoutubeId;
+const sanitizeImageUrl = (rawUrl, sanitizeStrFn) => {
+    if (!rawUrl || typeof rawUrl !== 'string')
+        return undefined;
+    let cleaned = sanitizeStrFn ? sanitizeStrFn(rawUrl) : rawUrl;
+    cleaned = cleaned.replace(/\[\d+\]/g, '').replace(/\(\d+\)/g, '').trim();
+    if (cleaned &&
+        cleaned.startsWith('https://en.wikipedia.org/wiki/Special:FilePath/') &&
+        !cleaned.includes('...') &&
+        cleaned !== 'https://en.wikipedia.org/wiki/Special:FilePath/') {
+        return cleaned;
+    }
+    return undefined;
+};
+exports.sanitizeImageUrl = sanitizeImageUrl;
 const extractCountrySlug = (originStr) => {
     if (!originStr || typeof originStr !== 'string' || originStr.trim().length === 0) {
         return 'global';
@@ -849,9 +885,8 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint)
         })),
         members: (details.members || []).map(sanitizeString),
         recommendationReason: sanitizeString(details.recommendationReason || ""),
-        youtubeVideoId: typeof details.youtubeVideoId === 'string' && details.youtubeVideoId.trim().length === 11
-            ? details.youtubeVideoId.trim()
-            : undefined,
+        youtubeVideoId: (0, exports.extractValidYoutubeId)(details.youtubeVideoId),
+        imageUrl: (0, exports.sanitizeImageUrl)(details.imageUrl, sanitizeString),
         youtubeSearchQuery: typeof details.youtubeSearchQuery === 'string' && details.youtubeSearchQuery.trim().length > 0
             ? sanitizeString(details.youtubeSearchQuery.trim())
             : undefined,
@@ -894,11 +929,8 @@ Look at the top organic YouTube video in search results. Extract its 11-characte
         const text = response.text?.trim();
         if (!text)
             return null;
-        let cleaned = text.replace(/['"`]/g, '').trim();
-        if (cleaned.toLowerCase() === 'null')
-            return null;
-        const match = cleaned.match(/([a-zA-Z0-9_-]{11})/);
-        return match ? match[1] : null;
+        const id = (0, exports.extractValidYoutubeId)(text);
+        return id || null;
     }
     catch (err) {
         console.error(`[scrapeVideoIdBackend] Scrape failed for ${artistName}:`, err);

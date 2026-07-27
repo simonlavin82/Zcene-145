@@ -689,27 +689,6 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 {isManualAdd && <span className="text-[10px] font-semibold uppercase tracking-[0.2em] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 border border-emerald-500/30 rounded-md">Manual</span>}
                                 {isAiSuggestion && <span className="text-[10px] font-semibold uppercase tracking-[0.2em] bg-purple-500/20 text-purple-400 px-2 py-0.5 border border-purple-500/30 flex items-center gap-1 rounded-md"><span className="material-symbols-outlined !text-[12px]">star</span>AI</span>}
                                 {isLibraryArtist && <span className="text-[10px] font-semibold uppercase tracking-[0.2em] bg-sky-500/20 text-sky-400 px-2 py-0.5 border border-sky-500/30 rounded-md">Library</span>}
-                                {availableImageTiers.length > 1 && (
-                                    <button
-                                        onClick={() => {
-                                            const nextIdx = (availableImageTiers.indexOf(imageTier) + 1) % availableImageTiers.length;
-                                            setImageTier(availableImageTiers[nextIdx]);
-                                        }}
-                                        className={`text-[10px] font-semibold uppercase tracking-[0.15em] px-2 py-0.5 border rounded-md flex items-center gap-1 transition-all duration-200 cursor-pointer select-none ${
-                                            imageTier === 'wikipedia' 
-                                                ? 'bg-purple-500/20 text-purple-300 border-purple-500/40 hover:bg-purple-500/30 hover:border-purple-500' 
-                                                : imageTier === 'youtube' 
-                                                ? 'bg-red-500/20 text-red-300 border-red-500/40 hover:bg-red-500/30 hover:border-red-500' 
-                                                : 'bg-zinc-800/80 text-zinc-400 border-zinc-700/50 hover:bg-zinc-700 hover:text-white'
-                                        }`}
-                                        title="Click to switch image source (Wikipedia / YouTube / Hidden)"
-                                    >
-                                        <span className="material-symbols-outlined !text-[12px]">
-                                            {imageTier === 'wikipedia' ? 'photo_library' : imageTier === 'youtube' ? 'smart_display' : 'visibility_off'}
-                                        </span>
-                                        <span>{imageTier === 'wikipedia' ? 'Wiki Photo' : imageTier === 'youtube' ? 'YouTube Still' : 'No Image'}</span>
-                                    </button>
-                                )}
                             </div>
                         </div>
                     </div>
@@ -875,24 +854,6 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                         onLoad={() => setImgLoaded(true)}
                                         onError={handleImageError}
                                     />
-
-                                    {/* Interactive Source Switcher (Visible inside container when image is shown) */}
-                                    {availableImageTiers.length > 1 && (
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                const nextIdx = (availableImageTiers.indexOf(imageTier) + 1) % availableImageTiers.length;
-                                                setImageTier(availableImageTiers[nextIdx]);
-                                            }}
-                                            className="absolute top-2 right-2 z-30 px-2.5 py-1 rounded-lg bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-700/50 hover:border-zinc-500 flex items-center gap-1.5 text-[10px] font-medium text-zinc-300 hover:text-white transition-all duration-200 backdrop-blur-md shadow-lg"
-                                            title="Cycle Image Source / Hide"
-                                        >
-                                            <span className="material-symbols-outlined !text-[14px] text-purple-400">
-                                                {imageTier === 'wikipedia' ? 'photo_library' : 'smart_display'}
-                                            </span>
-                                            <span>{imageTier === 'wikipedia' ? 'Wiki Photo' : 'YouTube Still'}</span>
-                                        </button>
-                                    )}
                                 </div>
                             )}
 

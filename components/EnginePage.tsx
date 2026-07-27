@@ -592,18 +592,22 @@ artist recommendation feels bespoke, snappy, and avoiding AI linguistic decay.
 `;
 
 const DEEP_CUT_IMAGE_PIPELINE_DOCUMENTATION = `
-The Deep Cuts image rendering engine implements a precision multi-tier sourcing hierarchy, entity-specific safeguard filters, and dynamic interactive source switching to guarantee visual accuracy and zero UI clutter.
+The Deep Cuts image rendering engine implements a precision multi-tier sourcing hierarchy, robust URL sanitization, automated self-healing for corrupt cache entries, and a zero-clutter UI without visual source tags.
 
-1. MULTI-TIER IMAGE SOURCING & FALLBACK HIERARCHY (DetailsPanel.tsx):
-   - Tier 1 (Primary - Canonical Wikipedia Portrait): Prioritizes canonical Wikipedia Special:FilePath photos (details.imageUrl) as the primary image source for artists. This ensures encyclopedic, human-centric band portraits and studio shots appear first, avoiding noisy generic video stills.
-   - Tier 2 (Secondary - YouTube Video Thumbnail): Falls back to high-resolution YouTube video thumbnails (https://img.youtube.com/vi/{videoId}/hqdefault.jpg) only if Wikipedia imagery is missing or fails to load.
-   - Record Label Safeguard (YouTube Exclusion): Record labels (node.type === 'label') strictly exclude YouTube video thumbnails from their tier pipeline, as promotional compilation videos often feature random band stills that misrepresent the label's corporate identity. Labels use canonical logos/artwork or fall back directly to zero-clutter omission.
+1. MULTI-TIER IMAGE SOURCING & ROBUST URL SANITIZATION:
+   - Tier 1 (Primary - Canonical Wikipedia Portrait): Prioritizes canonical Wikipedia Special:FilePath photos (details.imageUrl) as the primary image source for artists. All Wikipedia URLs are validated to reject template placeholders, citations, and non-FilePath strings.
+   - Tier 2 (Secondary - YouTube Video Thumbnail): Falls back to high-resolution YouTube video thumbnails (https://img.youtube.com/vi/{videoId}/hqdefault.jpg) when Wikipedia imagery is missing or fails to load. The curation backend and client hydration pipelines implement robust regex parsing to extract 11-character video IDs from full YouTube watch URLs, short links, and embed strings.
+   - Record Label Safeguard (YouTube Exclusion): Record labels (node.type === 'label') strictly exclude YouTube video thumbnails from their tier pipeline, as promotional compilation videos often feature random stills that misrepresent the label's identity.
 
-2. ZERO-CLUTTER PLACEHOLDER OMISSION & INTERACTIVE SOURCE SWITCHING:
-   - Dynamic Placeholder Omission: When no valid image is available (or if all sources return network errors), the generic grey placeholder box is completely omitted from the DOM, allowing the card layout to collapse cleanly without clunky visual filler.
-   - Interactive Source Switcher & Tag Controls: Cards with multiple available image sources render an interactive source toggle in the header badge row and floating on the image box. Users and admins can seamlessly cycle between Wikipedia Photo, YouTube Still, and Image Hidden on the fly.
+2. ZERO-CLUTTER UI & SOURCE BADGE REMOVAL:
+   - Dynamic Placeholder Omission: When no valid image is available (or if all sources return network errors), the generic grey placeholder box is completely omitted from the DOM, allowing the card layout to collapse cleanly without visual filler.
+   - Zero Source Attribution Badges: To maintain a clean, immersive user experience, text-based source attribution tags (such as 'Wiki Photo' or 'YouTube Still') and interactive source switcher buttons have been completely removed from both the card header badges and floating image overlays.
 
-3. CONTAINER SIZING & PORTRAIT FRAMING RULES:
+3. AUTONOMOUS SELF-HEALING & QUEUE REVALIDATION:
+   - Sentinel Cache Detection: The client cache validation engine (checkIsProfileStaleOrCorrupt) detects corrupt cache states and sentinel failure records (such as 'Failed to curate details for...').
+   - Queue Revalidation: When the background deep cut queue encounters a corrupt or sentinel entry, it actively triggers asynchronous background revalidation (triggerBackgroundRevalidation) to heal the record in Firestore without blocking the UI.
+
+4. CONTAINER SIZING & PORTRAIT FRAMING RULES:
    - Standardized 16:9 Widescreen Wrapper (aspect-video): Locks the image container to a consistent widescreen ratio across all card stacks, eliminating awkward letterboxing or layout shifts.
    - Upward Focal Point Alignment (object-cover object-[center_25%]): Replaces default center-cropping with facial-bias positioning, aligning the focal point to the upper-mid quadrant where human heads reside in portrait photographs.
 `;

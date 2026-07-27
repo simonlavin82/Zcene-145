@@ -48,6 +48,7 @@ const checkIsProfileStaleOrCorrupt = (details: any): boolean => {
   if (!summary || summary.trim() === "") return true;
   if (summary.length < 100) return true;
   if (summary.toLowerCase().includes('sandbox mock') || summary.toLowerCase().includes('test scenarios')) return true;
+  if (summary.toLowerCase().includes('failed to curate')) return true;
   if (summary.includes('{{') || summary.includes('}}')) return true;
 
   // Images and metadata (genre/origin) missing/unknown are best-effort only — they do NOT trigger autonomous re-synthesis.
@@ -6286,7 +6287,12 @@ const App: React.FC = () => {
                      triggerBackgroundRevalidation(node, disambiguatedCacheId);
                    }
                 } else {
-                   console.log(`[Queue] Node ${node.id} requires synthesis. The background queue does not perform automated live synthesis. Skipping API fetch.`);
+                   if (fallbackDetails) {
+                     console.log(`[Queue] Node ${node.id} cache entry is corrupt or sentinel. Triggering background revalidation...`);
+                     triggerBackgroundRevalidation(node, disambiguatedCacheId);
+                   } else {
+                     console.log(`[Queue] Node ${node.id} requires synthesis. The background queue does not perform automated live synthesis. Skipping API fetch.`);
+                   }
                    fetchingNodeIdsRef.current.delete(node.id);
                    fetchingNodeIdsRef.current.delete(node.id.toLowerCase());
                    fetchingNodeIdsRef.current.delete(disambiguatedCacheId);

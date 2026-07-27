@@ -1307,6 +1307,39 @@ export const sanitizeBioText = (rawText?: string): string => {
   return text;
 };
 
+export const extractValidYoutubeId = (rawUrlOrId?: string | null): string | undefined => {
+  if (!rawUrlOrId || typeof rawUrlOrId !== 'string') return undefined;
+  const cleaned = rawUrlOrId.replace(/['"`]/g, '').trim();
+  if (!cleaned || cleaned.toLowerCase() === 'null' || cleaned.toLowerCase() === 'undefined') return undefined;
+
+  const vMatch = cleaned.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+  const shortMatch = cleaned.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+  const embedMatch = cleaned.match(/embed\/([a-zA-Z0-9_-]{11})/);
+  if (vMatch) return vMatch[1];
+  if (shortMatch) return shortMatch[1];
+  if (embedMatch) return embedMatch[1];
+  if (/^[a-zA-Z0-9_-]{11}$/.test(cleaned)) return cleaned;
+
+  const anyMatch = cleaned.match(/(?:v=|youtu\.be\/|embed\/|^)([a-zA-Z0-9_-]{11})(?:[&/?]|$)|\b([a-zA-Z0-9_-]{11})\b/);
+  const cand = anyMatch ? (anyMatch[1] || anyMatch[2]) : undefined;
+  return cand && cand.length === 11 ? cand : undefined;
+};
+
+export const sanitizeImageUrl = (rawUrl?: string | null, sanitizeStrFn?: (s: string) => string): string | undefined => {
+  if (!rawUrl || typeof rawUrl !== 'string') return undefined;
+  let cleaned = sanitizeStrFn ? sanitizeStrFn(rawUrl) : rawUrl;
+  cleaned = cleaned.replace(/\[\d+\]/g, '').replace(/\(\d+\)/g, '').trim();
+  if (
+    cleaned &&
+    cleaned.startsWith('https://en.wikipedia.org/wiki/Special:FilePath/') &&
+    !cleaned.includes('...') &&
+    cleaned !== 'https://en.wikipedia.org/wiki/Special:FilePath/'
+  ) {
+    return cleaned;
+  }
+  return undefined;
+};
+
 export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArtists: string, originHint?: string | null): Promise<NodeDetails> => {
     if (isLocal) {
         return generateMockNodeDetails(node);
@@ -1481,9 +1514,20 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
         recommendationReason: sanitizeString(details.recommendationReason || ""),
     };
 
-    if (typeof details.youtubeVideoId === 'string' && details.youtubeVideoId.trim().length === 11) {
-        hydratedDetails.youtubeVideoId = details.youtubeVideoId.trim();
+    const validImageUrl = sanitizeImageUrl(details.imageUrl, sanitizeString);
+    if (validImageUrl) {
+        hydratedDetails.imageUrl = validImageUrl;
+    } else {
+        delete hydratedDetails.imageUrl;
     }
+
+    const validYtId = extractValidYoutubeId(details.youtubeVideoId);
+    if (validYtId) {
+        hydratedDetails.youtubeVideoId = validYtId;
+    } else {
+        delete hydratedDetails.youtubeVideoId;
+    }
+
     if (typeof details.youtubeSearchQuery === 'string' && details.youtubeSearchQuery.trim().length > 0) {
         hydratedDetails.youtubeSearchQuery = sanitizeString(details.youtubeSearchQuery.trim());
     }
