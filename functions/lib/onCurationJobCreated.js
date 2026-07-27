@@ -36,13 +36,13 @@ function validateArtistDetailsSchema(artistId, details) {
         throw new Error(`[Schema Sanity Check] detailsCache.details is missing or invalid for artist: ${artistId}`);
     }
     const { genre, origin, founded } = details.details;
-    if (!genre || typeof genre !== 'string' || genre.trim().length === 0) {
+    if (genre === undefined || genre === null || typeof genre !== 'string') {
         throw new Error(`[Schema Sanity Check] detailsCache.details is missing genre for artist: ${artistId}`);
     }
-    if (!origin || typeof origin !== 'string' || origin.trim().length === 0) {
+    if (origin === undefined || origin === null || typeof origin !== 'string') {
         throw new Error(`[Schema Sanity Check] detailsCache.details is missing origin for artist: ${artistId}`);
     }
-    if (!founded || typeof founded !== 'string' || founded.trim().length === 0) {
+    if (founded === undefined || founded === null || typeof founded !== 'string') {
         throw new Error(`[Schema Sanity Check] detailsCache.details is missing founded year for artist: ${artistId}`);
     }
     // Verify discography
@@ -415,7 +415,7 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                     const idFieldKey = isLabel ? "labelId" : "artistId";
                     // Run Sanity Check — non-fatal: log and skip this recommendation's cache write rather than aborting the entire job
                     try {
-                        if (!isLabel) {
+                        if (!isLabel && recDetails) {
                             validateArtistDetailsSchema(recNorm, recDetails);
                         }
                     }

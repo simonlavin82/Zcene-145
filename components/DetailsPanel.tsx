@@ -291,22 +291,33 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         return !!(details && details.summary && details.summary.trim().length > 5 && !details._isSentinel);
     }, [details]);
 
+    const isArtistNode = node.type === 'artist';
+    const isLabelNode = node.type === 'label';
+
     const [chatInput, setChatInput] = useState('');
     const [isListening, setIsListening] = useState(false);
-    const [imageTier, setImageTier] = useState<'youtube' | 'wikipedia' | 'placeholder'>('youtube');
+    const [imageTier, setImageTier] = useState<'youtube' | 'wikipedia' | 'placeholder'>('wikipedia');
     const [imgLoaded, setImgLoaded] = useState(false);
     const [isIdCopied, setIsIdCopied] = useState(false);
     const imgRef = useRef<HTMLImageElement>(null);
 
     const currentImageUrl = useMemo(() => {
-        if (imageTier === 'youtube' && details?.youtubeVideoId) {
-            return `https://img.youtube.com/vi/${details.youtubeVideoId}/hqdefault.jpg`;
-        }
         if (imageTier === 'wikipedia' && details?.imageUrl) {
             return details.imageUrl;
         }
+        if (!isLabelNode && imageTier === 'youtube' && details?.youtubeVideoId) {
+            return `https://img.youtube.com/vi/${details.youtubeVideoId}/hqdefault.jpg`;
+        }
         return null;
-    }, [imageTier, details?.youtubeVideoId, details?.imageUrl]);
+    }, [imageTier, details?.youtubeVideoId, details?.imageUrl, isLabelNode]);
+
+    const availableImageTiers = useMemo(() => {
+        const tiers: ('wikipedia' | 'youtube' | 'placeholder')[] = [];
+        if (details?.imageUrl) tiers.push('wikipedia');
+        if (!isLabelNode && details?.youtubeVideoId) tiers.push('youtube');
+        tiers.push('placeholder');
+        return tiers;
+    }, [details?.imageUrl, details?.youtubeVideoId, isLabelNode]);
     
     const [tourStatus, setTourStatus] = useState<'idle' | 'cost_warning' | 'fetching' | 'resolved_summary' | 'full_itinerary_modal'>('idle');
     const [tourDates, setTourDates] = useState<string[]>([]);
@@ -387,8 +398,6 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
     const libraryArtistSet = useMemo(() => new Set(libraryArtists.map(a => normalizeArtistId(a))), [libraryArtists]);
 
-    const isArtistNode = node.type === 'artist';
-    const isLabelNode = node.type === 'label';
     const normalizedArtistNodeId = isArtistNode ? normalizeArtistId(node.id) : '';
 
     const isLibraryArtist = isArtistNode && libraryArtistSet.has(normalizedArtistNodeId);
@@ -481,14 +490,14 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
     useEffect(() => {
         setImgLoaded(false);
-        if (details?.youtubeVideoId) {
-            setImageTier('youtube');
-        } else if (details?.imageUrl) {
+        if (details?.imageUrl) {
             setImageTier('wikipedia');
+        } else if (!isLabelNode && details?.youtubeVideoId) {
+            setImageTier('youtube');
         } else {
             setImageTier('placeholder');
         }
-    }, [node.id, details?.youtubeVideoId, details?.imageUrl]);
+    }, [node.id, isLabelNode, details?.youtubeVideoId, details?.imageUrl]);
 
     useEffect(() => {
         if (imgRef.current && imgRef.current.complete && currentImageUrl) {
@@ -498,12 +507,14 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
     const handleImageError = () => {
         setImgLoaded(false);
-        if (imageTier === 'youtube') {
-            if (details?.imageUrl) {
-                setImageTier('wikipedia');
+        if (imageTier === 'wikipedia') {
+            if (!isLabelNode && details?.youtubeVideoId) {
+                setImageTier('youtube');
             } else {
                 setImageTier('placeholder');
             }
+        } else if (imageTier === 'youtube') {
+            setImageTier('placeholder');
         } else {
             setImageTier('placeholder');
         }
@@ -678,6 +689,27 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 {isManualAdd && <span className="text-[10px] font-semibold uppercase tracking-[0.2em] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 border border-emerald-500/30 rounded-md">Manual</span>}
                                 {isAiSuggestion && <span className="text-[10px] font-semibold uppercase tracking-[0.2em] bg-purple-500/20 text-purple-400 px-2 py-0.5 border border-purple-500/30 flex items-center gap-1 rounded-md"><span className="material-symbols-outlined !text-[12px]">star</span>AI</span>}
                                 {isLibraryArtist && <span className="text-[10px] font-semibold uppercase tracking-[0.2em] bg-sky-500/20 text-sky-400 px-2 py-0.5 border border-sky-500/30 rounded-md">Library</span>}
+                                {availableImageTiers.length > 1 && (
+                                    <button
+                                        onClick={() => {
+                                            const nextIdx = (availableImageTiers.indexOf(imageTier) + 1) % availableImageTiers.length;
+                                            setImageTier(availableImageTiers[nextIdx]);
+                                        }}
+                                        className={`text-[10px] font-semibold uppercase tracking-[0.15em] px-2 py-0.5 border rounded-md flex items-center gap-1 transition-all duration-200 cursor-pointer select-none ${
+                                            imageTier === 'wikipedia' 
+                                                ? 'bg-purple-500/20 text-purple-300 border-purple-500/40 hover:bg-purple-500/30 hover:border-purple-500' 
+                                                : imageTier === 'youtube' 
+                                                ? 'bg-red-500/20 text-red-300 border-red-500/40 hover:bg-red-500/30 hover:border-red-500' 
+                                                : 'bg-zinc-800/80 text-zinc-400 border-zinc-700/50 hover:bg-zinc-700 hover:text-white'
+                                        }`}
+                                        title="Click to switch image source (Wikipedia / YouTube / Hidden)"
+                                    >
+                                        <span className="material-symbols-outlined !text-[12px]">
+                                            {imageTier === 'wikipedia' ? 'photo_library' : imageTier === 'youtube' ? 'smart_display' : 'visibility_off'}
+                                        </span>
+                                        <span>{imageTier === 'wikipedia' ? 'Wiki Photo' : imageTier === 'youtube' ? 'YouTube Still' : 'No Image'}</span>
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -810,36 +842,31 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 </div>
                             )}
 
-                            <div className="aspect-video w-full bg-zinc-900 overflow-hidden relative border border-zinc-800/50 shadow-2xl rounded-lg group">
-                                {/* Design-System Fallback Placeholder / Background */}
-                                {(imageTier === 'placeholder' || !imgLoaded || !currentImageUrl) && (
-                                    <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center p-6 text-center bg-zinc-900 overflow-hidden">
-                                        <img 
-                                            src={isLabelNode 
-                                                ? "https://storage.googleapis.com/zcene-prod-assets/Deep%20Cut%20background.png"
-                                                : "https://storage.googleapis.com/zcene-prod-assets/Artist%20background.png"
-                                            }
-                                            alt="Background" 
-                                            className="absolute inset-0 w-full h-full object-cover opacity-30 filter blur-sm scale-105 transition-transform duration-1000 group-hover:scale-100" 
-                                        />
-                                        <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-900/60 to-transparent" />
-                                        <div className="relative z-10 flex flex-col items-center justify-center space-y-2">
-                                            <div className="w-12 h-12 rounded-full bg-zinc-800/80 border border-zinc-700/50 flex items-center justify-center shadow-lg backdrop-blur-sm group-hover:border-purple-500/50 transition-colors duration-500">
-                                                <span className="material-symbols-outlined text-zinc-400 group-hover:text-purple-400 transition-colors duration-500 text-2xl">
-                                                    {isLabelNode ? 'album' : 'music_note'}
-                                                </span>
+                            {imageTier !== 'placeholder' && currentImageUrl && (
+                                <div className="aspect-video w-full bg-zinc-900 overflow-hidden relative border border-zinc-800/50 shadow-2xl rounded-lg group">
+                                    {/* Temporary Loading Skeleton while image loads */}
+                                    {!imgLoaded && (
+                                        <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center p-6 text-center bg-zinc-900 overflow-hidden">
+                                            <img 
+                                                src={isLabelNode 
+                                                    ? "https://storage.googleapis.com/zcene-prod-assets/Deep%20Cut%20background.png"
+                                                    : "https://storage.googleapis.com/zcene-prod-assets/Artist%20background.png"
+                                                }
+                                                alt="Background" 
+                                                className="absolute inset-0 w-full h-full object-cover opacity-30 filter blur-sm scale-105 transition-transform duration-1000 group-hover:scale-100" 
+                                            />
+                                            <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-900/60 to-transparent" />
+                                            <div className="relative z-10 flex flex-col items-center justify-center space-y-2">
+                                                <div className="w-12 h-12 rounded-full bg-zinc-800/80 border border-zinc-700/50 flex items-center justify-center shadow-lg backdrop-blur-sm group-hover:border-purple-500/50 transition-colors duration-500">
+                                                    <span className="material-symbols-outlined text-zinc-400 group-hover:text-purple-400 transition-colors duration-500 text-2xl">
+                                                        {isLabelNode ? 'album' : 'music_note'}
+                                                    </span>
+                                                </div>
                                             </div>
-                                            {(imageTier === 'placeholder' || !currentImageUrl) && (
-                                                <p className="text-xs font-medium text-zinc-400 uppercase tracking-widest px-3 py-1 rounded-full bg-zinc-800/50 border border-zinc-700/30 backdrop-blur-xs">
-                                                    {getArtistDisplayName(details, node)}
-                                                </p>
-                                            )}
                                         </div>
-                                    </div>
-                                )}
+                                    )}
 
-                                {/* Primary / Secondary Image */}
-                                {currentImageUrl && imageTier !== 'placeholder' && (
+                                    {/* Primary / Secondary Image */}
                                     <img 
                                         ref={imgRef}
                                         src={currentImageUrl} 
@@ -848,8 +875,26 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                         onLoad={() => setImgLoaded(true)}
                                         onError={handleImageError}
                                     />
-                                )}
-                            </div>
+
+                                    {/* Interactive Source Switcher (Visible inside container when image is shown) */}
+                                    {availableImageTiers.length > 1 && (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                const nextIdx = (availableImageTiers.indexOf(imageTier) + 1) % availableImageTiers.length;
+                                                setImageTier(availableImageTiers[nextIdx]);
+                                            }}
+                                            className="absolute top-2 right-2 z-30 px-2.5 py-1 rounded-lg bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-700/50 hover:border-zinc-500 flex items-center gap-1.5 text-[10px] font-medium text-zinc-300 hover:text-white transition-all duration-200 backdrop-blur-md shadow-lg"
+                                            title="Cycle Image Source / Hide"
+                                        >
+                                            <span className="material-symbols-outlined !text-[14px] text-purple-400">
+                                                {imageTier === 'wikipedia' ? 'photo_library' : 'smart_display'}
+                                            </span>
+                                            <span>{imageTier === 'wikipedia' ? 'Wiki Photo' : 'YouTube Still'}</span>
+                                        </button>
+                                    )}
+                                </div>
+                            )}
 
                             {(() => {
                                 const hasInsight = details.recommendationReason &&

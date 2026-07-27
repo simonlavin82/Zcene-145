@@ -592,16 +592,20 @@ artist recommendation feels bespoke, snappy, and avoiding AI linguistic decay.
 `;
 
 const DEEP_CUT_IMAGE_PIPELINE_DOCUMENTATION = `
-The Deep Cuts image rendering engine implements a resilient multi-tier sourcing hierarchy and standardized container cropping rules to ensure consistent visual presentation across card stacks.
+The Deep Cuts image rendering engine implements a precision multi-tier sourcing hierarchy, entity-specific safeguard filters, and dynamic interactive source switching to guarantee visual accuracy and zero UI clutter.
 
-1. MULTI-TIER IMAGE SOURCING & FALLBACKS (DetailsPanel.tsx):
-   - Tier 1 (Primary): Standardized high-resolution YouTube video thumbnails (https://img.youtube.com/vi/{videoId}/hqdefault.jpg) sourced from verified youtubeVideoId. This ensures crisp widescreen imagery aligned with the primary playback media.
-   - Tier 2 (Secondary / Backup): Canonical Wikipedia images (details.imageUrl) used if YouTube assets are missing or if the primary thumbnail returns a network error/404 during load.
-   - Tier 3 (Tertiary): Design-system gradient placeholder container displaying official Google Cloud Storage background assets (Deep Cut background.png or Artist background.png) blurred under a sleek gradient overlay, paired with a glowing frosted glass icon badge and artist/label display name.
+1. MULTI-TIER IMAGE SOURCING & FALLBACK HIERARCHY (DetailsPanel.tsx):
+   - Tier 1 (Primary - Canonical Wikipedia Portrait): Prioritizes canonical Wikipedia Special:FilePath photos (details.imageUrl) as the primary image source for artists. This ensures encyclopedic, human-centric band portraits and studio shots appear first, avoiding noisy generic video stills.
+   - Tier 2 (Secondary - YouTube Video Thumbnail): Falls back to high-resolution YouTube video thumbnails (https://img.youtube.com/vi/{videoId}/hqdefault.jpg) only if Wikipedia imagery is missing or fails to load.
+   - Record Label Safeguard (YouTube Exclusion): Record labels (node.type === 'label') strictly exclude YouTube video thumbnails from their tier pipeline, as promotional compilation videos often feature random band stills that misrepresent the label's corporate identity. Labels use canonical logos/artwork or fall back directly to zero-clutter omission.
 
-2. CONTAINER SIZING & PORTRAIT FRAMING RULES:
-   - Standardized 16:9 Widescreen Wrapper (aspect-video): Locks the image container to a consistent widescreen ratio across all card stacks, eliminating awkward letterboxing or layout shifts when transitioning between artists.
-   - Upward Focal Point Alignment (object-cover object-[center_25%]): Replaces default center-cropping with facial-bias positioning. This aligns the focal point to the upper-mid quadrant where human heads and faces reside in portrait photographs and band shots, ensuring natural framing without chopping off heads at the top.
+2. ZERO-CLUTTER PLACEHOLDER OMISSION & INTERACTIVE SOURCE SWITCHING:
+   - Dynamic Placeholder Omission: When no valid image is available (or if all sources return network errors), the generic grey placeholder box is completely omitted from the DOM, allowing the card layout to collapse cleanly without clunky visual filler.
+   - Interactive Source Switcher & Tag Controls: Cards with multiple available image sources render an interactive source toggle in the header badge row and floating on the image box. Users and admins can seamlessly cycle between Wikipedia Photo, YouTube Still, and Image Hidden on the fly.
+
+3. CONTAINER SIZING & PORTRAIT FRAMING RULES:
+   - Standardized 16:9 Widescreen Wrapper (aspect-video): Locks the image container to a consistent widescreen ratio across all card stacks, eliminating awkward letterboxing or layout shifts.
+   - Upward Focal Point Alignment (object-cover object-[center_25%]): Replaces default center-cropping with facial-bias positioning, aligning the focal point to the upper-mid quadrant where human heads reside in portrait photographs.
 `;
 
 const CONVERSATIONAL_INTELLIGENCE_DOCUMENTATION = `
