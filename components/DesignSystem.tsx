@@ -2403,6 +2403,34 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                 </div>
                             </div>
+
+                            <div className="pt-8 border-t border-zinc-800">
+                                <h3 className="text-xl font-medium text-zinc-200 mb-4">Interactive Candidate Card (Disambiguation Pattern)</h3>
+                                <p className="text-sm text-zinc-400 mb-6 leading-relaxed max-w-3xl">
+                                    Used inside search disambiguation dialogs when presenting an instant cache hit or live AI verified entity. Features a refined thin primary border (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 rounded border border-zinc-800">border border-primary/80</code>) with a soft focus glow (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 rounded border border-zinc-800">shadow-[0_0_15px_rgba(246,228,104,0.15)]</code>) that intensifies on hover, ensuring frictionless hero selection without visual heaviness.
+                                </p>
+                                <div className="max-w-md bg-zinc-950 p-6 rounded-xl border border-zinc-800">
+                                    <button
+                                        type="button"
+                                        className="w-full text-left p-5 bg-zinc-900 hover:bg-primary/10 border border-primary/80 hover:border-primary transition-all duration-200 flex items-center gap-4 group rounded-xl shadow-[0_0_15px_rgba(246,228,104,0.15)] hover:shadow-[0_0_20px_rgba(246,228,104,0.25)] cursor-pointer"
+                                    >
+                                        <span className="material-symbols-outlined text-primary group-hover:scale-110 transition-transform text-2xl flex-shrink-0">check_circle</span>
+                                        <div className="flex flex-col gap-0.5 min-w-0">
+                                            <span className="text-white group-hover:text-primary font-bold transition-colors text-base truncate">
+                                                Spaced
+                                            </span>
+                                            <div className="flex flex-wrap gap-x-2 text-[10px] text-zinc-400 group-hover:text-zinc-300 transition-colors uppercase tracking-wider font-semibold">
+                                                <span>BUFFALO, USA</span>
+                                                <span>•</span>
+                                                <span>HARDCORE PUNK</span>
+                                            </div>
+                                        </div>
+                                        <span className="material-symbols-outlined text-primary transition-transform group-hover:translate-x-1 text-[16px] ml-auto flex-shrink-0">
+                                            arrow_forward_ios
+                                        </span>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </section>
 
@@ -2918,7 +2946,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <p className="text-sm text-zinc-400 leading-relaxed">
                                             <strong>Trigger:</strong> Click 2 (desktop) or Tap 2 (mobile) on the already peeked node (or Deep Cut pagination selection).
                                             <br /><br />
-                                            <strong>Behavior:</strong> Automatically dismisses/hides the floating hover box to reduce visual clutter and opens the sidebar Details Panel (which now houses the primary <code>Explore</code> button with a compass icon and node removal controls in its header, keeping the spiderweb canvas pristine). All 1st-degree yellow connection lines remain illuminated to maintain visual context.
+                                            <strong>Behavior:</strong> Automatically dismisses/hides the floating hover box to reduce visual clutter and opens the sidebar Details Panel (which now houses the standard square <code>Explore</code> icon button with a compass icon and node removal controls in its header, keeping the spiderweb canvas pristine). All 1st-degree yellow connection lines remain illuminated to maintain visual context.
                                         </p>
                                     </div>
                                 </div>

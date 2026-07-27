@@ -899,7 +899,7 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
             <button
               type="button"
               onClick={() => onSelect(cand.id)}
-              className="w-full text-left p-5 bg-zinc-900 hover:bg-primary/10 border-2 border-primary/80 hover:border-primary transition-all duration-200 flex items-center gap-4 group rounded-xl shadow-lg cursor-pointer"
+              className="w-full text-left p-5 bg-zinc-900 hover:bg-primary/10 border border-primary/80 hover:border-primary transition-all duration-200 flex items-center gap-4 group rounded-xl shadow-[0_0_15px_rgba(246,228,104,0.15)] hover:shadow-[0_0_20px_rgba(246,228,104,0.25)] cursor-pointer"
             >
               <span className="material-symbols-outlined text-primary group-hover:scale-110 transition-transform text-2xl flex-shrink-0">check_circle</span>
               <div className="flex flex-col gap-0.5 min-w-0">

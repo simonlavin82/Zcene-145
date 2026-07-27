@@ -751,7 +751,7 @@ This section documents the cross-platform unified interaction design implemented
 2.  **State 2: Action Gateway (Secondary Interaction):**
     *   **Trigger:** A second click or tap on the already peeked node (or selecting an item from pagination).
     *   **State configuration:** `setSelectedNode(node)` is called, and `peekedNode` resets to `null`.
-    *   **Visual cues:** The floating hover box is automatically dismissed to prevent overlap and clear graph canvas clutter. The sidebar Details Panel mounts, housing the primary `Explore` button with a compass icon and node removal controls in its header, keeping the spiderweb canvas pristine.
+    *   **Visual cues:** The floating hover box is automatically dismissed to prevent overlap and clear graph canvas clutter. The sidebar Details Panel mounts, housing the standard square `Explore` icon button with a compass icon and node removal controls in its header, keeping the spiderweb canvas pristine.
     *   **Persistent Highlights (Sticky Connections):** The yellow connection lines highlighted during State 1 remain fully illuminated and visible throughout State 2 to prevent visual fragmentation on both mobile and desktop screens.
 
 ### 10.2 Mouseleave Locking & Event Safeguards
@@ -766,7 +766,7 @@ This section documents the cross-platform unified interaction design implemented
     ```
     If the node is currently in the Peek or Action State, the clear action is completely bypassed, forcing the hover container to stay locked to the node.
 *   **Transient Hover Restorations:** If a user hovers over a peer node `n2` while node `d` is pinned, the UI transiently updates to show `n2`'s connections and hover box. Once the cursor leaves `n2`, the `clearNodeHover` callback executes and detects that `d` is still peeked or selected, calling `triggerNodeHover(d)` to restore the pinned highlights instantly.
-*   **Smart Quota Cancel State Preservation:** If the user enters the Action state and triggers the Token Quota Warning but chooses to cancel, the graph does **not** reset to the Peek State. The node remains in the Action State (State 2) with the `Explore` button and sidebar details card visible, allowing the user to easily click it again.
+*   **Smart Quota Cancel State Preservation:** If the user enters the Action state and triggers the Token Quota Warning but chooses to cancel, the graph does **not** reset to the Peek State. The node remains in the Action State (State 2) with the `Explore` icon button and sidebar details card visible, allowing the user to easily click it again.
 
 ### 10.3 Deep Cut Pagination Bypass
 

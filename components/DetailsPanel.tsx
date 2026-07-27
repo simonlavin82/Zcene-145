@@ -578,11 +578,14 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             {isArtistNode && !isGuest && onExtendNode && (
                                 <button
                                     onClick={() => onExtendNode(node)}
-                                    className="h-8 px-3 bg-primary text-brand-black rounded-xl flex items-center justify-center gap-1.5 shadow-sm font-bold transition-all duration-200 hover:opacity-90 active:scale-95 leading-none mr-auto"
-                                    title="Explore related artists in Spiderweb"
+                                    className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 active:scale-95 leading-none text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-primary group relative"
+                                    title="Explore & expand graph outward from this artist"
+                                    aria-label="Explore & expand graph outward from this artist"
                                 >
                                     <span className="material-symbols-outlined !text-[18px]">explore</span>
-                                    <span className="text-[10px] font-bold tracking-wider uppercase select-none">Explore</span>
+                                    <span className="absolute top-full right-0 mt-2 px-2.5 py-1 bg-zinc-950 text-zinc-200 text-[11px] font-medium rounded-lg shadow-xl border border-zinc-800 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                                        Explore & expand graph outward from this artist
+                                    </span>
                                 </button>
                             )}
                             {(isArtistNode || isLabelNode) && (
