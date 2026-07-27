@@ -591,6 +591,19 @@ artist recommendation feels bespoke, snappy, and avoiding AI linguistic decay.
    the music itself.
 `;
 
+const DEEP_CUT_IMAGE_PIPELINE_DOCUMENTATION = `
+The Deep Cuts image rendering engine implements a resilient multi-tier sourcing hierarchy and standardized container cropping rules to ensure consistent visual presentation across card stacks.
+
+1. MULTI-TIER IMAGE SOURCING & FALLBACKS (DetailsPanel.tsx):
+   - Tier 1 (Primary): Standardized high-resolution YouTube video thumbnails (https://img.youtube.com/vi/{videoId}/hqdefault.jpg) sourced from verified youtubeVideoId. This ensures crisp widescreen imagery aligned with the primary playback media.
+   - Tier 2 (Secondary / Backup): Canonical Wikipedia images (details.imageUrl) used if YouTube assets are missing or if the primary thumbnail returns a network error/404 during load.
+   - Tier 3 (Tertiary): Design-system gradient placeholder container displaying official Google Cloud Storage background assets (Deep Cut background.png or Artist background.png) blurred under a sleek gradient overlay, paired with a glowing frosted glass icon badge and artist/label display name.
+
+2. CONTAINER SIZING & PORTRAIT FRAMING RULES:
+   - Standardized 16:9 Widescreen Wrapper (aspect-video): Locks the image container to a consistent widescreen ratio across all card stacks, eliminating awkward letterboxing or layout shifts when transitioning between artists.
+   - Upward Focal Point Alignment (object-cover object-[center_25%]): Replaces default center-cropping with facial-bias positioning. This aligns the focal point to the upper-mid quadrant where human heads and faces reside in portrait photographs and band shots, ensuring natural framing without chopping off heads at the top.
+`;
+
 const CONVERSATIONAL_INTELLIGENCE_DOCUMENTATION = `
 The "Consult Zcene AI" chat feature implements a zero-friction persona 
 designed for expert-friend utility.
@@ -1540,6 +1553,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                     <section id="deep-cut-details">
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">Deep Cut Details</h2>
                         <CodeBlock title="Lexical Hardening & Persona" content={DEEP_CUT_INTELLIGENCE_DOCUMENTATION} />
+                        <CodeBlock title="Image Pipeline & Rendering Rules" content={DEEP_CUT_IMAGE_PIPELINE_DOCUMENTATION} />
                         <CodeBlock title="Fetch Details Prompt" content={FETCH_NODE_DETAILS_PROMPT_TEMPLATE} />
                         <CodeBlock title="Node Details Schema" content={NODE_DETAILS_SCHEMA} isJson />
                     </section>

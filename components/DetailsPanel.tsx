@@ -293,10 +293,20 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
     const [chatInput, setChatInput] = useState('');
     const [isListening, setIsListening] = useState(false);
-    const [imageError, setImageError] = useState(false);
+    const [imageTier, setImageTier] = useState<'youtube' | 'wikipedia' | 'placeholder'>('youtube');
     const [imgLoaded, setImgLoaded] = useState(false);
     const [isIdCopied, setIsIdCopied] = useState(false);
     const imgRef = useRef<HTMLImageElement>(null);
+
+    const currentImageUrl = useMemo(() => {
+        if (imageTier === 'youtube' && details?.youtubeVideoId) {
+            return `https://img.youtube.com/vi/${details.youtubeVideoId}/hqdefault.jpg`;
+        }
+        if (imageTier === 'wikipedia' && details?.imageUrl) {
+            return details.imageUrl;
+        }
+        return null;
+    }, [imageTier, details?.youtubeVideoId, details?.imageUrl]);
     
     const [tourStatus, setTourStatus] = useState<'idle' | 'cost_warning' | 'fetching' | 'resolved_summary' | 'full_itinerary_modal'>('idle');
     const [tourDates, setTourDates] = useState<string[]>([]);
@@ -470,15 +480,34 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
 
     useEffect(() => {
-        setImageError(false);
         setImgLoaded(false);
-    }, [node.id, details?.imageUrl]);
+        if (details?.youtubeVideoId) {
+            setImageTier('youtube');
+        } else if (details?.imageUrl) {
+            setImageTier('wikipedia');
+        } else {
+            setImageTier('placeholder');
+        }
+    }, [node.id, details?.youtubeVideoId, details?.imageUrl]);
 
     useEffect(() => {
-        if (imgRef.current && imgRef.current.complete) {
+        if (imgRef.current && imgRef.current.complete && currentImageUrl) {
             setImgLoaded(true);
         }
-    }, [details?.imageUrl]);
+    }, [currentImageUrl]);
+
+    const handleImageError = () => {
+        setImgLoaded(false);
+        if (imageTier === 'youtube') {
+            if (details?.imageUrl) {
+                setImageTier('wikipedia');
+            } else {
+                setImageTier('placeholder');
+            }
+        } else {
+            setImageTier('placeholder');
+        }
+    };
 
     useEffect(() => {
       if (chatHistory.length > 0 && (chatHistory.length > prevHistoryLength.current || isChatLoading)) {
@@ -781,18 +810,46 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 </div>
                             )}
 
-                            {details.imageUrl && !imageError && (
-                                <div className={`aspect-video w-full bg-zinc-800 overflow-hidden relative border border-zinc-800/50 shadow-2xl transition-opacity duration-700 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}>
+                            <div className="aspect-video w-full bg-zinc-900 overflow-hidden relative border border-zinc-800/50 shadow-2xl rounded-lg group">
+                                {/* Design-System Fallback Placeholder / Background */}
+                                {(imageTier === 'placeholder' || !imgLoaded || !currentImageUrl) && (
+                                    <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center p-6 text-center bg-zinc-900 overflow-hidden">
+                                        <img 
+                                            src={isLabelNode 
+                                                ? "https://storage.googleapis.com/zcene-prod-assets/Deep%20Cut%20background.png"
+                                                : "https://storage.googleapis.com/zcene-prod-assets/Artist%20background.png"
+                                            }
+                                            alt="Background" 
+                                            className="absolute inset-0 w-full h-full object-cover opacity-30 filter blur-sm scale-105 transition-transform duration-1000 group-hover:scale-100" 
+                                        />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-900/60 to-transparent" />
+                                        <div className="relative z-10 flex flex-col items-center justify-center space-y-2">
+                                            <div className="w-12 h-12 rounded-full bg-zinc-800/80 border border-zinc-700/50 flex items-center justify-center shadow-lg backdrop-blur-sm group-hover:border-purple-500/50 transition-colors duration-500">
+                                                <span className="material-symbols-outlined text-zinc-400 group-hover:text-purple-400 transition-colors duration-500 text-2xl">
+                                                    {isLabelNode ? 'album' : 'music_note'}
+                                                </span>
+                                            </div>
+                                            {(imageTier === 'placeholder' || !currentImageUrl) && (
+                                                <p className="text-xs font-medium text-zinc-400 uppercase tracking-widest px-3 py-1 rounded-full bg-zinc-800/50 border border-zinc-700/30 backdrop-blur-xs">
+                                                    {getArtistDisplayName(details, node)}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Primary / Secondary Image */}
+                                {currentImageUrl && imageTier !== 'placeholder' && (
                                     <img 
                                         ref={imgRef}
-                                        src={details.imageUrl} 
+                                        src={currentImageUrl} 
                                         alt={getArtistDisplayName(details, node)} 
-                                        className="w-full h-full object-cover scale-105 hover:scale-100 transition-transform duration-1000"
+                                        className={`absolute inset-0 w-full h-full object-cover object-[center_25%] scale-105 group-hover:scale-100 transition-all duration-1000 ${imgLoaded ? 'opacity-100 z-20' : 'opacity-0 z-0'}`}
                                         onLoad={() => setImgLoaded(true)}
-                                        onError={() => setImageError(true)}
+                                        onError={handleImageError}
                                     />
-                                </div>
-                            )}
+                                )}
+                            </div>
 
                             {(() => {
                                 const hasInsight = details.recommendationReason &&
