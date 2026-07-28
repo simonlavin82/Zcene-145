@@ -1,0 +1,30 @@
+2026-07-28T20:53:31.451671Z ? oncurationjobcreated: [Curation Backend] Cache miss. Hydrating details for label: Convulse Records...
+
+2026-07-28T20:53:32.458960Z ? oncurationjobcreated: [Curation Backend] Cache miss. Hydrating details for label: Triple B Records...
+
+2026-07-28T20:54:03.705879Z ? oncurationjobcreated: [Curation Backend] Hydration successful for: convulse-records
+
+2026-07-28T20:54:07.881871Z ? oncurationjobcreated: [Curation Backend] Hydration successful for: flatspot-records
+
+2026-07-28T20:54:28.452145Z ? oncurationjobcreated: [Curation Backend] Hydration successful for: triple-b-records
+
+2026-07-28T20:54:28.453615Z ? oncurationjobcreated: [Curation Backend] Hydration complete. Success: 13/13 entities.
+
+2026-07-28T20:54:28.453968Z ? oncurationjobcreated: [Curation Backend] ✅ All 13 entities hydrated successfully — zero-miss compliance confirmed.
+
+2026-07-28T20:54:28.529260Z ? oncurationjobcreated: [Curation Backend] Wrote DEEP global cache for seed (artists): spaced-united-states
+
+2026-07-28T20:54:28.633467Z ? oncurationjobcreated: [Curation Backend] Created Bare Alias Pointer in artists: spaced -> spaced-united-states
+
+2026-07-28T20:54:28.800006Z ? oncurationjobcreated: [Curation Backend] Proactively created DEEP entry for recommendation (artists): buggin-united-states
+
+2026-07-28T20:54:28.916194Z ? oncurationjobcreated: [Curation Backend] Created Bare Alias Pointer & detailsCache in artists: buggin -> buggin-united-states
+
+2026-07-28T20:54:29.033449Z ? oncurationjobcreated: [Curation Backend] Proactively created DEEP entry for recommendation (artists): scowl-united-states
+
+2026-07-28T20:54:29.160596Z ? oncurationjobcreated: [Curation Backend] Created Bare Alias Pointer & detailsCache in artists: scowl -> scowl-united-states
+
+2026-07-28T20:54:29.259089Z ? oncurationjobcreated: [Curation Backend] Proactively created DEEP entry for recommendation (artists): gel-united-states
+
+2026-07-28T20:54:29.388411Z ? oncurationjobcreated: [Curation Backend] Created Bare Alias Pointer & detailsCache in artists: gel -> gel-united-states
+

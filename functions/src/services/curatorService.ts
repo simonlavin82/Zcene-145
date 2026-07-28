@@ -576,7 +576,7 @@ Follow these rules precisely:
 1.  CANONICAL NAMING: For ALL nodes, use the canonical, professional spelling and capitalization as recognized by the music industry. For example, use "Radiohead" even if the seed provided was "radiohead", and "blink-182" with a lowercase 'b' and hyphen if that is its official name.
 2.  MANDATORY: You MUST create an 'artist' node for EVERY seed artist provided in the list: {{artists}}. Assign a unique 'group' number for each seed artist.
 3.  For each seed artist, find and add nodes for their primary genre, record label, country of origin, and the year they were formed/founded (YYYY). The 'id' for the year node must be the 4-digit year (e.g. "1994") and its type must be 'founded'.
-4.  In addition, find and add UP TO 12 NEW related artists that are musically connected to the seed artists. For these NEW artists, you MUST also identify and create their respective genre, label, country, and especially their 'founded' year nodes (YYYY) to ensure the spiderweb is rich with chronological data. ONLY include artists that strictly meet any provided discovery filters.
+4.  In addition, find and add 18-21 NEW related artists that are musically connected to the seed artists, but you have the flexibility to scale down if the specific musical scene is smaller and fewer genuine connections exist. Do not pad the graph with irrelevant artists just to hit the number. For these NEW artists, you MUST also identify and create their respective genre, label, country, and especially their 'founded' year nodes (YYYY) to ensure the spiderweb is rich with chronological data. ONLY include artists that strictly meet any provided discovery filters.
 5.  For all artists (seed and related), create links connecting them to their respective genre, label, country, and founded year nodes. Also create links between related artists. All direct connections of a seed artist should share their 'group' number. Each link MUST include a 'context' string explaining the relationship (e.g., 'releases music on XL Recordings' or 'founded in 1985' or 'is a genre of'). Keep the context to a brief 3-7 words in present tense.
 6.  CRITICAL: Each 'founded' node MUST be linked ONLY to the correct artist who was founded in that year.
 7.  SYNTHESIS RATIONALE (MANDATORY): You MUST output the step-by-step reasoning chain of your analysis in the 'synthesis_rationale' field of the JSON object. The text MUST be scannable and formatted using Markdown: use short paragraphs, bolding for key terms, and bullet points for lists. Do NOT use double newlines between bullet points. Explain in detail how the seeds' acoustic, geographic, and chronological dimensions intersect to yield the generated connections.
@@ -1208,22 +1208,48 @@ export const scrapeImageUrlBackend = async (
   // Strategy 1: High-Speed Deterministic iTunes API (Artists Only)
   if (type !== 'label') {
     try {
-      // Search for albums by this artist to get high-quality artwork
-      const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(artistName)}&entity=album&limit=1`;
+      // Step 1: Search for the exact artist ID to avoid generic name collisions
+      const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(artistName)}&entity=musicArtist&limit=20`;
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
       const res = await fetch(itunesUrl, { signal: controller.signal });
       clearTimeout(timeoutId);
 
       if (res.ok) {
         const data = await res.json();
-        if (data.results && data.results.length > 0) {
-          let artwork = data.results[0].artworkUrl100;
-          // Upgrade thumbnail to 600x600 high resolution
-          if (artwork) {
-            const hiResArtwork = artwork.replace('100x100bb', '600x600bb');
-            console.log(`[scrapeImageUrlBackend] Fast-path iTunes success for ${artistName}`);
-            return hiResArtwork;
+        // Filter for exact, case-insensitive artist name match
+        const exactMatches = data.results?.filter((r: any) => r.artistName.toLowerCase() === artistName.toLowerCase()) || [];
+        
+        let selectedArtistId = null;
+        if (exactMatches.length === 1) {
+          selectedArtistId = exactMatches[0].artistId;
+        } else if (exactMatches.length > 1) {
+          // Genre disambiguation: Compare iTunes primary genre with our Zcene genre string
+          const zceneGenreLower = genre.toLowerCase();
+          const genreMatch = exactMatches.find((r: any) => {
+            const itunesGenre = (r.primaryGenreName || "").toLowerCase();
+            return zceneGenreLower.includes(itunesGenre) || itunesGenre.includes(zceneGenreLower);
+          });
+          // Fallback to the most popular exact match if genres don't perfectly align
+          selectedArtistId = genreMatch ? genreMatch.artistId : exactMatches[0].artistId;
+        }
+
+        if (selectedArtistId) {
+          // Step 2: Fetch their albums for the high-res artwork using the exact artistId
+          const albumUrl = `https://itunes.apple.com/lookup?id=${selectedArtistId}&entity=album&limit=1`;
+          const albumController = new AbortController();
+          const albumTimeout = setTimeout(() => albumController.abort(), 3000);
+          const albumRes = await fetch(albumUrl, { signal: albumController.signal });
+          clearTimeout(albumTimeout);
+          
+          if (albumRes.ok) {
+             const albumData = await albumRes.json();
+             const album = albumData.results?.find((r: any) => r.wrapperType === 'collection');
+             if (album && album.artworkUrl100) {
+                const hiResArtwork = album.artworkUrl100.replace('100x100bb', '600x600bb');
+                console.log(`[scrapeImageUrlBackend] Deterministic iTunes success for ${artistName}`);
+                return hiResArtwork;
+             }
           }
         }
       }
