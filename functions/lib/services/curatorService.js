@@ -1097,6 +1097,33 @@ const checkVideoPlayability = async (videoId) => {
 };
 exports.checkVideoPlayability = checkVideoPlayability;
 const scrapeImageUrlBackend = async (artistName, type, genre, summary) => {
+    // Strategy 1: High-Speed Deterministic iTunes API (Artists Only)
+    if (type !== 'label') {
+        try {
+            // Search for albums by this artist to get high-quality artwork
+            const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(artistName)}&entity=album&limit=1`;
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 3000);
+            const res = await fetch(itunesUrl, { signal: controller.signal });
+            clearTimeout(timeoutId);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.results && data.results.length > 0) {
+                    let artwork = data.results[0].artworkUrl100;
+                    // Upgrade thumbnail to 600x600 high resolution
+                    if (artwork) {
+                        const hiResArtwork = artwork.replace('100x100bb', '600x600bb');
+                        console.log(`[scrapeImageUrlBackend] Fast-path iTunes success for ${artistName}`);
+                        return hiResArtwork;
+                    }
+                }
+            }
+        }
+        catch (itunesErr) {
+            console.warn(`[scrapeImageUrlBackend] iTunes fallback bypassed for ${artistName}:`, itunesErr.message);
+        }
+    }
+    // Strategy 2: Gemini Google Search Fallback (for Labels or obscure deep cuts)
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey)
         return null;
@@ -1111,21 +1138,14 @@ Bio: ${summary}
 USE GOOGLE SEARCH to find a verified artist photo, album cover, or official logo. 
 
 GENRE-CONTEXTUAL IMAGE SOURCING HIERARCHY (STRICTLY ENFORCED):
-▸ FOR CONTEMPORARY / INDIE / ELECTRONIC / PUNK / METAL / HIP-HOP / R&B:
-  Priority 1 — Official Bandcamp artist page: band photo, header banner, or release artwork.
-  Priority 2 — Discogs artist page: press photo or release cover.
-  Priority 3 — AllMusic or Pitchfork artist entry: artist portrait or release art.
-  Priority 4 — Wikimedia Commons: if a verified artist photo exists there.
+▸ FOR ALL GENRES:
+  Priority 1 — Spotify CDN (i.scdn.co) or Last.fm CDN (lastfm.freetls.fastly.net) artist images.
+  Priority 2 — Discogs (i.discogs.com) or AllMusic artist entries.
+  Priority 3 — Wikimedia Commons.
+  Priority 4 — Official press sites or established music publications (Pitchfork, Stereogum).
 
-▸ FOR CLASSICAL / ORCHESTRAL / OPERA / EARLY MUSIC / TRADITIONAL:
-  Priority 1 — Wikimedia Commons: composer portrait, ensemble photo, or archival image.
-  Priority 2 — Record label catalog page (Naxos, Hyperion, ECM, etc): artist photo or release cover.
-  Priority 3 — Gramophone magazine or Britannica artist entry.
-
-▸ FOR JAZZ / BLUES:
-  Priority 1 — Wikimedia Commons or Blue Note/Verve/ECM label CDN.
-  Priority 2 — AllMusic or DownBeat artist entry.
-  Priority 3 — Bandcamp artist page.
+CRITICAL ANTI-HALLUCINATION RULE:
+DO NOT guess or invent random 10-digit IDs for Bandcamp (f4.bcbits.com) or other CDNs. Only return a URL if you extracted the exact, complete HTTPS image path directly from your Google Search results. If you cannot find a verified direct image path, state that no verified image was found.
 
 ACCEPTED IMAGE TYPES (all genre contexts): press photos, live performance photos, official band/artist portraits, album artwork, release covers, band logos, and official banners.
 
@@ -1163,7 +1183,14 @@ CRITICAL OUTPUT REQUIREMENTS:
                 });
                 clearTimeout(timeoutId);
                 if (imgRes.ok) {
-                    return extractedUrl;
+                    const contentType = imgRes.headers.get('content-type');
+                    if (contentType && contentType.startsWith('image/')) {
+                        return extractedUrl;
+                    }
+                    else {
+                        console.warn(`[scrapeImageUrlBackend] Extracted URL returned valid status but invalid content-type (${contentType}): ${extractedUrl}`);
+                        return null;
+                    }
                 }
                 else {
                     console.warn(`[scrapeImageUrlBackend] Extracted URL returned ${imgRes.status}: ${extractedUrl}`);

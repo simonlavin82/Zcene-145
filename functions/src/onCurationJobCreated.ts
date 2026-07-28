@@ -304,8 +304,8 @@ export const onCurationJobCreated = onDocumentCreated({
               // 2. Fetch from Gemini if cache miss
               if (!details) {
                 if (idx > 0) {
-                  // Stagger concurrent requests by 150ms to prevent rate limiting
-                  await new Promise(resolve => setTimeout(resolve, idx * 150));
+                  // Stagger concurrent requests by 1000ms to prevent Google Search Tool rate limiting
+                  await new Promise(resolve => setTimeout(resolve, idx * 1000));
                 }
 
                 console.log(`[Curation Backend] Cache miss. Hydrating details for ${isLabel ? 'label' : 'artist'}: ${artistName}...`);
@@ -383,9 +383,7 @@ export const onCurationJobCreated = onDocumentCreated({
                     details.details.genre || "",
                     details.summary || ""
                   );
-                  if (fetchedImageUrl) {
-                    details.imageUrl = fetchedImageUrl;
-                  }
+                  details.imageUrl = fetchedImageUrl || "";
 
                   details.details.artist = details.details.artist || artistName;
                   if (!details.synthesisRationale) {
@@ -404,6 +402,12 @@ export const onCurationJobCreated = onDocumentCreated({
             if (res) {
               detailsCacheEntries.push(res);
             }
+          }
+
+          // Add a 3-second cooldown between batches to prevent Google Search Tool quota exhaustion
+          if (i + batchSize < recommendedEntities.length) {
+            console.log(`[Curation Backend] Batch complete. Cooling down for 3 seconds before next batch...`);
+            await new Promise(resolve => setTimeout(resolve, 3000));
           }
         }
 

@@ -13,7 +13,7 @@ const imageScraperMatch = fileContent.match(/export const scrapeImageUrlBackend[
 if (!imageScraperMatch) throw new Error("Could not find image scraper prompt");
 const SCRAPE_IMAGE_URL_PROMPT = imageScraperMatch[1];
 
-async function runTest() {
+async function runTest(artistName) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     console.error('GEMINI_API_KEY environment variable is not set.');
@@ -21,21 +21,18 @@ async function runTest() {
   }
 
   const ai = new GoogleGenAI({ apiKey });
-  const artistName = 'Gel';
   const nodeType = 'artist';
-  const seedArtists = 'Spaced';
-  const contextNodes = 'Scowl, End It, Turnstile';
 
-  console.log('\n================================================================');
-  console.log(' TWO-STEP HYDRATION PIPELINE TEST — GEL');
-  console.log('================================================================\n');
+  console.log(`\n================================================================`);
+  console.log(` TWO-STEP HYDRATION PIPELINE TEST — ${artistName.toUpperCase()}`);
+  console.log(`================================================================\n`);
 
   console.log('--- STEP 1: Fetching Text Context ---');
   let prompt1 = FETCH_NODE_DETAILS_PROMPT_TEMPLATE
     .replace('{{nodeIdentifier}}', artistName)
     .replace('{{nodeType}}', nodeType)
-    .replace('{{seedArtists}}', seedArtists)
-    .replace('{{contextNodes}}', contextNodes)
+    .replace('{{seedArtists}}', 'Spaced')
+    .replace('{{contextNodes}}', 'End It, Turnstile')
     .replace(/{{currentDate}}/g, 'July 28, 2026')
     .replace(/{{#if originHint}}[\s\S]*?{{\/if}}/g, '');
 
@@ -70,7 +67,7 @@ async function runTest() {
       console.log(`Genre: ${genre}`);
       console.log(`Bio Preview: ${summary.slice(0, 100)}...`);
     } else {
-      console.error(`❌ Failed to parse JSON from Step 1. Raw text length: ${rawText.length}`);
+      console.error(`❌ Failed to parse JSON from Step 1.`);
       return;
     }
   } catch (err) {
@@ -95,16 +92,54 @@ async function runTest() {
       },
     });
 
-    const rawUrl = (response2.text || '').trim();
-    if (rawUrl && rawUrl.toLowerCase() !== 'null') {
-      console.log(`✅ Dedicated Image Scraper found URL for ${artistName}:`);
-      console.log(`URL: ${rawUrl}`);
+    const rawUrlText = (response2.text || '').trim();
+    console.log(`LLM Raw Output:\n${rawUrlText}\n`);
+    
+    if (rawUrlText.toLowerCase().includes('null') && !rawUrlText.includes('http')) {
+       console.log("❌ LLM explicitly returned null.");
+       return;
+    }
+
+    const urlMatch = rawUrlText.match(/https:\/\/[^\s"'<>()\[\]]+/i);
+    if (urlMatch) {
+      const extractedUrl = urlMatch[0];
+      console.log(`Regex Matched URL: ${extractedUrl}`);
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        const imgRes = await fetch(extractedUrl, { 
+          method: 'HEAD', 
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
+          },
+          signal: controller.signal 
+        });
+        clearTimeout(timeoutId);
+        
+        if (imgRes.ok) {
+          const contentType = imgRes.headers.get('content-type');
+          if (contentType && contentType.startsWith('image/')) {
+            console.log(`✅ Validated URL: ${extractedUrl} (Content-Type: ${contentType})`);
+          } else {
+            console.log(`❌ Invalid Content-Type: ${contentType}`);
+          }
+        } else {
+          console.log(`❌ HTTP HEAD failed with status: ${imgRes.status}`);
+        }
+      } catch (err) {
+         console.log(`❌ HTTP HEAD threw error: ${err.message}`);
+      }
     } else {
-      console.log(`❌ Dedicated Image Scraper returned null or empty.`);
+      console.log(`❌ Regex failed to find a URL in output.`);
     }
   } catch (err) {
     console.error(`❌ Step 2 API call failed:`, err.message);
   }
 }
 
-runTest();
+async function runAll() {
+  await runTest('Scowl');
+  await runTest('Spaced');
+}
+runAll();
