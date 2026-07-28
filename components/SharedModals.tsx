@@ -597,10 +597,14 @@ export const GenerativeRationaleModal: React.FC<{
   let sanitizedRationale = cleanRationale.replace(/\\n/g, '\n');
 
   // 1. Convert non-standard '•' bullets (and any following newlines/spaces) to standard markdown '- '
-  sanitizedRationale = sanitizedRationale.replace(/(^|\n)[ \t]*•[ \t]*[\n]*[ \t]*/g, '$1- ');
+  // 1. Convert varying bullet markers (•, -, *) followed by spaces/newlines into clean markdown list markers
+  sanitizedRationale = sanitizedRationale.replace(/(^|\n)[ \t]*[•-*][ \t]*/g, '$1- ');
 
-  // 2. Clean up stray newlines immediately following standard markdown list markers (- or *)
-  sanitizedRationale = sanitizedRationale.replace(/(^|\n)([ \t]*[-*][ \t]*)[\n]+[ \t]*/g, '$1$2');
+  // 2. Clean up stray newlines immediately following standard markdown list markers
+  sanitizedRationale = sanitizedRationale.replace(/(^|\n)([ \t]*-[ \t]*)[\n]+[ \t]*/g, '$1$2');
+
+  // 3. Enforce a blank line before and between list items so react-markdown parses them as blocks
+  sanitizedRationale = sanitizedRationale.replace(/([^\n])\n([ \t]*- )/g, '$1\n\n$2');
 
   const cleanRationaleLines = sanitizedRationale.split('\n').filter(line => {
     if (isFallback && line.trim().startsWith('[')) return false;

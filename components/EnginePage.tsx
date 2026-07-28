@@ -177,6 +177,16 @@ the entire dataset, the app evolves existing visual structures.
      to approximately 3 minutes. This pipeline integrates real-time YouTube scraping
      and status check routines and covers primary AI artist nodes, record labels, and
      previously-unhydrated untyped deep cut nodes in a single unified pass.
+   - Dual-Strategy iTunes Fast-Path & Genre Confidence Validation: The image scraper bypasses
+     LLM hallucination by querying the iTunes API for \`entity=musicArtist\`. It enforces a deterministic
+     case-insensitive exact match on the artist name, and crucially, disambiguates shared names
+     (like "Gel" or "Sunami") by actively cross-referencing the iTunes \`primaryGenreName\` against the 
+     generated Zcene scene genre. If the genre falls outside a safe whitelist (e.g. World, Gospel) or 
+     is hopelessly ambiguous, it safely drops the image rather than display a false match.
+   - Organic Deep-Cut Range Targeting: The LLM graph generator prompt is explicitly configured
+     to aim for a rich spiderweb density (18 to 21 organic related artists). However, the model is
+     given explicit natural flexibility to scale this number down if a smaller musical scene calls
+     for fewer genuine connections, completely avoiding padding just to hit an arbitrary quota.
    - Universal Node Type Filter: Only nodes explicitly typed as 'label' are routed to
      /labels/{labelSlug}. All other nodes (including nodes with no type property, which
      represent untyped deep cuts) are treated as artists and hydrated via /artists/{id}.
