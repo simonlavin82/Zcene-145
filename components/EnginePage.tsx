@@ -610,6 +610,12 @@ To prevent data rot, API failures, and visual rendering regressions, the synthes
    - The Google Cloud Firestore JavaScript SDK strictly forbids properties with value undefined in document payloads, throwing an immediate client-side synchronous error (Unsupported field value: undefined).
    - In AI-generated metadata (such as NodeDetails), optional properties (e.g. youtubeVideoId or youtubeSearchQuery) are frequently missing for non-musical entities like record labels.
    - Before any payload is transmitted to Firestore via setDoc or updateDoc, it MUST be wrapped with stripUndefinedProperties(...) (exported from services/artistCacheService.ts). This utility recursively traverses objects and arrays to strip any property whose value is strictly undefined, preventing serialization exceptions and silent generation failures.
+
+7. TWO-STEP HYDRATION & IMAGE VALIDATION ARCHITECTURE:
+   - Monolithic Prompt Decoupling: To prevent JSON schema constraint overwhelm and AI hallucination, entity hydration is split into two distinct steps. The primary \`fetchNodeDetailsBackend\` prompt focuses exclusively on synthesizing rich text (bio, genre, discography). A dedicated secondary step (\`scrapeImageUrlBackend\`) uses this text context to isolate and extract a single verified image URL.
+   - Bulletproof URL Extraction: The secondary image scraper bypasses rigid JSON schema requirements, outputting the URL naturally. A robust RegEx parser (\`/https:\\/\\/[^\\s"'<>()\\[\\]]+/i\`) strictly plucks the raw HTTPS link, preventing formatting failures.
+   - Active HTTP HEAD Validation: Before any image is cached, the backend actively pings the extracted URL using an HTTP HEAD request bundled with a standard Chrome \`User-Agent\`. This critical safety net catches 404s (hallucinated paths), 403s (expired CDN tokens), and 429s (bot blockers). If the link fails this ping, it is instantly discarded to \`null\`, ensuring only active, clickable imagery reaches the Firestore database.
+   - Flexible Frontend Rendering: Frontend image containers (e.g., DetailsPanel) strictly avoid fixed ratios (like \`aspect-video\`) or forced \`object-cover\` cropping, instead using natural proportional flow (\`w-full h-auto\`) so artist photos display fully without getting cut off, regardless of intrinsic height.
 `;
 
 const ARCHITECTURAL_SEPARATION_DOCUMENTATION = `

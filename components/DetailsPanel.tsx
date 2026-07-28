@@ -806,10 +806,10 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             )}
 
                             {imageTier !== 'placeholder' && currentImageUrl && (
-                                <div className="aspect-video w-full bg-zinc-900 overflow-hidden relative border border-zinc-800/50 shadow-2xl rounded-lg group">
+                                <div className="w-full bg-zinc-900 overflow-hidden relative border border-zinc-800/50 shadow-2xl rounded-lg group min-h-[150px]">
                                     {/* Temporary Loading Skeleton while image loads */}
                                     {!imgLoaded && (
-                                        <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center p-6 text-center bg-zinc-900 overflow-hidden">
+                                        <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center p-6 text-center bg-zinc-900 overflow-hidden z-10">
                                             <img 
                                                 src={isLabelNode 
                                                     ? "https://storage.googleapis.com/zcene-prod-assets/Deep%20Cut%20background.png"
@@ -834,7 +834,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                         ref={imgRef}
                                         src={currentImageUrl} 
                                         alt={getArtistDisplayName(details, node)} 
-                                        className={`absolute inset-0 w-full h-full object-cover object-[center_25%] scale-105 group-hover:scale-100 transition-all duration-1000 ${imgLoaded ? 'opacity-100 z-20' : 'opacity-0 z-0'}`}
+                                        className={`relative w-full h-auto block scale-105 group-hover:scale-100 transition-all duration-1000 ${imgLoaded ? 'opacity-100 z-20' : 'opacity-0 z-0'}`}
                                         onLoad={() => setImgLoaded(true)}
                                         onError={handleImageError}
                                     />

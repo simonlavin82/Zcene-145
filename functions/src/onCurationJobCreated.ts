@@ -8,6 +8,7 @@ import {
   fetchNodeDetailsBackend,
   scrapeVideoIdBackend,
   checkVideoPlayability,
+  scrapeImageUrlBackend,
   extractCountrySlug,
   buildCompositeCacheKey
 } from "./services/curatorService";
@@ -374,6 +375,18 @@ export const onCurationJobCreated = onDocumentCreated({
                   if (!details.details) {
                     details.details = { genre: "", origin: "", founded: "", notableArtists: [] };
                   }
+
+                  // 4. Scrape dedicated Image URL
+                  const fetchedImageUrl = await scrapeImageUrlBackend(
+                    artistName,
+                    tempNode.type,
+                    details.details.genre || "",
+                    details.summary || ""
+                  );
+                  if (fetchedImageUrl) {
+                    details.imageUrl = fetchedImageUrl;
+                  }
+
                   details.details.artist = details.details.artist || artistName;
                   if (!details.synthesisRationale) {
                     details.synthesisRationale = `[Single-Seed Analysis]\n- Acoustic & Sonics: Resolved core musical properties and stylistic lineage.\n- Scene Context: Mapped direct influences, record label history, and geographic background.\n- Overlap Insights: Unified structural connections and surrounding chronological relationships.`;

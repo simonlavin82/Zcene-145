@@ -339,6 +339,11 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                                 if (!details.details) {
                                     details.details = { genre: "", origin: "", founded: "", notableArtists: [] };
                                 }
+                                // 4. Scrape dedicated Image URL
+                                const fetchedImageUrl = await (0, curatorService_1.scrapeImageUrlBackend)(artistName, tempNode.type, details.details.genre || "", details.summary || "");
+                                if (fetchedImageUrl) {
+                                    details.imageUrl = fetchedImageUrl;
+                                }
                                 details.details.artist = details.details.artist || artistName;
                                 if (!details.synthesisRationale) {
                                     details.synthesisRationale = `[Single-Seed Analysis]\n- Acoustic & Sonics: Resolved core musical properties and stylistic lineage.\n- Scene Context: Mapped direct influences, record label history, and geographic background.\n- Overlap Insights: Unified structural connections and surrounding chronological relationships.`;
