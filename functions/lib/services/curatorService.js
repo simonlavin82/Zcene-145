@@ -888,7 +888,7 @@ exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed informatio
     Your task is to generate a JSON object matching this structure precisely:
     {
       "summary": "A scannable bio (approx. 100 words) using Markdown: short paragraphs, bolding for key terms, and bullet points for lists. Focus on style and significance.",
-      "imageUrl": "https://upload.wikimedia.org/... OR https://f4.bcbits.com/...",
+      "imageUrl": "https://... (press photo, live shot, album artwork, logo, banner — or null if nothing verified found)",
       "members": ["Name (Role)", ...],
       "details": {
         "genre": "The primary music genre(s) as a plain string (e.g. 'Hardcore Punk', 'Post-Hardcore', 'Metalcore'). NEVER return the literal string 'Unknown', 'N/A', or leave this empty — if grounding is inconclusive, infer the genre from the bio summary text and the connected scene context provided.",
@@ -939,7 +939,7 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint)
         .join(', ');
     const currentDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     let prompt = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE
-        .replace('{{nodeIdentifier}}', node.id)
+        .replace('{{nodeIdentifier}}', node.label || node.id)
         .replace('{{nodeType}}', node.type)
         .replace('{{seedArtists}}', seedArtists)
         .replace('{{contextNodes}}', contextNodes)

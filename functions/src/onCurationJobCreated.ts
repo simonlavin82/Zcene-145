@@ -328,12 +328,26 @@ export const onCurationJobCreated = onDocumentCreated({
                       details = await fetchNodeDetailsBackend(tempNode, finalGraph, inputPayload.artists);
                       console.log(`[Curation Backend] Retry succeeded for: ${artistNormId}`);
                     } catch (retryErr: any) {
-                      console.error(`[Curation Backend] Retry also failed for: ${artistNormId}. Skipping.`, retryErr.message);
-                      return null;
+                      console.error(`[Curation Backend] Retry also failed for: ${artistNormId}. Using fallback skeleton.`, retryErr.message);
+                      return [artistName, {
+                        summary: `Background hydration for ${artistName} experienced a temporary timeout. Tap to refresh or check back later.`,
+                        details: { genre: "Unknown", origin: "Unknown", founded: "Unknown", notableArtists: [] },
+                        links: [],
+                        discography: [],
+                        members: [],
+                        recommendationReason: ""
+                      }] as [string, any];
                     }
                   } else {
-                    console.error(`[Curation Backend] Hydration failed (non-transient) for: ${artistNormId}. Skipping.`, firstErr.message);
-                    return null;
+                    console.error(`[Curation Backend] Hydration failed (non-transient) for: ${artistNormId}. Using fallback skeleton.`, firstErr.message);
+                    return [artistName, {
+                      summary: `Background hydration for ${artistName} experienced a temporary timeout. Tap to refresh or check back later.`,
+                      details: { genre: "Unknown", origin: "Unknown", founded: "Unknown", notableArtists: [] },
+                      links: [],
+                      discography: [],
+                      members: [],
+                      recommendationReason: ""
+                    }] as [string, any];
                   }
                 }
 
@@ -410,12 +424,10 @@ export const onCurationJobCreated = onDocumentCreated({
             if (!isSeedLabel) {
               validateArtistDetailsSchema(seedNorm, seedDetails);
             } else if (!seedDetails) {
-              console.warn(`[Curation Backend] Seed label cache write skipped for "${seedNorm}" — missing detailsCache.`);
-              continue;
+              console.warn(`[Curation Backend] Seed label cache validation failed for "${seedNorm}" — missing detailsCache, but proceeding to write bare pointer.`);
             }
           } catch (validationErr: any) {
-            console.warn(`[Curation Backend] Seed cache write skipped for "${seedNorm}" — schema validation failed: ${validationErr.message}`);
-            continue;
+            console.warn(`[Curation Backend] Seed cache validation failed for "${seedNorm}", but proceeding to write: ${validationErr.message}`);
           }
 
           // Find connected country nodes in finalGraph
