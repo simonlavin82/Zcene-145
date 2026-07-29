@@ -949,6 +949,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                                     <IconDisplay icon={<span className="material-symbols-outlined">shopping_bag</span>} name="Catalog / Shop" pxSize="18px" description="Represents physical media or store links (e.g. Bandcamp)." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
                                     <IconDisplay icon={<span className="material-symbols-outlined">public</span>} name="Website / Public" pxSize="18px" description="Represents official artist domains." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="lucide lucide-flame w-5 h-5"></span>} name="Taste Profile (Flame)" pxSize="18px" description="Represents user's taste compatibility (high energy/independent culture)." implementation="Lucide Flame" overrideIconClass="!text-[18px]" />
                                 </div>
                             </div>
                         </div>
@@ -2298,10 +2299,16 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             </div>
 
                                             {/* Right-Aligned Magazine Trigger Mock */}
-                                            <button className="flex items-center gap-1.5 px-3 py-1.5 border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all text-xs font-medium shrink-0 leading-none">
-                                                <span className="material-symbols-outlined !text-[16px]">auto_stories</span>
-                                                <span>Magazine View</span>
-                                            </button>
+                                            <div className="flex gap-2">
+                                                <button className="flex items-center gap-1.5 px-3 py-1.5 border border-primary bg-primary/10 rounded-xl text-primary animate-pulse transition-all text-xs font-medium shrink-0 leading-none">
+                                                    <span className="material-symbols-outlined !text-[16px]">auto_stories</span>
+                                                    <span>Magazine View (Attention)</span>
+                                                </button>
+                                                <button className="flex items-center gap-1.5 px-3 py-1.5 border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 transition-all text-xs font-medium shrink-0 leading-none">
+                                                    <span className="material-symbols-outlined !text-[16px]">auto_stories</span>
+                                                    <span>Magazine View (Neutral)</span>
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -2318,7 +2325,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </div>
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Control Elements</h4>
-                                            <p className="text-sm text-zinc-400">Active indicator: <strong>w-4 bg-primary</strong>. Control buttons use <strong>w-8 h-8</strong> dimensions. The Magazine button is styled with a subtle border and <strong>auto_stories</strong> icon.</p>
+                                            <p className="text-sm text-zinc-400">Active indicator: <strong>w-4 bg-primary</strong>. Control buttons use <strong>w-8 h-8</strong> dimensions. The Magazine button utilizes a <strong>tri-state logic (disabled, attention, neutral)</strong>. The 'attention' state uses a primary yellow pulse to guide first-time clicks, shifting permanently to 'neutral' (subtle zinc border) post-interaction for the remainder of the session.</p>
                                         </div>
                                     </div>
                                 </div>

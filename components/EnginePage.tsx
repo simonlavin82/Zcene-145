@@ -378,6 +378,12 @@ the entire dataset, the app evolves existing visual structures.
       cleanArtistDisplayName helper checks against known regional suffixes and cross-references active graph
       topology nodes to return pristine, human-readable canonical display titles in the browser header, seed
       pills, toasts, and project titles.
+
+13. LOCAL DEVELOPMENT ENVIRONMENT & PROXY RESOLUTION:
+    - Synchronised Startup Sequence (concurrently): The development environment uses 'concurrently' to boot the
+      Node.js Express backend and the Vite dev server simultaneously in a single terminal process. This strictly
+      prevents race conditions where Vite's proxy attempts to forward requests (e.g., /api/label/) to a backend
+      that hasn't fully bound to its port yet, eliminating terminal ECONNREFUSED spam on mount.
 `;
 
 

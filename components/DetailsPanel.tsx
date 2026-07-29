@@ -1304,7 +1304,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     const [magazineSearchQuery, setMagazineSearchQuery] = useState('');
     const [hasSeenMagazineView, setHasSeenMagazineView] = useState(false);
     
-    const magazineBtnState = hasSeenMagazineView ? 'neutral' : 'attention';
+    const magazineBtnState: 'disabled' | 'attention' | 'neutral' = hasSeenMagazineView ? 'neutral' : 'attention';
     const magazineBtnClasses = {
         disabled: "flex items-center gap-1.5 px-3 py-1.5 border border-zinc-800 bg-zinc-900/20 rounded-xl text-zinc-600 cursor-not-allowed transition-all duration-200 text-xs font-medium shrink-0 leading-none backdrop-blur-sm",
         attention: "flex items-center gap-1.5 px-3 py-1.5 border border-primary bg-primary/10 rounded-xl text-primary animate-pulse hover:bg-primary/20 active:scale-95 transition-all duration-200 text-xs font-medium shrink-0 leading-none backdrop-blur-sm",
