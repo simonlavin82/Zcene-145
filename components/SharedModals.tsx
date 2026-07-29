@@ -598,7 +598,7 @@ export const GenerativeRationaleModal: React.FC<{
 
   // 1. Convert non-standard '•' bullets (and any following newlines/spaces) to standard markdown '- '
   // 1. Convert varying bullet markers (•, -, *) followed by spaces/newlines into clean markdown list markers
-  sanitizedRationale = sanitizedRationale.replace(/(^|\n)[ \t]*[•-*][ \t]*/g, '$1- ');
+  sanitizedRationale = sanitizedRationale.replace(/(^|\n)[ \t]*[-•*][ \t]*/g, '$1- ');
 
   // 2. Clean up stray newlines immediately following standard markdown list markers
   sanitizedRationale = sanitizedRationale.replace(/(^|\n)([ \t]*-[ \t]*)[\n]+[ \t]*/g, '$1$2');
