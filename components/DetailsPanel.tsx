@@ -1728,7 +1728,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                     setHasSeenMagazineView(true);
                                     onMagazineViewToggle(!isMagazineViewOpen);
                                 }}
-                                disabled={magazineBtnState === 'disabled'}
+                                disabled={(magazineBtnState as string) === 'disabled'}
                                 className={magazineBtnClasses}
                                 title="Enter Magazine View"
                             >

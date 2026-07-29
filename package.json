@@ -7,7 +7,8 @@
     "dev": "concurrently \"node --env-file=.env server.js\" \"vite\"",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0 --port $PORT",
-    "lint": "eslint . && tsc --noEmit"
+    "lint": "eslint . && tsc --noEmit",
+    "deploy": "npx firebase-tools deploy"
   },
   "dependencies": {
     "@google/genai": "^1.22.0",
