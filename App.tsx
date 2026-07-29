@@ -4914,9 +4914,9 @@ const App: React.FC = () => {
               // written by the backend (legacy projects have activeNodes: [] from creation).
               if (data.activeNodes && Array.isArray(data.activeNodes)) {
                 let resolvedActiveNodes = data.activeNodes;
-                const availableArtists = g.nodes.filter((n: any) => (n.type === 'artist' || !n.type)).map((n: any) => n.id);
-                if (resolvedActiveNodes.length <= 1 && availableArtists.length > resolvedActiveNodes.length) {
-                  resolvedActiveNodes = availableArtists;
+                const availableEntities = g.nodes.map((n: any) => n.id);
+                if (resolvedActiveNodes.length <= 1 && availableEntities.length > resolvedActiveNodes.length) {
+                  resolvedActiveNodes = availableEntities;
                 }
                 setActiveNodeIds(resolvedActiveNodes);
                 
@@ -5039,9 +5039,9 @@ const App: React.FC = () => {
 
             if (data.activeNodes && Array.isArray(data.activeNodes)) {
               let resolvedActiveNodes = data.activeNodes;
-              const availableArtists = hydratedNodes.filter((n: any) => (n.type === 'artist' || !n.type)).map((n: any) => n.id);
-              if (resolvedActiveNodes.length <= 1 && availableArtists.length > resolvedActiveNodes.length) {
-                 resolvedActiveNodes = availableArtists;
+              const availableEntities = hydratedNodes.map((n: any) => n.id);
+              if (resolvedActiveNodes.length <= 1 && availableEntities.length > resolvedActiveNodes.length) {
+                 resolvedActiveNodes = availableEntities;
               }
               setActiveNodeIds(resolvedActiveNodes);
             }
@@ -5092,9 +5092,9 @@ const App: React.FC = () => {
 
               if (data.activeNodes && Array.isArray(data.activeNodes)) {
                 let resolvedActiveNodes = data.activeNodes;
-                const availableArtists = g.nodes.filter((n: any) => (n.type === 'artist' || !n.type)).map((n: any) => n.id);
-                if (resolvedActiveNodes.length <= 1 && availableArtists.length > resolvedActiveNodes.length) {
-                   resolvedActiveNodes = availableArtists;
+                const availableEntities = g.nodes.map((n: any) => n.id);
+                if (resolvedActiveNodes.length <= 1 && availableEntities.length > resolvedActiveNodes.length) {
+                   resolvedActiveNodes = availableEntities;
                 }
                 setActiveNodeIds(resolvedActiveNodes);
               }
@@ -5115,9 +5115,9 @@ const App: React.FC = () => {
                   hydratedNodes = g.nodes;
                     if (data.activeNodes && Array.isArray(data.activeNodes)) {
                       let resolvedActiveNodes = data.activeNodes;
-                      const availableArtists = g.nodes.filter((n: any) => (n.type === 'artist' || !n.type)).map((n: any) => n.id);
-                      if (resolvedActiveNodes.length <= 1 && availableArtists.length > resolvedActiveNodes.length) {
-                         resolvedActiveNodes = availableArtists;
+                      const availableEntities = g.nodes.map((n: any) => n.id);
+                      if (resolvedActiveNodes.length <= 1 && availableEntities.length > resolvedActiveNodes.length) {
+                         resolvedActiveNodes = availableEntities;
                       }
                       setActiveNodeIds(resolvedActiveNodes);
                     }
@@ -5162,9 +5162,9 @@ const App: React.FC = () => {
 
             if (data.activeNodes && Array.isArray(data.activeNodes)) {
               let resolvedActiveNodes = data.activeNodes;
-              const availableArtists = g.nodes.filter((n: any) => (n.type === 'artist' || !n.type)).map((n: any) => n.id);
-              if (resolvedActiveNodes.length <= 1 && availableArtists.length > resolvedActiveNodes.length) {
-                 resolvedActiveNodes = availableArtists;
+              const availableEntities = g.nodes.map((n: any) => n.id);
+              if (resolvedActiveNodes.length <= 1 && availableEntities.length > resolvedActiveNodes.length) {
+                 resolvedActiveNodes = availableEntities;
               }
               setActiveNodeIds(resolvedActiveNodes);
             }

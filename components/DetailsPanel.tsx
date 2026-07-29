@@ -1300,7 +1300,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
 }) => {
     const [viewedIndex, setViewedIndex] = useState(0);
     const [isChatLoading, setIsChatLoading] = useState(false);
-    const [magazineSortBy, setMagazineSortBy] = useState<'none' | 'name' | 'genre' | 'origin' | 'founded'>('none');
+    const [magazineSortBy, setMagazineSortBy] = useState<'none' | 'artist' | 'label'>('none');
     const [magazineSearchQuery, setMagazineSearchQuery] = useState('');
     
     const touchStartX = useRef<number | null>(null);
@@ -1471,17 +1471,23 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                 const detailsA = detailsCache.get(a.id) || detailsCache.get(a.id.toLowerCase()) || detailsCache.get(normalizeArtistId(a.id));
                 const detailsB = detailsCache.get(b.id) || detailsCache.get(b.id.toLowerCase()) || detailsCache.get(normalizeArtistId(b.id));
                 
-                if (magazineSortBy === 'name') {
+                if (magazineSortBy === 'artist') {
+                    const isArtistA = a.type !== 'label';
+                    const isArtistB = b.type !== 'label';
+                    if (isArtistA && !isArtistB) return -1;
+                    if (!isArtistA && isArtistB) return 1;
                     return (a.label || a.id).localeCompare(b.label || b.id);
                 }
                 
-                const valA = (detailsA?.details?.[magazineSortBy] || '').toString().toLowerCase();
-                const valB = (detailsB?.details?.[magazineSortBy] || '').toString().toLowerCase();
+                if (magazineSortBy === 'label') {
+                    const isLabelA = a.type === 'label';
+                    const isLabelB = b.type === 'label';
+                    if (isLabelA && !isLabelB) return -1;
+                    if (!isLabelA && isLabelB) return 1;
+                    return (a.label || a.id).localeCompare(b.label || b.id);
+                }
                 
-                if (!valA && valB) return 1;
-                if (valA && !valB) return -1;
-                
-                return valA.localeCompare(valB);
+                return 0;
             });
         }
 
@@ -1546,13 +1552,11 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                 <select 
                                     value={magazineSortBy}
                                     onChange={(e) => setMagazineSortBy(e.target.value as any)}
-                                    className="w-full appearance-none border border-zinc-700 bg-zinc-900 py-2 pl-3 pr-8 text-xs text-zinc-300 rounded-xl focus:ring-1 focus:ring-primary focus:outline-none transition-all cursor-pointer"
+                                    className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-zinc-300 py-2.5 px-4 text-sm focus:ring-1 focus:ring-primary focus:outline-none cursor-pointer"
                                 >
                                     <option value="none">Sort</option>
-                                    <option value="name">Name</option>
-                                    <option value="genre">Genre</option>
-                                    <option value="origin">Origin</option>
-                                    <option value="founded">Founded</option>
+                                    <option value="artist">Artist</option>
+                                    <option value="label">Label</option>
                                 </select>
                                 <span className="material-symbols-outlined pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 !text-[16px]">arrow_drop_down</span>
                             </div>
@@ -1561,9 +1565,9 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                 </div>
             ) : (
                 isMagazineViewOpen ? (
-                    <div className="h-12 flex-shrink-0 border-b border-zinc-600/50 bg-zinc-900 z-[60] relative">
+                    <div className="h-16 flex-shrink-0 border-b border-zinc-600/50 bg-zinc-900 z-[60] relative">
                         <div className="max-w-[1400px] mx-auto w-full h-full px-4 md:px-6 lg:px-8 flex items-center justify-between relative">
-                            <div className="flex items-center gap-4 overflow-hidden w-full">
+                            <div className="flex items-center gap-4 overflow-hidden w-full h-full">
                                 <div className="flex items-center gap-2">
                                     <h2 className="text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Deep Cut</h2>
                                     <span className={`h-5 w-5 flex flex-shrink-0 items-center justify-center text-[9px] font-bold border rounded-md transition-all duration-500 ${unreadCount > 0 ? 'bg-brand-black text-primary border-primary/50' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>
@@ -1572,7 +1576,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                 </div>
                                 <div className="flex items-center gap-4 flex-grow animate-in fade-in slide-in-from-left-4 duration-500">
                                     <div className="h-6 w-px bg-zinc-700 mx-2 hidden md:block" />
-                                    <div className="flex items-center gap-3 flex-grow max-w-2xl">
+                                    <div className="flex items-center gap-3 flex-grow max-w-md">
                                         <div className="relative flex-grow">
                                             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 !text-[18px]">search</span>
                                             <input 
@@ -1580,7 +1584,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 placeholder="Filter magazine..."
                                                 value={magazineSearchQuery}
                                                 onChange={(e) => setMagazineSearchQuery(e.target.value)}
-                                                className="w-full appearance-none border border-zinc-700 bg-zinc-950 py-2 pl-10 pr-4 text-sm text-white placeholder:text-zinc-500 rounded-xl focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+                                                className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-10 pr-4 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none"
                                             />
                                         </div>
                                         <div className="flex items-center gap-2 shrink-0">
@@ -1589,13 +1593,11 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 <select 
                                                     value={magazineSortBy}
                                                     onChange={(e) => setMagazineSortBy(e.target.value as any)}
-                                                    className="w-full appearance-none border border-zinc-700 bg-zinc-900 py-2 pl-4 pr-10 text-base lg:text-sm text-zinc-300 rounded-xl focus:ring-1 focus:ring-primary focus:outline-none transition-all cursor-pointer"
+                                                    className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-zinc-300 py-2.5 px-4 text-sm focus:ring-1 focus:ring-primary focus:outline-none cursor-pointer"
                                                 >
                                                     <option value="none">Default</option>
-                                                    <option value="name">Name</option>
-                                                    <option value="genre">Genre</option>
-                                                    <option value="origin">Origin</option>
-                                                    <option value="founded">Founded</option>
+                                                    <option value="artist">Artist</option>
+                                                    <option value="label">Label</option>
                                                 </select>
                                                 <span className="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 !text-[18px]">arrow_drop_down</span>
                                             </div>
