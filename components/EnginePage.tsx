@@ -85,18 +85,17 @@ real-time intelligence and global scalability.
      record labels, and untyped deep cuts) are processed in parallel chunks of 5
      nodes at a time via Promise.all(), dramatically reducing total curation time
      from ~20 minutes to approximately 3 minutes. This architecture is the
-     authoritative resilience standard: it prevents Cloud Function timeouts while
-     guaranteeing that every node type — not just the primary artist entities — is
-     fully hydrated and written to Firestore before the job completes.
+     authoritative resilience standard: it prevents Cloud Function timeouts. 
+     To ensure data integrity, any node experiencing a transient network timeout 
+     during hydration explicitly returns null to bypass Firestore caching. This 
+     prevents writing toxic fallback skeletons to the database and seamlessly delegates
+     the missed node to the frontend's on-demand 'Consult AI' hydration fallback.
    - UPFRONT UNIVERSAL HYDRATION MANDATE:
      All curation jobs are required to fully hydrate ALL node types upfront during
      the initial background run. This includes: primary AI artist nodes, record label
-     nodes (/labels/{labelSlug}), and untyped deep cut artist nodes. Only nodes with
-     an explicit 'label' type are routed to the /labels collection; all others (including
-     nodes with no type property) are treated as artist nodes and hydrated via
-     /artists/{id}. This universal filter eliminates the legacy regression where deep
-     cuts required manual node-clicking on the frontend (EnginePage.tsx) to trigger
-     their individual data loads.
+     nodes (/labels/{labelSlug}), and untyped deep cut artist nodes. Transient network
+     timeouts are the sole permitted exception, gracefully skipping the cache write to 
+     leverage the frontend's robust on-demand hydration.
    - ROOT ALIAS REPLICATION (detailsCache on Bare Root Documents):
      When the backend creates or updates alias pointer documents (e.g., for regional
      variants like 'artist-united-states'), it replicates the full detailsCache payload
@@ -507,8 +506,8 @@ for transient API errors on the client.
 
 9. ROOTS BREAKDOWN SCANNABILITY FORMATTING (SharedModals.tsx / index.css / curatorService.ts):
    - Markdown Bio Styling Parity: The synthesis rationale payload is parsed and rendered natively via standard Markdown components using the .markdown-bio design guidelines. This ensures bullet points, paragraph spacing, and bold key term highlighting maintain consistent scannability aesthetics with the Deep Cut biographies.
-   - Generative Formatting Source Controls: The core generation template strictly commands the AI model to output tightly packed bullet lists (no double newlines between list items) and to emit standard JSON string encodings, strictly prohibiting raw \`\\\\n\` literals or malformed symbols to avoid layout breakages.
-   - Frontend Rendering Sanitization & Layout Constraints: The SharedModals renderer enforces a robust RegEx normalization pass to scrub stray \`•\` characters and collapse broken loose-list spacing, while the root CSS uses \`list-outside pl-4\` to ensure markdown-rendered \`<p>\` blocks stay perfectly inline with their bullet markers.
+   - Generative Formatting Source Controls: The core generation template strictly commands the AI model to output tightly packed bullet lists (no double newlines between list items) and to emit standard JSON string encodings.
+   - Strict Backend Layout Sanitization & Frontend Constraints: The backend 'sanitizeBioText' pipeline now aggressively scrubs markdown bolding (**) and translates literal escaped newlines (\\n) into structural paragraph breaks before the payload ever reaches Firestore. The SharedModals renderer retains a robust RegEx normalization pass to scrub stray \`•\` characters and collapse broken loose-list spacing, while the root CSS uses \`list-outside pl-4\` to ensure markdown-rendered \`<p>\` blocks stay perfectly inline with their bullet markers.
    - Regression Prevention (The "Why"): Previous iterations used \`list-inside\` which forced markdown loose-lists (where text is wrapped in \`<p>\` tags) to drop below the bullet point. The strict AI prompt prevents loose lists entirely, while \`list-outside\` serves as a visual safeguard for legacy databases. Future styling must NEVER revert markdown lists to \`list-inside\`.
 
 10. AUTOMATIC DEEP CUT BACKGROUND BATCH-HYDRATION (App.tsx):
@@ -590,11 +589,11 @@ To prevent data rot, API failures, and visual rendering regressions, the synthes
    - Label entities use normalized canonical slugs (bypassing multi-origin country suffixes like -united-states or -united-kingdom) because record labels represent global publishing organizations without country-specific disambiguation requirements.
    - ARCHITECTURAL LAW — UPFRONT UNIVERSAL HYDRATION: Every curation job MUST fully hydrate
      ALL node types during the initial background run — this includes primary AI artist nodes,
-     record label nodes, and untyped deep cut artist nodes. A deep cut is "unhydrated" only if
-     it has never received a Firestore document write during any prior curation run. Partial
-     hydration (e.g., only hydrating the primary seed artist and skipping remaining nodes) is
-     a regression that forces users to click nodes manually to trigger individual data loads and
-     is strictly prohibited as a completion state for any curation job.
+     record label nodes, and untyped deep cut artist nodes. Transient network failures (timeouts) 
+     are the explicitly permitted exception: failing nodes return null to safely bypass the cache write, 
+     preventing permanent database corruption and smoothly handing off hydration to the frontend 
+     on-demand fallback. Partial hydration (outside of these transient skips) is a regression and is 
+     strictly prohibited.
    - Chunked Concurrent Pre-Caching: Hydration is executed in parallel chunks of 5 nodes via
      Promise.all() to prevent Cloud Function timeouts while avoiding Gemini API rate exhaustion.
      On a cache miss for any entity, the pipeline synthesizes its profile via Gemini Flash and
@@ -726,6 +725,7 @@ The Zcene AI curation and client proxy pipelines implement a 4-tier defense-in-d
    In cases where Google Search grounding forces Gemini to drop JSON mode in favor of unstructured prose, the error handlers execute a Grounding Prose Fallback. To prevent raw JSON syntax wrappers ({ "summary": "..." }) or AI reasoning from being saved as band biographies:
    - Wrapper Rescue: Detects JSON artifact prefixes ({/[ or "summary":) and regex-extracts clean bio strings.
    - CoT Rejection: Actively rejects reasoning sentences (e.g., 'I have confirmed...', 'I will manually check...') and throws a safe formatting exception rather than writing commentary to Firestore alongside youtubeVideoId: null.
+   - Markdown Sanitization: Actively strips markdown bolding (**) and translates literal escaped newlines (\\n) to structural paragraph breaks on the backend to ensure pristine frontend rendering.
 
 4. CROSS-ENVIRONMENT SYNC:
    This defense-in-depth parsing contract is identically enforced across client proxies (services/geminiService.ts), Cloud Functions curation jobs (functions/src/services/curatorService.ts), and Node.js server endpoints (server.js).
