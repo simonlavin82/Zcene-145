@@ -280,7 +280,7 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                             // Does NOT retry on JSON parse failures or schema validation errors (deterministic failures).
                             const isTransientError = (err) => {
                                 const msg = (err?.message || String(err)).toLowerCase();
-                                return /429|503|resource.?exhausted|service.?unavailable|too many requests/i.test(msg);
+                                return /429|503|resource.?exhausted|service.?unavailable|too many requests|timeout|fetch failed|network|socket/i.test(msg);
                             };
                             try {
                                 details = await (0, curatorService_1.fetchNodeDetailsBackend)(tempNode, finalGraph, inputPayload.artists);
@@ -294,27 +294,13 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                                         console.log(`[Curation Backend] Retry succeeded for: ${artistNormId}`);
                                     }
                                     catch (retryErr) {
-                                        console.error(`[Curation Backend] Retry also failed for: ${artistNormId}. Using fallback skeleton.`, retryErr.message);
-                                        return [artistName, {
-                                                summary: `Background hydration for ${artistName} experienced a temporary timeout. Tap to refresh or check back later.`,
-                                                details: { genre: "Unknown", origin: "Unknown", founded: "Unknown", notableArtists: [] },
-                                                links: [],
-                                                discography: [],
-                                                members: [],
-                                                recommendationReason: ""
-                                            }];
+                                        console.error(`[Curation Backend] Retry also failed for: ${artistNormId}. Safely skipping cache write.`, retryErr.message);
+                                        return null;
                                     }
                                 }
                                 else {
-                                    console.error(`[Curation Backend] Hydration failed (non-transient) for: ${artistNormId}. Using fallback skeleton.`, firstErr.message);
-                                    return [artistName, {
-                                            summary: `Background hydration for ${artistName} experienced a temporary timeout. Tap to refresh or check back later.`,
-                                            details: { genre: "Unknown", origin: "Unknown", founded: "Unknown", notableArtists: [] },
-                                            links: [],
-                                            discography: [],
-                                            members: [],
-                                            recommendationReason: ""
-                                        }];
+                                    console.error(`[Curation Backend] Hydration failed (non-transient) for: ${artistNormId}. Safely skipping cache write.`, firstErr.message);
+                                    return null;
                                 }
                             }
                             if (details) {

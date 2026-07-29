@@ -961,6 +961,8 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint)
             text = text.replace(/^(?:I have confirmed|I will manually check|I will check|I need to check|I need to get|To answer your request|For the YouTube video|Here is the JSON|Here are the details|Here is the information|Note: Some details|Based on the search)[^.\n]*[.\n]+\s*/ig, '').trim();
         } while (text !== prevText && text.length > 0);
         text = text.replace(/\\n\*/g, '\n• ').replace(/\\n-/g, '\n• ').replace(/\\n\n/g, '\n\n');
+        text = text.replace(/\*\*/g, ''); // Strip markdown bolding
+        text = text.replace(/\\n/g, '\n'); // Convert literal escaped \n to actual newlines
         text = text.replace(/\[\d+\]/g, '').replace(/\(\d+\)/g, '').trim();
         return text;
     };
