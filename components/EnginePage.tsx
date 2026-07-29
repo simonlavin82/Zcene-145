@@ -1066,7 +1066,7 @@ Zcene implements a cross-platform 'Sticky Peek + Action Gateway' interaction mod
 1. STATE 1: THE 'STICKY PEEK' (Primary Interaction):
    - Trigger: Single click (Desktop) or single tap (Mobile touch viewports) on any node.
    - Behavior: Instantly sets active node focus, pins the floating 'Hover Box' (info snippet) banner, and illuminates yellow connection lines (#F6E468 at 0.9 opacity) to all 1st-degree related nodes while locking D3 camera focus. This state persists until the user explicitly clicks/taps the SVG background.
-   - Mobile Touch & Line Highlighting: Touch viewports execute synchronous node hover and line highlighting logic on single tap, guaranteeing mobile visual feature parity with desktop hover.
+   - Mobile Touch & Line Highlighting: Touch viewports execute synchronous node hover and line highlighting logic on single tap, guaranteeing mobile visual feature parity with desktop hover. To prevent D3 double-click zoom from hijacking rapid second taps, the native D3 '.on("dblclick.zoom", null)' event is suppressed, and 'hoveredNodeIdRef' state is updated synchronously upon the first tap to ensure the UI cleanly transitions to the Deep Cut tab on subsequent interaction.
    - Purpose: Provides identical, friction-free connection tracing and information peeks across all platforms without triggering paid network API transactions.
 
 2. STATE 2: THE 'ACTION GATEWAY' (Secondary Interaction):
@@ -1677,6 +1677,9 @@ export const EnginePage: React.FC<SourcePageProps> = ({
 
                         <div className="mb-12">
                             <h3 className="text-zinc-200 font-medium text-lg mb-6 uppercase tracking-wider">Transient Toast Notifications</h3>
+                            <p className="text-zinc-400 text-sm leading-relaxed mb-4">
+                                Transient toasts inform users of rapid background processes. To prevent user fatigue during fast graph navigation, aggressive notifications (e.g., Cache hits) are throttled via a session-level state lock (<code>hasShownCacheToastRef</code> in App.tsx), ensuring they gracefully display once per session to demonstrate speed before silently completing in the background for subsequent actions.
+                            </p>
                             <Table headers={["Original Message", "Translated Curator Message", "Target Component"]}>
                                 {Object.entries(TOAST_MAPPING_RULES).map(([raw, final], idx) => (
                                     <tr key={idx} className="hover:bg-zinc-900/10 transition-colors border-b border-zinc-900/30">
