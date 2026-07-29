@@ -3,6 +3,7 @@ import { StackItem, Node, UserTaste } from '../types';
 import { StackIcon } from './Icons';
 import Markdown from 'react-markdown';
 import { isNodeInSeedList } from '../services/artistCacheService';
+import { Flame } from 'lucide-react';
 
 // --- My Stack Dialog Component ---
 export const MyStackDialog: React.FC<{
@@ -157,7 +158,7 @@ export const MyTasteDialog: React.FC<{
       <div className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-hidden animate-fade-in-down" style={{ animationDuration: '200ms' }} onClick={e => e.stopPropagation()}>
         <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary !text-[18px]">favorite</span>
+            <Flame size={18} className="text-primary" />
             <h3 className="text-lg font-medium text-white">My Taste Profile</h3>
           </div>
           <button onClick={onClose} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none">

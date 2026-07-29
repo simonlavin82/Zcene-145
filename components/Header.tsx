@@ -3,6 +3,7 @@ import { FaviconLogo, StackIcon, Spinner } from './Icons';
 import { User } from 'firebase/auth';
 import { AnimatePresence, motion } from 'framer-motion';
 import { UserTaste } from '../types';
+import { Flame } from 'lucide-react';
 
 import { MyTasteDialog } from './SharedModals';
 
@@ -187,7 +188,7 @@ const Header: React.FC<HeaderProps> = ({
                 className={`h-8 flex flex-shrink-0 items-center justify-center rounded-xl bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 transition-colors leading-none shadow-lg border border-zinc-700/50 relative ${isSmallScreen ? 'w-8' : 'pl-2 pr-3 gap-2'}`} 
                 title="My Taste"
             >
-                <span className="material-symbols-outlined !text-[18px]">favorite</span>
+                <Flame size={18} />
                 {!isSmallScreen && <span className="text-xs font-medium">My Taste</span>}
             </button>
 

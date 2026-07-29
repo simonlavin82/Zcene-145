@@ -1536,7 +1536,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                             </div>
                             <button 
                                 onClick={() => onMagazineViewToggle(false)}
-                                className="flex items-center justify-center gap-2 px-4 py-2 bg-zinc-800 text-zinc-300 border border-zinc-700 hover:bg-zinc-700 hover:text-white hover:border-zinc-500 rounded-xl font-medium text-sm shrink-0 leading-none active:scale-95 transition-all duration-200"
+                                className="flex items-center gap-1.5 px-3 py-1.5 border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 transition-all duration-200 text-xs font-medium shrink-0 leading-none backdrop-blur-sm"
                                 title="Exit Magazine View"
                             >
                                 <span>Exit Magazine</span>
@@ -1616,7 +1616,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                             <div className="flex items-center gap-0.5 ml-4 shrink-0">
                                 <button 
                                     onClick={() => onMagazineViewToggle(false)}
-                                    className="flex items-center justify-center gap-2 px-4 py-2 bg-zinc-800 text-zinc-300 border border-zinc-700 hover:bg-zinc-700 hover:text-white hover:border-zinc-500 rounded-xl font-medium text-sm shrink-0 leading-none active:scale-95 transition-all duration-200"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 transition-all duration-200 text-xs font-medium shrink-0 leading-none backdrop-blur-sm"
                                     title="Exit Magazine View"
                                 >
                                     <span>Exit Magazine</span>
