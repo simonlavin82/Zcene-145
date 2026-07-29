@@ -1640,41 +1640,55 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                         <button 
                                             onClick={handlePrev} 
                                             disabled={viewedIndex <= 0}
-                                            className="w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 rounded-xl transition-colors disabled:opacity-20 disabled:pointer-events-none leading-none"
+                                            className="w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 rounded-xl transition-colors disabled:opacity-20 disabled:pointer-events-none leading-none select-none outline-none focus:outline-none"
                                         >
                                             <span className="material-symbols-outlined !text-[18px]">chevron_left</span>
                                         </button>
                                         <button 
                                             onClick={handleNext} 
                                             disabled={viewedIndex === activeNodes.length - 1}
-                                            className="w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 rounded-xl transition-colors disabled:opacity-20 disabled:pointer-events-none leading-none"
+                                            className="w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 rounded-xl transition-colors disabled:opacity-20 disabled:pointer-events-none leading-none select-none outline-none focus:outline-none"
                                         >
                                             <span className="material-symbols-outlined !text-[18px]">chevron_right</span>
                                         </button>
                                         
                                         <div 
-                                            className="w-[80px] sm:w-[120px] h-1.5 bg-zinc-800 rounded-full overflow-hidden flex-shrink-0 relative cursor-pointer group"
-                                            onClick={(e) => {
-                                                const rect = e.currentTarget.getBoundingClientRect();
-                                                const percentage = (e.clientX - rect.left) / rect.width;
-                                                const newIndex = Math.min(
-                                                    activeNodes.length - 1, 
-                                                    Math.max(0, Math.floor(percentage * activeNodes.length))
-                                                );
-                                                if (newIndex !== viewedIndex) {
-                                                    setViewedIndex(newIndex);
-                                                    onNodeClick(activeNodes[newIndex], true);
-                                                }
-                                            }}
-                                            title="Click to jump to a specific artist"
+                                            className="relative flex items-center justify-start w-[100px] sm:w-[140px] overflow-hidden flex-shrink-0 h-6 [--tx:var(--tx-mobile)] sm:[--tx:var(--tx-desktop)]"
+                                            style={{
+                                                '--tx-mobile': (activeNodes.length * 8 + 72) < 100 
+                                                    ? `${(100 - (activeNodes.length * 8 + 72)) / 2}px` 
+                                                    : `clamp(${100 - (activeNodes.length * 8 + 72)}px, calc(50px - ${40 + viewedIndex * 8}px), 0px)`,
+                                                '--tx-desktop': (activeNodes.length * 8 + 72) < 140 
+                                                    ? `${(140 - (activeNodes.length * 8 + 72)) / 2}px` 
+                                                    : `clamp(${140 - (activeNodes.length * 8 + 72)}px, calc(70px - ${40 + viewedIndex * 8}px), 0px)`,
+                                            } as React.CSSProperties}
                                         >
                                             <div 
-                                                className="absolute top-0 bottom-0 bg-primary rounded-full transition-all duration-300 ease-out shadow-[0_0_8px_rgba(252,211,77,0.5)] group-active:bg-yellow-200"
-                                                style={{
-                                                    width: `${100 / Math.max(1, activeNodes.length)}%`,
-                                                    transform: `translateX(${viewedIndex * 100}%)`
-                                                }}
-                                            />
+                                                className="flex items-center gap-1 flex-nowrap transition-transform duration-300 ease-out px-8"
+                                                style={{ transform: 'translateX(var(--tx))' }}
+                                            >
+                                                {activeNodes.map((node, i) => {
+                                                    const isLoading = loadingNodeIds.has(node.id);
+                                                    return (
+                                                        <div 
+                                                            key={node.id} 
+                                                            onClick={() => { setViewedIndex(i); onNodeClick(node, true); }}
+                                                            className={`transition-all cursor-pointer flex-shrink-0 rounded-full ${
+                                                                i === viewedIndex 
+                                                                    ? 'w-4 h-1 bg-primary' 
+                                                                    : isLoading 
+                                                                        ? 'w-1.5 h-1.5 bg-primary/80 animate-pulse' 
+                                                                        : 'w-1 h-1 bg-zinc-600 hover:bg-zinc-400'
+                                                            }`}
+                                                            title={`${cleanArtistDisplayName(node.label || node.id)}${isLoading ? ' (Generating...)' : ''}`}
+                                                        />
+                                                    );
+                                                })}
+                                            </div>
+                                            
+                                            {/* Gradient fades for the edges */}
+                                            <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-zinc-900 to-transparent pointer-events-none" />
+                                            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-zinc-900 to-transparent pointer-events-none" />
                                         </div>
                                     </>
                                 )}
