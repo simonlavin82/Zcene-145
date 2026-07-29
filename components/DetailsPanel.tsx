@@ -814,7 +814,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             )}
 
                             {imageTier !== 'placeholder' && currentImageUrl && (
-                                <div className="w-1/2 mx-auto bg-zinc-900 overflow-hidden relative border border-zinc-800/50 shadow-2xl rounded-lg group min-h-[150px]">
+                                <div className="w-40 h-40 sm:w-44 sm:h-44 flex-shrink-0 mx-auto bg-zinc-900 overflow-hidden relative border border-zinc-800/50 shadow-2xl rounded-lg group">
                                     {/* Temporary Loading Skeleton while image loads */}
                                     {!imgLoaded && (
                                         <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center p-6 text-center bg-zinc-900 overflow-hidden z-10">
@@ -842,7 +842,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                         ref={imgRef}
                                         src={currentImageUrl} 
                                         alt={getArtistDisplayName(details, node)} 
-                                        className={`relative w-full h-auto block scale-105 group-hover:scale-100 transition-all duration-1000 ${imgLoaded ? 'opacity-100 z-20' : 'opacity-0 z-0'}`}
+                                        className={`relative w-full h-full object-cover block scale-105 group-hover:scale-100 transition-all duration-1000 ${imgLoaded ? 'opacity-100 z-20' : 'opacity-0 z-0'}`}
                                         onLoad={() => setImgLoaded(true)}
                                         onError={handleImageError}
                                     />

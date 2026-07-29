@@ -2267,7 +2267,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <div className="p-8 bg-zinc-950 rounded-xl border border-zinc-800 flex flex-col items-center justify-center gap-6">
                                         <div className="flex justify-between items-center w-full max-w-sm px-4 py-2 border border-zinc-700/50 bg-zinc-900 rounded-xl gap-3">
                                             {/* Left-Aligned Cluster */}
-                                            <div className="flex items-center space-x-3 overflow-hidden">
+                                            <div className="flex items-center space-x-3 overflow-hidden flex-1 pr-2">
                                                 <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-xl transition-colors">
                                                     <span className="material-symbols-outlined !text-[18px]">chevron_left</span>
                                                 </button>
@@ -2275,18 +2275,25 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                     <span className="material-symbols-outlined !text-[18px]">chevron_right</span>
                                                 </button>
                                                 
-                                                {/* Dots Track Wrapper with Clamped Width and Right Edge Fade */}
-                                                <div className="relative flex items-center max-w-[80px] overflow-hidden flex-shrink-0">
-                                                    <div className="flex items-center gap-1 flex-nowrap pr-4 overflow-hidden">
-                                                        <div className="h-1 w-4 bg-primary transition-all rounded-full flex-shrink-0" />
-                                                        <div className="h-1 w-1 bg-zinc-600 transition-all rounded-full flex-shrink-0" />
-                                                        <div className="h-1 w-1 bg-zinc-600 transition-all rounded-full flex-shrink-0" />
-                                                        <div className="h-1 w-1 bg-zinc-600 transition-all rounded-full flex-shrink-0" />
-                                                        <div className="h-1 w-1 bg-zinc-600 transition-all rounded-full flex-shrink-0" />
-                                                        <div className="h-1 w-1 bg-zinc-600 transition-all rounded-full flex-shrink-0" />
+                                                {/* Dots Track Wrapper */}
+                                                <div className="relative flex items-center overflow-hidden flex-1 h-6 min-w-[40px] max-w-[140px] md:max-w-[200px] lg:max-w-[260px]">
+                                                    <div className="flex items-center flex-nowrap overflow-x-auto scrollbar-hide [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full h-full px-1">
+                                                        <div className="flex items-center justify-center h-full px-[2px] cursor-pointer group">
+                                                            <div className="h-1 w-4 bg-primary transition-all rounded-full flex-shrink-0" />
+                                                        </div>
+                                                        <div className="flex items-center justify-center h-full px-[2px] cursor-pointer group">
+                                                            <div className="h-1 w-1 bg-zinc-600 group-hover:bg-zinc-400 transition-all rounded-full flex-shrink-0" />
+                                                        </div>
+                                                        <div className="flex items-center justify-center h-full px-[2px] cursor-pointer group">
+                                                            <div className="h-1 w-1 bg-zinc-600 group-hover:bg-zinc-400 transition-all rounded-full flex-shrink-0" />
+                                                        </div>
+                                                        <div className="flex items-center justify-center h-full px-[2px] cursor-pointer group">
+                                                            <div className="h-1 w-1 bg-zinc-600 group-hover:bg-zinc-400 transition-all rounded-full flex-shrink-0" />
+                                                        </div>
+                                                        <div className="flex items-center justify-center h-full px-[2px] cursor-pointer group">
+                                                            <div className="h-1 w-1 bg-zinc-600 group-hover:bg-zinc-400 transition-all rounded-full flex-shrink-0" />
+                                                        </div>
                                                     </div>
-                                                    {/* Fade Overlay */}
-                                                    <div className="absolute right-0 top-0 bottom-0 w-4 bg-gradient-to-r from-transparent to-zinc-900 pointer-events-none" />
                                                 </div>
                                             </div>
 
