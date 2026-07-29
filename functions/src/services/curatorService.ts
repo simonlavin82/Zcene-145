@@ -603,7 +603,7 @@ export const generateGraphDataBackend = async (
   }
 
   const ai = new GoogleGenAI({ apiKey });
-  const currentModel = "gemini-3.1-pro-preview";
+  const currentModel = "gemini-2.5-flash";
   const artistList = artists.split('::').map(a => a.trim()).filter(Boolean);
 
   let userPrompt: string;
@@ -1217,21 +1217,30 @@ export const scrapeImageUrlBackend = async (
 
       if (res.ok) {
         const data = await res.json();
-        // Filter for exact, case-insensitive artist name match
-        const exactMatches = data.results?.filter((r: any) => r.artistName.toLowerCase() === artistName.toLowerCase()) || [];
+        const exactMatches = data.results?.filter((r: any) => (r.artistName || "").toLowerCase() === artistName.toLowerCase()) || [];
         
         let selectedArtistId = null;
-        if (exactMatches.length === 1) {
-          selectedArtistId = exactMatches[0].artistId;
-        } else if (exactMatches.length > 1) {
-          // Genre disambiguation: Compare iTunes primary genre with our Zcene genre string
-          const zceneGenreLower = genre.toLowerCase();
-          const genreMatch = exactMatches.find((r: any) => {
+        const zceneGenreLower = (genre || "").toLowerCase();
+        const allowedGenres = ['rock', 'alternative', 'punk', 'metal', 'hardcore', 'indie', 'emo', 'pop punk', 'post-hardcore', 'hip-hop', 'rap', 'electronic'];
+
+        if (exactMatches.length > 0) {
+          const bestMatch = exactMatches.find((r: any) => {
             const itunesGenre = (r.primaryGenreName || "").toLowerCase();
-            return zceneGenreLower.includes(itunesGenre) || itunesGenre.includes(zceneGenreLower);
+            if (!itunesGenre) return false;
+            
+            // Match 1: Direct intersection with Zcene's determined genre
+            if (zceneGenreLower.includes(itunesGenre) || itunesGenre.includes(zceneGenreLower)) return true;
+            
+            // Match 2: Intersection with our approved broad alternative whitelist
+            return allowedGenres.some(allowed => itunesGenre.includes(allowed));
           });
-          // Fallback to the most popular exact match if genres don't perfectly align
-          selectedArtistId = genreMatch ? genreMatch.artistId : exactMatches[0].artistId;
+
+          if (bestMatch) {
+            selectedArtistId = bestMatch.artistId;
+          } else {
+            console.warn(`[scrapeImageUrlBackend] iTunes validation blocked for ${artistName}. No genre overlap found, skipping to Gemini fallback.`);
+            selectedArtistId = null;
+          }
         }
 
         if (selectedArtistId) {
