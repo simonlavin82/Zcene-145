@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node --env-file=.env server.js & vite",
+    "dev": "concurrently \"node --env-file=.env server.js\" \"vite\"",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0 --port $PORT",
     "lint": "eslint . && tsc --noEmit"
@@ -30,6 +30,7 @@
     "@firebase/eslint-plugin-security-rules": "^0.0.2",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "concurrently": "^10.0.4",
     "eslint": "^10.3.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
