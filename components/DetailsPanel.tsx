@@ -299,6 +299,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     const [imageTier, setImageTier] = useState<'source' | 'placeholder'>('source');
     const [imgLoaded, setImgLoaded] = useState(false);
     const [isIdCopied, setIsIdCopied] = useState(false);
+    const [isHeaderStuck, setIsHeaderStuck] = useState(false);
     const imgRef = useRef<HTMLImageElement>(null);
 
     const currentImageUrl = useMemo(() => {
@@ -594,11 +595,15 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         <div 
           className={`w-full min-w-[320px] bg-zinc-900 relative break-words transition-all duration-500 ${isFullScreenMode ? 'h-fit border border-zinc-800/80 shadow-2xl overflow-hidden mb-4 md:mb-6 break-inside-avoid' : 'h-full overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800'}`}
           style={{ overscrollBehaviorY: 'auto' }}
+          onScroll={(e) => {
+              if (isFullScreenMode) return;
+              setIsHeaderStuck(e.currentTarget.scrollTop > 40);
+          }}
         >
             <div className="flex flex-col min-h-full">
-                <div className={`px-4 pt-3 pb-3 border-b border-zinc-800/50 bg-zinc-900 z-20 flex-shrink-0 ${isFullScreenMode ? 'md:px-6' : ''}`}>
-                    <div className="flex flex-col gap-2 mb-2">
-                        <div className="flex items-center justify-end gap-1 flex-shrink-0">
+                {/* 1. Action Icons (Not Sticky) */}
+                <div className={`px-4 pt-3 bg-zinc-900 z-20 flex-shrink-0 ${isFullScreenMode ? 'md:px-6' : ''}`}>
+                    <div className="flex items-center justify-end gap-1 flex-shrink-0">
                             {(isArtistNode || isLabelNode) && (
                                 <button
                                     onClick={() => onToggleStack(node, links.purchase?.[0]?.url)}
@@ -653,14 +658,18 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 )
                             )}
                         </div>
-                        <div className="flex flex-col gap-1 min-w-0 flex-grow">
+                </div>
+
+                {/* 2. Artist Name & Pills (Sticky in panel view only) */}
+                <div className={`px-4 ${isHeaderStuck && !isFullScreenMode ? 'py-2' : 'pt-2 pb-3'} transition-all duration-300 border-b border-zinc-800/50 bg-zinc-900 flex-shrink-0 ${!isFullScreenMode ? 'sticky top-0 z-40' : 'z-20'} ${isFullScreenMode ? 'md:px-6' : ''}`}>
+                    <div className={`flex flex-col ${isHeaderStuck && !isFullScreenMode ? 'gap-0' : 'gap-1'} min-w-0 flex-grow transition-all duration-300`}>
                             <div className="flex items-center gap-2">
                                 <div 
                                     onClick={handleCopyId}
                                     className="group flex items-center gap-2 cursor-copy w-fit transition-all active:scale-[0.98] min-w-0"
                                     title="Click to copy name"
                                 >
-                                    <h3 className={`${headerSizeClass} text-white leading-[0.9] py-1 break-normal`}>
+                                    <h3 className={`${isHeaderStuck && !isFullScreenMode ? 'text-base font-medium' : headerSizeClass} text-white leading-[0.9] py-1 break-normal transition-all duration-300`}>
                                         {getArtistDisplayName(details, node)}
                                     </h3>
                                     <span className={`material-symbols-outlined !text-[16px] flex-shrink-0 transition-all duration-300 ${isIdCopied ? 'text-primary opacity-100 scale-110' : 'text-zinc-500 opacity-0 group-hover:opacity-100'}`}>
@@ -668,14 +677,13 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     </span>
                                 </div>
                             </div>
-                            <div className="flex flex-wrap items-center gap-2 mt-1">
+                            <div className={`flex flex-wrap items-center gap-2 transition-all duration-300 overflow-hidden ${isHeaderStuck && !isFullScreenMode ? 'max-h-0 opacity-0 mt-0' : 'max-h-10 opacity-100 mt-1'}`}>
                                 <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-400 bg-zinc-800/80 px-2 py-0.5 border border-zinc-700/50 rounded-md">{node.type}</span>
                                 {isManualAdd && <span className="text-[10px] font-semibold uppercase tracking-[0.2em] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 border border-emerald-500/30 rounded-md">Manual</span>}
                                 {isAiSuggestion && <span className="text-[10px] font-semibold uppercase tracking-[0.2em] bg-purple-500/20 text-purple-400 px-2 py-0.5 border border-purple-500/30 flex items-center gap-1 rounded-md"><span className="material-symbols-outlined !text-[12px]">star</span>AI</span>}
                                 {isLibraryArtist && <span className="text-[10px] font-semibold uppercase tracking-[0.2em] bg-sky-500/20 text-sky-400 px-2 py-0.5 border border-sky-500/30 rounded-md">Library</span>}
                             </div>
                         </div>
-                    </div>
                 </div>
 
                 <div className={`px-4 space-y-10 flex-grow min-h-0 relative ${isFullScreenMode ? 'py-4 md:px-8' : 'py-8'}`}>
@@ -750,7 +758,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                     )}
 
                     {details && (
-                        <div className="space-y-10 text-zinc-300 pb-16">
+                        <div className={`space-y-10 text-zinc-300 ${isFullScreenMode ? 'pb-6' : 'pb-16'}`}>
                             {/* Compatibility Meter (Hidden for Labels) */}
                             {!isLabelNode && (
                                 <div className="flex flex-col gap-1.5 w-full">
@@ -806,7 +814,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             )}
 
                             {imageTier !== 'placeholder' && currentImageUrl && (
-                                <div className="w-full bg-zinc-900 overflow-hidden relative border border-zinc-800/50 shadow-2xl rounded-lg group min-h-[150px]">
+                                <div className="w-1/2 mx-auto bg-zinc-900 overflow-hidden relative border border-zinc-800/50 shadow-2xl rounded-lg group min-h-[150px]">
                                     {/* Temporary Loading Skeleton while image loads */}
                                     {!imgLoaded && (
                                         <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center p-6 text-center bg-zinc-900 overflow-hidden z-10">
@@ -852,7 +860,7 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 const quoteText = hasInsight ? details.recommendationReason : summaryFallback;
                                 return quoteText ? (
                                     <div className="pt-2">
-                                        <p className="italic text-zinc-100 leading-tight font-serif tracking-tight text-2xl">
+                                        <p className="italic text-zinc-100 leading-tight font-serif tracking-tight text-xl">
                                             "{quoteText}"
                                         </p>
                                     </div>
@@ -952,15 +960,15 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
                             <div className="space-y-4">
                                 <h4 className="font-bold text-zinc-500 text-[10px] uppercase tracking-[0.2em]">Bio</h4>
-                                <div className={`leading-relaxed text-zinc-300 markdown-bio ${isHero ? 'text-[clamp(1rem,1.2vw,1.125rem)] font-normal column-count-1 md:column-count-2 md:gap-12' : 'text-base'}`}>
+                                <div className={`leading-relaxed text-zinc-300 markdown-bio ${isHero ? 'text-[clamp(0.875rem,1vw,1rem)] font-normal column-count-1 md:column-count-2 md:gap-12' : 'text-sm'}`}>
                                     <Markdown>{details.summary}</Markdown>
                                 </div>
                             </div>
 
                             {!isLabelNode && details.members && details.members.length > 0 && (
                                 <div>
-                                    <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-widest">Personnel</h4>
-                                    <p className="text-base text-zinc-400">{details.members.join(' • ')}</p>
+                                    <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-widest">Members</h4>
+                                    <p className="text-sm text-zinc-400">{details.members.join(' • ')}</p>
                                 </div>
                             )}
 
@@ -1644,27 +1652,29 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                             <span className="material-symbols-outlined !text-[18px]">chevron_right</span>
                                         </button>
                                         
-                                        <div className="relative flex items-center max-w-[80px] sm:max-w-[120px] overflow-hidden flex-shrink-0">
-                                            <div className="flex items-center gap-1 flex-nowrap pr-4 overflow-hidden">
-                                                {activeNodes.map((node, i) => {
-                                                    const isLoading = loadingNodeIds.has(node.id);
-                                                    return (
-                                                        <div 
-                                                            key={node.id} 
-                                                            onClick={() => { setViewedIndex(i); onNodeClick(node, true); }}
-                                                            className={`transition-all cursor-pointer flex-shrink-0 rounded-full ${
-                                                                i === viewedIndex 
-                                                                    ? 'w-4 h-1 bg-primary' 
-                                                                    : isLoading 
-                                                                        ? 'w-1.5 h-1.5 bg-primary/80 animate-pulse' 
-                                                                        : 'w-1 h-1 bg-zinc-600 active:bg-zinc-400'
-                                                            }`}
-                                                            title={`${cleanArtistDisplayName(node.label || node.id)}${isLoading ? ' (Generating...)' : ''}`}
-                                                        />
-                                                    );
-                                                })}
-                                            </div>
-                                            <div className="absolute right-0 top-0 bottom-0 w-4 bg-gradient-to-r from-transparent to-zinc-900 pointer-events-none" />
+                                        <div 
+                                            className="w-[80px] sm:w-[120px] h-1.5 bg-zinc-800 rounded-full overflow-hidden flex-shrink-0 relative cursor-pointer group"
+                                            onClick={(e) => {
+                                                const rect = e.currentTarget.getBoundingClientRect();
+                                                const percentage = (e.clientX - rect.left) / rect.width;
+                                                const newIndex = Math.min(
+                                                    activeNodes.length - 1, 
+                                                    Math.max(0, Math.floor(percentage * activeNodes.length))
+                                                );
+                                                if (newIndex !== viewedIndex) {
+                                                    setViewedIndex(newIndex);
+                                                    onNodeClick(activeNodes[newIndex], true);
+                                                }
+                                            }}
+                                            title="Click to jump to a specific artist"
+                                        >
+                                            <div 
+                                                className="absolute top-0 bottom-0 bg-primary rounded-full transition-all duration-300 ease-out shadow-[0_0_8px_rgba(252,211,77,0.5)] group-active:bg-yellow-200"
+                                                style={{
+                                                    width: `${100 / Math.max(1, activeNodes.length)}%`,
+                                                    transform: `translateX(${viewedIndex * 100}%)`
+                                                }}
+                                            />
                                         </div>
                                     </>
                                 )}

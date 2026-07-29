@@ -561,7 +561,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 </p>
                                 <ul className="space-y-2 text-sm text-zinc-400 list-disc pl-5">
                                     <li><strong>Main Artist Header:</strong> Standardized to <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">text-5xl font-bold tracking-tighter</code> (48px static). Longer names wrap naturally onto two lines instead of shrinking.</li>
-                                    <li><strong>Curator Summary Quote:</strong> Standardized to <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">text-2xl font-serif italic text-zinc-100</code> (24px static). Placed tightly beneath metadata tags to eliminate empty layout spacers.</li>
+                                    <li><strong>Curator Summary Quote:</strong> Standardized to <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">text-xl font-serif italic text-zinc-100</code> (20px static). Placed tightly beneath metadata tags to eliminate empty layout spacers.</li>
                                 </ul>
                             </div>
 
