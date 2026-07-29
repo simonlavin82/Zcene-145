@@ -142,6 +142,10 @@ const generateGraphDataViaCloudJob = async (
         unsubscribe();
         const serverError = new Error(job.errorMessage || "Backend curation failed.");
         (serverError as any).errorDetails = job.errorDetails;
+        if (job.errorDetails && job.errorDetails.stack) {
+          (serverError as any).stackSnippet = job.errorDetails.stack.substring(0, 300);
+          console.error("[Cloud Job Listener] Backend Stack Trace:", job.errorDetails.stack);
+        }
         reject(serverError);
       }
     }, (error) => {
@@ -4368,7 +4372,8 @@ const App: React.FC = () => {
       }
     } catch (err: any) {
       if (err.name !== 'AbortError' && !(controller && controller.signal.aborted)) {
-        showToast(humanizeError(err));
+        const snippet = err.stackSnippet ? err.stackSnippet : "";
+        showToast(humanizeError(err) + snippet);
         setIsLoading(false);
         isFetchingDetailsRef.current = false;
       }
@@ -5340,7 +5345,17 @@ const App: React.FC = () => {
       } else if (job.status === 'failed') {
         setIsLoading(false);
         setError(job.errorMessage || "Backend curation failed.");
-        showToast(`Curation failed: ${job.errorMessage || "System anomaly"}`);
+        
+        let stackSnippet = "";
+        if (job.errorDetails && job.errorDetails.stack) {
+          stackSnippet = "\\n\\nTrace: " + job.errorDetails.stack.substring(0, 300);
+          console.error("[Curation Reconnect] Backend Stack Trace:", job.errorDetails.stack);
+        } else if (job.errorDetails && job.errorDetails.rawMessage) {
+          stackSnippet = "\\n\\nDetails: " + job.errorDetails.rawMessage;
+          console.error("[Curation Reconnect] Backend Raw Error:", job.errorDetails.rawMessage);
+        }
+        
+        showToast(`Curation failed: ${job.errorMessage || "System anomaly"}${stackSnippet}`);
       }
     }, (err) => {
       console.error(`[Curation Reconnect] Failed listening to job ${activeJobId}:`, err);

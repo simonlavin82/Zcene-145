@@ -184,7 +184,7 @@ export const onCurationJobCreated = onDocumentCreated({
       const forceMocks = inputPayload?.useMocks === true;
 
       if (isEmulator || isMissingApiKey || forceMocks) {
-        console.log(`[Curation Backend] Mock conditions met. Emulator: ${isEmulator}, No Key: ${isMissingApiKey}, Force Mocks: ${forceMocks}. Running simulated mock.`);
+        console.log(`[Curation Backend] [Step 1: Graph Generation Started] Mock conditions met. Running simulated mock.`);
         
         // Keep the 5-second simulated delay for verification of loading screens
         await new Promise(resolve => setTimeout(resolve, 5000));
@@ -215,7 +215,7 @@ export const onCurationJobCreated = onDocumentCreated({
           detailsCache: JSON.stringify(mockDetails)
         };
       } else {
-        console.log("[Curation Backend] Executing live Gemini AI graph synthesis...");
+        console.log("[Curation Backend] [Step 1: Graph Generation Started] Executing live Gemini AI graph synthesis...");
         
         // Run backend curation synthesis
         const finalGraph = await generateGraphDataBackend(
@@ -249,7 +249,7 @@ export const onCurationJobCreated = onDocumentCreated({
             type: n.type || 'artist'
           }));
 
-        console.log(`[Curation Backend] Hydrating details for ${recommendedEntities.length} entities in the graph:`, recommendedEntities.map((e: any) => `${e.name} (${e.type})`));
+        console.log(`[Curation Backend] [Step 2: Hydration Loop Started] Hydrating details for ${recommendedEntities.length} entities in the graph:`, recommendedEntities.map((e: any) => `${e.name} (${e.type})`));
 
         const detailsCacheEntries: [string, any][] = [];
 
@@ -397,6 +397,8 @@ export const onCurationJobCreated = onDocumentCreated({
               return [artistName, details] as [string, any];
             })
           );
+
+          console.log(`[Curation Backend] [Step 3: Firestore Caching] Hydration complete. Writing ${chunkResults.length} entities to Firestore cache...`);
 
           for (const res of chunkResults) {
             if (res) {

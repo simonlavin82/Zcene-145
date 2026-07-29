@@ -1,0 +1,39 @@
+2026-07-16T16:01:14.067038Z I oncurationjobcreated: 
+2026-07-16T16:01:14.120224Z I oncurationjobcreated: Starting new instance. Reason: AUTOSCALING - Instance started due to configured scaling factors (e.g. CPU utilization, request throughput, etc.) or no existing capacity for current traffic.
+2026-07-16T16:01:15.844174Z I oncurationjobcreated: Default STARTUP TCP probe succeeded after 1 attempt for container "worker" on port 8080.
+2026-07-16T16:01:15.944326Z ? oncurationjobcreated: [Curation Backend] Processing job job-1784217673755-ofyvak90y with status: pending
+
+2026-07-16T16:01:16.913669Z ? oncurationjobcreated: [Curation Backend] Project LWbWD84cUN0jeiPMwaQI status updated successfully: { status: 'curating' }
+
+2026-07-16T16:01:16.914447Z ? oncurationjobcreated: [Curation Backend] Executing graph_generation for user K3QqtNRg48X7I3C0Zu2PVPzRBSH3 with payload: { artists: 'Lagwagon', filters: {}, projectId: 'LWbWD84cUN0jeiPMwaQI' }
+
+2026-07-16T16:01:16.914461Z ? oncurationjobcreated: [Curation Backend] Executing live Gemini AI graph synthesis...
+
+2026-07-16T16:01:59.223800Z ? oncurationjobcreated: [Curation Backend] Hydrating details for 11 artists in the graph: [
+  'lagwagon',
+  'nofx',
+  'no-use-for-a-name',
+  'strung-out',
+  'good-riddance',
+  'propagandhi',
+  'pennywise',
+  'millencolin',
+  'bad-religion',
+  'descendents',
+  'less-than-jake'
+]
+
+2026-07-16T16:01:59.309775Z ? oncurationjobcreated: [Curation Backend] Cache miss. Hydrating details for: lagwagon (1/11)...
+
+2026-07-16T16:02:20.454929Z ? oncurationjobcreated: [Curation Backend] Hydration successful for: lagwagon
+
+2026-07-16T16:02:26.955277Z ? oncurationjobcreated: [Curation Backend] Cache miss. Hydrating details for: nofx (2/11)...
+
+2026-07-16T16:03:23.558320Z ? oncurationjobcreated: [Curation Backend] Hydration successful for: nofx
+
+2026-07-16T16:03:29.054578Z ? oncurationjobcreated: [Curation Backend] Cache miss. Hydrating details for: no-use-for-a-name (3/11)...
+
+2026-07-16T16:04:04.154769Z ? oncurationjobcreated: [Curation Backend] Hydration successful for: no-use-for-a-name
+
+2026-07-16T16:04:09.454944Z ? oncurationjobcreated: [Curation Backend] Cache miss. Hydrating details for: strung-out (4/11)...
+

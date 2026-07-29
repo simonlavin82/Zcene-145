@@ -182,6 +182,12 @@ exports.TOAST_MAPPING_RULES = {
 const translateError = (error) => {
     const rawMessage = error?.message || String(error) || '';
     const errorCode = error?.code || '';
+    // Prevent double-translation: if the backend already translated the error into a valid finalMessage,
+    // return it directly instead of letting it fall through to the 'System anomaly' fallback.
+    const isAlreadyTranslated = exports.ERROR_MAPPING_RULES.find(rule => rule.finalMessage === rawMessage);
+    if (isAlreadyTranslated) {
+        return new ZceneError(rawMessage, isAlreadyTranslated.severity, rawMessage, error);
+    }
     // Loop through defined rules and check for matching patterns
     for (const rule of exports.ERROR_MAPPING_RULES) {
         if (rule.rawPattern === 'auth/requires-recent-login' && (errorCode === 'auth/requires-recent-login' || rawMessage.includes('auth/requires-recent-login'))) {

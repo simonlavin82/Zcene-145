@@ -167,7 +167,7 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
             const isMissingApiKey = !process.env.GEMINI_API_KEY;
             const forceMocks = inputPayload?.useMocks === true;
             if (isEmulator || isMissingApiKey || forceMocks) {
-                console.log(`[Curation Backend] Mock conditions met. Emulator: ${isEmulator}, No Key: ${isMissingApiKey}, Force Mocks: ${forceMocks}. Running simulated mock.`);
+                console.log(`[Curation Backend] [Step 1: Graph Generation Started] Mock conditions met. Running simulated mock.`);
                 // Keep the 5-second simulated delay for verification of loading screens
                 await new Promise(resolve => setTimeout(resolve, 5000));
                 const mockDetails = [
@@ -196,7 +196,7 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                 };
             }
             else {
-                console.log("[Curation Backend] Executing live Gemini AI graph synthesis...");
+                console.log("[Curation Backend] [Step 1: Graph Generation Started] Executing live Gemini AI graph synthesis...");
                 // Run backend curation synthesis
                 const finalGraph = await (0, curatorService_1.generateGraphDataBackend)(inputPayload.artists, inputPayload.filters, inputPayload.cachedSubgraphsContext, inputPayload.baseGraph, inputPayload.disambiguationHints);
                 // Structural Integrity Guard: Verify that we received a valid, rich graph from the model
@@ -219,7 +219,7 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                     name: n.label || n.id,
                     type: n.type || 'artist'
                 }));
-                console.log(`[Curation Backend] Hydrating details for ${recommendedEntities.length} entities in the graph:`, recommendedEntities.map((e) => `${e.name} (${e.type})`));
+                console.log(`[Curation Backend] [Step 2: Hydration Loop Started] Hydrating details for ${recommendedEntities.length} entities in the graph:`, recommendedEntities.map((e) => `${e.name} (${e.type})`));
                 const detailsCacheEntries = [];
                 // Fetch details in concurrency chunks of 5 to reduce 20-minute run times to under 3 minutes
                 const batchSize = 5;
@@ -351,6 +351,7 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                         }
                         return [artistName, details];
                     }));
+                    console.log(`[Curation Backend] [Step 3: Firestore Caching] Hydration complete. Writing ${chunkResults.length} entities to Firestore cache...`);
                     for (const res of chunkResults) {
                         if (res) {
                             detailsCacheEntries.push(res);
