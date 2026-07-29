@@ -543,8 +543,11 @@ const generateGraphDataBackend = async (artists, filters, cachedSubgraphsContext
     if (!apiKey) {
         throw new Error("GEMINI_API_KEY is not defined in environment secrets.");
     }
-    const ai = new genai_1.GoogleGenAI({ apiKey });
-    const currentModel = "gemini-2.5-flash";
+    const ai = new genai_1.GoogleGenAI({
+        apiKey,
+        httpOptions: { timeout: 300000 } // 5 minutes
+    });
+    const currentModel = "gemini-3.1-pro-preview";
     const artistList = artists.split('::').map(a => a.trim()).filter(Boolean);
     let userPrompt;
     let systemInstruction;
@@ -574,7 +577,7 @@ const generateGraphDataBackend = async (artists, filters, cachedSubgraphsContext
         userPrompt = `Generate a music graph for these seed artists: ${artists}.`;
     }
     // Inject Discovery Filters into System Instruction
-    if (filters) {
+    if (filters && Object.keys(filters).length > 0) {
         let filterRules = "\n\nSTRICT DISCOVERY CONSTRAINTS (ZERO-TOLERANCE):";
         filterRules += "\nYou are a strict filtering agent. Your primary mission is to obey these filters. Musical relevance is secondary.";
         if (filters.foundedAfter) {
@@ -896,7 +899,10 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint)
     if (!apiKey) {
         throw new Error("GEMINI_API_KEY is not defined in environment secrets.");
     }
-    const ai = new genai_1.GoogleGenAI({ apiKey });
+    const ai = new genai_1.GoogleGenAI({
+        apiKey,
+        httpOptions: { timeout: 300000 } // 5 minutes
+    });
     const currentModel = "gemini-2.5-flash";
     const contextNodes = graphData.links
         .filter(l => (typeof l.source === 'string' ? l.source : l.source.id) === node.id || (typeof l.target === 'string' ? l.target : l.target.id) === node.id)
@@ -1054,7 +1060,10 @@ const scrapeVideoIdBackend = async (artistName, artistId) => {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey)
         return null;
-    const ai = new genai_1.GoogleGenAI({ apiKey });
+    const ai = new genai_1.GoogleGenAI({
+        apiKey,
+        httpOptions: { timeout: 300000 } // 5 minutes
+    });
     const currentModel = "gemini-2.5-flash";
     const prompt = `Perform a Google Search for: '${artistName} official music video youtube'. 
 Look at the top organic YouTube video in search results. Extract its 11-character video ID (the string after v= or inside the URL). Return ONLY the 11-character video ID as a plain string. Do not include any JSON, quotes, explanations, markdown, or other text. If not found, return "null".`;
@@ -1158,7 +1167,10 @@ const scrapeImageUrlBackend = async (artistName, type, genre, summary) => {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey)
         return null;
-    const ai = new genai_1.GoogleGenAI({ apiKey });
+    const ai = new genai_1.GoogleGenAI({
+        apiKey,
+        httpOptions: { timeout: 300000 } // 5 minutes
+    });
     const currentModel = "gemini-2.5-flash";
     const prompt = `Find a high-quality, direct HTTPS image URL representing the music ${type}: "${artistName}".
   

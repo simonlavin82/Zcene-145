@@ -602,8 +602,11 @@ export const generateGraphDataBackend = async (
     throw new Error("GEMINI_API_KEY is not defined in environment secrets.");
   }
 
-  const ai = new GoogleGenAI({ apiKey });
-  const currentModel = "gemini-2.5-flash";
+  const ai = new GoogleGenAI({ 
+    apiKey,
+    httpOptions: { timeout: 300000 } // 5 minutes
+  });
+  const currentModel = "gemini-3.1-pro-preview";
   const artistList = artists.split('::').map(a => a.trim()).filter(Boolean);
 
   let userPrompt: string;
@@ -636,7 +639,7 @@ export const generateGraphDataBackend = async (
   }
 
   // Inject Discovery Filters into System Instruction
-  if (filters) {
+  if (filters && Object.keys(filters).length > 0) {
       let filterRules = "\n\nSTRICT DISCOVERY CONSTRAINTS (ZERO-TOLERANCE):";
       filterRules += "\nYou are a strict filtering agent. Your primary mission is to obey these filters. Musical relevance is secondary.";
       
@@ -990,7 +993,10 @@ export const fetchNodeDetailsBackend = async (
     throw new Error("GEMINI_API_KEY is not defined in environment secrets.");
   }
   
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ 
+    apiKey,
+    httpOptions: { timeout: 300000 } // 5 minutes
+  });
   const currentModel = "gemini-2.5-flash";
 
   const contextNodes = graphData.links
@@ -1157,7 +1163,10 @@ export const scrapeVideoIdBackend = async (
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return null;
 
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ 
+    apiKey,
+    httpOptions: { timeout: 300000 } // 5 minutes
+  });
   const currentModel = "gemini-2.5-flash";
 
   const prompt = `Perform a Google Search for: '${artistName} official music video youtube'. 
@@ -1271,7 +1280,10 @@ export const scrapeImageUrlBackend = async (
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return null;
 
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ 
+    apiKey,
+    httpOptions: { timeout: 300000 } // 5 minutes
+  });
   const currentModel = "gemini-2.5-flash";
 
   const prompt = `Find a high-quality, direct HTTPS image URL representing the music ${type}: "${artistName}".
