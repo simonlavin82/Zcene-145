@@ -473,7 +473,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         }
     };
 
-    const triggerNodeHover = (d: Node) => {
+    const triggerNodeHover = (d: Node, isProgrammatic = false) => {
         setHoveredNodeId(d.id);
         activeHoveredNodeRef.current = d;
 
@@ -581,7 +581,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     fallbackMessage = "[Indirect recommendation]";
                 }
 
-                if (connections.length > 0 || nodeDna || fallbackMessage) {
+                if ((connections.length > 0 || nodeDna || fallbackMessage) && !isProgrammatic) {
                     const transform = d3.zoomTransform(svgRef.current);
                     setHoveredLink({
                         sourceId: toDisplayLabel(d),
@@ -603,7 +603,8 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     const clearNodeHover = () => {
         const activeNode = selectedNodeRef.current || peekedNodeRef.current;
         if (activeNode) {
-            triggerNodeHover(activeNode);
+            triggerNodeHover(activeNode, true);
+            setHoveredLink(null);
             return;
         }
 
@@ -1306,10 +1307,10 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   // Pin Hover Box and highlight connections when selectedNode or peekedNode changes
   useEffect(() => {
     const activeNode = selectedNode || peekedNode;
-    if (activeNode) {
-      triggerNodeHoverRef.current(activeNode);
-    } else {
-      clearNodeHoverRef.current();
+    if (activeNode && triggerNodeHoverRef.current) {
+        triggerNodeHoverRef.current(activeNode, true);
+    } else if (!activeNode && clearNodeHoverRef.current) {
+        clearNodeHoverRef.current();
     }
   }, [selectedNode, peekedNode]);
 
@@ -1431,7 +1432,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     >
         <svg ref={svgRef} className="w-full h-full touch-none" />
         
-        {hoveredLink && !selectedNode && (
+        {hoveredLink && (
             <div
                 style={
                     typeof window !== 'undefined' && window.innerWidth >= 1024

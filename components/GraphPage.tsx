@@ -875,6 +875,8 @@ const GraphPage: React.FC<GraphPageProps> = ({
       analyticsService.track('Node Clicked', { node_id: node?.id, node_type: node?.type });
       if (!isSmallScreen) {
         setIsLeftPanelCollapsed(true);
+      } else {
+        setActiveTab('details');
       }
     }
   }, [onNodeClick, isSmallScreen]);
