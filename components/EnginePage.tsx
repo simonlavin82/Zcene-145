@@ -725,7 +725,7 @@ The Zcene AI curation and client proxy pipelines implement a 4-tier defense-in-d
    In cases where Google Search grounding forces Gemini to drop JSON mode in favor of unstructured prose, the error handlers execute a Grounding Prose Fallback. To prevent raw JSON syntax wrappers ({ "summary": "..." }) or AI reasoning from being saved as band biographies:
    - Wrapper Rescue: Detects JSON artifact prefixes ({/[ or "summary":) and regex-extracts clean bio strings.
    - CoT Rejection: Actively rejects reasoning sentences (e.g., 'I have confirmed...', 'I will manually check...') and throws a safe formatting exception rather than writing commentary to Firestore alongside youtubeVideoId: null.
-   - Markdown Sanitization: Actively strips markdown bolding (**) and translates literal escaped newlines (\\n) to structural paragraph breaks on the backend to ensure pristine frontend rendering.
+   - Markdown Preservation: Preserves markdown formatting (bolding, lists) while translating literal escaped newlines (\\n) into actual breaks, allowing native frontend components to handle structural chunking and styling according to the Design System.
 
 4. CROSS-ENVIRONMENT SYNC:
    This defense-in-depth parsing contract is identically enforced across client proxies (services/geminiService.ts), Cloud Functions curation jobs (functions/src/services/curatorService.ts), and Node.js server endpoints (server.js).

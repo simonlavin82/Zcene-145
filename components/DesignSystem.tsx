@@ -627,6 +627,13 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                 </div>
                             </div>
+
+                            <div className="p-8 border border-primary/20 bg-primary/5 rounded-xl">
+                                <h4 className="text-sm font-semibold text-primary uppercase tracking-widest mb-4">Architecture Rule: Markdown Preservation</h4>
+                                <p className="text-sm text-zinc-300 leading-relaxed">
+                                    To achieve this native formatting, the backend sanitization pipeline (<code className="text-[10px] bg-zinc-900/80 px-1.5 py-0.5 rounded-none font-mono text-zinc-400">sanitizeBioText</code>) MUST preserve standard Markdown elements (such as <code className="text-[10px] bg-zinc-900/80 px-1.5 py-0.5 rounded-none font-mono text-zinc-400">**</code> for bolding and literal newlines for paragraph/list breaks) within the payload before saving to Firestore. Stripping these markers at the data layer will permanently break the frontend's ability to render structural chunking via the <code className="text-[10px] bg-zinc-900/80 px-1.5 py-0.5 rounded-none font-mono text-zinc-400">&lt;Markdown&gt;</code> component and the <code className="text-[10px] bg-zinc-900/80 px-1.5 py-0.5 rounded-none font-mono text-zinc-400">.markdown-bio</code> CSS class.
+                                </p>
+                            </div>
                         </div>
                     </section>
                     
