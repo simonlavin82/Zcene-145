@@ -1116,28 +1116,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 triggerNodeHoverRef.current(d);
             }
         })
-        .on("mousemove", (event, d) => {
-            if (!isSmallScreen && d.type === 'artist') {
-                if (containerRef.current) {
-                    const rect = containerRef.current.getBoundingClientRect();
-                    const x = event.clientX - rect.left;
-                    const y = event.clientY - rect.top;
-                    const isLeft = x < rect.width / 2;
-                    const isTop = y < rect.height / 2;
-                    let quadrant: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' = 'top-right';
-                    if (isLeft && isTop) {
-                        quadrant = 'bottom-right';
-                    } else if (!isLeft && isTop) {
-                        quadrant = 'bottom-left';
-                    } else if (isLeft && !isTop) {
-                        quadrant = 'top-right';
-                    } else if (!isLeft && !isTop) {
-                        quadrant = 'top-left';
-                    }
-                    setHoverQuadrant(quadrant);
-                }
-            }
-        })
+
         .on("mouseleave", (event, d) => {
             if (!isSmallScreen) {
                 const isPinned = (selectedNodeRef.current && isSameNodeId(selectedNodeRef.current.id, d.id)) ||
