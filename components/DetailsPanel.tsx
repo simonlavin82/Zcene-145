@@ -1307,6 +1307,29 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     const touchEndX = useRef<number | null>(null);
     const minSwipeDistance = 50;
 
+    const trackRef = useRef<HTMLDivElement>(null);
+    const activeDotRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!trackRef.current || !activeDotRef.current) return;
+
+        const centerDot = () => {
+            const track = trackRef.current;
+            const dot = activeDotRef.current;
+            if (track && dot) {
+                const scrollTarget = dot.offsetLeft - (track.clientWidth / 2) + (dot.clientWidth / 2);
+                track.scrollTo({ left: scrollTarget, behavior: 'smooth' });
+            }
+        };
+
+        centerDot();
+
+        const resizeObserver = new ResizeObserver(() => centerDot());
+        resizeObserver.observe(trackRef.current);
+        
+        return () => resizeObserver.disconnect();
+    }, [viewedIndex, activeNodes.length]);
+
     const isSelectedNodeHydrating = useMemo(() => {
         if (!selectedNode) return false;
         const normId = normalizeArtistId(selectedNode.id);
@@ -1634,7 +1657,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                 <div className="flex-grow flex flex-col min-h-0 h-full overflow-hidden">
                     {!isMagazineViewOpen && activeNodes.length > 0 && (
                         <div className="flex justify-between items-center w-full px-4 py-2 border-b border-zinc-700/50 bg-zinc-900 flex-shrink-0 gap-3">
-                            <div className="flex items-center space-x-3 overflow-hidden">
+                            <div className="flex items-center space-x-3 overflow-hidden flex-1 pr-2">
                                 {activeNodes.length > 1 && (
                                     <>
                                         <button 
@@ -1652,43 +1675,39 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                             <span className="material-symbols-outlined !text-[18px]">chevron_right</span>
                                         </button>
                                         
-                                        <div 
-                                            className="relative flex items-center justify-start w-[100px] sm:w-[140px] overflow-hidden flex-shrink-0 h-6 [--tx:var(--tx-mobile)] sm:[--tx:var(--tx-desktop)]"
-                                            style={{
-                                                '--tx-mobile': (activeNodes.length * 8 + 72) < 100 
-                                                    ? `${(100 - (activeNodes.length * 8 + 72)) / 2}px` 
-                                                    : `clamp(${100 - (activeNodes.length * 8 + 72)}px, calc(50px - ${40 + viewedIndex * 8}px), 0px)`,
-                                                '--tx-desktop': (activeNodes.length * 8 + 72) < 140 
-                                                    ? `${(140 - (activeNodes.length * 8 + 72)) / 2}px` 
-                                                    : `clamp(${140 - (activeNodes.length * 8 + 72)}px, calc(70px - ${40 + viewedIndex * 8}px), 0px)`,
-                                            } as React.CSSProperties}
-                                        >
+                                        <div className="relative flex items-center overflow-hidden flex-1 h-6 min-w-[40px] max-w-[140px] md:max-w-[200px] lg:max-w-[260px]">
                                             <div 
-                                                className="flex items-center gap-1 flex-nowrap transition-transform duration-300 ease-out px-8"
-                                                style={{ transform: 'translateX(var(--tx))' }}
+                                                ref={trackRef}
+                                                className="flex items-center flex-nowrap overflow-x-auto scrollbar-hide [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full h-full px-1"
                                             >
                                                 {activeNodes.map((node, i) => {
                                                     const isLoading = loadingNodeIds.has(node.id);
+                                                    const isActive = i === viewedIndex;
                                                     return (
                                                         <div 
-                                                            key={node.id} 
+                                                            key={node.id}
+                                                            ref={isActive ? activeDotRef : null} 
                                                             onClick={() => { setViewedIndex(i); onNodeClick(node, true); }}
-                                                            className={`transition-all cursor-pointer flex-shrink-0 rounded-full ${
-                                                                i === viewedIndex 
-                                                                    ? 'w-4 h-1 bg-primary' 
-                                                                    : isLoading 
-                                                                        ? 'w-1.5 h-1.5 bg-primary/80 animate-pulse' 
-                                                                        : 'w-1 h-1 bg-zinc-600 hover:bg-zinc-400'
-                                                            }`}
+                                                            className="flex items-center justify-center h-full px-[2px] cursor-pointer group"
                                                             title={`${cleanArtistDisplayName(node.label || node.id)}${isLoading ? ' (Generating...)' : ''}`}
-                                                        />
+                                                        >
+                                                            <div 
+                                                                className={`transition-all flex-shrink-0 rounded-full ${
+                                                                    isActive 
+                                                                        ? 'w-4 h-1 bg-primary' 
+                                                                        : isLoading 
+                                                                            ? 'w-1.5 h-1.5 bg-primary/80 animate-pulse' 
+                                                                            : 'w-1 h-1 bg-zinc-600 group-hover:bg-zinc-400'
+                                                                }`}
+                                                            />
+                                                        </div>
                                                     );
                                                 })}
                                             </div>
                                             
                                             {/* Gradient fades for the edges */}
-                                            <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-zinc-900 to-transparent pointer-events-none" />
-                                            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-zinc-900 to-transparent pointer-events-none" />
+                                            <div className="absolute left-0 top-0 bottom-0 w-4 bg-gradient-to-r from-zinc-900 to-transparent pointer-events-none" />
+                                            <div className="absolute right-0 top-0 bottom-0 w-4 bg-gradient-to-l from-zinc-900 to-transparent pointer-events-none" />
                                         </div>
                                     </>
                                 )}
