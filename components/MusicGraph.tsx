@@ -475,6 +475,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
     const triggerNodeHover = (d: Node, isProgrammatic = false) => {
         setHoveredNodeId(d.id);
+        hoveredNodeIdRef.current = d.id;
         activeHoveredNodeRef.current = d;
 
         const firstDegreeLinks = visibleLinks.filter(l => {
@@ -723,7 +724,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     isTrackingRef.current = false;
                 }
             });
-        svg.call(zoom);
+        svg.call(zoom).on("dblclick.zoom", null);
         zoomRef.current = zoom;
         svg.call(zoom.transform, d3.zoomIdentity.translate(dimensions.width/2 - VIRTUAL_CENTER_X * 0.5, dimensions.height/2 - VIRTUAL_CENTER_Y * 0.5).scale(0.5));
     }

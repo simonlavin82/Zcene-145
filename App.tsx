@@ -1514,6 +1514,13 @@ const App: React.FC = () => {
   const lastProgressTimestampRef = useRef<number>(Date.now());
 
   const showToast = useCallback((message: string) => setToast({ message: translateToast(message), id: Date.now() }), []);
+  const hasShownCacheToastRef = useRef(false);
+  const showCacheToast = useCallback(() => {
+    if (!hasShownCacheToastRef.current) {
+      showToast('⚡ Loaded from cache');
+      hasShownCacheToastRef.current = true;
+    }
+  }, [showToast]);
 
   const humanizeError = useCallback((error: any): string => {
     return translateError(error).userFriendlyMessage;
@@ -3089,7 +3096,7 @@ const App: React.FC = () => {
               if (!isQualified) {
                 console.log('[Front Gate Cache] Cache doc found but not fully qualified. Background revalidation queued.');
               } else {
-                showToast('⚡ Loaded from cache');
+                showCacheToast();
               }
               return;
             }
@@ -3436,7 +3443,7 @@ const App: React.FC = () => {
           if (!allQualified) {
             console.log('[Front Gate Cache] Some artists not fully qualified. Background revalidation queued.');
           } else {
-            showToast('⚡ Loaded from cache');
+            showCacheToast();
           }
           setIsLoading(false);
           
@@ -3692,7 +3699,7 @@ const App: React.FC = () => {
         if (!allQualified) {
           console.log('[Front Gate Cache] Some artists not fully qualified. Background revalidation queued.');
         } else {
-          showToast('⚡ Loaded from cache');
+          showCacheToast();
         }
         setIsLoading(false);
         
@@ -4002,7 +4009,7 @@ const App: React.FC = () => {
             setGraphData(normalizedGraph);
             setIsLoading(false);
             isHydratingSessionRef.current = false;
-            showToast('⚡ Loaded from cache');
+            showCacheToast();
             console.log(`[HARD GUARD] Cache loaded successfully. Nodes: ${normalizedGraph.nodes.length}. Synthesis blocked.`);
             return;
           }
@@ -5196,7 +5203,7 @@ const App: React.FC = () => {
           if (hasIncomplete) {
             console.log('[ProjectLoader] Cache incomplete for some seed nodes. Background revalidation queued.');
           } else {
-            showToast('⚡ Loaded from cache');
+            showCacheToast();
           }
         }
       } catch (err) {
