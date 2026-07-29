@@ -1302,6 +1302,14 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     const [isChatLoading, setIsChatLoading] = useState(false);
     const [magazineSortBy, setMagazineSortBy] = useState<'none' | 'artist' | 'label'>('none');
     const [magazineSearchQuery, setMagazineSearchQuery] = useState('');
+    const [hasSeenMagazineView, setHasSeenMagazineView] = useState(false);
+    
+    const magazineBtnState = hasSeenMagazineView ? 'neutral' : 'attention';
+    const magazineBtnClasses = {
+        disabled: "flex items-center gap-1.5 px-3 py-1.5 border border-zinc-800 bg-zinc-900/20 rounded-xl text-zinc-600 cursor-not-allowed transition-all duration-200 text-xs font-medium shrink-0 leading-none backdrop-blur-sm",
+        attention: "flex items-center gap-1.5 px-3 py-1.5 border border-primary bg-primary/10 rounded-xl text-primary animate-pulse hover:bg-primary/20 active:scale-95 transition-all duration-200 text-xs font-medium shrink-0 leading-none backdrop-blur-sm",
+        neutral: "flex items-center gap-1.5 px-3 py-1.5 border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 transition-all duration-200 text-xs font-medium shrink-0 leading-none backdrop-blur-sm"
+    }[magazineBtnState];
     
     const touchStartX = useRef<number | null>(null);
     const touchEndX = useRef<number | null>(null);
@@ -1528,11 +1536,11 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                             </div>
                             <button 
                                 onClick={() => onMagazineViewToggle(false)}
-                                className="flex items-center gap-1.5 px-3 py-1.5 border border-zinc-700/80 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 active:scale-95 transition-all text-xs font-medium shrink-0 leading-none"
+                                className="flex items-center justify-center gap-2 px-4 py-2 bg-zinc-800 text-zinc-300 border border-zinc-700 hover:bg-zinc-700 hover:text-white hover:border-zinc-500 rounded-xl font-medium text-sm shrink-0 leading-none active:scale-95 transition-all duration-200"
                                 title="Exit Magazine View"
                             >
                                 <span>Exit Magazine</span>
-                                <span className="material-symbols-outlined !text-[14px]">close</span>
+                                <span className="material-symbols-outlined !text-[16px]">close</span>
                             </button>
                         </div>
                         
@@ -1608,11 +1616,11 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                             <div className="flex items-center gap-0.5 ml-4 shrink-0">
                                 <button 
                                     onClick={() => onMagazineViewToggle(false)}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 border border-zinc-700/80 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 active:scale-95 transition-all text-xs font-medium shrink-0 leading-none"
+                                    className="flex items-center justify-center gap-2 px-4 py-2 bg-zinc-800 text-zinc-300 border border-zinc-700 hover:bg-zinc-700 hover:text-white hover:border-zinc-500 rounded-xl font-medium text-sm shrink-0 leading-none active:scale-95 transition-all duration-200"
                                     title="Exit Magazine View"
                                 >
                                     <span>Exit Magazine</span>
-                                    <span className="material-symbols-outlined !text-[14px]">close</span>
+                                    <span className="material-symbols-outlined !text-[16px]">close</span>
                                 </button>
                             </div>
                         </div>
@@ -1716,8 +1724,12 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                             </div>
 
                             <button
-                                onClick={() => onMagazineViewToggle(!isMagazineViewOpen)}
-                                className="flex items-center gap-1.5 px-3 py-1.5 border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 active:scale-95 transition-all text-xs font-medium shrink-0 leading-none"
+                                onClick={() => {
+                                    setHasSeenMagazineView(true);
+                                    onMagazineViewToggle(!isMagazineViewOpen);
+                                }}
+                                disabled={magazineBtnState === 'disabled'}
+                                className={magazineBtnClasses}
                                 title="Enter Magazine View"
                             >
                                 <span className="material-symbols-outlined !text-[16px]">auto_stories</span>
