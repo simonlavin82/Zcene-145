@@ -857,11 +857,11 @@ exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed informatio
     CRITICAL OUTPUT REQUIREMENTS (STRICTLY ENFORCED):
     1. You MUST respond with a single, valid JSON object matching the schema below. Do NOT write any conversational text or prose outside the JSON.
     2. Do NOT include markdown code fences (do NOT wrap the response in \`\`\`json ... \`\`\`). Output raw JSON directly.
-    3. Do NOT include any inline search citations, footnote markers (such as [1], [2], [3], etc.), or source references anywhere in the text or JSON fields. Ensure all string values are plain text or markdown bold/bullets only, with absolutely no citation brackets.
+    3. Do NOT include any inline search citations, footnote markers (such as [1], [4, 9, 11], [cite: 20]), or source references anywhere in the text or JSON fields. Ensure all string values are plain text or markdown bold/bullets only, with absolutely no citation brackets or array-style citations.
     
     Your task is to generate a JSON object matching this structure precisely:
     {
-      "summary": "A scannable bio (approx. 100 words) using Markdown: short paragraphs, bolding for key terms, and bullet points for lists. Focus on style and significance.",
+      "summary": "A scannable bio using Markdown. MUST follow strict Bio Scannability rules: 1. Chunking/Text Segmentation (Max 2-3 short sentences per paragraph). 2. Semantic Splitting (Group by meaning). 3. Formatting (MUST use a bulleted list for stylistic traits/key elements, and bold key terms).",
       "members": ["Name (Role)", ...],
       "details": {
         "genre": "The primary music genre(s) as a plain string (e.g. 'Hardcore Punk', 'Post-Hardcore', 'Metalcore'). NEVER return the literal string 'Unknown', 'N/A', or leave this empty — if grounding is inconclusive, infer the genre from the bio summary text and the connected scene context provided.",
@@ -960,10 +960,14 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint)
             prevText = text;
             text = text.replace(/^(?:I have confirmed|I will manually check|I will check|I need to check|I need to get|To answer your request|For the YouTube video|Here is the JSON|Here are the details|Here is the information|Note: Some details|Based on the search)[^.\n]*[.\n]+\s*/ig, '').trim();
         } while (text !== prevText && text.length > 0);
-        text = text.replace(/\\n\*/g, '\n• ').replace(/\\n-/g, '\n• ').replace(/\\n\n/g, '\n\n');
-        text = text.replace(/\*\*/g, ''); // Strip markdown bolding
-        text = text.replace(/\\n/g, '\n'); // Convert literal escaped \n to actual newlines
-        text = text.replace(/\[\d+\]/g, '').replace(/\(\d+\)/g, '').trim();
+        // Convert literal escaped \n to actual newlines (preserves markdown bolding ** and markdown lists \n*)
+        text = text.replace(/\\n/g, '\n');
+        // Strip citations like [1], [1, 2, 3], (1, 2), and [cite: 20 (previous search)]
+        text = text.replace(/\[\s*\d+(?:\s*,\s*\d+)*\s*\]/g, '')
+            .replace(/\(\s*\d+(?:\s*,\s*\d+)*\s*\)/g, '')
+            .replace(/\[\s*(?:cite|citation)[^\]]*\]/gi, '')
+            .replace(/""/g, '') // Strip stray empty quotes
+            .trim();
         return text;
     };
     let details;
@@ -998,7 +1002,11 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint)
     const sanitizeString = (str) => {
         if (typeof str !== 'string')
             return "";
-        return str.replace(/\[\d+\]/g, '').replace(/\(\d+\)/g, '').trim();
+        return str.replace(/\[\s*\d+(?:\s*,\s*\d+)*\s*\]/g, '')
+            .replace(/\(\s*\d+(?:\s*,\s*\d+)*\s*\)/g, '')
+            .replace(/\[\s*(?:cite|citation)[^\]]*\]/gi, '')
+            .replace(/""/g, '')
+            .trim();
     };
     const sanitisedLinks = (details.links || []).map((l) => ({
         ...l,
