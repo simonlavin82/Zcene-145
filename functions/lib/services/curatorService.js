@@ -1111,18 +1111,43 @@ const scrapeImageUrlBackend = async (artistName, type, genre, summary) => {
                 // Filter for exact, case-insensitive artist name match
                 const exactMatches = data.results?.filter((r) => r.artistName.toLowerCase() === artistName.toLowerCase()) || [];
                 let selectedArtistId = null;
+                const APPROVED_ITUNES_GENRES = ['rock', 'alternative', 'punk', 'metal', 'hardcore', 'indie', 'emo'];
+                // Safe helper to check if the iTunes result matches our scene whitelist
+                const isApprovedGenre = (itunesGenre) => {
+                    const lowerItunesGenre = (itunesGenre || "").toLowerCase();
+                    return APPROVED_ITUNES_GENRES.some(g => lowerItunesGenre.includes(g));
+                };
                 if (exactMatches.length === 1) {
-                    selectedArtistId = exactMatches[0].artistId;
+                    // Even for a single match, strictly enforce the confidence whitelist (e.g., prevent "Koyo" matching World/Gospel)
+                    if (isApprovedGenre(exactMatches[0].primaryGenreName)) {
+                        selectedArtistId = exactMatches[0].artistId;
+                    }
+                    else {
+                        console.warn(`[scrapeImageUrlBackend] Single match for ${artistName} rejected due to invalid genre: ${exactMatches[0].primaryGenreName}`);
+                    }
                 }
                 else if (exactMatches.length > 1) {
-                    // Genre disambiguation: Compare iTunes primary genre with our Zcene genre string
-                    const zceneGenreLower = genre.toLowerCase();
+                    // Genre disambiguation: Compare iTunes primary genre with our Zcene genre string safely
+                    const zceneGenreLower = (genre || "").toLowerCase();
                     const genreMatch = exactMatches.find((r) => {
                         const itunesGenre = (r.primaryGenreName || "").toLowerCase();
-                        return zceneGenreLower.includes(itunesGenre) || itunesGenre.includes(zceneGenreLower);
+                        const matchesWhitelist = isApprovedGenre(r.primaryGenreName);
+                        const matchesContext = zceneGenreLower ? (zceneGenreLower.includes(itunesGenre) || itunesGenre.includes(zceneGenreLower)) : false;
+                        return matchesWhitelist && (matchesContext || zceneGenreLower === "");
                     });
-                    // Fallback to the most popular exact match if genres don't perfectly align
-                    selectedArtistId = genreMatch ? genreMatch.artistId : exactMatches[0].artistId;
+                    if (genreMatch) {
+                        selectedArtistId = genreMatch.artistId;
+                    }
+                    else {
+                        // Fallback to the most popular exact match ONLY IF it passes the strict whitelist
+                        const popularMatch = exactMatches[0];
+                        if (isApprovedGenre(popularMatch.primaryGenreName)) {
+                            selectedArtistId = popularMatch.artistId;
+                        }
+                        else {
+                            console.warn(`[scrapeImageUrlBackend] Multiple matches for ${artistName} all rejected due to invalid genres.`);
+                        }
+                    }
                 }
                 if (selectedArtistId) {
                     // Step 2: Fetch their albums for the high-res artwork using the exact artistId
@@ -1135,9 +1160,17 @@ const scrapeImageUrlBackend = async (artistName, type, genre, summary) => {
                         const albumData = await albumRes.json();
                         const album = albumData.results?.find((r) => r.wrapperType === 'collection');
                         if (album && album.artworkUrl100) {
-                            const hiResArtwork = album.artworkUrl100.replace('100x100bb', '600x600bb');
-                            console.log(`[scrapeImageUrlBackend] Deterministic iTunes success for ${artistName}`);
-                            return hiResArtwork;
+                            const target = (artistName || "").toLowerCase().trim();
+                            const retrieved = (album.artistName || "").toLowerCase().trim();
+                            // Strict artist-name cross-reference to prevent compilation/mismatched artwork
+                            if (target && retrieved && (retrieved === target || retrieved.includes(target) || target.includes(retrieved))) {
+                                const hiResArtwork = album.artworkUrl100.replace('100x100bb', '600x600bb');
+                                console.log(`[scrapeImageUrlBackend] Deterministic iTunes success for ${artistName} (Album Artist: ${album.artistName})`);
+                                return hiResArtwork;
+                            }
+                            else {
+                                console.warn(`[scrapeImageUrlBackend] Rejected iTunes album for ${artistName} due to mismatched album artist: "${album.artistName}"`);
+                            }
                         }
                     }
                 }
