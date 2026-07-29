@@ -1922,12 +1922,9 @@ const App: React.FC = () => {
       return;
     }
 
-    // STATE 1: Sticky Peek (First Click / Tap on any node)
-    if (!isAlreadyPeeked && !forceActionState) {
-      setSelectedNode(null);
-      setPeekedNode(node);
-      return;
-    }
+    // The 'Sticky Peek' state requirement was removed to allow direct navigation.
+    // Desktop will now navigate on the first click, and mobile will navigate on the second tap
+    // (since MusicGraph.tsx swallows the first mobile tap to show the connection snippet).
 
     const isTransitioning = loadingNodeIds.has(node.id) || 
                             fetchingNodeIdsRef.current.has(node.id) || 

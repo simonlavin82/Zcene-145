@@ -1086,8 +1086,17 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             }
             
             const isTouch = isSmallScreen || (typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches);
+            
             if (isTouch) {
-                triggerNodeHoverRef.current(d);
+                const currentHoveredNodeId = hoveredNodeIdRef.current;
+                
+                // If first tap on this node, only trigger the connection snippet overlay
+                if (!currentHoveredNodeId || !isSameNodeId(currentHoveredNodeId, d.id)) {
+                    triggerNodeHoverRef.current(d);
+                    onInteractionRef.current?.();
+                    return; // Do not trigger Deep Cut navigation
+                }
+                // If second tap on the same active node, proceed to navigation
             }
             
             onNodeClickRef.current(d);
