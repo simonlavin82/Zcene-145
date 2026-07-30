@@ -1204,6 +1204,47 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 </div>
                             </div>
 
+                            {/* Instant AI Query Chips */}
+                            <div>
+                                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
+                                    <h3 className="text-xl font-medium text-zinc-200">Instant AI Query Chips</h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Radius: 9999px / rounded-full</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Padding: px-4 py-1.5</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Font: 12px / text-xs</span>
+                                    </div>
+                                </div>
+                                <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
+                                    Specialized context-aware chips used in the Deep Cut investigation panel. They feature three distinct visual states to guide the user: available (outline), spent (dimmed), and interactive dropdowns (native <code>&lt;select&gt;</code> masked as a chip).
+                                </p>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
+                                    <div className="space-y-4">
+                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Available Action</p>
+                                        <button className="px-4 py-1.5 text-xs text-zinc-400 border border-zinc-700 rounded-full hover:bg-zinc-800 hover:text-white transition-colors">
+                                            What sound do they have?
+                                        </button>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Spent / Clicked Status</p>
+                                        <button className="px-4 py-1.5 text-xs text-zinc-600 border border-zinc-800/50 rounded-full bg-zinc-950/30 flex items-center gap-1.5 cursor-default">
+                                            Where are they from?
+                                            <span className="material-symbols-outlined !text-[12px]">check</span>
+                                        </button>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Interactive Connection Dropdown</p>
+                                        <div className="relative inline-block group">
+                                            <select className="px-4 py-1.5 text-xs text-zinc-400 border border-zinc-700 rounded-full appearance-none hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer bg-transparent focus:outline-none focus:ring-1 focus:ring-primary pr-8">
+                                                <option value="">What is the connection to...</option>
+                                                <option value="node-1">Spaced</option>
+                                                <option value="node-2">Buggin</option>
+                                            </select>
+                                            <span className="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 !text-[16px] text-zinc-500 pointer-events-none group-hover:text-zinc-300">expand_more</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             {/* Tertiary / Ghost Buttons */}
                             <div>
                                 <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">

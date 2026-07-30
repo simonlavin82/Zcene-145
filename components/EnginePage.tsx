@@ -390,6 +390,12 @@ the entire dataset, the app evolves existing visual structures.
       Node.js Express backend and the Vite dev server simultaneously in a single terminal process. This strictly
       prevents race conditions where Vite's proxy attempts to forward requests (e.g., /api/label/) to a backend
       that hasn't fully bound to its port yet, eliminating terminal ECONNREFUSED spam on mount.
+
+14. DETERMINISTIC INSTANT AI & DEEP CONNECTIONS:
+    - Instead of open-ended regex routing, the free Instant AI mode operates on a strictly structured query chip architecture.
+    - Graph Proximity Synthesis: Connection query chips evaluate peer relationships by traversing exact graph edges in a prioritized strict hierarchy (Mutual Labels > Shared Genres > Explicit Topological Links > Broad Geographic Origins). This synthesizes intelligent relational context locally without incurring external LLM inference costs.
+    - Component-Bound State Isolation: Critical chat states such as \`chatLoadingMap\`, spent \`clickedChips\`, and dynamic node dropdown lists are firmly isolated per \`NodeDetailsCard\`. This ensures perfectly decoupled, simultaneous multi-node investigations without cross-panel layout bleeding or "phantom reflows".
+    - Interactive Select UI: Dynamic queries utilize a styled native \`<select>\` dropdown masked as a standard query chip, allowing users to intuitively cross-examine any graph peer directly from their active context window.
 `;
 
 
