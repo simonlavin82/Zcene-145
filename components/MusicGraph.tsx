@@ -127,7 +127,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   const hoveredNodeIdRef = useRef<string | null>(null);
   const activeHoveredNodeRef = useRef<Node | null>(null);
 
-  const triggerNodeHoverRef = useRef<(d: Node) => void>(() => {});
+  const triggerNodeHoverRef = useRef<(d: Node, isProgrammatic?: boolean) => void>(() => {});
   const clearNodeHoverRef = useRef<() => void>(() => {});
 
   useEffect(() => {
@@ -727,6 +727,13 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         svg.call(zoom).on("dblclick.zoom", null);
         zoomRef.current = zoom;
         svg.call(zoom.transform, d3.zoomIdentity.translate(dimensions.width/2 - VIRTUAL_CENTER_X * 0.5, dimensions.height/2 - VIRTUAL_CENTER_Y * 0.5).scale(0.5));
+        
+        // Custom conditional double-click zoom to restore background zooming without hijacking mobile node taps
+        svg.on("dblclick", (event) => {
+            const isNode = event.target && event.target.closest && event.target.closest('.node-element');
+            if (isNode) return;
+            d3.select(svgRef.current).transition().duration(250).call(zoom.scaleBy, event.shiftKey ? 0.5 : 2, d3.pointer(event));
+        });
     }
 
     svg.on("click", (event) => { 
