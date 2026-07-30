@@ -24,8 +24,16 @@ export default defineConfig(({ mode }) => {
             proxy.on('proxyRes', (proxyRes, req) => {
               console.log(`[Proxy Response] Status: ${proxyRes.statusCode} for ${req.url}`);
             });
-            proxy.on('error', (err, req) => {
-              console.error(`[Proxy Error] ${err.message} for ${req.url}`);
+            proxy.on('error', (err: any, req, res) => {
+              if (err.code === 'ECONNREFUSED') {
+                // Silently handle missing backend, application will fallback to Firebase direct reads
+                if (res && typeof (res as any).writeHead === 'function') {
+                    (res as any).writeHead(503, { 'Content-Type': 'application/json' });
+                    (res as any).end(JSON.stringify({ error: 'Backend service unavailable (falling back to local cache)' }));
+                }
+              } else {
+                console.error(`[Proxy Error] ${err.message} for ${req.url}`);
+              }
             });
           }
         }
