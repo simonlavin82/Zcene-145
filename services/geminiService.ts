@@ -1732,6 +1732,45 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
     return stripUndefinedProperties(hydratedDetails);
 };
 
+export const streamLocalHeuristicChat = async (
+  currentNode: Node,
+  detailsCache: Map<string, NodeDetails>,
+  graphData: GraphData,
+  onChunk: (text: string) => void
+) => {
+    const details = detailsCache.get(currentNode.id) || detailsCache.get(currentNode.id.toLowerCase());
+    const year = details?.formedYear || "their early years";
+    const genres = details?.genres?.slice(0, 2).join(" and ") || "the scene";
+    const connections = graphData.links
+        .filter(l => (typeof l.source === 'object' ? l.source.id : l.source) === currentNode.id || 
+                     (typeof l.target === 'object' ? l.target.id : l.target) === currentNode.id)
+        .filter(l => l.label !== 'has_genre' && l.label !== 'has_origin' && l.label !== 'from_label');
+    
+    const peers = connections.map(l => {
+        const sourceId = typeof l.source === 'object' ? l.source.id : l.source;
+        const targetId = typeof l.target === 'object' ? l.target.id : l.target;
+        return sourceId === currentNode.id ? targetId : sourceId;
+    }).slice(0, 2);
+
+    const peerText = peers.length > 0 ? ` They share deep sonic architecture with ${peers.join(" and ")}.` : "";
+    
+    const responses = [
+      `Tracing back to ${year}, ${currentNode.id} carved a unique space within ${genres}.${peerText}`,
+      `Their influence on ${genres} cannot be overstated. Since ${year}, they've shaped the underground aesthetic.${peerText}`,
+      `A foundational cornerstone of ${genres}, ${currentNode.id} brought raw energy to the scene.${peerText}`
+    ];
+    
+    const fullText = responses[Math.floor(Math.random() * responses.length)];
+    let current = "";
+    const words = fullText.split(" ");
+    for (let i = 0; i < words.length; i++) {
+      current += (i === 0 ? "" : " ") + words[i];
+      onChunk(current);
+      await new Promise(resolve => setTimeout(resolve, 40));
+    }
+    return fullText;
+};
+
 export const streamNodeChat = async (
   currentNode: Node,
   history: ChatMessage[],
@@ -1739,23 +1778,6 @@ export const streamNodeChat = async (
   graphData: GraphData,
   onChunk: (text: string) => void
 ) => {
-    if (isLocal) {
-        const responses = [
-          `Discussing ${currentNode.id} is always exciting. They represent a major stylistic milestone in this scene, particularly with their signature blend of raw energy and musical craftsmanship.`,
-          `${currentNode.id} really broke barriers by fusing their core style with experimental elements. This created a ripple effect, influencing dozens of bands in the subsequent years.`,
-          `If you listen to their early discography, you can hear how ${currentNode.id} shaped the scene's aesthetic. They brought a unique, analog warmth that modern digital releases try hard to replicate.`
-        ];
-        
-        const fullText = responses[Math.floor(Math.random() * responses.length)];
-        let current = "";
-        const words = fullText.split(" ");
-        for (let i = 0; i < words.length; i++) {
-          current += (i === 0 ? "" : " ") + words[i];
-          onChunk(current);
-          await new Promise(resolve => setTimeout(resolve, 60));
-        }
-        return fullText;
-    }
     const proxyKey = 'backend-proxy-key';
     const baseUrl = typeof window !== 'undefined' ? window.location.origin + '/api/gemini' : 'http://localhost:8080/api/gemini';
     const ai = new GoogleGenAI({ 

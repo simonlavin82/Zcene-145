@@ -11,6 +11,7 @@ import { ZceneLogo, InstagramIcon, ZceneAbbreviatedLogo, FaviconLogo, LegendSymb
 import ViewToggle from './ViewToggle';
 import Header from './Header';
 import { AdminViewToggle } from './ui/AdminViewToggle';
+import { SegmentedTextToggle } from './ui/SegmentedTextToggle';
 import { InfoTooltip } from './ui/InfoTooltip';
 import { TelemetryOverviewCards, DiscoveryLedgerTable, UserTelemetry } from './UsageAnalyticsPage';
 import { CountryFilterDropdown } from './SharedModals';
@@ -219,6 +220,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
 }) => {
     const [demoFocusMode, setDemoFocusMode] = useState<'organic' | 'cluster'>('organic');
     const [demoAdminToggle, setDemoAdminToggle] = useState(false);
+    const [demoChatToggle, setDemoChatToggle] = useState<'instant' | 'live'>('instant');
     const [demoExpandedRow, setDemoExpandedRow] = useState<string | null>(null);
     const [selectedOnboardingStep, setSelectedOnboardingStep] = useState<string>('step1');
     const containerRef = useRef<HTMLDivElement>(null);
@@ -1491,6 +1493,34 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <li><strong>Spring animation:</strong> Badge translates via <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-xl">stiffness: 480 / damping: 38</code> — snappy and responsive, not floaty.</li>
                                         <li><strong>Main Graph & Dashboard Alignment:</strong> This same component is used generic and dynamically inside the main graph canvas for layout mode switching, and inside the dashboard controls panel for View and Sort mode switching.</li>
                                     </ul>
+                                </div>
+                            </div>
+
+                            <div className="space-y-6 mt-12 border-t border-zinc-800/80 pt-12">
+                                <h3 className="text-xl font-medium text-zinc-200">Segmented Text Toggle</h3>
+                                <p className="text-sm text-zinc-400 max-w-2xl leading-relaxed">
+                                    An interactive text-based segmented toggle control used for switching modes like "Instant AI" and "Deep Web". Features concentric border radiuses and spring animations similar to the Admin toggle.
+                                </p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <div className="p-8 bg-zinc-900/40 border border-zinc-800 rounded-xl flex flex-col items-center justify-center min-h-[160px] gap-4">
+                                        <SegmentedTextToggle 
+                                            value={demoChatToggle} 
+                                            onChange={(v) => setDemoChatToggle(v as 'instant' | 'live')}
+                                            options={[
+                                                { id: 'instant', label: 'Instant AI' },
+                                                { id: 'live', label: 'Deep Web' }
+                                            ]}
+                                        />
+                                        <p className="text-xs text-zinc-500 font-mono">Current state: {demoChatToggle === 'instant' ? 'Instant AI' : 'Deep Web Live'}</p>
+                                    </div>
+                                    <div className="p-6 bg-zinc-950 border border-zinc-800 rounded-xl space-y-4 text-xs text-zinc-500 leading-relaxed">
+                                        <h4 className="font-semibold text-zinc-400 uppercase tracking-widest">Specifications</h4>
+                                        <ul className="list-disc list-outside pl-4 space-y-2">
+                                            <li><strong>Typography:</strong> Uses <code>text-[11px] uppercase tracking-wider font-semibold</code> for clarity.</li>
+                                            <li><strong>Animation:</strong> Spring-based text slider matching the physics of the main toggles.</li>
+                                            <li><strong>Dual Mode:</strong> Specifically designed for the Deep Connections chat to clearly demarcate Free/Local from Paid/Live states.</li>
+                                        </ul>
+                                    </div>
                                 </div>
                             </div>
                         </div>

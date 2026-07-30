@@ -637,6 +637,11 @@ To prevent data rot, API failures, and visual rendering regressions, the synthes
    - Bulletproof URL Extraction: The secondary image scraper bypasses rigid JSON schema requirements, outputting the URL naturally. A robust RegEx parser (\`/https:\\/\\/[^\\s"'<>()\\[\\]]+/i\`) strictly plucks the raw HTTPS link, preventing formatting failures.
    - Active HTTP HEAD Validation: Before any image is cached, the backend actively pings the extracted URL using an HTTP HEAD request bundled with a standard Chrome \`User-Agent\`. This critical safety net catches 404s (hallucinated paths), 403s (expired CDN tokens), and 429s (bot blockers). If the link fails this ping, it is instantly discarded to \`null\`, ensuring only active, clickable imagery reaches the Firestore database.
    - Flexible Frontend Rendering: Frontend image containers (e.g., DetailsPanel) strictly avoid fixed ratios (like \`aspect-video\`) or forced \`object-cover\` cropping, instead using natural proportional flow (\`w-full h-auto\`) so artist photos display fully without getting cut off, regardless of intrinsic height.
+
+8. DEEP CONNECTIONS DUAL-MODE ARCHITECTURE:
+   - Instant Graph AI (Free/Local): Leverages pre-cached graph data and local heuristics for instant, zero-cost responses. It compiles contextual metadata (genres, origins, connections) directly from the active node to provide immediate O(1) query responses.
+   - Deep Web AI (Paid/Live API): Utilizes Gemini Flash (gemini-3-flash-preview) for live RAG calls with full web expansion.
+   - Explicit Token Authorization Guard: Live mode implements a strict 3-message token guard. After a batch of 3 messages, the user is intercepted with a Token Confirmation dialog (via createPortal) before any further paid token generation occurs, preventing unintentional API consumption.
 `;
 
 const ARCHITECTURAL_SEPARATION_DOCUMENTATION = `
