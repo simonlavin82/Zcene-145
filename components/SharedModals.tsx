@@ -4,6 +4,7 @@ import { StackIcon } from './Icons';
 import Markdown from 'react-markdown';
 import { isNodeInSeedList } from '../services/artistCacheService';
 import { Flame } from 'lucide-react';
+import { formatSystemTimestamp } from '../utils/formatters';
 
 // --- My Stack Dialog Component ---
 export const MyStackDialog: React.FC<{
@@ -51,7 +52,7 @@ export const MyStackDialog: React.FC<{
                                 <div className="flex-grow min-w-0">
                                     <div className="flex items-center gap-2 mb-1">
                                         <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded-md">{item.type}</span>
-                                        <span className="text-[9px] text-zinc-600 font-mono">{new Date(item.dateSaved).toLocaleDateString()}</span>
+                                        <span className="font-mono text-xs text-zinc-300 font-normal">{formatSystemTimestamp(item.dateSaved)}</span>
                                     </div>
                                     <h4 className="text-lg font-medium text-white truncate">{item.id.replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</h4>
                                 </div>

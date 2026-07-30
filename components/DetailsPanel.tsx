@@ -2,13 +2,15 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom';
 import Markdown from 'react-markdown';
 import { Node, NodeDetails, GraphData, View, ChatMessage, StackItem, UserTaste, COST_PER_AI_CALL } from '../types';
-import { streamNodeChat, fetchLiveTourData } from '../services/geminiService';
+import { streamNodeChat, fetchLiveTourData, streamLocalHeuristicChat } from '../services/geminiService';
 import { normalizeArtistId, titleCaseArtistId, cleanArtistDisplayName, isNodeInSeedList, getArtistDocWithRedirect, enforceArtistCacheSchema } from '../services/artistCacheService';
 import { analyticsService } from '../services/analyticsService';
 import { Spinner, HelpIcon, MicIcon, LoadingSpinner, DETAIL_THINKING_STEPS, StackIcon } from './Icons';
 import { TokenConfirmationDialog, FullItineraryDialog } from './SharedModals';
+import { SegmentedTextToggle } from './ui/SegmentedTextToggle';
 import { db } from '../services/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
+import { formatSystemTimestamp } from '../utils/formatters';
 
 const SENTINEL_INSIGHT = 'No insight provided.';
 
@@ -229,6 +231,9 @@ interface NodeDetailsCardProps {
   chatHistory: ChatMessage[];
   onSendMessage: (message: string) => void;
   isChatLoading: boolean;
+  chatMode: 'instant' | 'live';
+  onChatModeChange: (mode: 'instant' | 'live') => void;
+  liveMessageCount: number;
   isFullScreenMode?: boolean;
   isHero?: boolean;
   isInStack: boolean;
@@ -282,10 +287,10 @@ const isTourCacheStale = (tourCachedAtString: string | undefined): boolean => {
     return (Date.now() - cachedDate.getTime()) >= sevenDaysMs;
 };
 
-const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
-    node, details, isLoading, isGlobalLoading, graphData, libraryArtists, seedArtists, onAddArtist, isSmallScreen, onRefresh, onClose, onNodeClick, onGenerateDeepCut, onExtendNode, onNavigate,
-    chatHistory, onSendMessage, isChatLoading, isFullScreenMode = false, isHero = false, isInStack, onToggleStack, onToggleMagazineView, isGuest = false, onAuthRequest, user,
-    userTaste, isAdmin = false
+export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
+  node, details, isLoading, isGlobalLoading, graphData, libraryArtists, seedArtists, onAddArtist, isSmallScreen, 
+  onRefresh, onClose, onNodeClick, onGenerateDeepCut, onExtendNode, onNavigate, 
+  chatHistory, onSendMessage, isChatLoading, chatMode, onChatModeChange, liveMessageCount, isFullScreenMode = false, isHero = false, isInStack, onToggleStack, onToggleMagazineView, isGuest = false, onAuthRequest, user, userTaste, isAdmin = false
 }) => {
     const isLocked = useMemo(() => {
         return !!(details && details.summary && details.summary.trim().length > 5 && !details._isSentinel);
@@ -1156,9 +1161,14 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                         ) : (
                                             chatHistory.map((msg, i) => (
                                                 <div key={i} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                                                    <div className={`max-w-[90%] px-4 py-2 text-base ${msg.role === 'user' ? 'bg-zinc-800 text-zinc-200 border-r-4 border-primary' : 'bg-zinc-900/50 text-zinc-300 border-l-4 border-zinc-600 shadow-sm'} rounded-none`}>
+                                                    <div className={`max-w-[90%] px-4 py-2 text-sm ${msg.role === 'user' ? 'bg-zinc-800 text-zinc-200 border-r-4 border-primary' : 'bg-zinc-900/50 text-zinc-300 border-l-4 border-zinc-600 shadow-sm'} rounded-none`}>
                                                         {msg.text}
                                                     </div>
+                                                    {msg.timestamp && (
+                                                        <span className="font-mono text-xs text-zinc-300 font-normal mt-1 px-1">
+                                                            {formatSystemTimestamp(msg.timestamp)}
+                                                        </span>
+                                                    )}
                                                 </div>
                                             ))
                                         )}
@@ -1174,6 +1184,24 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                             </div>
                                         )}
                                         <div ref={chatEndRef} />
+                                    </div>
+
+                                    <div className="flex justify-between items-center pt-3 pb-1">
+                                        <SegmentedTextToggle
+                                            value={chatMode}
+                                            onChange={(val) => onChatModeChange(val as 'instant' | 'live')}
+                                            options={[
+                                                { id: 'instant', label: 'Instant AI' },
+                                                { id: 'live', label: 'Deep Web' }
+                                            ]}
+                                            className="w-[180px] h-8"
+                                        />
+                                        {chatMode === 'live' && (
+                                            <div className="text-[10px] text-zinc-500 font-mono tracking-widest flex items-center gap-1">
+                                                <span className={`w-1.5 h-1.5 rounded-full ${3 - liveMessageCount > 0 ? 'bg-primary' : 'bg-red-500 animate-pulse'}`}></span>
+                                                {Math.max(0, 3 - liveMessageCount)} / 3 Messages
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div className="relative pt-2">
@@ -1305,6 +1333,10 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     const [magazineSearchQuery, setMagazineSearchQuery] = useState('');
     const [hasSeenMagazineView, setHasSeenMagazineView] = useState(false);
     
+    const [chatMode, setChatMode] = useState<'instant' | 'live'>('instant');
+    const [liveMessageCount, setLiveMessageCount] = useState(3);
+    const [pendingChatMessage, setPendingChatMessage] = useState<{ nodeId: string; message: string } | null>(null);
+
     const magazineBtnState: 'disabled' | 'attention' | 'neutral' = hasSeenMagazineView ? 'neutral' : 'attention';
     const magazineBtnClasses = {
         disabled: "flex items-center gap-1.5 px-3 py-1.5 border border-zinc-800 bg-zinc-900/20 rounded-xl text-zinc-600 cursor-not-allowed transition-all duration-200 text-xs font-medium shrink-0 leading-none backdrop-blur-sm",
@@ -1361,9 +1393,14 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         }
     }, [selectedNode, activeNodes]);
 
-    const handleSendMessage = async (nodeId: string, message: string) => {
+    const handleSendMessage = async (nodeId: string, message: string, forceLive = false) => {
+        if (chatMode === 'live' && liveMessageCount >= 3 && !forceLive) {
+            setPendingChatMessage({ nodeId, message });
+            return;
+        }
+
         const history = chatHistories.get(nodeId) || [];
-        const newHistory = [...history, { role: 'user', text: message } as ChatMessage];
+        const newHistory = [...history, { role: 'user', text: message, timestamp: Date.now() } as ChatMessage];
         
         onUpdateChatHistories(new Map(chatHistories).set(nodeId, newHistory));
         setIsChatLoading(true);
@@ -1372,21 +1409,35 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
             const currentNode = activeNodes.find(n => n.id.toLowerCase() === nodeId.toLowerCase());
             if (!currentNode) return;
 
-            const chatPromise = streamNodeChat(
-                currentNode,
-                history,
-                message,
-                graphData,
-                (chunk) => {
-                    onUpdateChatHistories(new Map(chatHistories).set(nodeId, [...newHistory, { role: 'model', text: chunk } as ChatMessage]));
-                }
-            );
+            if (chatMode === 'instant') {
+                const aiTimestamp = Date.now();
+                await streamLocalHeuristicChat(
+                    currentNode,
+                    detailsCache,
+                    graphData,
+                    (chunk) => {
+                        onUpdateChatHistories(new Map(chatHistories).set(nodeId, [...newHistory, { role: 'model', text: chunk, timestamp: aiTimestamp } as ChatMessage]));
+                    }
+                );
+            } else {
+                setLiveMessageCount(prev => prev + 1);
+                const aiTimestamp = Date.now();
+                const chatPromise = streamNodeChat(
+                    currentNode,
+                    history,
+                    message,
+                    graphData,
+                    (chunk) => {
+                        onUpdateChatHistories(new Map(chatHistories).set(nodeId, [...newHistory, { role: 'model', text: chunk, timestamp: aiTimestamp } as ChatMessage]));
+                    }
+                );
 
-            const timeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error("Chat request timed out")), 20000)
-            );
+                const timeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error("Chat request timed out")), 20000)
+                );
 
-            await Promise.race([chatPromise, timeoutPromise]);
+                await Promise.race([chatPromise, timeoutPromise]);
+            }
         } catch (err: any) {
             console.error("Chat error:", err);
             const errorMessage = err?.message?.includes("timed out") 
@@ -1812,6 +1863,9 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 chatHistory={chatHistories.get(node.id) || []}
                                                 onSendMessage={(msg) => handleSendMessage(node.id, msg)}
                                                 isChatLoading={isChatLoading}
+                                                chatMode={chatMode}
+                                                onChatModeChange={setChatMode}
+                                                liveMessageCount={liveMessageCount}
                                                 isFullScreenMode={isMagazineViewOpen}
                                                 isHero={isHero}
                                                 isInStack={isInStack}
@@ -1839,6 +1893,23 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
 
                     </div>
                 </div>
+            )}
+            
+            {pendingChatMessage && createPortal(
+                <TokenConfirmationDialog
+                    isOpen={true}
+                    onClose={() => setPendingChatMessage(null)}
+                    onConfirm={() => {
+                        setLiveMessageCount(0);
+                        handleSendMessage(pendingChatMessage.nodeId, pendingChatMessage.message, true);
+                        setPendingChatMessage(null);
+                    }}
+                    type="live_chat_search"
+                    cost={COST_PER_AI_CALL}
+                    cachedArtists={[]}
+                    missingArtists={["Live Chat Search (3 Messages)"]}
+                />,
+                document.body
             )}
         </div>
     );

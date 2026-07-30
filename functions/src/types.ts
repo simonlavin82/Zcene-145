@@ -40,6 +40,7 @@ export interface GraphData {
 export interface ChatMessage {
   role: 'user' | 'model';
   text: string;
+  timestamp?: number;
 }
 
 export interface NodeDetails {
