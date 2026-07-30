@@ -303,8 +303,9 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
     const [chatInput, setChatInput] = useState('');
     const [showAllChips, setShowAllChips] = useState(false);
+    const [clickedChips, setClickedChips] = useState<Set<string>>(new Set());
     
-    const queryChips = useMemo(() => {
+    const { queryChips, connectionPeers } = useMemo(() => {
         const chips = [
             "Where are they from?",
             "What sound do they have?",
@@ -324,17 +325,15 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         }).filter(peerId => {
             const peerNode = graphData.nodes.find(n => n.id === peerId);
             return peerNode && peerNode.type === 'artist';
-        }).slice(0, 2);
+        });
 
         const formatTitle = (str: string) => {
-            return str.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+            return str.split(/[-\s]+/).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
         };
         
-        peers.forEach(peer => {
-            chips.push(`What is the connection to ${formatTitle(peer)}?`);
-        });
+        const connectionPeers = Array.from(new Set(peers)).map(formatTitle).sort();
         
-        return chips;
+        return { queryChips: chips, connectionPeers };
     }, [node.id, graphData.links, graphData.nodes]);
 
     const [isListening, setIsListening] = useState(false);
@@ -432,7 +431,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         }
     };
 
-    const chatEndRef = useRef<HTMLDivElement>(null);
+    const chatContainerRef = useRef<HTMLDivElement>(null);
     const prevHistoryLength = useRef(chatHistory.length);
 
     const libraryArtistSet = useMemo(() => new Set(libraryArtists.map(a => normalizeArtistId(a))), [libraryArtists]);
@@ -549,7 +548,9 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
     useEffect(() => {
       if (chatHistory.length > 0 && (chatHistory.length > prevHistoryLength.current || isChatLoading)) {
-        chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        if (chatContainerRef.current) {
+            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+        }
       }
       prevHistoryLength.current = chatHistory.length;
     }, [chatHistory, isChatLoading]);
@@ -1190,7 +1191,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     </div>
                                 ) : (
                                     <div className="space-y-4 bg-zinc-950/20 border border-zinc-800/50 p-4">
-                                            <div className="max-h-60 overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-zinc-800 pr-1">
+                                            <div ref={chatContainerRef} className="max-h-60 overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-zinc-800 pr-1">
                                         {chatHistory.length === 0 ? (
                                             <p className="text-sm text-zinc-500 text-center py-4 italic">
                                                 Inquire about history or relative scene positioning.
@@ -1229,7 +1230,6 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                 </div>
                                             </div>
                                         )}
-                                        <div ref={chatEndRef} />
                                     </div>
 
                                     <div className="flex justify-between items-center pt-3 pb-1">
@@ -1305,16 +1305,47 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                             </>
                                         ) : (
                                             <div className="flex flex-wrap gap-2 pb-2">
-                                                {(showAllChips ? queryChips : queryChips.slice(0, 3)).map((chip, idx) => (
+                                                {(showAllChips ? queryChips : queryChips.slice(0, 3)).map((chip, idx) => {
+                                                    const isClicked = clickedChips.has(chip);
+                                                    return (
                                                     <button 
                                                         key={idx}
-                                                        onClick={() => onSendMessage(chip)}
+                                                        onClick={() => {
+                                                            setClickedChips(prev => new Set(prev).add(chip));
+                                                            onSendMessage(chip);
+                                                        }}
                                                         disabled={isChatLoading}
-                                                        className="px-3 py-1.5 bg-zinc-900 border border-zinc-700 hover:border-primary hover:bg-zinc-800 transition-colors text-xs text-zinc-300 rounded-full disabled:opacity-50 text-left"
+                                                        className={`px-3 py-1.5 border transition-colors text-xs rounded-full disabled:opacity-50 text-left flex items-center gap-1 ${
+                                                            isClicked 
+                                                                ? 'bg-zinc-950 border-zinc-800 text-zinc-500 hover:text-zinc-400' 
+                                                                : 'bg-zinc-900 border-zinc-700 hover:border-primary hover:bg-zinc-800 text-zinc-300'
+                                                        }`}
                                                     >
                                                         {chip}
+                                                        {isClicked && <span className="material-symbols-outlined !text-[12px] opacity-70">check</span>}
                                                     </button>
-                                                ))}
+                                                )})}
+                                                {connectionPeers.length > 0 && (
+                                                    <div className="relative">
+                                                        <select
+                                                            className="appearance-none px-3 py-1.5 bg-zinc-900 border border-zinc-700 hover:border-primary hover:bg-zinc-800 transition-colors text-xs text-zinc-300 rounded-full cursor-pointer focus:outline-none pr-8"
+                                                            onChange={(e) => {
+                                                                if (e.target.value) {
+                                                                    const query = `What is the connection to ${e.target.value}?`;
+                                                                    setClickedChips(prev => new Set(prev).add(query));
+                                                                    onSendMessage(query);
+                                                                    e.target.value = "";
+                                                                }
+                                                            }}
+                                                        >
+                                                            <option value="">What is the connection to...</option>
+                                                            {connectionPeers.map(peer => (
+                                                                <option key={peer} value={peer}>{peer}</option>
+                                                            ))}
+                                                        </select>
+                                                        <span className="material-symbols-outlined !text-[14px] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400">expand_more</span>
+                                                    </div>
+                                                )}
                                                 {queryChips.length > 3 && (
                                                     <button 
                                                         onClick={() => setShowAllChips(!showAllChips)}
@@ -1409,7 +1440,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
   isGuest = false, onAuthRequest, user, userTaste, isAdmin = false
 }) => {
     const [viewedIndex, setViewedIndex] = useState(0);
-    const [isChatLoading, setIsChatLoading] = useState(false);
+    const [chatLoadingMap, setChatLoadingMap] = useState<Map<string, boolean>>(new Map());
     const [magazineSortBy, setMagazineSortBy] = useState<'none' | 'artist' | 'label'>('none');
     const [magazineSearchQuery, setMagazineSearchQuery] = useState('');
     const [hasSeenMagazineView, setHasSeenMagazineView] = useState(false);
@@ -1486,7 +1517,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         const newHistory = [...history, { role: 'user', text: message, timestamp: Date.now() } as ChatMessage];
         
         onUpdateChatHistories(new Map(chatHistories).set(nodeId, newHistory));
-        setIsChatLoading(true);
+        setChatLoadingMap(prev => new Map(prev).set(nodeId, true));
 
         try {
             const currentNode = activeNodes.find(n => n.id.toLowerCase() === nodeId.toLowerCase());
@@ -1533,7 +1564,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                 { role: 'model', text: errorMessage } as ChatMessage
             ]));
         } finally {
-            setIsChatLoading(false);
+            setChatLoadingMap(prev => new Map(prev).set(nodeId, false));
         }
     };
 
@@ -1957,7 +1988,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 onNavigate={onNavigate}
                                                 chatHistory={chatHistories.get(node.id) || []}
                                                 onSendMessage={(msg) => handleSendMessage(node.id, msg)}
-                                                isChatLoading={isChatLoading}
+                                                isChatLoading={chatLoadingMap.get(node.id) || false}
                                                 chatMode={getChatMode(node.id)}
                                                 onChatModeChange={(mode) => setChatModes(prev => new Map(prev).set(node.id, mode))}
                                                 liveMessageCount={liveMessageCount}

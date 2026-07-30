@@ -1743,30 +1743,35 @@ export const streamLocalHeuristicChat = async (
     const msg = userMessage.toLowerCase();
 
     const formatTitle = (str: string) => {
-        return str.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+        return str.split(/[-\s]+/).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
     };
     const nodeName = formatTitle(currentNode.id);
     
     // Extracted Data
-    const year = details?.formedYear || "their early years";
-    const origin = details?.origin ? formatTitle(details.origin) : "the underground scene";
-    const genres = details?.genres?.length ? details.genres.map(formatTitle).join(", ") : "hardcore punk";
-    const labels = details?.recordLabels?.length ? details.recordLabels.map(formatTitle).join(" and ") : "various independent labels";
+    const year = details?.details?.founded || "their early years";
+    const origin = details?.details?.origin ? formatTitle(details.details.origin) : "the underground scene";
+    const genresStr = details?.details?.genre;
+    const genres = genresStr ? genresStr.split(',').map(g => formatTitle(g.trim())).join(", ") : "hardcore punk";
     
-    // Graph Traversal
-    const connections = graphData.links.filter(l => 
-        (typeof l.source === 'object' ? l.source.id : l.source) === currentNode.id || 
-        (typeof l.target === 'object' ? l.target.id : l.target) === currentNode.id
-    );
+    const getNodeType = (id: string) => graphData.nodes.find(n => n.id === id)?.type;
     
-    const peers = connections.map(l => {
-        const sourceId = typeof l.source === 'object' ? l.source.id : l.source;
-        const targetId = typeof l.target === 'object' ? l.target.id : l.target;
-        return sourceId === currentNode.id ? targetId : sourceId;
-    }).filter(peerId => {
-        const peerNode = graphData.nodes.find(n => n.id === peerId);
-        return peerNode && peerNode.type === 'artist';
-    }).slice(0, 3).map(formatTitle);
+    const getConnectedNodes = (nodeId: string, nodeType: string) => {
+        const connectedIds = graphData.links.filter(l => 
+            (typeof l.source === 'object' ? l.source.id : l.source) === nodeId || 
+            (typeof l.target === 'object' ? l.target.id : l.target) === nodeId
+        ).map(l => {
+            const s = typeof l.source === 'object' ? l.source.id : l.source;
+            const t = typeof l.target === 'object' ? l.target.id : l.target;
+            return s === nodeId ? t : s;
+        });
+        return Array.from(new Set(connectedIds.filter(id => getNodeType(id) === nodeType)));
+    };
+
+    const labelNames = getConnectedNodes(currentNode.id, 'label').map(formatTitle);
+    const labels = labelNames.length ? labelNames.join(" and ") : "various independent labels";
+    
+    // Graph Traversal for generic peers
+    const peers = getConnectedNodes(currentNode.id, 'artist').slice(0, 3).map(formatTitle);
     
     let fullText = "";
 
@@ -1780,7 +1785,38 @@ export const streamLocalHeuristicChat = async (
     else if (msg.startsWith("what is the connection to")) {
         const peerRaw = msg.replace("what is the connection to ", "").replace("?", "").trim();
         const peer = formatTitle(peerRaw);
-        fullText = `Within our data graph, ${nodeName} shares deep sonic architecture and historical scene connections with ${peer}.`;
+        
+        const peerNode = graphData.nodes.find(n => formatTitle(n.id).toLowerCase() === peerRaw);
+        const actualPeerId = peerNode ? peerNode.id : peerRaw.replace(/\s+/g, '-');
+        
+        const activeLabels = getConnectedNodes(currentNode.id, 'label');
+        const peerLabels = getConnectedNodes(actualPeerId, 'label');
+        const sharedLabels = activeLabels.filter(l => peerLabels.includes(l));
+
+        const activeOrigins = getConnectedNodes(currentNode.id, 'country');
+        const peerOrigins = getConnectedNodes(actualPeerId, 'country');
+        const sharedOrigins = activeOrigins.filter(l => peerOrigins.includes(l));
+
+        const activeGenres = getConnectedNodes(currentNode.id, 'genre');
+        const peerGenres = getConnectedNodes(actualPeerId, 'genre');
+        const sharedGenres = activeGenres.filter(l => peerGenres.includes(l));
+        
+        const hasDirectLink = graphData.links.some(l => 
+            ((typeof l.source === 'object' ? l.source.id : l.source) === currentNode.id && (typeof l.target === 'object' ? l.target.id : l.target) === actualPeerId) ||
+            ((typeof l.source === 'object' ? l.source.id : l.source) === actualPeerId && (typeof l.target === 'object' ? l.target.id : l.target) === currentNode.id)
+        );
+
+        if (sharedLabels.length > 0) {
+            fullText = `${nodeName} and ${peer} are intimately connected through their shared label, ${formatTitle(sharedLabels[0])}, a key driver of their sound.`;
+        } else if (sharedGenres.length > 0) {
+            fullText = `${nodeName} and ${peer} both pushed the boundaries of ${formatTitle(sharedGenres[0])}, defining a core era of the genre.`;
+        } else if (hasDirectLink) {
+            fullText = `Within our data graph, ${nodeName} and ${peer} share a direct structural connection, positioning them closely within the same scene topology.`;
+        } else if (sharedOrigins.length > 0) {
+            fullText = `${nodeName} and ${peer} share deep roots in the ${formatTitle(sharedOrigins[0])} scene, shaping their historical connection.`;
+        } else {
+            fullText = `Within our data graph, ${nodeName} shares deep sonic architecture and historical scene connections with ${peer}.`;
+        }
     }
     else if (msg === "what sound do they have?") {
         fullText = `They are primarily known for pushing the boundaries of ${genres}, blending raw aggression with technical precision.`;
