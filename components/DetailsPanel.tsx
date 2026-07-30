@@ -543,7 +543,8 @@ const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     const handleCopyId = async (e: React.MouseEvent) => {
         e.stopPropagation();
         try {
-            await navigator.clipboard.writeText(node.id);
+            const displayName = getArtistDisplayName(details, node);
+            await navigator.clipboard.writeText(displayName);
             setIsIdCopied(true);
             setTimeout(() => setIsIdCopied(false), 2000);
             analyticsService.track('Node ID Copied', { node_id: node.id });

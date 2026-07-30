@@ -1075,6 +1075,14 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                             dragEndTimeRef.current = Date.now();
                         })
                     );
+                
+                // Expanded invisible hit-box for forgiving touch/hover targets
+                g.append("circle")
+                    .attr("class", "hit-box")
+                    .attr("r", 35)
+                    .attr("fill", "transparent")
+                    .style("pointer-events", "all");
+
                 g.append("path");
                 g.append("text")
                     .attr("text-anchor", "middle")

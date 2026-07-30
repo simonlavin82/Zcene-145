@@ -248,6 +248,10 @@ the entire dataset, the app evolves existing visual structures.
      collapses the left 'ARTISTS' sidebar to yield horizontal space to the canvas.
    - Mobile Dynamic Landing Routing: Initializes the mobile viewport directly on the 
      'SPIDERWEB' canvas tab if the loaded project contains seed artists.
+   - Expanded Hit-Box Architecture: Nodes implement an invisible, expanded bounding circle 
+     (pointer-events="all", fill="transparent") behind the visual symbols. This decouples 
+     the interactive touch/hover target area from the aesthetic visual radius, significantly 
+     improving usability and click forgiveness on mobile devices without cluttering the UI.
 
 7. UNIFIED PROJECT CONTEXT, ACTIVE NODES SYNCHRONIZATION & STATE-LOADING (App.tsx / GraphPage.tsx):
    Zcene enforces a single, unified project state that orchestrates project identity
@@ -377,7 +381,9 @@ the entire dataset, the app evolves existing visual structures.
       keys and cache routing, the UI presentation layer strips clunky country suffixes and slugs. The
       cleanArtistDisplayName helper checks against known regional suffixes and cross-references active graph
       topology nodes to return pristine, human-readable canonical display titles in the browser header, seed
-      pills, toasts, and project titles.
+      pills, toasts, and project titles. Clipboard Quick-Copy Consistency: The Deep Cut quick-copy 
+      action strictly relies on this formatted output to write clean, title-cased strings (e.g., "Militarie Gun") 
+      to the user's clipboard rather than exposing internal database slugs.
 
 13. LOCAL DEVELOPMENT ENVIRONMENT & PROXY RESOLUTION:
     - Synchronised Startup Sequence (concurrently): The development environment uses 'concurrently' to boot the
