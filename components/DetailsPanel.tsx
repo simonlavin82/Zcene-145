@@ -583,6 +583,8 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         recognition.onend = () => setIsListening(false);
     };
 
+
+
     const handleCopyId = async (e: React.MouseEvent) => {
         e.stopPropagation();
         try {
@@ -1443,7 +1445,23 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     const [chatLoadingMap, setChatLoadingMap] = useState<Map<string, boolean>>(new Map());
     const [magazineSortBy, setMagazineSortBy] = useState<'none' | 'artist' | 'label'>('none');
     const [magazineSearchQuery, setMagazineSearchQuery] = useState('');
+    const [isListeningMagazineSearch, setIsListeningMagazineSearch] = useState(false);
     const [hasSeenMagazineView, setHasSeenMagazineView] = useState(false);
+
+    const handleMagazineSpeechToText = () => {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            alert("Speech recognition is not supported in this browser.");
+            return;
+        }
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'en-US';
+        setIsListeningMagazineSearch(true);
+        recognition.start();
+        recognition.onresult = (event: any) => setMagazineSearchQuery(event.results[0][0].transcript);
+        recognition.onerror = () => setIsListeningMagazineSearch(false);
+        recognition.onend = () => setIsListeningMagazineSearch(false);
+    };
     
     const [chatModes, setChatModes] = useState<Map<string, 'instant' | 'live'>>(new Map());
     const getChatMode = (nodeId: string) => chatModes.get(nodeId) || 'instant';
@@ -1726,12 +1744,20 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                             <div className="relative flex-grow">
                                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 !text-[18px]">search</span>
                                 <input 
-                                    type="text"
-                                    placeholder="Filter magazine..."
+                                    type="search"
+                                    placeholder="Search..."
                                     value={magazineSearchQuery}
                                     onChange={(e) => setMagazineSearchQuery(e.target.value)}
-                                    className="w-full appearance-none border border-zinc-700 bg-zinc-950 py-2 pl-10 pr-4 text-sm text-white placeholder:text-zinc-500 rounded-xl focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+                                    className="w-full appearance-none border border-zinc-700 bg-zinc-950 py-2 pl-10 pr-12 text-sm text-white placeholder:text-zinc-500 rounded-xl focus:ring-1 focus:ring-primary focus:outline-none transition-all"
                                 />
+                                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+                                    {!magazineSearchQuery && (
+                                        <button onClick={handleMagazineSpeechToText} className={`w-8 h-8 flex items-center justify-center rounded-[10px] transition-colors leading-none ${isListeningMagazineSearch ? 'text-primary animate-pulse' : 'text-zinc-500 hover:text-white'}`} title="Search by voice"><MicIcon className="!text-[18px]" /></button>
+                                    )}
+                                    {magazineSearchQuery && (
+                                        <button onClick={() => setMagazineSearchQuery('')} className="w-8 h-8 flex items-center justify-center rounded-[10px] text-zinc-400 hover:text-white transition-colors leading-none" aria-label="Clear search"><span className="material-symbols-outlined !text-[18px]">close</span></button>
+                                    )}
+                                </div>
                             </div>
 
                             <div className="relative shrink-0 w-[110px]">
@@ -1766,12 +1792,20 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                         <div className="relative flex-grow">
                                             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 !text-[18px]">search</span>
                                             <input 
-                                                type="text"
-                                                placeholder="Filter magazine..."
+                                                type="search"
+                                                placeholder="Search..."
                                                 value={magazineSearchQuery}
                                                 onChange={(e) => setMagazineSearchQuery(e.target.value)}
-                                                className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-10 pr-4 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none"
+                                                className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-10 pr-12 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none"
                                             />
+                                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+                                                {!magazineSearchQuery && (
+                                                    <button onClick={handleMagazineSpeechToText} className={`w-8 h-8 flex items-center justify-center rounded-[10px] transition-colors leading-none ${isListeningMagazineSearch ? 'text-primary animate-pulse' : 'text-zinc-500 hover:text-white'}`} title="Search by voice"><MicIcon className="!text-[18px]" /></button>
+                                                )}
+                                                {magazineSearchQuery && (
+                                                    <button onClick={() => setMagazineSearchQuery('')} className="w-8 h-8 flex items-center justify-center rounded-[10px] text-zinc-400 hover:text-white transition-colors leading-none" aria-label="Clear search"><span className="material-symbols-outlined !text-[18px]">close</span></button>
+                                                )}
+                                            </div>
                                         </div>
                                         <div className="flex items-center gap-2 shrink-0">
                                             <span className="text-xs text-zinc-500 uppercase tracking-widest hidden sm:block">Sort by</span>

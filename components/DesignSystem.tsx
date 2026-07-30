@@ -2098,6 +2098,50 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 </div>
                             </div>
 
+                            {/* Fully-Featured Search Input */}
+                            <div>
+                                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
+                                    <h3 className="text-xl font-medium text-zinc-200">Fully-Featured Search Input</h3>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-zinc-900/30 p-8 rounded-none border border-zinc-800">
+                                    <div className="space-y-4">
+                                        <p className="text-xs text-zinc-500 uppercase tracking-widest font-semibold">Empty State (Mic Available)</p>
+                                        <div className="relative">
+                                            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 !text-[18px]">search</span>
+                                            <input 
+                                                type="search" 
+                                                placeholder="Search..." 
+                                                className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-10 pr-12 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none" 
+                                                disabled
+                                            />
+                                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+                                                <button className="w-8 h-8 flex items-center justify-center rounded-[10px] text-zinc-500 hover:text-white transition-colors leading-none" title="Search by voice">
+                                                    <MicIcon className="!text-[18px]" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <p className="text-xs text-zinc-500 uppercase tracking-widest font-semibold">Filled State (Clear Available)</p>
+                                        <div className="relative">
+                                            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 !text-[18px]">search</span>
+                                            <input 
+                                                type="search" 
+                                                placeholder="Search..." 
+                                                defaultValue="Spaced"
+                                                className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-10 pr-12 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none" 
+                                                disabled
+                                            />
+                                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+                                                <button className="w-8 h-8 flex items-center justify-center rounded-[10px] text-zinc-400 hover:text-white transition-colors leading-none" aria-label="Clear search">
+                                                    <span className="material-symbols-outlined !text-[18px]">close</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             {/* Dropdowns */}
                             <div>
                                 <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
