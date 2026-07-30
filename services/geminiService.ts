@@ -1734,33 +1734,65 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
 
 export const streamLocalHeuristicChat = async (
   currentNode: Node,
+  userMessage: string,
   detailsCache: Map<string, NodeDetails>,
   graphData: GraphData,
   onChunk: (text: string) => void
 ) => {
     const details = detailsCache.get(currentNode.id) || detailsCache.get(currentNode.id.toLowerCase());
+    const msg = userMessage.toLowerCase();
+
+    const formatTitle = (str: string) => {
+        return str.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+    };
+    const nodeName = formatTitle(currentNode.id);
+    
+    // Extracted Data
     const year = details?.formedYear || "their early years";
-    const genres = details?.genres?.slice(0, 2).join(" and ") || "the scene";
-    const connections = graphData.links
-        .filter(l => (typeof l.source === 'object' ? l.source.id : l.source) === currentNode.id || 
-                     (typeof l.target === 'object' ? l.target.id : l.target) === currentNode.id)
-        .filter(l => l.label !== 'has_genre' && l.label !== 'has_origin' && l.label !== 'from_label');
+    const origin = details?.origin ? formatTitle(details.origin) : "the underground scene";
+    const genres = details?.genres?.length ? details.genres.map(formatTitle).join(", ") : "hardcore punk";
+    const labels = details?.recordLabels?.length ? details.recordLabels.map(formatTitle).join(" and ") : "various independent labels";
+    
+    // Graph Traversal
+    const connections = graphData.links.filter(l => 
+        (typeof l.source === 'object' ? l.source.id : l.source) === currentNode.id || 
+        (typeof l.target === 'object' ? l.target.id : l.target) === currentNode.id
+    );
     
     const peers = connections.map(l => {
         const sourceId = typeof l.source === 'object' ? l.source.id : l.source;
         const targetId = typeof l.target === 'object' ? l.target.id : l.target;
         return sourceId === currentNode.id ? targetId : sourceId;
-    }).slice(0, 2);
+    }).filter(peerId => {
+        const peerNode = graphData.nodes.find(n => n.id === peerId);
+        return peerNode && peerNode.type === 'artist';
+    }).slice(0, 3).map(formatTitle);
+    
+    let fullText = "";
 
-    const peerText = peers.length > 0 ? ` They share deep sonic architecture with ${peers.join(" and ")}.` : "";
+    // Deterministic Routing for Query Chips
+    if (msg === "where are they from?") {
+        fullText = `${nodeName} emerged from ${origin} in ${year}. This geographic scene heavily influenced their trajectory and sound.`;
+    } 
+    else if (msg === "what labels are they on?") {
+        fullText = `Throughout their history, they have released music on ${labels}. These partnerships were crucial to pushing their sound.`;
+    }
+    else if (msg.startsWith("what is the connection to")) {
+        const peerRaw = msg.replace("what is the connection to ", "").replace("?", "").trim();
+        const peer = formatTitle(peerRaw);
+        fullText = `Within our data graph, ${nodeName} shares deep sonic architecture and historical scene connections with ${peer}.`;
+    }
+    else if (msg === "what sound do they have?") {
+        fullText = `They are primarily known for pushing the boundaries of ${genres}, blending raw aggression with technical precision.`;
+    }
+    else if (msg === "recent history?") {
+        fullText = `Formed around ${year} in ${origin}, ${nodeName} carved a unique space within ${genres}. ${peers.length > 0 ? `They often shared the stage and scene with peers like ${peers.join(" and ")}.` : ""}`;
+    }
+    else {
+        // Fallback for anything else
+        fullText = `As a foundational cornerstone of ${genres}, ${nodeName} brought raw energy to the scene.`;
+    }
     
-    const responses = [
-      `Tracing back to ${year}, ${currentNode.id} carved a unique space within ${genres}.${peerText}`,
-      `Their influence on ${genres} cannot be overstated. Since ${year}, they've shaped the underground aesthetic.${peerText}`,
-      `A foundational cornerstone of ${genres}, ${currentNode.id} brought raw energy to the scene.${peerText}`
-    ];
-    
-    const fullText = responses[Math.floor(Math.random() * responses.length)];
     let current = "";
     const words = fullText.split(" ");
     for (let i = 0; i < words.length; i++) {

@@ -234,6 +234,8 @@ interface NodeDetailsCardProps {
   chatMode: 'instant' | 'live';
   onChatModeChange: (mode: 'instant' | 'live') => void;
   liveMessageCount: number;
+  onDeleteMessage?: (index: number) => void;
+  onClearChat?: () => void;
   isFullScreenMode?: boolean;
   isHero?: boolean;
   isInStack: boolean;
@@ -290,7 +292,7 @@ const isTourCacheStale = (tourCachedAtString: string | undefined): boolean => {
 export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
   node, details, isLoading, isGlobalLoading, graphData, libraryArtists, seedArtists, onAddArtist, isSmallScreen, 
   onRefresh, onClose, onNodeClick, onGenerateDeepCut, onExtendNode, onNavigate, 
-  chatHistory, onSendMessage, isChatLoading, chatMode, onChatModeChange, liveMessageCount, isFullScreenMode = false, isHero = false, isInStack, onToggleStack, onToggleMagazineView, isGuest = false, onAuthRequest, user, userTaste, isAdmin = false
+  chatHistory, onSendMessage, isChatLoading, chatMode, onChatModeChange, liveMessageCount, onDeleteMessage, onClearChat, isFullScreenMode = false, isHero = false, isInStack, onToggleStack, onToggleMagazineView, isGuest = false, onAuthRequest, user, userTaste, isAdmin = false
 }) => {
     const isLocked = useMemo(() => {
         return !!(details && details.summary && details.summary.trim().length > 5 && !details._isSentinel);
@@ -300,6 +302,41 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     const isLabelNode = node.type === 'label';
 
     const [chatInput, setChatInput] = useState('');
+    const [showAllChips, setShowAllChips] = useState(false);
+    
+    const queryChips = useMemo(() => {
+        const chips = [
+            "Where are they from?",
+            "What sound do they have?",
+            "What labels are they on?",
+            "Recent history?"
+        ];
+        
+        const peerLinks = graphData.links.filter(l => 
+            ((typeof l.source === 'object' ? l.source.id : l.source) === node.id || 
+            (typeof l.target === 'object' ? l.target.id : l.target) === node.id)
+        );
+        
+        const peers = peerLinks.map(l => {
+            const sourceId = typeof l.source === 'object' ? l.source.id : l.source;
+            const targetId = typeof l.target === 'object' ? l.target.id : l.target;
+            return sourceId === node.id ? targetId : sourceId;
+        }).filter(peerId => {
+            const peerNode = graphData.nodes.find(n => n.id === peerId);
+            return peerNode && peerNode.type === 'artist';
+        }).slice(0, 2);
+
+        const formatTitle = (str: string) => {
+            return str.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+        };
+        
+        peers.forEach(peer => {
+            chips.push(`What is the connection to ${formatTitle(peer)}?`);
+        });
+        
+        return chips;
+    }, [node.id, graphData.links, graphData.nodes]);
+
     const [isListening, setIsListening] = useState(false);
     const [imageTier, setImageTier] = useState<'source' | 'placeholder'>('source');
     const [imgLoaded, setImgLoaded] = useState(false);
@@ -1160,13 +1197,22 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                             </p>
                                         ) : (
                                             chatHistory.map((msg, i) => (
-                                                <div key={i} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                                                <div key={i} className={`flex flex-col group relative ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                                                     <div className={`max-w-[90%] px-4 py-2 text-sm ${msg.role === 'user' ? 'bg-zinc-800 text-zinc-200 border-r-4 border-primary' : 'bg-zinc-900/50 text-zinc-300 border-l-4 border-zinc-600 shadow-sm'} rounded-none`}>
                                                         {msg.text}
                                                     </div>
                                                     {msg.timestamp && (
-                                                        <span className="font-mono text-xs text-zinc-300 font-normal mt-1 px-1">
+                                                        <span className="font-mono text-xs text-zinc-300 font-normal mt-1 px-1 flex items-center gap-2">
                                                             {formatSystemTimestamp(msg.timestamp)}
+                                                            {onDeleteMessage && (
+                                                                <button 
+                                                                    onClick={() => onDeleteMessage(i)}
+                                                                    className="opacity-0 group-hover:opacity-100 text-red-500/70 hover:text-red-400 transition-opacity p-0.5 inline-flex items-center"
+                                                                    title="Delete Message"
+                                                                >
+                                                                    <span className="material-symbols-outlined !text-[12px] leading-none">delete</span>
+                                                                </button>
+                                                            )}
                                                         </span>
                                                     )}
                                                 </div>
@@ -1196,54 +1242,89 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                             ]}
                                             className="w-[180px] h-8"
                                         />
-                                        {chatMode === 'live' && (
-                                            <div className="text-[10px] text-zinc-500 font-mono tracking-widest flex items-center gap-1">
-                                                <span className={`w-1.5 h-1.5 rounded-full ${3 - liveMessageCount > 0 ? 'bg-primary' : 'bg-red-500 animate-pulse'}`}></span>
-                                                {Math.max(0, 3 - liveMessageCount)} / 3 Messages
-                                            </div>
-                                        )}
+                                        <div className="flex items-center gap-3">
+                                            {onClearChat && chatHistory.length > 0 && (
+                                                <button 
+                                                    onClick={onClearChat}
+                                                    className="px-3 py-1.5 text-[10px] text-zinc-500 hover:text-red-400 hover:bg-red-500/10 uppercase tracking-widest font-semibold rounded-lg transition-colors border border-transparent flex items-center justify-center"
+                                                >
+                                                    Clear Chat
+                                                </button>
+                                            )}
+                                            {chatMode === 'live' && (
+                                                <div className="text-[10px] text-zinc-500 font-mono tracking-widest flex items-center gap-1">
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${3 - liveMessageCount > 0 ? 'bg-primary' : 'bg-red-500 animate-pulse'}`}></span>
+                                                    {Math.max(0, 3 - liveMessageCount)} / 3 Messages
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
 
                                     <div className="relative pt-2">
-                                        <textarea
-                                            rows={3}
-                                            value={chatInput}
-                                            onChange={(e) => setChatInput(e.target.value)}
-                                            onKeyDown={handleKeyDown}
-                                            placeholder="Consult Zcene AI..."
-                                            className="w-full bg-zinc-950 border border-zinc-700 py-2 pl-4 pr-16 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary transition-all rounded-xl resize-none min-h-[80px] scrollbar-thin scrollbar-thumb-zinc-700"
-                                        />
-                                        <div className="absolute right-2 bottom-3 flex flex-col items-center gap-2">
-                                            {!chatInput.trim() ? (
-                                                <button 
-                                                    onClick={handleSpeechToText}
-                                                    className={`w-8 h-8 flex flex-shrink-0 items-center justify-center transition-colors rounded-xl ${isListening ? 'text-primary animate-pulse' : 'text-zinc-500 active:text-zinc-300'}`}
-                                                    title="Speak"
-                                                >
-                                                    <MicIcon className="!text-[22px]" />
-                                                </button>
-                                            ) : (
-                                                <button 
-                                                    onClick={() => setChatInput('')}
-                                                    className="w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-500 active:text-white transition-colors rounded-xl"
-                                                    title="Clear message"
-                                                >
-                                                    <span className="material-symbols-outlined !text-[18px]">close</span>
-                                                </button>
-                                            )}
-                                            <button 
-                                                onClick={handleSend}
-                                                disabled={!chatInput.trim() || isChatLoading}
-                                                className={`w-8 h-8 flex flex-shrink-0 items-center justify-center transition-all duration-300 rounded-xl ${
-                                                    !chatInput.trim() || isChatLoading
-                                                        ? 'bg-zinc-800 text-zinc-600'
-                                                        : 'bg-primary text-brand-black shadow-[0_0_12px_rgba(246,228,104,0.3)] active:scale-95'
-                                                }`}
-                                                title="Send"
-                                            >
-                                                <span className="material-symbols-outlined !text-[22px]">arrow_upward</span>
-                                            </button>
-                                        </div>
+                                        {chatMode === 'live' ? (
+                                            <>
+                                                <textarea
+                                                    rows={3}
+                                                    value={chatInput}
+                                                    onChange={(e) => setChatInput(e.target.value)}
+                                                    onKeyDown={handleKeyDown}
+                                                    placeholder="Consult Zcene AI..."
+                                                    className="w-full bg-zinc-950 border border-zinc-700 py-2 pl-4 pr-16 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary transition-all rounded-xl resize-none min-h-[80px] scrollbar-thin scrollbar-thumb-zinc-700"
+                                                />
+                                                <div className="absolute right-2 bottom-3 flex flex-col items-center gap-2">
+                                                    {!chatInput.trim() ? (
+                                                        <button 
+                                                            onClick={handleSpeechToText}
+                                                            className={`w-8 h-8 flex flex-shrink-0 items-center justify-center transition-colors rounded-xl ${isListening ? 'text-primary animate-pulse' : 'text-zinc-500 active:text-zinc-300'}`}
+                                                            title="Speak"
+                                                        >
+                                                            <MicIcon className="!text-[22px]" />
+                                                        </button>
+                                                    ) : (
+                                                        <button 
+                                                            onClick={() => setChatInput('')}
+                                                            className="w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-500 active:text-white transition-colors rounded-xl"
+                                                            title="Clear message"
+                                                        >
+                                                            <span className="material-symbols-outlined !text-[18px]">close</span>
+                                                        </button>
+                                                    )}
+                                                    <button 
+                                                        onClick={handleSend}
+                                                        disabled={!chatInput.trim() || isChatLoading}
+                                                        className={`w-8 h-8 flex flex-shrink-0 items-center justify-center transition-all duration-300 rounded-xl ${
+                                                            !chatInput.trim() || isChatLoading
+                                                                ? 'bg-zinc-800 text-zinc-600'
+                                                                : 'bg-primary text-brand-black shadow-[0_0_12px_rgba(246,228,104,0.3)] active:scale-95'
+                                                        }`}
+                                                        title="Send"
+                                                    >
+                                                        <span className="material-symbols-outlined !text-[22px]">arrow_upward</span>
+                                                    </button>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <div className="flex flex-wrap gap-2 pb-2">
+                                                {(showAllChips ? queryChips : queryChips.slice(0, 3)).map((chip, idx) => (
+                                                    <button 
+                                                        key={idx}
+                                                        onClick={() => onSendMessage(chip)}
+                                                        disabled={isChatLoading}
+                                                        className="px-3 py-1.5 bg-zinc-900 border border-zinc-700 hover:border-primary hover:bg-zinc-800 transition-colors text-xs text-zinc-300 rounded-full disabled:opacity-50 text-left"
+                                                    >
+                                                        {chip}
+                                                    </button>
+                                                ))}
+                                                {queryChips.length > 3 && (
+                                                    <button 
+                                                        onClick={() => setShowAllChips(!showAllChips)}
+                                                        className="px-3 py-1.5 bg-zinc-950 border border-zinc-800 hover:text-white transition-colors text-xs text-zinc-500 rounded-full"
+                                                    >
+                                                        {showAllChips ? "Show less" : "More..."}
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                     </div>
                                 )}
@@ -1333,7 +1414,8 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     const [magazineSearchQuery, setMagazineSearchQuery] = useState('');
     const [hasSeenMagazineView, setHasSeenMagazineView] = useState(false);
     
-    const [chatMode, setChatMode] = useState<'instant' | 'live'>('instant');
+    const [chatModes, setChatModes] = useState<Map<string, 'instant' | 'live'>>(new Map());
+    const getChatMode = (nodeId: string) => chatModes.get(nodeId) || 'instant';
     const [liveMessageCount, setLiveMessageCount] = useState(3);
     const [pendingChatMessage, setPendingChatMessage] = useState<{ nodeId: string; message: string } | null>(null);
 
@@ -1394,7 +1476,8 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     }, [selectedNode, activeNodes]);
 
     const handleSendMessage = async (nodeId: string, message: string, forceLive = false) => {
-        if (chatMode === 'live' && liveMessageCount >= 3 && !forceLive) {
+        const currentMode = getChatMode(nodeId);
+        if (currentMode === 'live' && liveMessageCount >= 3 && !forceLive) {
             setPendingChatMessage({ nodeId, message });
             return;
         }
@@ -1409,10 +1492,11 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
             const currentNode = activeNodes.find(n => n.id.toLowerCase() === nodeId.toLowerCase());
             if (!currentNode) return;
 
-            if (chatMode === 'instant') {
+            if (currentMode === 'instant') {
                 const aiTimestamp = Date.now();
                 await streamLocalHeuristicChat(
                     currentNode,
+                    message,
                     detailsCache,
                     graphData,
                     (chunk) => {
@@ -1451,6 +1535,17 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         } finally {
             setIsChatLoading(false);
         }
+    };
+
+    const handleDeleteMessage = (nodeId: string, index: number) => {
+        const history = chatHistories.get(nodeId) || [];
+        const newHistory = [...history];
+        newHistory.splice(index, 1);
+        onUpdateChatHistories(new Map(chatHistories).set(nodeId, newHistory));
+    };
+
+    const handleClearChat = (nodeId: string) => {
+        onUpdateChatHistories(new Map(chatHistories).set(nodeId, []));
     };
 
     const handleNext = useCallback(() => {
@@ -1863,9 +1958,11 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 chatHistory={chatHistories.get(node.id) || []}
                                                 onSendMessage={(msg) => handleSendMessage(node.id, msg)}
                                                 isChatLoading={isChatLoading}
-                                                chatMode={chatMode}
-                                                onChatModeChange={setChatMode}
+                                                chatMode={getChatMode(node.id)}
+                                                onChatModeChange={(mode) => setChatModes(prev => new Map(prev).set(node.id, mode))}
                                                 liveMessageCount={liveMessageCount}
+                                                onDeleteMessage={(index) => handleDeleteMessage(node.id, index)}
+                                                onClearChat={() => handleClearChat(node.id)}
                                                 isFullScreenMode={isMagazineViewOpen}
                                                 isHero={isHero}
                                                 isInStack={isInStack}
