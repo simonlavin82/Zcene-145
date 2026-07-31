@@ -134,6 +134,15 @@ real-time intelligence and global scalability.
      drivers (/artists) store computed graph structures and enriched Deep Cut metadata,
      while secondary deep cuts (/labels) store lightweight publishing house cards
      with graphData explicitly set to null.
+   - Prompt Decoupling & Immutable Global Deep Cuts: Deep cut biographies synthesized 
+     by the Cloud Function are strictly decoupled from the active project's seed artist. 
+     The backend prompts rely purely on organic genre and entity mapping without injecting 
+     the active seed into the LLM context, guaranteeing that all generated biographies are 
+     standalone, universally reusable, and free of context leaks across different project 
+     workspaces. These decoupled profiles are subsequently cached globally (in /artists 
+     and /labels) as well as embedded immutably within the project's detailsCache 
+     snapshots (/sharedZcenes), allowing instant UI hydration on cache hits without 
+     requiring dynamic re-synthesis.
    - Rules Engine & ABAC Security: Attribute-Based Access Control ensures every 
      music discovery journey remains private and secure. Both global cache collections
      are publicly readable but write-protected: authenticated users may CREATE new
