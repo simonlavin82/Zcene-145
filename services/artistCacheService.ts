@@ -655,7 +655,7 @@ export const writeArtistCacheMany = async (
           graphData: (isLabel || !isPrimarySeed) ? null : JSON.stringify({ nodes, links, synthesisRationale: normalizedGraph.synthesisRationale }),
           synthesisRationale: (isLabel || !isPrimarySeed) ? null : (normalizedGraph.synthesisRationale || null),
           filters: filters || {},
-          cacheVersion: 2,
+          cacheVersion: 3,
           cachedAt: serverTimestamp(),
           hitCount: 0,
           isDeep: preserveFullGraph || false,
@@ -690,7 +690,7 @@ export const writeArtistCacheMany = async (
             const updatePayload: any = {
               detailsCache: isLabel ? sanitizeLabelProfile(artistDetails) : (typeof artistDetails === 'string' ? JSON.parse(artistDetails) : artistDetails),
               cachedAt: serverTimestamp(),
-              cacheVersion: 2,
+              cacheVersion: 3,
               [idFieldKey]: canonicalId,
               cacheKey: compositeCanonicalId,
               isDeep: preserveFullGraph || false,
@@ -700,7 +700,7 @@ export const writeArtistCacheMany = async (
           } else {
             console.log(`[${isLabel ? 'LabelCache' : 'ArtistCache'}] Skipping deep cut update for "${compositeCanonicalId}" — no detailsCache to write.`);
           }
-        } else if (forceOverwrite || isRicherGraph || (existing && (!existing.cacheVersion || existing.cacheVersion < 2 || (preserveFullGraph && existing.isDeep !== true)))) {
+        } else if (forceOverwrite || isRicherGraph || (existing && (!existing.cacheVersion || existing.cacheVersion < 3 || (preserveFullGraph && existing.isDeep !== true)))) {
           // ── UPGRADE PATH (Primary Seed) ─────────────────────────────────────────
           const updatePayload: any = {
             cacheKey: compositeCanonicalId,
@@ -709,8 +709,9 @@ export const writeArtistCacheMany = async (
             graphData: isLabel ? null : JSON.stringify({ nodes, links, synthesisRationale: normalizedGraph.synthesisRationale }),
             synthesisRationale: normalizedGraph.synthesisRationale || null,
             filters: filters || {},
-            cacheVersion: 2,
-            cachedAt: serverTimestamp(),
+            cacheVersion: 3,
+            hitCount: (existing.hitCount || 0) + 1,
+            cachedAt: existing.cachedAt || serverTimestamp(),
             isDeep: preserveFullGraph || false,
             isPrimarySeed: !isLabel,
             hasUniqueSpiderweb: !isLabel,
@@ -720,13 +721,13 @@ export const writeArtistCacheMany = async (
           }
           if (!isLabel) enforceArtistCacheSchema(updatePayload);
           await updateDoc(canonicalDocRef, stripUndefinedProperties(updatePayload));
-          console.log(`[${isLabel ? 'LabelCache' : 'ArtistCache'}] Upgraded/Overwritten Canonical doc: ${compositeCanonicalId} → cacheVersion 2 (incoming: ${incomingArtistCount} entities, existing: ${existingArtistCount} entities)`);
+          console.log(`[${isLabel ? 'LabelCache' : 'ArtistCache'}] Upgraded/Overwritten Canonical doc: ${compositeCanonicalId} → cacheVersion 3 (incoming: ${incomingArtistCount} entities, existing: ${existingArtistCount} entities)`);
         } else if (artistDetails) {
           // Update detailsCache if it was missing or stale
           const updatePayload: any = {
             detailsCache: isLabel ? sanitizeLabelProfile(artistDetails) : (typeof artistDetails === 'string' ? JSON.parse(artistDetails) : artistDetails),
             cachedAt: serverTimestamp(),
-            cacheVersion: 2,
+            cacheVersion: 3,
             [idFieldKey]: canonicalId,
             cacheKey: compositeCanonicalId,
             isDeep: preserveFullGraph || false,
@@ -734,7 +735,7 @@ export const writeArtistCacheMany = async (
           await updateDoc(canonicalDocRef, stripUndefinedProperties(updatePayload));
           console.log(`[${isLabel ? 'LabelCache' : 'ArtistCache'}] Updated detailsCache for canonical doc: ${compositeCanonicalId}`);
         } else {
-          console.log(`[${isLabel ? 'LabelCache' : 'ArtistCache'}] Skipping write for Canonical "${compositeCanonicalId}" — doc already at v${existing?.cacheVersion || 2}.`);
+          console.log(`[${isLabel ? 'LabelCache' : 'ArtistCache'}] Skipping write for Canonical "${compositeCanonicalId}" — doc already at v${existing?.cacheVersion || 3}.`);
         }
       }
 
@@ -751,7 +752,7 @@ export const writeArtistCacheMany = async (
           seedArtists: name,
           graphData: isLabel ? null : JSON.stringify({ nodes: [], links: [] }),
           filters: {},
-          cacheVersion: 2,
+          cacheVersion: 3,
           cachedAt: serverTimestamp(),
           hitCount: 0,
           redirectTo: compositeCanonicalId,

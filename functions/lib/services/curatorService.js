@@ -845,6 +845,10 @@ exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed informatio
     - Origin Hint: {{originHint}}.
     {{/if}}
     
+    CRITICAL UNIVERSALITY RULE:
+    The summary (bio) MUST be globally universal and entity-focused. DO NOT mention or reference the "Seed artists" or "Connected nodes" in the generated text. They are provided strictly to help you disambiguate the entity during your Google Search. The biography must stand alone and remain accurate regardless of the user's project context.
+
+    
     USE GOOGLE SEARCH to find:
     1. The most accurate bio and cultural significance. You MUST dynamically adapt your search strategy to target authoritative sources and knowledge bases specific to the artist's musical genre (e.g., Resident Advisor/Beatport for electronic, DownBeat/Blue Note archives for jazz, Gramophone/publisher databases for classical, or Bandcamp/Discogs/AllMusic for independent rock/punk). Avoid single-genre biases or rigid source hierarchies. Use scannability techniques:
        - Chunking: Break information into smaller, digestible units.
