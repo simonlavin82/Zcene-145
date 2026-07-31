@@ -168,12 +168,14 @@ app.use(
 const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed information for the music entity: "{{nodeIdentifier}}" (type: {{nodeType}}).
     
     Context:
-    - Seed artists: {{seedArtists}}.
-    - Connected nodes: {{contextNodes}}.
+    - Search Disambiguation (Genres/Origins): {{contextNodes}}.
     - Date: {{currentDate}}.
     {{#if originHint}}
     - Origin Hint: {{originHint}}.
     {{/if}}
+    
+    CRITICAL UNIVERSALITY RULE:
+    The summary (bio) MUST be globally universal and entity-focused. DO NOT mention or reference the "Search Disambiguation (Genres/Origins)" in the generated text. They are provided strictly to help you disambiguate the entity during your Google Search. The biography must stand alone and remain accurate regardless of the user's project context.
     
     USE GOOGLE SEARCH to find:
     1. The most accurate bio and cultural significance. You MUST dynamically adapt your search strategy to target authoritative sources and knowledge bases specific to the artist's musical genre (e.g., Resident Advisor/Beatport for electronic, DownBeat/Blue Note archives for jazz, Gramophone/publisher databases for classical, or Bandcamp/Discogs/AllMusic for independent rock/punk). Avoid single-genre biases or rigid source hierarchies. Use scannability techniques:
@@ -490,7 +492,6 @@ async function triggerReSynthesis(artistId, originalData, collectionName = 'arti
   const prompt = FETCH_NODE_DETAILS_PROMPT_TEMPLATE
     .replace('{{nodeIdentifier}}', artistName)
     .replace('{{nodeType}}', 'artist')
-    .replace('{{seedArtists}}', seedArtists)
     .replace('{{contextNodes}}', contextNodes)
     .replace(/{{currentDate}}/g, currentDate)
     .replace(/{{#if originHint}}[\s\S]*?{{\/if}}/g, ''); // strip origin hint
