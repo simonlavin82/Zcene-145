@@ -924,15 +924,14 @@ export const NODE_DETAILS_SCHEMA = {
 export const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed information for the music entity: "{{nodeIdentifier}}" (type: {{nodeType}}).
     
     Context:
-    - Seed artists: {{seedArtists}}.
-    - Connected nodes: {{contextNodes}}.
+    - Search Disambiguation (Genres/Origins): {{contextNodes}}.
     - Date: {{currentDate}}.
     {{#if originHint}}
     - Origin Hint: {{originHint}}.
     {{/if}}
     
     CRITICAL UNIVERSALITY RULE:
-    The summary (bio) MUST be globally universal and entity-focused. DO NOT mention or reference the "Seed artists" or "Connected nodes" in the generated text. They are provided strictly to help you disambiguate the entity during your Google Search. The biography must stand alone and remain accurate regardless of the user's project context.
+    The summary (bio) MUST be globally universal and entity-focused. DO NOT mention or reference the "Search Disambiguation (Genres/Origins)" in the generated text. They are provided strictly to help you disambiguate the entity during your Google Search. The biography must stand alone and remain accurate regardless of the user's project context.
 
     
     USE GOOGLE SEARCH to find:
@@ -1010,6 +1009,9 @@ export const fetchNodeDetailsBackend = async (
       const targetId = typeof l.target === 'string' ? l.target : (l.target as Node).id;
       return sourceId === node.id ? targetId : sourceId;
     })
+    .map(id => graphData.nodes.find(n => n.id === id))
+    .filter(n => n && n.type !== 'artist' && n.type !== 'label')
+    .map(n => n!.label || n!.id)
     .slice(0, 10)
     .join(', ');
 
@@ -1018,7 +1020,6 @@ export const fetchNodeDetailsBackend = async (
   let prompt = FETCH_NODE_DETAILS_PROMPT_TEMPLATE
     .replace('{{nodeIdentifier}}', node.label || node.id)
     .replace('{{nodeType}}', node.type)
-    .replace('{{seedArtists}}', seedArtists)
     .replace('{{contextNodes}}', contextNodes)
     .replace(/{{currentDate}}/g, currentDate);
       

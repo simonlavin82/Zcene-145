@@ -1,55 +1,55 @@
-const admin = require('firebase-admin');
+const { initializeApp, cert } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
-const fs = require('fs');
+const serviceAccount = require('../firebase-service-account.json');
 
-// Initialize Firebase Admin
-if (fs.existsSync('firebase-service-account.json')) {
-  process.env.GOOGLE_APPLICATION_CREDENTIALS = 'firebase-service-account.json';
-}
-admin.initializeApp();
+initializeApp({
+  credential: cert(serviceAccount)
+});
+
 const db = getFirestore();
 
-async function countCollectionDocs(colRef) {
-  const snap = await colRef.count().get();
-  return snap.data().count;
+async function deleteCollection(collectionPath, batchSize) {
+  const collectionRef = db.collection(collectionPath);
+  const query = collectionRef.limit(batchSize);
+
+  return new Promise((resolve, reject) => {
+    deleteQueryBatch(query, resolve).catch(reject);
+  });
 }
 
-async function main() {
-  console.log("=========================================================");
-  console.log("   ZCENE FIRESTORE PURGE: /artists & /labels");
-  console.log("=========================================================\n");
+async function deleteQueryBatch(query, resolve) {
+  const snapshot = await query.get();
 
-  console.log("1. Checking pre-purge document counts...");
-  const preArtists = await countCollectionDocs(db.collection('artists'));
-  const preLabels = await countCollectionDocs(db.collection('labels'));
-  console.log(`   - /artists: ${preArtists} docs`);
-  console.log(`   - /labels:  ${preLabels} docs\n`);
-
-  console.log("2. Executing recursive batch deletion on root collections...");
-  console.log("   Purging /artists (including any subcollections)...");
-  await db.recursiveDelete(db.collection('artists'));
-  console.log("   ✔ Completed purging /artists.");
-
-  console.log("   Purging /labels (including any subcollections)...");
-  await db.recursiveDelete(db.collection('labels'));
-  console.log("   ✔ Completed purging /labels.\n");
-
-  console.log("3. Verifying deletion completion...");
-  const postArtists = await countCollectionDocs(db.collection('artists'));
-  const postLabels = await countCollectionDocs(db.collection('labels'));
-  console.log(`   - /artists: ${postArtists} docs (Expected: 0)`);
-  console.log(`   - /labels:  ${postLabels} docs (Expected: 0)\n`);
-
-  if (postArtists === 0 && postLabels === 0) {
-    console.log("=========================================================");
-    console.log("   ✔ BOTH COLLECTIONS COMPLETELY WIPED! READY FOR TEST.");
-    console.log("=========================================================");
-  } else {
-    console.error("⚠ WARNING: Collections were not completely empty after delete!");
+  const batchSize = snapshot.size;
+  if (batchSize === 0) {
+    resolve();
+    return;
   }
+
+  const batch = db.batch();
+  snapshot.docs.forEach((doc) => {
+    batch.delete(doc.ref);
+  });
+  await batch.commit();
+
+  process.nextTick(() => {
+    deleteQueryBatch(query, resolve);
+  });
 }
 
-main().then(() => process.exit(0)).catch(e => {
-  console.error("Error during purge:", e);
+async function purgeAll() {
+  console.log("Purging artists...");
+  await deleteCollection('artists', 500);
+  console.log("Artists purged.");
+
+  console.log("Purging labels...");
+  await deleteCollection('labels', 500);
+  console.log("Labels purged.");
+  
+  console.log("Done.");
+}
+
+purgeAll().then(() => process.exit(0)).catch(err => {
+  console.error(err);
   process.exit(1);
 });
