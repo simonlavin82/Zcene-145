@@ -1019,6 +1019,29 @@ If you cannot find a clear YouTube video ID for this artist, return null for the
 // Serve the static files from the React/Vite build output
 app.use(express.static(path.join(__dirname, 'dist')));
 
+function formatArtistName(name) {
+  if (!name) return "";
+  let clean = name.toLowerCase();
+  
+  // Strip common location suffixes that get appended to slugs
+  const suffixes = [
+    '-united-states', '-us', '-uk', '-australia', '-canada', '-ireland',
+    ' (us)', ' (uk)', ' (australia)', ' (canada)', ' (ireland)'
+  ];
+  for (const suffix of suffixes) {
+    if (clean.endsWith(suffix)) {
+      clean = clean.substring(0, clean.length - suffix.length);
+      break;
+    }
+  }
+
+  // Replace hyphens with spaces
+  clean = clean.replace(/-/g, ' ');
+
+  // Convert to Title Case
+  return clean.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ').trim();
+}
+
 // Fallback for SPA (React Router)
 app.use(async (req, res) => {
   const indexPath = path.join(__dirname, 'dist', 'index.html');
@@ -1049,13 +1072,20 @@ app.use(async (req, res) => {
         if (projectSnap.exists) {
           const projectData = projectSnap.data();
           const seedList = projectData.seedArtists ? projectData.seedArtists.split('::').filter(Boolean) : [];
-          const title = projectData.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene");
+          const cleanSeeds = seedList.map(formatArtistName);
+          
+          let title = projectData.name || (cleanSeeds.length > 0 ? `${cleanSeeds[0]} - Zcene` : "Untitled Zcene");
+          // Ensure custom project names are properly capitalized if they are simple strings
+          if (projectData.name) {
+            title = projectData.name;
+          }
           
           let imageUrl = "https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg";
-          let description = `Explore this music discovery journey mapping out ${seedList.length} seed artists.`;
+          let description = cleanSeeds.length > 0 
+            ? `Explore this Zcene seeded by ${cleanSeeds.join(', ')}. Own music discovery.`
+            : `Explore customised music maps and discover underground artists on Zcene.`;
 
           if (seedList.length > 0) {
-            description = `Explore this music map seeded by ${seedList.join(', ')}.`;
             const primarySeedId = normalizeArtistId(seedList[0]);
             
             try {
