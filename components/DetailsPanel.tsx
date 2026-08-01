@@ -1748,7 +1748,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                     placeholder="Search..."
                                     value={magazineSearchQuery}
                                     onChange={(e) => setMagazineSearchQuery(e.target.value)}
-                                    className="w-full appearance-none border border-zinc-700 bg-zinc-950 py-2 pl-10 pr-12 text-sm text-white placeholder:text-zinc-500 rounded-xl focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+                                    className="w-full h-10 appearance-none border border-zinc-700 bg-zinc-950 py-2 pl-10 pr-12 text-sm text-white placeholder:text-zinc-500 rounded-xl focus:ring-1 focus:ring-primary focus:outline-none transition-all"
                                 />
                                 <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
                                     {!magazineSearchQuery && (
@@ -1764,7 +1764,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                 <select 
                                     value={magazineSortBy}
                                     onChange={(e) => setMagazineSortBy(e.target.value as any)}
-                                    className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-zinc-300 py-2.5 px-4 text-sm focus:ring-1 focus:ring-primary focus:outline-none cursor-pointer"
+                                    className="w-full h-10 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-zinc-300 py-2 px-4 text-sm focus:ring-1 focus:ring-primary focus:outline-none cursor-pointer"
                                 >
                                     <option value="none">Sort</option>
                                     <option value="artist">Artist</option>
@@ -1796,7 +1796,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 placeholder="Search..."
                                                 value={magazineSearchQuery}
                                                 onChange={(e) => setMagazineSearchQuery(e.target.value)}
-                                                className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-10 pr-12 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none"
+                                                className="w-full h-10 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-10 pr-12 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
                                             />
                                             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
                                                 {!magazineSearchQuery && (
@@ -1813,7 +1813,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 <select 
                                                     value={magazineSortBy}
                                                     onChange={(e) => setMagazineSortBy(e.target.value as any)}
-                                                    className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-zinc-300 py-2.5 px-4 text-sm focus:ring-1 focus:ring-primary focus:outline-none cursor-pointer"
+                                                    className="w-full h-10 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-zinc-300 py-2 px-4 text-sm focus:ring-1 focus:ring-primary focus:outline-none cursor-pointer"
                                                 >
                                                     <option value="none">Default</option>
                                                     <option value="artist">Artist</option>
