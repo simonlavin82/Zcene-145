@@ -2,6 +2,7 @@ import express from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
 import admin from 'firebase-admin';
 import { getFirestore } from 'firebase-admin/firestore';
 
@@ -1019,8 +1020,74 @@ If you cannot find a clear YouTube video ID for this artist, return null for the
 app.use(express.static(path.join(__dirname, 'dist')));
 
 // Fallback for SPA (React Router)
-app.use((req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+app.use(async (req, res) => {
+  const indexPath = path.join(__dirname, 'dist', 'index.html');
+  
+  // Only inject if it's a GET request for an HTML page
+  if (req.method !== 'GET') {
+    return res.sendFile(indexPath);
+  }
+
+  try {
+    let html = fs.readFileSync(indexPath, 'utf8');
+
+    // Handle dynamic OG tags for shared Zcenes
+    if (req.path.startsWith('/z/')) {
+      const projectId = req.path.split('/z/')[1]?.split('?')[0]; // Strip query params
+      
+      if (projectId) {
+        const projectSnap = await db.collection('projects').doc(projectId).get();
+        
+        if (projectSnap.exists) {
+          const projectData = projectSnap.data();
+          const seedList = projectData.seedArtists ? projectData.seedArtists.split('::').filter(Boolean) : [];
+          const title = projectData.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene");
+          
+          let imageUrl = "https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg";
+          let description = `Explore this music discovery journey mapping out ${seedList.length} seed artists.`;
+
+          if (seedList.length > 0) {
+            description = `Explore this music map seeded by ${seedList.join(', ')}.`;
+            const primarySeedId = normalizeArtistId(seedList[0]);
+            
+            try {
+              // Try to fetch primary seed artist's artwork
+              const artistSnap = await db.collection('artists').doc(primarySeedId).get();
+              if (artistSnap.exists) {
+                const artistData = artistSnap.data();
+                if (artistData.detailsCache) {
+                  const parsedDetails = typeof artistData.detailsCache === 'string' ? JSON.parse(artistData.detailsCache) : artistData.detailsCache;
+                  if (parsedDetails.imageUrl) {
+                    imageUrl = parsedDetails.imageUrl;
+                  }
+                }
+              }
+            } catch (artistErr) {
+              console.error(`[OG Injection] Failed to fetch artist image for ${primarySeedId}:`, artistErr);
+            }
+          }
+
+          const ogTags = `
+    <!-- Dynamic Open Graph Tags -->
+    <meta property="og:title" content="${title.replace(/"/g, '&quot;')}" />
+    <meta property="og:description" content="${description.replace(/"/g, '&quot;')}" />
+    <meta property="og:image" content="${imageUrl}" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="${title.replace(/"/g, '&quot;')}" />
+    <meta name="twitter:description" content="${description.replace(/"/g, '&quot;')}" />
+    <meta name="twitter:image" content="${imageUrl}" />
+  `;
+          html = html.replace('</head>', `${ogTags}</head>`);
+        }
+      }
+    }
+    
+    res.send(html);
+  } catch (err) {
+    console.error("[OG Injection Error] Failed to serve index.html:", err);
+    res.sendFile(indexPath);
+  }
 });
 
 app.listen(PORT, '0.0.0.0', () => {

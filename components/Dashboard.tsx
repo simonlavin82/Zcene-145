@@ -8,6 +8,7 @@ import { normalizeArtistId, cleanArtistDisplayName } from '../services/artistCac
 
 
 import { formatSystemTimestamp } from '../utils/formatters';
+import { SeedArtistImages } from './SeedArtistImages';
 
 interface DashboardProps {
   user: User | null;
@@ -369,11 +370,19 @@ const Dashboard: React.FC<DashboardProps> = ({
                           onClick={() => onSelectProject(project.id)}
                           className="group relative bg-zinc-900 border border-zinc-700/50 rounded-none p-5 hover:border-primary/50 transition-all cursor-pointer flex flex-col justify-between w-full md:w-[360px] h-[180px] shadow-xl"
                         >
-                          <div className="space-y-4">
-                            <div className="flex items-center justify-between gap-3">
-                              <h3 className="text-base font-medium text-white group-hover:text-primary transition-colors truncate">
-                                {displayTitle}
-                              </h3>
+                          <div className="flex flex-col gap-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex flex-row items-center gap-4 flex-1 min-w-0">
+                                <SeedArtistImages seedArtists={project.seedArtists} userId={user?.uid} variant="grid" />
+                                <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+                                  <h3 className="text-base font-medium text-white group-hover:text-primary transition-colors line-clamp-2 pr-2">
+                                    {displayTitle}
+                                  </h3>
+                                  <p className="font-mono text-[10px] text-zinc-400 font-normal truncate uppercase tracking-widest">
+                                    {project.updatedAt ? `Edited ${formatSystemTimestamp(project.updatedAt)}` : 'New Project'}
+                                  </p>
+                                </div>
+                              </div>
                               <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                                 <button
                                   onClick={() => setActiveMenuId(activeMenuId === project.id ? null : project.id)}
@@ -411,9 +420,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 )}
                               </div>
                             </div>
-                            <p className="font-mono text-xs text-zinc-300 font-normal">
-                              {project.updatedAt ? `Edited ${formatSystemTimestamp(project.updatedAt)}` : 'New Project'}
-                            </p>
                           </div>
                           
                           <div className="mt-4 pt-4 border-t border-white/5 flex items-center">
