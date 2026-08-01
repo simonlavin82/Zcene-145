@@ -304,10 +304,11 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     const sentinelRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        if (!isFullScreenMode) return;
+        if (!isFullScreenMode || !sentinelRef.current) return;
         const scrollContainer = sentinelRef.current.closest('.overflow-y-auto') || window;
         let lastStuck = false;
         let frameId = 0;
+        let timeoutId: NodeJS.Timeout;
 
         const checkStuck = () => {
             if (!sentinelRef.current) return;
@@ -333,7 +334,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         };
 
         // Initial check with slight delay for layout to settle
-        setTimeout(checkStuck, 50);
+        timeoutId = setTimeout(checkStuck, 50);
 
         scrollContainer.addEventListener('scroll', onScroll, { passive: true });
         window.addEventListener('resize', onScroll, { passive: true });
@@ -342,6 +343,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
             scrollContainer.removeEventListener('scroll', onScroll);
             window.removeEventListener('resize', onScroll);
             cancelAnimationFrame(frameId);
+            clearTimeout(timeoutId);
         };
     }, [isFullScreenMode]);
     const [chatInput, setChatInput] = useState('');
@@ -1496,20 +1498,18 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     const [isTransitioning, setIsTransitioning] = useState(false);
 
     useEffect(() => {
-        if (isMagazineViewOpen && renderMode === 'panel') {
+        if (isMagazineViewOpen) {
             setIsTransitioning(true);
             setRenderMode('magazine');
-            const timer = setTimeout(() => setIsTransitioning(false), 50);
-            return () => clearTimeout(timer);
-        } else if (!isMagazineViewOpen && renderMode === 'magazine') {
+            setTimeout(() => setIsTransitioning(false), 50);
+        } else {
             setIsTransitioning(true);
-            const timer = setTimeout(() => {
+            setTimeout(() => {
                 setRenderMode('panel');
                 setIsTransitioning(false);
             }, 300);
-            return () => clearTimeout(timer);
         }
-    }, [isMagazineViewOpen, renderMode]);
+    }, [isMagazineViewOpen]);
 
     const handleMagazineSpeechToText = () => {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
