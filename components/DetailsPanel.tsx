@@ -639,7 +639,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
     return (
         <div 
-          className={`w-full min-w-[320px] bg-zinc-900 relative break-words transition-all duration-500 ${isFullScreenMode ? 'h-fit border border-zinc-800/80 shadow-2xl overflow-hidden mb-4 md:mb-6 break-inside-avoid' : 'h-full overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800'}`}
+          className={`w-full min-w-[320px] bg-zinc-900 relative break-words transition-all duration-500 ${isFullScreenMode ? 'h-fit border border-zinc-800/80 shadow-2xl overflow-hidden mb-4 md:mb-6 break-inside-avoid' : 'h-full border border-zinc-900 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800'}`}
           style={{ overscrollBehaviorY: 'auto' }}
           onScroll={(e) => {
               if (isFullScreenMode) return;
@@ -1448,6 +1448,25 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     const [isListeningMagazineSearch, setIsListeningMagazineSearch] = useState(false);
     const [hasSeenMagazineView, setHasSeenMagazineView] = useState(false);
 
+    const [renderMode, setRenderMode] = useState<'magazine' | 'panel'>(isMagazineViewOpen ? 'magazine' : 'panel');
+    const [isTransitioning, setIsTransitioning] = useState(false);
+
+    useEffect(() => {
+        if (isMagazineViewOpen && renderMode === 'panel') {
+            setIsTransitioning(true);
+            setRenderMode('magazine');
+            const timer = setTimeout(() => setIsTransitioning(false), 50);
+            return () => clearTimeout(timer);
+        } else if (!isMagazineViewOpen && renderMode === 'magazine') {
+            setIsTransitioning(true);
+            const timer = setTimeout(() => {
+                setRenderMode('panel');
+                setIsTransitioning(false);
+            }, 300);
+            return () => clearTimeout(timer);
+        }
+    }, [isMagazineViewOpen, renderMode]);
+
     const handleMagazineSpeechToText = () => {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SpeechRecognition) {
@@ -1712,12 +1731,11 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
 
     return (
         <div 
-          className="w-full h-full flex flex-col bg-zinc-900 overflow-hidden relative min-h-0"
+          className="w-full h-full flex flex-col bg-zinc-900 overflow-hidden relative min-h-0 outline-none"
           style={isMagazineViewOpen ? {
             backgroundImage: 'url("https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg")',
             backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundAttachment: 'fixed'
+            backgroundPosition: 'center'
           } : {}}
         >
             {isSmallScreen ? (
@@ -1732,7 +1750,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                             </div>
                             <button 
                                 onClick={() => onMagazineViewToggle(false)}
-                                className="flex items-center gap-1.5 px-3 py-1.5 border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 transition-all duration-200 text-xs font-medium shrink-0 leading-none backdrop-blur-sm"
+                                className="flex items-center gap-1.5 px-3 py-1.5 border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 focus:outline-none transition-all duration-200 text-xs font-medium shrink-0 leading-none backdrop-blur-sm"
                                 title="Exit Magazine View"
                             >
                                 <span>Exit Magazine</span>
@@ -1828,7 +1846,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                             <div className="flex items-center gap-0.5 ml-4 shrink-0">
                                 <button 
                                     onClick={() => onMagazineViewToggle(false)}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 transition-all duration-200 text-xs font-medium shrink-0 leading-none backdrop-blur-sm"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 focus:outline-none transition-all duration-200 text-xs font-medium shrink-0 leading-none backdrop-blur-sm"
                                     title="Exit Magazine View"
                                 >
                                     <span>Exit Magazine</span>
@@ -1958,10 +1976,10 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                         style={isMagazineViewOpen ? { touchAction: 'pan-y', overscrollBehaviorY: 'auto' } : {}}
                     >
                         <div 
-                            className={`${isMagazineViewOpen 
-                                ? 'grid grid-cols-[repeat(auto-fit,minmax(min(100%,400px),1fr))] gap-6 items-start w-full max-w-[1400px] mx-auto pb-12' 
-                                : 'flex h-full w-full transition-transform duration-300 ease-in-out will-change-transform touch-pan-y'}`}
-                            style={!isMagazineViewOpen ? { 
+                            className={`${renderMode === 'magazine' 
+                                ? `grid grid-cols-[repeat(auto-fit,minmax(min(100%,400px),1fr))] gap-6 items-start max-w-[1400px] mx-auto pb-12 transition-opacity duration-300 ease-in-out ${!isMagazineViewOpen || isTransitioning ? 'opacity-0 min-w-[100vw]' : 'opacity-100 w-full'}` 
+                                : `flex h-full w-full transition-all duration-300 ease-in-out will-change-transform touch-pan-y ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}`}
+                            style={renderMode === 'panel' ? { 
                                 transform: `translateX(-${viewedIndex * 100}%)`,
                                 overscrollBehaviorX: 'none'
                             } : {}}
@@ -2001,7 +2019,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                     return (
                                         <div 
                                             key={node.id} 
-                                            className={`transition-all duration-700 ${isMagazineViewOpen 
+                                            className={`${renderMode === 'magazine' 
                                                 ? 'inline-block w-full max-w-2xl text-left' 
                                                 : 'w-full h-full flex-shrink-0 overflow-hidden'}`}
                                         >

@@ -1432,8 +1432,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
         style={{
             backgroundImage: 'url("https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg")',
             backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundAttachment: 'fixed'
+            backgroundPosition: 'center'
         }}
     >
         <OnboardingTooltip isVisible={visibleTooltips.step1} content="Add your seed artists to start your Zcene. These are your starting points, you can type them or select from your library." position="bottom" anchorRef={artistInputRef} onDismiss={() => updateOnboarding('step1')} />
@@ -1647,7 +1646,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                     </div>
                 </div>
                 
-                <aside style={isMagazineViewOpen ? {} : { width: `${rightPanelWidth}px` }} className={`z-50 flex flex-col flex-shrink-0 ${isMagazineViewOpen ? '!fixed !inset-0 !top-0 !left-0 !m-0 !w-screen !h-screen !z-[1000] bg-background-dark/95' : 'relative h-full bg-zinc-900 border border-zinc-600/50 overflow-hidden transition-all duration-300 ease-in-out'}`}>
+                <aside style={isMagazineViewOpen ? {} : { width: `${rightPanelWidth}px` }} className={`z-50 flex flex-col flex-shrink-0 outline-none transition-colors transition-[width] duration-300 ease-in-out ${isMagazineViewOpen ? '!fixed !inset-0 !top-0 !left-0 !m-0 !w-screen !h-screen !z-[1000] bg-zinc-900 border border-zinc-900' : 'relative h-full bg-zinc-900 border border-zinc-600/50 overflow-hidden'}`}>
                        {!isDetailsPanelCollapsed && !isMagazineViewOpen && (
                          <div onMouseDown={handleMouseDown('right')} className="absolute top-0 left-0 h-full w-2 cursor-col-resize select-none touch-none z-10 group" aria-label="Resize right panel" role="separator">
                            <div className="w-full h-full bg-transparent group-hover:bg-primary/20 transition-colors"></div>
