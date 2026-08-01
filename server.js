@@ -1087,7 +1087,6 @@ app.use(async (req, res) => {
           html = html.replace('</head>', `${ogTags}</head>`);
         }
       }
-    }
     
     res.send(html);
   } catch (err) {
