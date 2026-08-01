@@ -1031,6 +1031,7 @@ app.use(async (req, res) => {
   try {
     let html = fs.readFileSync(indexPath, 'utf8');
 
+    console.log("[OG Debug] req.path:", req.path, "req.query:", JSON.stringify(req.query));
     // Handle dynamic OG tags for shared Zcenes
     let projectId = null;
     if (req.path.startsWith('/z/')) {
@@ -1040,7 +1041,10 @@ app.use(async (req, res) => {
     }
     
     if (projectId) {
-        const projectSnap = await db.collection('projects').doc(projectId).get();
+        let projectSnap = await db.collection('sharedZcenes').doc(projectId).get();
+        if (!projectSnap.exists) {
+          projectSnap = await db.collection('projects').doc(projectId).get();
+        }
         
         if (projectSnap.exists) {
           const projectData = projectSnap.data();
@@ -1088,6 +1092,8 @@ app.use(async (req, res) => {
         }
       }
     
+    // Ensure Cloud CDN and Firebase Hosting cache the dynamically injected social tags
+    res.set('Cache-Control', 'public, max-age=3600, s-maxage=86400');
     res.send(html);
   } catch (err) {
     console.error("[OG Injection Error] Failed to serve index.html:", err);
