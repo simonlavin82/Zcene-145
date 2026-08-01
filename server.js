@@ -1017,6 +1017,8 @@ If you cannot find a clear YouTube video ID for this artist, return null for the
 
 
 // Serve the static files from the React/Vite build output
+app.use('/assets', express.static(path.join(__dirname, 'dist/assets')));
+app.use('/app/assets', express.static(path.join(__dirname, 'dist/assets')));
 app.use(express.static(path.join(__dirname, 'dist')));
 
 function formatArtistName(name) {
