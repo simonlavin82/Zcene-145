@@ -1032,10 +1032,14 @@ app.use(async (req, res) => {
     let html = fs.readFileSync(indexPath, 'utf8');
 
     // Handle dynamic OG tags for shared Zcenes
+    let projectId = null;
     if (req.path.startsWith('/z/')) {
-      const projectId = req.path.split('/z/')[1]?.split('?')[0]; // Strip query params
-      
-      if (projectId) {
+      projectId = req.path.split('/z/')[1]?.split('?')[0]; // Strip query params
+    } else if (req.path === '/app' && req.query && req.query.shareId) {
+      projectId = req.query.shareId;
+    }
+    
+    if (projectId) {
         const projectSnap = await db.collection('projects').doc(projectId).get();
         
         if (projectSnap.exists) {
