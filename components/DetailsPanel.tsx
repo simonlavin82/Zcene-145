@@ -301,6 +301,33 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     const isArtistNode = node.type === 'artist';
     const isLabelNode = node.type === 'label';
 
+    const sentinelRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!isFullScreenMode) return;
+        
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                if (!entry.isIntersecting && entry.boundingClientRect.y < 100) {
+                    setIsHeaderStuck(true);
+                } else {
+                    setIsHeaderStuck(false);
+                }
+            },
+            {
+                rootMargin: '0px',
+                threshold: 0
+            }
+        );
+
+        if (sentinelRef.current) {
+            observer.observe(sentinelRef.current);
+        }
+
+        return () => {
+            observer.disconnect();
+        };
+    }, [isFullScreenMode]);
     const [chatInput, setChatInput] = useState('');
     const [showAllChips, setShowAllChips] = useState(false);
     const [clickedChips, setClickedChips] = useState<Set<string>>(new Set());
@@ -639,7 +666,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
     return (
         <div 
-          className={`w-full min-w-[320px] bg-zinc-900 relative break-words transition-all duration-500 ${isFullScreenMode ? 'h-fit border border-zinc-800/80 shadow-2xl overflow-hidden mb-4 md:mb-6 break-inside-avoid' : 'h-full border border-zinc-900 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800'}`}
+          className={`w-full min-w-[320px] bg-zinc-900 relative break-words transition-all duration-500 ${isFullScreenMode ? 'h-fit border border-zinc-800/80 shadow-2xl overflow-visible mb-4 md:mb-6 break-inside-avoid' : 'h-full border border-zinc-900 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800'}`}
           style={{ overscrollBehaviorY: 'auto' }}
           onScroll={(e) => {
               if (isFullScreenMode) return;
@@ -706,16 +733,17 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                         </div>
                 </div>
 
-                {/* 2. Artist Name & Pills (Sticky in panel view only) */}
-                <div className={`px-4 ${isHeaderStuck && !isFullScreenMode ? 'py-2' : 'pt-2 pb-3'} transition-all duration-300 border-b border-zinc-800/50 bg-zinc-900 flex-shrink-0 ${!isFullScreenMode ? 'sticky top-0 z-40' : 'z-20'} ${isFullScreenMode ? 'md:px-6' : ''}`}>
-                    <div className={`flex flex-col ${isHeaderStuck && !isFullScreenMode ? 'gap-0' : 'gap-1'} min-w-0 flex-grow transition-all duration-300`}>
+                <div ref={sentinelRef} className="w-full h-[1px] -mt-[1px] pointer-events-none" />
+                {/* 2. Artist Name & Pills */}
+                <div className={`px-4 ${isHeaderStuck ? 'py-2' : 'pt-2 pb-3'} transition-all duration-300 border-b border-zinc-800/50 bg-zinc-900 flex-shrink-0 sticky top-0 z-40 ${isFullScreenMode ? 'md:px-6' : ''}`}>
+                    <div className={`flex flex-col ${isHeaderStuck ? 'gap-0' : 'gap-3'} min-w-0 flex-grow transition-all duration-300`}>
                             <div className="flex items-center gap-2">
                                 <div 
                                     onClick={handleCopyId}
                                     className="group flex items-center gap-2 cursor-copy w-fit transition-all active:scale-[0.98] min-w-0"
                                     title="Click to copy name"
                                 >
-                                    <h3 className={`${isHeaderStuck && !isFullScreenMode ? 'text-base font-medium' : headerSizeClass} text-white leading-[0.9] py-1 break-normal transition-all duration-300`}>
+                                    <h3 className={`${isHeaderStuck ? 'text-base font-medium' : headerSizeClass} text-white leading-[0.9] py-1 break-normal transition-all duration-300`}>
                                         {getArtistDisplayName(details, node)}
                                     </h3>
                                     <span className={`material-symbols-outlined !text-[16px] flex-shrink-0 transition-all duration-300 ${isIdCopied ? 'text-primary opacity-100 scale-110' : 'text-zinc-500 opacity-0 group-hover:opacity-100'}`}>
@@ -723,7 +751,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     </span>
                                 </div>
                             </div>
-                            <div className={`flex flex-wrap items-center gap-2 transition-all duration-300 overflow-hidden ${isHeaderStuck && !isFullScreenMode ? 'max-h-0 opacity-0 mt-0' : 'max-h-10 opacity-100 mt-1'}`}>
+                            <div className={`flex flex-wrap items-center gap-2 transition-all duration-300 overflow-hidden ${isHeaderStuck ? 'max-h-0 opacity-0 mt-0' : 'max-h-10 opacity-100 mt-1'}`}>
                                 <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-400 bg-zinc-800/80 px-2 py-0.5 border border-zinc-700/50 rounded-md">{node.type}</span>
                                 {isManualAdd && <span className="text-[10px] font-semibold uppercase tracking-[0.2em] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 border border-emerald-500/30 rounded-md">Manual</span>}
                                 {isAiSuggestion && <span className="text-[10px] font-semibold uppercase tracking-[0.2em] bg-purple-500/20 text-purple-400 px-2 py-0.5 border border-purple-500/30 flex items-center gap-1 rounded-md"><span className="material-symbols-outlined !text-[12px]">star</span>AI</span>}
@@ -1969,7 +1997,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     )}
 
                     <div 
-                        className={`flex-grow relative min-h-0 ${isMagazineViewOpen ? 'overflow-y-auto p-4 md:p-6 lg:p-8 scrollbar-thin scrollbar-thumb-zinc-800' : 'overflow-hidden'}`}
+                        className={`flex-grow relative min-h-0 ${isMagazineViewOpen ? 'overflow-y-auto px-4 md:px-6 lg:px-8 scrollbar-thin scrollbar-thumb-zinc-800' : 'overflow-hidden'}`}
                         onTouchStart={handleTouchStart}
                         onTouchMove={handleTouchMove}
                         onTouchEnd={handleTouchEnd}
@@ -1977,7 +2005,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     >
                         <div 
                             className={`${renderMode === 'magazine' 
-                                ? `grid grid-cols-[repeat(auto-fit,minmax(min(100%,400px),1fr))] gap-6 items-start max-w-[1400px] mx-auto pb-12 transition-opacity duration-300 ease-in-out ${!isMagazineViewOpen || isTransitioning ? 'opacity-0 min-w-[100vw]' : 'opacity-100 w-full'}` 
+                                ? `grid grid-cols-[repeat(auto-fit,minmax(min(100%,400px),1fr))] gap-6 items-start max-w-[1400px] mx-auto pt-4 md:pt-6 lg:pt-8 pb-12 transition-opacity duration-300 ease-in-out ${!isMagazineViewOpen || isTransitioning ? 'opacity-0 min-w-[100vw]' : 'opacity-100 w-full'}` 
                                 : `flex h-full w-full transition-all duration-300 ease-in-out will-change-transform touch-pan-y ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}`}
                             style={renderMode === 'panel' ? { 
                                 transform: `translateX(-${viewedIndex * 100}%)`,

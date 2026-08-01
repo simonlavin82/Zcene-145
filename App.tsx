@@ -4858,8 +4858,8 @@ const App: React.FC = () => {
           });
         } catch (e) { console.error("Chat histories parse fail", e); }
       }
-      if (data.isMagazineViewOpen !== undefined) {
-        setIsMagazineViewOpen((prev: any) => prev === data.isMagazineViewOpen ? prev : data.isMagazineViewOpen);
+      if (data.isMagazineViewOpen !== undefined && isProjectLoadingRef.current) {
+        setIsMagazineViewOpen(false); // Safely default to workspace view on initial load
       }
 
       try {
@@ -5213,7 +5213,7 @@ const App: React.FC = () => {
         discoveryFilters: typeof data.discoveryFilters === 'string' ? data.discoveryFilters : JSON.stringify(data.discoveryFilters || {}),
         lastViewedStackCount: data.lastViewedStackCount || 0,
         activeNodes: data.activeNodes || [],
-        isMagazineViewOpen: data.isMagazineViewOpen || false,
+        isMagazineViewOpen: false, // Don't rely on saved state for initial mount
         chatHistories: typeof data.chatHistories === 'string' ? data.chatHistories : JSON.stringify(data.chatHistories || []),
         canvasLayout: data.canvasLayout || '[]',
         graphData: data.graphData || '{}'
