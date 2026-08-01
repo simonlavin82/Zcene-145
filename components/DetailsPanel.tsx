@@ -305,27 +305,43 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
     useEffect(() => {
         if (!isFullScreenMode) return;
-        
-        const observer = new IntersectionObserver(
-            ([entry]) => {
-                if (!entry.isIntersecting && entry.boundingClientRect.y < 100) {
-                    setIsHeaderStuck(true);
-                } else {
-                    setIsHeaderStuck(false);
-                }
-            },
-            {
-                rootMargin: '0px',
-                threshold: 0
-            }
-        );
+        const scrollContainer = sentinelRef.current.closest('.overflow-y-auto') || window;
+        let lastStuck = false;
+        let frameId = 0;
 
-        if (sentinelRef.current) {
-            observer.observe(sentinelRef.current);
-        }
+        const checkStuck = () => {
+            if (!sentinelRef.current) return;
+            const rect = sentinelRef.current.getBoundingClientRect();
+            
+            let boundaryTop = 0;
+            if (scrollContainer instanceof Element) {
+                boundaryTop = scrollContainer.getBoundingClientRect().top;
+            }
+            
+            // Add a 1px buffer to ensure smooth trigger
+            const isStuck = rect.top <= boundaryTop + 1;
+            
+            if (isStuck !== lastStuck) {
+                lastStuck = isStuck;
+                setIsHeaderStuck(isStuck);
+            }
+        };
+
+        const onScroll = () => {
+            cancelAnimationFrame(frameId);
+            frameId = requestAnimationFrame(checkStuck);
+        };
+
+        // Initial check with slight delay for layout to settle
+        setTimeout(checkStuck, 50);
+
+        scrollContainer.addEventListener('scroll', onScroll, { passive: true });
+        window.addEventListener('resize', onScroll, { passive: true });
 
         return () => {
-            observer.disconnect();
+            scrollContainer.removeEventListener('scroll', onScroll);
+            window.removeEventListener('resize', onScroll);
+            cancelAnimationFrame(frameId);
         };
     }, [isFullScreenMode]);
     const [chatInput, setChatInput] = useState('');
