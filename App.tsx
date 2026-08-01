@@ -4908,7 +4908,13 @@ const App: React.FC = () => {
               }
 
               // ── FIRESTORE-FIRST: batch-load all node biographies before marking load complete
-              await batchHydrateDetailsCache(g.nodes, g.links);
+              const isInitialHydration = isProjectLoadingRef.current;
+              if (isInitialHydration) setIsLoading(true);
+              try {
+                await batchHydrateDetailsCache(g.nodes, g.links);
+              } finally {
+                if (isInitialHydration) setIsLoading(false);
+              }
               hydratedNodes = g.nodes;
 
               // Restore active nodes — with seed-fallback for stale documents where activeNodes was never
@@ -6852,7 +6858,7 @@ const App: React.FC = () => {
             <GraphPage
               areFiltersChanged={areFiltersChanged}
               data={formattedGraphData || { nodes: [], links: [] }} baseGraph={baseGraph} libraryArtists={libraryArtists} seedArtists={seedArtists}
-              onRegenerate={(n) => handleGenerateGraph(n, true, graphData)} isLoading={isLoading}
+              onRegenerate={(n) => handleGenerateGraph(n, true, graphData)} isLoading={isLoading} isHydrating={isProjectLoadingRef.current}
               onCancelGeneration={handleCancel} onFileUpload={(f) => {
                 const r = new FileReader(); r.onload = (e) => {
                   const t = e.target?.result as string;
