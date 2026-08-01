@@ -469,7 +469,7 @@ export const onCurationJobCreated = onDocumentCreated({
             graphData: isSeedLabel ? null : JSON.stringify(finalGraph),
             detailsCache: isSeedLabel ? sanitizeLabelProfile(seedDetails) : sanitizeUndefinedProperties(seedDetails), // Save as structured object!
             filters: inputPayload.filters || null,
-            cacheVersion: 3,
+            cacheVersion: 4,
             cachedAt: FieldValue.serverTimestamp(),
             hitCount: 0,
             isDeep: true, // Marked Deep!
@@ -492,7 +492,7 @@ export const onCurationJobCreated = onDocumentCreated({
               seedArtists: seed,
               graphData: isSeedLabel ? null : JSON.stringify({ nodes: [], links: [] }),
               filters: {},
-              cacheVersion: 3,
+              cacheVersion: 4,
               cachedAt: FieldValue.serverTimestamp(),
               hitCount: 0,
               redirectTo: compositeCanonicalId
@@ -578,7 +578,7 @@ export const onCurationJobCreated = onDocumentCreated({
               graphData: null,
               detailsCache: isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(recDetails), // Save as structured object!
               filters: null, // Note: active filters are not strictly carried for proactive rec entries unless we explicitly want to
-              cacheVersion: 3,
+              cacheVersion: 4,
               cachedAt: FieldValue.serverTimestamp(),
               hitCount: 0,
               isDeep: true, // Marked Deep!
@@ -591,7 +591,7 @@ export const onCurationJobCreated = onDocumentCreated({
             const updatePayload: any = {
               detailsCache: isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(recDetails),
               cachedAt: FieldValue.serverTimestamp(),
-              cacheVersion: 3,
+              cacheVersion: 4,
               [idFieldKey]: recNorm,
               cacheKey: compositeCanonicalId,
               isDeep: true
@@ -609,7 +609,7 @@ export const onCurationJobCreated = onDocumentCreated({
             [idFieldKey]: recNorm,
             seedArtists: recArtist,
             detailsCache: isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(recDetails),
-            cacheVersion: 3,
+            cacheVersion: 4,
             cachedAt: FieldValue.serverTimestamp(),
             redirectTo: compositeCanonicalId
           };

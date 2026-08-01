@@ -416,7 +416,7 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                         graphData: isSeedLabel ? null : JSON.stringify(finalGraph),
                         detailsCache: isSeedLabel ? sanitizeLabelProfile(seedDetails) : sanitizeUndefinedProperties(seedDetails), // Save as structured object!
                         filters: inputPayload.filters || null,
-                        cacheVersion: 3,
+                        cacheVersion: 4,
                         cachedAt: firestore_2.FieldValue.serverTimestamp(),
                         hitCount: 0,
                         isDeep: true, // Marked Deep!
@@ -436,7 +436,7 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                             seedArtists: seed,
                             graphData: isSeedLabel ? null : JSON.stringify({ nodes: [], links: [] }),
                             filters: {},
-                            cacheVersion: 3,
+                            cacheVersion: 4,
                             cachedAt: firestore_2.FieldValue.serverTimestamp(),
                             hitCount: 0,
                             redirectTo: compositeCanonicalId
@@ -514,7 +514,7 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                             graphData: null,
                             detailsCache: isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(recDetails), // Save as structured object!
                             filters: null, // Note: active filters are not strictly carried for proactive rec entries unless we explicitly want to
-                            cacheVersion: 3,
+                            cacheVersion: 4,
                             cachedAt: firestore_2.FieldValue.serverTimestamp(),
                             hitCount: 0,
                             isDeep: true, // Marked Deep!
@@ -528,7 +528,7 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                         const updatePayload = {
                             detailsCache: isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(recDetails),
                             cachedAt: firestore_2.FieldValue.serverTimestamp(),
-                            cacheVersion: 3,
+                            cacheVersion: 4,
                             [idFieldKey]: recNorm,
                             cacheKey: compositeCanonicalId,
                             isDeep: true
@@ -544,7 +544,7 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                         [idFieldKey]: recNorm,
                         seedArtists: recArtist,
                         detailsCache: isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(recDetails),
-                        cacheVersion: 3,
+                        cacheVersion: 4,
                         cachedAt: firestore_2.FieldValue.serverTimestamp(),
                         redirectTo: compositeCanonicalId
                     };

@@ -178,6 +178,7 @@ the entire dataset, the app evolves existing visual structures.
      normalized slugs ('isSameNodeId') to resolve raw artist name and selection mismatches.
 
 4. DATA INTEGRITY & PARALLEL HYDRATION PIPELINE:
+   - Temporal Isolation & Search Grounding (v4): The prompt architecture strictly enforces period-accurate temporal isolation by excluding explicit token-biasing band examples (e.g., Snapcase) that previously caused generation leakage. To ensure the Google Search tool correctly grounds its deep cuts into the specific historical era of the seed, contemporary artist nodes are explicitly included as 'Temporal Era Anchors' in the backend search context, whilst a strict Universality Rule forbids the LLM from mentioning these anchors in the final returned biography.
    - Chunked Concurrent Backend Hydration: Curation details (biographies, genres, origins,
      formed years, member lists, and image URLs) for ALL node types are resolved via a
      chunked Promise.all() execution model on the backend. Nodes are batched into groups

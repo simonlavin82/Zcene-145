@@ -105,7 +105,7 @@ export interface CanvasNodeRef {
 /**
  * Top-level Firestore 'artists' collection document — per-artist isolated cache entry.
  *
- * STRICT ISOLATION RULE (cacheVersion 3):
+ * STRICT ISOLATION RULE (cacheVersion 4):
  *   - `nodes` contains ONLY the artist's own node plus its direct structural metadata
  *     nodes (genre, label, country, founded).
  *   - `links` contains ONLY the links between this artist and its own metadata nodes.

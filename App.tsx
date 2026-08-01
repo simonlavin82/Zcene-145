@@ -1080,7 +1080,7 @@ const App: React.FC = () => {
               artistId: "needtobreathe",
               cacheKey: "needtobreathe",
               redirectTo: "needtobreathe-united-states",
-              cacheVersion: 3,
+              cacheVersion: 4,
               cachedAt: serverTimestamp()
             });
             await batch.commit();
@@ -1445,7 +1445,7 @@ const App: React.FC = () => {
           artistId: nonSelectedData.artistId || normalizeArtistId(nonSelectedId),
           cacheKey: nonSelectedId,
           redirectTo: selectedId,
-          cacheVersion: 3,
+          cacheVersion: 4,
           cachedAt: serverTimestamp()
         });
         
@@ -2323,7 +2323,7 @@ const App: React.FC = () => {
               artistId: simpleArtistId,
               cacheKey: simpleArtistId,
               redirectTo: disambiguatedCacheId,
-              cacheVersion: 3,
+              cacheVersion: 4,
               cachedAt: serverTimestamp()
             }), { merge: true });
           }
@@ -2340,7 +2340,7 @@ const App: React.FC = () => {
       const setPayload = isLabel ? {
         cacheKey: disambiguatedCacheId,
         labelId: simpleArtistId,
-        cacheVersion: 3,
+        cacheVersion: 4,
         cachedAt: serverTimestamp(),
         hitCount: 0,
         isDeep: true,
@@ -2348,7 +2348,7 @@ const App: React.FC = () => {
       } : {
         cacheKey: disambiguatedCacheId,
         artistId: simpleArtistId,
-        cacheVersion: 3,
+        cacheVersion: 4,
         cachedAt: serverTimestamp(),
         hitCount: 0,
         isDeep: true,
@@ -3478,7 +3478,7 @@ const App: React.FC = () => {
               artistId: normalizeArtistId(name),
               seedArtists: name,
               graphData: JSON.stringify({ nodes: [{ id: name, type: 'artist', label: name, group: 1 }], links: [] }),
-              cacheVersion: 3,
+              cacheVersion: 4,
               cachedAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
               hitCount: 0,
               detailsCache: JSON.stringify({
@@ -3508,7 +3508,7 @@ const App: React.FC = () => {
                 artistId: normalizeArtistId(name),
                 seedArtists: name,
                 graphData: JSON.stringify({ nodes, links }),
-                cacheVersion: 3,
+                cacheVersion: 4,
                 cachedAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
                 hitCount: 0,
                 detailsCache: details ? JSON.stringify(details) : undefined
@@ -6530,7 +6530,7 @@ const App: React.FC = () => {
                               artistId: simpleArtistId,
                               cacheKey: simpleArtistId,
                               redirectTo: cacheId,
-                              cacheVersion: 3,
+                              cacheVersion: 4,
                               cachedAt: serverTimestamp()
                             }));
                             console.log(`[Reconciliation] Converted base document "${simpleArtistId}" into a redirect to "${cacheId}".`);
@@ -6563,7 +6563,7 @@ const App: React.FC = () => {
                         seedArtists: canonicalNameFromDetails || canonicalName,
                         graphData: JSON.stringify(normalizedGraph),
                         filters: discoveryFiltersRef.current || {},
-                        cacheVersion: 3,
+                        cacheVersion: 4,
                         cachedAt: serverTimestamp(),
                         hitCount: 0,
                         isDeep: true,
@@ -6581,7 +6581,7 @@ const App: React.FC = () => {
                         cacheKey: cacheId,
                         artistId: cacheId,
                         redirectTo: canonicalId,
-                        cacheVersion: 3,
+                        cacheVersion: 4,
                         cachedAt: serverTimestamp()
                       }));
                       console.log(`[Deep Cut Queue] Created Alias Redirect: ${cacheId} -> ${canonicalId}`);
