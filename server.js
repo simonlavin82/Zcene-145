@@ -1056,6 +1056,16 @@ app.use(async (req, res) => {
   try {
     let html = fs.readFileSync(indexPath, 'utf8');
 
+    // Force absolute paths for Vite assets to prevent relative routing failures on nested paths
+    html = html.split('src="assets/').join('src="/assets/');
+    html = html.split('src="index').join('src="/assets/index');
+    html = html.split('href="assets/').join('href="/assets/');
+    html = html.split('href="index').join('href="/assets/index');
+
+    // Regex specifically targeting vite chunk formats if they missed the assets folder entirely
+    html = html.replace(/src=["'](?:.\/)?(index-[^"']+\.js)["']/g, 'src="/assets/$1"');
+    html = html.replace(/href=["'](?:.\/)?(index-[^"']+\.css)["']/g, 'href="/assets/$1"');
+
     console.log("[OG Debug] req.path:", req.path, "req.query:", JSON.stringify(req.query));
     // Handle dynamic OG tags for shared Zcenes
     let projectId = null;
