@@ -3125,7 +3125,7 @@ const App: React.FC = () => {
             } else {
               console.log(`[Front Gate Cache] User cancelled cache upgrade. Falling back to legacy data.`);
               isHydratingSessionRef.current = false;
-              handleGenerateGraph(artists, isRegeneration, graphToEnhance, true);
+              handleGenerateGraph(artists, isRegeneration, graphToEnhance, true, true);
               return;
             }
           }
@@ -3745,7 +3745,7 @@ const App: React.FC = () => {
             setActiveNodeIds(prevActiveNodeIds);
             setSeedArtists(prevSeedArtists);
             showToast(`Loading cached artists: ${legacyArtists.join(', ')}`);
-            handleGenerateGraph(legacyArtists.join('::'), isRegeneration, graphToEnhance, true);
+            handleGenerateGraph(legacyArtists.join('::'), isRegeneration, graphToEnhance, true, true);
           } else {
             isHydratingSessionRef.current = false;
             setActiveNodeIds(prevActiveNodeIds);
