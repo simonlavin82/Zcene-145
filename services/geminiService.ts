@@ -28,7 +28,16 @@ export const extractCleanJsonString = (rawText?: string): string => {
     }
 
     // 2. Find the first occurrence of { or [
-    const startIdx = text.search(/[{[]/);
+    let startIdx = text.indexOf('{');
+    const arrayStartIdx = text.search(/\[\s*(?:\{|")/); // allow array of objects or strings
+    if (startIdx === -1) startIdx = arrayStartIdx;
+    else if (arrayStartIdx !== -1 && arrayStartIdx < startIdx) startIdx = arrayStartIdx;
+    
+    if (startIdx === -1) {
+        // Fallback to just [
+        startIdx = text.indexOf('[');
+    }
+    
     if (startIdx === -1) return text;
     text = text.substring(startIdx);
 
@@ -88,7 +97,15 @@ const repairJson = (json: string): string => {
     let escaped = false;
     
     // Find the first occurrence of { or [
-    const startIdx = json.search(/[{[]/);
+    let startIdx = json.indexOf('{');
+    const arrayStartIdx = json.search(/\[\s*(?:\{|")/); // allow array of objects or strings
+    if (startIdx === -1) startIdx = arrayStartIdx;
+    else if (arrayStartIdx !== -1 && arrayStartIdx < startIdx) startIdx = arrayStartIdx;
+    
+    if (startIdx === -1) {
+        startIdx = json.indexOf('[');
+    }
+    
     if (startIdx === -1) return json;
     let text = json.substring(startIdx);
 
@@ -1405,7 +1422,7 @@ export const sanitizeBioText = (rawText?: string): string => {
 
   // If text is a raw JSON string wrapper like {"summary": "..."} or {"bio": "..."}, extract the string!
   if (text.startsWith('{') || text.startsWith('[')) {
-      const summaryMatch = text.match(/["'](?:summary|bio|description|text)["']\s*:\s*["']([\s\S]*?)["']\s*(?:,\s*["']|\}|$)/i);
+      const summaryMatch = text.match(/["'](?:summary|bio|description|text)["']\s*:\s*["']([\s\S]*?)(?=["']\s*(?:,\s*["'](?:imageUrl|members|details|discography|tourInfo|recommendationReason|nodes|links|group|id|type)["']|\s*\}|\s*$))/i);
       if (summaryMatch && summaryMatch[1]) {
           text = summaryMatch[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\').trim();
       }
@@ -1628,19 +1645,26 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
                     `[Deep Cut Parse] JSON repair failed — response appears to be grounding prose (${rawProse.length} chars). ` +
                     `Mapping prose to NodeDetails bio field as graceful fallback.`
                 );
+                
+                // Best effort extraction of other fields from the raw string
+                const genreMatch = cleanedJsonText.match(/["']genre["']\s*:\s*["']([^"']*)["']/i);
+                const originMatch = cleanedJsonText.match(/["']origin["']\s*:\s*["']([^"']*)["']/i);
+                const foundedMatch = cleanedJsonText.match(/["']founded["']\s*:\s*["']([^"']*)["']/i);
+                const tourInfoMatch = cleanedJsonText.match(/["']tourInfo["']\s*:\s*["']([^"']*)["']/i);
+                
                 details = {
                     summary: rawProse,
                     details: {
                         artist: node.label || node.id,
-                        genre: "",
-                        origin: originHint || "",
-                        founded: "",
+                        genre: genreMatch ? genreMatch[1] : "",
+                        origin: originMatch ? originMatch[1] : (originHint || ""),
+                        founded: foundedMatch ? foundedMatch[1] : "",
                         notableArtists: []
                     },
                     members: [],
                     links: [],
                     discography: [],
-                    tourInfo: "",
+                    tourInfo: tourInfoMatch ? tourInfoMatch[1] : "",
                     recommendationReason: "Synthesised from live cultural archives via Google Search grounding."
                 };
             } else {

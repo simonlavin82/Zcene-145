@@ -302,7 +302,15 @@ const extractCleanJsonString = (rawText) => {
     else {
         text = text.replace(/^```(?:json)?\n?/i, '').replace(/```$/i, '').trim();
     }
-    const startIdx = text.search(/[{[]/);
+    let startIdx = text.indexOf('{');
+    const arrayStartIdx = text.search(/\[\s*(?:\{|")/); // allow array of objects or strings
+    if (startIdx === -1)
+        startIdx = arrayStartIdx;
+    else if (arrayStartIdx !== -1 && arrayStartIdx < startIdx)
+        startIdx = arrayStartIdx;
+    if (startIdx === -1) {
+        startIdx = text.indexOf('[');
+    }
     if (startIdx === -1)
         return text;
     text = text.substring(startIdx);
@@ -354,7 +362,15 @@ const repairJson = (json) => {
     let stack = [];
     let inString = false;
     let escaped = false;
-    const startIdx = json.search(/[{[]/);
+    let startIdx = json.indexOf('{');
+    const arrayStartIdx = json.search(/\[\s*(?:\{|")/); // allow array of objects or strings
+    if (startIdx === -1)
+        startIdx = arrayStartIdx;
+    else if (arrayStartIdx !== -1 && arrayStartIdx < startIdx)
+        startIdx = arrayStartIdx;
+    if (startIdx === -1) {
+        startIdx = json.indexOf('[');
+    }
     if (startIdx === -1)
         return json;
     let text = json.substring(startIdx);
@@ -955,7 +971,7 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint)
             text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
         }
         if (text.startsWith('{') || text.startsWith('[')) {
-            const summaryMatch = text.match(/["'](?:summary|bio|description|text)["']\s*:\s*["']([\s\S]*?)["']\s*(?:,\s*["']|\}|$)/i);
+            const summaryMatch = text.match(/["'](?:summary|bio|description|text)["']\s*:\s*["']([\s\S]*?)(?=["']\s*(?:,\s*["'](?:imageUrl|members|details|discography|tourInfo|recommendationReason|nodes|links|group|id|type)["']|\s*\}|\s*$))/i);
             if (summaryMatch && summaryMatch[1]) {
                 text = summaryMatch[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\').trim();
             }
@@ -990,13 +1006,27 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint)
                 throw new Error("Invalid data format from details service (unparsed JSON wrapper).");
             }
             if (rawProse.length > 40) {
+                console.warn(`[Backend Deep Cut Parse] JSON repair failed — response appears to be grounding prose (${rawProse.length} chars). ` +
+                    `Mapping prose to NodeDetails bio field as graceful fallback.`);
+                // Best effort extraction of other fields from the raw string
+                const genreMatch = cleanedJsonText.match(/["']genre["']\s*:\s*["']([^"']*)["']/i);
+                const originMatch = cleanedJsonText.match(/["']origin["']\s*:\s*["']([^"']*)["']/i);
+                const foundedMatch = cleanedJsonText.match(/["']founded["']\s*:\s*["']([^"']*)["']/i);
+                const tourInfoMatch = cleanedJsonText.match(/["']tourInfo["']\s*:\s*["']([^"']*)["']/i);
                 details = {
                     summary: rawProse,
-                    details: { genre: "", origin: "", founded: "", notableArtists: [] },
+                    details: {
+                        artist: node.label || node.id,
+                        genre: genreMatch ? genreMatch[1] : "",
+                        origin: originMatch ? originMatch[1] : (originHint || ""),
+                        founded: foundedMatch ? foundedMatch[1] : "",
+                        notableArtists: []
+                    },
+                    members: [],
                     links: [],
                     discography: [],
-                    members: [],
-                    recommendationReason: ""
+                    tourInfo: tourInfoMatch ? tourInfoMatch[1] : "",
+                    recommendationReason: "Synthesised from live cultural archives via Google Search grounding."
                 };
             }
             else {
