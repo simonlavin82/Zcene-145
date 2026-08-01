@@ -5166,7 +5166,7 @@ const App: React.FC = () => {
           } else if (data.graphData) {
             // --- VERY LEGACY FORMAT: full graph blob stored inline ---
             console.log(`[ProjectLoader] Full blob legacy format — loading graphData inline.`);
-            const g = normalizeGraphData(JSON.parse(data.graphData));
+            const g = normalizeGraphData(typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData);
             g.links = g.links.map((l: any) => ({
               ...l,
               source: typeof l.source === 'object' ? l.source.id : l.source,
