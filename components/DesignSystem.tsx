@@ -2636,6 +2636,14 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <p className="text-sm text-zinc-400">Labels use compact <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">text-xs font-medium</code> styling to match high-density UI constraints, with metadata labels in tiny caps (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">text-[9px] font-bold uppercase</code>) like GUEST ACCOUNT. The container uses <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">antialiased</code> font smoothing to keep small sizes thin and readable.</p>
                                         </div>
                                         <div className="space-y-1">
+                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Icon Hover States</h4>
+                                            <p className="text-sm text-zinc-400">Context menu icons MUST remain neutral gray (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">text-zinc-500</code>) on hover. Hover states should only trigger subtle row background/text changes (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">hover:bg-zinc-800 hover:text-zinc-200</code>) without altering icon color.</p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Item Ordering</h4>
+                                            <p className="text-sm text-zinc-400">Menu items follow a strict hierarchy: Primary Action (e.g. Edit) &rarr; Secondary Action (e.g. Share) &rarr; Destructive Action (e.g. Delete, using <code className="text-xs bg-zinc-950 text-[#ef4444] px-1.5 py-0.5 font-mono">text-[#ef4444]</code>).</p>
+                                        </div>
+                                        <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Sign-In Action CTA</h4>
                                             <p className="text-sm text-zinc-400">Unauthenticated dropdowns feature a prominent primary CTA button (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">bg-primary text-black rounded-xl px-4 py-2 text-xs font-semibold</code>) to bridge guest journeys immediately.</p>
                                         </div>

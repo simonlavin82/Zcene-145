@@ -285,7 +285,7 @@ const Header: React.FC<HeaderProps> = ({
                             onClick={() => { setIsProfileOpen(false); onNavigate('help'); }}
                             className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
                           >
-                            <span className="material-symbols-outlined !text-[16px] text-zinc-500 group-hover:text-primary">help</span>
+                            <span className="material-symbols-outlined !text-[16px] text-zinc-500">help</span>
                             Help
                           </button>
 
@@ -295,14 +295,14 @@ const Header: React.FC<HeaderProps> = ({
                                 onClick={() => { setIsProfileOpen(false); onNavigate('design'); }}
                                 className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
                               >
-                                <span className="material-symbols-outlined !text-[16px] text-zinc-500 group-hover:text-primary">grid_view</span>
+                                <span className="material-symbols-outlined !text-[16px] text-zinc-500">grid_view</span>
                                 Design System
                               </button>
                               <button
                                 onClick={() => { setIsProfileOpen(false); onNavigate('engine'); }}
                                 className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
                               >
-                                <span className="material-symbols-outlined !text-[16px] text-zinc-500 group-hover:text-primary">settings_input_component</span>
+                                <span className="material-symbols-outlined !text-[16px] text-zinc-500">settings_input_component</span>
                                 Engine
                               </button>
                             </>
@@ -313,7 +313,7 @@ const Header: React.FC<HeaderProps> = ({
                               onClick={() => { setIsProfileOpen(false); onNavigate('analytics'); }}
                               className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
                             >
-                              <span className="material-symbols-outlined !text-[16px] text-zinc-500 group-hover:text-primary">monitoring</span>
+                              <span className="material-symbols-outlined !text-[16px] text-zinc-500">monitoring</span>
                               Discovery Ledger
                             </button>
                           )}
@@ -325,7 +325,7 @@ const Header: React.FC<HeaderProps> = ({
                             }}
                             className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
                           >
-                            <span className="material-symbols-outlined !text-[16px] text-zinc-500 group-hover:text-primary">camera_alt</span>
+                            <span className="material-symbols-outlined !text-[16px] text-zinc-500">camera_alt</span>
                             Instagram
                             <span className="material-symbols-outlined !text-[10px] ml-auto opacity-40">open_in_new</span>
                           </button>
@@ -345,7 +345,7 @@ const Header: React.FC<HeaderProps> = ({
                             }}
                             className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
                           >
-                            <span className="material-symbols-outlined !text-[16px] text-zinc-500 group-hover:text-primary">restart_alt</span>
+                            <span className="material-symbols-outlined !text-[16px] text-zinc-500">restart_alt</span>
                             Restart Walkthrough
                           </button>
                         </div>
@@ -358,7 +358,7 @@ const Header: React.FC<HeaderProps> = ({
                                 onClick={() => { setIsProfileOpen(false); onLogout(); }}
                                 className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
                               >
-                                <span className="material-symbols-outlined !text-[16px] text-zinc-500 group-hover:text-primary">logout</span>
+                                <span className="material-symbols-outlined !text-[16px] text-zinc-500">logout</span>
                                 Sign Out
                               </button>
                               <div className="border-t border-zinc-800/80 my-1.5" />

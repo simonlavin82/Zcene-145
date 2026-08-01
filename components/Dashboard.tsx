@@ -34,6 +34,7 @@ interface DashboardProps {
   isMenuOpen: boolean;
   setIsMenuOpen: (open: boolean) => void;
   onRestartWalkthrough?: () => void;
+  onShareProject?: (project: Project) => void;
 }
 
 const Dashboard: React.FC<DashboardProps> = ({
@@ -59,7 +60,8 @@ const Dashboard: React.FC<DashboardProps> = ({
   isAdmin,
   isMenuOpen,
   setIsMenuOpen,
-  onRestartWalkthrough
+  onRestartWalkthrough,
+  onShareProject
 }) => {
   const [projectToDelete, setProjectToDelete] = React.useState<string | null>(null);
   const [view, setView] = React.useState<'grid' | 'list'>('grid');
@@ -394,25 +396,38 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 {activeMenuId === project.id && (
                                   <>
                                     <div className="fixed inset-0 z-10" onClick={() => setActiveMenuId(null)} />
-                                    <div className="absolute right-0 mt-1 w-36 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl z-50 py-1 text-left animate-fade-in-down">
+                                    <div className="absolute right-0 mt-2 w-48 z-50 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1 shadow-2xl shadow-black pointer-events-auto text-left animate-fade-in-down antialiased">
                                       <button
                                         onClick={() => {
                                           setActiveMenuId(null);
                                           handleRenameClick(project);
                                         }}
-                                        className="w-full px-4 py-2.5 text-xs font-medium text-zinc-300 hover:bg-zinc-800/60 hover:text-white transition-all flex items-center gap-2"
+                                        className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
                                       >
-                                        <span className="material-symbols-outlined !text-sm">edit</span>
+                                        <span className="material-symbols-outlined !text-[16px] text-zinc-500">edit</span>
                                         Edit Title
                                       </button>
+                                      {onShareProject && (
+                                        <button
+                                          onClick={() => {
+                                            setActiveMenuId(null);
+                                            onShareProject(project);
+                                          }}
+                                          className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                                        >
+                                          <span className="material-symbols-outlined !text-[16px] text-zinc-500">share</span>
+                                          Share
+                                        </button>
+                                      )}
+                                      <div className="border-t border-zinc-800/80 my-1" />
                                       <button
                                         onClick={() => {
                                           setActiveMenuId(null);
                                           setProjectToDelete(project.id);
                                         }}
-                                        className="w-full px-4 py-2.5 text-xs font-medium text-red-500 hover:bg-red-500/10 hover:text-red-400 transition-all flex items-center gap-2"
+                                        className="w-full text-left px-3 py-2 text-xs font-medium text-[#ef4444] hover:bg-[#ef4444]/10 transition-all rounded-lg flex items-center gap-2 group"
                                       >
-                                        <span className="material-symbols-outlined !text-sm">delete</span>
+                                        <span className="material-symbols-outlined !text-[16px] text-[#ef4444]">delete</span>
                                         Delete
                                       </button>
                                     </div>
@@ -612,25 +627,38 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 {activeMenuId === project.id && (
                                   <>
                                     <div className="fixed inset-0 z-10" onClick={() => setActiveMenuId(null)} />
-                                    <div className="absolute right-0 top-8 w-36 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl z-50 py-1 text-left animate-fade-in-down">
+                                    <div className="absolute right-0 top-8 w-48 z-50 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1 shadow-2xl shadow-black pointer-events-auto text-left animate-fade-in-down antialiased">
                                       <button
                                         onClick={() => {
                                           setActiveMenuId(null);
                                           handleRenameClick(project);
                                         }}
-                                        className="w-full px-4 py-2.5 text-xs font-medium text-zinc-300 hover:bg-zinc-800/60 hover:text-white transition-all flex items-center gap-2"
+                                        className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
                                       >
-                                        <span className="material-symbols-outlined !text-sm">edit</span>
+                                        <span className="material-symbols-outlined !text-[16px] text-zinc-500">edit</span>
                                         Edit Title
                                       </button>
+                                      {onShareProject && (
+                                        <button
+                                          onClick={() => {
+                                            setActiveMenuId(null);
+                                            onShareProject(project);
+                                          }}
+                                          className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                                        >
+                                          <span className="material-symbols-outlined !text-[16px] text-zinc-500">share</span>
+                                          Share
+                                        </button>
+                                      )}
+                                      <div className="border-t border-zinc-800/80 my-1" />
                                       <button
                                         onClick={() => {
                                           setActiveMenuId(null);
                                           setProjectToDelete(project.id);
                                         }}
-                                        className="w-full px-4 py-2.5 text-xs font-medium text-red-500 hover:bg-red-500/10 hover:text-red-400 transition-all flex items-center gap-2"
+                                        className="w-full text-left px-3 py-2 text-xs font-medium text-[#ef4444] hover:bg-[#ef4444]/10 transition-all rounded-lg flex items-center gap-2 group"
                                       >
-                                        <span className="material-symbols-outlined !text-sm">delete</span>
+                                        <span className="material-symbols-outlined !text-[16px] text-[#ef4444]">delete</span>
                                         Delete
                                       </button>
                                     </div>

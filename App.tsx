@@ -1706,6 +1706,27 @@ const App: React.FC = () => {
     return shareId;
   }, [handleShareZcene]);
 
+  const handleDashboardShareProject = useCallback(async (project: Project) => {
+    if (!user) return;
+    try {
+      const sharePayload: Record<string, any> = {
+        ...project,
+        authorId: user.uid,
+        createdAt: serverTimestamp(),
+      };
+      delete sharePayload.id; // Exclude the local ID
+      
+      const sharedRef = await addDoc(collection(db, 'sharedZcenes'), sharePayload);
+      const shareUrl = `${window.location.origin}/app?shareId=${sharedRef.id}`;
+      
+      await navigator.clipboard.writeText(shareUrl);
+      showToast('Link copied to clipboard!');
+    } catch (err) {
+      console.error("Failed to share project from dashboard:", err);
+      showToast("Failed to create share link");
+    }
+  }, [user, showToast]);
+
   const handleDeleteProject = useCallback(async (projectId: string) => {
     if (!user) return;
     const path = `users/${user.uid}/projects/${projectId}`;
@@ -4564,8 +4585,18 @@ const App: React.FC = () => {
         const data = docSnap.data();
         projs.push({
           id: docSnap.id,
-          ...data
-        } as Project);
+          name: data.name || 'Untitled Zcene',
+          seedArtists: data.seedArtists || '',
+          cacheKey: data.cacheKey || '',
+          createdAt: data.createdAt,
+          updatedAt: data.updatedAt,
+          artistIds: data.artistIds,
+          graphData: data.graphData,
+          detailsCache: data.detailsCache,
+          canvasLayout: data.canvasLayout,
+          activeNodes: data.activeNodes,
+          isMagazineViewOpen: data.isMagazineViewOpen
+        });
       });
       setProjects(projs);
       console.log(`[Projects Listener] Synchronized ${projs.length} projects.`);
@@ -5710,8 +5741,9 @@ const App: React.FC = () => {
           } else {
             setError("Shared Zcene not found.");
           }
-        } catch (err) {
+        } catch (err: any) {
           console.error("Import failed:", err);
+          setError("This shared link appears to be broken or corrupted.");
         } finally {
           setIsLoading(false);
         }
@@ -6837,6 +6869,7 @@ const App: React.FC = () => {
             isCreatingProject={isCreatingProject}
             onDeleteProject={handleDeleteProject}
             onRenameProject={handleRenameProject}
+            onShareProject={handleDashboardShareProject}
             onLogoClick={() => handleViewChange(View.Home)}
             onLogout={handleLogout}
             onDeleteAccount={handleDeleteAccount}
