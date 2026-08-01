@@ -1719,8 +1719,8 @@ const App: React.FC = () => {
       const sharedRef = await addDoc(collection(db, 'sharedZcenes'), sharePayload);
       const shareUrl = `${window.location.origin}/app?shareId=${sharedRef.id}`;
       
-      await navigator.clipboard.writeText(shareUrl);
-      showToast('Link copied to clipboard!');
+      setActiveShareUrl(shareUrl);
+      setIsShareModalOpen(true);
     } catch (err) {
       console.error("Failed to share project from dashboard:", err);
       showToast("Failed to create share link");
