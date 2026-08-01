@@ -5722,7 +5722,7 @@ const App: React.FC = () => {
           const shareSnap = await getDoc(shareRef);
           if (shareSnap.exists()) {
             const data = shareSnap.data();
-            const g = normalizeGraphData(JSON.parse(data.graphData));
+            const g = normalizeGraphData(typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData);
             g.links = g.links.map((l: any) => ({
               ...l,
               source: typeof l.source === 'string' ? l.source : l.source.id,
