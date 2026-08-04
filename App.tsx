@@ -1796,10 +1796,15 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (seedArtists && (!projectName || projectName === 'Untitled Zcene')) {
-      const first = seedArtists.split('::')[0]?.trim();
-      if (first) {
-        const formatted = cleanArtistDisplayName(first, graphData?.nodes);
-        handleUpdateProjectName(formatted);
+      const seeds = seedArtists.split('::').map(s => s.trim()).filter(Boolean);
+      if (seeds.length > 0) {
+        if (seeds.length > 1) {
+          const formattedSeeds = seeds.map(s => cleanArtistDisplayName(s, graphData?.nodes));
+          handleUpdateProjectName(formattedSeeds.join(' + '));
+        } else {
+          const formatted = cleanArtistDisplayName(seeds[0], graphData?.nodes);
+          handleUpdateProjectName(formatted);
+        }
       }
     }
   }, [seedArtists, projectName, handleUpdateProjectName, graphData]);
@@ -4105,13 +4110,23 @@ const App: React.FC = () => {
         // Stateful Project UX: Update project document immediately before running job
         if (currentProjectId && !isGuest) {
           const projectPath = `users/${user.uid}/projects/${currentProjectId}`;
-          const firstArtist = artists.split('::')[0];
+          
+          let defaultName = projectName || "Untitled Zcene";
+          if (!projectName || projectName === "Untitled Zcene") {
+            const seeds = artists.split('::').map(s => s.trim()).filter(Boolean);
+            if (seeds.length > 1) {
+              defaultName = seeds.join(' + ');
+            } else if (seeds.length === 1) {
+              defaultName = seeds[0];
+            }
+          }
+
           try {
             await updateDoc(doc(db, projectPath), {
               status: 'curating',
               activeJobId: jobId,
               seedArtists: artists,
-              name: projectName || firstArtist,
+              name: defaultName,
               updatedAt: serverTimestamp()
             });
           } catch (e) {
@@ -4123,7 +4138,7 @@ const App: React.FC = () => {
               status: 'curating',
               activeJobId: jobId,
               seedArtists: artists,
-              name: projectName || firstArtist,
+              name: defaultName,
               updatedAt: serverTimestamp()
             }, { merge: true });
           }
@@ -4142,6 +4157,7 @@ const App: React.FC = () => {
                 expandedMap.forEach((v, k) => next.set(k, v));
                 return next;
               });
+              expandedMap.forEach((v, k) => detailsCacheRef.current.set(k, v));
             } catch (e) {
               console.warn("Failed to parse detailsCache from cloud job:", e);
             }
@@ -4438,7 +4454,9 @@ const App: React.FC = () => {
     seedArtists,
     confirmCacheChoice,
     confirmTokenUsage,
-    detailsCache
+    detailsCache,
+    currentProjectId,
+    projectName
   ]);
 
 
