@@ -268,7 +268,7 @@ service cloud.firestore {
     // --- Curation Jobs ---
     match /curationJobs/{jobId} {
       // Users can only read their own curation jobs, admins can read all
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow read: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
       
       // Users can only create pending curation jobs owned by themselves
       allow create: if isSignedIn() &&

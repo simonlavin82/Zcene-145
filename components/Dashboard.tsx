@@ -535,7 +535,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
                         const displayTitle = cleanArtistDisplayName(project.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene"));
                         const formattedDate = formatSystemTimestamp(project.updatedAt);
-                        const isMapped = !!project.graphData;
+                        const isMapped = project.status === 'completed' || (!!project.graphData && !project.graphData.includes('"nodes":[]'));
                         
                         // Derive deep cuts count: prefer the persisted activeNodes queue.
                         // Fallback for stale documents: count seed artists present in graphData.
@@ -604,7 +604,11 @@ const Dashboard: React.FC<DashboardProps> = ({
                             </td>
                             <td className={`py-4 px-6 font-normal ${tdClass}`}>
                               {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
-                              {isMapped ? (
+                              {(project.status === 'curating' || (!project.graphData && project.seedArtists)) ? (
+                                <span className="text-[10px] uppercase tracking-wider text-amber-500/80 font-bold px-2 py-0.5 bg-amber-500/10 rounded-md border border-amber-500/10 whitespace-nowrap animate-pulse">
+                                  Mapping...
+                                </span>
+                              ) : isMapped ? (
                                 <span className="text-[10px] uppercase tracking-widest text-primary/70 font-bold px-2 py-0.5 bg-primary/10 rounded-md border border-primary/20 whitespace-nowrap">
                                   Mapped
                                   </span>
