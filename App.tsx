@@ -2048,7 +2048,7 @@ const App: React.FC = () => {
           origin: cachedDetails.details?.origin || "",
           founded: cachedDetails.details?.founded || "",
           name: cachedDetails.details?.artist || node.id,
-          imageUrl: cachedDetails.imageUrl || cachedDetails.image || node.imageUrl || "",
+          imageUrl: cachedDetails.imageUrl || (cachedDetails as any).image || (node as any).imageUrl || "",
           isLibrary: true
        };
        
@@ -2154,7 +2154,7 @@ const App: React.FC = () => {
                         origin,
                         founded,
                         name: artistName,
-                        imageUrl: imageUrl || node.imageUrl || "",
+                        imageUrl: imageUrl || (node as any).imageUrl || "",
                         isLibrary: true
                     };
                     
@@ -2833,7 +2833,17 @@ const App: React.FC = () => {
 
     if (hasDisambiguated) {
       const newArtistsStr = resolvedArtistSeeds.join('::');
-      handleGenerateGraph(newArtistsStr, isRegeneration, graphToEnhance, false, true, overrideFilters, activeDisambiguationHints, true);
+      const hasActiveFiltersNext = !!(
+        activeDiscoveryFilters.foundedAfter ||
+        activeDiscoveryFilters.foundedBefore ||
+        (activeDiscoveryFilters.includeOrigins && activeDiscoveryFilters.includeOrigins.length > 0) ||
+        (activeDiscoveryFilters.excludeOrigins && activeDiscoveryFilters.excludeOrigins.length > 0) ||
+        (activeDiscoveryFilters.includeGenres && activeDiscoveryFilters.includeGenres.length > 0) ||
+        (activeDiscoveryFilters.additionalInstructions && activeDiscoveryFilters.additionalInstructions.trim().length > 0)
+      );
+      const isCustomNext = resolvedArtistSeeds.length > 1 || hasActiveFiltersNext;
+      
+      handleGenerateGraph(newArtistsStr, isRegeneration, graphToEnhance, false, !isCustomNext, overrideFilters, activeDisambiguationHints, true);
       return;
     }
 
@@ -3211,6 +3221,15 @@ const App: React.FC = () => {
     // cached and which are missing — then only call Gemini for the missing ones.
     let fullCacheHit = false;
 
+    const isCustomSpiderweb = artistList.length > 1 || !!(
+      activeDiscoveryFilters.foundedAfter ||
+      activeDiscoveryFilters.foundedBefore ||
+      (activeDiscoveryFilters.includeOrigins && activeDiscoveryFilters.includeOrigins.length > 0) ||
+      (activeDiscoveryFilters.excludeOrigins && activeDiscoveryFilters.excludeOrigins.length > 0) ||
+      (activeDiscoveryFilters.includeGenres && activeDiscoveryFilters.includeGenres.length > 0) ||
+      (activeDiscoveryFilters.additionalInstructions && activeDiscoveryFilters.additionalInstructions.trim().length > 0)
+    );
+
     try {
       let cached = new Map<string, ArtistCacheEntry>();
       let missing: string[] = [];
@@ -3218,15 +3237,6 @@ const App: React.FC = () => {
       let fullHits: string[] = [];
 
       let bypassChoiceConfirmation = false;
-
-      const isCustomSpiderweb = artistList.length > 1 || (
-        activeDiscoveryFilters.foundedAfter ||
-        activeDiscoveryFilters.foundedBefore ||
-        (activeDiscoveryFilters.includeOrigins && activeDiscoveryFilters.includeOrigins.length > 0) ||
-        (activeDiscoveryFilters.excludeOrigins && activeDiscoveryFilters.excludeOrigins.length > 0) ||
-        (activeDiscoveryFilters.includeGenres && activeDiscoveryFilters.includeGenres.length > 0) ||
-        (activeDiscoveryFilters.additionalInstructions && activeDiscoveryFilters.additionalInstructions.trim().length > 0)
-      );
 
       if (!skipCacheLookup && !bypassToken && !isLiveSynthesis && !isCustomSpiderweb) {
         const normalizedArtistList = artistList.map(name => name.toLowerCase());
@@ -5039,7 +5049,11 @@ const App: React.FC = () => {
                 setActiveNodeIds(resolvedActiveNodes);
               }
 
-              handleGenerateGraph(data.seedArtists || (data.artistIds || []).join('::'), false, null, false, false, parsedFilters);
+              if (!isHydratingSessionRef.current) {
+                handleGenerateGraph(data.seedArtists || (data.artistIds || []).join('::'), false, null, false, false, parsedFilters);
+              } else {
+                console.log(`[ProjectLoader] Bypassing handleGenerateGraph call because the session is already hydrating (API job is active).`);
+              }
               return true;
             }
 
