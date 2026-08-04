@@ -122,6 +122,11 @@ export const cleanArtistDisplayName = (rawIdOrName?: string | null, graphNodes?:
   const trimmed = rawIdOrName.trim();
   if (!trimmed) return '';
 
+  // Multi-seed / Composite Bypass: If this is a multi-seed project title (e.g. "Spaced + Buggin"),
+  // return immediately to avoid incorrectly flattening it to a single graph node.
+  if (trimmed.includes(' + ')) return trimmed;
+
+
   // 1. Known common country routing suffixes and slugs in display or kebab case
   const countrySuffixes = [
     'united states', 'united kingdom', 'global', 'australia', 'canada', 'germany', 'france',
@@ -1137,8 +1142,20 @@ export const findCanonicalNodeForArtist = (name: string, nodes: Node[]): Node | 
     const checkPair = (a: string, b: string) => {
       if (!a || !b) return false;
       if (a === b) return true;
-      if (a.startsWith(`${b}-`) || b.startsWith(`${a}-`)) return true;
-      if (a.includes(`-${b}-`) || a.endsWith(`-${b}`) || b.includes(`-${a}-`) || b.endsWith(`-${a}`)) return true;
+      
+      const KNOWN_COUNTRY_SLUGS = [
+        'united-states', 'united-kingdom', 'global', 'australia', 'canada', 'germany', 'france',
+        'japan', 'sweden', 'italy', 'spain', 'brazil', 'mexico', 'netherlands', 'belgium',
+        'norway', 'finland', 'denmark', 'ireland', 'new-zealand', 'poland', 'austria',
+        'switzerland', 'uk', 'usa', 'us'
+      ];
+      
+      // Only allow a prefix match if the suffix stripped off is exactly a known country slug
+      for (const suffix of KNOWN_COUNTRY_SLUGS) {
+        if (a === `${b}-${suffix}` || b === `${a}-${suffix}`) {
+          return true;
+        }
+      }
       return false;
     };
     return checkPair(normSearch, normId) || (normLabel ? checkPair(normSearch, normLabel) : false);
