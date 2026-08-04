@@ -442,11 +442,15 @@ const Dashboard: React.FC<DashboardProps> = ({
                               <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
                                 SEED: {seedList.length}
                               </span>
-                              {(project.status === 'curating' || (!project.graphData && project.seedArtists)) ? (
+                              {(project.status === 'curating' || project.status === 'pending' || (project.status !== 'failed' && !hasGraphNodes && project.seedArtists)) ? (
                                 <span className="text-[9px] uppercase tracking-wider text-amber-500/80 font-bold px-1.5 py-0.5 bg-amber-500/10 rounded-md border border-amber-500/10 whitespace-nowrap animate-pulse">
                                   Mapping...
                                 </span>
-                              ) : project.graphData ? (
+                              ) : project.status === 'failed' ? (
+                                <span className="text-[9px] uppercase tracking-wider text-red-500/80 font-bold px-1.5 py-0.5 bg-red-500/10 rounded-md border border-red-500/10 whitespace-nowrap">
+                                  Failed
+                                </span>
+                              ) : hasGraphNodes ? (
                                 <>
                                   <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
                                     AI ARTISTS: {recommendedCount}
@@ -458,7 +462,11 @@ const Dashboard: React.FC<DashboardProps> = ({
                                     Mapped
                                   </span>
                                 </>
-                              ) : null}
+                              ) : (
+                                <span className="text-[9px] uppercase tracking-wide text-zinc-500 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-zinc-800 font-mono whitespace-nowrap">
+                                  Unmapped
+                                </span>
+                              )}
                             </div>
                           </div>
                         </motion.div>
@@ -535,7 +543,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                         const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
                         const displayTitle = cleanArtistDisplayName(project.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene"));
                         const formattedDate = formatSystemTimestamp(project.updatedAt);
-                        const isMapped = project.status === 'completed' || (!!project.graphData && !project.graphData.includes('"nodes":[]'));
+                        const hasGraphNodes = !!project.graphData && !project.graphData.includes('"nodes":[]');
+                        const isMapped = project.status === 'completed' || hasGraphNodes;
                         
                         // Derive deep cuts count: prefer the persisted activeNodes queue.
                         // Fallback for stale documents: count seed artists present in graphData.
@@ -604,9 +613,13 @@ const Dashboard: React.FC<DashboardProps> = ({
                             </td>
                             <td className={`py-4 px-6 font-normal ${tdClass}`}>
                               {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
-                              {(project.status === 'curating' || (!project.graphData && project.seedArtists)) ? (
+                              {(project.status === 'curating' || project.status === 'pending' || (project.status !== 'failed' && !hasGraphNodes && project.seedArtists)) ? (
                                 <span className="text-[10px] uppercase tracking-wider text-amber-500/80 font-bold px-2 py-0.5 bg-amber-500/10 rounded-md border border-amber-500/10 whitespace-nowrap animate-pulse">
                                   Mapping...
+                                </span>
+                              ) : project.status === 'failed' ? (
+                                <span className="text-[10px] uppercase tracking-wider text-red-500/80 font-bold px-2 py-0.5 bg-red-500/10 rounded-md border border-red-500/10 whitespace-nowrap">
+                                  Failed
                                 </span>
                               ) : isMapped ? (
                                 <span className="text-[10px] uppercase tracking-widest text-primary/70 font-bold px-2 py-0.5 bg-primary/10 rounded-md border border-primary/20 whitespace-nowrap">
