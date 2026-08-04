@@ -3219,7 +3219,16 @@ const App: React.FC = () => {
 
       let bypassChoiceConfirmation = false;
 
-      if (!skipCacheLookup && !bypassToken && !isLiveSynthesis) {
+      const isCustomSpiderweb = artistList.length > 1 || (
+        activeDiscoveryFilters.foundedAfter ||
+        activeDiscoveryFilters.foundedBefore ||
+        (activeDiscoveryFilters.includeOrigins && activeDiscoveryFilters.includeOrigins.length > 0) ||
+        (activeDiscoveryFilters.excludeOrigins && activeDiscoveryFilters.excludeOrigins.length > 0) ||
+        (activeDiscoveryFilters.includeGenres && activeDiscoveryFilters.includeGenres.length > 0) ||
+        (activeDiscoveryFilters.additionalInstructions && activeDiscoveryFilters.additionalInstructions.trim().length > 0)
+      );
+
+      if (!skipCacheLookup && !bypassToken && !isLiveSynthesis && !isCustomSpiderweb) {
         const normalizedArtistList = artistList.map(name => name.toLowerCase());
         const compositeCacheResult = await readArtistCacheMany(normalizedArtistList, user?.uid, activeDiscoveryFilters);
         const baseCacheResult = await readArtistCacheMany(normalizedArtistList, user?.uid);
@@ -3548,7 +3557,7 @@ const App: React.FC = () => {
         });
       }
 
-      if (!controller.signal.aborted && missing.length === 0 && enrichmentRequired.length === 0 && cached.size > 0) {
+      if (!controller.signal.aborted && missing.length === 0 && enrichmentRequired.length === 0 && cached.size > 0 && !isCustomSpiderweb) {
         // Intercept with the dual-option choice gate if it's a multi-artist or filtered query.
         // Single-artist queries without filters are already handled by the Front Gate cache check.
         // Thus, any full hit reaching Phase 2 is by definition multi-artist or filtered.
@@ -3732,7 +3741,7 @@ const App: React.FC = () => {
         }
         return;
 
-      } else if (!controller.signal.aborted && (missing.length > 0 || enrichmentRequired.length > 0) && (cached.size > 0 || fullHits.length > 0)) {
+      } else if (!controller.signal.aborted && (missing.length > 0 || enrichmentRequired.length > 0) && (cached.size > 0 || fullHits.length > 0) && !isCustomSpiderweb) {
         // ── PARTIAL CACHE HIT: some artists cached (or needing enrichment), some missing/needing-enrichment ─────────────
         const toFetch = [...missing, ...enrichmentRequired];
         console.log(`[Music Discovery] Partial cache HIT. Full hits: [${fullHits.join(', ')}] | Enrichment required: [${enrichmentRequired.join(', ')}] | Missing: [${missing.join(', ')}]`);
@@ -3995,7 +4004,7 @@ const App: React.FC = () => {
     // This catches any edge case where Phase 02's validation gates (isGraphDataPresent / filtersMatch)
     // returned false for non-critical reasons (e.g. missing link context, filter mismatch).
     // If we find a valid graphData document for ALL artists, we load from cache and return.
-    if (!skipCacheLookup && !bypassToken && artistList.length >= 1) {
+    if (!skipCacheLookup && !bypassToken && artistList.length >= 1 && !isCustomSpiderweb) {
       try {
         const hardGuardResults = await Promise.allSettled(
           artistList.map(async (name) => {

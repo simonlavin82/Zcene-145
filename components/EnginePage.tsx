@@ -313,10 +313,10 @@ the entire dataset, the app evolves existing visual structures.
      panel, or triggering the foreground loading overlay. If the JIT details queue revalidation
      fails for an already displayable node, the exception is bypassed silently without writing
      sentinels or toasting error alerts.
-   - Canonical Graph Caching: Global shared artist cache documents (/artists/{id}) store the
-     complete, canonical compiled graph returned by the model rather than pruned sub-graph
-     snippets. This guarantees that both single-seed and multi-seed projects consistently
-     reference the full master network.
+   - Target System Architecture Boundaries:
+     * Single Seed (Unfiltered): Use the canonical, pre-calculated Spiderweb cached globally on the artist's Firestore document.
+     * Custom Spiderwebs (Multi-Seed OR Filtered): Trigger a brand-new, project-specific Spiderweb via Gemini 3.1 Pro. The LLM discovers novel intermediate bridge nodes.
+     * Isolation: Custom Spiderwebs belong only to the specific project (/projects/{id}) and NEVER write to or overwrite global single-artist graph documents, protecting the master network from topology pollution.
    - Sentinel Resolution: Cache entries marked as sentinel slots (_isSentinel: true) are
      flagged as corrupt; clicking a sentinel node bypasses the early-return cache checks and
      triggers JIT re-evaluation.
