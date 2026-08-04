@@ -337,6 +337,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                       {projectsInBucket.map((project, idx) => {
                       const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
                       const displayTitle = cleanArtistDisplayName(project.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene"));
+                      const hasGraphNodes = !!project.graphData && !project.graphData.includes('"nodes":[]');
                       
                       // Derive deep cuts count: prefer the persisted activeNodes queue.
                       // For stale documents where activeNodes was never written by the backend
