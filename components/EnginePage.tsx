@@ -658,6 +658,11 @@ To prevent data rot, API failures, and visual rendering regressions, the synthes
    - Instant Graph AI (Free/Local): Leverages pre-cached graph data and local heuristics for instant, zero-cost responses. It compiles contextual metadata (genres, origins, connections) directly from the active node to provide immediate O(1) query responses.
    - Deep Web AI (Paid/Live API): Utilizes Gemini Flash (gemini-3-flash-preview) for live RAG calls with full web expansion.
    - Explicit Token Authorization Guard: Live mode implements a strict 3-message token guard. After a batch of 3 messages, the user is intercepted with a Token Confirmation dialog (via createPortal) before any further paid token generation occurs, preventing unintentional API consumption.
+
+9. LIFECYCLE & STATE RESILIENCY (App.tsx / Dashboard.tsx / firestore.rules):
+   - Optimistic Read Race Conditions: Firebase \`onSnapshot\` listeners frequently fire with \`resource == null\` during the microsecond gap before a newly created background job document is fully committed to the server. Firestore security rules MUST use \`(resource == null || resource.data.userId == request.auth.uid)\` for \`allow read\` to prevent ghost "System Anomaly" permission denied errors from disrupting the UI flow.
+   - Unified Dashboard Status Heuristics: Dashboard cards cannot rely purely on \`status === 'curating'\` because single-seed syntheses or active AI Validation modals leave the project status as \`null\` while still "mapping." The Grid and List views strictly unify around a \`hasGraphNodes\` heuristic: if a project lacks actual nodes (i.e., its graphData is the skeleton \`{"nodes":[],"links":[]}\`) and hasn't explicitly failed, it is pinned in the pulsing "Mapping..." state.
+   - Clean Feedback Loops: Internal lexical warnings and system-level debug logs are strictly suppressed from user-facing toast notifications unless they represent terminal curation pipeline disruptions.
 `;
 
 const ARCHITECTURAL_SEPARATION_DOCUMENTATION = `
