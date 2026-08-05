@@ -883,7 +883,7 @@ Respond in strict JSON only — no prose, no markdown, no citation markers.`;
   try {
     const response = await fetch(targetUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': 'backend-proxy-key' },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(requestBody),
       signal: combinedSignal
     });
@@ -926,6 +926,7 @@ Respond in strict JSON only — no prose, no markdown, no citation markers.`;
     if ((err as any)?.name !== 'AbortError') {
       console.warn(`[Disambiguation Probe] Failed for "${artistName}":`, err);
     }
+    console.error(`[Disambiguation Probe] Candidate probe error for "${artistName}":`, err);
     return [];
   }
 };

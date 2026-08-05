@@ -18,6 +18,8 @@ export default defineConfig(({ mode }) => {
         '/api': {
           target: 'http://127.0.0.1:8080',
           changeOrigin: true,
+          timeout: 60000,
+          proxyTimeout: 60000,
           configure: (proxy) => {
             proxy.on('proxyReq', (proxyReq, req) => {
               console.log(`[Proxy Request] Path: ${req.url} -> Target: ${proxyReq.path}`);
