@@ -1959,7 +1959,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                             <span className="material-symbols-outlined !text-[18px]">chevron_right</span>
                                         </button>
                                         
-                                        <div className="relative flex items-center overflow-hidden flex-1 h-6 min-w-[40px] max-w-[140px] md:max-w-[200px] lg:max-w-[260px]">
+                                        <div className="relative flex items-center overflow-hidden flex-1 h-6 min-w-[40px] md:max-w-[240px] lg:max-w-[280px]">
                                             <div 
                                                 ref={trackRef}
                                                 className="flex items-center flex-nowrap overflow-x-auto scrollbar-hide [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full h-full px-1"
