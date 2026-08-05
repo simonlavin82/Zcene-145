@@ -855,7 +855,7 @@ export const resolveArtistCandidatesViaAI = async (
     ? window.location.origin + '/api/gemini'
     : 'http://localhost:8080/api/gemini';
 
-  const model = 'gemini-2.0-flash';
+  const model = 'gemini-2.5-flash';
   const targetUrl = `${baseUrl}/v1beta/models/${model}:generateContent`;
 
   const systemInstruction = `You are a music database disambiguation assistant.

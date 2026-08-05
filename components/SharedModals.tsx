@@ -828,7 +828,7 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
           </header>
 
           <div className="p-5 flex flex-col gap-4 overflow-visible">
-            <p className="text-sm font-normal text-zinc-400 leading-relaxed">
+            <p className="text-sm font-light text-zinc-400 leading-relaxed">
               {isLiveAISuggestions 
                 ? <>No specific regional variants were identified for <span className="text-primary font-semibold">"{query}"</span> by the AI probe. Proceed by typing origin country below.</>
                 : <>No cached records found for <span className="text-primary font-semibold">"{query}"</span>. This artist may be new to the platform, or multiple regional acts share this name.</>}
@@ -895,7 +895,7 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
           </header>
 
           <div className="p-5 flex flex-col gap-4 overflow-visible">
-            <p className="text-sm font-normal text-zinc-400 leading-relaxed">
+            <p className="text-sm font-light text-zinc-400 leading-relaxed">
               {isLiveAISuggestions
                 ? <>We ran a quick live check and found a distinct regional entity for <span className="text-primary font-semibold">"{query}"</span>. Is this the act you mean?</>
                 : <>We found this in our index for <span className="text-primary font-semibold">"{query}"</span>. Is this the artist you're looking for?</>}
@@ -993,7 +993,7 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
         </header>
 
         <div className="p-5 flex flex-col gap-4 overflow-visible">
-          <p className="text-sm font-normal text-zinc-400 leading-relaxed">
+          <p className="text-sm font-light text-zinc-400 leading-relaxed">
             {isLiveAISuggestions
               ? <>Our live model identified multiple regional entities matching <span className="text-primary font-semibold">"{query}"</span>. Please specify which one you mean to avoid token waste.</>
               : <>We found multiple distinct artists matching <span className="text-primary font-semibold">"{query}"</span>. Which one did you mean?</>}
