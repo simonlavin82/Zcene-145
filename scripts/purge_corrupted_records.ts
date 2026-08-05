@@ -1,62 +1,72 @@
-import * as admin from 'firebase-admin';
+import { initializeApp, cert } from 'firebase-admin/app';
+import { getFirestore, Query, Firestore } from 'firebase-admin/firestore';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
 
-// This script expects a service account key at the root of the project
-// Make sure to download your service account key and place it at the specified path
-const serviceAccountPath = path.resolve(__dirname, '../service-account-key.json');
+const require = createRequire(import.meta.url);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const serviceAccountPath = path.resolve(__dirname, '../firebase-service-account.json');
 
 try {
   const serviceAccount = require(serviceAccountPath);
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount)
+  initializeApp({
+    credential: cert(serviceAccount)
   });
 } catch (e) {
-  console.error("Failed to load service-account-key.json. Please make sure it exists at the root of the project.");
+  console.error("Failed to initialize firebase admin:", e);
   process.exit(1);
 }
 
-const db = admin.firestore();
+const db = getFirestore();
 
-async function purgeCorruptedRecord(canonicalId: string, baseId: string) {
+async function deleteCollection(collectionPath: string) {
+  console.log(`Starting deletion of collection: ${collectionPath}`);
+  const collectionRef = db.collection(collectionPath);
+  const query = collectionRef.orderBy('__name__').limit(500);
+
+  return new Promise<void>((resolve, reject) => {
+    deleteQueryBatch(db, query, resolve).catch(reject);
+  });
+}
+
+async function deleteQueryBatch(db: Firestore, query: Query, resolve: () => void) {
+  const snapshot = await query.get();
+  
+  if (snapshot.size === 0) {
+    resolve();
+    return;
+  }
+
+  const batch = db.batch();
+  snapshot.docs.forEach((doc) => {
+    batch.delete(doc.ref);
+  });
+  
+  await batch.commit();
+  console.log(`Deleted ${snapshot.size} documents...`);
+  
+  process.nextTick(() => {
+    deleteQueryBatch(db, query, resolve);
+  });
+}
+
+async function run() {
   try {
-    console.log(`Attempting to delete corrupted record: ${canonicalId}`);
+    await deleteCollection('artists');
+    console.log('✅ Successfully purged artists collection.');
     
-    const docRef = db.collection('artists').doc(canonicalId);
-    const docSnap = await docRef.get();
+    await deleteCollection('labels');
+    console.log('✅ Successfully purged labels collection.');
     
-    if (docSnap.exists) {
-      await docRef.delete();
-      console.log(`✅ Successfully deleted ${canonicalId}`);
-    } else {
-      console.log(`ℹ️ Record ${canonicalId} not found.`);
-    }
-
-    // Check if the bare pointer (e.g. 'radiohead') redirects to the corrupted record
-    console.log(`Checking bare pointer record: ${baseId}`);
-    const bareRef = db.collection('artists').doc(baseId);
-    const bareSnap = await bareRef.get();
-    
-    if (bareSnap.exists) {
-      const bareData = bareSnap.data();
-      if (bareData && bareData.redirectTo === canonicalId) {
-        // We can either delete it or remove the redirectTo field
-        console.log(`⚠️ Bare pointer ${baseId} redirects to corrupted record. Updating...`);
-        await bareRef.update({
-          redirectTo: admin.firestore.FieldValue.delete()
-        });
-        console.log(`✅ Removed redirectTo from ${baseId}`);
-      } else {
-        console.log(`ℹ️ Bare pointer ${baseId} is fine or redirects elsewhere.`);
-      }
-    }
+    console.log('Purge script finished successfully.');
+    process.exit(0);
   } catch (error) {
     console.error("Error purging records:", error);
+    process.exit(1);
   }
 }
 
-// Execute purge
-purgeCorruptedRecord('radiohead-united-states', 'radiohead')
-  .then(() => {
-    console.log('Purge script finished.');
-    process.exit(0);
-  });
+run();

@@ -859,10 +859,11 @@ export const resolveArtistCandidatesViaAI = async (
   const targetUrl = `${baseUrl}/v1beta/models/${model}:generateContent`;
 
   const systemInstruction = `You are a music database disambiguation assistant.
-Given an artist or band name, enumerate every distinct musical act that has used this exact name, across all countries, regions, and eras.
-Return ONLY acts with genuinely distinct identities — do not list lineup variations or reissue editions of the same act.
-If only one clear act exists globally, return exactly one entry.
-Maximum 5 entries.
+Given an artist or band name, enumerate distinct musical acts that have used this exact name, across all countries, regions, and eras.
+Return ONLY acts with genuinely distinct identities (do not list lineup variations).
+If there is only one clear act, return exactly one entry.
+If there are multiple acts (e.g. obscure local bands sharing the name), list them all up to a maximum of 5.
+If you are unsure but know at least one act with this name, return it.
 Respond in strict JSON only — no prose, no markdown, no citation markers.`;
 
   const userPrompt = `List all distinct musical artists or bands named "${artistName}". Return a JSON array of objects with fields: name (string), country (string, country of origin), genre (string, primary genre), activeYears (string, e.g. "1992–2004" or "2010–present").`;
