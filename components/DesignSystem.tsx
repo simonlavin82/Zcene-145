@@ -13,7 +13,7 @@ import Header from './Header';
 import { AdminViewToggle } from './ui/AdminViewToggle';
 import { SegmentedTextToggle } from './ui/SegmentedTextToggle';
 import { InfoTooltip } from './ui/InfoTooltip';
-import { Sprout } from 'lucide-react';
+import { Waypoints } from 'lucide-react';
 import { TelemetryOverviewCards, DiscoveryLedgerTable, UserTelemetry } from './UsageAnalyticsPage';
 import { CountryFilterDropdown } from './SharedModals';
 
@@ -189,7 +189,7 @@ export const RootsBreakdownButton: React.FC<RootsBreakdownButtonProps> = ({ stat
       className={btnClasses}
       title={btnTitle}
     >
-      <Sprout size={16} className="text-current" />
+      <Waypoints size={16} className="text-current" />
       <span>Roots</span>
     </button>
   );

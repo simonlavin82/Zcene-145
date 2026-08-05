@@ -3,7 +3,7 @@ import { StackItem, Node, UserTaste } from '../types';
 import { StackIcon } from './Icons';
 import Markdown from 'react-markdown';
 import { isNodeInSeedList } from '../services/artistCacheService';
-import { Flame } from 'lucide-react';
+import { Flame, Waypoints } from 'lucide-react';
 import { formatSystemTimestamp } from '../utils/formatters';
 
 // --- My Stack Dialog Component ---
@@ -628,7 +628,7 @@ export const GenerativeRationaleModal: React.FC<{
       >
         <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary !text-[18px]">info</span>
+            <Waypoints size={18} className="text-primary" />
             <h3 className="text-base font-medium text-white">Roots Breakdown</h3>
           </div>
           <button 
