@@ -385,9 +385,8 @@ export const TokenConfirmationDialog: React.FC<{
           </button>
           <button 
             onClick={onConfirm} 
-            className="px-4 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 transition-opacity hover:opacity-90"
+            className="px-4 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90"
           >
-            <span className="material-symbols-outlined !text-[16px]">check</span>
             Confirm
           </button>
         </ModalFooter>
@@ -854,8 +853,8 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
               }
             >
               {isLiveAISuggestions 
-                ? (overrideInput.trim() ? 'Proceed' : 'None of these')
-                : (overrideInput.trim() ? 'Synthesize with override' : 'Search Live AI')}
+                ? (overrideInput.trim() ? 'Confirm' : 'None of these')
+                : (overrideInput.trim() ? 'Confirm' : 'Search Live AI')}
             </button>
           </ModalFooter>
         </form>
@@ -952,7 +951,7 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
                 type="submit"
                 className="px-6 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 active:scale-95 transition-all shadow-md cursor-pointer whitespace-nowrap"
               >
-                {overrideInput.trim() ? 'Synthesize with override' : 'Confirm Selection'}
+                {overrideInput.trim() ? 'Confirm' : 'Confirm Selection'}
               </button>
             )}
           </ModalFooter>
@@ -1048,10 +1047,9 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
                 : 'border border-zinc-700 bg-zinc-800/50 hover:bg-zinc-800 hover:border-zinc-500 text-zinc-300 hover:text-white'
             }`}
           >
-            {!overrideInput.trim() && <span className="material-symbols-outlined !text-[16px]">search</span>}
             {isLiveAISuggestions 
-              ? (overrideInput.trim() ? 'Proceed' : 'None of these')
-              : (overrideInput.trim() ? 'Synthesize with override' : 'None of these')}
+              ? (overrideInput.trim() ? 'Confirm' : 'None of these')
+              : (overrideInput.trim() ? 'Confirm' : 'None of these')}
           </button>
           </ModalFooter>
         </form>

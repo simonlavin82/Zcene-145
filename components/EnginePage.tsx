@@ -406,6 +406,16 @@ the entire dataset, the app evolves existing visual structures.
     - Graph Proximity Synthesis: Connection query chips evaluate peer relationships by traversing exact graph edges in a prioritized strict hierarchy (Mutual Labels > Shared Genres > Explicit Topological Links > Broad Geographic Origins). This synthesizes intelligent relational context locally without incurring external LLM inference costs.
     - Component-Bound State Isolation: Critical chat states such as \`chatLoadingMap\`, spent \`clickedChips\`, and dynamic node dropdown lists are firmly isolated per \`NodeDetailsCard\`. This ensures perfectly decoupled, simultaneous multi-node investigations without cross-panel layout bleeding or "phantom reflows".
     - Interactive Select UI: Dynamic queries utilize a styled native \`<select>\` dropdown masked as a standard query chip, allowing users to intuitively cross-examine any graph peer directly from their active context window.
+
+15. NETWORK STREAMING & DECOMPRESSION FIX:
+    - The browser fetch for Live AI generation was aborting precisely due to 'ERR_CONTENT_DECODING_FAILED'.
+    - Root Cause: The local proxy (server.js) or Node fetch client was aggressively compressing streams without properly syncing headers.
+    - Fix: We implemented explicit header sanitization in the proxy middleware by stripping 'accept-encoding' and 'content-length' before forwarding requests to the Gemini API, ensuring clean decompression of chunked streams.
+
+16. STRICT UI DIALOG ARCHITECTURE:
+    - SharedModals.tsx previously contained inline, unstandardized HTML for modals that drifted from our design spec.
+    - Fix: We extracted the mandatory dialog primitives into components/ui/Dialog.tsx (ModalBackdrop, ModalContainer, ModalHeader, ModalBody, ModalFooter).
+    - Rule: All future modals must strictly import and compose these primitives to maintain the rigid 0px border-radius, background darkness, and animate-fade-in-down timing, acting as the Single Source of Truth.
 `;
 
 
