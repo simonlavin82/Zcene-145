@@ -403,7 +403,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                         className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
                                       >
                                         <span className="material-symbols-outlined !text-[16px] text-zinc-500">edit</span>
-                                        Edit Title
+                                        Rename
                                       </button>
                                       {onShareProject && (
                                         <button
@@ -651,7 +651,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                         className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
                                       >
                                         <span className="material-symbols-outlined !text-[16px] text-zinc-500">edit</span>
-                                        Edit Title
+                                        Rename
                                       </button>
                                       {onShareProject && (
                                         <button
@@ -752,9 +752,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                   }
                 }} 
                 disabled={!renameValue.trim()}
-                className="px-4 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+                className="px-4 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
               >
-                <span className="material-symbols-outlined !text-[16px]">check</span>
                 Save
               </button>
             </footer>
