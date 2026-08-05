@@ -17,6 +17,53 @@ import { Waypoints } from 'lucide-react';
 import { TelemetryOverviewCards, DiscoveryLedgerTable, UserTelemetry } from './UsageAnalyticsPage';
 import { CountryFilterDropdown } from './SharedModals';
 
+// --- Input Primitives & Sizings ---
+
+export const InputSizes = {
+  sm: {
+    base: 'py-1.5 text-xs',
+    search: 'py-1.5 pl-4 pr-10 text-xs',
+    magazineSearch: 'py-1.5 pl-8 pr-10 text-xs',
+    iconBtn: 'w-6 h-6 rounded-[8px]',
+    icon: '!text-[14px]',
+    leftIcon: '!text-[16px] left-2.5',
+    select: 'py-1.5 pl-3 pr-8 text-xs',
+    selectIcon: '!text-[16px] right-2'
+  },
+  md: {
+    base: 'py-2 text-sm',
+    search: 'py-2 pl-4 pr-12 text-sm',
+    magazineSearch: 'py-2 pl-10 pr-12 text-sm',
+    iconBtn: 'w-8 h-8 rounded-[10px]',
+    icon: '!text-[18px]',
+    leftIcon: '!text-[18px] left-3',
+    select: 'py-2 pl-4 pr-10 text-sm',
+    selectIcon: '!text-[18px] right-3'
+  }
+};
+
+export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
+  variant?: 'sm' | 'md';
+}
+
+export const Select: React.FC<SelectProps> = ({ variant = 'md', className = '', children, ...props }) => {
+  const size = InputSizes[variant];
+
+  return (
+    <div className="relative">
+      <select 
+        className={`w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-zinc-300 focus:ring-1 focus:ring-primary focus:outline-none cursor-pointer ${size.select} ${className}`}
+        {...props}
+      >
+        {children}
+      </select>
+      <span className={`material-symbols-outlined pointer-events-none absolute top-1/2 -translate-y-1/2 text-zinc-400 ${size.selectIcon}`}>
+        arrow_drop_down
+      </span>
+    </div>
+  );
+};
+
 const ColorSwatch: React.FC<{ name: string; hex: string; className?: string; style?: React.CSSProperties; description?: string }> = ({ name, hex, className = "", style, description }) => {
     return (
         <div className="group cursor-pointer">

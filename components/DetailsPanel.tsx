@@ -11,7 +11,8 @@ import { SegmentedTextToggle } from './ui/SegmentedTextToggle';
 import { db } from '../services/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import { formatSystemTimestamp } from '../utils/formatters';
-
+import { formatSystemTimestamp } from '../utils/formatters';
+import { Select, InputSizes } from './DesignSystem';
 const SENTINEL_INSIGHT = 'No insight provided.';
 
 export const getArtistDisplayName = (details: any, node: any): string => {
@@ -1806,35 +1807,34 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                         
                         <div className="flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-500">
                             <div className="relative flex-grow">
-                                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 !text-[18px]">search</span>
+                                <span className={`material-symbols-outlined absolute top-1/2 -translate-y-1/2 text-zinc-500 ${InputSizes.sm.leftIcon}`}>search</span>
                                 <input 
                                     type="search"
                                     placeholder="Search..."
                                     value={magazineSearchQuery}
                                     onChange={(e) => setMagazineSearchQuery(e.target.value)}
-                                    className="w-full h-10 appearance-none border border-zinc-700 bg-zinc-950 py-2 pl-10 pr-12 text-sm text-white placeholder:text-zinc-500 rounded-xl focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+                                    className={`w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all ${InputSizes.sm.magazineSearch}`}
                                 />
-                                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+                                <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
                                     {!magazineSearchQuery && (
-                                        <button onClick={handleMagazineSpeechToText} className={`w-8 h-8 flex items-center justify-center rounded-[10px] transition-colors leading-none ${isListeningMagazineSearch ? 'text-primary animate-pulse' : 'text-zinc-500 hover:text-white'}`} title="Search by voice"><MicIcon className="!text-[18px]" /></button>
+                                        <button onClick={handleMagazineSpeechToText} className={`flex items-center justify-center transition-colors leading-none ${InputSizes.sm.iconBtn} ${isListeningMagazineSearch ? 'text-primary animate-pulse' : 'text-zinc-500 hover:text-white'}`} title="Search by voice"><MicIcon className={InputSizes.sm.icon} /></button>
                                     )}
                                     {magazineSearchQuery && (
-                                        <button onClick={() => setMagazineSearchQuery('')} className="w-8 h-8 flex items-center justify-center rounded-[10px] text-zinc-400 hover:text-white transition-colors leading-none" aria-label="Clear search"><span className="material-symbols-outlined !text-[18px]">close</span></button>
+                                        <button onClick={() => setMagazineSearchQuery('')} className={`flex items-center justify-center text-zinc-400 hover:text-white transition-colors leading-none ${InputSizes.sm.iconBtn}`} aria-label="Clear search"><span className={`material-symbols-outlined ${InputSizes.sm.icon}`}>close</span></button>
                                     )}
                                 </div>
                             </div>
 
                             <div className="relative shrink-0 w-[110px]">
-                                <select 
+                                <Select 
+                                    variant="sm"
                                     value={magazineSortBy}
                                     onChange={(e) => setMagazineSortBy(e.target.value as any)}
-                                    className="w-full h-10 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-zinc-300 py-2 px-4 text-sm focus:ring-1 focus:ring-primary focus:outline-none cursor-pointer"
                                 >
                                     <option value="none">Sort</option>
                                     <option value="artist">Artist</option>
                                     <option value="label">Label</option>
-                                </select>
-                                <span className="material-symbols-outlined pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 !text-[16px]">arrow_drop_down</span>
+                                </Select>
                             </div>
                         </div>
                     </div>
@@ -1854,37 +1854,34 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                     <div className="h-6 w-px bg-zinc-700 mx-2 hidden md:block" />
                                     <div className="flex items-center gap-3 flex-grow max-w-md">
                                         <div className="relative flex-grow">
-                                            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 !text-[18px]">search</span>
+                                            <span className={`material-symbols-outlined absolute top-1/2 -translate-y-1/2 text-zinc-500 ${InputSizes.sm.leftIcon}`}>search</span>
                                             <input 
                                                 type="search"
                                                 placeholder="Search..."
                                                 value={magazineSearchQuery}
                                                 onChange={(e) => setMagazineSearchQuery(e.target.value)}
-                                                className="w-full h-10 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-10 pr-12 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+                                                className={`w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all ${InputSizes.sm.magazineSearch}`}
                                             />
-                                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+                                            <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
                                                 {!magazineSearchQuery && (
-                                                    <button onClick={handleMagazineSpeechToText} className={`w-8 h-8 flex items-center justify-center rounded-[10px] transition-colors leading-none ${isListeningMagazineSearch ? 'text-primary animate-pulse' : 'text-zinc-500 hover:text-white'}`} title="Search by voice"><MicIcon className="!text-[18px]" /></button>
+                                                    <button onClick={handleMagazineSpeechToText} className={`flex items-center justify-center transition-colors leading-none ${InputSizes.sm.iconBtn} ${isListeningMagazineSearch ? 'text-primary animate-pulse' : 'text-zinc-500 hover:text-white'}`} title="Search by voice"><MicIcon className={InputSizes.sm.icon} /></button>
                                                 )}
                                                 {magazineSearchQuery && (
-                                                    <button onClick={() => setMagazineSearchQuery('')} className="w-8 h-8 flex items-center justify-center rounded-[10px] text-zinc-400 hover:text-white transition-colors leading-none" aria-label="Clear search"><span className="material-symbols-outlined !text-[18px]">close</span></button>
+                                                    <button onClick={() => setMagazineSearchQuery('')} className={`flex items-center justify-center text-zinc-400 hover:text-white transition-colors leading-none ${InputSizes.sm.iconBtn}`} aria-label="Clear search"><span className={`material-symbols-outlined ${InputSizes.sm.icon}`}>close</span></button>
                                                 )}
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2 shrink-0">
                                             <span className="text-xs text-zinc-500 uppercase tracking-widest hidden sm:block">Sort by</span>
-                                            <div className="relative">
-                                                <select 
-                                                    value={magazineSortBy}
-                                                    onChange={(e) => setMagazineSortBy(e.target.value as any)}
-                                                    className="w-full h-10 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-zinc-300 py-2 px-4 text-sm focus:ring-1 focus:ring-primary focus:outline-none cursor-pointer"
-                                                >
-                                                    <option value="none">Default</option>
-                                                    <option value="artist">Artist</option>
-                                                    <option value="label">Label</option>
-                                                </select>
-                                                <span className="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 !text-[18px]">arrow_drop_down</span>
-                                            </div>
+                                            <Select 
+                                                variant="sm"
+                                                value={magazineSortBy}
+                                                onChange={(e) => setMagazineSortBy(e.target.value as any)}
+                                            >
+                                                <option value="none">Default</option>
+                                                <option value="artist">Artist</option>
+                                                <option value="label">Label</option>
+                                            </Select>
                                         </div>
                                     </div>
                                 </div>
