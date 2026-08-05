@@ -845,9 +845,11 @@ export const resolveArtistCandidatesViaAI = async (
         { id: 'i-wish-i-united-states', label: 'I Wish I', origin: 'United States', genre: 'Screamo' }
       ];
     }
-    // Return a generic mock single candidate for other searches to test STATE B
+    // Return multiple mock candidates by default to test STATE C
     return [
-      { id: `${artistName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-mock`, label: artistName, origin: 'Local Sandbox', genre: 'Mock Genre' }
+      { id: `${artistName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-mock-us`, label: artistName, origin: 'United States', genre: 'Mock Punk' },
+      { id: `${artistName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-mock-uk`, label: artistName, origin: 'United Kingdom', genre: 'Mock Breaks' },
+      { id: `${artistName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-mock-au`, label: artistName, origin: 'Australia', genre: 'Mock Indie' }
     ];
   }
 
