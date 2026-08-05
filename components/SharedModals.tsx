@@ -1033,11 +1033,11 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
           )}
         </div>
 
-        <footer className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2">
+        <footer className="p-3 sm:p-4 bg-zinc-900 border-t border-zinc-700 flex flex-wrap items-center justify-end gap-3">
           <button
             type="button"
             onClick={() => onSelect('cancel')}
-            className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors"
+            className="px-4 py-1.5 text-zinc-400 hover:text-white text-sm font-medium rounded-xl hover:bg-zinc-800 transition-colors"
           >
             Cancel
           </button>
