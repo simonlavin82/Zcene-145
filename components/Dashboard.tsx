@@ -64,6 +64,8 @@ const Dashboard: React.FC<DashboardProps> = ({
   onShareProject
 }) => {
   const [projectToDelete, setProjectToDelete] = React.useState<string | null>(null);
+  const [projectToRename, setProjectToRename] = React.useState<Project | null>(null);
+  const [renameValue, setRenameValue] = React.useState('');
   const [view, setView] = React.useState<'grid' | 'list'>('grid');
   const [activeMenuId, setActiveMenuId] = React.useState<string | null>(null);
   const [sortBy, setSortBy] = React.useState<'recent' | 'alphabetical'>('recent');
@@ -71,13 +73,8 @@ const Dashboard: React.FC<DashboardProps> = ({
   const handleRenameClick = (project: Project) => {
     const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
     const displayTitle = cleanArtistDisplayName(project.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene"));
-    const newName = window.prompt("Rename Zcene", displayTitle);
-    if (newName !== null) {
-      const trimmed = newName.trim();
-      if (trimmed && onRenameProject) {
-        onRenameProject(project.id, trimmed);
-      }
-    }
+    setRenameValue(displayTitle);
+    setProjectToRename(project);
   };
 
   const groupedProjects = React.useMemo(() => {
@@ -695,6 +692,75 @@ const Dashboard: React.FC<DashboardProps> = ({
           )}
         </div>
       </main>
+
+      {/* Custom Rename Confirmation Modal */}
+      {projectToRename && (
+        <div 
+          className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 animate-fade-in-down"
+          style={{ animationDuration: '200ms' }}
+          onClick={() => setProjectToRename(null)}
+        >
+          <div 
+            className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-hidden text-left"
+            onClick={e => e.stopPropagation()}
+          >
+            <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary !text-[18px]">edit</span>
+                <h3 className="text-base font-medium text-white">Rename Zcene</h3>
+              </div>
+              <button 
+                onClick={() => setProjectToRename(null)} 
+                className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none"
+              >
+                <span className="material-symbols-outlined !text-[18px]">close</span>
+              </button>
+            </header>
+
+            <div className="p-5">
+              <input 
+                type="text" 
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    const trimmed = renameValue.trim();
+                    if (trimmed && onRenameProject) {
+                      onRenameProject(projectToRename.id, trimmed);
+                      setProjectToRename(null);
+                    }
+                  }
+                }}
+                className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none" 
+              />
+            </div>
+
+            <footer className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2">
+              <button 
+                onClick={() => setProjectToRename(null)} 
+                className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => {
+                  const trimmed = renameValue.trim();
+                  if (trimmed && onRenameProject) {
+                    onRenameProject(projectToRename.id, trimmed);
+                    setProjectToRename(null);
+                  }
+                }} 
+                disabled={!renameValue.trim()}
+                className="px-4 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+              >
+                <span className="material-symbols-outlined !text-[16px]">check</span>
+                Save
+              </button>
+            </footer>
+          </div>
+        </div>
+      )}
 
       {/* Custom Delete Confirmation Modal */}
       {projectToDelete && (
