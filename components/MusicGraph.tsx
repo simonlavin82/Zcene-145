@@ -1157,12 +1157,12 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         .attr("class", d => `node-element ${d.isLoading || d.isPending ? 'animate-pulse' : ''}`);
 
     nodeElements.select("path")
-        .attr("stroke-width", d => isNodeInSeedList(d.id || d.label || '', seedArtists) ? 3 : 2)
-        .attr("stroke", d => isNodeInSeedList(d.id || d.label || '', seedArtists) ? '#F6E468' : '#1F1F1E')
+        .attr("stroke-width", d => (d.type === 'artist' && isNodeInSeedList(d.id || d.label || '', seedArtists)) ? 3 : 2)
+        .attr("stroke", d => (d.type === 'artist' && isNodeInSeedList(d.id || d.label || '', seedArtists)) ? '#F6E468' : '#1F1F1E')
         .attr("fill", d => getNodeColor(d))
         .attr("opacity", d => d.isLoading || d.isPending ? 0.35 : 1)
         .attr("d", d => {
-            const isSeed = isNodeInSeedList(d.id || d.label || '', seedArtists);
+            const isSeed = d.type === 'artist' && isNodeInSeedList(d.id || d.label || '', seedArtists);
             const area = 350;
             
             if (d.type === 'artist') return isSeed ? d3.symbol().type(d3.symbolCircle).size(area)() : d3.symbol().type(d3.symbolStar).size(area + 50)();
@@ -1390,14 +1390,14 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         .attr("stroke-width", d => {
             const activeNode = selectedNode || peekedNode;
             const isSelected = activeNode ? isSameNodeId(activeNode.id, d.id) : false;
-            const isSeed = isNodeInSeedList(d.id || d.label || '', seedArtists);
+            const isSeed = d.type === 'artist' && isNodeInSeedList(d.id || d.label || '', seedArtists);
             if (isSelected) return 4;
             return isSeed ? 3 : 2;
         })
         .attr("stroke", d => {
             const activeNode = selectedNode || peekedNode;
             const isSelected = activeNode ? isSameNodeId(activeNode.id, d.id) : false;
-            const isSeed = isNodeInSeedList(d.id || d.label || '', seedArtists);
+            const isSeed = d.type === 'artist' && isNodeInSeedList(d.id || d.label || '', seedArtists);
             if (isSelected) return '#F6E468';
             return isSeed ? '#F6E468' : '#1F1F1E';
         })
