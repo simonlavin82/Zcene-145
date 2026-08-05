@@ -812,9 +812,9 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
         >
           <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary !text-[18px]">{isLiveAISuggestions ? 'auto_awesome' : 'psychology'}</span>
+              <span className="material-symbols-outlined text-primary !text-[18px]">{isLiveAISuggestions ? 'public' : 'psychology'}</span>
               <h3 className="text-lg font-medium text-white">
-                {isLiveAISuggestions ? 'Live AI Validation' : 'Disambiguation'}
+                {isLiveAISuggestions ? 'Validate Origin' : 'Disambiguation'}
               </h3>
             </div>
             <button type="button" onClick={() => onSelect('cancel')} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none">
@@ -825,7 +825,7 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
           <div className="p-5 flex flex-col gap-4 overflow-visible">
             <p className="text-sm font-light text-zinc-400 leading-relaxed">
               {isLiveAISuggestions 
-                ? <>No specific regional variants were identified for <span className="text-primary font-semibold">"{query}"</span> by the AI probe. Proceed by typing origin country below.</>
+                ? <>No specific regional variants were identified for <span className="text-primary font-semibold">"{query}"</span> by the AI probe. Proceed by typing an origin below, or proceed without one.</>
                 : <>No cached records found for <span className="text-primary font-semibold">"{query}"</span>. This artist may be new to the platform, or multiple regional acts share this name.</>}
             </p>
 
@@ -836,20 +836,24 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
             )}
           </div>
 
-          <footer className="p-3 sm:p-4 bg-zinc-900 border-t border-zinc-700 flex items-center justify-end gap-3">
+          <footer className="p-3 sm:p-4 bg-zinc-900 border-t border-zinc-700 flex flex-wrap items-center justify-end gap-3">
             <button
               type="button"
               onClick={() => onSelect('cancel')}
-              className="px-4 py-2 text-zinc-400 hover:text-white text-sm font-medium rounded-xl hover:bg-zinc-800 transition-colors"
+              className="px-4 py-1.5 text-zinc-400 hover:text-white text-sm font-medium rounded-xl hover:bg-zinc-800 transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-6 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all shadow-md cursor-pointer whitespace-nowrap"
+              className={
+                isLiveAISuggestions && !overrideInput.trim()
+                  ? "px-4 py-1.5 border border-zinc-700 bg-zinc-800/50 hover:bg-zinc-800 hover:border-zinc-500 text-zinc-300 hover:text-white rounded-xl font-medium text-sm flex items-center gap-2 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+                  : "px-6 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all shadow-md cursor-pointer whitespace-nowrap"
+              }
             >
               {isLiveAISuggestions 
-                ? (overrideInput.trim() ? 'Proceed' : 'Proceed without origin')
+                ? (overrideInput.trim() ? 'Proceed' : 'None of these')
                 : (overrideInput.trim() ? 'Synthesize with override' : 'Search Live AI')}
             </button>
           </footer>
@@ -879,9 +883,9 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
         >
           <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary !text-[18px]">{isLiveAISuggestions ? 'auto_awesome' : 'travel_explore'}</span>
+              <span className="material-symbols-outlined text-primary !text-[18px]">{isLiveAISuggestions ? 'public' : 'travel_explore'}</span>
               <h3 className="text-lg font-medium text-white">
-                {isLiveAISuggestions ? 'Live AI Validation' : 'Look What I Found'}
+                {isLiveAISuggestions ? 'Validate Origin' : 'Look What I Found'}
               </h3>
             </div>
             <button type="button" onClick={() => onSelect('cancel')} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none">
