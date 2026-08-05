@@ -752,6 +752,23 @@ export const CountryFilterDropdown: React.FC<CountryFilterDropdownProps> = ({ va
         <>
           <div className="fixed inset-0 z-[1190]" onClick={() => setIsOpen(false)} />
           <div className="absolute left-0 right-0 top-full mt-1.5 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl max-h-48 overflow-y-auto z-[1200] scrollbar-thin py-1">
+            <button
+              type="button"
+              onClick={() => {
+                onChange("None of these");
+                setIsOpen(false);
+              }}
+              className={`w-full px-4 py-2 text-left text-xs font-medium transition-colors flex items-center justify-between cursor-pointer ${
+                value === "None of these" 
+                  ? 'bg-primary/10 text-primary font-semibold' 
+                  : 'text-zinc-300 hover:text-white hover:bg-zinc-800'
+              }`}
+            >
+              <span>None of these</span>
+              {value === "None of these" && (
+                <span className="material-symbols-outlined text-primary !text-[14px]">check</span>
+              )}
+            </button>
             {filtered.length > 0 ? (
               filtered.map((country) => {
                 const isSelected = value.toLowerCase().trim() === country.toLowerCase();
@@ -844,18 +861,16 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
             >
               Cancel
             </button>
-            <button
-              type="submit"
-              className={
-                isLiveAISuggestions && !overrideInput.trim()
-                  ? "px-6 py-2 border border-zinc-700 bg-zinc-800/50 hover:bg-zinc-800 hover:border-zinc-500 text-zinc-300 hover:text-white rounded-xl font-medium text-sm flex items-center gap-2 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
-                  : "px-6 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all shadow-md cursor-pointer whitespace-nowrap"
-              }
-            >
-              {isLiveAISuggestions 
-                ? (overrideInput.trim() ? 'Confirm' : 'None of these')
-                : (overrideInput.trim() ? 'Confirm' : 'Search Live AI')}
-            </button>
+            {(!isLiveAISuggestions || overrideInput.trim()) && (
+              <button
+                type="submit"
+                className="px-6 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all shadow-md cursor-pointer whitespace-nowrap"
+              >
+                {isLiveAISuggestions 
+                  ? 'Confirm Origin'
+                  : (overrideInput.trim() ? 'Confirm' : 'Search Live AI')}
+              </button>
+            )}
           </ModalFooter>
         </form>
       </ModalContainer>
@@ -876,7 +891,7 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
               if (overrideInput.trim()) {
                 onSelect(`override::${overrideInput.trim()}`);
               } else {
-                onSelect(cand.id);
+                onSelect('synthesis');
               }
             }}
             className="flex flex-col w-full" onClick={e => e.stopPropagation()}
@@ -940,18 +955,17 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
               Cancel
             </button>
             {isLiveAISuggestions && !overrideInput.trim() ? (
-              <button
-                type="submit"
-                className="px-6 py-2 border border-zinc-700 bg-zinc-800/50 hover:bg-zinc-800 hover:border-zinc-500 text-zinc-300 hover:text-white rounded-xl font-medium text-sm flex items-center gap-2 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
-              >
-                None of these
-              </button>
+              null // "None of these" is in the dropdown now
             ) : (
               <button
                 type="submit"
-                className="px-6 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 active:scale-95 transition-all shadow-md cursor-pointer whitespace-nowrap"
+                className={
+                  overrideInput.trim()
+                    ? "px-6 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 active:scale-95 transition-all shadow-md cursor-pointer whitespace-nowrap"
+                    : "px-6 py-2 border border-zinc-700 bg-zinc-800/50 hover:bg-zinc-800 hover:border-zinc-500 text-zinc-300 hover:text-white rounded-xl font-medium text-sm flex items-center gap-2 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+                }
               >
-                {overrideInput.trim() ? 'Confirm' : 'Confirm Selection'}
+                {overrideInput.trim() ? (isLiveAISuggestions ? 'Confirm Origin' : 'Confirm') : 'None of these'}
               </button>
             )}
           </ModalFooter>
@@ -1039,18 +1053,14 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
           >
             Cancel
           </button>
-          <button
-            type="submit"
-            className={`px-6 py-2 rounded-xl font-medium text-sm flex items-center gap-2 active:scale-95 transition-all cursor-pointer whitespace-nowrap ${
-              overrideInput.trim()
-                ? 'bg-primary text-brand-black shadow-md'
-                : 'border border-zinc-700 bg-zinc-800/50 hover:bg-zinc-800 hover:border-zinc-500 text-zinc-300 hover:text-white'
-            }`}
-          >
-            {isLiveAISuggestions 
-              ? (overrideInput.trim() ? 'Confirm' : 'None of these')
-              : (overrideInput.trim() ? 'Confirm' : 'None of these')}
-          </button>
+          {overrideInput.trim() && (
+            <button
+              type="submit"
+              className="px-6 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 active:scale-95 transition-all shadow-md cursor-pointer whitespace-nowrap"
+            >
+              {isLiveAISuggestions ? 'Confirm Origin' : 'Confirm'}
+            </button>
+          )}
           </ModalFooter>
         </form>
       </ModalContainer>
