@@ -836,21 +836,16 @@ export const resolveArtistCandidatesViaAI = async (
   artistName: string,
   signal?: AbortSignal
 ): Promise<Array<{ id: string; label: string; origin: string; genre: string }>> => {
+  console.log(`[Validation Flow]: resolveArtistCandidatesViaAI called for "${artistName}", isLocal = ${isLocal}`);
   if (isLocal) {
     console.log(`[Disambiguation Probe] Intercepted in sandbox mode for "${artistName}"`);
-    if (artistName.toLowerCase() === 'i wish i') {
-      return [
-        { id: 'i-wish-i-united-kingdom', label: 'I Wish I', origin: 'United Kingdom', genre: 'Indie Pop' },
-        { id: 'i-wish-i-australia', label: 'I Wish I', origin: 'Australia', genre: 'Metalcore' },
-        { id: 'i-wish-i-united-states', label: 'I Wish I', origin: 'United States', genre: 'Screamo' }
-      ];
-    }
-    // Return multiple mock candidates by default to test STATE C
-    return [
+    const mockReturn = [
       { id: `${artistName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-mock-us`, label: artistName, origin: 'United States', genre: 'Mock Punk' },
       { id: `${artistName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-mock-uk`, label: artistName, origin: 'United Kingdom', genre: 'Mock Breaks' },
       { id: `${artistName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-mock-au`, label: artistName, origin: 'Australia', genre: 'Mock Indie' }
     ];
+    console.log(`[Validation Flow]: Returning mock candidates for "${artistName}":`, mockReturn);
+    return mockReturn;
   }
 
   const baseUrl = typeof window !== 'undefined'

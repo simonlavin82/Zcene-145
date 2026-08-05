@@ -788,13 +788,8 @@ export const CountryFilterDropdown: React.FC<CountryFilterDropdownProps> = ({ va
   );
 };
 
-export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
-  isOpen,
-  query,
-  candidates,
-  onSelect,
-  isLiveAISuggestions,
-}) => {
+export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiveAISuggestions = false }: DisambiguationModalProps) {
+  console.log("[Validation Flow]: DisambiguationModal opened with", { query, candidates, isLiveAISuggestions, state: candidates.length === 0 ? 'STATE A' : candidates.length === 1 ? 'STATE B' : 'STATE C' });
   const [overrideInput, setOverrideInput] = useState('');
   if (!isOpen) return null;
 
@@ -1005,23 +1000,24 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
                 type="button"
                 key={cand.id}
                 onClick={() => onSelect(cand.id)}
-                className="w-full text-left p-4 bg-zinc-900/50 hover:bg-zinc-800 border border-zinc-700 hover:border-primary/50 transition-all duration-200 flex flex-col gap-1 group rounded-xl"
+                className="w-full text-left p-5 bg-zinc-900 hover:bg-primary/10 border border-primary/80 hover:border-primary transition-all duration-200 flex items-center gap-4 group rounded-xl shadow-[0_0_15px_rgba(246,228,104,0.15)] hover:shadow-[0_0_20px_rgba(246,228,104,0.25)] cursor-pointer"
               >
-                <div className="flex items-center justify-between w-full">
-                  <span className="text-zinc-200 group-hover:text-primary font-medium transition-colors text-sm">
+                <span className="material-symbols-outlined text-primary group-hover:scale-110 transition-transform text-2xl flex-shrink-0">check_circle</span>
+                <div className="flex flex-col gap-0.5 min-w-0">
+                  <span className="text-white group-hover:text-primary font-medium transition-colors text-base truncate">
                     {cand.label || cand.id}
                   </span>
-                  <span className="material-symbols-outlined text-zinc-600 group-hover:text-primary transition-colors text-[14px]">
-                    arrow_forward_ios
-                  </span>
+                  {(cand.genre || cand.origin) && (
+                    <div className="flex flex-wrap gap-x-2 text-[10px] text-zinc-400 group-hover:text-zinc-300 transition-colors uppercase tracking-wider font-semibold">
+                      {cand.origin && <span>{cand.origin}</span>}
+                      {cand.origin && cand.genre && <span>•</span>}
+                      {cand.genre && <span>{cand.genre}</span>}
+                    </div>
+                  )}
                 </div>
-                {(cand.genre || cand.origin) && (
-                  <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-1 text-[10px] text-zinc-500 group-hover:text-zinc-400 transition-colors uppercase tracking-wider font-semibold">
-                    {cand.origin && <span>{cand.origin}</span>}
-                    {cand.origin && cand.genre && <span>•</span>}
-                    {cand.genre && <span>{cand.genre}</span>}
-                  </div>
-                )}
+                <span className="material-symbols-outlined text-primary transition-transform group-hover:translate-x-1 text-[16px] ml-auto flex-shrink-0">
+                  arrow_forward_ios
+                </span>
               </button>
             ))}
           </div>
@@ -1044,12 +1040,12 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
           <button
             type="submit"
             className={`px-4 py-1.5 rounded-xl font-medium text-sm flex items-center gap-2 active:scale-95 transition-all cursor-pointer whitespace-nowrap ${
-              !isLiveAISuggestions
-                ? 'border border-zinc-700 bg-zinc-800/50 hover:bg-zinc-800 hover:border-zinc-500 text-zinc-300 hover:text-white'
-                : 'bg-primary text-brand-black shadow-md'
+              overrideInput.trim()
+                ? 'bg-primary text-brand-black shadow-md'
+                : 'border border-zinc-700 bg-zinc-800/50 hover:bg-zinc-800 hover:border-zinc-500 text-zinc-300 hover:text-white'
             }`}
           >
-            {!isLiveAISuggestions && <span className="material-symbols-outlined !text-[16px]">search</span>}
+            {!overrideInput.trim() && <span className="material-symbols-outlined !text-[16px]">search</span>}
             {isLiveAISuggestions 
               ? (overrideInput.trim() ? 'Proceed' : 'Proceed without origin')
               : (overrideInput.trim() ? 'Synthesize with override' : 'None of these')}
