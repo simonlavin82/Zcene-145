@@ -981,6 +981,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <IconDisplay icon={<span className="material-symbols-outlined">remove</span>} name="Zoom Out" pxSize="18px" description="Decreases graph magnification." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
                                     <IconDisplay icon={<span className="material-symbols-outlined">hub</span>} name="Organic View" pxSize="18px" description="Switches the graph to the default organic layout." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
                                     <IconDisplay icon={<span className="material-symbols-outlined">bubble_chart</span>} name="Cluster View" pxSize="18px" description="Switches the graph to the clustered attribute layout." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<Waypoints size={18} />} name="Roots Breakdown" pxSize="18px" description="Dimensional Topology / Roots Breakdown." implementation="size={18}" />
                                 </div>
                             </div>
 
@@ -1517,6 +1518,8 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <h3 className="text-xl font-medium text-zinc-200">Roots Breakdown Button</h3>
                                     <div className="flex flex-wrap gap-2">
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Component: RootsBreakdownButton</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Icon: Waypoints (lucide)</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Size: Compact (sm)</span>
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">States: disabled, attention, neutral</span>
                                     </div>
                                 </div>
@@ -2105,43 +2108,47 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             {/* Input Size Scale */}
                             <div className="p-8 bg-zinc-900/50 rounded-none border border-zinc-800">
                                 <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4 border-b border-zinc-800 pb-4">
-                                    <h3 className="text-xl font-medium text-primary">Input Size Scale</h3>
+                                    <h3 className="text-xl font-medium text-primary">Input & Select Size Scale</h3>
                                     <div className="flex flex-wrap gap-2">
-                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Radius: 12px / rounded-xl</span>
-                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Height: 38px (Standardized)</span>
-                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Padding: px-4</span>
-                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Font: 14px / text-sm (Standardized)</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Component: Select, InputSizes</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Variants: sm, md</span>
                                     </div>
                                 </div>
                                 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                                     <div className="space-y-4">
-                                        <div className="p-6 bg-zinc-950 rounded-none border border-zinc-800 flex items-center justify-center">
+                                        <div className="p-6 bg-zinc-950 rounded-none border border-zinc-800 flex flex-col gap-4 justify-center">
                                             <input 
                                                 type="text" 
-                                                placeholder="Desktop Input" 
-                                                className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none" 
+                                                placeholder="Compact Input (sm)" 
+                                                className={`w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none ${InputSizes.sm.base} px-3`} 
                                             /> 
+                                            <Select variant="sm" defaultValue="none">
+                                                <option value="none">Compact Select (sm)</option>
+                                            </Select>
                                         </div>
                                         <div>
-                                            <h4 className="text-sm font-semibold text-zinc-200 uppercase tracking-widest">Desktop (Standard)</h4>
-                                            <p className="text-xs text-zinc-500 mt-1 font-mono"><code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">py-2</code> <code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">text-sm</code> (38px height) | Radius: 12px (<code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">rounded-xl</code>)</p>
-                                            <p className="text-xs text-zinc-400 mt-2">The default size for all desktop viewports (lg+).</p>
+                                            <h4 className="text-sm font-semibold text-zinc-200 uppercase tracking-widest">Compact (sm)</h4>
+                                            <p className="text-xs text-zinc-500 mt-1 font-mono"><code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">py-1.5</code> <code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">text-xs</code></p>
+                                            <p className="text-xs text-zinc-400 mt-2">Used for tight inline controls, such as headers and sub-nav filters.</p>
                                         </div>
                                     </div>
 
                                     <div className="space-y-4">
-                                        <div className="p-6 bg-zinc-950 rounded-none border border-zinc-800 flex items-center justify-center">
+                                        <div className="p-6 bg-zinc-950 rounded-none border border-zinc-800 flex flex-col gap-4 justify-center">
                                             <input 
                                                 type="text" 
-                                                placeholder="Mobile Input" 
-                                                className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none" 
+                                                placeholder="Standard Input (md)" 
+                                                className={`w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none ${InputSizes.md.base} px-4`} 
                                             /> 
+                                            <Select variant="md" defaultValue="none">
+                                                <option value="none">Standard Select (md)</option>
+                                            </Select>
                                         </div>
                                         <div>
-                                            <h4 className="text-sm font-semibold text-zinc-200 uppercase tracking-widest">Mobile (Standardized)</h4>
-                                            <p className="text-xs text-zinc-500 mt-1 font-mono"><code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">py-2</code> <code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">text-sm</code> (38px height) | Radius: 12px (<code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">rounded-xl</code>)</p>
-                                            <p className="text-xs text-zinc-400 mt-2">Standardized to text-sm and py-2 across all breakpoints since viewport configuration prevents auto-zoom.</p>
+                                            <h4 className="text-sm font-semibold text-zinc-200 uppercase tracking-widest">Standard (md)</h4>
+                                            <p className="text-xs text-zinc-500 mt-1 font-mono"><code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">py-2</code> <code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">text-sm</code></p>
+                                            <p className="text-xs text-zinc-400 mt-2">The default size for all main forms and primary layout inputs.</p>
                                         </div>
                                     </div>
                                 </div>

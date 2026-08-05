@@ -11,7 +11,6 @@ import { SegmentedTextToggle } from './ui/SegmentedTextToggle';
 import { db } from '../services/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import { formatSystemTimestamp } from '../utils/formatters';
-import { formatSystemTimestamp } from '../utils/formatters';
 import { Select, InputSizes } from './DesignSystem';
 const SENTINEL_INSIGHT = 'No insight provided.';
 
@@ -1841,7 +1840,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                 </div>
             ) : (
                 isMagazineViewOpen ? (
-                    <div className="h-16 flex-shrink-0 border-b border-zinc-600/50 bg-zinc-900 z-[60] relative">
+                    <div className="h-12 flex-shrink-0 border-b border-zinc-600/50 bg-zinc-900 z-[60] relative">
                         <div className="max-w-[1400px] mx-auto w-full h-full px-4 md:px-6 lg:px-8 flex items-center justify-between relative">
                             <div className="flex items-center gap-4 overflow-hidden w-full h-full">
                                 <div className="flex items-center gap-2">
