@@ -848,7 +848,7 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
               type="submit"
               className={
                 isLiveAISuggestions && !overrideInput.trim()
-                  ? "px-4 py-1.5 border border-zinc-700 bg-zinc-800/50 hover:bg-zinc-800 hover:border-zinc-500 text-zinc-300 hover:text-white rounded-xl font-medium text-sm flex items-center gap-2 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+                  ? "px-6 py-2 border border-zinc-700 bg-zinc-800/50 hover:bg-zinc-800 hover:border-zinc-500 text-zinc-300 hover:text-white rounded-xl font-medium text-sm flex items-center gap-2 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
                   : "px-6 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all shadow-md cursor-pointer whitespace-nowrap"
               }
             >
@@ -931,27 +931,25 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
             )}
           </div>
           
-          <footer className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2">
+          <footer className="p-3 sm:p-4 bg-zinc-900 border-t border-zinc-700 flex flex-wrap items-center justify-end gap-3">
             <button
               type="button"
               onClick={() => onSelect('cancel')}
-              className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors"
+              className="px-4 py-1.5 text-zinc-400 hover:text-white text-sm font-medium rounded-xl hover:bg-zinc-800 transition-colors"
             >
               Cancel
             </button>
-            {!isLiveAISuggestions ? (
+            {isLiveAISuggestions && !overrideInput.trim() ? (
               <button
-                type="button"
-                onClick={() => onSelect('synthesis')}
-                className="px-4 py-1.5 border border-zinc-700 bg-zinc-800/50 hover:bg-zinc-800 hover:border-zinc-500 text-zinc-300 hover:text-white rounded-xl font-medium text-sm flex items-center gap-2 active:scale-95 transition-all cursor-pointer"
+                type="submit"
+                className="px-6 py-2 border border-zinc-700 bg-zinc-800/50 hover:bg-zinc-800 hover:border-zinc-500 text-zinc-300 hover:text-white rounded-xl font-medium text-sm flex items-center gap-2 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
               >
-                <span className="material-symbols-outlined !text-[16px]">search</span>
                 None of these
               </button>
             ) : (
               <button
                 type="submit"
-                className="px-4 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 active:scale-95 transition-all shadow-md cursor-pointer whitespace-nowrap"
+                className="px-6 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 active:scale-95 transition-all shadow-md cursor-pointer whitespace-nowrap"
               >
                 {overrideInput.trim() ? 'Synthesize with override' : 'Confirm Selection'}
               </button>
@@ -1043,7 +1041,7 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
           </button>
           <button
             type="submit"
-            className={`px-4 py-1.5 rounded-xl font-medium text-sm flex items-center gap-2 active:scale-95 transition-all cursor-pointer whitespace-nowrap ${
+            className={`px-6 py-2 rounded-xl font-medium text-sm flex items-center gap-2 active:scale-95 transition-all cursor-pointer whitespace-nowrap ${
               overrideInput.trim()
                 ? 'bg-primary text-brand-black shadow-md'
                 : 'border border-zinc-700 bg-zinc-800/50 hover:bg-zinc-800 hover:border-zinc-500 text-zinc-300 hover:text-white'
