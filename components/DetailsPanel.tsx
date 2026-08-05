@@ -980,7 +980,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 </div>
                             )}
 
-                            <div className={`grid ${isHero ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2'} gap-8 py-4 border-b border-zinc-800/50`}>
+                            <div className={`grid grid-cols-2 gap-8 py-4 border-b border-zinc-800/50`}>
                                 <div>
                                     <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Genre</h4>
                                     <p className="text-sm font-normal text-zinc-200">{details.details?.genre || 'Unknown'}</p>
