@@ -1,3 +1,4 @@
+import { ModalFooter, ModalContainer, ModalBackdrop, ModalHeader, ModalBody } from './ui/Dialog';
 import React, { useState, useMemo } from 'react';
 import { StackItem, Node, UserTaste } from '../types';
 import { StackIcon } from './Icons';
@@ -94,14 +95,14 @@ export const MyStackDialog: React.FC<{
                     })
                 )}
             </div>
-            <footer className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2">
+            <ModalFooter>
                 <button onClick={onClose} className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors">
                     Cancel
                 </button>
                 <button onClick={onClose} className="px-6 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90">
                     Done
                 </button>
-            </footer>
+            </ModalFooter>
         </div>
     </div>
   );
@@ -230,14 +231,14 @@ export const MyTasteDialog: React.FC<{
           </div>
         </div>
 
-        <footer className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2">
+        <ModalFooter>
           <button onClick={onClose} disabled={isSaving} className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors disabled:opacity-50">
             Cancel
           </button>
           <button onClick={handleSaveClick} disabled={isSaving} className="px-6 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90 disabled:opacity-50">
             {isSaving ? 'Saving...' : 'Save'}
           </button>
-        </footer>
+        </ModalFooter>
       </div>
     </div>
   );
@@ -375,7 +376,7 @@ export const TokenConfirmationDialog: React.FC<{
           )}
         </div>
 
-        <footer className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2">
+        <ModalFooter>
           <button 
             onClick={onClose} 
             className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors"
@@ -389,7 +390,7 @@ export const TokenConfirmationDialog: React.FC<{
             <span className="material-symbols-outlined !text-[16px]">check</span>
             Confirm
           </button>
-        </footer>
+        </ModalFooter>
       </div>
     </div>
   );
@@ -504,14 +505,14 @@ export const CacheChoiceDialog: React.FC<{
           </div>
         </div>
 
-        <footer className="p-4 bg-zinc-900 border-t border-zinc-700 flex justify-end">
+        <ModalFooter>
           <button 
             onClick={() => onSelect('cancel')} 
             className="px-4 py-2 text-zinc-400 hover:text-white text-sm rounded-xl hover:bg-zinc-800 transition-colors"
           >
             Cancel
           </button>
-        </footer>
+        </ModalFooter>
       </motion.div>
     </div>
   );
@@ -558,14 +559,14 @@ export const FullItineraryDialog: React.FC<{
           ))}
         </div>
 
-        <footer className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end">
+        <ModalFooter>
           <button 
             onClick={onClose}
             className="px-5 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90"
           >
             Close
           </button>
-        </footer>
+        </ModalFooter>
       </div>
     </div>
   );
@@ -648,14 +649,14 @@ export const GenerativeRationaleModal: React.FC<{
           </div>
         </div>
 
-        <footer className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end">
+        <ModalFooter>
           <button 
             onClick={onClose}
             className="px-6 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90 active:scale-95 transition-all duration-200"
           >
             Done
           </button>
-        </footer>
+        </ModalFooter>
       </div>
     </div>
   );
@@ -796,33 +797,33 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
   // ── STATE A: Cache Miss (0 candidates in cache) ───────────────────────────
   if (candidates.length === 0) {
     return (
-      <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/60 animate-fade-in-down pointer-events-auto" style={{ animationDuration: '200ms' }} onClick={() => onSelect('cancel')}>
-        <form 
-          onSubmit={(e) => { 
-            e.preventDefault(); 
-            if (overrideInput.trim()) {
-              onSelect(`override::${overrideInput.trim()}`);
-            } else {
-              onSelect('synthesis');
-            }
-          }} 
-          className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-visible animate-fade-in-down relative z-[1150]" 
-          style={{ animationDuration: '200ms' }} 
-          onClick={e => e.stopPropagation()}
-        >
-          <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary !text-[18px]">{isLiveAISuggestions ? 'public' : 'psychology'}</span>
-              <h3 className="text-lg font-medium text-white">
-                {isLiveAISuggestions ? 'Validate Origin' : 'Disambiguation'}
-              </h3>
-            </div>
-            <button type="button" onClick={() => onSelect('cancel')} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none">
-              <span className="material-symbols-outlined !text-[18px]">close</span>
-            </button>
-          </header>
+      <ModalBackdrop onClick={() => onSelect('cancel')} className="z-[1100]">
+        <ModalContainer className="overflow-visible relative z-[1150]">
+          <form 
+            onSubmit={(e) => { 
+              e.preventDefault(); 
+              if (overrideInput.trim()) {
+                onSelect(`override::${overrideInput.trim()}`);
+              } else {
+                onSelect('synthesis');
+              }
+            }} 
+            className="flex flex-col w-full" 
+            onClick={e => e.stopPropagation()}
+          >
+            <ModalHeader>
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary !text-[18px]">{isLiveAISuggestions ? 'public' : 'psychology'}</span>
+                <h3 className="text-lg font-medium text-white">
+                  {isLiveAISuggestions ? 'Validate Origin' : 'Disambiguation'}
+                </h3>
+              </div>
+              <button type="button" onClick={() => onSelect('cancel')} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none">
+                <span className="material-symbols-outlined !text-[18px]">close</span>
+              </button>
+            </ModalHeader>
 
-          <div className="p-5 flex flex-col gap-4 overflow-visible">
+          <ModalBody className="overflow-visible flex flex-col gap-4">
             <p className="text-sm font-light text-zinc-400 leading-relaxed">
               {isLiveAISuggestions 
                 ? <>No specific regional variants were identified for <span className="text-primary font-semibold">"{query}"</span> by the AI probe. Proceed by typing an origin below, or proceed without one.</>
@@ -834,9 +835,9 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
                 <CountryFilterDropdown value={overrideInput} onChange={setOverrideInput} />
               </div>
             )}
-          </div>
+          </ModalBody>
 
-          <footer className="p-3 sm:p-4 bg-zinc-900 border-t border-zinc-700 flex flex-wrap items-center justify-end gap-3">
+          <ModalFooter>
             <button
               type="button"
               onClick={() => onSelect('cancel')}
@@ -856,9 +857,10 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
                 ? (overrideInput.trim() ? 'Proceed' : 'None of these')
                 : (overrideInput.trim() ? 'Synthesize with override' : 'Search Live AI')}
             </button>
-          </footer>
+          </ModalFooter>
         </form>
-      </div>
+      </ModalContainer>
+    </ModalBackdrop>
     );
   }
 
@@ -867,33 +869,32 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
   if (candidates.length === 1) {
     const cand = candidates[0];
     return (
-      <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/60 animate-fade-in-down pointer-events-auto" style={{ animationDuration: '200ms' }} onClick={() => onSelect('cancel')}>
-        <form 
-          onSubmit={(e) => { 
-            e.preventDefault(); 
-            if (overrideInput.trim()) {
-              onSelect(`override::${overrideInput.trim()}`);
-            } else {
-              onSelect(cand.id);
-            }
-          }}
-          className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-visible animate-fade-in-down relative z-[1150]" 
-          style={{ animationDuration: '200ms' }} 
-          onClick={e => e.stopPropagation()}
-        >
-          <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary !text-[18px]">{isLiveAISuggestions ? 'public' : 'travel_explore'}</span>
-              <h3 className="text-lg font-medium text-white">
-                {isLiveAISuggestions ? 'Validate Origin' : 'Look What I Found'}
-              </h3>
-            </div>
-            <button type="button" onClick={() => onSelect('cancel')} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none">
-              <span className="material-symbols-outlined !text-[18px]">close</span>
-            </button>
-          </header>
+      <ModalBackdrop onClick={() => onSelect('cancel')} className="z-[1100]">
+        <ModalContainer className="overflow-visible relative z-[1150]">
+          <form 
+            onSubmit={(e) => { 
+              e.preventDefault(); 
+              if (overrideInput.trim()) {
+                onSelect(`override::${overrideInput.trim()}`);
+              } else {
+                onSelect(cand.id);
+              }
+            }}
+            className="flex flex-col w-full" onClick={e => e.stopPropagation()}
+          >
+            <ModalHeader>
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary !text-[18px]">{isLiveAISuggestions ? 'public' : 'travel_explore'}</span>
+                <h3 className="text-lg font-medium text-white">
+                  {isLiveAISuggestions ? 'Validate Origin' : 'Look What I Found'}
+                </h3>
+              </div>
+              <button type="button" onClick={() => onSelect('cancel')} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none">
+                <span className="material-symbols-outlined !text-[18px]">close</span>
+              </button>
+            </ModalHeader>
 
-          <div className="p-5 flex flex-col gap-4 overflow-visible">
+          <ModalBody className="p-5 flex flex-col gap-4 overflow-visible">
             <p className="text-sm font-light text-zinc-400 leading-relaxed">
               {isLiveAISuggestions
                 ? <>We ran a quick live check and found a distinct regional entity for <span className="text-primary font-semibold">"{query}"</span>. Is this the act you mean?</>
@@ -929,9 +930,9 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
                 <CountryFilterDropdown value={overrideInput} onChange={setOverrideInput} />
               </div>
             )}
-          </div>
+          </ModalBody>
           
-          <footer className="p-3 sm:p-4 bg-zinc-900 border-t border-zinc-700 flex flex-wrap items-center justify-end gap-3">
+          <ModalFooter>
             <button
               type="button"
               onClick={() => onSelect('cancel')}
@@ -954,47 +955,47 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
                 {overrideInput.trim() ? 'Synthesize with override' : 'Confirm Selection'}
               </button>
             )}
-          </footer>
+          </ModalFooter>
         </form>
-      </div>
+      </ModalContainer>
+    </ModalBackdrop>
     );
   }
 
   // ── STATE C: Multiple Cached Candidates — "Which Did You Mean?" ───────────
   // Cache returned >1 records. User selects one or requests live AI search.
   return (
-    <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/60 animate-fade-in-down pointer-events-auto" style={{ animationDuration: '200ms' }} onClick={() => onSelect('cancel')}>
-      <form 
-        onSubmit={(e) => { 
-          e.preventDefault(); 
-          if (overrideInput.trim()) {
-            onSelect(`override::${overrideInput.trim()}`);
-          } else {
-            onSelect('synthesis');
-          }
-        }}
-        className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-visible animate-fade-in-down relative z-[1150]" 
-        style={{ animationDuration: '200ms' }} 
-        onClick={e => e.stopPropagation()}
-      >
-        <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary !text-[18px]">{isLiveAISuggestions ? 'public' : 'psychology'}</span>
-            <h3 className="text-lg font-medium text-white">
-              {isLiveAISuggestions ? 'Validate Origin' : 'Disambiguation'}
-            </h3>
-          </div>
-          <button type="button" onClick={() => onSelect('cancel')} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none">
-            <span className="material-symbols-outlined !text-[18px]">close</span>
-          </button>
-        </header>
+    <ModalBackdrop onClick={() => onSelect('cancel')} className="z-[1100]">
+      <ModalContainer className="overflow-visible relative z-[1150]">
+        <form 
+          onSubmit={(e) => { 
+            e.preventDefault(); 
+            if (overrideInput.trim()) {
+              onSelect(`override::${overrideInput.trim()}`);
+            } else {
+              onSelect('synthesis');
+            }
+          }}
+          className="flex flex-col w-full" onClick={e => e.stopPropagation()}
+        >
+          <ModalHeader>
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary !text-[18px]">{isLiveAISuggestions ? 'public' : 'psychology'}</span>
+              <h3 className="text-lg font-medium text-white">
+                {isLiveAISuggestions ? 'Validate Origin' : 'Disambiguation'}
+              </h3>
+            </div>
+            <button type="button" onClick={() => onSelect('cancel')} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none">
+              <span className="material-symbols-outlined !text-[18px]">close</span>
+            </button>
+          </ModalHeader>
 
-        <div className="p-5 flex flex-col gap-4 overflow-visible">
-          <p className="text-sm font-light text-zinc-400 leading-relaxed">
-            {isLiveAISuggestions
-              ? <>We found multiple artists matching <span className="text-primary font-semibold">"{query}"</span>. Please select the correct regional act to begin mapping your scene.</>
-              : <>We found multiple distinct artists matching <span className="text-primary font-semibold">"{query}"</span>. Which one did you mean?</>}
-          </p>
+          <ModalBody className="p-5 flex flex-col gap-4 overflow-visible">
+            <p className="text-sm font-light text-zinc-400 leading-relaxed">
+              {isLiveAISuggestions
+                ? <>We found multiple artists matching <span className="text-primary font-semibold">"{query}"</span>. Please select the correct regional act to begin mapping your scene.</>
+                : <>We found multiple distinct artists matching <span className="text-primary font-semibold">"{query}"</span>. Which one did you mean?</>}
+            </p>
 
           <div className="flex flex-col gap-3 max-h-[240px] overflow-y-auto pr-1">
             {candidates.map((cand) => (
@@ -1029,9 +1030,9 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
               <CountryFilterDropdown value={overrideInput} onChange={setOverrideInput} />
             </div>
           )}
-        </div>
+          </ModalBody>
 
-        <footer className="p-3 sm:p-4 bg-zinc-900 border-t border-zinc-700 flex flex-wrap items-center justify-end gap-3">
+        <ModalFooter>
           <button
             type="button"
             onClick={() => onSelect('cancel')}
@@ -1052,10 +1053,11 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
               ? (overrideInput.trim() ? 'Proceed' : 'None of these')
               : (overrideInput.trim() ? 'Synthesize with override' : 'None of these')}
           </button>
-        </footer>
-      </form>
-    </div>
-  );
+          </ModalFooter>
+        </form>
+      </ModalContainer>
+    </ModalBackdrop>
+    );
 };
 
 export const ExploreActionDialog: React.FC<{
@@ -1096,7 +1098,7 @@ export const ExploreActionDialog: React.FC<{
           </p>
         </div>
 
-        <footer className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-3">
+        <ModalFooter>
           <button
             onClick={onClose}
             className="px-4 py-1.5 border border-zinc-700 hover:border-zinc-500 text-zinc-300 hover:text-white rounded-xl font-medium text-sm transition-colors active:scale-95 cursor-pointer"
@@ -1109,7 +1111,7 @@ export const ExploreActionDialog: React.FC<{
           >
             Continue
           </button>
-        </footer>
+        </ModalFooter>
       </div>
     </div>
   );
