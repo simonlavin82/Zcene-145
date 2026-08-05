@@ -900,9 +900,9 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
             <button
               type="button"
               onClick={() => onSelect(cand.id)}
-              className="w-full text-left p-5 bg-zinc-900 hover:bg-primary/10 border border-primary/80 hover:border-primary transition-all duration-200 flex items-center gap-4 group rounded-xl shadow-[0_0_15px_rgba(246,228,104,0.15)] hover:shadow-[0_0_20px_rgba(246,228,104,0.25)] cursor-pointer"
+              className="w-full text-left p-4 bg-zinc-900/50 hover:bg-zinc-800 border border-zinc-700 hover:border-primary/50 transition-all duration-200 flex items-center gap-4 group rounded-xl cursor-pointer"
             >
-              <span className="material-symbols-outlined text-primary group-hover:scale-110 transition-transform text-2xl flex-shrink-0">check_circle</span>
+              <span className="material-symbols-outlined text-zinc-600 group-hover:text-primary group-hover:scale-110 transition-all text-2xl flex-shrink-0">check_circle</span>
               <div className="flex flex-col gap-0.5 min-w-0">
                 <span className="text-white group-hover:text-primary font-medium transition-colors text-base truncate">
                   {cand.label || cand.id}
@@ -977,9 +977,9 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
       >
         <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary !text-[18px]">{isLiveAISuggestions ? 'auto_awesome' : 'psychology'}</span>
+            <span className="material-symbols-outlined text-primary !text-[18px]">{isLiveAISuggestions ? 'public' : 'psychology'}</span>
             <h3 className="text-lg font-medium text-white">
-              {isLiveAISuggestions ? 'Live AI Validation' : 'Disambiguation'}
+              {isLiveAISuggestions ? 'Validate Origin' : 'Disambiguation'}
             </h3>
           </div>
           <button type="button" onClick={() => onSelect('cancel')} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none">
@@ -990,7 +990,7 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
         <div className="p-5 flex flex-col gap-4 overflow-visible">
           <p className="text-sm font-light text-zinc-400 leading-relaxed">
             {isLiveAISuggestions
-              ? <>Our live model identified multiple regional entities matching <span className="text-primary font-semibold">"{query}"</span>. Please specify which one you mean to avoid token waste.</>
+              ? <>We found multiple artists matching <span className="text-primary font-semibold">"{query}"</span>. Please select the correct regional act to begin mapping your scene.</>
               : <>We found multiple distinct artists matching <span className="text-primary font-semibold">"{query}"</span>. Which one did you mean?</>}
           </p>
 
@@ -1000,9 +1000,9 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
                 type="button"
                 key={cand.id}
                 onClick={() => onSelect(cand.id)}
-                className="w-full text-left p-5 bg-zinc-900 hover:bg-primary/10 border border-primary/80 hover:border-primary transition-all duration-200 flex items-center gap-4 group rounded-xl shadow-[0_0_15px_rgba(246,228,104,0.15)] hover:shadow-[0_0_20px_rgba(246,228,104,0.25)] cursor-pointer"
+                className="w-full text-left p-4 bg-zinc-900/50 hover:bg-zinc-800 border border-zinc-700 hover:border-primary/50 transition-all duration-200 flex items-center gap-4 group rounded-xl cursor-pointer"
               >
-                <span className="material-symbols-outlined text-primary group-hover:scale-110 transition-transform text-2xl flex-shrink-0">check_circle</span>
+                <span className="material-symbols-outlined text-zinc-600 group-hover:text-primary group-hover:scale-110 transition-all text-2xl flex-shrink-0">check_circle</span>
                 <div className="flex flex-col gap-0.5 min-w-0">
                   <span className="text-white group-hover:text-primary font-medium transition-colors text-base truncate">
                     {cand.label || cand.id}
@@ -1047,7 +1047,7 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
           >
             {!overrideInput.trim() && <span className="material-symbols-outlined !text-[16px]">search</span>}
             {isLiveAISuggestions 
-              ? (overrideInput.trim() ? 'Proceed' : 'Proceed without origin')
+              ? (overrideInput.trim() ? 'Proceed' : 'None of these')
               : (overrideInput.trim() ? 'Synthesize with override' : 'None of these')}
           </button>
         </footer>

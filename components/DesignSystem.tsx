@@ -2600,14 +2600,14 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             <div className="pt-8 border-t border-zinc-800">
                                 <h3 className="text-xl font-medium text-zinc-200 mb-4">Interactive Candidate Card (Disambiguation Pattern)</h3>
                                 <p className="text-sm text-zinc-400 mb-6 leading-relaxed max-w-3xl">
-                                    Used inside search disambiguation dialogs when presenting an instant cache hit or live AI verified entity. Features a refined thin primary border (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 rounded border border-zinc-800">border border-primary/80</code>) with a soft focus glow (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 rounded border border-zinc-800">shadow-[0_0_15px_rgba(246,228,104,0.15)]</code>) that intensifies on hover, ensuring frictionless hero selection without visual heaviness.
+                                    Used inside search disambiguation dialogs when presenting an instant cache hit or live AI verified entity. Features a refined thin secondary border (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 rounded border border-zinc-800">border border-zinc-700 hover:border-primary/50</code>) that illuminates cleanly on hover, ensuring frictionless hero selection without visual heaviness when multiple candidates are stacked.
                                 </p>
                                 <div className="max-w-md bg-zinc-950 p-6 rounded-xl border border-zinc-800">
                                     <button
                                         type="button"
-                                        className="w-full text-left p-5 bg-zinc-900 hover:bg-primary/10 border border-primary/80 hover:border-primary transition-all duration-200 flex items-center gap-4 group rounded-xl shadow-[0_0_15px_rgba(246,228,104,0.15)] hover:shadow-[0_0_20px_rgba(246,228,104,0.25)] cursor-pointer"
+                                        className="w-full text-left p-4 bg-zinc-900/50 hover:bg-zinc-800 border border-zinc-700 hover:border-primary/50 transition-all duration-200 flex items-center gap-4 group rounded-xl cursor-pointer"
                                     >
-                                        <span className="material-symbols-outlined text-primary group-hover:scale-110 transition-transform text-2xl flex-shrink-0">check_circle</span>
+                                        <span className="material-symbols-outlined text-zinc-600 group-hover:text-primary group-hover:scale-110 transition-all text-2xl flex-shrink-0">check_circle</span>
                                         <div className="flex flex-col gap-0.5 min-w-0">
                                             <span className="text-white group-hover:text-primary font-medium transition-colors text-base truncate">
                                                 Spaced

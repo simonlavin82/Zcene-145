@@ -2796,6 +2796,11 @@ const App: React.FC = () => {
               activeDisambiguationHints[probeKey] = 
                 `[MANDATORY DISAMBIGUATION CONSTRAINT: The user explicitly selected the following regional entity: "${selectedCand.label}" from ${selectedCand.origin} (${selectedCand.genre}). You MUST synthesize this specific act and NO OTHER.]`;
               console.log(`[Flash Validation Hint Injected for ${probeKey}]:`, activeDisambiguationHints[probeKey]);
+              
+              // Map the chosen origin entity and continue the loop!
+              resolvedArtistSeeds[i] = normalizeArtistId(selectedCand.id);
+              hasDisambiguated = true;
+              continue;
             }
           }
 
@@ -4263,26 +4268,27 @@ const App: React.FC = () => {
       });
 
       // Phase 02 complete — write each artist as an isolated individual doc - only for standalone queries
-      if (artistList.length === 1) {
-        console.log(`[Music Discovery] Full cache MISS — writing per-artist docs for: [${artistList.join(', ')}]`);
+      if (resolvedArtistList.length === 1) {
+        console.log(`[Music Discovery] Full cache MISS — writing per-artist docs for: [${resolvedArtistList.join(', ')}]`);
         const fetchedDetailsMap = new Map<string, NodeDetails>();
-        const seedName = artistList[0];
-        const nodeObj = { id: seedName, label: seedName, type: 'artist' as any, group: 0 };
+        const seedId = resolvedArtistList[0];
+        const seedLabel = resolvedArtists;
+        const nodeObj = { id: seedId, label: seedLabel, type: 'artist' as any, group: 0 };
         
         const runUpfrontFetchAndWrite = async () => {
           try {
-            console.log(`[Music Discovery] Fetching upfront details for seed: ${seedName}`);
-            const details = await fetchNodeDetails(nodeObj, final, seedArtists, urlOriginHint);
+            console.log(`[Music Discovery] Fetching upfront details for seed: ${seedLabel}`);
+            const details = await fetchNodeDetails(nodeObj, final, seedLabel, urlOriginHint);
             
             // JIT Scraper Hook
-            const artistDisplay = details.details?.artist || seedName;
+            const artistDisplay = details.details?.artist || seedLabel;
             try {
               const scrapeRes = await window.fetch('/api/artist/scrape-video-id', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   artistName: artistDisplay,
-                  artistId: normalizeArtistId(seedName)
+                  artistId: seedId
                 })
               });
               if (scrapeRes.ok) {
@@ -4305,27 +4311,27 @@ const App: React.FC = () => {
             if (!details.details) {
               details.details = { genre: "", origin: "", founded: "", notableArtists: [] };
             }
-            details.details.artist = details.details.artist || seedName;
+            details.details.artist = details.details.artist || seedLabel;
             if (!details.synthesisRationale) {
               details.synthesisRationale = final.synthesisRationale || "";
             }
 
-            fetchedDetailsMap.set(normalizeArtistId(seedName), details);
-            fetchedDetailsMap.set(seedName.toLowerCase(), details);
+            fetchedDetailsMap.set(seedId, details);
+            fetchedDetailsMap.set(seedLabel.toLowerCase(), details);
 
             // Seed detailsCache so JIT loading is instant
             setDetailsCache(prev => {
               const updated = new Map(prev);
-              updated.set(seedName, details);
-              updated.set(seedName.toLowerCase(), details);
-              updated.set(normalizeArtistId(seedName), details);
+              updated.set(seedLabel, details);
+              updated.set(seedLabel.toLowerCase(), details);
+              updated.set(seedId, details);
               return updated;
             });
-            healedDetailsCacheRef.current.set(seedName, details);
-            healedDetailsCacheRef.current.set(seedName.toLowerCase(), details);
-            healedDetailsCacheRef.current.set(normalizeArtistId(seedName), details);
+            healedDetailsCacheRef.current.set(seedLabel, details);
+            healedDetailsCacheRef.current.set(seedLabel.toLowerCase(), details);
+            healedDetailsCacheRef.current.set(seedId, details);
           } catch (err) {
-            console.error(`[Music Discovery] Upfront details fetch failed for ${seedName}:`, err);
+            console.error(`[Music Discovery] Upfront details fetch failed for ${seedLabel}:`, err);
           }
 
           // Write to Firestore

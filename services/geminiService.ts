@@ -836,24 +836,12 @@ export const resolveArtistCandidatesViaAI = async (
   artistName: string,
   signal?: AbortSignal
 ): Promise<Array<{ id: string; label: string; origin: string; genre: string }>> => {
-  // HARDCODED LOCAL MOCK (Forced for UI Verification)
-  const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
-  
-  if (isLocalhost || isLocal) {
-    const mockReturn = [
-      { id: `${artistName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-mock-us`, label: artistName, origin: 'United States', genre: 'Mock Punk' },
-      { id: `${artistName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-mock-uk`, label: artistName, origin: 'United Kingdom', genre: 'Mock Breaks' },
-      { id: `${artistName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-mock-au`, label: artistName, origin: 'Australia', genre: 'Mock Indie' }
-    ];
-    console.log("[LOCAL MOCK ACTIVE] State C Triggered", mockReturn);
-    return mockReturn;
-  }
 
   const baseUrl = typeof window !== 'undefined'
     ? window.location.origin + '/api/gemini'
     : 'http://localhost:8080/api/gemini';
 
-  const model = 'gemini-2.5-flash';
+  const model = 'gemini-1.5-flash';
   const targetUrl = `${baseUrl}/v1beta/models/${model}:generateContent`;
 
   const systemInstruction = `You are a music database disambiguation assistant.
@@ -1596,7 +1584,7 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
       }
     };
 
-    const url = `${baseUrl}/v1beta/models/gemini-2.5-flash:generateContent`;
+    const url = `${baseUrl}/v1beta/models/gemini-1.5-flash:generateContent`;
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -1978,7 +1966,7 @@ export const fetchLiveTourData = async (artistName: string): Promise<string> => 
       }
     };
 
-    const url = `${baseUrl}/v1beta/models/gemini-2.5-flash:generateContent`;
+    const url = `${baseUrl}/v1beta/models/gemini-1.5-flash:generateContent`;
     const response = await fetch(url, {
       method: 'POST',
       headers: {
