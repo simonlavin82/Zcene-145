@@ -836,15 +836,16 @@ export const resolveArtistCandidatesViaAI = async (
   artistName: string,
   signal?: AbortSignal
 ): Promise<Array<{ id: string; label: string; origin: string; genre: string }>> => {
-  console.log(`[Validation Flow]: resolveArtistCandidatesViaAI called for "${artistName}", isLocal = ${isLocal}`);
-  if (isLocal) {
-    console.log(`[Disambiguation Probe] Intercepted in sandbox mode for "${artistName}"`);
+  // HARDCODED LOCAL MOCK (Forced for UI Verification)
+  const isLocalhost = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  
+  if (isLocalhost || isLocal) {
     const mockReturn = [
       { id: `${artistName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-mock-us`, label: artistName, origin: 'United States', genre: 'Mock Punk' },
       { id: `${artistName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-mock-uk`, label: artistName, origin: 'United Kingdom', genre: 'Mock Breaks' },
       { id: `${artistName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-mock-au`, label: artistName, origin: 'Australia', genre: 'Mock Indie' }
     ];
-    console.log(`[Validation Flow]: Returning mock candidates for "${artistName}":`, mockReturn);
+    console.log("[LOCAL MOCK ACTIVE] State C Triggered", mockReturn);
     return mockReturn;
   }
 
