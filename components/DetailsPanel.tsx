@@ -2007,7 +2007,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                 title="Enter Magazine View"
                             >
                                 <span className="material-symbols-outlined !text-[16px]">auto_stories</span>
-                                <span>Magazine View</span>
+                                <span>Magazine</span>
                             </button>
                         </div>
                     )}
