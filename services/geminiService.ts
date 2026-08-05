@@ -881,6 +881,12 @@ Respond in strict JSON only — no prose, no markdown, no citation markers.`;
   const combinedSignal = signal || controller.signal;
 
   try {
+    const startTime = Date.now();
+    console.log(`[Diagnostic] Starting fetch for "${artistName}". Signal aborted? ${combinedSignal.aborted}`);
+    combinedSignal.addEventListener('abort', () => {
+      console.warn(`[Diagnostic] signal 'abort' event fired at ${Date.now() - startTime}ms! Reason:`, combinedSignal.reason);
+    });
+
     const response = await fetch(targetUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -889,6 +895,7 @@ Respond in strict JSON only — no prose, no markdown, no citation markers.`;
     });
 
     clearTimeout(timeoutId);
+    console.log(`[Diagnostic] Fetch completed successfully at ${Date.now() - startTime}ms. Status: ${response.status}`);
 
     if (!response.ok) {
       console.warn(`[Disambiguation Probe] API returned ${response.status} for "${artistName}"`);
@@ -923,6 +930,8 @@ Respond in strict JSON only — no prose, no markdown, no citation markers.`;
     }));
   } catch (err) {
     clearTimeout(timeoutId);
+    console.error(`[Diagnostic] Fetch catch block hit! Name: ${(err as any)?.name}, Message: ${(err as any)?.message}`);
+    console.error(`[Diagnostic] Was combinedSignal aborted? ${combinedSignal.aborted}. Reason:`, combinedSignal.reason);
     if ((err as any)?.name !== 'AbortError') {
       console.warn(`[Disambiguation Probe] Failed for "${artistName}":`, err);
     }

@@ -133,7 +133,10 @@ app.all('/api/gemini/*wildcard', async (req, res) => {
 
     res.status(response.status);
     response.headers.forEach((value, key) => {
-      if (key.toLowerCase() !== 'transfer-encoding') {
+      const lowerKey = key.toLowerCase();
+      // Node fetch auto-decompresses the body, so we must strip encoding/length headers
+      // to prevent ERR_CONTENT_DECODING_FAILED in the browser.
+      if (lowerKey !== 'transfer-encoding' && lowerKey !== 'content-encoding' && lowerKey !== 'content-length') {
         res.setHeader(key, value);
       }
     });
@@ -1143,6 +1146,10 @@ app.use(async (req, res) => {
   }
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`Zcene Server listening on port ${PORT}`);
 });
+
+server.keepAliveTimeout = 60000;
+server.headersTimeout = 61000;
+server.setTimeout(60000);
