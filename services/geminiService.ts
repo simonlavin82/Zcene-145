@@ -872,7 +872,7 @@ Respond in strict JSON only — no prose, no markdown, no citation markers.`;
           required: ['name', 'country', 'genre']
         }
       },
-      maxOutputTokens: 512
+      maxOutputTokens: 2048
     }
   };
 
