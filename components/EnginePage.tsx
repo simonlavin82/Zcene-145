@@ -1712,7 +1712,6 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">Data Synthesis & Persistence</h2>
                         <CodeBlock title="Atomicity, API Gateway & Sanitization Specification" content={DATA_SYNTHESIS_PERSISTENCE_DOCUMENTATION} />
                         <CodeBlock title="Architectural Separation: Artists vs. Labels & Simultaneous Pre-Caching" content={ARCHITECTURAL_SEPARATION_DOCUMENTATION} />
-                        <CodeBlock title="Cache Validation & Qualification Rules" content={CACHE_VALIDATION_DOCUMENTATION} />
                         <CodeBlock title="AI Parsing Resilience & Anti-Leakage Defense" content={AI_PARSING_RESILIENCE_DOCUMENTATION} />
                     </section>
 
