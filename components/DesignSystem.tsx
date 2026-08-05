@@ -170,9 +170,9 @@ export interface RootsBreakdownButtonProps {
 
 export const RootsBreakdownButton: React.FC<RootsBreakdownButtonProps> = ({ state, onClick, isLoading }) => {
   const btnClasses = {
-    disabled: "w-9 h-9 flex flex-shrink-0 items-center justify-center border border-zinc-800 bg-zinc-900/20 rounded-xl text-zinc-600 cursor-not-allowed transition-all duration-200 leading-none backdrop-blur-sm",
-    attention: "w-9 h-9 flex flex-shrink-0 items-center justify-center border border-primary bg-primary/10 rounded-xl text-primary animate-pulse hover:bg-primary/20 active:scale-95 transition-all duration-200 leading-none backdrop-blur-sm",
-    neutral: "w-9 h-9 flex flex-shrink-0 items-center justify-center border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none backdrop-blur-sm"
+    disabled: "h-9 px-3 flex flex-shrink-0 items-center justify-center gap-1.5 border border-zinc-800 bg-zinc-900/20 rounded-xl text-zinc-600 cursor-not-allowed transition-all duration-200 leading-none backdrop-blur-sm",
+    attention: "h-9 px-3 flex flex-shrink-0 items-center justify-center gap-1.5 border border-primary bg-primary/10 rounded-xl text-primary animate-pulse hover:bg-primary/20 active:scale-95 transition-all duration-200 leading-none backdrop-blur-sm",
+    neutral: "h-9 px-3 flex flex-shrink-0 items-center justify-center gap-1.5 border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none backdrop-blur-sm"
   }[state];
 
   const btnTitle = {
@@ -189,6 +189,7 @@ export const RootsBreakdownButton: React.FC<RootsBreakdownButtonProps> = ({ stat
       title={btnTitle}
     >
       <span className="material-symbols-outlined !text-[18px]">info</span>
+      <span className="text-sm font-medium tracking-wide">Roots</span>
     </button>
   );
 };
