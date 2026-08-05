@@ -629,7 +629,7 @@ export const GenerativeRationaleModal: React.FC<{
         <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary !text-[18px]">info</span>
-            <h3 className="text-base font-medium text-white">Roots breakdown</h3>
+            <h3 className="text-base font-medium text-white">Roots Breakdown</h3>
           </div>
           <button 
             onClick={onClose}

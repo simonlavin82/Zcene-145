@@ -176,9 +176,9 @@ export const RootsBreakdownButton: React.FC<RootsBreakdownButtonProps> = ({ stat
   }[state];
 
   const btnTitle = {
-    disabled: isLoading ? "Roots breakdown in progress..." : "No roots breakdown available",
-    attention: "New roots breakdown available! Click to view",
-    neutral: "View roots breakdown"
+    disabled: isLoading ? "Roots Breakdown in progress..." : "No Roots Breakdown available",
+    attention: "New Roots Breakdown available! Click to view",
+    neutral: "View Roots Breakdown"
   }[state];
 
   return (

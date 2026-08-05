@@ -3060,7 +3060,8 @@ const App: React.FC = () => {
                                 ? parsedDetails.youtubeSearchQuery.trim()
                                 : undefined,
                             tourDates: parsedDetails?.tourDates || [],
-                            tourCachedAt: parsedDetails?.tourCachedAt || ""
+                            tourCachedAt: parsedDetails?.tourCachedAt || "",
+                            synthesisRationale: parsedDetails?.synthesisRationale
                          };
                           console.log("[Phase 3 Cache Payload – Front Gate]", searchId, JSON.stringify({ youtubeVideoId: detailsPayload.youtubeVideoId, youtubeSearchQuery: detailsPayload.youtubeSearchQuery }));
                           
@@ -4754,7 +4755,8 @@ const App: React.FC = () => {
           youtubeVideoId,
           youtubeSearchQuery,
           tourDates,
-          tourCachedAt
+          tourCachedAt,
+          synthesisRationale: parsed?.synthesisRationale
         };
 
         // Register under all lookup key variants

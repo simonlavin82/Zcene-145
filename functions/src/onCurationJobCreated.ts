@@ -462,6 +462,10 @@ export const onCurationJobCreated = onDocumentCreated({
           const disambiguatedCanonicalId = seedNorm.endsWith(`-${countryNorm}`) ? seedNorm : `${seedNorm}-${countryNorm}`;
           const compositeCanonicalId = buildCompositeCacheKey(disambiguatedCanonicalId, inputPayload.filters || undefined);
 
+          if (!isSeedLabel && !finalGraph.synthesisRationale && seedDetails?.synthesisRationale) {
+            finalGraph.synthesisRationale = seedDetails.synthesisRationale;
+          }
+
           await db.collection(collName).doc(compositeCanonicalId).set({
             cacheKey: compositeCanonicalId,
             [idFieldKey]: seedNorm,
