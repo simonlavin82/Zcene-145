@@ -452,10 +452,11 @@ export const onCurationJobCreated = onDocumentCreated({
             .map((n: any) => n!.label || n!.id);
 
           let countryNorm = "";
-          if (connectedCountries.length > 0) {
-            countryNorm = extractCountrySlug(connectedCountries[0]);
-          } else if (seedDetails?.details?.origin) {
+          if (seedDetails?.details?.origin) {
             countryNorm = extractCountrySlug(seedDetails.details.origin);
+          }
+          if (!countryNorm && connectedCountries.length > 0) {
+            countryNorm = extractCountrySlug(connectedCountries[0]);
           }
           if (!countryNorm) countryNorm = "global";
 
@@ -561,10 +562,11 @@ export const onCurationJobCreated = onDocumentCreated({
             .map((n: any) => n!.label || n!.id);
 
           let countryNorm = "";
-          if (connectedCountries.length > 0) {
-            countryNorm = extractCountrySlug(connectedCountries[0]);
-          } else if (recDetails?.details?.origin) {
+          if (recDetails?.details?.origin) {
             countryNorm = extractCountrySlug(recDetails.details.origin);
+          }
+          if (!countryNorm && connectedCountries.length > 0) {
+            countryNorm = extractCountrySlug(connectedCountries[0]);
           }
           if (!countryNorm) countryNorm = "global";
 

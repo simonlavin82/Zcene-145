@@ -865,7 +865,7 @@ export const DisambiguationModal: React.FC<DisambiguationModalProps> = ({
 
   // ── STATE B: Single Candidate — "Look What I Found" ──────────────────────
   // Cache returned 1 record. User confirms cached candidate card or requests live AI search.
-  if (candidates.length === 1) {
+  if (candidates.length === 1 || (isLiveAISuggestions && candidates.length > 0)) {
     const cand = candidates[0];
     return (
       <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/60 animate-fade-in-down pointer-events-auto" style={{ animationDuration: '200ms' }} onClick={() => onSelect('cancel')}>
