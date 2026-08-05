@@ -830,122 +830,53 @@ global artist cache from unauthorized mutations.
    The Admin-only model ensures curation quality and budget control.
 `;
 
-const SELF_HEALING_DOCUMENTATION = `
-Zcene implements a Priority-Based Self-Healing system that repairs
-degraded Deep Cut metadata while strictly enforcing a Token Safety Contract.
+const STATE_RESILIENCY_DOCUMENTATION = `
+Zcene implements a strict Token Safety Contract and a dual-pipeline architecture 
+to manage Deep Cut metadata healing and graph topology caching.
 
-1. HUMAN CONFIRMATION & TOKEN SAFETY CONTRACT (MANDATORY):
-   - Passive project loads and graph navigation must NEVER trigger unprompted backend API calls.
-   - If the system detects a stale, corrupt, or completely missing cache entry during passive 
-     exploration, it MUST NOT auto-fetch data from the backend. 
-   - Instead, the UI exposes the missing/corrupt state (e.g. via 'checkIsProfileStaleOrCorrupt'),
-     and the user must explicitly click a Call-to-Action button in the DetailsPanel to manually 
-     approve the token expenditure and heal the cache.
+1. THE HUMAN-IN-THE-LOOP TOKEN SAFETY CONTRACT (MANDATORY):
+   - Zero Unprompted Calls: Passive project loads, graph navigation, and node selection 
+     must NEVER trigger unprompted backend API calls.
+   - Suppressed Auto-Fetching: If the system detects a stale, corrupt, or missing cache entry 
+     during passive exploration, it MUST NOT auto-fetch data from the backend. 
+   - Manual Curation UI: Instead, the UI explicitly exposes the missing/corrupt state (e.g. 
+     via 'checkIsProfileStaleOrCorrupt'). The user must explicitly click the 
+     "Profile Missing: Click to Curate" CTA button in the DetailsPanel to manually approve 
+     the token expenditure and heal the cache.
 
-2. HARD REQUIREMENT — PROFILE MISSING/STALE (App.tsx: checkIsProfileStaleOrCorrupt):
-   The following conditions flag a profile as stale/corrupt for human review:
-   - Biography/summary is null, empty, or consists only of whitespace.
-   - Summary length is below 100 characters (classified as a "lite" profile).
-   - Summary contains placeholder text (e.g., "currently unavailable").
-   - Genre or Origin labels are "Unknown" or missing.
+2. PIPELINE DUALITY (CLIENT VS. QUEUE):
+   - Single-Node Deep Cut Healing / Admin Force Refresh:
+     * Flow: 'handleRefreshNode' -> Client-side Gemini execution ('fetchNodeDetails') -> Direct Firestore 'setDoc'.
+     * Why: Single-node curation requires immediate, synchronous UI feedback. Executing 
+       natively on the client allows the UI to instantly transition from the Token Quota 
+       Warning to the loading spinner, and immediately render the fresh Deep Cut upon resolution.
+   - Multi-Seed Project Graph Generation:
+     * Flow: 'createCurationJob' -> Firebase Cloud Function queue ('onCurationJobCreated') -> 'artists' global cache write.
+     * Why: Generating a heavy multi-seed topology involves cross-referencing massive amounts 
+       of overlapping artist data, which exceeds safe browser execution timeframes. Offloading 
+       this to a gen2 Cloud Function ensures the client does not hang or timeout.
 
-3. OPPORTUNISTIC ENHANCEMENT — DO NOT FLAG AS STALE:
-   The following conditions are treated as acceptable "lite" states:
-   - High-quality biography present (>= 100 chars) but no image URL.
-   Images are classified as optional enrichment data. The system will NOT flag
-   a node for healing solely because an image is absent.
-
-4. SCOPE BOUNDARY:
-   Curated healing only applies for ARTIST and LABEL nodes. Metadata
-   hub nodes (Genre, Origin, Founded) are dynamically rendered and never healed.
-
-5. THE SELF-HEALING LIFECYCLE (MANDATORY SCHEMA CONTRACT):
-   - A strict "schema-first" cache validation model is enforced via 'validateCacheEntry'.
-   - Every cached multi-seed graph document must contain a 'synthesisRationale' (Roots Breakdown).
-   - SINGLE-SEED EXCEPTION: Single-seed projects inherently have no overlapping roots to synthesize. 
+3. CACHE VALIDATION & EXCEPTION CONTRACTS:
+   - Synthesis Rationale Contract: Every cached multi-seed graph document MUST contain a 
+     'synthesisRationale' (Roots Breakdown). Missing this field invalidates the cache via 
+     'validateCacheEntry'.
+   - Single-Seed Exception: Single-seed projects inherently have no overlapping roots to synthesize. 
      They intentionally use a structural fallback string ("[Single-Seed Analysis]...") which is 
-     explicitly permitted by 'validateRootsBreakdown'. This is NOT a broken stub and should 
+     explicitly permitted by 'validateRootsBreakdown'. This is NOT a broken stub and must 
      never be flagged for healing.
-   - Any new required UI data fields must be added to 'validateCacheEntry' so legacy records 
-     fail validation and route to the Human Confirmation gate for manual healing.
+   - Pruning Rules: To maintain payload efficiency, 'onCurationJobCreated' aggressively strips 
+     dead fields (e.g., 'hitCount' and redundant root 'synthesisRationale' keys) and prunes explicit 
+     'null' properties (e.g., 'youtubeVideoId: null') before writing to Firestore.
 
-6. SECONDARY NODE EVICTION LOOP PREVENTION (CRITICAL — validateNodeDetailsContent):
-   - Root Cause: The topology-focused 'validateCacheEntry' gate requires graphData, isPrimarySeed,
-     and synthesisRationale/Roots Breakdown. Secondary nodes (deep cuts, record labels, untyped artists)
-     never store these fields. Applying validateCacheEntry to secondary documents always returns
-     isFullyQualified: false, triggering eviction on every background worker queue tick, causing
-     an infinite synthesis loop that exhausts API quota and never settles.
-   - Fix: The background worker queue, the fallback Firestore read inside onNodeClick, and the
-     isStale computation all use the content-focused 'validateNodeDetailsContent' gate instead.
-     This gate only checks for a valid, non-sentinel summary/bio presence in detailsCache.
-   - CONTRACT: The background worker queue checks (App.tsx: the JIT details fetcher) MUST use
-     validateNodeDetailsContent for ALL non-seed node evaluations. Future refactoring of the
-     background queue MUST preserve this routing — reverting to validateCacheEntry in the
-     secondary-node path will reintroduce the infinite eviction loop regression.
-`;
-
-const CACHE_VALIDATION_DOCUMENTATION = `
-1. CONTEXT-AWARE VALIDATION (validateRootsBreakdown):
-   The validation of cached reasoning rationales (synthesisRationale) is context-aware to ensure optimal data-reuse. 
-   It operates in two distinct validation scopes governed by the 'isSingleArtist' flag:
-   - Single-Artist Mode (isSingleArtist === true):
-     Validates single-artist Zcenes. Requires only 'acoustic' and 'scene' keywords.
-     The 'overlap' insight check is bypassed because single-seed graphs contain no overlapping relationships.
-   - Multi-Artist Mode (isSingleArtist === false):
-     Validates complex, multi-artist graphs. Enforces all three keywords: 'acoustic', 'scene', and 'overlap' 
-     to ensure cross-connection network fidelity.
-
-2. LOGIC FORKING GATES (MANDATORY REQUIREMENT):
-   Any future modifications to the 'validateRootsBreakdown' or 'validateCacheEntry' functions in 'App.tsx' 
-   MUST preserve this context-aware logic fork. Disabling the fork or applying the strict multi-artist 
-   'overlap' constraint globally will regress the system into redundant, paid Gemini API re-synthesis loops 
-   for single-artist caches.
-
-3. FLAG PROPAGATION PATTERN:
-   The 'isSingleArtist' flag should be propagated dynamically from the graph generation queries 
-   (e.g., checking 'artistList.length === 1' inside handleGenerateGraph) or set to 'true' in isolated 
-   detail panel reads where only a single artist's profile card is being evaluated.
-
-4. DUAL-GATE VALIDATION MODEL — TOPOLOGY vs. CONTENT (MANDATORY CONTRACT):
-   The system enforces two semantically distinct validation gates. Each gate has a precisely scoped
-   purpose and MUST NOT be substituted for the other:
-
-   GATE 1 — validateCacheEntry (Topology Gate):
-   - Purpose: Full graph-topology validation for seed-level data quality.
-   - Scope: Used exclusively in the high-level cache front gate inside handleGenerateGraph and
-     in global cache hit checks where a complete, qualified seed document is required.
-   - Checks: graphData structure presence, synthesisRationale/Roots Breakdown completeness
-     ('acoustic', 'scene', optional 'overlap'), and document version integrity.
-   - Usage: validateCacheEntry(data, isSingleArtist).isFullyQualified
-   - DO NOT use this gate for secondary nodes, deep cuts, or background worker queue checks.
-     Applying it to non-seed documents will block all secondary node hydration because deep
-     cuts never carry graphData or synthesisRationale, causing a permanent cache eviction loop.
-
-   GATE 2 — validateNodeDetailsContent (Content Gate):
-   - Purpose: Lightweight content-presence validation for secondary node details.
-   - Scope: Used in the background worker queue (JIT details fetcher), in the fallback
-     Firestore read path inside onNodeClick, and in the staleness check inside the
-     background cache loader. Does NOT require graphData, isPrimarySeed, or synthesisRationale.
-   - Checks: detailsCache field is a non-null, non-empty value. Parses the field and confirms
-     that the resolved object has a 'summary' or 'bio' string with length > 5, and that the
-     entry is not marked as corrupt (_isSentinel: true).
-   - Usage: validateNodeDetailsContent(data.detailsCache)
-   - This is the authoritative gate for: (a) deciding whether to skip or trigger background
-     revalidation for a node, (b) deciding whether to treat a Firestore cache read as a valid
-     hit or a miss in the short-ID fallback lookup, and (c) computing isStale for background
-     worker queue scheduling.
-
-5. CACHE MAP ALIAS RESOLUTION (expandDetailsCacheMap):
-   All detailsCache Map population — across project loaders, shared Zcene imports, and cloud
-   curation job callbacks — MUST route through the expandDetailsCacheMap() utility (App.tsx).
-   This function parses raw detailsCache JSON (handling string, array-wrapped, and object forms),
-   then replicates each entry under four keys: the raw original key, a lowercased variant, a
-   normalizeArtistId() slug variant, and a display-name variant derived from the cached
-   artist/details.artist field. This quad-binding guarantees that any node ID format used
-   at query time — regardless of casing, hyphenation, or slug normalization — resolves
-   to the correct cached entry without an O(n) scan. Any future project loader code that
-   directly calls new Map(JSON.parse(data.detailsCache)) bypasses this guarantee and MUST
-   be refactored to use expandDetailsCacheMap() instead.
+4. TROUBLESHOOTING & DIAGNOSTIC MATRIX:
+   | Symptom / Action | Expected Behavior & Flow | Root Cause Check (File/Function) |
+   | :--- | :--- | :--- |
+   | Deep cut missing origin/genre | Node is flagged as incomplete. DetailsPanel renders the "Profile Missing: Click to Curate" CTA. | App.tsx: checkIsProfileStaleOrCorrupt |
+   | User clicks "Click to Curate" | App prompts Token Warning. If confirmed, 'handleRefreshNode' evicts cache. UI reverts to "Generate Deep Cut". | App.tsx: handleRefreshNode |
+   | Admin clicks "Force Refresh" | Identical flow to above. Token Warning -> Eviction -> "Generate Deep Cut". | App.tsx: handleRefreshNode |
+   | User clicks "Generate Deep Cut" | Client calls Gemini natively. Spinner runs. Fresh payload is written to Firestore. | App.tsx: handleGenerateDeepCut, fetchNodeDetails |
+   | Single-seed shows fallback rationale | Valid behavior. 'validateRootsBreakdown' explicitly permits the fallback string. | App.tsx: validateRootsBreakdown |
+   | Infinite loading spinner on graph | Usually a topology/cache mismatch. Check if a new required UI field is missing from the validation gate. | App.tsx: validateCacheEntry |
 `;
 
 const LOCALIZED_LOADING_DOCUMENTATION = `
@@ -1729,10 +1660,10 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                         <CodeBlock title="Quick Heal (Force Refresh) — Access Control & Eviction Logic" content={ADMIN_OVERRIDE_DOCUMENTATION} />
                     </section>
 
-                    {/* ── SELF-HEALING ── */}
-                    <section id="self-healing">
-                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">Priority-Based Self-Healing</h2>
-                        <CodeBlock title="Auto-Heal Rules & Session Guard" content={SELF_HEALING_DOCUMENTATION} />
+                    {/* ── STATE RESILIENCY & TOKEN SAFETY ── */}
+                    <section id="state-resiliency">
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">State Resiliency, Caching, & Token Safety</h2>
+                        <CodeBlock title="Diagnostic Manual & Pipeline Rules" content={STATE_RESILIENCY_DOCUMENTATION} />
                     </section>
 
                     {/* ── LOCALIZED LOADING ── */}
