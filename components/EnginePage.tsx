@@ -831,49 +831,43 @@ global artist cache from unauthorized mutations.
 `;
 
 const SELF_HEALING_DOCUMENTATION = `
-Zcene implements a Priority-Based Self-Healing system that autonomously repairs
-degraded Deep Cut metadata without triggering unnecessary API calls.
+Zcene implements a Priority-Based Self-Healing system that repairs
+degraded Deep Cut metadata while strictly enforcing a Token Safety Contract.
 
-The system distinguishes between two categories of data quality:
+1. HUMAN CONFIRMATION & TOKEN SAFETY CONTRACT (MANDATORY):
+   - Passive project loads and graph navigation must NEVER trigger unprompted backend API calls.
+   - If the system detects a stale, corrupt, or completely missing cache entry during passive 
+     exploration, it MUST NOT auto-fetch data from the backend. 
+   - Instead, the UI exposes the missing/corrupt state (e.g. via 'checkIsProfileStaleOrCorrupt'),
+     and the user must explicitly click a Call-to-Action button in the DetailsPanel to manually 
+     approve the token expenditure and heal the cache.
 
-1. HARD REQUIREMENT — AUTO-HEAL (App.tsx: checkIsProfileStaleOrCorrupt):
-   The following conditions trigger an immediate background re-synthesis:
+2. HARD REQUIREMENT — PROFILE MISSING/STALE (App.tsx: checkIsProfileStaleOrCorrupt):
+   The following conditions flag a profile as stale/corrupt for human review:
    - Biography/summary is null, empty, or consists only of whitespace.
    - Summary length is below 100 characters (classified as a "lite" profile).
    - Summary contains placeholder text (e.g., "currently unavailable").
+   - Genre or Origin labels are "Unknown" or missing.
 
-   Trigger mechanism: handleNodeClick detects a stale profile via
-   checkIsProfileStaleOrCorrupt(cachedDetails). If stale, the node is quietly
-   evicted from the local healedNodeIdsRef tracking set and re-queued for
-   synthesis in the background, WITHOUT prompting the user.
-
-   Session Guard (healedNodeIdsRef): A Set<string> tracks node IDs that have
-   already been auto-healed in the current session. A node will not be
-   re-synthesized more than once per session, preventing infinite healing loops.
-
-2. OPPORTUNISTIC ENHANCEMENT — DO NOT AUTO-HEAL:
+3. OPPORTUNISTIC ENHANCEMENT — DO NOT FLAG AS STALE:
    The following conditions are treated as acceptable "lite" states:
    - High-quality biography present (>= 100 chars) but no image URL.
-   - Genre or origin is "Unknown" but bio text is substantive.
-
-   Images are classified as optional enrichment data. The system will NOT
-   trigger re-synthesis solely because an image is absent. This prevents
-   wasteful API calls for content that is functionally complete.
-
-3. ADMIN OVERRIDE:
-   An Admin can bypass the "Do Not Auto-Heal" logic at any time using the
-   "Quick Heal" button. This forces a full re-synthesis, which includes a
-   fresh attempt at image discovery, regardless of current profile quality.
+   Images are classified as optional enrichment data. The system will NOT flag
+   a node for healing solely because an image is absent.
 
 4. SCOPE BOUNDARY:
-   Auto-healing only fires for ARTIST nodes (type === 'artist'). Metadata
-   hub nodes (Genre, Label, Origin, Founded) are never auto-healed.
+   Curated healing only applies for ARTIST and LABEL nodes. Metadata
+   hub nodes (Genre, Origin, Founded) are dynamically rendered and never healed.
 
-5. THE SELF-HEALING LIFECYCLE (MANDATORY CONTRACT):
-   - To prevent legacy data regressions, a strict "schema-first" cache validation model is enforced via the 'validateCacheEntry' and 'validateRootsBreakdown' pattern.
-   - Every cached artist card/document must contain a complete dataset, including the required "Roots Breakdown" structure (Acoustic & Sonics, Scene Context, Overlap Insights).
-   - MANDATORY CONTRACT FOR DATA-LAYER CHANGES: Any new data field introduced to 'NodeDetails' that is required for high-fidelity UI representation must be added to the 'validateCacheEntry' schema-validation gate in 'App.tsx'.
-   - This ensures that legacy or incomplete datasets lacking the new fields are treated as "cache misses" at the front gate and details panel, automatically routing through the standard 'confirmTokenUsage' estimation warning and live Gemini API re-synthesis to heal the cached records to the current schema standards.
+5. THE SELF-HEALING LIFECYCLE (MANDATORY SCHEMA CONTRACT):
+   - A strict "schema-first" cache validation model is enforced via 'validateCacheEntry'.
+   - Every cached multi-seed graph document must contain a 'synthesisRationale' (Roots Breakdown).
+   - SINGLE-SEED EXCEPTION: Single-seed projects inherently have no overlapping roots to synthesize. 
+     They intentionally use a structural fallback string ("[Single-Seed Analysis]...") which is 
+     explicitly permitted by 'validateRootsBreakdown'. This is NOT a broken stub and should 
+     never be flagged for healing.
+   - Any new required UI data fields must be added to 'validateCacheEntry' so legacy records 
+     fail validation and route to the Human Confirmation gate for manual healing.
 
 6. SECONDARY NODE EVICTION LOOP PREVENTION (CRITICAL — validateNodeDetailsContent):
    - Root Cause: The topology-focused 'validateCacheEntry' gate requires graphData, isPrimarySeed,

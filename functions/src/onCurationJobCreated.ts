@@ -76,7 +76,7 @@ function sanitizeUndefinedProperties(obj: any): any {
     const clean: any = {};
     for (const key of Object.keys(obj)) {
       const val = obj[key];
-      if (val !== undefined) {
+      if (val !== undefined && val !== null) {
         clean[key] = sanitizeUndefinedProperties(val);
       }
     }
@@ -210,7 +210,7 @@ export const onCurationJobCreated = onDocumentCreated({
               { id: "Skeleton Node", type: "artist", group: 1 }
             ],
             links: [],
-            synthesisRationale: "Skeleton rationale. Real-time background curation running on backend."
+
           },
           detailsCache: JSON.stringify(mockDetails)
         };
@@ -475,11 +475,11 @@ export const onCurationJobCreated = onDocumentCreated({
             filters: inputPayload.filters || null,
             cacheVersion: 4,
             cachedAt: FieldValue.serverTimestamp(),
-            hitCount: 0,
+
             isDeep: true, // Marked Deep!
             isPrimarySeed: true,
             hasUniqueSpiderweb: !isSeedLabel,
-            synthesisRationale: finalGraph.synthesisRationale || null
+
           });
           
           console.log(`[Curation Backend] Wrote DEEP global cache for seed (${collName}): ${compositeCanonicalId}`);
@@ -498,7 +498,7 @@ export const onCurationJobCreated = onDocumentCreated({
               filters: {},
               cacheVersion: 4,
               cachedAt: FieldValue.serverTimestamp(),
-              hitCount: 0,
+
               redirectTo: compositeCanonicalId
             });
             console.log(`[Curation Backend] Created Bare Alias Pointer in ${collName}: ${seedNorm} -> ${compositeCanonicalId}`);
@@ -584,11 +584,11 @@ export const onCurationJobCreated = onDocumentCreated({
               filters: null, // Note: active filters are not strictly carried for proactive rec entries unless we explicitly want to
               cacheVersion: 4,
               cachedAt: FieldValue.serverTimestamp(),
-              hitCount: 0,
+
               isDeep: true, // Marked Deep!
               isPrimarySeed: false,
               hasUniqueSpiderweb: false,
-              synthesisRationale: null
+
             });
             console.log(`[Curation Backend] Proactively created DEEP entry for recommendation (${collName}): ${compositeCanonicalId}`);
           } else {
@@ -621,7 +621,7 @@ export const onCurationJobCreated = onDocumentCreated({
           if (!bareSnap.exists) {
             barePayload.graphData = isLabel ? null : JSON.stringify({ nodes: [], links: [] });
             barePayload.filters = {};
-            barePayload.hitCount = 0;
+
             await bareArtistIdRef.set(sanitizeUndefinedProperties(barePayload));
             console.log(`[Curation Backend] Created Bare Alias Pointer & detailsCache in ${collName}: ${recNorm} -> ${compositeCanonicalId}`);
           } else {

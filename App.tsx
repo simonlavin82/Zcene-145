@@ -970,9 +970,9 @@ const validateCacheEntry = (data: any, isSingleArtist: boolean = false): CacheVa
       return { isFullyQualified: false, needsPeerBands, needsFutureFields: true };
     }
 
-    // 5. If synthesisRationale exists, validate it
+    // 5. Enforce synthesisRationale presence and validate it
     const rationale = data.synthesisRationale || graph.synthesisRationale;
-    if (rationale && !validateRootsBreakdown(rationale, isSingleArtist)) {
+    if (!rationale || !validateRootsBreakdown(rationale, isSingleArtist)) {
       return { isFullyQualified: false, needsPeerBands, needsFutureFields: true };
     }
 
