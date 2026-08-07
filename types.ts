@@ -126,6 +126,27 @@ export interface ArtistCacheEntry {
   filters?: DiscoveryFilters;
   isDeep?: boolean;
   synthesisRationale?: string;
+  /**
+   * DATASET INTEGRITY LOCK — Staging → Verified Protocol.
+   *
+   * Set by the Cloud Function (onCurationJobCreated) to track the write lifecycle
+   * of every global /artists/{id} and /labels/{id} document:
+   *
+   *   'in_progress' — Staging placeholder. Hydration is running on the Cloud Function.
+   *                   Clients MUST treat this as a cache miss (isCacheDocumentVerified = false).
+   *   'verified'    — Atomic completion seal. All hydration (graphData, detailsCache,
+   *                   YouTube, imageUrl) passed schema validation. Safe to serve globally.
+   *   'failed'      — Seed validation failed. Document is corrupt. Treat as cache miss.
+   *
+   * Legacy documents without this field are trusted as verified for backward compatibility.
+   * The Cloud Function writes 'in_progress' first, then replaces the entire document
+   * atomically with the full payload and 'verified' at the end. No partial state ever
+   * reaches 'verified'. See onCurationJobCreated.ts § INTEGRITY LOCK for implementation.
+   */
+  dataIntegrityStatus?: 'in_progress' | 'verified' | 'failed';
+  /** ISO timestamp of when the in_progress staging lock was acquired. Used by
+   *  isCacheDocumentVerified to detect stale locks from crashed Cloud Functions (>15 min). */
+  integrityLockedAt?: string;
 }
 
 export interface Project {

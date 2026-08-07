@@ -424,17 +424,6 @@ export const onCurationJobCreated = onDocumentCreated({
           const seedDetailsEntry = detailsCacheEntries.find(entry => isEntitySeedMatch(seedNorm, entry[0]));
           const seedDetails = seedDetailsEntry ? seedDetailsEntry[1] : null;
 
-          // Run Sanity Check — non-fatal: log and skip this seed's cache write rather than aborting the entire job
-          try {
-            if (!isSeedLabel) {
-              validateArtistDetailsSchema(seedNorm, seedDetails);
-            } else if (!seedDetails) {
-              console.warn(`[Curation Backend] Seed label cache validation failed for "${seedNorm}" — missing detailsCache, but proceeding to write bare pointer.`);
-            }
-          } catch (validationErr: any) {
-            console.warn(`[Curation Backend] Seed cache validation failed for "${seedNorm}", but proceeding to write: ${validationErr.message}`);
-          }
-
           // Find connected country nodes in finalGraph
           const connectedCountries = (finalGraph.links || [])
             .filter((l: any) => {
@@ -467,23 +456,78 @@ export const onCurationJobCreated = onDocumentCreated({
             finalGraph.synthesisRationale = seedDetails.synthesisRationale;
           }
 
+          // ─── INTEGRITY LOCK § Phase A: Staging Write ─────────────────────────
+          // Before touching any data, check if the document already has a verified
+          // gold-standard record. If so, skip the staging write entirely to protect
+          // existing production data from being clobbered by a re-triggered job.
+          const existingDocSnap = await db.collection(collName).doc(compositeCanonicalId).get();
+          const existingDocData = existingDocSnap.exists ? existingDocSnap.data() : null;
+          const isAlreadyVerified = existingDocData?.dataIntegrityStatus === 'verified' && existingDocData?.isDeep === true;
+
+          if (isAlreadyVerified) {
+            console.log(`[Integrity Lock] Skipping staging write for ${compositeCanonicalId} — already verified gold-standard record. Re-using existing data.`);
+          } else {
+            // Write in_progress staging placeholder so clients treat this doc as a cache miss
+            // while hydration is running. integrityLockedAt enables the 15-minute stale-lock
+            // fallback in the client's isCacheDocumentVerified() helper.
+            await db.collection(collName).doc(compositeCanonicalId).set({
+              cacheKey: compositeCanonicalId,
+              [idFieldKey]: seedNorm,
+              seedArtists: seed,
+              cacheVersion: 4,
+              cachedAt: FieldValue.serverTimestamp(),
+              isDeep: false,
+              dataIntegrityStatus: 'in_progress',
+              integrityLockedAt: new Date().toISOString(),
+            }, { merge: true });
+            console.log(`[Integrity Lock] Wrote in_progress staging placeholder for seed (${collName}): ${compositeCanonicalId}`);
+          }
+
+          // ─── INTEGRITY LOCK § Phase B: Fatal Seed Validation ─────────────────
+          // For primary seeds, schema validation is FATAL. A missing or corrupt
+          // detailsCache means the dataset cannot be sealed as verified. The outer
+          // catch block will mark the job as 'failed' and update the staging doc.
+          // REGRESSION PREVENTION: Do NOT revert this to a non-fatal warning-only
+          // check. Previously, validation failures were swallowed and corrupt seed
+          // docs were written to Firestore as gold-standard, polluting global reads.
+          if (!isSeedLabel) {
+            try {
+              validateArtistDetailsSchema(seedNorm, seedDetails);
+            } catch (validationErr: any) {
+              // Mark the staging doc as failed so clients skip it
+              await db.collection(collName).doc(compositeCanonicalId).update({
+                dataIntegrityStatus: 'failed',
+                errorMessage: `Fatal seed validation: ${validationErr.message}`,
+                updatedAt: FieldValue.serverTimestamp(),
+              }).catch(() => {}); // Best-effort; the job throw below is what matters
+              throw new Error(`[Integrity Lock] Fatal seed schema validation failed for "${seedNorm}": ${validationErr.message}`);
+            }
+          } else if (!seedDetails) {
+            console.warn(`[Curation Backend] Seed label missing detailsCache for "${seedNorm}" — proceeding to write bare pointer only.`);
+          }
+
+          // ─── INTEGRITY LOCK § Phase C: Atomic Verified Final Write ───────────
+          // ALL hydration data has been assembled and validated. Replace the staging
+          // doc in a single atomic set() that simultaneously writes the complete
+          // payload and seals dataIntegrityStatus: 'verified'. No partial state
+          // ever reaches 'verified'. The integrityLockedAt field is intentionally
+          // absent from this write — it only exists on in_progress staging docs.
           await db.collection(collName).doc(compositeCanonicalId).set({
             cacheKey: compositeCanonicalId,
             [idFieldKey]: seedNorm,
             seedArtists: seed,
             graphData: isSeedLabel ? null : JSON.stringify(finalGraph),
-            detailsCache: isSeedLabel ? sanitizeLabelProfile(seedDetails) : sanitizeUndefinedProperties(seedDetails), // Save as structured object!
+            detailsCache: isSeedLabel ? sanitizeLabelProfile(seedDetails) : sanitizeUndefinedProperties(seedDetails),
             filters: inputPayload.filters || null,
             cacheVersion: 4,
             cachedAt: FieldValue.serverTimestamp(),
-
-            isDeep: true, // Marked Deep!
+            isDeep: true,
             isPrimarySeed: true,
             hasUniqueSpiderweb: !isSeedLabel,
-
+            dataIntegrityStatus: 'verified',   // ← COMPLETION SEAL
           });
           
-          console.log(`[Curation Backend] Wrote DEEP global cache for seed (${collName}): ${compositeCanonicalId}`);
+          console.log(`[Integrity Lock] ✅ Atomic verified write complete for seed (${collName}): ${compositeCanonicalId}`);
 
           // Create/Heal Bare Root Alias Pointer
           const bareArtistIdRef = db.collection(collName).doc(seedNorm);
@@ -499,7 +543,6 @@ export const onCurationJobCreated = onDocumentCreated({
               filters: {},
               cacheVersion: 4,
               cachedAt: FieldValue.serverTimestamp(),
-
               redirectTo: compositeCanonicalId
             });
             console.log(`[Curation Backend] Created Bare Alias Pointer in ${collName}: ${seedNorm} -> ${compositeCanonicalId}`);

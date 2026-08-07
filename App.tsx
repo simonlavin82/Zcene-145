@@ -5429,6 +5429,25 @@ const App: React.FC = () => {
       if (job.status === 'completed') {
         setIsLoading(false);
         console.log(`[Curation Reconnect] Job completed. Handled by backend project update.`);
+
+        // CLIENT RECOVERY: If the user reconnected after a mobile drop, the Cloud Function
+        // has already written graphData + detailsCache to the project doc, but the in-memory
+        // detailsCache is empty. Pipe the job result into React memory so Deep Cut panels
+        // hydrate immediately without requiring manual node clicks.
+        if (job.result?.detailsCache) {
+          try {
+            const expandedMap = expandDetailsCacheMap(job.result.detailsCache);
+            setDetailsCache(prev => {
+              const next = new Map(prev);
+              expandedMap.forEach((v, k) => next.set(k, v));
+              return next;
+            });
+            expandedMap.forEach((v, k) => detailsCacheRef.current.set(k, v));
+            console.log(`[Curation Reconnect] Piped ${expandedMap.size} detailsCache entries into memory after reconnect.`);
+          } catch (e) {
+            console.warn('[Curation Reconnect] Failed to parse detailsCache from reconnected job:', e);
+          }
+        }
       } else if (job.status === 'failed') {
         setIsLoading(false);
         setError(job.errorMessage || "Backend curation failed.");
@@ -5452,6 +5471,7 @@ const App: React.FC = () => {
   }, [user, currentProjectId, isFirebaseReady, isGuest, projectStatus, activeJobId]);
 
   // Re-hydration Hook: Synchronize frontend UI state with Firestore project status
+
   useEffect(() => {
     if (!user || !currentProjectId || !isFirebaseReady || isGuest) return;
 

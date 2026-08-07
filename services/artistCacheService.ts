@@ -81,6 +81,54 @@ export const buildCompositeCacheKey = (artistId: string, filters?: DiscoveryFilt
 };
 
 /**
+ * INTEGRITY GATE — Staging → Verified Protocol.
+ *
+ * Returns true only if the cache document is safe to serve as a global gold-standard.
+ *
+ * Rules:
+ *   - 'verified'                   → ✅ trusted.
+ *   - 'in_progress' (< 15 min old) → ❌ cache miss — Cloud Function still running.
+ *   - 'in_progress' (> 15 min old) → ✅ stale lock from crashed CF; treat as legacy trust.
+ *   - 'failed'                     → ❌ cache miss — corrupt document.
+ *   - undefined (legacy doc)        → ✅ trusted for backward compatibility.
+ *
+ * REGRESSION PREVENTION: Every cache-hit branch in this service must call this
+ * function before treating a Firestore document as a valid result. Skipping this
+ * gate allows partially-written staging docs to be served globally.
+ */
+export const isCacheDocumentVerified = (data: Record<string, any>): boolean => {
+  const status: string | undefined = data?.dataIntegrityStatus;
+
+  // Legacy document — no integrity field — trust it for backward compat.
+  if (!status) return true;
+
+  if (status === 'verified') return true;
+
+  if (status === 'failed') {
+    console.warn('[Integrity Gate] Document has dataIntegrityStatus: failed — treating as cache miss.');
+    return false;
+  }
+
+  if (status === 'in_progress') {
+    // Stale-lock fallback: if the Cloud Function crashed > 15 minutes ago, treat as legacy trust.
+    const lockedAt: string | undefined = data?.integrityLockedAt;
+    if (lockedAt) {
+      const lockedMs = Date.parse(lockedAt);
+      const STALE_LOCK_MS = 15 * 60 * 1000; // 15 minutes
+      if (!isNaN(lockedMs) && Date.now() - lockedMs > STALE_LOCK_MS) {
+        console.warn(`[Integrity Gate] Stale in_progress lock (locked at ${lockedAt}) — treating as legacy trust.`);
+        return true;
+      }
+    }
+    console.warn('[Integrity Gate] Document has dataIntegrityStatus: in_progress — treating as cache miss.');
+    return false;
+  }
+
+  // Unknown status value — trust it to avoid blocking future schema extensions.
+  return true;
+};
+
+/**
  * Extracts a clean, normalized country slug from origin strings.
  * e.g. "San Diego, CA, United States" -> "united-states"
  * e.g. "London, England, United Kingdom" -> "united-kingdom"
@@ -499,8 +547,14 @@ export const readArtistCacheMany = async (
           }
         }
         if (snap.exists()) {
+          const rawData = snap.data() as ArtistCacheEntry;
+          // INTEGRITY GATE: skip staging or failed docs — treat as cache miss
+          if (!isCacheDocumentVerified(rawData)) {
+            console.log(`[ArtistCache] INTEGRITY MISS (not verified): ${compositeId}`);
+            return { name, entry: null };
+          }
           console.log(`[ArtistCache] HIT (Resolved): ${compositeId}`);
-          return { name, entry: snap.data() as ArtistCacheEntry };
+          return { name, entry: rawData };
         } else {
           console.log(`[ArtistCache] MISS: ${compositeId}`);
           return { name, entry: null };
@@ -902,6 +956,11 @@ export const readLegacyArtistCache = async (
     const snap = await getDoc(doc(db, collName, cacheKey));
     if (snap.exists()) {
       const data = snap.data();
+      // INTEGRITY GATE: skip staging or failed docs — treat as legacy cache miss
+      if (!isCacheDocumentVerified(data)) {
+        console.log(`[ArtistCache] Legacy INTEGRITY MISS (not verified): ${cacheKey}`);
+        return null;
+      }
       console.log(`[ArtistCache] Legacy HIT: ${cacheKey}`);
       let graphDataStr = data.graphData ?? '{"nodes":[],"links":[]}';
       let detailsCacheStr = data.detailsCache ?? '[]';

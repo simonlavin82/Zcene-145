@@ -673,8 +673,60 @@ To prevent data rot, API failures, and visual rendering regressions, the synthes
 9. LIFECYCLE & STATE RESILIENCY (App.tsx / Dashboard.tsx / firestore.rules):
    - Optimistic Read Race Conditions: Firebase \`onSnapshot\` listeners frequently fire with \`resource == null\` during the microsecond gap before a newly created background job document is fully committed to the server. Firestore security rules MUST use \`(resource == null || resource.data.userId == request.auth.uid)\` for \`allow read\` to prevent ghost "System Anomaly" permission denied errors from disrupting the UI flow.
    - Unified Dashboard Status Heuristics: Dashboard cards cannot rely purely on \`status === 'curating'\` because single-seed syntheses or active AI Validation modals leave the project status as \`null\` while still "mapping." The Grid and List views strictly unify around a \`hasGraphNodes\` heuristic: if a project lacks actual nodes (i.e., its graphData is the skeleton \`{"nodes":[],"links":[]}\`) and hasn't explicitly failed, it is pinned in the pulsing "Mapping..." state.
-   - Clean Feedback Loops: Internal lexical warnings and system-level debug logs are strictly suppressed from user-facing toast notifications unless they represent terminal curation pipeline disruptions.
-   - Multi-Seed Title Preservation: Multi-seed project titles (e.g. "Spaced + Buggin") are explicitly protected from canonical flattening during hydration. \`cleanArtistDisplayName\` immediately bypasses canonical searches if the string contains \`" + "\`, and \`findCanonicalNodeForArtist\` strictly limits prefix fuzzy-matching to a hardcoded array of \`KNOWN_COUNTRY_SLUGS\`. This ensures that composite titles never falsely match partial prefixes (e.g. "Spaced") and overwrite the project name.
+   - Clean Feedback Loops: Internal lexical warnings and system-level debug logs are strictly suppressed from user-facing toast notifications unless they represent terminal curat   - Multi-Seed Title Preservation: Multi-seed project titles (e.g. "Spaced + Buggin") are explicitly protected from canonical flattening during hydration. \`cleanArtistDisplayName\` immediately bypasses canonical searches if the string contains \`" + "\`, and \`findCanonicalNodeForArtist\` strictly limits prefix fuzzy-matching to a hardcoded array of \`KNOWN_COUNTRY_SLUGS\`. This ensures that composite titles never falsely match partial prefixes (e.g. "Spaced") and overwrite the project name.
+
+10. DATASET INTEGRITY LOCK — STAGING → VERIFIED ATOMIC WRITE PROTOCOL
+    [BASELINE: ACTIVE — Do NOT regress this pattern]
+
+    Background: Mobile network drops during the ~3-minute Cloud Function synthesis window
+    previously allowed partially-populated global /artists/{id} and /labels/{id} documents
+    to persist in Firestore and be served globally as gold-standard deep cut datasets.
+    The root cause was the absence of any "in-flight" write guard: documents were written
+    during hydration rather than atomically at completion.
+
+    Implementation (onCurationJobCreated.ts § INTEGRITY LOCK):
+
+    - PHASE A — STAGING WRITE (in_progress):
+      Before any hydration data is committed to a global collection, the Cloud Function
+      writes a minimal staging placeholder with \`dataIntegrityStatus: 'in_progress'\` and
+      \`integrityLockedAt: <ISO timestamp>\`. This staging write is SKIPPED if the document
+      already has \`dataIntegrityStatus === 'verified'\` and \`isDeep === true\`, protecting
+      existing gold-standard records from re-triggered job overwrites.
+
+    - PHASE B — FATAL SEED VALIDATION:
+      \`validateArtistDetailsSchema()\` is FATAL for primary seed entities. A schema failure
+      (missing summary, genre, origin, founded, or discography) immediately:
+        1. Updates the staging doc to \`dataIntegrityStatus: 'failed'\`
+        2. Throws an Error that propagates to the outer catch block
+        3. Marks the entire curation job as \`status: 'failed'\`
+      REGRESSION PREVENTION: Do NOT revert seed validation to a non-fatal warning-only
+      check. The previous pattern silently wrote corrupt seed docs as gold-standard records.
+      Recommendation validation for non-seed entities REMAINS non-fatal (skip + log).
+
+    - PHASE C — ATOMIC VERIFIED FINAL WRITE:
+      After all hydration (graphData, detailsCache, YouTube, imageUrl) assembles and passes
+      validation, a single atomic \`set()\` replaces the staging doc with the complete payload
+      AND seals \`dataIntegrityStatus: 'verified'\`. The \`integrityLockedAt\` field is
+      intentionally absent from this write — it only exists on in_progress staging docs.
+      No partial state ever reaches 'verified'.
+
+    Client Read Gate (artistCacheService.ts — isCacheDocumentVerified()):
+    - \`'verified'\`      → ✅ cache hit (gold standard).
+    - \`'in_progress'\` (< 15 min) → ❌ cache miss — Cloud Function still running.
+    - \`'in_progress'\` (> 15 min) → ✅ stale lock from crashed CF; treated as legacy trust.
+    - \`'failed'\`        → ❌ cache miss — corrupt document, forces live synthesis.
+    - \`undefined\`       → ✅ legacy document without field; trusted for backward compat.
+    Every cache-hit branch in artistCacheService.ts MUST call isCacheDocumentVerified()
+    before treating a Firestore document as a valid result.
+
+    Client Recovery (App.tsx — Curation Reconnect useEffect):
+    When a user's browser reconnects after a mobile drop, the project document's
+    \`status: 'curating'\` + \`activeJobId\` triggers re-attachment of the onSnapshot listener.
+    On job completion, the listener pipes the job's \`result.detailsCache\` into React memory
+    via expandDetailsCacheMap(), ensuring Deep Cut panels hydrate immediately without manual
+    node clic    Schema (types.ts — ArtistCacheEntry):
+    - \`dataIntegrityStatus?: 'in_progress' | 'verified' | 'failed'\`
+    - \`integrityLockedAt?: string\` (ISO timestamp; present only on in_progress staging docs)
 `;
 
 const ARCHITECTURAL_SEPARATION_DOCUMENTATION = `
@@ -706,7 +758,6 @@ To maintain strict data cleanliness and prevent schema bloat across our global d
        sanitizeLabelProfile without being stripped or nullified. Any future changes to sanitizeLabelProfile
        MUST NOT remove imageUrl from the preserved field set.
 `;
-
 
 const DEEP_CUT_INTELLIGENCE_DOCUMENTATION = `
 Zcene's "Curator Insights" use a Variety-First strategy to ensure every 
