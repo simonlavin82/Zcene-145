@@ -57,6 +57,7 @@ To prevent layout computation leaks, trailing dark voids, and mobile padding cli
 `;
 
 const ARCHITECTURE_DOCUMENTATION = `
+[BASELINE V-fe0bd91: STABLE]
 Zcene is built on a modern, serverless full-stack architecture that prioritizes 
 real-time intelligence and global scalability.
 
