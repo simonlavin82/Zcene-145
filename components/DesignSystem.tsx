@@ -270,6 +270,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
     const [demoFocusMode, setDemoFocusMode] = useState<'organic' | 'cluster'>('organic');
     const [demoAdminToggle, setDemoAdminToggle] = useState(false);
     const [demoChatToggle, setDemoChatToggle] = useState<'instant' | 'live'>('instant');
+    const [demoProfileActive, setDemoProfileActive] = useState(false);
     const [demoExpandedRow, setDemoExpandedRow] = useState<string | null>(null);
     const [selectedOnboardingStep, setSelectedOnboardingStep] = useState<string>('step1');
     const containerRef = useRef<HTMLDivElement>(null);
@@ -756,16 +757,16 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <h4 className="text-xs font-semibold text-primary uppercase tracking-widest">Meter Architecture</h4>
                                     <ul className="space-y-4 text-sm text-zinc-400">
                                         <li>
-                                            <span className="text-white font-medium block font-bold">3-Segment Layout</span>
-                                            The meter consists of exactly 3 blocks mapped exclusively to <strong>Genre</strong>, <strong>Origin</strong>, and <strong>Era</strong> from left to right.
+                                            <span className="text-white font-medium block font-bold">Multi-Row Layout</span>
+                                            The meter renders active profiles as a stacked list. Each row contains exactly 4 segment blocks mapped to <strong>Genre</strong>, <strong>Style</strong>, <strong>Origin</strong>, and <strong>Era</strong> from left to right.
                                         </li>
                                         <li>
-                                            <span className="text-white font-medium block font-bold">Static Header Label</span>
-                                            The gauge tracks under a minimal, static tracking uppercase header label: <strong className="text-white">"MY TASTE"</strong>.
+                                            <span className="text-white font-medium block font-bold">Anchored Taxonomy Labels</span>
+                                            The column labels <strong className="text-white">GENRE | STYLE | ORIGIN | ERA</strong> sit grounded beneath the bottom-most active profile row.
                                         </li>
                                         <li>
-                                            <span className="text-white font-medium block font-bold">Deterministic Matching</span>
-                                            Matches are computed dynamically on the client side without AI API overhead, comparing properties directly to active filters.
+                                            <span className="text-white font-medium block font-bold">Tooltip Pattern</span>
+                                            Hovering over segments reveals a minimal tooltip displaying the raw criteria value (e.g., "Hardcore", "2018+"), omitting generic taxonomy prefixes.
                                         </li>
                                     </ul>
                                 </div>
@@ -788,20 +789,50 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                     <div className="pt-4 border-t border-zinc-800/80">
                                         <h5 className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest mb-2">Live Demo Sandbox Reference</h5>
-                                        <div className="flex flex-col gap-1.5 max-w-xs bg-zinc-900 p-3 border border-zinc-800">
-                                            <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">
+                                        <div className="flex flex-col gap-2 max-w-xs bg-zinc-900 p-3 border border-zinc-800">
+                                            <div className="flex items-center justify-between text-[10px] font-medium uppercase tracking-[0.2em] text-zinc-400">
                                                 <span>MY TASTE</span>
-                                                <span className="font-mono text-[#a855f7] font-bold">2/3 Hits</span>
                                             </div>
-                                            <div className="grid grid-cols-3 gap-1.5 w-full">
-                                                <div className="h-2 bg-[#a855f7] border border-[#a855f7]" title="Genre: Matched" />
-                                                <div className="h-2 bg-transparent border border-[#52525b] border-solid" title="Origin: Unmatched" />
-                                                <div className="h-2 bg-[#a855f7] border border-[#a855f7]" title="Era: Matched" />
-                                            </div>
-                                            <div className="flex justify-between text-[8px] font-mono tracking-widest text-zinc-500 uppercase">
-                                                <span className="text-[#a855f7] font-bold">Genre</span>
-                                                <span className="text-zinc-400">Origin</span>
-                                                <span className="text-[#a855f7] font-bold">Era</span>
+                                            <div className="flex flex-col gap-2">
+                                                <div className="flex flex-col gap-1">
+                                                    <div className="flex justify-between items-center text-[10px]">
+                                                        <span className="text-zinc-300 font-medium">Hardcore</span>
+                                                        <span className="font-mono font-bold text-[#10b981]">
+                                                            3/4 Hits
+                                                        </span>
+                                                    </div>
+                                                    <div className="grid grid-cols-4 gap-1.5 w-full relative group">
+                                                        <div className="h-2 bg-[#10b981] border border-[#10b981] transition-all duration-300 relative">
+                                                            {/* Tooltip demo */}
+                                                            <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full mb-1 left-1/2 -translate-x-1/2 w-max max-w-[150px] bg-zinc-800 text-white text-[10px] px-2 py-1 rounded shadow-lg pointer-events-none z-50 text-center truncate">
+                                                                Hardcore
+                                                            </div>
+                                                        </div>
+                                                        <div className="h-2 bg-[#10b981] border border-[#10b981]" />
+                                                        <div className="h-2 bg-transparent border border-[#52525b] border-solid" />
+                                                        <div className="h-2 bg-[#10b981] border border-[#10b981]" />
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-col gap-1">
+                                                    <div className="flex justify-between items-center text-[10px]">
+                                                        <span className="text-zinc-300 font-medium">Soft Rock</span>
+                                                        <span className="font-mono font-bold text-[#f59e0b]">
+                                                            1/4 Hits
+                                                        </span>
+                                                    </div>
+                                                    <div className="grid grid-cols-4 gap-1.5 w-full">
+                                                        <div className="h-2 bg-transparent border border-[#52525b] border-solid" />
+                                                        <div className="h-2 bg-transparent border border-[#52525b] border-solid" />
+                                                        <div className="h-2 bg-transparent border border-[#52525b] border-solid" />
+                                                        <div className="h-2 bg-[#f59e0b] border border-[#f59e0b]" />
+                                                    </div>
+                                                </div>
+                                                <div className="flex justify-between text-[8px] font-mono tracking-widest uppercase select-none text-zinc-500 mt-0">
+                                                    <span>GENRE</span>
+                                                    <span>STYLE</span>
+                                                    <span>ORIGIN</span>
+                                                    <span>ERA</span>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -1613,6 +1644,34 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <li><strong>Typography:</strong> Uses <code>text-[11px] uppercase tracking-wider font-semibold</code> for clarity.</li>
                                             <li><strong>Animation:</strong> Spring-based text slider matching the physics of the main toggles.</li>
                                             <li><strong>Dual Mode:</strong> Specifically designed for the Deep Connections chat to clearly demarcate Free/Local from Paid/Live states.</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-6 mt-12 border-t border-zinc-800/80 pt-12">
+                                <h3 className="text-xl font-medium text-zinc-200">Standard Toggle Switch</h3>
+                                <p className="text-sm text-zinc-400 max-w-2xl leading-relaxed">
+                                    A simple, standard switch used for generic boolean states like the Taste Profile "Active" toggle.
+                                </p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <div className="p-8 bg-zinc-900/40 border border-zinc-800 rounded-xl flex flex-col items-center justify-center min-h-[160px] gap-6">
+                                        <div className="flex flex-col items-end gap-1.5">
+                                            <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Active</label>
+                                            <button 
+                                                onClick={() => setDemoProfileActive(!demoProfileActive)}
+                                                className="w-10 h-5 rounded-full relative transition-colors bg-zinc-800"
+                                            >
+                                                <div className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full transition-transform ${demoProfileActive ? 'translate-x-5 bg-primary' : 'bg-zinc-400'}`} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="p-6 bg-zinc-950 border border-zinc-800 rounded-xl space-y-4 text-xs text-zinc-500 leading-relaxed">
+                                        <h4 className="font-semibold text-zinc-400 uppercase tracking-widest">Specifications</h4>
+                                        <ul className="list-disc list-outside pl-4 space-y-2">
+                                            <li><strong>Track:</strong> Uses <code className="text-zinc-400">bg-zinc-800</code> for a dark, recessed track.</li>
+                                            <li><strong>Handle:</strong> The toggle handle is <code className="text-zinc-400">bg-zinc-400</code> when off, and illuminates to <code className="text-zinc-400">bg-primary</code> (brand yellow) when active.</li>
+                                            <li><strong>Animation:</strong> Uses simple CSS transitions for handle translation and color fading.</li>
                                         </ul>
                                     </div>
                                 </div>
@@ -2598,6 +2657,44 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             </div>
 
                             <div className="pt-8 border-t border-zinc-800">
+                                <h3 className="text-xl font-medium text-zinc-200 mb-4">Tabbed Profile Manager</h3>
+                                <p className="text-sm text-zinc-400 max-w-3xl leading-relaxed mb-8">
+                                    The Taste Profile modal utilizes a horizontal tab bar allowing up to 5 distinct musical contexts to be saved and quickly toggled.
+                                </p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                                    <div className="space-y-4">
+                                        <div className="bg-zinc-950 p-6 rounded-xl border border-zinc-800 flex items-center justify-center min-h-[120px]">
+                                            <div className="bg-zinc-900/50 border border-zinc-800 px-3 py-2 flex flex-wrap items-center gap-1.5 w-full">
+                                                <button className="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-zinc-800 text-white border border-zinc-600">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                                                        Hardcore
+                                                    </div>
+                                                </button>
+                                                <button className="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 border border-transparent">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <div className="w-2 h-2 rounded-full bg-amber-500 opacity-30" />
+                                                        Soft Rock
+                                                    </div>
+                                                </button>
+                                                <button className="px-2 py-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors flex items-center border border-transparent">
+                                                    <span className="material-symbols-outlined !text-[16px]">add</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Specifications</h4>
+                                        <ul className="text-sm text-zinc-400 list-disc list-outside pl-4 space-y-3">
+                                            <li><strong>Tab Layout:</strong> Uses <code className="text-zinc-400">flex-wrap</code> to cleanly wrap up to 5 profile tabs on narrow viewports without clipping.</li>
+                                            <li><strong>Active State:</strong> The selected tab uses a solid <code className="text-zinc-400">bg-zinc-800</code> fill and a subtle <code className="text-zinc-400">border-zinc-600</code>.</li>
+                                            <li><strong>Color Swatches:</strong> Each profile is mapped to a semantic brand color (Purple, Emerald, Amber, Rose, Cyan) indicated by a small <code className="text-zinc-400">w-2 h-2</code> dot next to the name. Inactive profiles fade this dot to <code className="text-zinc-400">opacity-30</code>.</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="pt-8 border-t border-zinc-800 mt-12">
                                 <h3 className="text-xl font-medium text-zinc-200 mb-4">Interactive Candidate Card (Disambiguation Pattern)</h3>
                                 <p className="text-sm text-zinc-400 mb-6 leading-relaxed max-w-3xl">
                                     Used inside search disambiguation dialogs when presenting an instant cache hit or live AI verified entity. Features a refined thin secondary border (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 rounded border border-zinc-800">border border-zinc-700 hover:border-primary/50</code>) that illuminates cleanly on hover, ensuring frictionless hero selection without visual heaviness when multiple candidates are stacked.

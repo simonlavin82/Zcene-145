@@ -71,22 +71,34 @@ const Header: React.FC<HeaderProps> = ({
   const isDashboard = view === 'dashboard';
 
   const [isTasteDialogOpen, setIsTasteDialogOpen] = React.useState(false);
-  const [localTaste, setLocalTaste] = React.useState<UserTaste>({
-    favoriteArtist: '',
-    favoriteGenre: '',
-    favoriteOrigin: '',
-    eraMin: null,
-    eraMax: null
-  });
+  const [localTaste, setLocalTaste] = React.useState<UserTaste>([]);
 
   React.useEffect(() => {
-    if (userTaste) {
+    if (userTaste && Array.isArray(userTaste)) {
       setLocalTaste(userTaste);
     } else {
       try {
         const saved = localStorage.getItem('zcene_user_taste');
         if (saved) {
-          setLocalTaste(JSON.parse(saved));
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            setLocalTaste(parsed);
+          } else if (parsed && typeof parsed === 'object') {
+            // Migration: Transform legacy single object to array
+            const migrated: UserTaste = [{
+              id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
+              name: 'My Taste',
+              color: 'purple',
+              isActive: true,
+              favoriteGenre: parsed.favoriteGenre || '',
+              style: parsed.style || '',
+              favoriteOrigin: parsed.favoriteOrigin || '',
+              eraMin: parsed.eraMin ?? null,
+              eraMax: parsed.eraMax ?? null
+            }];
+            localStorage.setItem('zcene_user_taste', JSON.stringify(migrated));
+            setLocalTaste(migrated);
+          }
         }
       } catch (e) {
         console.error(e);

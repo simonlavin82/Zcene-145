@@ -111,42 +111,83 @@ export const MyStackDialog: React.FC<{
 import { AnimatePresence, motion } from 'framer-motion';
 
 
+const PROFILE_COLORS = [
+  { name: 'purple', class: 'bg-[#a855f7]' },
+  { name: 'emerald', class: 'bg-[#10b981]' },
+  { name: 'amber', class: 'bg-[#f59e0b]' },
+  { name: 'rose', class: 'bg-[#f43f5e]' },
+  { name: 'cyan', class: 'bg-[#06b6d4]' }
+];
+
 export const MyTasteDialog: React.FC<{
   isOpen: boolean;
   onClose: () => void;
   taste?: UserTaste;
   onSave: (taste: UserTaste) => Promise<void>;
 }> = ({ isOpen, onClose, taste, onSave }) => {
-  const [favoriteArtist, setFavoriteArtist] = useState(taste?.favoriteArtist || '');
-  const [favoriteGenre, setFavoriteGenre] = useState(taste?.favoriteGenre || '');
-  const [favoriteOrigin, setFavoriteOrigin] = useState(taste?.favoriteOrigin || '');
-  const [eraMin, setEraMin] = useState<number | null>(taste?.eraMin ?? null);
-  const [eraMax, setEraMax] = useState<number | null>(taste?.eraMax ?? null);
+  const [profiles, setProfiles] = useState<UserTaste>([]);
+  const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   // Sync state if taste changes
   React.useEffect(() => {
     if (isOpen) {
-      setFavoriteArtist(taste?.favoriteArtist || '');
-      setFavoriteGenre(taste?.favoriteGenre || '');
-      setFavoriteOrigin(taste?.favoriteOrigin || '');
-      setEraMin(taste?.eraMin ?? null);
-      setEraMax(taste?.eraMax ?? null);
+      const initialProfiles = taste?.length ? JSON.parse(JSON.stringify(taste)) : [];
+      setProfiles(initialProfiles);
+      if (initialProfiles.length > 0) {
+        setActiveTabId(initialProfiles[0].id);
+      } else {
+        setActiveTabId(null);
+      }
+    } else {
+      setActiveTabId(null);
     }
   }, [isOpen, taste]);
 
   if (!isOpen) return null;
 
+  const activeProfile = profiles.find(p => p.id === activeTabId) || null;
+  const activeProfileIndex = profiles.findIndex(p => p.id === activeTabId);
+
+  const updateProfile = (field: any, value: any) => {
+    if (activeProfileIndex === -1) return;
+    const newProfiles = [...profiles];
+    newProfiles[activeProfileIndex] = { ...newProfiles[activeProfileIndex], [field]: value };
+    setProfiles(newProfiles);
+  };
+
+  const handleAddProfile = () => {
+    if (profiles.length >= 5) return;
+    const newProfile = {
+      id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
+      name: `Profile ${profiles.length + 1}`,
+      color: PROFILE_COLORS[profiles.length % PROFILE_COLORS.length].name,
+      isActive: true,
+      favoriteGenre: '',
+      style: '',
+      favoriteOrigin: '',
+      eraMin: null,
+      eraMax: null
+    };
+    setProfiles([...profiles, newProfile]);
+    setActiveTabId(newProfile.id);
+  };
+
+  const handleDeleteProfile = () => {
+    if (activeProfileIndex === -1) return;
+    const newProfiles = profiles.filter(p => p.id !== activeTabId);
+    setProfiles(newProfiles);
+    if (newProfiles.length > 0) {
+      setActiveTabId(newProfiles[0].id);
+    } else {
+      setActiveTabId(null);
+    }
+  };
+
   const handleSaveClick = async () => {
     setIsSaving(true);
     try {
-      await onSave({
-        favoriteArtist,
-        favoriteGenre,
-        favoriteOrigin,
-        eraMin,
-        eraMax
-      });
+      await onSave(profiles);
       onClose();
     } catch (e) {
       console.error(e);
@@ -155,89 +196,174 @@ export const MyTasteDialog: React.FC<{
     }
   };
 
+  const getColorClass = (colorName: string) => {
+    const colorObj = PROFILE_COLORS.find(c => c.name === colorName);
+    return colorObj ? colorObj.class : 'bg-zinc-500';
+  };
+
   return (
     <div className="fixed inset-0 bg-black/60 z-[120] flex items-center justify-center p-4 animate-fade-in-down pointer-events-auto" style={{ animationDuration: '200ms' }} onClick={onClose}>
       <div className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-hidden animate-fade-in-down" style={{ animationDuration: '200ms' }} onClick={e => e.stopPropagation()}>
         <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Flame size={18} className="text-primary" />
-            <h3 className="text-lg font-medium text-white">My Taste Profile</h3>
+            <h3 className="text-lg font-medium text-white">My Taste Profiles</h3>
           </div>
           <button onClick={onClose} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none">
             <span className="material-symbols-outlined !text-[18px]">close</span>
           </button>
         </header>
 
-        <div className="flex-grow overflow-y-auto p-5 space-y-5">
-          <p className="text-xs text-zinc-400 leading-relaxed">
-            Customize your permanent music taste. Deep Cut cards will display compatibility indicators based on these criteria.
-          </p>
-
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Favourite Artist</label>
-            <input 
-              type="text" 
-              placeholder="e.g. Turnstile"
-              value={favoriteArtist}
-              onChange={(e) => setFavoriteArtist(e.target.value)}
-              className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Favorite Genre</label>
-            <input 
-              type="text" 
-              placeholder="e.g. Hardcore Punk"
-              value={favoriteGenre}
-              onChange={(e) => setFavoriteGenre(e.target.value)}
-              className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Favorite Origin</label>
-            <input 
-              type="text" 
-              placeholder="e.g. Baltimore"
-              value={favoriteOrigin}
-              onChange={(e) => setFavoriteOrigin(e.target.value)}
-              className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Founded Era Range (Years)</label>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <input 
-                  type="number" 
-                  placeholder="Min Year"
-                  value={eraMin ?? ''}
-                  onChange={(e) => setEraMin(e.target.value ? parseInt(e.target.value) : null)}
-                  className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
-                />
+        <div className="bg-zinc-900/50 border-b border-zinc-800 px-3 py-2 flex flex-wrap items-center overflow-x-auto scrollbar-hide gap-1.5">
+          {profiles.map(p => (
+            <button
+              key={p.id}
+              onClick={() => setActiveTabId(p.id)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                activeTabId === p.id 
+                  ? `bg-zinc-800 text-white border border-zinc-600` 
+                  : `text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 border border-transparent`
+              }`}
+            >
+              <div className="flex items-center gap-1.5">
+                <div className={`w-2 h-2 rounded-full ${getColorClass(p.color)} ${!p.isActive ? 'opacity-30' : ''}`} />
+                {p.name}
+                {profiles.length > 1 && activeTabId === p.id && (
+                  <div 
+                    onClick={(e) => { e.stopPropagation(); handleDeleteProfile(); }}
+                    className="flex items-center justify-center rounded-full hover:bg-zinc-700/50 p-0.5 ml-1 transition-colors text-zinc-400 hover:text-white cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined !text-[12px]">close</span>
+                  </div>
+                )}
               </div>
-              <div className="space-y-1">
-                <input 
-                  type="number" 
-                  placeholder="Max Year"
-                  value={eraMax ?? ''}
-                  onChange={(e) => setEraMax(e.target.value ? parseInt(e.target.value) : null)}
-                  className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
-                />
-              </div>
+            </button>
+          ))}
+          {profiles.length < 5 && (
+            <button
+              onClick={handleAddProfile}
+              className="px-2 py-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors flex items-center border border-transparent"
+            >
+              <span className="material-symbols-outlined !text-[16px]">add</span>
+            </button>
+          )}
+        </div>
+
+        <div className="flex-grow overflow-y-auto p-5 space-y-5 h-[400px]">
+          {!activeProfile ? (
+            <div className="flex items-center justify-center h-full text-zinc-500 text-sm">
+              No profiles yet. Click + to create one.
             </div>
-          </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Color Theme</label>
+                  <div className="flex items-center gap-2">
+                    {PROFILE_COLORS.map(color => (
+                      <button
+                        key={color.name}
+                        onClick={() => updateProfile('color', color.name)}
+                        className={`w-4 h-4 rounded-full transition-transform ${color.class} ${activeProfile.color === color.name ? 'ring-2 ring-white ring-offset-2 ring-offset-zinc-900 scale-110' : 'hover:scale-110'}`}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-col items-end gap-1.5">
+                  <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Active</label>
+                  <button 
+                    onClick={() => updateProfile('isActive', !activeProfile.isActive)}
+                    className="w-10 h-5 rounded-full relative transition-colors bg-zinc-800"
+                  >
+                    <div className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full transition-transform ${activeProfile.isActive ? 'translate-x-5 bg-primary' : 'bg-zinc-400'}`} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Profile Name</label>
+                <input 
+                  type="text" 
+                  value={activeProfile.name}
+                  onChange={(e) => updateProfile('name', e.target.value)}
+                  className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
+                />
+              </div>
+              
+              <hr className="border-zinc-800" />
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Genre</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Hardcore Punk"
+                  value={activeProfile.favoriteGenre}
+                  onChange={(e) => updateProfile('favoriteGenre', e.target.value)}
+                  className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Style</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. melodic, post"
+                  value={activeProfile.style}
+                  onChange={(e) => updateProfile('style', e.target.value)}
+                  className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Origin</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Baltimore"
+                  value={activeProfile.favoriteOrigin}
+                  onChange={(e) => updateProfile('favoriteOrigin', e.target.value)}
+                  className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Era Range (Min / Max Year)</label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <input 
+                      type="number" 
+                      placeholder="Min Year"
+                      value={activeProfile.eraMin ?? ''}
+                      onChange={(e) => updateProfile('eraMin', e.target.value ? parseInt(e.target.value) : null)}
+                      className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <input 
+                      type="number" 
+                      placeholder="Max Year"
+                      value={activeProfile.eraMax ?? ''}
+                      onChange={(e) => updateProfile('eraMax', e.target.value ? parseInt(e.target.value) : null)}
+                      className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+                    />
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         <ModalFooter>
-          <button onClick={onClose} disabled={isSaving} className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors disabled:opacity-50">
-            Cancel
-          </button>
-          <button onClick={handleSaveClick} disabled={isSaving} className="px-6 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90 disabled:opacity-50">
-            {isSaving ? 'Saving...' : 'Save'}
-          </button>
+          <div className="flex justify-end items-center w-full">
+            <div className="flex gap-2">
+              <button onClick={onClose} disabled={isSaving} className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors disabled:opacity-50">
+                Cancel
+              </button>
+              <button onClick={handleSaveClick} disabled={isSaving} className="px-6 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90 disabled:opacity-50">
+                {isSaving ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
         </ModalFooter>
       </div>
     </div>

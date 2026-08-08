@@ -488,85 +488,96 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     const isAiSuggestion = isArtistNode && !isSeedArtist;
     const isManualAdd = isArtistNode && isSeedArtist && !isLibraryArtist;
 
-    const tasteCompatibility = useMemo(() => {
-        if (!userTaste || !details) return {
-            hasTasteData: false,
-            totalActive: 0,
-            matches: 0,
-            criteria: [
-                { id: 'genre', name: 'Genre', active: false, matched: false },
-                { id: 'origin', name: 'Origin', active: false, matched: false },
-                { id: 'era', name: 'Era', active: false, matched: false }
-            ]
-        };
+    const activeTasteProfilesData = useMemo(() => {
+        if (!userTaste || !Array.isArray(userTaste) || !details) return [];
 
-        const favGenreActive = !!userTaste.favoriteGenre?.trim();
-        const favOriginActive = !!userTaste.favoriteOrigin?.trim();
-        const eraActive = userTaste.eraMin !== null || userTaste.eraMax !== null;
+        const activeProfiles = userTaste.filter(p => p.isActive);
+        
+        return activeProfiles.map(profile => {
+            const favGenreActive = !!profile.favoriteGenre?.trim();
+            const styleActive = !!profile.style?.trim();
+            const favOriginActive = !!profile.favoriteOrigin?.trim();
+            const eraActive = profile.eraMin !== null || profile.eraMax !== null;
 
-        const hasTasteData = favGenreActive || favOriginActive || eraActive;
+            const hasTasteData = favGenreActive || styleActive || favOriginActive || eraActive;
 
-        let favGenreMatched = false;
-        let favOriginMatched = false;
-        let eraMatched = false;
+            let favGenreMatched = false;
+            let styleMatched = false;
+            let favOriginMatched = false;
+            let eraMatched = false;
 
-        // 1. Match Favorite Genre
-        if (favGenreActive) {
-            const favGenre = userTaste.favoriteGenre.toLowerCase().trim();
-            const genre = (details?.details?.genre || '').toLowerCase().trim();
-            favGenreMatched = !!genre && (genre.includes(favGenre) || favGenre.includes(genre));
-        }
+            // 1. Match Favorite Genre
+            if (favGenreActive) {
+                const favGenre = profile.favoriteGenre.toLowerCase().trim();
+                const genre = (details?.details?.genre || '').toLowerCase().trim();
+                favGenreMatched = !!genre && (genre.includes(favGenre) || favGenre.includes(genre));
+            }
 
-        // 2. Match Favorite Origin
-        if (favOriginActive) {
-            const favOrigin = userTaste.favoriteOrigin.toLowerCase().trim();
-            const origin = (details?.details?.origin || '').toLowerCase().trim();
-            favOriginMatched = !!origin && (origin.includes(favOrigin) || favOrigin.includes(origin));
-        }
+            // 2. Match Style
+            if (styleActive) {
+                const styleKeywords = profile.style.split(/[\s,]+/).filter(k => k.trim().length > 0).map(k => k.toLowerCase().trim());
+                const genre = (details?.details?.genre || '').toLowerCase();
+                const bio = (details?.summary || '').toLowerCase();
+                const deepCutDesc = (details?.recommendationReason || '').toLowerCase();
 
-        // 3. Match Era Range
-        if (eraActive) {
-            const foundedStr = details?.details?.founded || '';
-            if (foundedStr) {
-                const yearMatch = foundedStr.match(/\b(19\d{2}|20\d{2})\b/);
-                let year = yearMatch ? parseInt(yearMatch[0]) : null;
-                
-                if (!year) {
-                    const decadeMatch = foundedStr.match(/\b(\d{2})s\b/);
-                    if (decadeMatch) {
-                        const decVal = parseInt(decadeMatch[1]);
-                        year = decVal >= 50 ? 1900 + decVal : 2000 + decVal;
+                styleMatched = styleKeywords.some(keyword => 
+                    genre.includes(keyword) || bio.includes(keyword) || deepCutDesc.includes(keyword)
+                );
+            }
+
+            // 3. Match Favorite Origin
+            if (favOriginActive) {
+                const favOrigin = profile.favoriteOrigin.toLowerCase().trim();
+                const origin = (details?.details?.origin || '').toLowerCase().trim();
+                favOriginMatched = !!origin && (origin.includes(favOrigin) || favOrigin.includes(origin));
+            }
+
+            // 4. Match Era Range
+            if (eraActive) {
+                const foundedStr = details?.details?.founded || '';
+                if (foundedStr) {
+                    const yearMatch = foundedStr.match(/\b(19\d{2}|20\d{2})\b/);
+                    let year = yearMatch ? parseInt(yearMatch[0]) : null;
+                    
+                    if (!year) {
+                        const decadeMatch = foundedStr.match(/\b(\d{2})s\b/);
+                        if (decadeMatch) {
+                            const decVal = parseInt(decadeMatch[1]);
+                            year = decVal >= 50 ? 1900 + decVal : 2000 + decVal;
+                        }
                     }
-                }
-                
-                if (year) {
-                    let isEraMatch = true;
-                    if (userTaste.eraMin !== null && year < userTaste.eraMin) {
-                        isEraMatch = false;
+                    
+                    if (year) {
+                        let isEraMatch = true;
+                        if (profile.eraMin !== null && year < profile.eraMin) {
+                            isEraMatch = false;
+                        }
+                        if (profile.eraMax !== null && year > profile.eraMax) {
+                            isEraMatch = false;
+                        }
+                        eraMatched = isEraMatch;
                     }
-                    if (userTaste.eraMax !== null && year > userTaste.eraMax) {
-                        isEraMatch = false;
-                    }
-                    eraMatched = isEraMatch;
                 }
             }
-        }
 
-        const criteria = [
-            { id: 'genre', name: 'Genre', active: favGenreActive, matched: favGenreMatched },
-            { id: 'origin', name: 'Origin', active: favOriginActive, matched: favOriginMatched },
-            { id: 'era', name: 'Era', active: eraActive, matched: eraMatched }
-        ];
+            const criteria = [
+                { id: 'genre', name: 'Genre', active: favGenreActive, matched: favGenreMatched, value: profile.favoriteGenre },
+                { id: 'style', name: 'Style', active: styleActive, matched: styleMatched, value: profile.style },
+                { id: 'origin', name: 'Origin', active: favOriginActive, matched: favOriginMatched, value: profile.favoriteOrigin },
+                { id: 'era', name: 'Era', active: eraActive, matched: eraMatched, value: (profile.eraMin !== null && profile.eraMax !== null) ? `${profile.eraMin} - ${profile.eraMax}` : (profile.eraMin !== null ? `${profile.eraMin}+` : (profile.eraMax !== null ? `Until ${profile.eraMax}` : '')) }
+            ];
 
-        const totalActive = (favGenreActive ? 1 : 0) + (favOriginActive ? 1 : 0) + (eraActive ? 1 : 0);
-        const matches = (favGenreMatched ? 1 : 0) + (favOriginMatched ? 1 : 0) + (eraMatched ? 1 : 0);
+            const totalActive = (favGenreActive ? 1 : 0) + (styleActive ? 1 : 0) + (favOriginActive ? 1 : 0) + (eraActive ? 1 : 0);
+            const matches = (favGenreMatched ? 1 : 0) + (styleMatched ? 1 : 0) + (favOriginMatched ? 1 : 0) + (eraMatched ? 1 : 0);
 
-        return {
-            hasTasteData,
-            totalActive,
-            matches,
-            criteria
-        };
+            return {
+                profile,
+                hasTasteData,
+                totalActive,
+                matches,
+                criteria
+            };
+        });
     }, [userTaste, details, node.id, node.label]);
 
 
@@ -855,55 +866,82 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                         <div className={`space-y-10 text-zinc-300 ${isFullScreenMode ? 'pb-6' : 'pb-16'}`}>
                             {/* Compatibility Meter (Hidden for Labels) */}
                             {!isLabelNode && (
-                                <div className="flex flex-col gap-1.5 w-full">
+                                <div className="flex flex-col gap-2 w-full">
                                     <div className="flex items-center justify-between text-[10px] font-medium uppercase tracking-[0.2em] text-zinc-400">
                                         <span>MY TASTE</span>
-                                        {tasteCompatibility.hasTasteData ? (
-                                            <span className="font-mono text-[#a855f7] font-bold">
-                                                {tasteCompatibility.matches}/{tasteCompatibility.totalActive} Hits
-                                            </span>
-                                        ) : (
+                                        {activeTasteProfilesData.length === 0 && (
                                             <span className="text-zinc-500 normal-case font-medium">Empty Taste Profile</span>
                                         )}
                                     </div>
-                                    <div className="grid grid-cols-3 gap-1.5 w-full">
-                                        {tasteCompatibility.criteria.map((c) => {
-                                            let bgClass = '';
-                                            let borderClass = '';
-                                            if (c.active) {
-                                                if (c.matched) {
-                                                    bgClass = 'bg-[#a855f7]';
-                                                    borderClass = 'border-[#a855f7]';
-                                                } else {
-                                                    bgClass = 'bg-transparent';
-                                                    borderClass = 'border-[#52525b] border-solid';
-                                                }
-                                            } else {
-                                                bgClass = 'bg-transparent';
-                                                borderClass = 'border-[#52525b] border-dashed';
-                                            }
-                                            return (
-                                                <div 
-                                                    key={c.id} 
-                                                    className={`h-2 border transition-all duration-300 ${bgClass} ${borderClass}`}
-                                                    title={`${c.name}: ${c.active ? (c.matched ? 'Matched' : 'Unmatched') : 'Not Configured'}`}
-                                                />
-                                            );
-                                        })}
-                                    </div>
-                                    <div className="flex justify-between text-[8px] font-mono tracking-widest text-zinc-500 uppercase select-none">
-                                        {tasteCompatibility.criteria.map((c) => {
-                                            let textClass = 'text-zinc-600';
-                                            if (c.active) {
-                                                textClass = c.matched ? 'text-[#a855f7] font-bold' : 'text-zinc-400';
-                                            }
-                                            return (
-                                                <span key={c.id} className={textClass}>
-                                                    {c.name}
-                                                </span>
-                                            );
-                                        })}
-                                    </div>
+                                    {activeTasteProfilesData.length > 0 && (
+                                        <div className="flex flex-col gap-2">
+
+                                            {activeTasteProfilesData.map((data) => {
+                                                const hexMap: Record<string, string> = {
+                                                    purple: '#a855f7',
+                                                    emerald: '#10b981',
+                                                    amber: '#f59e0b',
+                                                    rose: '#f43f5e',
+                                                    cyan: '#06b6d4'
+                                                };
+                                                const colorHex = hexMap[data.profile.color] || '#a855f7';
+
+                                                return (
+                                                    <div key={data.profile.id} className="flex flex-col gap-1">
+                                                        <div className="flex justify-between items-center text-[10px]">
+                                                            <span className="text-zinc-300 font-medium">{data.profile.name}</span>
+                                                            <span className="font-mono font-bold" style={{ color: colorHex }}>
+                                                                {data.matches}/{data.totalActive} Hits
+                                                            </span>
+                                                        </div>
+                                                        <div className="grid grid-cols-4 gap-1.5 w-full relative group">
+                                                            {data.criteria.map((c) => {
+                                                                const isActive = c.active;
+                                                                const isMatched = c.matched;
+                                                                let bgStyle = {};
+                                                                let borderStyle = {};
+                                                                
+                                                                if (isActive) {
+                                                                    if (isMatched) {
+                                                                        bgStyle = { backgroundColor: colorHex };
+                                                                        borderStyle = { borderColor: colorHex, borderStyle: 'solid' };
+                                                                    } else {
+                                                                        bgStyle = { backgroundColor: 'transparent' };
+                                                                        borderStyle = { borderColor: '#52525b', borderStyle: 'solid' };
+                                                                    }
+                                                                } else {
+                                                                    bgStyle = { backgroundColor: 'transparent' };
+                                                                    borderStyle = { borderColor: '#52525b', borderStyle: 'dashed' };
+                                                                }
+
+                                                                return (
+                                                                    <div 
+                                                                        key={c.id} 
+                                                                        className="h-2 border transition-all duration-300 relative"
+                                                                        style={{ ...bgStyle, ...borderStyle }}
+                                                                    >
+                                                                        {/* Tooltip on hover/tap */}
+                                                                        {isActive && c.value && (
+                                                                            <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full mb-1 left-1/2 -translate-x-1/2 w-max max-w-[150px] bg-zinc-800 text-white text-[10px] px-2 py-1 rounded shadow-lg pointer-events-none z-50 text-center truncate">
+                                                                                {c.value}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                            {/* Single Master Header for Sub-labels */}
+                                            <div className="flex justify-between text-[8px] font-mono tracking-widest uppercase select-none text-zinc-500 mt-0">
+                                                <span>GENRE</span>
+                                                <span>STYLE</span>
+                                                <span>ORIGIN</span>
+                                                <span>ERA</span>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 

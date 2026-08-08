@@ -187,13 +187,19 @@ export interface DiscoveryFilters {
   additionalInstructions?: string;
 }
 
-export interface UserTaste {
-  favoriteArtist: string;
+export interface TasteProfile {
+  id: string;
+  name: string;
+  color: string;
+  isActive: boolean;
   favoriteGenre: string;
+  style: string;
   favoriteOrigin: string;
   eraMin: number | null;
   eraMax: number | null;
 }
+
+export type UserTaste = TasteProfile[];
 
 export const COST_PER_AI_CALL = 0.0015;
 

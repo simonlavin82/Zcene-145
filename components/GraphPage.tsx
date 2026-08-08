@@ -146,22 +146,42 @@ const DiscoveryFiltersPanel: React.FC<{
     onUpdate({ ...filters, [field]: value });
   };
 
-  const hasTasteData = !!userTaste && !!(
-    userTaste.favoriteArtist?.trim() ||
-    userTaste.favoriteGenre?.trim() ||
-    userTaste.favoriteOrigin?.trim() ||
-    userTaste.eraMin !== null ||
-    userTaste.eraMax !== null
+  const activeProfiles = Array.isArray(userTaste) ? userTaste.filter(p => p.isActive) : [];
+  const hasTasteData = activeProfiles.length > 0 && activeProfiles.some(p => 
+    p.style?.trim() ||
+    p.favoriteGenre?.trim() ||
+    p.favoriteOrigin?.trim() ||
+    p.eraMin !== null ||
+    p.eraMax !== null
   );
 
   const handleApplyTaste = () => {
-    if (!userTaste) return;
+    if (!userTaste || !Array.isArray(userTaste)) return;
+    const active = userTaste.filter(p => p.isActive);
+    if (active.length === 0) return;
+
+    let minEra: number | undefined = undefined;
+    let maxEra: number | undefined = undefined;
+    const genres = new Set<string>();
+    const origins = new Set<string>();
+
+    active.forEach(p => {
+      if (p.eraMin !== null) {
+        minEra = minEra === undefined ? p.eraMin : Math.min(minEra, p.eraMin);
+      }
+      if (p.eraMax !== null) {
+        maxEra = maxEra === undefined ? p.eraMax : Math.max(maxEra, p.eraMax);
+      }
+      if (p.favoriteGenre?.trim()) genres.add(p.favoriteGenre.trim());
+      if (p.favoriteOrigin?.trim()) origins.add(p.favoriteOrigin.trim());
+    });
+
     onUpdate({
       ...filters,
-      foundedAfter: userTaste.eraMin ?? undefined,
-      foundedBefore: userTaste.eraMax ?? undefined,
-      includeGenres: userTaste.favoriteGenre?.trim() ? [userTaste.favoriteGenre.trim()] : undefined,
-      includeOrigins: userTaste.favoriteOrigin?.trim() ? [userTaste.favoriteOrigin.trim()] : undefined,
+      foundedAfter: minEra,
+      foundedBefore: maxEra,
+      includeGenres: genres.size > 0 ? Array.from(genres) : undefined,
+      includeOrigins: origins.size > 0 ? Array.from(origins) : undefined,
     });
   };
 
@@ -195,7 +215,7 @@ const DiscoveryFiltersPanel: React.FC<{
               onClick={handleApplyTaste}
               className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 active:scale-95 transition-all text-xs font-medium leading-none cursor-pointer"
             >
-              Apply my taste
+              Apply My Taste
             </button>
           )}
           <div className="space-y-1.5">
