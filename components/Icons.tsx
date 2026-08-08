@@ -180,10 +180,10 @@ export const SortControls: React.FC<SortControlsProps> = ({ sortConfig, onSortCh
                 <button
                     key={btn.key}
                     onClick={() => onSortChange(btn.key)}
-                    className={`flex items-center gap-1 text-sm px-4 py-2 rounded-xl transition-colors ${isActive ? 'bg-zinc-300 text-brand-black font-medium' : 'bg-zinc-700/80 text-zinc-300 hover:bg-zinc-700'}`}
+                    className={`flex items-center gap-1 text-xs px-4 py-1 rounded-full font-medium transition-colors ${isActive ? 'border border-zinc-400 bg-zinc-200 text-brand-black' : 'border border-zinc-600 text-zinc-300 bg-transparent hover:border-zinc-500 hover:text-white hover:bg-zinc-800'}`}
                 >
                     <span>{btn.label}</span>
-                    {isActive && <span className="material-symbols-outlined !text-[18px]">{icon}</span>}
+                    {isActive && <span className="material-symbols-outlined !text-[14px]">{icon}</span>}
                 </button>
             );
         })}

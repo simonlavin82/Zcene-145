@@ -12,7 +12,7 @@ import { analyticsService } from '../services/analyticsService';
 import AdSenseUnit from './AdSenseUnit';
 import OnboardingTooltip from './OnboardingTooltip';
 import * as d3 from 'd3';
-import { RootsBreakdownButton } from './DesignSystem';
+import { RootsBreakdownButton, Select, InputSizes } from './DesignSystem';
 
 // Inform TypeScript about the SpeechRecognition and WakeLock APIs
 declare global {
@@ -438,30 +438,31 @@ const LibraryDialog: React.FC<{
 
             <div className="p-4 flex-shrink-0 border-b border-zinc-700 space-y-3">
                 <div className="relative">
+                    <span className={`material-symbols-outlined absolute top-1/2 -translate-y-1/2 text-zinc-500 ${InputSizes.md.leftIcon}`}>search</span>
                     <input
                         type="search"
                         placeholder="Search your library..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 text-sm px-4 pr-24 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none font-normal"
+                        className={`w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none font-normal ${InputSizes.md.magazineSearch}`}
                     />
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                    <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
                         {!searchTerm && (
                             <button
                                 onClick={handleSpeechToText}
-                                className={`w-10 h-10 flex flex-shrink-0 items-center justify-center rounded-xl transition-colors leading-none ${isListening ? 'text-primary animate-pulse' : 'text-zinc-400 hover:text-white'}`}
+                                className={`flex flex-shrink-0 items-center justify-center transition-colors leading-none ${InputSizes.md.iconBtn} ${isListening ? 'text-primary animate-pulse' : 'text-zinc-400 hover:text-white'}`}
                                 title="Search by voice"
                             >
-                                <MicIcon className="!text-[18px]" />
+                                <MicIcon className={InputSizes.md.icon} />
                             </button>
                         )}
                         {searchTerm && (
                             <button 
                                 onClick={() => setSearchTerm('')} 
-                                className="w-10 h-10 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white transition-colors leading-none" 
+                                className={`flex items-center justify-center text-zinc-400 hover:text-white transition-colors leading-none ${InputSizes.md.iconBtn}`}
                                 aria-label="Clear search"
                             >
-                                <span className="material-symbols-outlined !text-[18px]">close</span>
+                                <span className={`material-symbols-outlined ${InputSizes.md.icon}`}>close</span>
                             </button>
                         )}
                     </div>
@@ -469,12 +470,12 @@ const LibraryDialog: React.FC<{
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <SortControls sortConfig={sortConfig} onSortChange={handleSortChange} />
                     <div className="relative w-full sm:w-56">
-                        <button onClick={() => setSearchSectionVisible(!isGenreSectionVisible)} className="w-full flex items-center justify-between text-left text-sm font-medium text-zinc-300 py-3 sm:py-2 px-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl" aria-expanded={isGenreSectionVisible}>
+                        <button onClick={() => setSearchSectionVisible(!isGenreSectionVisible)} className="w-full flex items-center justify-between text-left text-sm font-medium text-zinc-300 py-2 px-3 bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 rounded-xl transition-colors" aria-expanded={isGenreSectionVisible}>
                             <span>Filter by Genre {selectedGenres.length > 0 && `(${selectedGenres.length})`}</span>
                             <span className="material-symbols-outlined transition-transform duration-200" style={{ transform: isGenreSectionVisible ? 'rotate(180deg)' : '' }}>expand_more</span>
                         </button>
                         {isGenreSectionVisible && (
-                            <div className="absolute top-full right-0 mt-1 w-full sm:w-64 bg-zinc-900 border border-zinc-700 rounded-none shadow-lg z-10 p-2">
+                            <div className="absolute top-full right-0 mt-1 w-full sm:w-64 bg-zinc-900 border border-zinc-700 rounded-xl shadow-lg z-10 p-2">
                                 <div className="flex justify-end items-center px-1 mb-1">
                                     <button onClick={() => setSelectedGenres([])} className="text-xs font-medium text-zinc-400 transition-colors hover:text-primary hover:underline">Clear</button>
                                 </div>
@@ -514,7 +515,10 @@ const LibraryDialog: React.FC<{
             </div>
 
             <footer className="p-4 bg-zinc-900 flex-shrink-0 border-t border-zinc-700 flex justify-between items-center">
-                <button onClick={onTriggerClear} className="rounded-xl border border-zinc-600 bg-transparent px-6 py-2 text-sm font-medium text-zinc-300 hover:bg-zinc-800 transition-colors">Clear Library</button>
+                <button onClick={onTriggerClear} className="flex items-center gap-2 rounded-xl border border-red-500/50 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/20 transition-colors">
+                    <span className="material-symbols-outlined !text-[18px]">delete_sweep</span>
+                    Clear Library
+                </button>
                 <button onClick={onClose} className="rounded-xl bg-primary px-6 py-2 text-sm font-medium text-brand-black transition-opacity hover:opacity-90">Done</button>
             </footer>
         </div>
