@@ -202,6 +202,12 @@ the entire dataset, the app evolves existing visual structures.
      represent untyped deep cuts) are treated as artists and hydrated via /artists/{id}.
      This universal filter is the authoritative safeguard against the legacy regression
      where untyped deep cuts were silently skipped during background hydration.
+   - Strict Entity Disambiguation & Contextual Grounding: Node details fetches (fetchNodeDetails) strictly 
+     incorporate the original seed artists (Ecosystem Anchors) and strongly-typed context edges (e.g., Genres, 
+     Labels, connected Artists) directly into the LLM prompt. This forces the model to execute highly specific 
+     Google searches (e.g., factoring in the hardcore punk scene or New York origin), completely eliminating 
+     historical homonym collisions where obscure local bands were previously conflated with identically-named 
+     legacy acts from different eras and genres.
    - Orphaned Link Mitigation (geminiService.ts): Filters the AI response to 
      ensure every link's 'source' and 'target' corresponds to a validated node ID.
    - Client detailsCache callback: The client subscribes to job updates, immediately 
