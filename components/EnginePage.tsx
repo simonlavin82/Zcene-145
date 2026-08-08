@@ -724,7 +724,9 @@ To prevent data rot, API failures, and visual rendering regressions, the synthes
     \`status: 'curating'\` + \`activeJobId\` triggers re-attachment of the onSnapshot listener.
     On job completion, the listener pipes the job's \`result.detailsCache\` into React memory
     via expandDetailsCacheMap(), ensuring Deep Cut panels hydrate immediately without manual
-    node clic    Schema (types.ts — ArtistCacheEntry):
+    node clicks. This mirrors the behavior of the initial dispatch path exactly.
+
+    Schema (types.ts — ArtistCacheEntry):
     - \`dataIntegrityStatus?: 'in_progress' | 'verified' | 'failed'\`
     - \`integrityLockedAt?: string\` (ISO timestamp; present only on in_progress staging docs)
 `;
