@@ -417,6 +417,12 @@ the entire dataset, the app evolves existing visual structures.
     - SharedModals.tsx previously contained inline, unstandardized HTML for modals that drifted from our design spec.
     - Fix: We extracted the mandatory dialog primitives into components/ui/Dialog.tsx (ModalBackdrop, ModalContainer, ModalHeader, ModalBody, ModalFooter).
     - Rule: All future modals must strictly import and compose these primitives to maintain the rigid 0px border-radius, background darkness, and animate-fade-in-down timing, acting as the Single Source of Truth.
+
+17. LIBRARY IMPORT & GRAPH PERSISTENCE:
+    - Library Upload parsing strictly supports Apple Music XML and raw CSV formats natively in the browser without backend preprocessing.
+    - Graph Synthesis: During parsing, the engine dynamically constructs a secondary 'libraryBaseGraph' by creating nodes for the imported artist, their extracted genres, and linking them together. This ensures native spiderweb metadata (like 'acoustic-punk' genres) is preserved directly from the user's iTunes database.
+    - Sanitization: XML genre fields containing multiple comma-separated or slash-separated values are split into individual genre nodes, while discarding pure numeric metadata anomalies.
+    - Persistent Storage: Upon successful import, both the raw 'libraryArtists' array and the compiled 'libraryBaseGraph' are stringified and written to the authenticated user's root document in Firestore. This guarantees that multi-genre filtering capabilities inside the Library Modal persist safely across browser reloads.
 `;
 
 

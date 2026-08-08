@@ -2675,6 +2675,30 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             </div>
                                         </div>
                                     </div>
+
+                                    <h3 className="text-xl font-medium text-zinc-200 mt-12 mb-6">Multi-Select Filter Dropdown</h3>
+                                    <div className="bg-zinc-950 p-8 rounded-xl border border-zinc-800 flex justify-center">
+                                        <div className="w-56 rounded-xl border border-zinc-700 bg-zinc-950 shadow-2xl flex flex-col relative z-20">
+                                            <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800 rounded-t-xl">
+                                                <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Filter by Genre</span>
+                                                <button className="text-[10px] font-semibold text-zinc-400 hover:text-primary transition-colors uppercase tracking-widest">Clear</button>
+                                            </div>
+                                            <div className="max-h-52 overflow-y-auto p-1.5 space-y-0.5 rounded-b-xl bg-zinc-950">
+                                                <label className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors hover:bg-zinc-800/80">
+                                                    <span className="material-symbols-outlined !text-[16px] flex-shrink-0 transition-colors text-zinc-600">check_box_outline_blank</span>
+                                                    <span className="text-xs select-none truncate text-zinc-300">acoustic</span>
+                                                </label>
+                                                <label className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors bg-primary/10">
+                                                    <span className="material-symbols-outlined !text-[16px] flex-shrink-0 transition-colors text-primary">check_box</span>
+                                                    <span className="text-xs select-none truncate text-white font-medium">emo</span>
+                                                </label>
+                                                <label className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors hover:bg-zinc-800/80">
+                                                    <span className="material-symbols-outlined !text-[16px] flex-shrink-0 transition-colors text-zinc-600">check_box_outline_blank</span>
+                                                    <span className="text-xs select-none truncate text-zinc-300">punk</span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div className="space-y-6">
                                     <h3 className="text-xl font-medium text-zinc-200">Design Guidelines</h3>
@@ -2702,6 +2726,14 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Sign-In Action CTA</h4>
                                             <p className="text-sm text-zinc-400">Unauthenticated dropdowns feature a prominent primary CTA button (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">bg-primary text-black rounded-xl px-4 py-2 text-xs font-semibold</code>) to bridge guest journeys immediately.</p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Multi-Select Filtering</h4>
+                                            <p className="text-sm text-zinc-400">Use <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">bg-primary/10</code> and <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">text-primary</code> for checked states to provide clear visual feedback without overwhelming the dark theme.</p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Stacking Context & Rendering</h4>
+                                            <p className="text-sm text-zinc-400">To prevent WebKit GPU clipping bugs, <strong>never use <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">overflow-hidden</code> on an absolute container</strong> that holds a nested scrollable element. Instead, apply <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">rounded-t-xl</code> and <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">rounded-b-xl</code> explicitly to the top and bottom inner children. Always wrap the trigger in <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">relative z-10</code> to elevate the stacking context safely above adjacent flex/scroll layers.</p>
                                         </div>
                                     </div>
                                 </div>
