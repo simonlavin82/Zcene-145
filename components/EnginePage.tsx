@@ -560,6 +560,12 @@ for transient API errors on the client.
     - Client-Side Sparse Queue Fallback: To support legacy or cached projects where the database's \`activeNodes\` array was hardcoded or sparse (e.g., length <= 1), the loader gracefully falls back to injecting all discovered graph artists, ensuring the Deep Cut panel always opens fully populated without requiring manual user clicks on the spiderweb.
     - Continuous Session Sync: Auto-queueing strictly runs as a one-time initialization event. During the active session, the \`activeNodeIds\` queue safely mutates in isolation, respecting the user's manual curation (such as deleting or prioritizing nodes) without disruptive background overwrites.
     - Regression Prevention (The "Why"): Previously, cached projects loaded with empty queues, forcing users to manually click every node to re-hydrate the Deep Cut panel. This frontend fallback ensures legacy databases hydrate gracefully, while continuous session sync prevents auto-population from overwriting deliberate user deletions during an active session.
+
+11. FLAME TO TASTE EXTRACTION ENGINE (DetailsPanel.tsx):
+    - Zero-Shot Client Parsing: The Deep Cut utility bar includes a "Flame" button that deterministically extracts Taste Profile criteria from existing hydrated node metadata entirely on the client-side, avoiding any LLM overhead.
+    - Genre & Style Precision: The engine maps the primary genre from \`genreArray[0]\`. To prevent verbose, comma-stacked style lists, it strictly isolates the second tag (\`genreArray[1]\`) as the profile Style. If only one tag exists, it executes a targeted regex keyword scan (e.g., "progressive", "melodic", "heavy") across the artist's summary text to intelligently assign a single descriptive fallback Style.
+    - Origin Sanitization: A cleanup regex strictly strips generic trailing country suffixes (e.g., ", USA", ", UK") from the extracted location string to enforce clean, focused origins.
+    - 5-Profile Limit Guard: Upon hitting the 5-profile ceiling, the system suppresses silent data overwrites, throws a Toast notification, and immediately auto-opens the Taste Manager modal to prompt the user to curate their existing profiles.
 `;
 
 const SHARING_FLOW_DOCUMENTATION = `

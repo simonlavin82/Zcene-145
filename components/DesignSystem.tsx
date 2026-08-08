@@ -1460,6 +1460,38 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 </div>
                             </div>
 
+                            {/* Deep Cut Utility Action Icons */}
+                            <div>
+                                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
+                                    <h3 className="text-xl font-medium text-zinc-200">Deep Cut Utility Action Icons</h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Radius: 12px / rounded-xl</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Size: 32x32px (w-8 h-8)</span>
+                                    </div>
+                                </div>
+                                <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
+                                    Square icon buttons used in the Deep Cut header for primary utility actions like Add to Taste, Explore, and Remove. They feature a distinct standard hover state.
+                                </p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
+                                    <div className="space-y-4">
+                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Default Status</p>
+                                        <div className="flex gap-2">
+                                            <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl leading-none text-zinc-400">
+                                                <span className="lucide lucide-flame w-[18px] h-[18px]" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover Status</p>
+                                        <div className="flex gap-2">
+                                            <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-700 rounded-xl leading-none text-white bg-zinc-800 transition-colors">
+                                                <span className="lucide lucide-flame w-[18px] h-[18px]" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             {/* Icon Buttons */}
                             <div className="space-y-8">
                                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-800 pb-4">

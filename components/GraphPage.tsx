@@ -1678,6 +1678,9 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                         user={user}
                                         onAuthRequest={() => { user ? onSaveToDashboard?.() : onLogin(); }}
                                         userTaste={profile?.taste}
+                                        onUpdateTasteProfile={async (taste) => { await onUpdateProfile({ taste }); }}
+                                        onShowToast={onShowToast}
+                                        onOpenTasteModal={() => setIsProfileOpen(true)}
                                     />
                                 </div>
                             </div>
@@ -1792,6 +1795,9 @@ const GraphPage: React.FC<GraphPageProps> = ({
                          user={user}
                          onAuthRequest={() => { user ? onSaveToDashboard?.() : onLogin(); }}
                          userTaste={profile?.taste}
+                         onUpdateTasteProfile={async (taste) => { await onUpdateProfile({ taste }); }}
+                         onShowToast={onShowToast}
+                         onOpenTasteModal={() => setIsProfileOpen(true)}
                        />
                 </aside>
             </main>

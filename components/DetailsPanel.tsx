@@ -1,17 +1,18 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import Markdown from 'react-markdown';
-import { Node, NodeDetails, GraphData, View, ChatMessage, StackItem, UserTaste, COST_PER_AI_CALL } from '../types';
+import { Node, NodeDetails, GraphData, View, ChatMessage, StackItem, UserTaste, TasteProfile, COST_PER_AI_CALL } from '../types';
 import { streamNodeChat, fetchLiveTourData, streamLocalHeuristicChat } from '../services/geminiService';
 import { normalizeArtistId, titleCaseArtistId, cleanArtistDisplayName, isNodeInSeedList, getArtistDocWithRedirect, enforceArtistCacheSchema } from '../services/artistCacheService';
 import { analyticsService } from '../services/analyticsService';
 import { Spinner, HelpIcon, MicIcon, LoadingSpinner, DETAIL_THINKING_STEPS, StackIcon } from './Icons';
-import { TokenConfirmationDialog, FullItineraryDialog } from './SharedModals';
+import { TokenConfirmationDialog, FullItineraryDialog, PROFILE_COLORS } from './SharedModals';
 import { SegmentedTextToggle } from './ui/SegmentedTextToggle';
 import { db } from '../services/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import { formatSystemTimestamp } from '../utils/formatters';
 import { Select, InputSizes } from './DesignSystem';
+import { Flame } from 'lucide-react';
 const SENTINEL_INSIGHT = 'No insight provided.';
 
 export const getArtistDisplayName = (details: any, node: any): string => {
@@ -246,6 +247,9 @@ interface NodeDetailsCardProps {
   onAuthRequest?: () => void;
   userTaste?: UserTaste;
   isAdmin?: boolean;
+  onUpdateTasteProfile?: (taste: UserTaste) => Promise<void>;
+  onShowToast?: (message: string) => void;
+  onOpenTasteModal?: () => void;
 }
 
 const parseTourDates = (text: string): { isTouring: boolean; dates: string[] } => {
@@ -292,8 +296,69 @@ const isTourCacheStale = (tourCachedAtString: string | undefined): boolean => {
 export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
   node, details, isLoading, isGlobalLoading, graphData, libraryArtists, seedArtists, onAddArtist, isSmallScreen, 
   onRefresh, onClose, onNodeClick, onGenerateDeepCut, onExtendNode, onNavigate, 
-  chatHistory, onSendMessage, isChatLoading, chatMode, onChatModeChange, liveMessageCount, onDeleteMessage, onClearChat, isFullScreenMode = false, isHero = false, isInStack, onToggleStack, onToggleMagazineView, isGuest = false, onAuthRequest, user, userTaste, isAdmin = false
+  chatHistory, onSendMessage, isChatLoading, chatMode, onChatModeChange, liveMessageCount, onDeleteMessage, onClearChat, isFullScreenMode = false, isHero = false, isInStack, onToggleStack, onToggleMagazineView, isGuest = false, onAuthRequest, user, userTaste, isAdmin = false,
+  onUpdateTasteProfile, onShowToast, onOpenTasteModal
 }) => {
+    const handleAddToTaste = async (node: Node, details: NodeDetails) => {
+        if (!userTaste || !onUpdateTasteProfile) return;
+
+        if (userTaste.length >= 5) {
+            if (onShowToast) {
+                onShowToast("Maximum 5 taste profiles reached");
+            }
+            if (onOpenTasteModal) {
+                onOpenTasteModal();
+            }
+            return;
+        }
+
+        const profileName = getArtistDisplayName(details, node);
+        const rawGenreStr = details?.details?.genre || '';
+        const genreArray = rawGenreStr.split(',').map(s => s.trim()).filter(Boolean);
+        const genre = genreArray.length > 0 ? genreArray[0] : '';
+        let style = '';
+
+        if (genreArray.length > 1) {
+            style = genreArray[1];
+        } else if (genreArray.length === 1 && details.summary) {
+            const keywords = ["melodic", "post", "experimental", "heavy", "progressive", "raw", "ambient", "pop"];
+            const summaryLower = details.summary.toLowerCase();
+            for (const keyword of keywords) {
+                if (summaryLower.includes(keyword)) {
+                    style = keyword.charAt(0).toUpperCase() + keyword.slice(1);
+                    break;
+                }
+            }
+        }
+
+        const rawOrigin = details?.details?.origin || '';
+        const origin = rawOrigin.replace(/,\s*(USA|United States|UK|U\.S\.A\.|U\.K\.)$/i, '').trim();
+        let eraMin = null;
+        const foundedStr = details?.details?.founded;
+        if (foundedStr) {
+            const match = foundedStr.match(/\d{4}/);
+            if (match) eraMin = parseInt(match[0], 10);
+        }
+
+        const newProfile: TasteProfile = {
+            id: crypto.randomUUID(),
+            name: profileName || `Profile ${userTaste.length + 1}`,
+            color: PROFILE_COLORS[userTaste.length % PROFILE_COLORS.length].name,
+            isActive: true,
+            favoriteGenre: genre,
+            style: style,
+            favoriteOrigin: origin,
+            eraMin: eraMin,
+            eraMax: null
+        };
+
+        const updatedTaste = [...userTaste, newProfile];
+        await onUpdateTasteProfile(updatedTaste);
+        if (onShowToast) {
+            onShowToast(`Added ${newProfile.name} to Taste Profiles`);
+        }
+    };
+
     const isLocked = useMemo(() => {
         return !!(details && details.summary && details.summary.trim().length > 5 && !details._isSentinel);
     }, [details]);
@@ -706,6 +771,15 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                 {/* 1. Action Icons (Not Sticky) */}
                 <div className={`px-4 pt-3 bg-zinc-900 z-20 flex-shrink-0 ${isFullScreenMode ? 'md:px-6' : ''}`}>
                     <div className="flex items-center justify-end gap-1 flex-shrink-0">
+                            {isArtistNode && details && (
+                                <button
+                                    onClick={() => handleAddToTaste(node, details)}
+                                    className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 hover:bg-zinc-800 active:scale-95 leading-none text-zinc-400 hover:text-white hover:bg-zinc-800"
+                                    title="Add to Taste"
+                                >
+                                    <Flame size={18} />
+                                </button>
+                            )}
                             {(isArtistNode || isLabelNode) && (
                                 <button
                                     onClick={() => onToggleStack(node, links.purchase?.[0]?.url)}
@@ -735,6 +809,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     </span>
                                 </button>
                             )}
+
 
                             <button onClick={onClose} className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-700 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none" title="Remove Card">
                                     <span className="material-symbols-outlined !text-[18px]">remove</span>
@@ -1518,6 +1593,9 @@ interface DetailsPanelProps {
   onAuthRequest?: () => void;
   userTaste?: UserTaste;
   isAdmin?: boolean;
+  onUpdateTasteProfile?: (taste: UserTaste) => Promise<void>;
+  onShowToast?: (message: string) => void;
+  onOpenTasteModal?: () => void;
 }
 
 export const DetailsPanel: React.FC<DetailsPanelProps> = ({
@@ -1525,7 +1603,8 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
   error, systemError, graphData, libraryArtists, seedArtists, onAddArtist, isCollapsed, onToggleCollapse,
   isSmallScreen, onNodeClick, onGenerateDeepCut, onExtendNode, onNavigate, isGlobalLoading, onCancelGlobalLoading, unreadCount, isActive, collapseBtnRef,
   isMagazineViewOpen, onMagazineViewToggle, chatHistories, onUpdateChatHistories, stack, onToggleStack,
-  isGuest = false, onAuthRequest, user, userTaste, isAdmin = false
+  isGuest = false, onAuthRequest, user, userTaste, isAdmin = false,
+  onUpdateTasteProfile, onShowToast, onOpenTasteModal
 }) => {
     const [viewedIndex, setViewedIndex] = useState(0);
     const [chatLoadingMap, setChatLoadingMap] = useState<Map<string, boolean>>(new Map());
@@ -2137,6 +2216,9 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 userTaste={userTaste}
                                                 isAdmin={isAdmin}
                                                 onExtendNode={onExtendNode}
+                                                onUpdateTasteProfile={onUpdateTasteProfile}
+                                                onShowToast={onShowToast}
+                                                onOpenTasteModal={onOpenTasteModal}
                                             />
                                         </div>
                                     );

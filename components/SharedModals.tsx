@@ -111,7 +111,7 @@ export const MyStackDialog: React.FC<{
 import { AnimatePresence, motion } from 'framer-motion';
 
 
-const PROFILE_COLORS = [
+export const PROFILE_COLORS = [
   { name: 'purple', class: 'bg-[#a855f7]' },
   { name: 'emerald', class: 'bg-[#10b981]' },
   { name: 'amber', class: 'bg-[#f59e0b]' },
