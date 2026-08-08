@@ -321,8 +321,13 @@ const parseAppleMusicXml = (xmlString: string): ParsedResult => {
       const group = getArtistGroupId(artist);
       addNode({ id: artist, type: 'artist', group });
       if (genre) {
-        addNode({ id: genre, type: 'genre', group: 1000 });
-        addLink(artist, genre);
+        const subGenres = genre.split(/[,/]+/).map(g => g.trim()).filter(g => g.length > 0);
+        for (const g of subGenres) {
+          if (/^\d+$/.test(g)) continue;
+          if (g.length > 40 || g.toLowerCase().startsWith('http')) continue;
+          addNode({ id: g, type: 'genre', group: 1000 });
+          addLink(artist, g);
+        }
       }
     }
   }

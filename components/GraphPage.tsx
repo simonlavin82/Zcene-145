@@ -435,8 +435,14 @@ const LibraryDialog: React.FC<{
     const genreFiltered = selectedGenres.length === 0
         ? sorted
         : sorted.filter(artist => {
-            const artistGenres = artistGenreMap.get(artist.name);
-            return artistGenres ? selectedGenres.some(g => artistGenres.has(g)) : false;
+            const normalizedArtistId = normalizeArtistId(artist.name);
+            const artistGenres = artistGenreMap.get(normalizedArtistId) || artistGenreMap.get(artist.name) || artistGenreMap.get(artist.name.trim());
+            if (!artistGenres) return false;
+            
+            return selectedGenres.some(selected => {
+                const selLower = selected.trim().toLowerCase();
+                return Array.from(artistGenres).some(g => g.trim().toLowerCase() === selLower);
+            });
         });
 
     if (!searchTerm) return genreFiltered;
@@ -457,7 +463,7 @@ const LibraryDialog: React.FC<{
                 </button>
             </header>
 
-            <div className="p-4 flex-shrink-0 border-b border-zinc-700 space-y-3">
+            <div className="relative z-10 p-4 flex-shrink-0 border-b border-zinc-700 space-y-3">
                 <div className="relative">
                     <span className={`material-symbols-outlined absolute top-1/2 -translate-y-1/2 text-zinc-500 ${InputSizes.md.leftIcon}`}>search</span>
                     <input
@@ -535,24 +541,31 @@ const LibraryDialog: React.FC<{
             </div>
 
             <div className="flex-grow overflow-y-auto p-4" style={{ overscrollBehaviorY: 'contain' }}>
-                <div className="space-y-1">
-                    {sortedAndFilteredLibraryArtists.map(artist => (
-                        <button
-                            key={artist.name}
-                            onClick={() => onArtistToggle(artist.name)}
-                            className={`w-full text-left rounded-xl px-4 py-3 text-base sm:py-2 sm:text-sm font-medium transition-colors flex items-center justify-between ${
-                                selectedArtistNames.has(artist.name)
-                                    ? 'text-white bg-zinc-700/80'
-                                    : 'text-zinc-300 hover:bg-zinc-800/50'
-                            }`}
-                        >
-                            <span className="truncate select-none">{artist.name}</span>
-                            <span className={`material-symbols-outlined transition-colors ${selectedArtistNames.has(artist.name) ? 'text-primary' : 'text-transparent'}`}>
-                               check_circle
-                            </span>
-                        </button>
-                    ))}
-                </div>
+                {sortedAndFilteredLibraryArtists.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full text-zinc-500 space-y-3 min-h-[200px]">
+                        <span className="material-symbols-outlined !text-4xl text-zinc-700">search_off</span>
+                        <p className="text-sm font-medium">No artists found matching selected filters.</p>
+                    </div>
+                ) : (
+                    <div className="space-y-1">
+                        {sortedAndFilteredLibraryArtists.map(artist => (
+                            <button
+                                key={artist.name}
+                                onClick={() => onArtistToggle(artist.name)}
+                                className={`w-full text-left rounded-xl px-4 py-3 text-base sm:py-2 sm:text-sm font-medium transition-colors flex items-center justify-between ${
+                                    selectedArtistNames.has(artist.name)
+                                        ? 'text-white bg-zinc-700/80'
+                                        : 'text-zinc-300 hover:bg-zinc-800/50'
+                                }`}
+                            >
+                                <span className="truncate select-none">{artist.name}</span>
+                                <span className={`material-symbols-outlined transition-colors ${selectedArtistNames.has(artist.name) ? 'text-primary' : 'text-transparent'}`}>
+                                   check_circle
+                                </span>
+                            </button>
+                        ))}
+                    </div>
+                )}
             </div>
 
             <footer className="p-4 bg-zinc-900 flex-shrink-0 border-t border-zinc-700 flex justify-between items-center">
