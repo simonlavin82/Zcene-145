@@ -214,6 +214,11 @@ the entire dataset, the app evolves existing visual structures.
    Before invoking Gemini for Phase 02 Orchestration, the engine computes a 
    normalized single-artist ID (using Unicode NFD accent-stripping and hyphen replacement) 
    and probes the global 'artists' collection concurrently for all seeds.
+   - Cache Merge & Image Immutability Rule: Background revalidation processes ('triggerBackgroundRevalidation') 
+     MUST perform a safe merge when updating cache payloads. They are strictly forbidden from overwriting or clearing 
+     existing canonical 'imageUrl' properties in 'detailsCache' or global Firestore documents. This ensures that 
+     highly accurate artwork resolved during initial graph hydration (e.g. from Spotify) is permanently protected 
+     against subsequent generic Google Image Search hits.
    - Cache HIT: Graph structure + Deep Cut metadata are returned instantly. 
      Phases 02 and 03 are bypassed entirely. D3 Phase 04 begins immediately, 
      artist canvas positions from the project's canvasLayout are restored, and

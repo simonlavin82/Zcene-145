@@ -6114,12 +6114,24 @@ const App: React.FC = () => {
         }
       }
       
-      // Update local state details cache
+      // Extract the existing cache payload before mutating anything
+      const existingDetails = detailsCache.get(node.id) || detailsCache.get(node.id.toLowerCase()) || detailsCache.get(cacheId);
+
+      // Create a safely merged payload
+      const mergedDetails = { ...freshDetails };
+
+      // IMMUTABILITY RULE: If the existing cache already has a valid canonical image, protect it.
+      // We assume an existing image is canonical/trusted, whereas background fetches may be generic hits.
+      if (existingDetails && existingDetails.imageUrl && existingDetails.imageUrl.length > 5) {
+          mergedDetails.imageUrl = existingDetails.imageUrl;
+      }
+
+      // Update local state details cache with the MERGED details
       setDetailsCache(prev => {
         const updated = new Map(prev);
-        updated.set(node.id, freshDetails);
-        updated.set(node.id.toLowerCase(), freshDetails);
-        updated.set(normalizeArtistId(node.id), freshDetails);
+        updated.set(node.id, mergedDetails);
+        updated.set(node.id.toLowerCase(), mergedDetails);
+        updated.set(cacheId, mergedDetails);
         return updated;
       });
 
@@ -6128,21 +6140,21 @@ const App: React.FC = () => {
         if (prev && normalizeArtistId(prev.id) === cacheId) {
           return {
             ...prev,
-            bio: freshDetails.summary,
-            summary: freshDetails.summary,
-            genre: freshDetails.details?.genre || "",
-            origin: freshDetails.details?.origin || "",
-            founded: freshDetails.details?.founded || "",
-            name: freshDetails.details?.artist || prev.id,
-            imageUrl: freshDetails.imageUrl || (prev as any).imageUrl
+            bio: mergedDetails.summary,
+            summary: mergedDetails.summary,
+            genre: mergedDetails.details?.genre || "",
+            origin: mergedDetails.details?.origin || "",
+            founded: mergedDetails.details?.founded || "",
+            name: mergedDetails.details?.artist || prev.id,
+            imageUrl: mergedDetails.imageUrl || (prev as any).imageUrl
           };
         }
         return prev;
       });
 
-      // Overwrite the global cache doc with fresh data and a new cachedAt timestamp
+      // Overwrite the global cache doc with the MERGED data and a new cachedAt timestamp
       const updatePayload = {
-        detailsCache: freshDetails,
+        detailsCache: mergedDetails,
         cachedAt: serverTimestamp()
       };
       enforceArtistCacheSchema(updatePayload);
