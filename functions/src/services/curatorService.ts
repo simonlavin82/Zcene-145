@@ -943,6 +943,7 @@ export const NODE_DETAILS_SCHEMA = {
 export const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed information for the music entity: "{{nodeIdentifier}}" (type: {{nodeType}}).
     
     Context:
+    - Seed Artist(s) / Ecosystem Anchor: {{seedArtists}}.
     - Search Disambiguation & Temporal Era Anchors: {{contextNodes}}.
     - Date: {{currentDate}}.
     {{#if originHint}}
@@ -997,7 +998,7 @@ export const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed infor
     - NEGATIVE SHORTS CONSTRAINT: DO NOT parse or return video hashes derived from search queries matching vertical formats or the '/shorts/' route structure. Prioritize landscape video IDs with durations longer than 2 minutes.
     - ENTITY VALIDATION: Ensure the chosen video belongs strictly to verified artist channels, high-fidelity archive channels (e.g., Hate5six, KEXP, Audiotree), or standard label uploads (e.g., Relapse Records, Epitaph Records).
     - ZERO HALLUCINATION (MANDATORY): You must only return a youtubeVideoId if you can extract the exact 11-character ID from a YouTube watch URL (e.g., youtube.com/watch?v=...) present in your Google Search results. If you do not see the exact URL or video ID in the search results, set youtubeVideoId to null. NEVER guess or hallucinate a video ID under any circumstances.
-    - AMBIGUITY RESOLUTION: For bands with common or ambiguous names (such as "Cave In"), make sure your search query includes qualifiers (e.g. "Cave In band" or "Cave In post-hardcore") to avoid generic results.
+    - AMBIGUITY RESOLUTION (CRITICAL): For entities with common or ambiguous names (such as "Missing Link"), you MUST combine the entity name with its Connected Network (e.g., its genre, label, or the Seed Artist) in your search query to prevent entity collisions. For example, search "Missing Link hardcore punk band" or "Missing Link Triple B Records" instead of just "Missing Link band".
 
     WIKIPEDIA ORDERING RULE (MANDATORY):
     If a Wikipedia link is found, it MUST be the very first item (index 0) in the links array.`;
@@ -1029,7 +1030,8 @@ export const fetchNodeDetailsBackend = async (
       return sourceId === node.id ? targetId : sourceId;
     })
     .map(id => graphData.nodes.find(n => n.id === id))
-    .map(n => n!.label || n!.id)
+    .filter(Boolean)
+    .map(n => `${n!.label || n!.id} (${n!.type})`)
     .slice(0, 10)
     .join(', ');
 
@@ -1038,6 +1040,7 @@ export const fetchNodeDetailsBackend = async (
   let prompt = FETCH_NODE_DETAILS_PROMPT_TEMPLATE
     .replace('{{nodeIdentifier}}', node.label || node.id)
     .replace('{{nodeType}}', node.type)
+    .replace('{{seedArtists}}', seedArtists)
     .replace('{{contextNodes}}', contextNodes)
     .replace(/{{currentDate}}/g, currentDate);
       
