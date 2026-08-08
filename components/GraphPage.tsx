@@ -511,8 +511,8 @@ const LibraryDialog: React.FC<{
                             <span className="material-symbols-outlined !text-[14px] transition-transform duration-200" style={{ transform: isGenreOpen ? 'rotate(180deg)' : '' }}>expand_more</span>
                         </button>
                         {isGenreOpen && uniqueGenres.length > 0 && (
-                            <div className="absolute top-full right-0 mt-1.5 w-56 rounded-xl border border-zinc-700 bg-zinc-950 shadow-xl z-20 flex flex-col overflow-hidden">
-                                <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800">
+                            <div className="absolute top-full right-0 mt-1.5 w-56 rounded-xl border border-zinc-700 bg-zinc-950 shadow-xl z-20 flex flex-col">
+                                <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800 rounded-t-xl">
                                     <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Filter by Genre</span>
                                     {selectedGenres.length > 0 && (
                                         <button onClick={() => setSelectedGenres([])} className="text-[10px] font-semibold text-zinc-400 hover:text-primary transition-colors uppercase tracking-widest">
@@ -520,7 +520,7 @@ const LibraryDialog: React.FC<{
                                         </button>
                                     )}
                                 </div>
-                                <div className="max-h-52 overflow-y-auto p-1.5 space-y-0.5">
+                                <div className="max-h-52 overflow-y-auto p-1.5 space-y-0.5 rounded-b-xl">
                                     {[...uniqueGenres].sort().map(genre => {
                                         const isChecked = selectedGenres.includes(genre);
                                         return (

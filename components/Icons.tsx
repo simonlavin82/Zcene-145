@@ -164,9 +164,9 @@ interface SortControlsProps {
 }
 
 export const SortControls: React.FC<SortControlsProps> = ({ sortConfig, onSortChange }) => {
-  const sortButtons: { label: string; key: SortKey }[] = [
-    { label: 'Name', key: 'name' },
-    { label: 'Date', key: 'dateAdded' },
+  const sortButtons: { label: string; key: SortKey; icon?: string }[] = [
+    { label: 'Recent', key: 'dateAdded', icon: 'history' },
+    { label: 'Name', key: 'name', icon: 'sort_by_alpha' },
     { label: 'Selected', key: 'selected' },
   ];
   
@@ -174,16 +174,17 @@ export const SortControls: React.FC<SortControlsProps> = ({ sortConfig, onSortCh
     <div className="flex flex-wrap items-center gap-2">
         {sortButtons.map(btn => {
             const isActive = sortConfig.key === btn.key;
-            const icon = sortConfig.direction === 'asc' ? 'arrow_upward' : 'arrow_downward';
+            const sortIcon = sortConfig.direction === 'asc' ? 'arrow_upward' : 'arrow_downward';
             
             return (
                 <button
                     key={btn.key}
                     onClick={() => onSortChange(btn.key)}
-                    className={`flex items-center gap-1 text-xs px-4 py-1 rounded-full font-medium transition-colors ${isActive ? 'border border-zinc-400 bg-zinc-200 text-brand-black' : 'border border-zinc-600 text-zinc-300 bg-transparent hover:border-zinc-500 hover:text-white hover:bg-zinc-800'}`}
+                    className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl font-medium transition-colors ${isActive ? 'border border-zinc-400 bg-zinc-200 text-brand-black' : 'border border-zinc-600 text-zinc-300 bg-transparent hover:border-zinc-500 hover:text-white hover:bg-zinc-800'}`}
                 >
+                    {btn.icon && <span className="material-symbols-outlined !text-[14px] leading-none">{btn.icon}</span>}
                     <span>{btn.label}</span>
-                    {isActive && <span className="material-symbols-outlined !text-[14px]">{icon}</span>}
+                    {isActive && <span className="material-symbols-outlined !text-[14px] leading-none">{sortIcon}</span>}
                 </button>
             );
         })}
