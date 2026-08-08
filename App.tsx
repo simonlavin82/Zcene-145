@@ -1869,7 +1869,7 @@ const App: React.FC = () => {
   const handleClearLib = useCallback(() => {
     setLibraryArtists([]); setBaseGraph(null);
     if (user) {
-      setDoc(doc(db, 'users', user.uid), { libraryArtists: "[]" }, { merge: true }).catch(console.error);
+      setDoc(doc(db, 'users', user.uid), { libraryArtists: "[]", libraryBaseGraph: null }, { merge: true }).catch(console.error);
     }
   }, [user]);
 
@@ -4533,6 +4533,14 @@ const App: React.FC = () => {
           } catch (e) {
             console.error("[Profile Listener] Failed to parse libraryArtists:", e);
           }
+          if (data.libraryBaseGraph) {
+            try {
+              const parsedGraph = JSON.parse(data.libraryBaseGraph);
+              setBaseGraph(normalizeGraphData(parsedGraph));
+            } catch (e) {
+              console.error("[Profile Listener] Failed to parse libraryBaseGraph:", e);
+            }
+          }
         } else {
           setLibraryArtists([]);
         }
@@ -6972,7 +6980,8 @@ const App: React.FC = () => {
                     setLibraryArtists(res.artists); setBaseGraph(normalizeGraphData(res.baseGraph));
                     if (res.artists.length && user) {
                       setDoc(doc(db, 'users', user.uid), {
-                        libraryArtists: JSON.stringify(res.artists)
+                        libraryArtists: JSON.stringify(res.artists),
+                        libraryBaseGraph: JSON.stringify(res.baseGraph)
                       }, { merge: true }).catch(console.error);
                     }
                   } catch (err: any) { setError(err.message); }

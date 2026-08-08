@@ -308,15 +308,24 @@ const LimitReachedDialog: React.FC<{ isOpen: boolean; onClose: () => void; }> = 
     if (!isOpen) return null;
     return (
         <div className="fixed inset-0 bg-black/60 z-[110] flex items-center justify-center p-4 animate-fade-in-down" style={{ animationDuration: '200ms' }} onClick={onClose}>
-            <div className="bg-background-dark border border-zinc-600 rounded-none w-full sm:max-w-md shadow-2xl p-6 text-center space-y-4" onClick={e => e.stopPropagation()}>
-                 <div className="mx-auto w-12 h-12 bg-zinc-800 rounded-none flex items-center justify-center text-zinc-400">
-                    <span className="material-symbols-outlined !text-3xl">warning</span>
-                 </div>
-                 <h3 className="text-xl font-medium text-white">Artist Limit Reached</h3>
-                 <p className="text-zinc-400 text-sm leading-relaxed">To ensure the best performance and graph quality, you can only add up to 5 seed artists.</p>
-                 <button onClick={onClose} className="w-full rounded-xl bg-primary px-4 py-1.5 text-sm font-medium text-brand-black transition-colors hover:bg-primary/90">
-                    Got it
-                 </button>
+            <div className="bg-background-dark border border-zinc-600 rounded-none w-full sm:max-w-md shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
+                <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-yellow-400 !text-[18px]">warning</span>
+                        <h3 className="font-medium text-white text-base">Artist Limit Reached</h3>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">
+                        <span className="material-symbols-outlined !text-[18px]">close</span>
+                    </button>
+                </header>
+                <div className="p-4 text-sm text-zinc-400 leading-relaxed">
+                    To ensure the best performance and graph quality, you can only add up to 5 seed artists.
+                </div>
+                <footer className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end">
+                    <button onClick={onClose} className="px-4 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm transition-colors hover:bg-primary/90">
+                        Got it
+                    </button>
+                </footer>
             </div>
         </div>
     );
@@ -342,7 +351,8 @@ const LibraryDialog: React.FC<{
   const [isListening, setIsListening] = useState(false);
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'dateAdded', direction: 'desc' });
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
-  const [isGenreSectionVisible, setSearchSectionVisible] = useState(false);
+  const [isGenreOpen, setIsGenreOpen] = useState(false);
+  const genrePopoverRef = useRef<HTMLDivElement>(null);
   
   const selectedArtistNames = useMemo(() => new Set(selectedArtists.map(a => a.name)), [selectedArtists]);
 
@@ -358,6 +368,17 @@ const LibraryDialog: React.FC<{
   const handleGenreToggle = (genre: string) => {
     setSelectedGenres(prev => prev.includes(genre) ? prev.filter(g => g !== genre) : [...prev, genre]);
   };
+
+  useEffect(() => {
+    if (!isGenreOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (genrePopoverRef.current && !genrePopoverRef.current.contains(e.target as HTMLElement)) {
+        setIsGenreOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isGenreOpen]);
 
   const handleSpeechToText = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -469,23 +490,43 @@ const LibraryDialog: React.FC<{
                 </div>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <SortControls sortConfig={sortConfig} onSortChange={handleSortChange} />
-                    <div className="relative w-full sm:w-56">
-                        <button onClick={() => setSearchSectionVisible(!isGenreSectionVisible)} className="w-full flex items-center justify-between text-left text-sm font-medium text-zinc-300 py-2 px-3 bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 rounded-xl transition-colors" aria-expanded={isGenreSectionVisible}>
-                            <span>Filter by Genre {selectedGenres.length > 0 && `(${selectedGenres.length})`}</span>
-                            <span className="material-symbols-outlined transition-transform duration-200" style={{ transform: isGenreSectionVisible ? 'rotate(180deg)' : '' }}>expand_more</span>
+                    <div className="relative shrink-0" ref={genrePopoverRef}>
+                        <button
+                            onClick={() => setIsGenreOpen(v => !v)}
+                            className={`flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-medium transition-colors ${
+                                selectedGenres.length > 0
+                                    ? 'border-primary/60 bg-primary/10 text-primary'
+                                    : 'border-zinc-700 bg-zinc-800 text-zinc-200 hover:bg-zinc-700'
+                            }`}
+                            aria-expanded={isGenreOpen}
+                        >
+                            <span className="material-symbols-outlined !text-[14px]">filter_list</span>
+                            {selectedGenres.length > 0 ? `${selectedGenres.length} Genre${selectedGenres.length > 1 ? 's' : ''}` : 'All Genres'}
+                            <span className="material-symbols-outlined !text-[14px] transition-transform duration-200" style={{ transform: isGenreOpen ? 'rotate(180deg)' : '' }}>expand_more</span>
                         </button>
-                        {isGenreSectionVisible && (
-                            <div className="absolute top-full right-0 mt-1 w-full sm:w-64 bg-zinc-900 border border-zinc-700 rounded-xl shadow-lg z-10 p-2">
-                                <div className="flex justify-end items-center px-1 mb-1">
-                                    <button onClick={() => setSelectedGenres([])} className="text-xs font-medium text-zinc-400 transition-colors hover:text-primary hover:underline">Clear</button>
+                        {isGenreOpen && uniqueGenres.length > 0 && (
+                            <div className="absolute top-full right-0 mt-1.5 w-56 rounded-xl border border-zinc-700 bg-zinc-950 shadow-xl z-20 flex flex-col overflow-hidden">
+                                <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800">
+                                    <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Filter by Genre</span>
+                                    {selectedGenres.length > 0 && (
+                                        <button onClick={() => setSelectedGenres([])} className="text-[10px] font-semibold text-zinc-400 hover:text-primary transition-colors uppercase tracking-widest">
+                                            Clear
+                                        </button>
+                                    )}
                                 </div>
-                                <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
-                                    {uniqueGenres.map(genre => (
-                                        <label key={genre} className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl transition-colors hover:bg-zinc-800 cursor-pointer">
-                                            <input type="checkbox" checked={selectedGenres.includes(genre)} onChange={() => handleGenreToggle(genre)} className="h-4 w-4 rounded-md bg-zinc-700 border-zinc-600 text-primary focus:ring-primary focus:ring-offset-zinc-900" />
-                                            <span className="text-sm text-zinc-300 select-none">{genre}</span>
-                                        </label>
-                                    ))}
+                                <div className="max-h-52 overflow-y-auto p-1.5 space-y-0.5">
+                                    {[...uniqueGenres].sort().map(genre => {
+                                        const isChecked = selectedGenres.includes(genre);
+                                        return (
+                                            <label key={genre} className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors ${ isChecked ? 'bg-primary/10' : 'hover:bg-zinc-800/80' }`}>
+                                                <span className={`material-symbols-outlined !text-[16px] flex-shrink-0 transition-colors ${ isChecked ? 'text-primary' : 'text-zinc-600' }`}>
+                                                    {isChecked ? 'check_box' : 'check_box_outline_blank'}
+                                                </span>
+                                                <input type="checkbox" checked={isChecked} onChange={() => handleGenreToggle(genre)} className="sr-only" />
+                                                <span className={`text-xs select-none truncate ${ isChecked ? 'text-white font-medium' : 'text-zinc-300' }`}>{genre}</span>
+                                            </label>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         )}
