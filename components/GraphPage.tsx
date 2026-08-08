@@ -494,9 +494,9 @@ const LibraryDialog: React.FC<{
                         )}
                     </div>
                 </div>
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex flex-row items-center justify-between gap-3 w-full">
                     <SortControls sortConfig={sortConfig} onSortChange={handleSortChange} />
-                    <div className="relative shrink-0" ref={genrePopoverRef}>
+                    <div className="static sm:relative shrink-0" ref={genrePopoverRef}>
                         <button
                             onClick={() => setIsGenreOpen(v => !v)}
                             className={`flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-medium transition-colors ${
@@ -511,7 +511,7 @@ const LibraryDialog: React.FC<{
                             <span className="material-symbols-outlined !text-[14px] transition-transform duration-200" style={{ transform: isGenreOpen ? 'rotate(180deg)' : '' }}>expand_more</span>
                         </button>
                         {isGenreOpen && uniqueGenres.length > 0 && (
-                            <div className="absolute top-full right-0 mt-1.5 w-56 rounded-xl border border-zinc-700 bg-zinc-950 shadow-xl z-20 flex flex-col">
+                            <div className="absolute top-full left-4 right-4 sm:left-auto sm:right-0 mt-2 sm:mt-1.5 w-auto sm:w-56 max-w-none rounded-xl border border-zinc-700 bg-zinc-950 shadow-xl z-20 flex flex-col">
                                 <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800 rounded-t-xl">
                                     <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Filter by Genre</span>
                                     {selectedGenres.length > 0 && (

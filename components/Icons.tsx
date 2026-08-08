@@ -167,11 +167,11 @@ export const SortControls: React.FC<SortControlsProps> = ({ sortConfig, onSortCh
   const sortButtons: { label: string; key: SortKey; icon?: string }[] = [
     { label: 'Recent', key: 'dateAdded', icon: 'history' },
     { label: 'Name', key: 'name', icon: 'sort_by_alpha' },
-    { label: 'Selected', key: 'selected' },
+    { label: 'Selected', key: 'selected', icon: 'task_alt' },
   ];
   
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-nowrap items-center gap-2">
         {sortButtons.map(btn => {
             const isActive = sortConfig.key === btn.key;
             const sortIcon = sortConfig.direction === 'asc' ? 'arrow_upward' : 'arrow_downward';
@@ -183,7 +183,7 @@ export const SortControls: React.FC<SortControlsProps> = ({ sortConfig, onSortCh
                     className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl font-medium transition-colors ${isActive ? 'border border-zinc-400 bg-zinc-200 text-brand-black' : 'border border-zinc-600 text-zinc-300 bg-transparent hover:border-zinc-500 hover:text-white hover:bg-zinc-800'}`}
                 >
                     {btn.icon && <span className="material-symbols-outlined !text-[14px] leading-none">{btn.icon}</span>}
-                    <span>{btn.label}</span>
+                    <span className="hidden sm:inline">{btn.label}</span>
                     {isActive && <span className="material-symbols-outlined !text-[14px] leading-none">{sortIcon}</span>}
                 </button>
             );

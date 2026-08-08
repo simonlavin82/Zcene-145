@@ -3496,6 +3496,52 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                         </div>
                     </section>
 
+                    {/* 27.5. RESPONSIVE FILTER BAR */}
+                    <section id="responsive-filter-bar">
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Responsive Filter Bar</h2>
+                        <div className="space-y-12">
+                            <p className="text-base text-zinc-400 leading-relaxed max-w-3xl">
+                                The Library Filter Bar uses a responsive single-row layout pattern that collapses text labels into icon-only pills on mobile viewports. This ensures all controls (including sort toggles and the multi-select genre popover) fit onto a single line without stacking.
+                            </p>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                                <div className="space-y-6">
+                                    <h3 className="text-xl font-medium text-zinc-200">Sort Controls</h3>
+                                    <div className="p-8 bg-zinc-900/50 border border-zinc-800 rounded-xl space-y-6 flex justify-center">
+                                        <div className="flex flex-nowrap items-center gap-2">
+                                            <button className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl font-medium transition-colors border border-zinc-600 text-zinc-300 bg-transparent">
+                                                <span className="material-symbols-outlined !text-[14px] leading-none">history</span>
+                                                <span className="hidden sm:inline">Recent</span>
+                                            </button>
+                                            <button className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl font-medium transition-colors border border-zinc-400 bg-zinc-200 text-brand-black">
+                                                <span className="material-symbols-outlined !text-[14px] leading-none">sort_by_alpha</span>
+                                                <span className="hidden sm:inline">Name</span>
+                                                <span className="material-symbols-outlined !text-[14px] leading-none">arrow_upward</span>
+                                            </button>
+                                            <button className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl font-medium transition-colors border border-zinc-600 text-zinc-300 bg-transparent">
+                                                <span className="material-symbols-outlined !text-[14px] leading-none">task_alt</span>
+                                                <span className="hidden sm:inline">Selected</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="space-y-6">
+                                    <h3 className="text-xl font-medium text-zinc-200">Design Logic</h3>
+                                    <div className="space-y-4">
+                                        <div className="space-y-1">
+                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Mobile Collapse</h4>
+                                            <p className="text-sm text-zinc-400">Pill labels are wrapped in <strong>hidden sm:inline</strong>, relying entirely on <strong>material-symbols-outlined</strong> on small screens to conserve horizontal space.</p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Flex-Nowrap Container</h4>
+                                            <p className="text-sm text-zinc-400">The parent container uses <strong>flex-nowrap</strong> and <strong>justify-between</strong> to lock the sort pills and genre dropdown onto a unified single row.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
                     {/* 27.5. TELEMETRY BLOCKS */}
                     <section id="telemetry-blocks">
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Telemetry Blocks</h2>
