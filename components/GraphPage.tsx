@@ -1680,7 +1680,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                         userTaste={profile?.taste}
                                         onUpdateTasteProfile={async (taste) => { await onUpdateProfile({ taste }); }}
                                         onShowToast={onShowToast}
-                                        onOpenTasteModal={() => setIsProfileOpen(true)}
+                                        onOpenTasteModal={() => window.dispatchEvent(new CustomEvent('open-taste-modal'))}
                                     />
                                 </div>
                             </div>
@@ -1797,7 +1797,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                          userTaste={profile?.taste}
                          onUpdateTasteProfile={async (taste) => { await onUpdateProfile({ taste }); }}
                          onShowToast={onShowToast}
-                         onOpenTasteModal={() => setIsProfileOpen(true)}
+                         onOpenTasteModal={() => window.dispatchEvent(new CustomEvent('open-taste-modal'))}
                        />
                 </aside>
             </main>

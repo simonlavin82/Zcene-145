@@ -74,6 +74,12 @@ const Header: React.FC<HeaderProps> = ({
   const [localTaste, setLocalTaste] = React.useState<UserTaste>([]);
 
   React.useEffect(() => {
+    const handleOpenTasteModal = () => setIsTasteDialogOpen(true);
+    window.addEventListener('open-taste-modal', handleOpenTasteModal);
+    return () => window.removeEventListener('open-taste-modal', handleOpenTasteModal);
+  }, []);
+
+  React.useEffect(() => {
     if (userTaste && Array.isArray(userTaste)) {
       setLocalTaste(userTaste);
     } else {

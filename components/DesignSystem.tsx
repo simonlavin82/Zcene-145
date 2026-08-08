@@ -768,6 +768,10 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <span className="text-white font-medium block font-bold">Tooltip Pattern</span>
                                             Hovering over segments reveals a minimal tooltip displaying the raw criteria value (e.g., "Hardcore", "2018+"), omitting generic taxonomy prefixes.
                                         </li>
+                                        <li>
+                                            <span className="text-white font-medium block font-bold">Inline Profile Dismissal</span>
+                                            Hovering over a profile row reveals a subtle `<span className="material-symbols-outlined !text-[12px]">close</span>` ghost icon button next to the hit count to quickly remove the profile without opening the modal context. Hitting the 5-profile cap uses a global event dispatcher (`open-taste-modal`) to launch the full Taste Manager modal.
+                                        </li>
                                     </ul>
                                 </div>
 
@@ -794,12 +798,17 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                 <span>MY TASTE</span>
                                             </div>
                                             <div className="flex flex-col gap-2">
-                                                <div className="flex flex-col gap-1">
+                                                <div className="flex flex-col gap-1 group">
                                                     <div className="flex justify-between items-center text-[10px]">
                                                         <span className="text-zinc-300 font-medium">Hardcore</span>
-                                                        <span className="font-mono font-bold text-[#10b981]">
-                                                            3/4 Hits
-                                                        </span>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="font-mono font-bold text-[#10b981]">
+                                                                3/4 Hits
+                                                            </span>
+                                                            <button className="w-4 h-4 flex flex-shrink-0 items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-zinc-500 hover:text-white rounded-full hover:bg-zinc-800" title="Remove Profile">
+                                                                <span className="material-symbols-outlined !text-[12px]">close</span>
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                     <div className="grid grid-cols-4 gap-1.5 w-full relative group">
                                                         <div className="h-2 bg-[#10b981] border border-[#10b981] transition-all duration-300 relative">

@@ -962,12 +962,26 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                 const colorHex = hexMap[data.profile.color] || '#a855f7';
 
                                                 return (
-                                                    <div key={data.profile.id} className="flex flex-col gap-1">
+                                                    <div key={data.profile.id} className="flex flex-col gap-1 group">
                                                         <div className="flex justify-between items-center text-[10px]">
                                                             <span className="text-zinc-300 font-medium">{data.profile.name}</span>
-                                                            <span className="font-mono font-bold" style={{ color: colorHex }}>
-                                                                {data.matches}/{data.totalActive} Hits
-                                                            </span>
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="font-mono font-bold" style={{ color: colorHex }}>
+                                                                    {data.matches}/{data.totalActive} Hits
+                                                                </span>
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        if (!userTaste) return;
+                                                                        const newTaste = userTaste.filter(p => p.id !== data.profile.id);
+                                                                        onUpdateTasteProfile?.(newTaste);
+                                                                    }}
+                                                                    className="w-4 h-4 flex flex-shrink-0 items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-zinc-500 hover:text-white rounded-full hover:bg-zinc-800"
+                                                                    title="Remove Profile"
+                                                                >
+                                                                    <span className="material-symbols-outlined !text-[12px]">close</span>
+                                                                </button>
+                                                            </div>
                                                         </div>
                                                         <div className="grid grid-cols-4 gap-1.5 w-full relative group">
                                                             {data.criteria.map((c) => {
