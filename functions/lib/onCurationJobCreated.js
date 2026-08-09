@@ -362,6 +362,7 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                     console.log(`[Curation Backend] ✅ All ${recommendedEntities.length} entities hydrated successfully — zero-miss compliance confirmed.`);
                 }
                 // Write-back cache entries for the seed entities (deep cache: isDeep: true)
+                const idRewriteMap = new Map();
                 for (const seed of artistList) {
                     const seedNorm = (0, curatorService_1.normalizeArtistId)(seed);
                     const seedNode = (finalGraph.nodes || []).find((n) => isEntitySeedMatch(seedNorm, n.id) || isEntitySeedMatch(seedNorm, n.label || ''));
@@ -396,6 +397,9 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                         countryNorm = "global";
                     const disambiguatedCanonicalId = seedNorm.endsWith(`-${countryNorm}`) ? seedNorm : `${seedNorm}-${countryNorm}`;
                     const compositeCanonicalId = (0, curatorService_1.buildCompositeCacheKey)(disambiguatedCanonicalId, inputPayload.filters || undefined);
+                    idRewriteMap.set(seedNorm, compositeCanonicalId);
+                    if (seedDetailsEntry)
+                        seedDetailsEntry[0] = compositeCanonicalId;
                     if (!isSeedLabel && !finalGraph.synthesisRationale && seedDetails?.synthesisRationale) {
                         finalGraph.synthesisRationale = seedDetails.synthesisRationale;
                     }
@@ -479,8 +483,6 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                             cacheKey: seedNorm,
                             [idFieldKey]: seedNorm,
                             seedArtists: seed,
-                            graphData: isSeedLabel ? null : JSON.stringify({ nodes: [], links: [] }),
-                            filters: {},
                             cacheVersion: 4,
                             cachedAt: firestore_2.FieldValue.serverTimestamp(),
                             redirectTo: compositeCanonicalId
@@ -548,6 +550,9 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                         countryNorm = "global";
                     const disambiguatedCanonicalId = recNorm.endsWith(`-${countryNorm}`) ? recNorm : `${recNorm}-${countryNorm}`;
                     const compositeCanonicalId = (0, curatorService_1.buildCompositeCacheKey)(disambiguatedCanonicalId, inputPayload.filters || undefined);
+                    idRewriteMap.set(recNorm, compositeCanonicalId);
+                    if (recDetailsEntry)
+                        recDetailsEntry[0] = compositeCanonicalId;
                     const recDocRef = db.collection(collName).doc(compositeCanonicalId);
                     const recSnap = await recDocRef.get();
                     if (!recSnap.exists) {
@@ -597,6 +602,35 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                         await bareArtistIdRef.update(sanitizeUndefinedProperties(barePayload)).catch(() => { });
                         console.log(`[Curation Backend] Updated Bare Alias Pointer Stub in ${collName}: ${recNorm} -> ${compositeCanonicalId}`);
                     }
+                }
+                // Apply Canonical ID Rewrite to Graph Topology
+                if (finalGraph.nodes) {
+                    finalGraph.nodes.forEach((node) => {
+                        const normId = (0, curatorService_1.normalizeArtistId)(node.id);
+                        if (idRewriteMap.has(normId)) {
+                            node.id = idRewriteMap.get(normId);
+                        }
+                    });
+                }
+                if (finalGraph.links) {
+                    finalGraph.links.forEach((link) => {
+                        const sId = typeof link.source === 'string' ? link.source : link.source.id;
+                        const tId = typeof link.target === 'string' ? link.target : link.target.id;
+                        const normS = (0, curatorService_1.normalizeArtistId)(sId);
+                        const normT = (0, curatorService_1.normalizeArtistId)(tId);
+                        if (idRewriteMap.has(normS)) {
+                            if (typeof link.source === 'string')
+                                link.source = idRewriteMap.get(normS);
+                            else
+                                link.source.id = idRewriteMap.get(normS);
+                        }
+                        if (idRewriteMap.has(normT)) {
+                            if (typeof link.target === 'string')
+                                link.target = idRewriteMap.get(normT);
+                            else
+                                link.target.id = idRewriteMap.get(normT);
+                        }
+                    });
                 }
                 result = {
                     graphData: finalGraph,

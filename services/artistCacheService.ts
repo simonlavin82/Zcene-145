@@ -743,7 +743,9 @@ export const writeArtistCacheMany = async (
         const incomingArtistCount = nodes.filter(n => n.type === 'artist' || n.type === 'label').length;
         const isRicherGraph = incomingArtistCount > existingArtistCount;
 
-        if (!isPrimarySeed) {
+        if (existing && existing.redirectTo) {
+          console.log(`[${isLabel ? 'LabelCache' : 'ArtistCache'}] Skipping canonical update for "${compositeCanonicalId}" because it is a redirect alias to ${existing.redirectTo}.`);
+        } else if (!isPrimarySeed) {
           // Recommendation / Deep Cut: strictly perform telemetry/details write-back without overwriting graph topology or seed status!
           if (artistDetails) {
             const updatePayload: any = {
@@ -802,23 +804,18 @@ export const writeArtistCacheMany = async (
       const bareArtistIdRef = doc(db, collName, artistId);
       const bareSnap = await getDoc(bareArtistIdRef);
       const bareData = bareSnap.exists() ? bareSnap.data() : null;
-      const idFieldKey = isLabel ? 'labelId' : 'artistId';
+      const idFieldKeyLocal = isLabel ? 'labelId' : 'artistId';
 
       if (!bareSnap.exists() || (bareData && !bareData.redirectTo && bareSnap.id !== compositeCanonicalId)) {
         await setDoc(bareArtistIdRef, stripUndefinedProperties({
           cacheKey: artistId,
-          [idFieldKey]: artistId,
+          [idFieldKeyLocal]: artistId,
           seedArtists: name,
-          graphData: isLabel ? null : JSON.stringify({ nodes: [], links: [] }),
-          filters: {},
           cacheVersion: 4,
           cachedAt: serverTimestamp(),
-          hitCount: 0,
-          redirectTo: compositeCanonicalId,
-          isPrimarySeed: isPrimarySeed && !isLabel,
-          hasUniqueSpiderweb: false
+          redirectTo: compositeCanonicalId
         }));
-        console.log(`[${isLabel ? 'LabelCache' : 'ArtistCache'}] Created/Healed Bare Alias Pointer: ${artistId} -> ${compositeCanonicalId}`);
+        console.log(`[${isLabel ? 'LabelCache' : 'ArtistCache'}] Created/Healed Bare Alias Pointer Stub: ${artistId} -> ${compositeCanonicalId}`);
       }
       } catch (e: any) {
         console.warn(`[ArtistCache] Write failed for "${compositeArtistId}" (${e.code ?? 'unknown'}): ${e.message}`);
