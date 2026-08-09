@@ -293,6 +293,121 @@ const isTourCacheStale = (tourCachedAtString: string | undefined): boolean => {
     return (Date.now() - cachedDate.getTime()) >= sevenDaysMs;
 };
 
+// ---------------------------------------------------------------------------
+// ProfileRow — per-profile row in the Style Compatibility Meter.
+// Extracted as a local component so it can hold its own `isExpanded` state
+// for mobile tap-to-reveal, without touching parent state.
+// ---------------------------------------------------------------------------
+interface ProfileRowProps {
+    data: {
+        profile: TasteProfile;
+        matches: number;
+        totalActive: number;
+        criteria: Array<{ id: string; name: string; active: boolean; matched: boolean; value: string }>;
+    };
+    colorHex: string;
+    isSmallScreen: boolean;
+    userTaste: UserTaste | null | undefined;
+    onUpdateTasteProfile?: (taste: UserTaste) => void;
+}
+
+const ProfileRow: React.FC<ProfileRowProps> = ({ data, colorHex, isSmallScreen, userTaste, onUpdateTasteProfile }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+
+    return (
+        <div className="flex flex-col gap-1">
+            {/* Header: profile name | hits count | remove button */}
+            <div className="flex justify-between items-center text-[10px]">
+                <span className="text-zinc-300 font-medium">{data.profile.name}</span>
+                <div className="flex items-center gap-1.5">
+                    <span className="font-mono font-bold" style={{ color: colorHex }}>
+                        {data.matches}/{data.totalActive} Hits
+                    </span>
+                    {/* Chevron — mobile only, rotates when expanded */}
+                    {isSmallScreen && (
+                        <span
+                            className={`material-symbols-outlined !text-[12px] text-zinc-500 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                        >
+                            expand_more
+                        </span>
+                    )}
+                    {/* Remove button: hover-gated on desktop, visible when expanded on mobile */}
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            if (!userTaste) return;
+                            const newTaste = userTaste.filter(p => p.id !== data.profile.id);
+                            onUpdateTasteProfile?.(newTaste);
+                        }}
+                        className={`w-4 h-4 flex flex-shrink-0 items-center justify-center transition-opacity text-zinc-500 hover:text-white rounded-full hover:bg-zinc-800 ${
+                            isSmallScreen
+                                ? (isExpanded ? 'opacity-100' : 'opacity-0 pointer-events-none')
+                                : 'opacity-0 group-hover:opacity-100'
+                        }`}
+                        title="Remove Profile"
+                    >
+                        <span className="material-symbols-outlined !text-[12px]">close</span>
+                    </button>
+                </div>
+            </div>
+            {/* Bar grid: tappable on mobile to reveal criterion labels */}
+            <div
+                className={`grid grid-cols-4 gap-1.5 w-full relative ${
+                    isSmallScreen ? (isExpanded ? 'mb-4 cursor-pointer' : 'cursor-pointer') : 'group'
+                }`}
+                onClick={isSmallScreen ? () => setIsExpanded(e => !e) : undefined}
+                role={isSmallScreen ? 'button' : undefined}
+                aria-expanded={isSmallScreen ? isExpanded : undefined}
+                aria-label={isSmallScreen ? `${data.profile.name} style breakdown` : undefined}
+            >
+                {data.criteria.map((c) => {
+                    const isActive = c.active;
+                    const isMatched = c.matched;
+                    let bgStyle: React.CSSProperties = {};
+                    let borderStyle: React.CSSProperties = {};
+
+                    if (isActive) {
+                        if (isMatched) {
+                            bgStyle = { backgroundColor: colorHex };
+                            borderStyle = { borderColor: colorHex, borderStyle: 'solid' };
+                        } else {
+                            bgStyle = { backgroundColor: 'transparent' };
+                            borderStyle = { borderColor: '#52525b', borderStyle: 'solid' };
+                        }
+                    } else {
+                        bgStyle = { backgroundColor: 'transparent' };
+                        borderStyle = { borderColor: '#52525b', borderStyle: 'dashed' };
+                    }
+
+                    return (
+                        <div
+                            key={c.id}
+                            className="h-2 border transition-all duration-300 relative"
+                            style={{ ...bgStyle, ...borderStyle }}
+                        >
+                            {isActive && c.value && (
+                                isSmallScreen ? (
+                                    // Mobile: persistent inline label — visible only when row is expanded
+                                    isExpanded ? (
+                                        <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 w-max max-w-[150px] bg-zinc-800 text-white text-[10px] px-2 py-1 rounded shadow-lg pointer-events-none z-50 text-center truncate">
+                                            {c.value}
+                                        </div>
+                                    ) : null
+                                ) : (
+                                    // Desktop: hover tooltip (unchanged)
+                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full mb-1 left-1/2 -translate-x-1/2 w-max max-w-[150px] bg-zinc-800 text-white text-[10px] px-2 py-1 rounded shadow-lg pointer-events-none z-50 text-center truncate">
+                                        {c.value}
+                                    </div>
+                                )
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
 export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
   node, details, isLoading, isGlobalLoading, graphData, libraryArtists, seedArtists, onAddArtist, isSmallScreen, 
   onRefresh, onClose, onNodeClick, onGenerateDeepCut, onExtendNode, onNavigate, 
@@ -955,66 +1070,15 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                     cyan: '#06b6d4'
                                                 };
                                                 const colorHex = hexMap[data.profile.color] || '#a855f7';
-
                                                 return (
-                                                    <div key={data.profile.id} className="flex flex-col gap-1 group">
-                                                        <div className="flex justify-between items-center text-[10px]">
-                                                            <span className="text-zinc-300 font-medium">{data.profile.name}</span>
-                                                            <div className="flex items-center gap-1.5">
-                                                                <span className="font-mono font-bold" style={{ color: colorHex }}>
-                                                                    {data.matches}/{data.totalActive} Hits
-                                                                </span>
-                                                                <button
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        if (!userTaste) return;
-                                                                        const newTaste = userTaste.filter(p => p.id !== data.profile.id);
-                                                                        onUpdateTasteProfile?.(newTaste);
-                                                                    }}
-                                                                    className="w-4 h-4 flex flex-shrink-0 items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-zinc-500 hover:text-white rounded-full hover:bg-zinc-800"
-                                                                    title="Remove Profile"
-                                                                >
-                                                                    <span className="material-symbols-outlined !text-[12px]">close</span>
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                        <div className="grid grid-cols-4 gap-1.5 w-full relative group">
-                                                            {data.criteria.map((c) => {
-                                                                const isActive = c.active;
-                                                                const isMatched = c.matched;
-                                                                let bgStyle = {};
-                                                                let borderStyle = {};
-                                                                
-                                                                if (isActive) {
-                                                                    if (isMatched) {
-                                                                        bgStyle = { backgroundColor: colorHex };
-                                                                        borderStyle = { borderColor: colorHex, borderStyle: 'solid' };
-                                                                    } else {
-                                                                        bgStyle = { backgroundColor: 'transparent' };
-                                                                        borderStyle = { borderColor: '#52525b', borderStyle: 'solid' };
-                                                                    }
-                                                                } else {
-                                                                    bgStyle = { backgroundColor: 'transparent' };
-                                                                    borderStyle = { borderColor: '#52525b', borderStyle: 'dashed' };
-                                                                }
-
-                                                                return (
-                                                                    <div 
-                                                                        key={c.id} 
-                                                                        className="h-2 border transition-all duration-300 relative"
-                                                                        style={{ ...bgStyle, ...borderStyle }}
-                                                                    >
-                                                                        {/* Tooltip on hover/tap */}
-                                                                        {isActive && c.value && (
-                                                                            <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full mb-1 left-1/2 -translate-x-1/2 w-max max-w-[150px] bg-zinc-800 text-white text-[10px] px-2 py-1 rounded shadow-lg pointer-events-none z-50 text-center truncate">
-                                                                                {c.value}
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    </div>
+                                                    <ProfileRow
+                                                        key={data.profile.id}
+                                                        data={data}
+                                                        colorHex={colorHex}
+                                                        isSmallScreen={isSmallScreen}
+                                                        userTaste={userTaste}
+                                                        onUpdateTasteProfile={onUpdateTasteProfile}
+                                                    />
                                                 );
                                             })}
                                             {/* Single Master Header for Sub-labels */}

@@ -766,11 +766,15 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </li>
                                         <li>
                                             <span className="text-white font-medium block font-bold">Tooltip Pattern</span>
-                                            Hovering over segments reveals a minimal tooltip displaying the raw criteria value (e.g., "Hardcore", "2018+"), omitting generic taxonomy prefixes.
+                                            Hovering over segments on desktop reveals a minimal tooltip (bg-zinc-800, rounded, shadow-lg) displaying the raw criteria value (e.g., "Hardcore", "2018+").
+                                        </li>
+                                        <li>
+                                            <span className="text-white font-medium block font-bold">Mobile Tap-to-Expand</span>
+                                            On touch viewports (<code className="text-xs font-mono text-purple-400">isSmallScreen</code>), each profile row is tappable. A chevron (<code className="text-xs font-mono text-purple-400">expand_more</code>) rotates on expand, and criterion values surface using the identical tooltip container (bg-zinc-800, px-2 py-1, rounded, shadow-lg) positioned above each bar — preserving visual parity with the desktop experience. The remove button becomes visible in the expanded state only.
                                         </li>
                                         <li>
                                             <span className="text-white font-medium block font-bold">Inline Profile Dismissal</span>
-                                            Hovering over a profile row reveals a subtle `<span className="material-symbols-outlined !text-[12px]">close</span>` ghost icon button next to the hit count to quickly remove the profile without opening the modal context. Hitting the 5-profile cap uses a global event dispatcher (`open-taste-modal`) to launch the full Taste Manager modal.
+                                            Hovering (desktop) or expanding (mobile) a profile row reveals a subtle <span className="material-symbols-outlined !text-[12px]">close</span> ghost icon button next to the hit count to quickly remove the profile without opening the modal. Hitting the 5-profile cap uses a global event dispatcher (<code className="text-xs font-mono text-purple-400">open-taste-modal</code>) to launch the full Style Manager modal.
                                         </li>
                                     </ul>
                                 </div>
@@ -794,9 +798,6 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <div className="pt-4 border-t border-zinc-800/80">
                                         <h5 className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest mb-2">Live Demo Sandbox Reference</h5>
                                         <div className="flex flex-col gap-2 max-w-xs bg-zinc-900 p-3 border border-zinc-800">
-                                            <div className="flex items-center justify-between text-[10px] font-medium uppercase tracking-[0.2em] text-zinc-400">
-                                                <span>MY STYLE</span>
-                                            </div>
                                             <div className="flex flex-col gap-2">
                                                 <div className="flex flex-col gap-1 group">
                                                     <div className="flex justify-between items-center text-[10px]">
