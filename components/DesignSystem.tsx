@@ -287,7 +287,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
         { id: 'typography', title: 'Typography' },
         { id: 'bio-scannability', title: 'Bio Scannability' },
         { id: 'artist-metadata', title: 'Artist Metadata' },
-        { id: 'taste-compatibility', title: 'Taste Compatibility' },
+        { id: 'taste-compatibility', title: 'Style Compatibility' },
         { id: 'colour-palette', title: 'Colour Palette' },
         { id: 'layout-spacing', title: 'Layout & Spacing' },
         { id: 'iconography', title: 'Iconography' },
@@ -746,7 +746,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
 
                     {/* 2.3 TASTE COMPATIBILITY */}
                     <section id="taste-compatibility">
-                        <h2 className="text-3xl font-medium text-white border-b-2 border-primary/50 pb-2 mb-8">Taste Compatibility</h2>
+                        <h2 className="text-3xl font-medium text-white border-b-2 border-primary/50 pb-2 mb-8">Style Compatibility</h2>
                         <div className="space-y-12">
                             <p className="text-base text-zinc-400 leading-relaxed max-w-3xl">
                                 Zcene includes a deterministic, client-side visual compatibility meter within Deep Cut panels that compares the selected artist's attributes directly against the user's active "Style" profile.
