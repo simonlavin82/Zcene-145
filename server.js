@@ -567,11 +567,8 @@ async function triggerReSynthesis(artistId, originalData, collectionName = 'arti
           cacheKey: artistId,
           artistId: artistId,
           seedArtists: originalData.seedArtists || artistId,
-          graphData: JSON.stringify({ nodes: [], links: [] }),
-          filters: {},
           cacheVersion: 2,
           cachedAt: admin.firestore.FieldValue.serverTimestamp(),
-          hitCount: 0,
           redirectTo: cleanCanonicalId
         });
         console.log(`[Re-Synthesis] Mock Created Alias Redirect: ${artistId} -> ${cleanCanonicalId}`);
@@ -677,11 +674,8 @@ async function triggerReSynthesis(artistId, originalData, collectionName = 'arti
           cacheKey: artistId,
           artistId: artistId,
           seedArtists: originalData.seedArtists || artistId,
-          graphData: JSON.stringify({ nodes: [], links: [] }),
-          filters: {},
           cacheVersion: 2,
           cachedAt: admin.firestore.FieldValue.serverTimestamp(),
-          hitCount: 0,
           redirectTo: canonicalId
         });
         console.log(`[Re-Synthesis] Created Alias Redirect: ${artistId} -> ${canonicalId}`);

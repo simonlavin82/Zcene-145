@@ -97,15 +97,14 @@ real-time intelligence and global scalability.
      nodes (/labels/{labelSlug}), and untyped deep cut artist nodes. Transient network
      timeouts are the sole permitted exception, gracefully skipping the cache write to 
      leverage the frontend's robust on-demand hydration.
-   - ROOT ALIAS REPLICATION (detailsCache on Bare Root Documents):
+   - LIGHTWEIGHT REDIRECT STUBS (No Cache Bloat):
      When the backend creates or updates alias pointer documents (e.g., for regional
-     variants like 'artist-united-states'), it replicates the full detailsCache payload
-     directly onto the bare root document (e.g., 'artist') in a single atomic write.
-     This eliminates secondary redirect lookups during frontend short-ID resolution:
-     when the client queries /artists/{shortId} and finds a bare root document, the
-     detailsCache is immediately available without requiring a second Firestore hop to
-     follow a redirectsTo pointer. Alias replication uses a merge-safe updateDoc to
-     avoid overwriting any existing canonical data on the root document.
+     variants like 'artist-united-states'), it writes a pure lightweight stub to the 
+     bare root document (e.g., 'artist') containing ONLY routing metadata: 
+     { artistId, cacheKey, cacheVersion, cachedAt, redirectTo, seedArtists }.
+     It explicitly strips detailsCache and graphData to prevent data duplication and bloat. 
+     The frontend handles this via a double-hop: fetching the stub, reading the 
+     redirectsTo pointer, and then fetching the canonical document.
    - Stateful Project Orchestration: When a curation job begins, the frontend
       immediately saves the project status as 'curating', recording seedArtists
       and activeJobId. Even if the browser tab is closed, the background Cloud
@@ -661,11 +660,11 @@ To prevent data rot, API failures, and visual rendering regressions, the synthes
      On a cache miss for any entity, the pipeline synthesizes its profile via Gemini Flash and
      atomically writes it to /labels/{labelSlug} or /artists/{id} with isDeep: true before the
      job finalizes.
-   - Root Alias Replication: After writing a disambiguated regional variant document (e.g.,
-     /artists/artist-united-states), the backend replicates the full detailsCache payload onto
-     the bare root document (/artists/artist). This guarantees that frontend short-ID queries
-     against root documents immediately return hydrated content without requiring a redirectsTo
-     pointer follow-through.
+   - Lightweight Alias Stubs: After writing a disambiguated regional variant document (e.g.,
+     /artists/artist-united-states), the backend writes a lightweight stub onto the bare root 
+     document (/artists/artist). This stub contains a 'redirectTo' pointer and explicitly excludes 
+     the 'detailsCache' or 'graphData' to prevent bloat. Frontend queries against root documents 
+     must follow this 'redirectTo' pointer to fetch the fully hydrated canonical content.
    - Guaranteed Instant Cache Hits: By the time the Spiderweb graph finishes rendering on the
      client, all /artists/{id} and /labels/{canonicalId} documents exist in Firestore, ensuring
      that clicking any node — including record labels and previously unhydrated deep cuts —
