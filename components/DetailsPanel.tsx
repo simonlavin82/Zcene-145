@@ -295,8 +295,8 @@ const isTourCacheStale = (tourCachedAtString: string | undefined): boolean => {
 
 // ---------------------------------------------------------------------------
 // ProfileRow — per-profile row in the Style Compatibility Meter.
-// Extracted as a local component so it can hold its own `isExpanded` state
-// for mobile tap-to-reveal, without touching parent state.
+// Fully controlled: isExpanded and onToggle are driven by the parent list
+// so that only one profile row can be expanded at a time (mutual exclusivity).
 // ---------------------------------------------------------------------------
 interface ProfileRowProps {
     data: {
@@ -307,12 +307,13 @@ interface ProfileRowProps {
     };
     colorHex: string;
     isSmallScreen: boolean;
+    isExpanded: boolean;
+    onToggle: () => void;
     userTaste: UserTaste | null | undefined;
     onUpdateTasteProfile?: (taste: UserTaste) => void;
 }
 
-const ProfileRow: React.FC<ProfileRowProps> = ({ data, colorHex, isSmallScreen, userTaste, onUpdateTasteProfile }) => {
-    const [isExpanded, setIsExpanded] = useState(false);
+const ProfileRow: React.FC<ProfileRowProps> = ({ data, colorHex, isSmallScreen, isExpanded, onToggle, userTaste, onUpdateTasteProfile }) => {
 
     return (
         <div className="flex flex-col gap-1">
@@ -353,9 +354,9 @@ const ProfileRow: React.FC<ProfileRowProps> = ({ data, colorHex, isSmallScreen, 
             {/* Bar grid: tappable on mobile to reveal criterion labels */}
             <div
                 className={`grid grid-cols-4 gap-1.5 w-full relative ${
-                    isSmallScreen ? (isExpanded ? 'mb-4 cursor-pointer' : 'cursor-pointer') : 'group'
+                    isSmallScreen ? 'cursor-pointer' : 'group'
                 }`}
-                onClick={isSmallScreen ? () => setIsExpanded(e => !e) : undefined}
+                onClick={isSmallScreen ? onToggle : undefined}
                 role={isSmallScreen ? 'button' : undefined}
                 aria-expanded={isSmallScreen ? isExpanded : undefined}
                 aria-label={isSmallScreen ? `${data.profile.name} style breakdown` : undefined}
@@ -529,6 +530,10 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     const [chatInput, setChatInput] = useState('');
     const [showAllChips, setShowAllChips] = useState(false);
     const [clickedChips, setClickedChips] = useState<Set<string>>(new Set());
+    // Tracks which profile row is expanded on mobile — only one at a time.
+    const [expandedProfileId, setExpandedProfileId] = useState<string | null>(null);
+    // Reset expanded row when navigating to a different artist card.
+    useEffect(() => { setExpandedProfileId(null); }, [node.id]);
     
     const { queryChips, connectionPeers } = useMemo(() => {
         const chips = [
@@ -1076,6 +1081,10 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                         data={data}
                                                         colorHex={colorHex}
                                                         isSmallScreen={isSmallScreen}
+                                                        isExpanded={expandedProfileId === data.profile.id}
+                                                        onToggle={() => setExpandedProfileId(prev =>
+                                                            prev === data.profile.id ? null : data.profile.id
+                                                        )}
                                                         userTaste={userTaste}
                                                         onUpdateTasteProfile={onUpdateTasteProfile}
                                                     />
