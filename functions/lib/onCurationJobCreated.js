@@ -585,20 +585,17 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                         cacheKey: recNorm,
                         [idFieldKey]: recNorm,
                         seedArtists: recArtist,
-                        detailsCache: isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(recDetails),
                         cacheVersion: 4,
                         cachedAt: firestore_2.FieldValue.serverTimestamp(),
                         redirectTo: compositeCanonicalId
                     };
                     if (!bareSnap.exists) {
-                        barePayload.graphData = isLabel ? null : JSON.stringify({ nodes: [], links: [] });
-                        barePayload.filters = {};
                         await bareArtistIdRef.set(sanitizeUndefinedProperties(barePayload));
-                        console.log(`[Curation Backend] Created Bare Alias Pointer & detailsCache in ${collName}: ${recNorm} -> ${compositeCanonicalId}`);
+                        console.log(`[Curation Backend] Created Bare Alias Pointer Stub in ${collName}: ${recNorm} -> ${compositeCanonicalId}`);
                     }
                     else {
                         await bareArtistIdRef.update(sanitizeUndefinedProperties(barePayload)).catch(() => { });
-                        console.log(`[Curation Backend] Updated Bare Alias Pointer & detailsCache in ${collName}: ${recNorm} -> ${compositeCanonicalId}`);
+                        console.log(`[Curation Backend] Updated Bare Alias Pointer Stub in ${collName}: ${recNorm} -> ${compositeCanonicalId}`);
                     }
                 }
                 result = {
