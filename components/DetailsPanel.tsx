@@ -775,7 +775,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 <button
                                     onClick={() => handleAddToTaste(node, details)}
                                     className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 hover:bg-zinc-800 active:scale-95 leading-none text-zinc-400 hover:text-white hover:bg-zinc-800"
-                                    title="Add to Taste"
+                                    title="Add to Style"
                                 >
                                     <Flame size={18} />
                                 </button>
@@ -942,12 +942,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             {/* Compatibility Meter (Hidden for Labels) */}
                             {!isLabelNode && (
                                 <div className="flex flex-col gap-2 w-full">
-                                    <div className="flex items-center justify-between text-[10px] font-medium uppercase tracking-[0.2em] text-zinc-400">
-                                        <span>MY TASTE</span>
-                                        {activeTasteProfilesData.length === 0 && (
-                                            <span className="text-zinc-500 normal-case font-medium">Empty Taste Profile</span>
-                                        )}
-                                    </div>
+
                                     {activeTasteProfilesData.length > 0 && (
                                         <div className="flex flex-col gap-2">
 

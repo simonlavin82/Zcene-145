@@ -215,7 +215,7 @@ const DiscoveryFiltersPanel: React.FC<{
               onClick={handleApplyTaste}
               className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 active:scale-95 transition-all text-xs font-medium leading-none cursor-pointer"
             >
-              Apply My Taste
+              Apply Style
             </button>
           )}
           <div className="space-y-1.5">

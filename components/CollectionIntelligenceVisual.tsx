@@ -100,10 +100,10 @@ const CollectionIntelligenceVisual: React.FC<{ className?: string }> = ({ classN
                     </div>
 
                     <div className="px-4 py-8 space-y-10">
-                        {/* My Taste Bar (Matching DetailsPanel Taste Meter) */}
+                        {/* Style Bar (Matching DetailsPanel Style Meter) */}
                         <div className="flex flex-col gap-1.5 w-full">
                             <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">
-                                <span>MY TASTE</span>
+                                <span>MY STYLE</span>
                                 <span className="font-mono text-[#a855f7] font-bold">
                                     2/3 Hits
                                 </span>

@@ -749,7 +749,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                         <h2 className="text-3xl font-medium text-white border-b-2 border-primary/50 pb-2 mb-8">Taste Compatibility</h2>
                         <div className="space-y-12">
                             <p className="text-base text-zinc-400 leading-relaxed max-w-3xl">
-                                Zcene includes a deterministic, client-side visual compatibility meter within Deep Cut panels that compares the selected artist's attributes directly against the user's active "My Taste" profile.
+                                Zcene includes a deterministic, client-side visual compatibility meter within Deep Cut panels that compares the selected artist's attributes directly against the user's active "Style" profile.
                             </p>
                             
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -795,7 +795,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <h5 className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest mb-2">Live Demo Sandbox Reference</h5>
                                         <div className="flex flex-col gap-2 max-w-xs bg-zinc-900 p-3 border border-zinc-800">
                                             <div className="flex items-center justify-between text-[10px] font-medium uppercase tracking-[0.2em] text-zinc-400">
-                                                <span>MY TASTE</span>
+                                                <span>MY STYLE</span>
                                             </div>
                                             <div className="flex flex-col gap-2">
                                                 <div className="flex flex-col gap-1 group">

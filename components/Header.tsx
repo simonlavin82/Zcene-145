@@ -93,7 +93,7 @@ const Header: React.FC<HeaderProps> = ({
             // Migration: Transform legacy single object to array
             const migrated: UserTaste = [{
               id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
-              name: 'My Taste',
+              name: 'Style',
               color: 'purple',
               isActive: true,
               favoriteGenre: parsed.favoriteGenre || '',
@@ -204,10 +204,10 @@ const Header: React.FC<HeaderProps> = ({
             <button 
                 onClick={() => setIsTasteDialogOpen(true)}
                 className={`h-8 flex flex-shrink-0 items-center justify-center rounded-xl bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 transition-colors leading-none shadow-lg border border-zinc-700/50 relative ${isSmallScreen ? 'w-8' : 'pl-2 pr-3 gap-2'}`} 
-                title="My Taste"
+                title="Style"
             >
                 <Flame size={18} />
-                {!isSmallScreen && <span className="text-xs font-medium">My Taste</span>}
+                {!isSmallScreen && <span className="text-xs font-medium">Style</span>}
             </button>
 
             <button 

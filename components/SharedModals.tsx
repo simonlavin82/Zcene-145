@@ -207,7 +207,7 @@ export const MyTasteDialog: React.FC<{
         <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Flame size={18} className="text-primary" />
-            <h3 className="text-lg font-medium text-white">My Taste Profiles</h3>
+            <h3 className="text-lg font-medium text-white">Style Profiles</h3>
           </div>
           <button onClick={onClose} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none">
             <span className="material-symbols-outlined !text-[18px]">close</span>
