@@ -3037,7 +3037,8 @@ const App: React.FC = () => {
               }
               const normalizedGraph = applyHumanCasedLabels(normalizeGraphData(parsedGraph), artists);
               console.log(`[Front Gate Cache] GOLD STANDARD HIT! Bypassing all generation logic. searchId: ${searchId} -> resolvedId: ${resolvedSearchId}, nodes: ${normalizedGraph.nodes.length}`);
-              setGraphData(normalizedGraph);
+              // Delay setting graph data until details are hydrated
+              // setGraphData(normalizedGraph); // Moved down
               
               // 3. Extract the detailsCache string from the same document read
               let parsedDetails: any = null;
@@ -3126,10 +3127,13 @@ const App: React.FC = () => {
               }
               
               // Hydrate details for all nodes before returning
-              batchHydrateDetailsCache(normalizedGraph.nodes, normalizedGraph.links).catch(e => {
+              try {
+                await batchHydrateDetailsCache(normalizedGraph.nodes, normalizedGraph.links);
+              } catch (e) {
                 console.warn("[Front Gate Cache] Failed batch hydration of nodes:", e);
-              });
+              }
               
+              setGraphData(normalizedGraph);
               setSeedArtists(artists);
               artistList.forEach(name => {
                 approvedSeedsRef.current.add(normalizeArtistId(name));
@@ -5128,12 +5132,11 @@ const App: React.FC = () => {
                 } catch (e) { console.warn('[ProjectLoader] canvasLayout parse failed:', e); }
               }
 
-              g.nodes.forEach((n: any) => { n.fx = n.fx ?? null; n.fy = n.fy ?? null; });
-              setGraphData((prev: any) => isGraphEqual(prev, g) ? prev : g);
-
               // ── FIRESTORE-FIRST: batch-load all node biographies before marking load complete
               await batchHydrateDetailsCache(g.nodes, g.links);
               hydratedNodes = g.nodes;
+              
+              setGraphData((prev: any) => isGraphEqual(prev, g) ? prev : g);
 
               if (missing.length > 0) {
                 console.warn(`[ProjectLoader] ${missing.length} artist doc(s) missing from cache: [${missing.join(', ')}]. They will be re-fetched on next graph generation.`);
@@ -5176,13 +5179,13 @@ const App: React.FC = () => {
                   });
                 } catch (e) { console.warn('[ProjectLoader] canvasLayout parse failed:', e); }
               }
-
-              setGraphData((prev: any) => isGraphEqual(prev, g) ? prev : g);
               setCurrentCacheKey(data.cacheKey);
 
               // ── FIRESTORE-FIRST: batch-load biographies from global collection
               await batchHydrateDetailsCache(g.nodes, g.links);
               hydratedNodes = g.nodes;
+              
+              setGraphData((prev: any) => isGraphEqual(prev, g) ? prev : g);
 
 
               if (legacyEntry.detailsCache) {
@@ -5216,6 +5219,9 @@ const App: React.FC = () => {
                 }));
                 g.nodes.forEach((n: any) => { n.fx = null; n.fy = null; });
                 if (g.nodes.length > 0) {
+                  // ── FIRESTORE-FIRST: batch-load biographies from global collection
+                  await batchHydrateDetailsCache(g.nodes, g.links);
+                  
                   setGraphData((prev: any) => isGraphEqual(prev, g) ? prev : g);
                   hydratedNodes = g.nodes;
                     if (data.activeNodes && Array.isArray(data.activeNodes)) {
@@ -5240,12 +5246,11 @@ const App: React.FC = () => {
               target: typeof l.target === 'object' ? l.target.id : l.target
             }));
             g.nodes.forEach((n: any) => { n.fx = null; n.fy = null; });
-
-            setGraphData((prev: any) => isGraphEqual(prev, g) ? prev : g);
-
             // ── FIRESTORE-FIRST: batch-load biographies from global collection
             await batchHydrateDetailsCache(g.nodes, g.links);
             hydratedNodes = g.nodes;
+            
+            setGraphData((prev: any) => isGraphEqual(prev, g) ? prev : g);
 
             let preHydratedIds: string[] = [];
 
