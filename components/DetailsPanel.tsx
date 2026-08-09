@@ -316,7 +316,7 @@ interface ProfileRowProps {
 const ProfileRow: React.FC<ProfileRowProps> = ({ data, colorHex, isSmallScreen, isExpanded, onToggle, userTaste, onUpdateTasteProfile }) => {
 
     return (
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1 group">
             {/* Header: profile name | hits count | remove button */}
             <div className="flex justify-between items-center text-[10px]">
                 <span className="text-zinc-300 font-medium">{data.profile.name}</span>
@@ -324,14 +324,6 @@ const ProfileRow: React.FC<ProfileRowProps> = ({ data, colorHex, isSmallScreen, 
                     <span className="font-mono font-bold" style={{ color: colorHex }}>
                         {data.matches}/{data.totalActive} Hits
                     </span>
-                    {/* Chevron — mobile only, rotates when expanded */}
-                    {isSmallScreen && (
-                        <span
-                            className={`material-symbols-outlined !text-[12px] text-zinc-500 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
-                        >
-                            expand_more
-                        </span>
-                    )}
                     {/* Remove button: hover-gated on desktop, visible when expanded on mobile */}
                     <button
                         onClick={(e) => {
@@ -1742,6 +1734,13 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     const touchStartX = useRef<number | null>(null);
     const touchEndX = useRef<number | null>(null);
     const minSwipeDistance = 50;
+    // Fix B — Reset stale touch coordinates whenever the panel is shown/hidden.
+    // Prevents a prior gesture's coordinates from leaking across a tab switch
+    // and being misread as a forward swipe inside handleTouchEnd.
+    useEffect(() => {
+        touchStartX.current = null;
+        touchEndX.current = null;
+    }, [isActive]);
 
     const trackRef = useRef<HTMLDivElement>(null);
     const activeDotRef = useRef<HTMLDivElement>(null);
@@ -1878,18 +1877,20 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     }, [viewedIndex, activeNodes, onNodeClick]);
 
     const handleTouchStart = (e: React.TouchEvent) => {
-        if (isMagazineViewOpen) return;
+        // Fix A: ignore gestures when panel is not the active tab
+        if (isMagazineViewOpen || !isActive) return;
         touchEndX.current = null;
         touchStartX.current = e.targetTouches[0].clientX;
     };
 
     const handleTouchMove = (e: React.TouchEvent) => {
-        if (isMagazineViewOpen) return;
+        if (isMagazineViewOpen || !isActive) return;
         touchEndX.current = e.targetTouches[0].clientX;
     };
 
     const handleTouchEnd = () => {
-        if (isMagazineViewOpen || !touchStartX.current || !touchEndX.current) return;
+        // Fix A: ignore if panel is not active, or if we have no valid gesture coords
+        if (isMagazineViewOpen || !isActive || !touchStartX.current || !touchEndX.current) return;
         const distance = touchStartX.current - touchEndX.current;
         const isLeftSwipe = distance > minSwipeDistance;
         const isRightSwipe = distance < -minSwipeDistance;
