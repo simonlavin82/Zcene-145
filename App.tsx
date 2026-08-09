@@ -2802,8 +2802,8 @@ const App: React.FC = () => {
                 `[MANDATORY DISAMBIGUATION CONSTRAINT: The user explicitly selected the following regional entity: "${selectedCand.label}" from ${selectedCand.origin} (${selectedCand.genre}). You MUST synthesize this specific act and NO OTHER.]`;
               console.log(`[Flash Validation Hint Injected for ${probeKey}]:`, activeDisambiguationHints[probeKey]);
               
-              // Map the chosen origin entity and continue the loop!
-              resolvedArtistSeeds[i] = normalizeArtistId(selectedCand.id);
+              // Map the chosen origin entity hint but preserve the original query!
+              resolvedArtistSeeds[i] = normalizeArtistId(rawInput);
               hasDisambiguated = true;
               continue;
             }
@@ -3124,6 +3124,11 @@ const App: React.FC = () => {
                   setSelectedNode(hydratedNode);
                   setActiveNodeIds([hydratedNode.id]);
               }
+              
+              // Hydrate details for all nodes before returning
+              batchHydrateDetailsCache(normalizedGraph.nodes, normalizedGraph.links).catch(e => {
+                console.warn("[Front Gate Cache] Failed batch hydration of nodes:", e);
+              });
               
               setSeedArtists(artists);
               artistList.forEach(name => {
@@ -5075,7 +5080,7 @@ const App: React.FC = () => {
               (parsedFilters.includeGenres && parsedFilters.includeGenres.length > 0) ||
               (parsedFilters.additionalInstructions && parsedFilters.additionalInstructions.trim().length > 0)
             );
-            const isMultiArtistIncoming = (data.artistIds && data.artistIds.length > 1) || (data.seedArtists && data.seedArtists.includes('::'));
+            const isMultiArtistIncoming = (data.seedArtists && data.seedArtists.includes('::'));
 
             if (isMultiArtistIncoming || hasActiveFiltersIncoming) {
               console.log(`[ProjectLoader] Intercepting Phase 1 loading for complex query. Multi-artist: ${isMultiArtistIncoming}, Filtered: ${hasActiveFiltersIncoming}. Handing over to handleGenerateGraph.`);
@@ -6126,14 +6131,17 @@ const App: React.FC = () => {
           mergedDetails.imageUrl = existingDetails.imageUrl;
       }
 
-      // Update local state details cache with the MERGED details
-      setDetailsCache(prev => {
-        const updated = new Map(prev);
-        updated.set(node.id, mergedDetails);
-        updated.set(node.id.toLowerCase(), mergedDetails);
-        updated.set(cacheId, mergedDetails);
-        return updated;
-      });
+      // Update local state details cache with the MERGED details (using deep equality to avoid infinite loops)
+      const isIdentical = existingDetails && JSON.stringify(existingDetails) === JSON.stringify(mergedDetails);
+      if (!isIdentical) {
+        setDetailsCache(prev => {
+          const updated = new Map(prev);
+          updated.set(node.id, mergedDetails);
+          updated.set(node.id.toLowerCase(), mergedDetails);
+          updated.set(cacheId, mergedDetails);
+          return updated;
+        });
+      }
 
       // Update selectedNode UI state if the user is still actively viewing it
       setSelectedNode(prev => {

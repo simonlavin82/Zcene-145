@@ -45,6 +45,10 @@ async function purgeAll() {
   console.log("Purging labels...");
   await deleteCollection('labels', 500);
   console.log("Labels purged.");
+
+  console.log("Purging curationJobs...");
+  await deleteCollection('curationJobs', 500);
+  console.log("curationJobs purged.");
   
   console.log("Done.");
 }
