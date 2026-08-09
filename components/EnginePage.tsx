@@ -97,14 +97,20 @@ real-time intelligence and global scalability.
      nodes (/labels/{labelSlug}), and untyped deep cut artist nodes. Transient network
      timeouts are the sole permitted exception, gracefully skipping the cache write to 
      leverage the frontend's robust on-demand hydration.
-   - LIGHTWEIGHT REDIRECT STUBS (No Cache Bloat):
+   - LIGHTWEIGHT REDIRECT STUBS & COLD-START HYDRATION GUARDS (No Cache Bloat):
      When the backend creates or updates alias pointer documents (e.g., for regional
      variants like 'artist-united-states'), it writes a pure lightweight stub to the 
      bare root document (e.g., 'artist') containing ONLY routing metadata: 
      { artistId, cacheKey, cacheVersion, cachedAt, redirectTo, seedArtists }.
      It explicitly strips detailsCache and graphData to prevent data duplication and bloat. 
-     The frontend handles this via a double-hop: fetching the stub, reading the 
-     redirectsTo pointer, and then fetching the canonical document.
+     To guarantee cold-start hydration succeeds and prevent frontend cache poisoning:
+     1. BACKEND CANONICAL ID REWRITE (onCurationJobCreated): Before returning the finalized 
+        graph payload, the Cloud Function maps all alias IDs (e.g., 'scowl') in finalGraph.nodes 
+        and finalGraph.links to their disambiguated canonical IDs (e.g., 'scowl-usa').
+     2. FRONTEND COLD-START CACHE GUARDS (artistCacheService): The frontend caching layer 
+        strictly enforces an 'if (existing.redirectTo) return' guard clause. This prevents 
+        legacy UI state from mistakenly injecting heavy detailsCache payloads onto bare stubs,
+        ensuring the alias stubs remain pristine and the UI correctly achieves O(1) memory hits.
    - Stateful Project Orchestration: When a curation job begins, the frontend
       immediately saves the project status as 'curating', recording seedArtists
       and activeJobId. Even if the browser tab is closed, the background Cloud
