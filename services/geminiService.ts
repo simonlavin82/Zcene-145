@@ -835,6 +835,7 @@ const generateMockNodeDetails = (node: Node): NodeDetails => {
  */
 export const resolveArtistCandidatesViaAI = async (
   artistName: string,
+  rejectedCandidates?: Array<{ id: string; label: string; origin: string; genre: string }>,
   signal?: AbortSignal
 ): Promise<Array<{ id: string; label: string; origin: string; genre: string }>> => {
 
@@ -853,7 +854,12 @@ If there are multiple acts (e.g. obscure local bands sharing the name), list the
 If you are unsure but know at least one act with this name, return it.
 Respond in strict JSON only — no prose, no markdown, no citation markers.`;
 
-  const userPrompt = `List all distinct musical artists or bands named "${artistName}". Return a JSON array of objects with fields: name (string), country (string, country of origin), genre (string, primary genre), activeYears (string, e.g. "1992–2004" or "2010–present").`;
+  let userPrompt = `List all distinct musical artists or bands named "${artistName}". Return a JSON array of objects with fields: name (string), country (string, country of origin), genre (string, primary genre), activeYears (string, e.g. "1992–2004" or "2010–present").`;
+
+  if (rejectedCandidates && rejectedCandidates.length > 0) {
+    const rejectedContext = rejectedCandidates.map(c => `${c.label || c.id} (Origin: ${c.origin}, Genre: ${c.genre})`).join(', ');
+    userPrompt += `\n\nCRITICAL CONSTRAINT: Do NOT include any of the following acts in your response, as the user has already rejected them: [${rejectedContext}]. Focus solely on other distinct acts sharing this name.`;
+  }
 
   const requestBody = {
     contents: [{ role: 'user', parts: [{ text: userPrompt }] }],

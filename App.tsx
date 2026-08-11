@@ -1214,9 +1214,10 @@ const App: React.FC = () => {
     type: 'generation' | 'extension' | 'deep_cut_creation' | 'partial_synthesis' | 'cache_upgrade' | 'data_quality_optimization' | 'live_tour_search' | 'live_synthesis',
     cachedArtists: string[],
     missingArtists: string[],
-    enrichmentArtists?: string[]
+    enrichmentArtists?: string[],
+    showBack?: boolean
   ) => {
-    return new Promise<boolean>((resolve) => {
+    return new Promise<boolean | 'back'>((resolve) => {
       setTokenConfirmation({
         isOpen: true,
         type,
@@ -1231,7 +1232,11 @@ const App: React.FC = () => {
         onCancel: () => {
           setTokenConfirmation(null);
           resolve(false);
-        }
+        },
+        onBack: showBack ? () => {
+          setTokenConfirmation(null);
+          resolve('back');
+        } : undefined
       });
     });
   }, []);
@@ -2767,7 +2772,11 @@ const App: React.FC = () => {
         if (choice === 'synthesis') {
           // --- FRONT-LOADED TOKEN QUOTA GATE (Enforced BEFORE AI Validation) ---
           if (!bypassToken) {
-            const confirmed = await confirmTokenUsage(isLiveSynthesisTemp ? 'live_synthesis' : 'generation', [], artistList);
+            const confirmed = await confirmTokenUsage(isLiveSynthesisTemp ? 'live_synthesis' : 'generation', [], artistList, undefined, cacheCandidates.length > 0);
+            if (confirmed === 'back') {
+              i--;
+              continue;
+            }
             if (!confirmed) {
               setIsLoading(false);
               isHydratingSessionRef.current = false;
@@ -2778,19 +2787,25 @@ const App: React.FC = () => {
 
           // --- AI VALIDATION GATE (Validate Origin Modal) ---
           setIsLoading(true);
-          const flashCandidates = await resolveArtistCandidatesViaAI(rawInput, controller?.signal);
+          const flashCandidates = await resolveArtistCandidatesViaAI(rawInput, cacheCandidates, controller?.signal);
           setIsLoading(false);
 
           // Validate Origin Verification Gate
-          const flashChoice = await new Promise<string | 'synthesis' | 'cancel'>((resolve) => {
+          const flashChoice = await new Promise<string | 'synthesis' | 'cancel' | 'back'>((resolve) => {
             setDisambiguationDialog({
               isOpen: true,
               query: rawInput,
               candidates: flashCandidates || [],
+              showBack: cacheCandidates.length > 0,
               onSelect: (c) => { setDisambiguationDialog(null); resolve(c); },
               isLiveAISuggestions: true
             });
           });
+
+          if (flashChoice === 'back') {
+            i--;
+            continue;
+          }
 
           if (flashChoice === 'cancel') {
             setIsLoading(false);
@@ -7367,6 +7382,7 @@ const App: React.FC = () => {
         cachedArtists={tokenConfirmation?.cachedArtists || []}
         missingArtists={tokenConfirmation?.missingArtists || []}
         enrichmentArtists={tokenConfirmation?.enrichmentArtists || []}
+        onBack={tokenConfirmation?.onBack}
       />
 
       <CacheChoiceDialog

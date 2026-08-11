@@ -380,7 +380,8 @@ export const TokenConfirmationDialog: React.FC<{
   cachedArtists: string[];
   missingArtists: string[];
   enrichmentArtists?: string[];
-}> = ({ isOpen, onClose, onConfirm, type, cost, cachedArtists, missingArtists, enrichmentArtists }) => {
+  onBack?: () => void;
+}> = ({ isOpen, onClose, onConfirm, type, cost, cachedArtists, missingArtists, enrichmentArtists, onBack }) => {
   if (!isOpen) return null;
 
   return (
@@ -503,6 +504,14 @@ export const TokenConfirmationDialog: React.FC<{
         </div>
 
         <ModalFooter>
+          {onBack && (
+            <button 
+              onClick={onBack} 
+              className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:text-white hover:bg-zinc-800 transition-colors"
+            >
+              Back
+            </button>
+          )}
           <button 
             onClick={onClose} 
             className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors"
@@ -799,8 +808,9 @@ export interface DisambiguationModalProps {
   isOpen: boolean;
   query: string;
   candidates: DisambiguationCandidate[];
-  onSelect: (choice: string | 'synthesis' | 'cancel') => void;
+  onSelect: (choice: string | 'synthesis' | 'cancel' | 'back') => void;
   isLiveAISuggestions?: boolean;
+  showBack?: boolean;
 }
 
 export const COMMON_COUNTRIES = [
@@ -931,7 +941,7 @@ export const CountryFilterDropdown: React.FC<CountryFilterDropdownProps> = ({ va
   );
 };
 
-export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiveAISuggestions = false }: DisambiguationModalProps) {
+export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiveAISuggestions = false, showBack = false }: DisambiguationModalProps) {
   console.log("[Validation Flow]: DisambiguationModal opened with", { query, candidates, isLiveAISuggestions, state: candidates.length === 0 ? 'STATE A' : candidates.length === 1 ? 'STATE B' : 'STATE C' });
   const [overrideInput, setOverrideInput] = useState('');
   if (!isOpen) return null;
@@ -980,6 +990,15 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
           </ModalBody>
 
           <ModalFooter>
+            {showBack && (
+              <button
+                type="button"
+                onClick={() => onSelect('back')}
+                className="px-4 py-1.5 text-zinc-400 hover:text-white text-sm font-medium rounded-xl hover:bg-zinc-800 transition-colors"
+              >
+                Back
+              </button>
+            )}
             <button
               type="button"
               onClick={() => onSelect('cancel')}
