@@ -2676,6 +2676,44 @@ const App: React.FC = () => {
       return;
     }
 
+    // Phase 2: Upfront Project Minting (Step Zero)
+    if (user && !currentProjectId && !isGuest && !isRegeneration && !graphToEnhance) {
+      const newDocRef = doc(collection(db, 'users', user.uid, 'projects'));
+      const newId = newDocRef.id;
+      setCurrentProjectId(newId);
+      currentProjectIdRef.current = newId;
+      navigate(`/z/${newId}`);
+
+      let defaultName = projectName || "Untitled Zcene";
+      if (!projectName || projectName === "Untitled Zcene") {
+        const seeds = artists.split('::').map(s => s.trim()).filter(Boolean);
+        if (seeds.length > 1) {
+          defaultName = seeds.join(' + ');
+        } else if (seeds.length === 1) {
+          defaultName = seeds[0];
+        }
+      }
+
+      await setDoc(newDocRef, {
+        name: defaultName,
+        seedArtists: artists,
+        graphData: JSON.stringify({ nodes: [], links: [] }),
+        activeNodes: [],
+        detailsCache: '[]',
+        chatHistories: '[]',
+        discoveryFilters: '{}',
+        lastViewedStackCount: 0,
+        isMagazineViewOpen: false,
+        authorId: user.uid,
+        supportsLabelDeepCuts: true,
+        schemaVersion: 2,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        status: 'curating'
+      });
+      console.log(`[Step Zero] Minted new project: ${newId}`);
+    }
+
     const artistList = artists.split('::').map(a => normalizeArtistId(a)).filter(Boolean);
     if (artistList.length > 25) {
       isHydratingSessionRef.current = false;
@@ -2685,16 +2723,7 @@ const App: React.FC = () => {
       return;
     }
 
-    // ─── STAGE 0: UNIFIED DISAMBIGUATION GATE ─────────────────────────────────
-    // Constitutional rule: Cache is always interrogated first.
-    // The live AI probe fires ONLY on explicit "Search Live AI" click — never automatically.
-    //
-    // Every artist search ALWAYS passes through this checkpoint.
-    // The modal is shown regardless of how many cache records are found:
-    //   0 candidates → "No records found" + Search Live AI + Continue
-    //   1 candidate  → "Look what I found — is this correct?" + None of these + Continue
-    //   >1 candidates → "Multiple found — which did you mean?" + None of these + Continue
-    // ─────────────────────────────────────────────────────────────────────────────
+    // ─── STAGE 0: UNIFIED DISAMBIGUATION GATE & TOKEN GUARD ────────────────────
     let resolvedArtistSeeds = [...artistList];
     let activeDisambiguationHints: Record<string, string> = disambiguationHints || {};
     let hasDisambiguated = false;
@@ -2704,7 +2733,7 @@ const App: React.FC = () => {
         const rawInput = artists.split('::').map(s => s.trim()).filter(Boolean)[i] || artistList[i];
         const searchId = artistList[i];
 
-        // Step 1: Interrogate the Firestore cache first (always).
+        // Step 1: Interrogate the Firestore cache first.
         const cacheCandidates = await searchDisambiguationCandidates(searchId);
 
         setIsLoading(false);
@@ -2713,14 +2742,18 @@ const App: React.FC = () => {
 
         let choice: string | 'synthesis' | 'cancel' = 'synthesis';
 
-        // Step 2: Show the verification modal if we have cached candidates.
-        if (cacheCandidates.length > 0) {
+        // Flow 3 Bypass: If exactly 1 cache candidate and no active filters, bypass Validate Origin
+        if (cacheCandidates.length === 1 && !hasActiveFilters) {
+          choice = cacheCandidates[0].id;
+        } else if (cacheCandidates.length > 0) {
+          // Look What I Found / Multiple Candidates Modal
           choice = await new Promise<string | 'synthesis' | 'cancel'>((resolve) => {
             setDisambiguationDialog({
               isOpen: true,
               query: rawInput,
               candidates: cacheCandidates, 
-              onSelect: (c) => { setDisambiguationDialog(null); resolve(c); }
+              onSelect: (c) => { setDisambiguationDialog(null); resolve(c); },
+              isLiveAISuggestions: false
             });
           });
         }
@@ -2735,8 +2768,7 @@ const App: React.FC = () => {
         }
 
         if (choice === 'synthesis') {
-          // --- FRONT-LOADED TOKEN QUOTA GATE ---
-          // Ensure absolutely zero API tokens or network dispatches occur before user accepts cost.
+          // --- FRONT-LOADED TOKEN QUOTA GATE (Enforced BEFORE AI Validation) ---
           if (!bypassToken) {
             const confirmed = await confirmTokenUsage(isLiveSynthesisTemp ? 'live_synthesis' : 'generation', [], artistList);
             if (!confirmed) {
@@ -2747,12 +2779,12 @@ const App: React.FC = () => {
             }
           }
 
-          // --- FLASH MODEL VALIDATION GATE ---
+          // --- AI VALIDATION GATE (Validate Origin Modal) ---
           setIsLoading(true);
           const flashCandidates = await resolveArtistCandidatesViaAI(rawInput, controller?.signal);
           setIsLoading(false);
 
-          // Always mount the modal to act as a mandatory verification gate
+          // Validate Origin Verification Gate
           const flashChoice = await new Promise<string | 'synthesis' | 'cancel'>((resolve) => {
             setDisambiguationDialog({
               isOpen: true,
@@ -2776,7 +2808,6 @@ const App: React.FC = () => {
             const userInputCountry = flashChoice.split('::')[1];
             const normalizedCountry = normalizeCountry(userInputCountry);
             
-            // Check for collision against cache
             const cacheHit = cacheCandidates.find(c => 
               c.origin && c.origin.toLowerCase().includes(normalizedCountry.toLowerCase())
             );
@@ -2787,7 +2818,7 @@ const App: React.FC = () => {
               hasDisambiguated = true;
               const nonSelected = cacheCandidates.filter(c => c.id !== cacheHit.id);
               nonSelected.forEach(ns => mergeAndCleanupArtists(cacheHit.id, ns.id));
-              continue; // proceed to next artist in loop
+              continue;
             } else {
               const probeKey = normalizeArtistId(rawInput);
               activeDisambiguationHints[probeKey] = 
@@ -2801,23 +2832,18 @@ const App: React.FC = () => {
               activeDisambiguationHints[probeKey] = 
                 `[MANDATORY DISAMBIGUATION CONSTRAINT: The user explicitly selected the following regional entity: "${selectedCand.label}" from ${selectedCand.origin} (${selectedCand.genre}). You MUST synthesize this specific act and NO OTHER.]`;
               console.log(`[Flash Validation Hint Injected for ${probeKey}]:`, activeDisambiguationHints[probeKey]);
-              
-              // Map the chosen origin entity hint but preserve the original query!
               resolvedArtistSeeds[i] = normalizeArtistId(rawInput);
               hasDisambiguated = true;
               continue;
             }
           }
 
-          // Direct Wire to Live Generative Synthesis & Rejection Constraint Injection:
-          // Extract rejected metadata from cacheCandidates and inject negative constraint hint for Gemini 3.1 Pro:
           if (cacheCandidates && cacheCandidates.length > 0) {
             const rejectedDescriptions = cacheCandidates.map(c => 
               `"${c.label}"${c.origin ? ` from ${c.origin}` : ''}${c.genre ? ` (${c.genre})` : ''}`
             ).join(', ');
 
             const probeKey = normalizeArtistId(rawInput);
-            // Append or create rejection hint
             const rejectionHint = 
               `[DISAMBIGUATION REJECTION CONSTRAINTS: The user explicitly rejected the cached artist ` +
               `candidate(s): ${rejectedDescriptions}. Synthesize a DIFFERENT regional or genre act ` +
@@ -2826,14 +2852,9 @@ const App: React.FC = () => {
             activeDisambiguationHints[probeKey] = activeDisambiguationHints[probeKey] 
               ? activeDisambiguationHints[probeKey] + '\n' + rejectionHint 
               : rejectionHint;
-            
             console.log(`[Disambiguation Rejection Hint Injected for ${probeKey}]:`, activeDisambiguationHints[probeKey]);
           }
 
-          // We immediately re-invoke handleGenerateGraph with:
-          //   - skipCacheLookup = true (bypass local Firestore cache)
-          //   - bypassTokenConfirmation = true (we already confirmed it above!)
-          //   - bypassDisambiguation = true (break STAGE 0 re-entry loop)
           handleGenerateGraph(artists, isRegeneration, graphToEnhance, true, true, overrideFilters, activeDisambiguationHints, true);
           return;
         } else {
@@ -3122,30 +3143,53 @@ const App: React.FC = () => {
                       type: 'artist' as const,
                       group: 0
                   };
-                  setSelectedNode(hydratedNode);
-                  setActiveNodeIds([hydratedNode.id]);
+                  
+                  const nodeIndex = normalizedGraph.nodes.findIndex((n: any) => n.id === hydratedNode.id);
+                  if (nodeIndex !== -1) {
+                      normalizedGraph.nodes[nodeIndex] = hydratedNode;
+                  }
+                  
+                  if (!currentProjectIdRef.current || isGuest) {
+                    setSelectedNode(hydratedNode);
+                    setActiveNodeIds([hydratedNode.id]);
+                  }
               }
               
-              // Hydrate details for all nodes before returning
               try {
                 await batchHydrateDetailsCache(normalizedGraph.nodes, normalizedGraph.links);
               } catch (e) {
                 console.warn("[Front Gate Cache] Failed batch hydration of nodes:", e);
               }
               
-              setGraphData(normalizedGraph);
-              setSeedArtists(artists);
               artistList.forEach(name => {
                 approvedSeedsRef.current.add(normalizeArtistId(name));
               });
-              // Force all loading flags off and short-circuit the entire function
+
+              // Phase 3 Hydration Guard
+              if (currentProjectIdRef.current && user && !isGuest) {
+                const projectPath = `users/${user.uid}/projects/${currentProjectIdRef.current}`;
+                try {
+                  const activeId = primaryNode ? primaryNode.id : searchId;
+                  await updateDoc(doc(db, projectPath), {
+                    graphData: JSON.stringify(normalizedGraph),
+                    activeNodes: [activeId],
+                    seedArtists: artists,
+                    status: 'completed',
+                    updatedAt: serverTimestamp()
+                  });
+                  console.log("[Phase 3 Hydration Guard] Updated project doc via Cache Hit. Awaiting onSnapshot.");
+                } catch (e) {
+                  console.error("Failed to update project doc for hydration", e);
+                }
+              } else {
+                setGraphData(normalizedGraph);
+                setSeedArtists(artists);
+              }
+
               setIsLoading(false);
               isFetchingDetailsRef.current = false;
-              if (user && isFirebaseReady && isAuthInitialized && currentProjectId && !isGuest) {
-                isLockReleasedByAutosave = true;
-              } else {
-                isHydratingSessionRef.current = false;
-              }
+              isHydratingSessionRef.current = false;
+              
               if (!isQualified) {
                 console.log('[Front Gate Cache] Cache doc found but not fully qualified. Background revalidation queued.');
               } else {
@@ -4360,8 +4404,22 @@ const App: React.FC = () => {
             ...healedDetailsCacheRef.current,
             ...detailsCache
           ]);
-          const allEntityNamesToCache = Array.from(new Set([...artistList, ...final.nodes.filter(n => n.type === 'artist' || n.type === 'label').map(n => n.label || n.id)]));
-          await writeArtistCacheMany(allEntityNamesToCache, final, user?.uid, activeDiscoveryFilters, true, true, combinedDetailsMap, artistList);
+          const hasActiveFilters = !!(
+            activeDiscoveryFilters.foundedAfter ||
+            activeDiscoveryFilters.foundedBefore ||
+            (activeDiscoveryFilters.includeOrigins && activeDiscoveryFilters.includeOrigins.length > 0) ||
+            (activeDiscoveryFilters.excludeOrigins && activeDiscoveryFilters.excludeOrigins.length > 0) ||
+            (activeDiscoveryFilters.includeGenres && activeDiscoveryFilters.includeGenres.length > 0) ||
+            (activeDiscoveryFilters.additionalInstructions && activeDiscoveryFilters.additionalInstructions.trim().length > 0)
+          );
+          const isMultiSeed = artists.includes('::');
+
+          if (isMultiSeed || hasActiveFilters) {
+            console.log(`[Phase 4 Sandbox Guard] Bypassing global cache writes for bespoke generation. Multi-Seed: ${isMultiSeed}, Filters: ${hasActiveFilters}`);
+          } else {
+            const allEntityNamesToCache = Array.from(new Set([...artistList, ...final.nodes.filter(n => n.type === 'artist' || n.type === 'label').map(n => n.label || n.id)]));
+            await writeArtistCacheMany(allEntityNamesToCache, final, user?.uid, activeDiscoveryFilters, true, true, combinedDetailsMap, artistList);
+          }
         };
 
         runUpfrontFetchAndWrite()
@@ -4370,29 +4428,24 @@ const App: React.FC = () => {
       }
 
       // Update active nodes metadata from the final graph, ensuring all seeds are present
-      setActiveNodeIds(prev => {
-        const seedIds = new Set(resolvedArtistList.map(name => name.toLowerCase()));
-        const finalActive = [...resolvedArtistList];
-
-        // Add back other previously active nodes that aren't seeds (e.g. manual discoveries)
-        prev.forEach(id => {
-          if (!seedIds.has(id.toLowerCase())) {
-            finalActive.push(id);
-            seedIds.add(id.toLowerCase());
-          }
-        });
-
-        return finalActive;
+      // Update active nodes metadata from the final graph, ensuring all seeds are present
+      const seedIds = new Set(resolvedArtistList.map(name => name.toLowerCase()));
+      const finalActive = [...resolvedArtistList];
+      activeNodeIds.forEach(id => {
+        if (!seedIds.has(id.toLowerCase())) {
+          finalActive.push(id);
+          seedIds.add(id.toLowerCase());
+        }
       });
 
-      // Find the primary/seed node in the final graph and select it to paint the sidebar immediately
       const firstSlug = resolvedArtistList[0];
       const primaryNode = final.nodes.find(n => n.id.toLowerCase() === firstSlug.toLowerCase()) || final.nodes[0];
+      let selectedNodeData = primaryNode;
+
       if (primaryNode) {
         const normId = normalizeArtistId(primaryNode.id);
         const cachedDetails = detailsCache.get(normId) || detailsCache.get(primaryNode.id.toLowerCase());
         
-        // Find connected countries in the newly synthesized graph
         const connectedCountries = final.links
           .filter((l: any) => {
             const sId = typeof l.source === 'string' ? l.source : l.source.id;
@@ -4417,7 +4470,7 @@ const App: React.FC = () => {
           });
 
         if (cachedDetails && cachedDetails.summary && !hasMismatch) {
-          setSelectedNode({
+          selectedNodeData = {
             ...primaryNode,
             bio: cachedDetails.summary,
             summary: cachedDetails.summary,
@@ -4425,10 +4478,8 @@ const App: React.FC = () => {
             origin: cachedDetails.details?.origin || "",
             founded: cachedDetails.details?.founded || "",
             imageUrl: cachedDetails.imageUrl || (primaryNode as any).imageUrl || ""
-          } as any);
-        } else {
-          // If there is an origin mismatch, evict the stale entry from detailsCache so the queue can fetch it
-          if (hasMismatch) {
+          } as any;
+        } else if (hasMismatch) {
             console.log(`[Selection Hydration Gate] Origin mismatch detected for ${primaryNode.id} selection (cached: "${cachedOrigin}", graph: [${connectedCountries.join(', ')}]). Evicting simple-key cache.`);
             setDetailsCache(prev => {
               const next = new Map(prev);
@@ -4438,16 +4489,39 @@ const App: React.FC = () => {
             });
             detailsCacheRef.current.delete(normId);
             detailsCacheRef.current.delete(primaryNode.id.toLowerCase());
-          }
-          setSelectedNode(primaryNode);
         }
       }
+
       setLastAppliedFilters(activeDiscoveryFilters);
-      if (user && isFirebaseReady && isAuthInitialized && currentProjectId && !isGuest) {
-        isLockReleasedByAutosave = true;
+
+      // Phase 3 Hydration Guard
+      if (currentProjectIdRef.current && user && !isGuest) {
+        const projectPath = `users/${user.uid}/projects/${currentProjectIdRef.current}`;
+        try {
+          if (selectedNodeData) {
+              const nodeIndex = final.nodes.findIndex((n: any) => n.id === selectedNodeData.id);
+              if (nodeIndex !== -1) final.nodes[nodeIndex] = selectedNodeData;
+          }
+          await updateDoc(doc(db, projectPath), {
+            graphData: JSON.stringify(final),
+            activeNodes: finalActive,
+            seedArtists: resolvedArtists,
+            status: 'completed',
+            updatedAt: serverTimestamp()
+          });
+          console.log("[Phase 3 Hydration Guard] Updated project doc after Generation. Awaiting onSnapshot.");
+        } catch (e) {
+          console.error("Failed to update project doc for hydration", e);
+        }
       } else {
-        isHydratingSessionRef.current = false;
+        setGraphData(final);
+        setActiveNodeIds(finalActive);
+        if (selectedNodeData) {
+            setSelectedNode(selectedNodeData);
+        }
       }
+
+      isHydratingSessionRef.current = false;
     } catch (err: any) {
       if (err.name !== 'AbortError' && !(controller && controller.signal.aborted)) {
         const snippet = err.stackSnippet ? err.stackSnippet : "";
@@ -6005,18 +6079,32 @@ const App: React.FC = () => {
       // Double-Write to Global Cache: Await global cache writes before updating canvas graphData state.
       // This prevents the project canvas auto-save from racing ahead before the cache entries exist.
       if (discoveredArtistNames.length > 0) {
-        showToast("Saving new discoveries to global cache...");
-        try {
-          const combinedDetailsMap = new Map([
-            ...detailsCacheRef.current,
-            ...healedDetailsCacheRef.current,
-            ...detailsCache
-          ]);
-          const allEntityNamesToCache = Array.from(new Set([...discoveredArtistNames, ...mergedGraph.nodes.filter(n => n.type === 'artist' || n.type === 'label').map(n => n.label || n.id)]));
-          await writeArtistCacheMany(allEntityNamesToCache, mergedGraph, user?.uid, discoveryFilters, true, false, combinedDetailsMap, discoveredArtistNames);
-          console.log(`[Node Extension] Global cache double-write confirmed for: ${allEntityNamesToCache.join(', ')}`);
-        } catch (e) {
-          console.error('[Node Extension] Global cache double-write failed:', e);
+        const hasActiveFilters = !!(
+          discoveryFilters.foundedAfter ||
+          discoveryFilters.foundedBefore ||
+          (discoveryFilters.includeOrigins && discoveryFilters.includeOrigins.length > 0) ||
+          (discoveryFilters.excludeOrigins && discoveryFilters.excludeOrigins.length > 0) ||
+          (discoveryFilters.includeGenres && discoveryFilters.includeGenres.length > 0) ||
+          (discoveryFilters.additionalInstructions && discoveryFilters.additionalInstructions.trim().length > 0)
+        );
+        const isMultiSeed = seedArtists.includes('::');
+        
+        if (isMultiSeed || hasActiveFilters) {
+          console.log(`[Phase 4 Sandbox Guard] Bypassing global cache writes for network extension. Multi-Seed: ${isMultiSeed}, Filters: ${hasActiveFilters}`);
+        } else {
+          showToast("Saving new discoveries to global cache...");
+          try {
+            const combinedDetailsMap = new Map([
+              ...detailsCacheRef.current,
+              ...healedDetailsCacheRef.current,
+              ...detailsCache
+            ]);
+            const allEntityNamesToCache = Array.from(new Set([...discoveredArtistNames, ...mergedGraph.nodes.filter(n => n.type === 'artist' || n.type === 'label').map(n => n.label || n.id)]));
+            await writeArtistCacheMany(allEntityNamesToCache, mergedGraph, user?.uid, discoveryFilters, true, false, combinedDetailsMap, discoveredArtistNames);
+            console.log(`[Node Extension] Global cache double-write confirmed for: ${allEntityNamesToCache.join(', ')}`);
+          } catch (e) {
+            console.error('[Node Extension] Global cache double-write failed:', e);
+          }
         }
       }
 

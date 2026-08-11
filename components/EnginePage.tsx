@@ -288,6 +288,7 @@ the entire dataset, the app evolves existing visual structures.
      preventing the header from briefly clearing or flickering.
    - Auto-Hydration: The Deep Cut details panel automatically hydrates upon loading a completed project
      by auto-selecting the first activeNodes entry and triggering the local details loader.
+   - O(1) Cold-Start Database Hydration: Synchronous state mutations (setGraphData) have been removed from the generation and cache-hit pipelines for authenticated users. The pipeline strictly writes the generated graph and active nodes to the minted Project Document in Firestore, relying entirely on the onSnapshot listener to organically hydrate the frontend React state.
    - SEED-FALLBACK LOADER (CRITICAL — App.tsx: handleProjectSnapshot):
      The project loader runs across four code branches (graphData-direct, Phase 1 per-artist cache,
      legacy cacheKey format, very-legacy blob format). Every branch calls
@@ -333,7 +334,7 @@ the entire dataset, the app evolves existing visual structures.
    - Target System Architecture Boundaries:
      * Single Seed (Unfiltered): Use the canonical, pre-calculated Spiderweb cached globally on the artist's Firestore document.
      * Custom Spiderwebs (Multi-Seed OR Filtered): Trigger a brand-new, project-specific Spiderweb via Gemini 3.1 Pro. The LLM discovers novel intermediate bridge nodes.
-     * Isolation: Custom Spiderwebs belong only to the specific project (/projects/{id}) and NEVER write to or overwrite global single-artist graph documents, protecting the master network from topology pollution.
+     * Isolation (Phase 4 Sandbox Guard): Custom Spiderwebs strictly bypass the writeArtistCacheMany routine (for both initial generation and network extension). They belong only to the specific project (/projects/{id}) and NEVER write to or overwrite global single-artist graph documents, protecting the master network from topology pollution.
    - Sentinel Resolution: Cache entries marked as sentinel slots (_isSentinel: true) are
      flagged as corrupt; clicking a sentinel node bypasses the early-return cache checks and
      triggers JIT re-evaluation.
@@ -351,17 +352,17 @@ the entire dataset, the app evolves existing visual structures.
     STAGE 0 re-entry bypassed (bypassDisambiguation = true), and token authorization enabled (bypassTokenConfirmation = false).
 
     State Machine & Verification Pipeline:
+    - Step 0 (Upfront Project Minting): Immediately upon generation start, a new Project ID is minted and the user is routed to /z/:id.
     - Step 1 (Cache Interrogation): searchDisambiguationCandidates() queries global /artists.
-    - Step 2 (Human-in-the-Loop Checkpoint):
-      - 0 cache hits -> "No cached records found" + Search Live AI -> Direct Live Synthesis + Cancel.
-      - 1 cache hit -> "Look What I Found" (single card). Clicking card accepts candidate.
-        Escape: "None of these" -> Direct Live Synthesis + Cancel.
-      - >1 cache hits -> "Disambiguation" (list of cards). Clicking card accepts candidate.
-    - Step 3 (Direct Live Synthesis & Cloud Rejection Constraint Propagation): Clicking Search Live AI closes the modal instantly.
+    - Step 2 (Token Guard): If API synthesis is required, the API Token Authorization Modal is displayed BEFORE any AI validation.
+    - Step 3 (Human-in-the-Loop Checkpoint):
+      - 1 cache hit + no filters -> (Flow 3 Bypass) Automatically accepts candidate without modal.
+      - >0 cache hits -> "Look What I Found" / "Disambiguation" modal. Clicking card accepts candidate.
+        Escape: "None of these" -> Validate Origin.
+    - Step 4 (Flash AI Validation): "Validate Origin" modal resolves ambiguity. Clicking candidate accepts it.
       STAGE 0 packages rejected card metadata into a negative constraint hint for Gemini 3.1 Pro.
       handleGenerateGraph re-invokes with skipCacheLookup = true, bypassDisambiguation = true,
-      and bypassTokenConfirmation = false. The decoupled guard skips STAGE 0 re-entry, displays
-      the API Token Authorization Modal, and dispatches generateGraphDataViaCloudJob with disambiguationHints
+      and bypassTokenConfirmation = true. The decoupled guard skips STAGE 0 re-entry, and dispatches generateGraphDataViaCloudJob with disambiguationHints
       passed in inputPayload to /curationJobs. Deep Cut responses are parsed via regex codeblock extraction
       and sanitized with sanitizeBioText() to strip \n* artifacts.
 
