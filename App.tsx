@@ -2742,10 +2742,7 @@ const App: React.FC = () => {
 
         let choice: string | 'synthesis' | 'cancel' = 'synthesis';
 
-        // Flow 3 Bypass: If exactly 1 cache candidate and no active filters, bypass Validate Origin
-        if (cacheCandidates.length === 1 && !hasActiveFilters) {
-          choice = cacheCandidates[0].id;
-        } else if (cacheCandidates.length > 0) {
+        if (cacheCandidates.length > 0) {
           // Look What I Found / Multiple Candidates Modal
           choice = await new Promise<string | 'synthesis' | 'cancel'>((resolve) => {
             setDisambiguationDialog({

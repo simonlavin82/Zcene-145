@@ -356,8 +356,9 @@ the entire dataset, the app evolves existing visual structures.
     - Step 1 (Cache Interrogation): searchDisambiguationCandidates() queries global /artists.
     - Step 2 (Token Guard): If API synthesis is required, the API Token Authorization Modal is displayed BEFORE any AI validation.
     - Step 3 (Human-in-the-Loop Checkpoint):
-      - 1 cache hit + no filters -> (Flow 3 Bypass) Automatically accepts candidate without modal.
-      - >0 cache hits -> "Look What I Found" / "Disambiguation" modal. Clicking card accepts candidate.
+      - 1 cache hit -> "Look What I Found" modal. Clicking card accepts candidate.
+        Escape: "None of these" -> Validate Origin.
+      - >1 cache hits -> "Disambiguation" modal. Clicking card accepts candidate.
         Escape: "None of these" -> Validate Origin.
     - Step 4 (Flash AI Validation): "Validate Origin" modal resolves ambiguity. Clicking candidate accepts it.
       STAGE 0 packages rejected card metadata into a negative constraint hint for Gemini 3.1 Pro.
