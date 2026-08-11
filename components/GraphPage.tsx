@@ -114,8 +114,9 @@ interface GraphPageProps {
     query: string;
     candidates: DisambiguationCandidate[];
     isLiveAISuggestions?: boolean;
+    showBack?: boolean;
   } | null;
-  onSelectDisambiguation: (choice: string | 'synthesis' | 'cancel') => void;
+  onSelectDisambiguation: (choice: string | 'synthesis' | 'cancel' | 'back') => void;
 }
 
 const DEFAULT_LEFT_PANEL_WIDTH = 320;
@@ -1812,6 +1813,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
           query={disambiguationDialog?.query || ''}
           candidates={disambiguationDialog?.candidates || []}
           isLiveAISuggestions={disambiguationDialog?.isLiveAISuggestions}
+          showBack={disambiguationDialog?.showBack}
           onSelect={onSelectDisambiguation}
         />
     </div>

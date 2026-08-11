@@ -504,20 +504,21 @@ export const TokenConfirmationDialog: React.FC<{
         </div>
 
         <ModalFooter>
-          {onBack && (
+          {onBack ? (
             <button 
               onClick={onBack} 
-              className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:text-white hover:bg-zinc-800 transition-colors"
+              className="px-4 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent"
             >
               Back
             </button>
+          ) : (
+            <button 
+              onClick={onClose} 
+              className="px-4 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent"
+            >
+              Cancel
+            </button>
           )}
-          <button 
-            onClick={onClose} 
-            className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors"
-          >
-            Cancel
-          </button>
           <button 
             onClick={onConfirm} 
             className="px-4 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90"
@@ -990,22 +991,23 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
           </ModalBody>
 
           <ModalFooter>
-            {showBack && (
+            {showBack ? (
               <button
                 type="button"
                 onClick={() => onSelect('back')}
-                className="px-4 py-1.5 text-zinc-400 hover:text-white text-sm font-medium rounded-xl hover:bg-zinc-800 transition-colors"
+                className="px-4 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent"
               >
                 Back
               </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onSelect('cancel')}
+                className="px-4 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent"
+              >
+                Cancel
+              </button>
             )}
-            <button
-              type="button"
-              onClick={() => onSelect('cancel')}
-              className="px-4 py-1.5 text-zinc-400 hover:text-white text-sm font-medium rounded-xl hover:bg-zinc-800 transition-colors"
-            >
-              Cancel
-            </button>
             {(!isLiveAISuggestions || overrideInput.trim()) && (
               <button
                 type="submit"
@@ -1092,13 +1094,23 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
           </ModalBody>
           
           <ModalFooter>
-            <button
-              type="button"
-              onClick={() => onSelect('cancel')}
-              className="px-4 py-1.5 text-zinc-400 hover:text-white text-sm font-medium rounded-xl hover:bg-zinc-800 transition-colors"
-            >
-              Cancel
-            </button>
+            {showBack ? (
+              <button
+                type="button"
+                onClick={() => onSelect('back')}
+                className="px-4 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent"
+              >
+                Back
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onSelect('cancel')}
+                className="px-4 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent"
+              >
+                Cancel
+              </button>
+            )}
             {isLiveAISuggestions && !overrideInput.trim() ? (
               null // "None of these" is in the dropdown now
             ) : (
@@ -1191,13 +1203,23 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
           </ModalBody>
 
         <ModalFooter>
-          <button
-            type="button"
-            onClick={() => onSelect('cancel')}
-            className="px-4 py-1.5 text-zinc-400 hover:text-white text-sm font-medium rounded-xl hover:bg-zinc-800 transition-colors"
-          >
-            Cancel
-          </button>
+          {showBack ? (
+            <button
+              type="button"
+              onClick={() => onSelect('back')}
+              className="px-4 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent"
+            >
+              Back
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onSelect('cancel')}
+              className="px-4 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent"
+            >
+              Cancel
+            </button>
+          )}
           {overrideInput.trim() && (
             <button
               type="submit"

@@ -361,6 +361,8 @@ the entire dataset, the app evolves existing visual structures.
       - >1 cache hits -> "Disambiguation" modal. Clicking card accepts candidate.
         Escape: "None of these" -> Validate Origin.
     - Step 4 (Flash AI Validation): "Validate Origin" modal resolves ambiguity. Clicking candidate accepts it.
+      - Negative AI Constraints: Rejected candidates from the cache hit are sent to resolveArtistCandidatesViaAI to ensure the live model strictly excludes them from its regional variance suggestions.
+      - Back Escape Route: If the user presses "Back" in the Token Quota Warning or Validate Origin modals, the state machine triggers an 'i--; continue;' loop-reset to cleanly restore the original cache hit modal without data pollution.
       STAGE 0 packages rejected card metadata into a negative constraint hint for Gemini 3.1 Pro.
       handleGenerateGraph re-invokes with skipCacheLookup = true, bypassDisambiguation = true,
       and bypassTokenConfirmation = true. The decoupled guard skips STAGE 0 re-entry, and dispatches generateGraphDataViaCloudJob with disambiguationHints
