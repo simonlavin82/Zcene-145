@@ -594,8 +594,8 @@ designed to minimize friction for new users while rewarding existing authors.
 
 1. URL-BASED SHARING:
    Every 'Share' operation generates a unique document ID in the '/sharedZcenes' 
-   collection. This ID is appended to the URL as a query parameter (/app?id=...) 
-   or accessed directly via path-based routing (/z/{shareId}).
+   collection. This ID is directly accessed via path-based routing (/z/{shareId}).
+   (The legacy /app?shareId= format has been sunset).
 
 2. READ-ONLY PREVIEW:
    - Anonymous/Logged-out: Users see a "Guest Mode" watermark. They can 
@@ -1276,7 +1276,7 @@ const SharingFlowDiagram: React.FC = () => (
                     <span className="material-symbols-outlined text-zinc-400">share</span>
                 </div>
                 <div className="text-white font-medium text-center text-xs">A User Shares a Zcene Project</div>
-                <div className="px-2 py-1 bg-zinc-900 border border-zinc-800 rounded-md text-[10px] font-mono text-zinc-500">?shareId=...</div>
+                <div className="px-2 py-1 bg-zinc-900 border border-zinc-800 rounded-md text-[10px] font-mono text-zinc-500">/z/...</div>
             </div>
 
             <div className="pt-6">

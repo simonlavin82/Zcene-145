@@ -1681,7 +1681,7 @@ const App: React.FC = () => {
 
       const docRef = await addDoc(collection(db, path), sharePayload);
 
-      const shareUrl = `${window.location.origin}/app?id=${docRef.id}`;
+      const shareUrl = `${window.location.origin}/z/${docRef.id}`;
       try {
         await navigator.clipboard.writeText(shareUrl);
         showToast('Link copied to clipboard!');
@@ -1709,7 +1709,7 @@ const App: React.FC = () => {
   const handleTriggerShareModal = useCallback(async () => {
     const shareId = await handleShareZcene();
     if (shareId) {
-      const deepLink = `${window.location.origin}/app?shareId=${shareId}`;
+      const deepLink = `${window.location.origin}/z/${shareId}`;
       setActiveShareUrl(deepLink);
       setIsShareModalOpen(true);
     }
@@ -1727,7 +1727,7 @@ const App: React.FC = () => {
       delete sharePayload.id; // Exclude the local ID
       
       const sharedRef = await addDoc(collection(db, 'sharedZcenes'), sharePayload);
-      const shareUrl = `${window.location.origin}/app?shareId=${sharedRef.id}`;
+      const shareUrl = `${window.location.origin}/z/${sharedRef.id}`;
       
       setActiveShareUrl(shareUrl);
       setIsShareModalOpen(true);
@@ -5769,7 +5769,7 @@ const App: React.FC = () => {
         }
 
         // Allow access to app if we have a deep link ID, even if not logged in
-        if (!user && !projectIdFromQuery && !shareIdFromQuery) {
+        if (!user && !projectIdFromQuery && !shareIdFromQuery && !isProjectPath) {
           authRedirectPathRef.current = pathname + window.location.search;
           if (currentViewRef.current !== View.Home) {
             setCurrentView(View.Home);
