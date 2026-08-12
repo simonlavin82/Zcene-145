@@ -195,9 +195,9 @@ the entire dataset, the app evolves existing visual structures.
    - Dual-Strategy iTunes Fast-Path & Genre Confidence Validation: The image scraper bypasses
      LLM hallucination by querying the iTunes API for \`entity=musicArtist\`. It enforces a deterministic
      case-insensitive exact match on the artist name, and crucially, disambiguates shared names
-     (like "Gel" or "Sunami") by actively cross-referencing the iTunes \`primaryGenreName\` against the 
-     generated Zcene scene genre. If the genre falls outside a safe whitelist (e.g. World, Gospel) or 
-     is hopelessly ambiguous, it safely drops the image rather than display a false match.
+     (like "Gel" or "Sunami") by strictly enforcing a bidirectional substring intersection between the iTunes \`primaryGenreName\` and the 
+     generated Zcene scene genre. If the iTunes genre does not strictly intersect with the Zcene genre, 
+     it safely drops the image rather than display a false match.
    - Organic Deep-Cut Range Targeting: The LLM graph generator prompt is explicitly configured
      to aim for a rich spiderweb density (18 to 21 organic related artists). However, the model is
      given explicit natural flexibility to scale this number down if a smaller musical scene calls
