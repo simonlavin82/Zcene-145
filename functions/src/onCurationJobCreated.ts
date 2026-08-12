@@ -310,10 +310,14 @@ export const onCurationJobCreated = onDocumentCreated({
                 requiresTextHydration = true;
                 requiresImageScraping = true;
                 requiresVideoScraping = true;
+              } else if (details.summary === "Imported from Apple Music library." || details.summary.length <= 50 || !details.details?.genre) {
+                // Stub node (e.g. from frontend library import) -> Full Hydration
+                requiresTextHydration = true;
+                requiresImageScraping = true;
+                requiresVideoScraping = true;
               } else {
-                if (!details.imageUrl) requiresImageScraping = true;
-                if (!isLabel && !details.youtubeVideoId) requiresVideoScraping = true;
-                if (!details.summary || !details.details?.genre) requiresTextHydration = true;
+                // Complete canonical cache hit -> STRICT BYPASS
+                // We do not mutate or re-scrape existing global records.
               }
 
               const tempNode = { id: artistName, type: entityObj.type as any, group: 1 };

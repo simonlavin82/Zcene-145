@@ -896,7 +896,7 @@ exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed informatio
         {"site": "Wikipedia", "url": "https://en.wikipedia.org/wiki/..."}
       ],
       "discography": [{"albumName": "Name", "releaseYear": "YYYY"}],
-      "recommendationReason": "Curator insight about their role in this scene.",
+      "recommendationReason": "A 1-2 sentence curator insight explaining exactly why they matter to this specific scene.",
       "youtubeVideoId": "dQw4w9WgXcQ",
       "youtubeSearchQuery": "Turnstile hardcore punk official music video"
     }
@@ -1031,7 +1031,7 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint)
                     links: [],
                     discography: [],
                     tourInfo: tourInfoMatch ? tourInfoMatch[1] : "",
-                    recommendationReason: "Synthesised from live cultural archives via Google Search grounding."
+                    recommendationReason: "Curatorial records retrieved."
                 };
             }
             else {
@@ -1176,7 +1176,14 @@ const scrapeImageUrlBackend = async (artistName, type, genre, summary) => {
                         if (!itunesGenre)
                             return false;
                         // Match 1: Direct intersection with Zcene's determined genre
-                        return zceneGenreLower.includes(itunesGenre) || itunesGenre.includes(zceneGenreLower);
+                        const directMatch = zceneGenreLower.includes(itunesGenre) || itunesGenre.includes(zceneGenreLower);
+                        // Match 2: Broad genre fallback for niche genres (e.g. "Hardcore Punk" matches "Metal", "Rock", "Alternative")
+                        let broadMatch = false;
+                        if (zceneGenreLower.includes('hardcore') || zceneGenreLower.includes('punk') || zceneGenreLower.includes('metal')) {
+                            const broadGenres = ['metal', 'rock', 'alternative', 'punk'];
+                            broadMatch = broadGenres.some(bg => itunesGenre.includes(bg));
+                        }
+                        return directMatch || broadMatch;
                     });
                     if (strictMatches.length > 0) {
                         selectedArtistId = strictMatches[0].artistId;
@@ -1263,7 +1270,7 @@ CRITICAL OUTPUT REQUIREMENTS:
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 5000);
                 const imgRes = await fetch(extractedUrl, {
-                    method: 'HEAD',
+                    method: 'GET',
                     headers: {
                         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                         'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
@@ -1272,13 +1279,13 @@ CRITICAL OUTPUT REQUIREMENTS:
                 });
                 clearTimeout(timeoutId);
                 if (imgRes.ok) {
-                    const contentType = imgRes.headers.get('content-type');
-                    if (contentType && contentType.startsWith('image/')) {
+                    const contentType = imgRes.headers.get('content-type') || '';
+                    if (!contentType || contentType.startsWith('image/') || contentType.includes('octet-stream')) {
                         return extractedUrl;
                     }
                     else {
-                        console.warn(`[scrapeImageUrlBackend] Extracted URL returned valid status but invalid content-type (${contentType}): ${extractedUrl}`);
-                        return null;
+                        console.warn(`[scrapeImageUrlBackend] Extracted URL returned valid status but unexpected content-type (${contentType}): ${extractedUrl}. Accepting anyway.`);
+                        return extractedUrl;
                     }
                 }
                 else {
