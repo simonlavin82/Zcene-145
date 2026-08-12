@@ -163,7 +163,7 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
         let result = null;
         if (jobType === "graph_generation") {
             // Determine if we should run in mock mode
-            const isEmulator = process.env.FUNCTIONS_EMULATOR === "true";
+            const isEmulator = false; // TEMPORARILY DISABLED: process.env.FUNCTIONS_EMULATOR === "true";
             const isMissingApiKey = !process.env.GEMINI_API_KEY;
             const forceMocks = inputPayload?.useMocks === true;
             if (isEmulator || isMissingApiKey || forceMocks) {
