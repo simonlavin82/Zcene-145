@@ -956,7 +956,8 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint)
         model: currentModel,
         contents: prompt,
         config: {
-            tools: [{ googleSearch: {} }]
+            tools: [{ googleSearch: {} }],
+            responseMimeType: 'application/json'
         }
     });
     const jsonText = response.text?.trim();
@@ -1031,7 +1032,7 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint)
                     links: [],
                     discography: [],
                     tourInfo: tourInfoMatch ? tourInfoMatch[1] : "",
-                    recommendationReason: "Curatorial records retrieved."
+                    recommendationReason: "Synthesised from live cultural archives via Google Search grounding."
                 };
             }
             else {

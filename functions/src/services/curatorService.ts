@@ -1055,7 +1055,8 @@ export const fetchNodeDetailsBackend = async (
     model: currentModel,
     contents: prompt,
     config: {
-      tools: [{ googleSearch: {} }]
+      tools: [{ googleSearch: {} }],
+      responseMimeType: 'application/json'
     }
   });
 
@@ -1136,7 +1137,7 @@ export const fetchNodeDetailsBackend = async (
           links: [],
           discography: [],
           tourInfo: tourInfoMatch ? tourInfoMatch[1] : "",
-          recommendationReason: "Curatorial records retrieved."
+          recommendationReason: "Synthesised from live cultural archives via Google Search grounding."
         };
       } else {
         throw new Error("Invalid data format from details service.");
