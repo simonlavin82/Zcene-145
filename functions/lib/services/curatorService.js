@@ -1170,23 +1170,19 @@ const scrapeImageUrlBackend = async (artistName, type, genre, summary) => {
                 const exactMatches = data.results?.filter((r) => (r.artistName || "").toLowerCase() === artistName.toLowerCase()) || [];
                 let selectedArtistId = null;
                 const zceneGenreLower = (genre || "").toLowerCase();
-                const allowedGenres = ['rock', 'alternative', 'punk', 'metal', 'hardcore', 'indie', 'emo', 'pop punk', 'post-hardcore', 'hip-hop', 'rap', 'electronic'];
                 if (exactMatches.length > 0) {
-                    const bestMatch = exactMatches.find((r) => {
+                    const strictMatches = exactMatches.filter((r) => {
                         const itunesGenre = (r.primaryGenreName || "").toLowerCase();
                         if (!itunesGenre)
                             return false;
                         // Match 1: Direct intersection with Zcene's determined genre
-                        if (zceneGenreLower.includes(itunesGenre) || itunesGenre.includes(zceneGenreLower))
-                            return true;
-                        // Match 2: Intersection with our approved broad alternative whitelist
-                        return allowedGenres.some(allowed => itunesGenre.includes(allowed));
+                        return zceneGenreLower.includes(itunesGenre) || itunesGenre.includes(zceneGenreLower);
                     });
-                    if (bestMatch) {
-                        selectedArtistId = bestMatch.artistId;
+                    if (strictMatches.length > 0) {
+                        selectedArtistId = strictMatches[0].artistId;
                     }
                     else {
-                        console.warn(`[scrapeImageUrlBackend] iTunes validation blocked for ${artistName}. No genre overlap found, skipping to Gemini fallback.`);
+                        console.warn(`[scrapeImageUrlBackend] iTunes validation blocked for ${artistName}. No strict genre overlap found, skipping to Gemini fallback.`);
                         selectedArtistId = null;
                     }
                 }
