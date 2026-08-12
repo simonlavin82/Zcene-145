@@ -266,14 +266,30 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                         catch (cacheErr) {
                             console.warn(`[Curation Backend] Direct cache lookup failed for details of: ${artistNormId}`, cacheErr);
                         }
-                        // 2. Fetch from Gemini if cache miss
+                        // 2. Fetch from Gemini if cache miss or partial hydration needed
+                        let requiresTextHydration = false;
+                        let requiresImageScraping = false;
+                        let requiresVideoScraping = false;
                         if (!details) {
+                            requiresTextHydration = true;
+                            requiresImageScraping = true;
+                            requiresVideoScraping = true;
+                        }
+                        else {
+                            if (!details.imageUrl)
+                                requiresImageScraping = true;
+                            if (!isLabel && !details.youtubeVideoId)
+                                requiresVideoScraping = true;
+                            if (!details.summary || !details.details?.genre)
+                                requiresTextHydration = true;
+                        }
+                        const tempNode = { id: artistName, type: entityObj.type, group: 1 };
+                        if (requiresTextHydration) {
                             if (idx > 0) {
                                 // Stagger concurrent requests by 1000ms to prevent Google Search Tool rate limiting
                                 await new Promise(resolve => setTimeout(resolve, idx * 1000));
                             }
-                            console.log(`[Curation Backend] Cache miss. Hydrating details for ${isLabel ? 'label' : 'artist'}: ${artistName}...`);
-                            const tempNode = { id: artistName, type: entityObj.type, group: 1 };
+                            console.log(`[Curation Backend] Cache miss (or missing text). Hydrating details for ${isLabel ? 'label' : 'artist'}: ${artistName}...`);
                             // Change 2 — Per-node transient retry with 2-second backoff.
                             // Only retries on transient API errors (429, 503, Resource Exhausted, Service Unavailable).
                             // Does NOT retry on JSON parse failures or schema validation errors (deterministic failures).
@@ -302,37 +318,39 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                                     return null;
                                 }
                             }
-                            if (details) {
-                                // 3. Scrape YouTube and validate video ID (only for artists; labels do not have music videos)
-                                if (!isLabel) {
-                                    if (details.youtubeVideoId) {
-                                        const playable = await (0, curatorService_1.checkVideoPlayability)(details.youtubeVideoId);
-                                        if (!playable) {
-                                            details.youtubeVideoId = null;
-                                        }
+                        }
+                        if (details) {
+                            // 3. Scrape YouTube and validate video ID (only for artists; labels do not have music videos)
+                            if (!isLabel && requiresVideoScraping) {
+                                if (details.youtubeVideoId) {
+                                    const playable = await (0, curatorService_1.checkVideoPlayability)(details.youtubeVideoId);
+                                    if (!playable) {
+                                        details.youtubeVideoId = null;
                                     }
-                                    if (!details.youtubeVideoId && details.youtubeSearchQuery) {
-                                        const scrapedId = await (0, curatorService_1.scrapeVideoIdBackend)(artistName, artistNormId);
-                                        if (scrapedId) {
-                                            const playable = await (0, curatorService_1.checkVideoPlayability)(scrapedId);
-                                            if (playable) {
-                                                details.youtubeVideoId = scrapedId;
-                                            }
+                                }
+                                if (!details.youtubeVideoId && details.youtubeSearchQuery) {
+                                    const scrapedId = await (0, curatorService_1.scrapeVideoIdBackend)(artistName, artistNormId);
+                                    if (scrapedId) {
+                                        const playable = await (0, curatorService_1.checkVideoPlayability)(scrapedId);
+                                        if (playable) {
+                                            details.youtubeVideoId = scrapedId;
                                         }
                                     }
                                 }
-                                if (!details.details) {
-                                    details.details = { genre: "", origin: "", founded: "", notableArtists: [] };
-                                }
-                                // 4. Scrape dedicated Image URL
+                            }
+                            if (!details.details) {
+                                details.details = { genre: "", origin: "", founded: "", notableArtists: [] };
+                            }
+                            // 4. Scrape dedicated Image URL
+                            if (requiresImageScraping) {
                                 const fetchedImageUrl = await (0, curatorService_1.scrapeImageUrlBackend)(artistName, tempNode.type, details.details.genre || "", details.summary || "");
                                 details.imageUrl = fetchedImageUrl || "";
-                                details.details.artist = details.details.artist || artistName;
-                                if (!details.synthesisRationale) {
-                                    details.synthesisRationale = `[Single-Seed Analysis]\n- Acoustic & Sonics: Resolved core musical properties and stylistic lineage.\n- Scene Context: Mapped direct influences, record label history, and geographic background.\n- Overlap Insights: Unified structural connections and surrounding chronological relationships.`;
-                                }
-                                console.log(`[Curation Backend] Hydration successful for: ${artistNormId}`);
                             }
+                            details.details.artist = details.details.artist || artistName;
+                            if (!details.synthesisRationale) {
+                                details.synthesisRationale = `[Single-Seed Analysis]\n- Acoustic & Sonics: Resolved core musical properties and stylistic lineage.\n- Scene Context: Mapped direct influences, record label history, and geographic background.\n- Overlap Insights: Unified structural connections and surrounding chronological relationships.`;
+                            }
+                            console.log(`[Curation Backend] Hydration successful for: ${artistNormId}`);
                         }
                         return [artistName, details];
                     }));
