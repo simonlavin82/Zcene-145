@@ -137,13 +137,17 @@ app.all('/api/gemini/*wildcard', async (req, res) => {
       // 1. Disambiguation Probe Mock
       if (systemInstruction.includes("enumerate distinct musical acts") || userPrompt.includes("enumerate distinct musical acts")) {
         console.log(`[Gemini Proxy] Mock AI returning Disambiguation JSON.`);
+        // Extract the artist name from the userPrompt
+        const match = userPrompt.match(/named "(.*?)"/);
+        const artistName = match ? match[1] : "Spaced";
+        
         const mockResponse = {
           candidates: [
             {
               content: {
                 parts: [
                   {
-                    text: `\`\`\`json\n[\n  {"name": "Spaced", "country": "USA", "genre": "Hardcore Punk", "activeYears": "2021-present"},\n  {"name": "Spaced", "country": "UK", "genre": "UK Techno", "activeYears": "1998-2005"}\n]\n\`\`\``
+                    text: `\`\`\`json\n[\n  {"name": "${artistName}", "country": "USA", "genre": "Hardcore Punk", "activeYears": "2021-present"},\n  {"name": "${artistName}", "country": "UK", "genre": "UK Techno", "activeYears": "1998-2005"}\n]\n\`\`\``
                   }
                 ]
               },

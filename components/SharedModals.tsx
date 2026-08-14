@@ -943,7 +943,6 @@ export const CountryFilterDropdown: React.FC<CountryFilterDropdownProps> = ({ va
 };
 
 export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiveAISuggestions = false, showBack = false }: DisambiguationModalProps) {
-  console.log("[Validation Flow]: DisambiguationModal opened with", { query, candidates, isLiveAISuggestions, state: candidates.length === 0 ? 'STATE A' : candidates.length === 1 ? 'STATE B' : 'STATE C' });
   const [overrideInput, setOverrideInput] = useState('');
   if (!isOpen) return null;
 

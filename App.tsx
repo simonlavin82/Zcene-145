@@ -1362,6 +1362,7 @@ const App: React.FC = () => {
   }, []);
 
   const searchDisambiguationCandidates = useCallback(async (queryStr: string): Promise<DisambiguationCandidate[]> => {
+    console.log(`[Disambiguation Lookup] STARTING cache search for: "${queryStr}"`);
     const normQuery = normalizeArtistId(queryStr);
     if (normQuery.length < 2) return [];
 
@@ -1373,17 +1374,39 @@ const App: React.FC = () => {
       );
 
       const snapshot = await getDocs(q);
-      console.log(`[Disambiguation] getDocs returned ${snapshot.size} docs for query: ${normQuery}`);
+      console.log(`[Disambiguation Lookup] Range query for cacheKey >= "${normQuery}" returned ${snapshot.size} docs.`);
+      
+      // Log all raw docs found
+      snapshot.docs.forEach(d => console.log(`[Disambiguation Lookup] Range query raw doc ID: ${d.id}`, d.data()));
+
       const candidatesMap = new Map<string, DisambiguationCandidate>();
 
       let snapshotDocs = snapshot.docs;
 
       // --- FALLBACK: Exact match lookup if range query fails (Emulator Web SDK bug workaround) ---
       if (snapshotDocs.length === 0) {
-        console.log(`[Disambiguation] Range query returned 0 docs, attempting exact lookup for: ${normQuery}`);
+        console.log(`[Disambiguation Lookup] Range query returned 0 docs, attempting exact getDoc lookup for: "${normQuery}"`);
         const exactDocRef = doc(db, 'artists', normQuery);
-        const exactSnap = await getDoc(exactDocRef);
-        if (exactSnap.exists()) {
+        
+        let exactSnap = null;
+        let attempts = 0;
+        
+        while (attempts < 3) {
+           try {
+              exactSnap = await getDoc(exactDocRef);
+              break;
+           } catch (e: any) {
+              if (e?.message?.includes('offline') || e?.code?.includes('unavailable')) {
+                 attempts++;
+                 console.warn(`[Disambiguation Lookup] getDoc failed (offline). Retrying ${attempts}/3 in 800ms...`);
+                 await new Promise(r => setTimeout(r, 800));
+              } else {
+                 throw e;
+              }
+           }
+        }
+        
+        if (exactSnap && exactSnap.exists()) {
           const data = exactSnap.data();
           if (data.redirectTo) {
             console.log(`[Disambiguation] Exact match has redirectTo: ${data.redirectTo}. Fetching target.`);

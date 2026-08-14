@@ -12,7 +12,7 @@ const useMocks = import.meta.env.VITE_USE_MOCKS === 'true';
 if (useMocks || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
   console.log("Connecting to local Firebase Emulators (VITE_USE_MOCKS is enabled or localhost detected)...");
   connectFirestoreEmulator(db, '127.0.0.1', 8080);
-  connectAuthEmulator(auth, 'http://127.0.0.1:9099');
+  // connectAuthEmulator(auth, 'http://127.0.0.1:9099'); // Auth emulator is not running, commenting out to prevent auth network errors
 }
 
 const googleProvider = new GoogleAuthProvider();
