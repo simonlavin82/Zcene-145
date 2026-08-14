@@ -318,15 +318,23 @@ export const onCurationJobCreated = onDocumentCreated({
               } else {
                 // Complete canonical cache hit -> STRICT BYPASS
                 // We do not mutate or re-scrape existing global records.
+                // However, we MUST check if it's missing assets due to a past failure.
+                if (!details.imageUrl) {
+                   requiresImageScraping = true;
+                }
+                if (!details.youtubeVideoId && !isLabel) {
+                   requiresVideoScraping = true;
+                }
               }
 
               const tempNode = { id: artistName, type: entityObj.type as any, group: 1 };
 
+              // Stagger concurrent requests by 1000ms to prevent API burst rate limiting (iTunes & Gemini)
+              if (idx > 0 && (requiresTextHydration || requiresImageScraping || requiresVideoScraping)) {
+                await new Promise(resolve => setTimeout(resolve, idx * 1000));
+              }
+
               if (requiresTextHydration) {
-                if (idx > 0) {
-                  // Stagger concurrent requests by 1000ms to prevent Google Search Tool rate limiting
-                  await new Promise(resolve => setTimeout(resolve, idx * 1000));
-                }
 
                 console.log(`[Curation Backend] Cache miss (or missing text). Hydrating details for ${isLabel ? 'label' : 'artist'}: ${artistName}...`);
 
