@@ -1041,7 +1041,6 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint)
                 contents: prompt,
                 config: {
                     tools: [{ googleSearch: {} }],
-                    responseMimeType: 'application/json',
                     temperature: 0.4 - (attempts * 0.1) // Lower temperature on retries
                 }
             });

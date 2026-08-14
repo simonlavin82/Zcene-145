@@ -65,7 +65,6 @@ async function testFetch() {
             contents: prompt,
             config: {
                 tools: [{ googleSearch: {} }],
-                responseMimeType: 'application/json',
                 temperature: 0.4
             }
         });

@@ -2897,7 +2897,7 @@ const App: React.FC = () => {
             } else {
               const probeKey = normalizeArtistId(rawInput);
               activeDisambiguationHints[probeKey] = 
-                `[MANDATORY DISAMBIGUATION CONSTRAINT: The user explicitly requested the regional variant of "${rawInput}" originating from or associated with "${userInputCountry}". You MUST synthesize this specific regional act and NO OTHER.]`;
+                `[MANDATORY DISAMBIGUATION CONSTRAINT: The user explicitly requested the regional variant of "${rawInput}" originating from or associated with "${userInputCountry}". You MUST use this specific regional act as the root seed for your graph generation, rather than any other bands with the same name.]`;
               console.log(`[Disambiguation Override Hint Injected for ${probeKey}]:`, activeDisambiguationHints[probeKey]);
             }
           } else if (flashChoice !== 'synthesis') {
@@ -2905,7 +2905,7 @@ const App: React.FC = () => {
             if (selectedCand) {
               const probeKey = normalizeArtistId(rawInput);
               activeDisambiguationHints[probeKey] = 
-                `[MANDATORY DISAMBIGUATION CONSTRAINT: The user explicitly selected the following regional entity: "${selectedCand.label}" from ${selectedCand.origin} (${selectedCand.genre}). You MUST synthesize this specific act and NO OTHER.]`;
+                `[MANDATORY DISAMBIGUATION CONSTRAINT: The user explicitly selected the following regional entity: "${selectedCand.label}" from ${selectedCand.origin} (${selectedCand.genre}). You MUST use this specific act as the root seed for your graph generation, rather than any other bands with the same name.]`;
               console.log(`[Flash Validation Hint Injected for ${probeKey}]:`, activeDisambiguationHints[probeKey]);
               resolvedArtistSeeds[i] = normalizeArtistId(rawInput);
               hasDisambiguated = true;
