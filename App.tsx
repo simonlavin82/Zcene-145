@@ -1369,11 +1369,35 @@ const App: React.FC = () => {
       );
 
       const snapshot = await getDocs(q);
+      console.log(`[Disambiguation] getDocs returned ${snapshot.size} docs for query: ${normQuery}`);
       const candidatesMap = new Map<string, DisambiguationCandidate>();
 
-      for (const docSnap of snapshot.docs) {
+      let snapshotDocs = snapshot.docs;
+
+      // --- FALLBACK: Exact match lookup if range query fails (Emulator Web SDK bug workaround) ---
+      if (snapshotDocs.length === 0) {
+        console.log(`[Disambiguation] Range query returned 0 docs, attempting exact lookup for: ${normQuery}`);
+        const exactDocRef = doc(db, 'artists', normQuery);
+        const exactSnap = await getDoc(exactDocRef);
+        if (exactSnap.exists()) {
+          const data = exactSnap.data();
+          if (data.redirectTo) {
+            console.log(`[Disambiguation] Exact match has redirectTo: ${data.redirectTo}. Fetching target.`);
+            const targetRef = doc(db, 'artists', data.redirectTo);
+            const targetSnap = await getDoc(targetRef);
+            if (targetSnap.exists()) {
+              snapshotDocs = [targetSnap as any];
+            }
+          } else {
+            snapshotDocs = [exactSnap as any];
+          }
+        }
+      }
+
+      for (const docSnap of snapshotDocs) {
         const data = docSnap.data();
         const docId = docSnap.id;
+        console.log(`[Disambiguation] Processing doc: ${docId}, redirectTo: ${data.redirectTo}`);
         
         if (data.redirectTo) {
           continue; // Skip redirect pointer documents
@@ -1413,6 +1437,7 @@ const App: React.FC = () => {
           });
         }
       }
+      console.log(`[Disambiguation Candidates Search] Found ${candidatesMap.size} candidates for ${normQuery}`);
       return Array.from(candidatesMap.values());
     } catch (err) {
       console.warn('[Disambiguation Candidates Search] Failed:', err);
@@ -3557,9 +3582,49 @@ const App: React.FC = () => {
               detail: { artist: entry?.seedArtists || entry?.artistId || firstSlug } 
           }));
           
-          const allQualified = Array.from(cached.values()).every(e => validateCacheEntry(e, artistList.length === 1).isFullyQualified);
-          if (!allQualified) {
-            console.log('[Front Gate Cache] Some artists not fully qualified. Background revalidation queued.');
+          let needsAssetHydration = false;
+          const allQualified = Array.from(cached.values()).every(e => {
+            const v = validateCacheEntry(e, artistList.length === 1);
+            if (v.isFullyQualified) {
+               // Check if image is missing on any fully qualified node
+               try {
+                 const parsed = parseDetailsCacheSafely(e.detailsCache);
+                 if (!parsed?.imageUrl) needsAssetHydration = true;
+               } catch (err) {}
+            }
+            return v.isFullyQualified;
+          });
+
+          if (!allQualified || needsAssetHydration) {
+            console.log(`[Front Gate Cache] Cache hit missing assets. Silent background revalidation queued (Smart Bypass).`);
+            // Trigger Smart Bypass without blocking the UI
+            if (import.meta.env.VITE_USE_CLOUD_CURATION === 'true' && user?.uid) {
+              generateGraphDataViaCloudJob(
+                artists,
+                activeDiscoveryFilters,
+                user.uid,
+                undefined, // no abort signal for background
+                (detailsCacheJson) => {
+                  try {
+                    const expandedMap = expandDetailsCacheMap(detailsCacheJson);
+                    setDetailsCache(prev => {
+                      const next = new Map(prev);
+                      expandedMap.forEach((v, k) => next.set(k, v));
+                      return next;
+                    });
+                    expandedMap.forEach((v, k) => detailsCacheRef.current.set(k, v));
+                    console.log("[Smart Bypass] Background asset hydration complete. UI updated.");
+                  } catch (e) {
+                    console.warn("Failed to parse detailsCache from silent cloud job:", e);
+                  }
+                },
+                currentProjectId || undefined,
+                `job-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
+                activeDisambiguationHints
+              ).catch(err => {
+                 console.warn("[Smart Bypass] Background generation failed:", err);
+              });
+            }
           } else {
             showCacheToast();
           }

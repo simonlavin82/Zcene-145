@@ -1,11 +1,12 @@
-const admin = require('firebase-admin');
+const { initializeApp } = require('firebase-admin/app');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 
 process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
 
-admin.initializeApp({
+initializeApp({
   projectId: "zcene-production" // Matches emulator default
 });
-const db = admin.firestore();
+const db = getFirestore();
 
 async function seedCacheMiss() {
   const artistId = 'spaced-usa';
@@ -42,7 +43,7 @@ async function seedCacheMiss() {
       cacheKey: artistId,
       seedArtists: "Spaced",
       detailsCache: JSON.stringify(detailsCache),
-      cachedAt: admin.firestore.FieldValue.serverTimestamp(),
+      cachedAt: FieldValue.serverTimestamp(),
       cacheVersion: 2
     };
 
@@ -54,7 +55,7 @@ async function seedCacheMiss() {
       cacheKey: aliasId,
       seedArtists: 'Spaced',
       redirectTo: artistId,
-      cachedAt: admin.firestore.FieldValue.serverTimestamp(),
+      cachedAt: FieldValue.serverTimestamp(),
       cacheVersion: 2
     }, { merge: true });
 
