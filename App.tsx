@@ -73,7 +73,9 @@ const generateGraphDataViaCloudJob = async (
   onDetailsCacheReceived?: (detailsCacheJson: string) => void,
   projectId?: string,
   jobId?: string,
-  disambiguationHints?: Record<string, string>
+  disambiguationHints?: Record<string, string>,
+  baseGraph?: GraphData,
+  isSmartBypass?: boolean
 ): Promise<GraphData> => {
   const finalJobId = jobId || `job-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
   const jobRef = doc(db, 'curationJobs', finalJobId);
@@ -87,7 +89,9 @@ const generateGraphDataViaCloudJob = async (
       artists,
       filters,
       projectId,
-      disambiguationHints
+      disambiguationHints,
+      baseGraph,
+      isSmartBypass
     },
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -1400,6 +1404,15 @@ const App: React.FC = () => {
         console.log(`[Disambiguation] Processing doc: ${docId}, redirectTo: ${data.redirectTo}`);
         
         if (data.redirectTo) {
+          try {
+            const targetRef = doc(db, 'artists', data.redirectTo);
+            const targetSnap = await getDoc(targetRef);
+            if (targetSnap.exists()) {
+              snapshotDocs.push(targetSnap as any);
+            }
+          } catch (e) {
+            console.warn(`[Disambiguation] Failed to resolve redirect ${data.redirectTo} inline:`, e);
+          }
           continue; // Skip redirect pointer documents
         }
         
@@ -3062,7 +3075,7 @@ const App: React.FC = () => {
           );
           
           // Relaxed cache qualification check: if graphData exists, accept as cache hit!
-          const isQualified = !!hasGraph && validation.isFullyQualified;
+          const isQualified = !!hasGraph;
           
           console.log("Decision State:", {
             searchedId: searchId,
@@ -3620,7 +3633,9 @@ const App: React.FC = () => {
                 },
                 currentProjectId || undefined,
                 `job-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
-                activeDisambiguationHints
+                activeDisambiguationHints,
+                parsedGraph, // Pass the cache's parsed graph as baseGraph
+                true // isSmartBypass flag
               ).catch(err => {
                  console.warn("[Smart Bypass] Background generation failed:", err);
               });

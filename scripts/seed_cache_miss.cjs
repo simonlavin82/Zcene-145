@@ -43,6 +43,13 @@ async function seedCacheMiss() {
       cacheKey: artistId,
       seedArtists: "Spaced",
       detailsCache: JSON.stringify(detailsCache),
+      graphData: JSON.stringify({
+        nodes: [{ id: artistId, label: "Spaced", type: "artist", group: 1 }, { id: "peer1", label: "Peer 1", type: "artist", group: 2 }],
+        links: [{ source: artistId, target: "peer1", context: "is musically related to" }],
+        synthesisRationale: "[Single-Seed Analysis]\n- Acoustic & Sonics: Heavy hitting riffs.\n- Scene Context: Buffalo NY punk scene.\n- Overlap Insights: Close ties to peers."
+      }),
+      isPrimarySeed: true,
+      hasUniqueSpiderweb: true,
       cachedAt: FieldValue.serverTimestamp(),
       cacheVersion: 2
     };

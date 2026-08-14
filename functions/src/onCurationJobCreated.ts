@@ -215,19 +215,23 @@ export const onCurationJobCreated = onDocumentCreated({
           detailsCache: JSON.stringify(mockDetails)
         };
       } else {
-        console.log("[Curation Backend] [Step 1: Graph Generation Started] Executing live Gemini AI graph synthesis...");
-        
-        // Run backend curation synthesis
-        const finalGraph = await generateGraphDataBackend(
-          inputPayload.artists,
-          inputPayload.filters,
-          inputPayload.cachedSubgraphsContext,
-          inputPayload.baseGraph,
-          inputPayload.disambiguationHints
-        );
+        let finalGraph = inputPayload.baseGraph;
+        if (!inputPayload.isSmartBypass) {
+          console.log("[Curation Backend] [Step 1: Graph Generation Started] Executing live Gemini AI graph synthesis...");
+          // Run backend curation synthesis
+          finalGraph = await generateGraphDataBackend(
+            inputPayload.artists,
+            inputPayload.filters,
+            inputPayload.cachedSubgraphsContext,
+            inputPayload.baseGraph,
+            inputPayload.disambiguationHints
+          );
+        } else {
+          console.log("[Curation Backend] [Step 1: Graph Generation Bypassed] Smart Bypass active. Using baseGraph directly.");
+        }
 
         // Structural Integrity Guard: Verify that we received a valid, rich graph from the model
-        const artistNodesCount = finalGraph.nodes?.filter(n => n.type === 'artist' || !n.type).length || 0;
+        const artistNodesCount = finalGraph.nodes?.filter((n: any) => n.type === 'artist' || !n.type).length || 0;
         const minimumRequiredArtists = 2; // Seed artist + at least 1 recommendation
         if (!finalGraph.nodes || finalGraph.nodes.length === 0 || artistNodesCount < minimumRequiredArtists) {
           throw new Error(`Generated graph failed structural integrity check. Artist nodes count: ${artistNodesCount} (minimum required: ${minimumRequiredArtists}). Curation aborted.`);
@@ -259,7 +263,7 @@ export const onCurationJobCreated = onDocumentCreated({
           const chunk = recommendedEntities.slice(i, i + batchSize);
           console.log(`[Curation Backend] Hydrating batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(recommendedEntities.length / batchSize)} (${chunk.length} entities)...`);
           const chunkResults = await Promise.all(
-            chunk.map(async (entityObj, idx) => {
+            chunk.map(async (entityObj: any, idx: number) => {
               const artistName = entityObj.name;
               const artistNormId = normalizeArtistId(artistName);
               const isLabel = entityObj.type === 'label';
