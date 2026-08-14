@@ -566,7 +566,7 @@ const generateGraphDataBackend = async (artists, filters, cachedSubgraphsContext
         apiKey,
         httpOptions: { timeout: 300000 } // 5 minutes
     });
-    const currentModel = "gemini-3.1-pro-preview";
+    const currentModel = "gemini-2.5-flash";
     const artistList = artists.split('::').map(a => a.trim()).filter(Boolean);
     let userPrompt;
     let systemInstruction;
@@ -636,37 +636,65 @@ const generateGraphDataBackend = async (artists, filters, cachedSubgraphsContext
         const hintBlock = Object.values(disambiguationHints).join('\n');
         systemInstruction += `\n\nDISAMBIGUATION CONSTRAINTS (MANDATORY — DO NOT OVERRIDE):\n${hintBlock}`;
     }
-    const response = await ai.models.generateContent({
-        model: currentModel,
-        contents: userPrompt,
-        config: {
-            systemInstruction: systemInstruction.replace(/{{artists}}/g, artists),
-            temperature: 0.2,
-            topP: 0.95,
-            topK: 40,
-            maxOutputTokens: 12000,
-            responseMimeType: "application/json",
-            responseSchema: dynamicSchema
+    // Apply system instruction to the prompt template artists
+    const finalizedSystemInstruction = systemInstruction.replace(/{{artists}}/g, artists);
+    let jsonText = "";
+    let data = null;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 3;
+    while (attempts < MAX_ATTEMPTS && !data) {
+        try {
+            const response = await ai.models.generateContent({
+                model: currentModel,
+                contents: userPrompt,
+                config: {
+                    systemInstruction: finalizedSystemInstruction,
+                    temperature: 0.4 - (attempts * 0.1), // Lower temperature on retries for more deterministic output
+                    topP: 0.95,
+                    topK: 40,
+                    maxOutputTokens: 12000,
+                    responseMimeType: "application/json",
+                    responseSchema: dynamicSchema
+                }
+            });
+            jsonText = response.text?.trim() || "";
+            if (!jsonText)
+                throw new Error("The AI returned an empty response.");
+            const cleanedJsonText = (0, exports.extractCleanJsonString)(jsonText);
+            try {
+                data = JSON.parse(cleanedJsonText);
+            }
+            catch (parseError) {
+                try {
+                    const repaired = repairJson(cleanedJsonText);
+                    data = JSON.parse(repaired);
+                }
+                catch (repairError) {
+                    throw new Error(`AI JSON parse failed: ${repairError.message}`);
+                }
+            }
         }
-    });
-    const jsonText = response.text?.trim();
-    if (!jsonText) {
-        throw new Error("The AI returned an empty response.");
-    }
-    const cleanedJsonText = (0, exports.extractCleanJsonString)(jsonText);
-    let data;
-    try {
-        data = JSON.parse(cleanedJsonText);
-    }
-    catch (parseError) {
-        const repaired = repairJson(cleanedJsonText);
-        data = JSON.parse(repaired);
+        catch (error) {
+            attempts++;
+            console.warn(`[Curation Backend] Graph generation attempt ${attempts} failed: ${error.message}`);
+            if (attempts >= MAX_ATTEMPTS) {
+                throw new Error(`AI generated an unparsable response format after ${MAX_ATTEMPTS} attempts: ${error.message}`);
+            }
+            // Wait a moment before retrying
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
     }
     // --- POST-PROCESSING FILTERING ---
     const seedArtistIds = new Set(artists.split('::').map(a => a.trim().toLowerCase()));
     const nodesToRemove = new Set();
-    const rawNodes = Array.isArray(data?.nodes) ? data.nodes : [];
-    const rawLinks = Array.isArray(data?.links) ? data.links : [];
+    const rawNodes = Array.isArray(data?.nodes) ? data.nodes.filter(n => n && n.id != null) : [];
+    const rawLinks = Array.isArray(data?.links) ? data.links.filter(l => {
+        if (!l)
+            return false;
+        const s = typeof l.source === 'string' ? l.source : l.source?.id;
+        const t = typeof l.target === 'string' ? l.target : l.target?.id;
+        return s != null && t != null;
+    }) : [];
     if (filters?.foundedAfter) {
         const threshold = Number(filters.foundedAfter);
         const artistToYear = new Map();
@@ -771,8 +799,28 @@ const generateGraphDataBackend = async (artists, filters, cachedSubgraphsContext
         link.target = validationNodeMap.get(targetId).id;
         return true;
     });
+    const finalNodes = Array.isArray(deduplicatedNodes) ? deduplicatedNodes : [];
+    // Guarantee that ALL requested seed artists are present in the final graph.
+    // If the LLM hallucinated and omitted a seed, inject a stub node for it.
+    const seedList = artists.split('::').map(a => a.trim()).filter(Boolean);
+    for (const seed of seedList) {
+        const seedNorm = (0, exports.normalizeArtistId)(seed);
+        const exists = finalNodes.some(n => {
+            const nNorm = (0, exports.normalizeArtistId)(n.id);
+            const lNorm = (0, exports.normalizeArtistId)(n.label || '');
+            return nNorm === seedNorm || lNorm === seedNorm || nNorm.startsWith(`${seedNorm}-`) || lNorm.startsWith(`${seedNorm}-`);
+        });
+        if (!exists) {
+            finalNodes.push({
+                id: seed,
+                label: seed,
+                type: 'artist',
+                group: 1
+            });
+        }
+    }
     const finalGraph = (0, exports.normalizeGraphData)({
-        nodes: Array.isArray(deduplicatedNodes) ? deduplicatedNodes : [],
+        nodes: finalNodes,
         links: Array.isArray(validLinks) ? validLinks : []
     });
     if (data) {
@@ -952,19 +1000,10 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint)
     else {
         prompt = prompt.replace(/{{#if originHint}}[\s\S]*?{{\/if}}/g, '');
     }
-    const response = await ai.models.generateContent({
-        model: currentModel,
-        contents: prompt,
-        config: {
-            tools: [{ googleSearch: {} }],
-            responseMimeType: 'application/json'
-        }
-    });
-    const jsonText = response.text?.trim();
-    if (!jsonText) {
-        throw new Error("The AI returned an empty response for details.");
-    }
-    const cleanedJsonText = (0, exports.extractCleanJsonString)(jsonText);
+    let details = null;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 3;
+    let lastResponse = null;
     const sanitizeBioText = (rawText) => {
         if (!rawText || typeof rawText !== 'string')
             return '';
@@ -987,57 +1026,80 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint)
             prevText = text;
             text = text.replace(/^(?:I have confirmed|I will manually check|I will check|I need to check|I need to get|To answer your request|For the YouTube video|Here is the JSON|Here are the details|Here is the information|Note: Some details|Based on the search)[^.\n]*[.\n]+\s*/ig, '').trim();
         } while (text !== prevText && text.length > 0);
-        // Convert literal escaped \n to actual newlines (preserves markdown bolding ** and markdown lists \n*)
         text = text.replace(/\\n/g, '\n');
-        // Strip citations like [1], [1, 2, 3], (1, 2), and [cite: 20 (previous search)]
         text = text.replace(/\[\s*\d+(?:\s*,\s*\d+)*\s*\]/g, '')
             .replace(/\(\s*\d+(?:\s*,\s*\d+)*\s*\)/g, '')
             .replace(/\[\s*(?:cite|citation)[^\]]*\]/gi, '')
-            .replace(/""/g, '') // Strip stray empty quotes
+            .replace(/""/g, '')
             .trim();
         return text;
     };
-    let details;
-    try {
-        details = JSON.parse(cleanedJsonText);
-    }
-    catch (parseError) {
-        const repaired = repairJson(cleanedJsonText);
+    while (attempts < MAX_ATTEMPTS && !details) {
         try {
-            details = JSON.parse(repaired);
+            const response = await ai.models.generateContent({
+                model: currentModel,
+                contents: prompt,
+                config: {
+                    tools: [{ googleSearch: {} }],
+                    responseMimeType: 'application/json',
+                    temperature: 0.4 - (attempts * 0.1) // Lower temperature on retries
+                }
+            });
+            lastResponse = response;
+            const jsonText = response.text?.trim();
+            if (!jsonText) {
+                throw new Error("The AI returned an empty response for details.");
+            }
+            const cleanedJsonText = (0, exports.extractCleanJsonString)(jsonText);
+            try {
+                details = JSON.parse(cleanedJsonText);
+            }
+            catch (parseError) {
+                const repaired = repairJson(cleanedJsonText);
+                try {
+                    details = JSON.parse(repaired);
+                }
+                catch (repairError) {
+                    const rawProse = sanitizeBioText(cleanedJsonText);
+                    if (rawProse.startsWith('{') || rawProse.startsWith('[') || rawProse.includes('":') || rawProse.includes('": ')) {
+                        throw new Error("Invalid data format from details service (unparsed JSON wrapper).");
+                    }
+                    if (rawProse.length > 40) {
+                        console.warn(`[Backend Deep Cut Parse] JSON repair failed — response appears to be grounding prose (${rawProse.length} chars). ` +
+                            `Mapping prose to NodeDetails bio field as graceful fallback.`);
+                        const genreMatch = cleanedJsonText.match(/["']genre["']\s*:\s*["']([^"']*)["']/i);
+                        const originMatch = cleanedJsonText.match(/["']origin["']\s*:\s*["']([^"']*)["']/i);
+                        const foundedMatch = cleanedJsonText.match(/["']founded["']\s*:\s*["']([^"']*)["']/i);
+                        const tourInfoMatch = cleanedJsonText.match(/["']tourInfo["']\s*:\s*["']([^"']*)["']/i);
+                        details = {
+                            summary: rawProse,
+                            details: {
+                                artist: node.label || node.id,
+                                genre: genreMatch ? genreMatch[1] : "",
+                                origin: originMatch ? originMatch[1] : (originHint || ""),
+                                founded: foundedMatch ? foundedMatch[1] : "",
+                                notableArtists: []
+                            },
+                            members: [],
+                            links: [],
+                            discography: [],
+                            tourInfo: tourInfoMatch ? tourInfoMatch[1] : "",
+                            recommendationReason: "Synthesised from live cultural archives via Google Search grounding."
+                        };
+                    }
+                    else {
+                        throw new Error("Invalid data format from details service.");
+                    }
+                }
+            }
         }
-        catch (repairError) {
-            const rawProse = sanitizeBioText(cleanedJsonText);
-            if (rawProse.startsWith('{') || rawProse.startsWith('[') || rawProse.includes('":') || rawProse.includes('": ')) {
-                throw new Error("Invalid data format from details service (unparsed JSON wrapper).");
+        catch (error) {
+            attempts++;
+            console.warn(`[Curation Backend] fetchNodeDetailsBackend attempt ${attempts} failed for ${node.id}: ${error.message}`);
+            if (attempts >= MAX_ATTEMPTS) {
+                throw new Error(`fetchNodeDetailsBackend failed after ${MAX_ATTEMPTS} attempts: ${error.message}`);
             }
-            if (rawProse.length > 40) {
-                console.warn(`[Backend Deep Cut Parse] JSON repair failed — response appears to be grounding prose (${rawProse.length} chars). ` +
-                    `Mapping prose to NodeDetails bio field as graceful fallback.`);
-                // Best effort extraction of other fields from the raw string
-                const genreMatch = cleanedJsonText.match(/["']genre["']\s*:\s*["']([^"']*)["']/i);
-                const originMatch = cleanedJsonText.match(/["']origin["']\s*:\s*["']([^"']*)["']/i);
-                const foundedMatch = cleanedJsonText.match(/["']founded["']\s*:\s*["']([^"']*)["']/i);
-                const tourInfoMatch = cleanedJsonText.match(/["']tourInfo["']\s*:\s*["']([^"']*)["']/i);
-                details = {
-                    summary: rawProse,
-                    details: {
-                        artist: node.label || node.id,
-                        genre: genreMatch ? genreMatch[1] : "",
-                        origin: originMatch ? originMatch[1] : (originHint || ""),
-                        founded: foundedMatch ? foundedMatch[1] : "",
-                        notableArtists: []
-                    },
-                    members: [],
-                    links: [],
-                    discography: [],
-                    tourInfo: tourInfoMatch ? tourInfoMatch[1] : "",
-                    recommendationReason: "Synthesised from live cultural archives via Google Search grounding."
-                };
-            }
-            else {
-                throw new Error("Invalid data format from details service.");
-            }
+            await new Promise(resolve => setTimeout(resolve, 1500));
         }
     }
     const sanitizeString = (str) => {
@@ -1091,7 +1153,7 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint)
     };
     if (!hydratedDetails.details)
         hydratedDetails.details = {};
-    const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+    const groundingChunks = lastResponse?.candidates?.[0]?.groundingMetadata?.groundingChunks;
     if (groundingChunks && Array.isArray(groundingChunks)) {
         const uniqueLinks = new Map();
         groundingChunks.forEach((chunk) => {

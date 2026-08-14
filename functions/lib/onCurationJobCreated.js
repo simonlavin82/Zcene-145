@@ -306,11 +306,10 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                         if (requiresTextHydration) {
                             console.log(`[Curation Backend] Cache miss (or missing text). Hydrating details for ${isLabel ? 'label' : 'artist'}: ${artistName}...`);
                             // Change 2 — Per-node transient retry with 2-second backoff.
-                            // Only retries on transient API errors (429, 503, Resource Exhausted, Service Unavailable).
-                            // Does NOT retry on JSON parse failures or schema validation errors (deterministic failures).
+                            // Now also retries on JSON parse failures or schema validation errors (AI hallucination glitches).
                             const isTransientError = (err) => {
                                 const msg = (err?.message || String(err)).toLowerCase();
-                                return /429|503|resource.?exhausted|service.?unavailable|too many requests|timeout|fetch failed|network|socket/i.test(msg);
+                                return /429|503|resource.?exhausted|service.?unavailable|too many requests|timeout|fetch failed|network|socket|parse|invalid data|json/i.test(msg);
                             };
                             try {
                                 details = await (0, curatorService_1.fetchNodeDetailsBackend)(tempNode, finalGraph, inputPayload.artists);
@@ -403,7 +402,34 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                     const collName = isSeedLabel ? "labels" : "artists";
                     const idFieldKey = isSeedLabel ? "labelId" : "artistId";
                     const seedDetailsEntry = detailsCacheEntries.find(entry => isEntitySeedMatch(seedNorm, entry[0]));
-                    const seedDetails = seedDetailsEntry ? seedDetailsEntry[1] : null;
+                    let seedDetails = seedDetailsEntry ? seedDetailsEntry[1] : null;
+                    // Ultimate Fallback: If AI fails to hydrate the root seed completely, inject a safe stub
+                    // so the job doesn't crash the Integrity Lock.
+                    if (!seedDetails && !isSeedLabel) {
+                        console.warn(`[Integrity Lock Warning] AI failed all hydration attempts for root seed: ${seedNorm}. Injecting fallback stub.`);
+                        seedDetails = {
+                            summary: "Artist biography temporarily unavailable.",
+                            details: {
+                                artist: seedNode?.label || seedNorm,
+                                genre: "",
+                                origin: "",
+                                founded: "",
+                                notableArtists: []
+                            },
+                            members: [],
+                            links: [],
+                            discography: [],
+                            tourInfo: "",
+                            recommendationReason: "Fallback stub injected due to transient metadata service failure.",
+                            _isStub: true
+                        };
+                        if (seedDetailsEntry) {
+                            seedDetailsEntry[1] = seedDetails;
+                        }
+                        else {
+                            detailsCacheEntries.push([seedNorm, seedDetails]);
+                        }
+                    }
                     // Find connected country nodes in finalGraph
                     const connectedCountries = (finalGraph.links || [])
                         .filter((l) => {
@@ -504,7 +530,7 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                         isDeep: true,
                         isPrimarySeed: true,
                         hasUniqueSpiderweb: !isSeedLabel,
-                        dataIntegrityStatus: 'verified', // ← COMPLETION SEAL
+                        dataIntegrityStatus: seedDetails?._isStub ? 'degraded' : 'verified', // ← COMPLETION SEAL
                     });
                     console.log(`[Integrity Lock] ✅ Atomic verified write complete for seed (${collName}): ${compositeCanonicalId}`);
                     // Create/Heal Bare Root Alias Pointer

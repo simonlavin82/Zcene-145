@@ -80,19 +80,21 @@ const generateGraphDataViaCloudJob = async (
   const finalJobId = jobId || `job-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
   const jobRef = doc(db, 'curationJobs', finalJobId);
 
+  const payload = {
+    artists,
+    filters,
+    ...(projectId && { projectId }),
+    ...(disambiguationHints && { disambiguationHints }),
+    ...(baseGraph && { baseGraph }),
+    ...(isSmartBypass !== undefined && { isSmartBypass })
+  };
+
   await setDoc(jobRef, {
     jobId: finalJobId,
     userId,
     status: 'pending',
     jobType: 'graph_generation',
-    inputPayload: {
-      artists,
-      filters,
-      projectId,
-      disambiguationHints,
-      baseGraph,
-      isSmartBypass
-    },
+    inputPayload: payload,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     expireAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
