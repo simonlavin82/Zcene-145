@@ -4443,7 +4443,7 @@ const App: React.FC = () => {
       });
 
       // Phase 02 complete — write each artist as an isolated individual doc - only for standalone queries
-      if (resolvedArtistList.length === 1) {
+      if (resolvedArtistList.length === 1 && !useCloudCuration) {
         console.log(`[Music Discovery] Full cache MISS — writing per-artist docs for: [${resolvedArtistList.join(', ')}]`);
         const fetchedDetailsMap = new Map<string, NodeDetails>();
         const seedId = resolvedArtistList[0];
