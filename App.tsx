@@ -1425,12 +1425,19 @@ const App: React.FC = () => {
         }
       }
 
-      for (const docSnap of snapshotDocs) {
+      const processedDocs = new Set<string>();
+
+      for (let i = 0; i < snapshotDocs.length; i++) {
+        const docSnap = snapshotDocs[i];
         const data = docSnap.data();
         const docId = docSnap.id;
+        
+        if (processedDocs.has(docId)) continue;
+        processedDocs.add(docId);
+
         console.log(`[Disambiguation] Processing doc: ${docId}, redirectTo: ${data.redirectTo}`);
         
-        if (data.redirectTo) {
+        if (data.redirectTo && data.redirectTo !== docId && !processedDocs.has(data.redirectTo)) {
           try {
             const targetRef = doc(db, 'artists', data.redirectTo);
             const targetSnap = await getDoc(targetRef);
@@ -2933,7 +2940,8 @@ const App: React.FC = () => {
             console.log(`[Disambiguation Rejection Hint Injected for ${probeKey}]:`, activeDisambiguationHints[probeKey]);
           }
 
-          handleGenerateGraph(artists, isRegeneration, graphToEnhance, true, true, overrideFilters, activeDisambiguationHints, true);
+          const currentResolvedStr = resolvedArtistSeeds.join('::');
+          handleGenerateGraph(currentResolvedStr, isRegeneration, graphToEnhance, true, true, overrideFilters, activeDisambiguationHints, true);
           return;
         } else {
           // User accepted a specific candidate card from the cache.

@@ -164,6 +164,13 @@ export const ERROR_MAPPING_RULES: ErrorMappingRule[] = [
     finalMessage: "Curation missing. The requested project could not be found or has been deleted.",
     severity: "system",
     targetComponent: "Global Error Overlay"
+  },
+  {
+    scenario: "Empty Bridge / Orphan",
+    rawPattern: "relational bridges",
+    finalMessage: "Synthesis constrained. The curation engine could not discover any relational bridges between the requested seeds within the applied filters. Try widening your search parameters.",
+    severity: "system",
+    targetComponent: "Global Error Overlay"
   }
 ];
 

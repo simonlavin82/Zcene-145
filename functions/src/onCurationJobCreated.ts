@@ -238,6 +238,81 @@ export const onCurationJobCreated = onDocumentCreated({
           throw new Error(`Generated graph failed structural integrity check. Artist nodes count: ${artistNodesCount} (minimum required: ${minimumRequiredArtists}). Curation aborted.`);
         }
 
+        // Multi-Seed Orphan Guard: Ensure all seeds are part of a single connected component
+        const seedCount = inputPayload.artists.split('::').length;
+        if (seedCount > 1) {
+          const adj = new Map<string, string[]>();
+          const rawNodes = finalGraph.nodes || [];
+          const rawLinks = finalGraph.links || [];
+          
+          rawNodes.forEach((n: any) => adj.set(n.id, []));
+          
+          rawLinks.forEach((link: any) => {
+            const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
+            const targetId = typeof link.target === 'string' ? link.target : link.target.id;
+            if (!adj.has(sourceId)) adj.set(sourceId, []);
+            if (!adj.has(targetId)) adj.set(targetId, []);
+            adj.get(sourceId)!.push(targetId);
+            adj.get(targetId)!.push(sourceId); // undirected
+          });
+
+          // Helper to find actual node IDs for a given seed
+          const isArtistIdMatch = (a: string, b: string) => {
+            const na = normalizeArtistId(a);
+            const nb = normalizeArtistId(b);
+            return na === nb || na.startsWith(nb + '-') || nb.startsWith(na + '-');
+          };
+
+          // Assign each node to a connected component ID
+          const componentMap = new Map<string, number>();
+          let currentComponent = 0;
+
+          rawNodes.forEach((n: any) => {
+            if (!componentMap.has(n.id)) {
+              currentComponent++;
+              const queue = [n.id];
+              componentMap.set(n.id, currentComponent);
+              
+              while(queue.length > 0) {
+                const curr = queue.shift()!;
+                const neighbors = adj.get(curr) || [];
+                for(const neighbor of neighbors) {
+                  if (!componentMap.has(neighbor)) {
+                    componentMap.set(neighbor, currentComponent);
+                    queue.push(neighbor);
+                  }
+                }
+              }
+            }
+          });
+
+          // Now check if all seeds share at least one component ID
+          const artistList = inputPayload.artists.split('::').map((a: string) => a.trim()).filter(Boolean);
+          const seedComponents = artistList.map((seed: string) => {
+            const matchingNodes = rawNodes.filter((n: any) => isArtistIdMatch(n.id, seed)).map((n: any) => n.id);
+            const comps = new Set<number>();
+            matchingNodes.forEach((id: string) => {
+              if (componentMap.has(id)) comps.add(componentMap.get(id)!);
+            });
+            return comps;
+          });
+
+          let hasCommonComponent = false;
+          if (seedComponents.length > 0 && seedComponents[0].size > 0) {
+            for (const compId of seedComponents[0]) {
+              const inAll = seedComponents.every((comps: Set<number>) => comps.has(compId));
+              if (inAll) {
+                hasCommonComponent = true;
+                break;
+              }
+            }
+          }
+
+          if (!hasCommonComponent) {
+            throw new Error(`The AI could not discover any relational bridges between the requested seeds within the applied constraints. Try widening your discovery filters (e.g., expanding the Era range) to allow more paths.`);
+          }
+        }
+
         // Parse seed artists list
         const artistList = inputPayload.artists
           .split('::')
