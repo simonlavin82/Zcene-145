@@ -6,12 +6,14 @@ interface SeedArtistImagesProps {
   seedArtists: string; // "Spaced::End It::Buggin"
   userId?: string;
   variant?: 'stack' | 'grid' | 'reel';
+  fallbackGraphData?: any;
 }
 
 export const SeedArtistImages: React.FC<SeedArtistImagesProps> = ({ 
   seedArtists, 
   userId,
-  variant = 'stack'
+  variant = 'stack',
+  fallbackGraphData
 }) => {
   const [images, setImages] = useState<{ id: string, url: string, name: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,6 +53,18 @@ export const SeedArtistImages: React.FC<SeedArtistImagesProps> = ({
             }
           }
         }
+        
+        // Fallback to project internal graph data if global cache is empty
+        if (!url && fallbackGraphData && fallbackGraphData.nodes) {
+          const fallbackNode = fallbackGraphData.nodes.find((fn: any) => 
+            fn.id.toLowerCase() === normId.toLowerCase() || 
+            (fn.label && fn.label.toLowerCase() === name.toLowerCase())
+          );
+          if (fallbackNode && fallbackNode.imageUrl) {
+            url = fallbackNode.imageUrl;
+          }
+        }
+        
         loadedImages.push({ id: normId, name, url });
       });
       

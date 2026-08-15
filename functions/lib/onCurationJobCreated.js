@@ -166,7 +166,9 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
             const isEmulator = false; // TEMPORARILY DISABLED: process.env.FUNCTIONS_EMULATOR === "true";
             const isMissingApiKey = !process.env.GEMINI_API_KEY;
             const forceMocks = inputPayload?.useMocks === true;
-            const isSandboxMode = inputPayload?.isSandboxMode === true;
+            const isMultiSeedJob = (inputPayload?.artists || "").split('::').filter(Boolean).length > 1;
+            const hasFiltersJob = inputPayload?.filters && Object.keys(inputPayload.filters).length > 0;
+            const isSandboxMode = inputPayload?.isSandboxMode === true || isMultiSeedJob || hasFiltersJob;
             if (isEmulator || isMissingApiKey || forceMocks) {
                 console.log(`[Curation Backend] [Step 1: Graph Generation Started] Mock conditions met. Running simulated mock.`);
                 // Keep the 5-second simulated delay for verification of loading screens

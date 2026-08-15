@@ -631,7 +631,7 @@ export const generateGraphDataBackend = async (
   let systemInstruction: string;
 
   const isEnhancement = baseGraph && baseGraph.nodes && baseGraph.nodes.length > 0;
-  const isMultiSeed = artistList.length > 1 && cachedSubgraphsContext && cachedSubgraphsContext.length > 0;
+  const isMultiSeed = artistList.length > 1;
   
   // Reinforce schema with dynamic descriptions if filters exist
   const dynamicSchema = JSON.parse(JSON.stringify(GRAPH_RESPONSE_SCHEMA));
@@ -644,7 +644,7 @@ export const generateGraphDataBackend = async (
 
   if (isMultiSeed) {
       systemInstruction = GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE
-          .replace('{{cachedSubgraphsContext}}', cachedSubgraphsContext!)
+          .replace('{{cachedSubgraphsContext}}', cachedSubgraphsContext || "No pre-cached graphs available. Generate the topology from scratch.")
           .replace('{{artists}}', artists);
       userPrompt = `Stitch together the music graphs for these seed artists: ${artists}. Use the provided cached graphs as context.`;
   } else if (isEnhancement) {
