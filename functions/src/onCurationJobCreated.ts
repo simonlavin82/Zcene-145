@@ -616,7 +616,14 @@ export const onCurationJobCreated = onDocumentCreated({
           const recNorm = normalizeArtistId(recArtist);
           const isLabel = entityObj.type === 'label';
 
-          if (seedNorms.some((s: string) => isEntitySeedMatch(s, recNorm))) continue; // Already seeds
+          const matchingSeedNorm = seedNorms.find((s: string) => isEntitySeedMatch(s, recNorm));
+          if (matchingSeedNorm) {
+            // ALIAS this duplicate reference to the canonical seed ID so it gets merged!
+            if (!idRewriteMap.has(recNorm) && idRewriteMap.has(matchingSeedNorm)) {
+               idRewriteMap.set(recNorm, idRewriteMap.get(matchingSeedNorm)!);
+            }
+            continue; // Already seeds
+          }
           
           const recDetailsEntry = detailsCacheEntries.find(entry => isEntitySeedMatch(recNorm, entry[0]));
           const recDetails = recDetailsEntry ? recDetailsEntry[1] : null;
@@ -733,30 +740,49 @@ export const onCurationJobCreated = onDocumentCreated({
           }
         }
 
-        // Apply Canonical ID Rewrite to Graph Topology
+        // Apply Canonical ID Rewrite and Strict Deduplication to Graph Topology
         if (finalGraph.nodes) {
+          const uniqueNodesMap = new Map<string, any>();
           finalGraph.nodes.forEach((node: any) => {
             const normId = normalizeArtistId(node.id);
             if (idRewriteMap.has(normId)) {
               node.id = idRewriteMap.get(normId);
             }
+            if (!uniqueNodesMap.has(node.id)) {
+              uniqueNodesMap.set(node.id, node);
+            }
           });
+          finalGraph.nodes = Array.from(uniqueNodesMap.values());
         }
+        
         if (finalGraph.links) {
+          const uniqueLinksMap = new Map<string, any>();
           finalGraph.links.forEach((link: any) => {
             const sId = typeof link.source === 'string' ? link.source : (link.source as any).id;
             const tId = typeof link.target === 'string' ? link.target : (link.target as any).id;
             const normS = normalizeArtistId(sId);
             const normT = normalizeArtistId(tId);
-            if (idRewriteMap.has(normS)) {
-              if (typeof link.source === 'string') link.source = idRewriteMap.get(normS);
-              else (link.source as any).id = idRewriteMap.get(normS);
-            }
-            if (idRewriteMap.has(normT)) {
-              if (typeof link.target === 'string') link.target = idRewriteMap.get(normT);
-              else (link.target as any).id = idRewriteMap.get(normT);
+            
+            let finalS = sId;
+            let finalT = tId;
+            
+            if (idRewriteMap.has(normS)) finalS = idRewriteMap.get(normS);
+            if (idRewriteMap.has(normT)) finalT = idRewriteMap.get(normT);
+            
+            if (typeof link.source === 'string') link.source = finalS;
+            else (link.source as any).id = finalS;
+            
+            if (typeof link.target === 'string') link.target = finalT;
+            else (link.target as any).id = finalT;
+            
+            if (finalS !== finalT) {
+              const linkKey = [finalS, finalT].sort().join('--');
+              if (!uniqueLinksMap.has(linkKey)) {
+                uniqueLinksMap.set(linkKey, link);
+              }
             }
           });
+          finalGraph.links = Array.from(uniqueLinksMap.values());
         }
 
         result = {
