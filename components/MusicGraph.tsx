@@ -1380,8 +1380,16 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                                   !activeFilters[nodeType];
             if (isFilteredOut) return 0.1;
 
-            if (selectionHighlightIds) return selectionHighlightIds.has(d.id) ? 1 : 0.1;
-            if (highlightedNodes.size > 0) return highlightedNodes.has(d.id) ? 1 : 0.1;
+            if (selectionHighlightIds) {
+                if (selectionHighlightIds.has(d.id)) return 1;
+                if (d.type === 'artist') return 0.4;
+                return 0.1;
+            }
+            if (highlightedNodes.size > 0) {
+                if (highlightedNodes.has(d.id)) return 1;
+                if (d.type === 'artist') return 0.4;
+                return 0.1;
+            }
             return 1;
         });
 

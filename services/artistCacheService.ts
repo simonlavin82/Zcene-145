@@ -268,7 +268,7 @@ export const normalizeGraphData = (graph: GraphData): GraphData => {
 
     let label = node.label || originalId.trim();
     if (node.type === 'artist' || node.type === 'label') {
-      label = titleCaseArtistId(label);
+      label = titleCaseArtistId(cleanArtistDisplayName(label));
     }
 
     return {
