@@ -1210,6 +1210,9 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`Zcene Server listening on port ${PORT}`);
 });
 
-server.keepAliveTimeout = 60000;
-server.headersTimeout = 61000;
-server.setTimeout(60000);
+// server.keepAliveTimeout = 60000;
+// server.headersTimeout = 61000;
+// server.setTimeout(60000);
+
+setInterval(() => {}, 1000 * 60 * 60); // Keep event loop alive
+
