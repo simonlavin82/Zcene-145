@@ -1210,6 +1210,46 @@ export const generateGraphData = async (
       const rawNodes = Array.isArray(data?.nodes) ? data.nodes : [];
       const rawLinks = Array.isArray(data?.links) ? data.links : [];
 
+      // --- MULTI-SEED TOPOLOGY MAPPING ---
+      // Re-anchor natural LLM output (e.g. "turnstile") to cached baseGraph roots (e.g. "turnstile-usa")
+      if (disambiguationHints) {
+          rawNodes.forEach(node => {
+              if (!node.id) return;
+              const mapKey = `__MAP__${normalizeArtistId(node.id)}`;
+              if (disambiguationHints[mapKey]) {
+                  node.id = disambiguationHints[mapKey];
+              }
+          });
+          rawLinks.forEach(link => {
+              if (link.source) {
+                  const sourceStr = typeof link.source === 'string' ? link.source : link.source.id;
+                  if (sourceStr) {
+                      const mapKey = `__MAP__${normalizeArtistId(sourceStr)}`;
+                      if (disambiguationHints[mapKey]) {
+                          if (typeof link.source === 'string') {
+                              link.source = disambiguationHints[mapKey];
+                          } else {
+                              link.source.id = disambiguationHints[mapKey];
+                          }
+                      }
+                  }
+              }
+              if (link.target) {
+                  const targetStr = typeof link.target === 'string' ? link.target : link.target.id;
+                  if (targetStr) {
+                      const mapKey = `__MAP__${normalizeArtistId(targetStr)}`;
+                      if (disambiguationHints[mapKey]) {
+                          if (typeof link.target === 'string') {
+                              link.target = disambiguationHints[mapKey];
+                          } else {
+                              link.target.id = disambiguationHints[mapKey];
+                          }
+                      }
+                  }
+              }
+          });
+      }
+
       // --- SANITIZE POLLUTED IDS ---
       // Match patterns like "-after-2020", "(After 2020)", "after 2020", etc.
       const pollutedSuffixRegex = /(?:-|\s*\(?)?(?:after|before)\s*-?\d{4}\)?$/i;

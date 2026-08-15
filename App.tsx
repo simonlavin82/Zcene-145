@@ -4371,6 +4371,14 @@ const App: React.FC = () => {
         // receives clean textual labels for context. The backend will use 'baseGraph' and 'disambiguationHints'
         // to map generated canonical nodes back to their cache IDs.
         
+        // Inject exact mappings into disambiguationHints for the backend to use for topology healing
+        const rawNames = artists.split('::').map(a => a.trim()).filter(Boolean);
+        rawNames.forEach((rawName, idx) => {
+            if (artistList[idx]) {
+                activeDisambiguationHints[`__MAP__${normalizeArtistId(rawName)}`] = artistList[idx];
+            }
+        });
+        
         // Ensure we explicitly generate a cachedSubgraphsContext if we have a pruned graph with nodes
         let computedContext = undefined;
         if (pruned && pruned.nodes && pruned.nodes.length > 0) {
