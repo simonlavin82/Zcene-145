@@ -1007,18 +1007,16 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
                 Cancel
               </button>
             )}
-            <button
-              type="submit"
-              className={
-                (!isLiveAISuggestions || overrideInput.trim())
-                  ? "px-6 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all shadow-md cursor-pointer whitespace-nowrap"
-                  : "px-6 py-2 border border-zinc-700 bg-zinc-800/50 hover:bg-zinc-800 hover:border-zinc-500 text-zinc-300 hover:text-white rounded-xl font-medium text-sm active:scale-95 transition-all cursor-pointer whitespace-nowrap"
-              }
-            >
-              {isLiveAISuggestions 
-                ? (overrideInput.trim() ? 'Confirm Origin' : 'Proceed Without Origin')
-                : (overrideInput.trim() ? 'Confirm' : 'Search Live AI')}
-            </button>
+            {(!isLiveAISuggestions || overrideInput.trim()) && (
+              <button
+                type="submit"
+                className="px-6 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all shadow-md cursor-pointer whitespace-nowrap"
+              >
+                {isLiveAISuggestions 
+                  ? 'Confirm Origin'
+                  : (overrideInput.trim() ? 'Confirm' : 'Search Live AI')}
+              </button>
+            )}
           </ModalFooter>
         </form>
       </ModalContainer>

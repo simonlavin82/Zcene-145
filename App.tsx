@@ -2833,11 +2833,7 @@ const App: React.FC = () => {
 
         let choice: string | 'synthesis' | 'cancel' = 'synthesis';
 
-        if (cacheCandidates.length === 1 && isLiveSynthesisTemp) {
-          // Pre-flight validation: Silently use local foundational context for bespoke generation
-          console.log(`[Pre-Flight Context] Silently anchoring bespoke synthesis to known local seed: ${cacheCandidates[0].id}`);
-          choice = cacheCandidates[0].id;
-        } else if (cacheCandidates.length > 0) {
+        if (cacheCandidates.length > 0) {
           // Look What I Found / Multiple Candidates Modal
           choice = await new Promise<string | 'synthesis' | 'cancel'>((resolve) => {
             setDisambiguationDialog({
@@ -2931,11 +2927,6 @@ const App: React.FC = () => {
               hasDisambiguated = true;
               continue;
             }
-          } else if (flashChoice === 'synthesis') {
-            // Proceed without origin (Fallback from empty 503 modal)
-            resolvedArtistSeeds[i] = normalizeArtistId(rawInput);
-            hasDisambiguated = true;
-            continue;
           } else if (flashChoice !== 'synthesis') {
             const selectedCand = (flashCandidates || []).find(c => c.id === flashChoice);
             if (selectedCand) {
@@ -2970,21 +2961,11 @@ const App: React.FC = () => {
           handleGenerateGraph(currentResolvedStr, isRegeneration, graphToEnhance, true, true, overrideFilters, activeDisambiguationHints, true);
           return;
         } else {
-          // User accepted a specific candidate card from the cache (or it was silently accepted)
+          // User accepted a specific candidate card from the cache.
           resolvedArtistSeeds[i] = normalizeArtistId(choice);
           hasDisambiguated = true;
           const nonSelected = cacheCandidates.filter(c => c.id !== choice);
           nonSelected.forEach(ns => mergeAndCleanupArtists(choice, ns.id));
-          
-          if (isLiveSynthesisTemp) {
-            const selectedCand = cacheCandidates.find(c => c.id === choice);
-            if (selectedCand) {
-              const probeKey = normalizeArtistId(rawInput);
-              activeDisambiguationHints[probeKey] = 
-                `[MANDATORY DISAMBIGUATION CONSTRAINT: The user's seed must specifically refer to the regional entity: "${selectedCand.label}" from ${selectedCand.origin} (${selectedCand.genre}). You MUST use this specific act as the root seed for your graph generation, rather than any other bands with the same name.]`;
-              console.log(`[Pre-Flight Context] Disambiguation Hint Injected for ${probeKey}:`, activeDisambiguationHints[probeKey]);
-            }
-          }
         }
       }
     }
