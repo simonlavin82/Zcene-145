@@ -543,12 +543,20 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                         console.log(`[Sandbox Mode] Bypassing Phase C global verified write and bare pointer for bespoke topology.`);
                     }
                     else {
+                        // Fetch existing document to safely merge detailsCache if seedDetails is missing
+                        const existingDoc = await db.collection(collName).doc(compositeCanonicalId).get();
+                        const existingData = existingDoc.exists ? existingDoc.data() : null;
+                        const finalDetailsCache = seedDetails
+                            ? (isSeedLabel ? sanitizeLabelProfile(seedDetails) : sanitizeUndefinedProperties(seedDetails))
+                            : (existingData?.detailsCache || null);
+                        // Extract the canonical subgraph for this specific seed to prevent multi-seed ghost data
+                        const extractedGraph = isSeedLabel ? null : (0, curatorService_1.extractArtistSubGraph)(seedNorm, finalGraph, artistList);
                         await db.collection(collName).doc(compositeCanonicalId).set({
                             cacheKey: compositeCanonicalId,
                             [idFieldKey]: seedNorm,
                             seedArtists: seed,
-                            graphData: isSeedLabel ? null : JSON.stringify(finalGraph),
-                            detailsCache: isSeedLabel ? sanitizeLabelProfile(seedDetails) : sanitizeUndefinedProperties(seedDetails),
+                            graphData: extractedGraph ? JSON.stringify(extractedGraph) : null,
+                            detailsCache: finalDetailsCache,
                             filters: inputPayload.filters || null,
                             cacheVersion: 4,
                             cachedAt: firestore_2.FieldValue.serverTimestamp(),
@@ -769,15 +777,11 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
             const labelEntityIds = graphObj.nodes
                 ? graphObj.nodes.filter((n) => n.type === 'label').map((n) => (0, curatorService_1.normalizeArtistId)(n.id))
                 : [];
-            const allEntityIds = graphObj.nodes
-                ? graphObj.nodes.filter((n) => n.type === 'artist' || n.type === 'label' || !n.type).map((n) => (0, curatorService_1.normalizeArtistId)(n.id))
-                : [];
             await updateProjectStatus(jobData.userId, inputPayload.projectId, {
                 status: "completed",
                 graphData: JSON.stringify(result.graphData),
                 artistIds: artistEntityIds,
                 labelIds: labelEntityIds,
-                activeNodes: allEntityIds, // Native bulk queue population (both artists and labels)!
                 activeJobId: null,
                 detailsCache: result.detailsCache
             });

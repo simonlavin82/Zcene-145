@@ -10,7 +10,8 @@ import {
   checkVideoPlayability,
   scrapeImageUrlBackend,
   extractCountrySlug,
-  buildCompositeCacheKey
+  buildCompositeCacheKey,
+  extractArtistSubGraph
 } from "./services/curatorService";
 
 // Initialize Firebase Admin SDK if not already done
@@ -601,12 +602,22 @@ export const onCurationJobCreated = onDocumentCreated({
           if (isSandboxMode) {
             console.log(`[Sandbox Mode] Bypassing Phase C global verified write and bare pointer for bespoke topology.`);
           } else {
+            // Fetch existing document to safely merge detailsCache if seedDetails is missing
+            const existingDoc = await db.collection(collName).doc(compositeCanonicalId).get();
+            const existingData = existingDoc.exists ? existingDoc.data() : null;
+            const finalDetailsCache = seedDetails 
+              ? (isSeedLabel ? sanitizeLabelProfile(seedDetails) : sanitizeUndefinedProperties(seedDetails))
+              : (existingData?.detailsCache || null);
+
+            // Extract the canonical subgraph for this specific seed to prevent multi-seed ghost data
+            const extractedGraph = isSeedLabel ? null : extractArtistSubGraph(seedNorm, finalGraph, artistList);
+
             await db.collection(collName).doc(compositeCanonicalId).set({
               cacheKey: compositeCanonicalId,
               [idFieldKey]: seedNorm,
               seedArtists: seed,
-              graphData: isSeedLabel ? null : JSON.stringify(finalGraph),
-              detailsCache: isSeedLabel ? sanitizeLabelProfile(seedDetails) : sanitizeUndefinedProperties(seedDetails),
+              graphData: extractedGraph ? JSON.stringify(extractedGraph) : null,
+              detailsCache: finalDetailsCache,
               filters: inputPayload.filters || null,
               cacheVersion: 4,
               cachedAt: FieldValue.serverTimestamp(),
@@ -843,9 +854,6 @@ export const onCurationJobCreated = onDocumentCreated({
         : [];
       const labelEntityIds = graphObj.nodes
         ? graphObj.nodes.filter((n: any) => n.type === 'label').map((n: any) => normalizeArtistId(n.id))
-        : [];
-      const allEntityIds = graphObj.nodes
-        ? graphObj.nodes.filter((n: any) => n.type === 'artist' || n.type === 'label' || !n.type).map((n: any) => normalizeArtistId(n.id))
         : [];
 
       await updateProjectStatus(jobData.userId, inputPayload.projectId, {

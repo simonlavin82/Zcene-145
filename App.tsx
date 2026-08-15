@@ -2936,7 +2936,7 @@ const App: React.FC = () => {
               activeDisambiguationHints[probeKey] = 
                 `[MANDATORY DISAMBIGUATION CONSTRAINT: The user explicitly selected the following regional entity: "${selectedCand.label}" from ${selectedCand.origin} (${selectedCand.genre}). You MUST use this specific act as the root seed for your graph generation, rather than any other bands with the same name.]`;
               console.log(`[Flash Validation Hint Injected for ${probeKey}]:`, activeDisambiguationHints[probeKey]);
-              resolvedArtistSeeds[i] = normalizeArtistId(rawInput);
+              resolvedArtistSeeds[i] = selectedCand.id; // Fix: Use canonical ID!
               hasDisambiguated = true;
               continue;
             }
