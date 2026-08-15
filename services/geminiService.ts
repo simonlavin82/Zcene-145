@@ -1210,6 +1210,33 @@ export const generateGraphData = async (
       const rawNodes = Array.isArray(data?.nodes) ? data.nodes : [];
       const rawLinks = Array.isArray(data?.links) ? data.links : [];
 
+      // --- SANITIZE POLLUTED IDS ---
+      // Match patterns like "-after-2020", "(After 2020)", "after 2020", etc.
+      const pollutedSuffixRegex = /(?:-|\s*\(?)?(?:after|before)\s*-?\d{4}\)?$/i;
+      
+      rawNodes.forEach(node => {
+          if (node.id) {
+              node.id = node.id.replace(pollutedSuffixRegex, '').trim();
+          }
+      });
+    
+      rawLinks.forEach(link => {
+          if (link.source) {
+              if (typeof link.source === 'string') {
+                  link.source = link.source.replace(pollutedSuffixRegex, '').trim();
+              } else if (link.source.id) {
+                  link.source.id = link.source.id.replace(pollutedSuffixRegex, '').trim();
+              }
+          }
+          if (link.target) {
+              if (typeof link.target === 'string') {
+                  link.target = link.target.replace(pollutedSuffixRegex, '').trim();
+              } else if (link.target.id) {
+                  link.target.id = link.target.id.replace(pollutedSuffixRegex, '').trim();
+              }
+          }
+      });
+
       if (filters?.foundedAfter) {
           const threshold = Number(filters.foundedAfter);
           const artistToYear = new Map<string, number>();
@@ -1327,10 +1354,28 @@ export const generateGraphData = async (
           return true;
       });
 
+      const finalNodes = Array.isArray(deduplicatedNodes) ? deduplicatedNodes : [];
+      let mergedLinks = Array.isArray(validLinks) ? validLinks : [];
+      
+      // Explicitly merge baseGraph nodes and links to preserve context
+      if (baseGraph) {
+          if (baseGraph.nodes) {
+              baseGraph.nodes.forEach(baseNode => {
+                  const normalizedBaseId = normalizeArtistId(baseNode.id);
+                  if (!finalNodes.some(n => normalizeArtistId(n.id) === normalizedBaseId)) {
+                      finalNodes.push(baseNode);
+                  }
+              });
+          }
+          if (baseGraph.links) {
+              mergedLinks = [...mergedLinks, ...baseGraph.links];
+          }
+      }
+      
       // Explicitly assign generated arrays to the returned graph metadata object
       const finalGraph: GraphData = normalizeGraphData({
-          nodes: Array.isArray(deduplicatedNodes) ? deduplicatedNodes : [],
-          links: Array.isArray(validLinks) ? validLinks : []
+          nodes: finalNodes,
+          links: mergedLinks
       });
 
       if (data && (data as any).synthesis_rationale) {

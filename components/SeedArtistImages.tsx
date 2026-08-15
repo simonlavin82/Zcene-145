@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { normalizeArtistId, readArtistCacheMany } from '../services/artistCacheService';
+import { normalizeArtistId, getEntityDocWithRedirect } from '../services/artistCacheService';
 import { motion } from 'framer-motion';
 
 interface SeedArtistImagesProps {
@@ -28,24 +28,27 @@ export const SeedArtistImages: React.FC<SeedArtistImagesProps> = ({
     
     let isMounted = true;
     
-    readArtistCacheMany(normalized, userId).then(({ cached }) => {
+    Promise.all(normalized.map(id => getEntityDocWithRedirect(id, 'artist'))).then(snapshots => {
       if (!isMounted) return;
       const loadedImages: { id: string, url: string, name: string }[] = [];
       
       list.forEach((name, idx) => {
         const normId = normalized[idx];
-        const entry = cached.get(normId);
+        const snap = snapshots[idx];
         let url = '';
-        if (entry && entry.detailsCache) {
-          try {
-            const parsed = typeof entry.detailsCache === 'string' ? JSON.parse(entry.detailsCache) : entry.detailsCache;
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              url = parsed[0].imageUrl || parsed[0].details?.imageUrl || '';
-            } else if (parsed) {
-              url = parsed.imageUrl || parsed.details?.imageUrl || '';
+        if (snap && snap.exists()) {
+          const entry = snap.data();
+          if (entry && entry.detailsCache) {
+            try {
+              const parsed = typeof entry.detailsCache === 'string' ? JSON.parse(entry.detailsCache) : entry.detailsCache;
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                url = parsed[0].imageUrl || parsed[0].details?.imageUrl || '';
+              } else if (parsed) {
+                url = parsed.imageUrl || parsed.details?.imageUrl || '';
+              }
+            } catch (e) {
+              // ignore
             }
-          } catch (e) {
-            // ignore
           }
         }
         loadedImages.push({ id: normId, name, url });

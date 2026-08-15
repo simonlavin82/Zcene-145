@@ -75,6 +75,7 @@ const generateGraphDataViaCloudJob = async (
   jobId?: string,
   disambiguationHints?: Record<string, string>,
   baseGraph?: GraphData,
+  cachedSubgraphsContext?: string,
   isSmartBypass?: boolean,
   isSandboxMode?: boolean
 ): Promise<GraphData> => {
@@ -87,6 +88,7 @@ const generateGraphDataViaCloudJob = async (
     ...(projectId && { projectId }),
     ...(disambiguationHints && { disambiguationHints }),
     ...(baseGraph && { baseGraph }),
+    ...(cachedSubgraphsContext && { cachedSubgraphsContext }),
     ...(isSmartBypass !== undefined && { isSmartBypass }),
     ...(isSandboxMode !== undefined && { isSandboxMode })
   };
@@ -3688,6 +3690,7 @@ const App: React.FC = () => {
                 `job-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
                 activeDisambiguationHints,
                 parsedGraphData, // Pass the cache's parsed graph as baseGraph
+                undefined, // cachedSubgraphsContext
                 true, // isSmartBypass flag
                 isSandboxMode
               ).catch(err => {
@@ -4363,9 +4366,19 @@ const App: React.FC = () => {
           }
         }
 
-        const payloadArtists = artistList.map(a => normalizeArtistId(a)).join('::');
+        // [Payload Configuration]: We pass 'artists' (display names like "Turnstile::Militarie Gun")
+        // rather than 'payloadArtists' (hyphenated cache IDs) to the cloud job. This ensures the LLM
+        // receives clean textual labels for context. The backend will use 'baseGraph' and 'disambiguationHints'
+        // to map generated canonical nodes back to their cache IDs.
+        
+        // Ensure we explicitly generate a cachedSubgraphsContext if we have a pruned graph with nodes
+        let computedContext = undefined;
+        if (pruned && pruned.nodes && pruned.nodes.length > 0) {
+          computedContext = pruned.nodes.map(n => `"${n.id}" (${n.type})`).join(', ');
+        }
+        
         graphPromise = generateGraphDataViaCloudJob(
-          payloadArtists,
+          artists, // Raw display names to prevent LLM hallucinations
           activeDiscoveryFilters,
           user.uid,
           controller?.signal,
@@ -4385,9 +4398,10 @@ const App: React.FC = () => {
           currentProjectId || undefined,
           jobId,
           activeDisambiguationHints,
-          undefined,
-          undefined,
-          isSandboxMode
+          pruned || undefined,          // Base graph context
+          computedContext,              // Stringified cached subgraphs context for multi-seed
+          undefined,                    // isSmartBypass
+          isSandboxMode                 // isSandboxMode
         );
       } else {
         const payloadArtists = artistList.map(a => normalizeArtistId(a)).join('::');

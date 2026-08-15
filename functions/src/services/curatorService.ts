@@ -767,27 +767,28 @@ export const generateGraphDataBackend = async (
   }) : [];
 
   // --- SANITIZE POLLUTED IDS ---
-  const pollutedSuffixRegex = /-after-\d{4}$|-before-\d{4}$/i;
+  // Match patterns like "-after-2020", "(After 2020)", "after 2020", etc.
+  const pollutedSuffixRegex = /(?:-|\s*\(?)?(?:after|before)\s*-?\d{4}\)?$/i;
   
   rawNodes.forEach(node => {
       if (node.id) {
-          node.id = node.id.replace(pollutedSuffixRegex, '');
+          node.id = node.id.replace(pollutedSuffixRegex, '').trim();
       }
   });
 
   rawLinks.forEach(link => {
       if (link.source) {
           if (typeof link.source === 'string') {
-              link.source = link.source.replace(pollutedSuffixRegex, '');
+              link.source = link.source.replace(pollutedSuffixRegex, '').trim();
           } else if (link.source.id) {
-              link.source.id = link.source.id.replace(pollutedSuffixRegex, '');
+              link.source.id = link.source.id.replace(pollutedSuffixRegex, '').trim();
           }
       }
       if (link.target) {
           if (typeof link.target === 'string') {
-              link.target = link.target.replace(pollutedSuffixRegex, '');
+              link.target = link.target.replace(pollutedSuffixRegex, '').trim();
           } else if (link.target.id) {
-              link.target.id = link.target.id.replace(pollutedSuffixRegex, '');
+              link.target.id = link.target.id.replace(pollutedSuffixRegex, '').trim();
           }
       }
   });
@@ -939,6 +940,22 @@ export const generateGraphDataBackend = async (
   });
 
   const finalNodes = Array.isArray(deduplicatedNodes) ? deduplicatedNodes : [];
+  let mergedLinks = Array.isArray(validLinks) ? validLinks : [];
+  
+  // Explicitly merge baseGraph nodes and links to preserve context
+  if (baseGraph) {
+      if (baseGraph.nodes) {
+          baseGraph.nodes.forEach(baseNode => {
+              const normalizedBaseId = normalizeArtistId(baseNode.id);
+              if (!finalNodes.some(n => normalizeArtistId(n.id) === normalizedBaseId)) {
+                  finalNodes.push(baseNode);
+              }
+          });
+      }
+      if (baseGraph.links) {
+          mergedLinks = [...mergedLinks, ...baseGraph.links];
+      }
+  }
   
   // Guarantee that ALL requested seed artists are present in the final graph.
   // If the LLM hallucinated and omitted a seed, inject a stub node for it.
@@ -950,7 +967,24 @@ export const generateGraphDataBackend = async (
           const lNorm = normalizeArtistId(n.label || '');
           return nNorm === seedNorm || lNorm === seedNorm || nNorm.startsWith(`${seedNorm}-`) || lNorm.startsWith(`${seedNorm}-`);
       });
-      if (!exists) {
+      
+      // Consult disambiguationHints if available to map generated nodes to canonical cache IDs
+      let isMapped = false;
+      if (!exists && disambiguationHints) {
+          const keys = Object.keys(disambiguationHints);
+          for (const key of keys) {
+              if (normalizeArtistId(disambiguationHints[key]) === seedNorm) {
+                  // We found a hint mapping this seed. Check if the key (e.g. "Turnstile") is in finalNodes
+                  const keyNorm = normalizeArtistId(key);
+                  if (finalNodes.some(n => normalizeArtistId(n.id) === keyNorm)) {
+                      isMapped = true;
+                      break;
+                  }
+              }
+          }
+      }
+      
+      if (!exists && !isMapped) {
           finalNodes.push({
               id: seed,
               label: seed,
@@ -962,7 +996,7 @@ export const generateGraphDataBackend = async (
 
   const finalGraph: GraphData = normalizeGraphData({
       nodes: finalNodes,
-      links: Array.isArray(validLinks) ? validLinks : []
+      links: mergedLinks
   });
 
   if (data) {
