@@ -182,6 +182,7 @@ export const onCurationJobCreated = onDocumentCreated({
       const isEmulator = false; // TEMPORARILY DISABLED: process.env.FUNCTIONS_EMULATOR === "true";
       const isMissingApiKey = !process.env.GEMINI_API_KEY;
       const forceMocks = inputPayload?.useMocks === true;
+      const isSandboxMode = inputPayload?.isSandboxMode === true;
 
       if (isEmulator || isMissingApiKey || forceMocks) {
         console.log(`[Curation Backend] [Step 1: Graph Generation Started] Mock conditions met. Running simulated mock.`);
@@ -546,7 +547,9 @@ export const onCurationJobCreated = onDocumentCreated({
           const existingDocData = existingDocSnap.exists ? existingDocSnap.data() : null;
           const isAlreadyVerified = existingDocData?.dataIntegrityStatus === 'verified' && existingDocData?.isDeep === true;
 
-          if (isAlreadyVerified) {
+          if (isSandboxMode) {
+            console.log(`[Sandbox Mode] Bypassing Phase A global staging write for bespoke topology.`);
+          } else if (isAlreadyVerified) {
             console.log(`[Integrity Lock] Skipping staging write for ${compositeCanonicalId} — already verified gold-standard record. Re-using existing data.`);
           } else {
             // Write in_progress staging placeholder so clients treat this doc as a cache miss
@@ -594,38 +597,42 @@ export const onCurationJobCreated = onDocumentCreated({
           // payload and seals dataIntegrityStatus: 'verified'. No partial state
           // ever reaches 'verified'. The integrityLockedAt field is intentionally
           // absent from this write — it only exists on in_progress staging docs.
-          await db.collection(collName).doc(compositeCanonicalId).set({
-            cacheKey: compositeCanonicalId,
-            [idFieldKey]: seedNorm,
-            seedArtists: seed,
-            graphData: isSeedLabel ? null : JSON.stringify(finalGraph),
-            detailsCache: isSeedLabel ? sanitizeLabelProfile(seedDetails) : sanitizeUndefinedProperties(seedDetails),
-            filters: inputPayload.filters || null,
-            cacheVersion: 4,
-            cachedAt: FieldValue.serverTimestamp(),
-            isDeep: true,
-            isPrimarySeed: true,
-            hasUniqueSpiderweb: !isSeedLabel,
-            dataIntegrityStatus: seedDetails?._isStub ? 'degraded' : 'verified',   // ← COMPLETION SEAL
-          });
-          
-          console.log(`[Integrity Lock] ✅ Atomic verified write complete for seed (${collName}): ${compositeCanonicalId}`);
-
-          // Create/Heal Bare Root Alias Pointer
-          const bareArtistIdRef = db.collection(collName).doc(seedNorm);
-          const bareSnap = await bareArtistIdRef.get();
-          const bareData = bareSnap.exists ? bareSnap.data() : null;
-
-          if (!bareSnap.exists || (bareData && !bareData.redirectTo && bareSnap.id !== compositeCanonicalId)) {
-            await bareArtistIdRef.set({
-              cacheKey: seedNorm,
+          if (isSandboxMode) {
+            console.log(`[Sandbox Mode] Bypassing Phase C global verified write and bare pointer for bespoke topology.`);
+          } else {
+            await db.collection(collName).doc(compositeCanonicalId).set({
+              cacheKey: compositeCanonicalId,
               [idFieldKey]: seedNorm,
               seedArtists: seed,
+              graphData: isSeedLabel ? null : JSON.stringify(finalGraph),
+              detailsCache: isSeedLabel ? sanitizeLabelProfile(seedDetails) : sanitizeUndefinedProperties(seedDetails),
+              filters: inputPayload.filters || null,
               cacheVersion: 4,
               cachedAt: FieldValue.serverTimestamp(),
-              redirectTo: compositeCanonicalId
+              isDeep: true,
+              isPrimarySeed: true,
+              hasUniqueSpiderweb: !isSeedLabel,
+              dataIntegrityStatus: seedDetails?._isStub ? 'degraded' : 'verified',   // ← COMPLETION SEAL
             });
-            console.log(`[Curation Backend] Created Bare Alias Pointer in ${collName}: ${seedNorm} -> ${compositeCanonicalId}`);
+            
+            console.log(`[Integrity Lock] ✅ Atomic verified write complete for seed (${collName}): ${compositeCanonicalId}`);
+
+            // Create/Heal Bare Root Alias Pointer
+            const bareArtistIdRef = db.collection(collName).doc(seedNorm);
+            const bareSnap = await bareArtistIdRef.get();
+            const bareData = bareSnap.exists ? bareSnap.data() : null;
+
+            if (!bareSnap.exists || (bareData && !bareData.redirectTo && bareSnap.id !== compositeCanonicalId)) {
+              await bareArtistIdRef.set({
+                cacheKey: seedNorm,
+                [idFieldKey]: seedNorm,
+                seedArtists: seed,
+                cacheVersion: 4,
+                cachedAt: FieldValue.serverTimestamp(),
+                redirectTo: compositeCanonicalId
+              });
+              console.log(`[Curation Backend] Created Bare Alias Pointer in ${collName}: ${seedNorm} -> ${compositeCanonicalId}`);
+            }
           }
         }
 
@@ -705,58 +712,62 @@ export const onCurationJobCreated = onDocumentCreated({
           idRewriteMap.set(recNorm, compositeCanonicalId);
           if (recDetailsEntry) recDetailsEntry[0] = compositeCanonicalId;
 
-          const recDocRef = db.collection(collName).doc(compositeCanonicalId);
-          const recSnap = await recDocRef.get();
+          if (isSandboxMode) {
+            console.log(`[Sandbox Mode] Bypassing global cache writes for recommendation (${collName}): ${compositeCanonicalId}`);
+          } else {
+            const recDocRef = db.collection(collName).doc(compositeCanonicalId);
+            const recSnap = await recDocRef.get();
 
-          if (!recSnap.exists) {
-            await recDocRef.set({
-              cacheKey: compositeCanonicalId,
+            if (!recSnap.exists) {
+              await recDocRef.set({
+                cacheKey: compositeCanonicalId,
+                [idFieldKey]: recNorm,
+                seedArtists: recArtist,
+                graphData: null,
+                detailsCache: isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(recDetails), // Save as structured object!
+                filters: null, // Note: active filters are not strictly carried for proactive rec entries unless we explicitly want to
+                cacheVersion: 4,
+                cachedAt: FieldValue.serverTimestamp(),
+
+                isDeep: true, // Marked Deep!
+                isPrimarySeed: false,
+                hasUniqueSpiderweb: false,
+
+              });
+              console.log(`[Curation Backend] Proactively created DEEP entry for recommendation (${collName}): ${compositeCanonicalId}`);
+            } else {
+              const updatePayload: any = {
+                detailsCache: isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(recDetails),
+                cachedAt: FieldValue.serverTimestamp(),
+                cacheVersion: 4,
+                [idFieldKey]: recNorm,
+                cacheKey: compositeCanonicalId,
+                isDeep: true
+              };
+              await recDocRef.update(sanitizeUndefinedProperties(updatePayload));
+              console.log(`[Curation Backend] Proactively updated detailsCache for recommendation (${collName}): ${compositeCanonicalId}`);
+            }
+
+            // Create/Heal Bare Root Alias Pointer and replicate detailsCache for immediate short-ID resolution
+            const bareArtistIdRef = db.collection(collName).doc(recNorm);
+            const bareSnap = await bareArtistIdRef.get();
+
+            const barePayload: any = {
+              cacheKey: recNorm,
               [idFieldKey]: recNorm,
               seedArtists: recArtist,
-              graphData: null,
-              detailsCache: isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(recDetails), // Save as structured object!
-              filters: null, // Note: active filters are not strictly carried for proactive rec entries unless we explicitly want to
               cacheVersion: 4,
               cachedAt: FieldValue.serverTimestamp(),
-
-              isDeep: true, // Marked Deep!
-              isPrimarySeed: false,
-              hasUniqueSpiderweb: false,
-
-            });
-            console.log(`[Curation Backend] Proactively created DEEP entry for recommendation (${collName}): ${compositeCanonicalId}`);
-          } else {
-            const updatePayload: any = {
-              detailsCache: isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(recDetails),
-              cachedAt: FieldValue.serverTimestamp(),
-              cacheVersion: 4,
-              [idFieldKey]: recNorm,
-              cacheKey: compositeCanonicalId,
-              isDeep: true
+              redirectTo: compositeCanonicalId
             };
-            await recDocRef.update(sanitizeUndefinedProperties(updatePayload));
-            console.log(`[Curation Backend] Proactively updated detailsCache for recommendation (${collName}): ${compositeCanonicalId}`);
-          }
 
-          // Create/Heal Bare Root Alias Pointer and replicate detailsCache for immediate short-ID resolution
-          const bareArtistIdRef = db.collection(collName).doc(recNorm);
-          const bareSnap = await bareArtistIdRef.get();
-
-          const barePayload: any = {
-            cacheKey: recNorm,
-            [idFieldKey]: recNorm,
-            seedArtists: recArtist,
-            cacheVersion: 4,
-            cachedAt: FieldValue.serverTimestamp(),
-            redirectTo: compositeCanonicalId
-          };
-
-          if (!bareSnap.exists) {
-            await bareArtistIdRef.set(sanitizeUndefinedProperties(barePayload));
-            console.log(`[Curation Backend] Created Bare Alias Pointer Stub in ${collName}: ${recNorm} -> ${compositeCanonicalId}`);
-          } else {
-            await bareArtistIdRef.update(sanitizeUndefinedProperties(barePayload)).catch(() => {});
-            console.log(`[Curation Backend] Updated Bare Alias Pointer Stub in ${collName}: ${recNorm} -> ${compositeCanonicalId}`);
+            if (!bareSnap.exists) {
+              await bareArtistIdRef.set(sanitizeUndefinedProperties(barePayload));
+              console.log(`[Curation Backend] Created Bare Alias Pointer Stub in ${collName}: ${recNorm} -> ${compositeCanonicalId}`);
+            } else {
+              await bareArtistIdRef.update(sanitizeUndefinedProperties(barePayload)).catch(() => {});
+              console.log(`[Curation Backend] Updated Bare Alias Pointer Stub in ${collName}: ${recNorm} -> ${compositeCanonicalId}`);
+            }
           }
         }
 

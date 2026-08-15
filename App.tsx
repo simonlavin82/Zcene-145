@@ -75,7 +75,8 @@ const generateGraphDataViaCloudJob = async (
   jobId?: string,
   disambiguationHints?: Record<string, string>,
   baseGraph?: GraphData,
-  isSmartBypass?: boolean
+  isSmartBypass?: boolean,
+  isSandboxMode?: boolean
 ): Promise<GraphData> => {
   const finalJobId = jobId || `job-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
   const jobRef = doc(db, 'curationJobs', finalJobId);
@@ -86,7 +87,8 @@ const generateGraphDataViaCloudJob = async (
     ...(projectId && { projectId }),
     ...(disambiguationHints && { disambiguationHints }),
     ...(baseGraph && { baseGraph }),
-    ...(isSmartBypass !== undefined && { isSmartBypass })
+    ...(isSmartBypass !== undefined && { isSmartBypass }),
+    ...(isSandboxMode !== undefined && { isSandboxMode })
   };
 
   await setDoc(jobRef, {
@@ -2710,6 +2712,7 @@ const App: React.FC = () => {
       (activeDiscoveryFilters.additionalInstructions && activeDiscoveryFilters.additionalInstructions.trim().length > 0)
     );
     const isLiveSynthesisTemp = hasActiveFilters || (rawArtists.split('::').map(s => s.trim()).filter(Boolean).length > 1);
+    const isSandboxMode = isLiveSynthesisTemp;
 
     let artists = rawArtists;
     if (isLiveSynthesisTemp) {
@@ -3660,7 +3663,8 @@ const App: React.FC = () => {
                 `job-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
                 activeDisambiguationHints,
                 parsedGraph, // Pass the cache's parsed graph as baseGraph
-                true // isSmartBypass flag
+                true, // isSmartBypass flag
+                isSandboxMode
               ).catch(err => {
                  console.warn("[Smart Bypass] Background generation failed:", err);
               });
@@ -4001,7 +4005,13 @@ const App: React.FC = () => {
               } catch (e) {
                 console.warn("Failed to parse detailsCache from cloud job:", e);
               }
-            }
+            },
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            toFetch.length > 1 || hasActiveFilters
           );
         } else {
           partialGraphPromise = generateGraphData(toFetch.join('::'), pruned, activeDiscoveryFilters, user?.uid, controller?.signal, activeDisambiguationHints);
@@ -4345,7 +4355,10 @@ const App: React.FC = () => {
           },
           currentProjectId || undefined,
           jobId,
-          activeDisambiguationHints
+          activeDisambiguationHints,
+          undefined,
+          undefined,
+          isSandboxMode
         );
       } else {
         graphPromise = generateGraphData(artists, pruned, activeDiscoveryFilters, user?.uid, controller?.signal, activeDisambiguationHints);
