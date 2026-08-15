@@ -734,9 +734,24 @@ export const GenerativeRationaleModal: React.FC<{
   // Sanitize literal escape sequences from the JSON payload
   let sanitizedRationale = cleanRationale.replace(/\\n/g, '\n');
 
-  // 1. Convert non-standard '•' bullets (and any following newlines/spaces) to standard markdown '- '
-  // 1. Convert varying bullet markers (•, -, *) followed by spaces/newlines into clean markdown list markers
+  // 1a. Pre-process inline bullets: If a bullet marker immediately follows a period (end of sentence),
+  // force it onto a double newline so it gets parsed correctly as a list item.
+  sanitizedRationale = sanitizedRationale.replace(/\. \s*[-•*]\s+/g, '.\n\n- ');
+
+  // 1b. Convert varying bullet markers (•, -, *) followed by spaces/newlines into clean markdown list markers
   sanitizedRationale = sanitizedRationale.replace(/(^|\n)[ \t]*[-•*][ \t]*/g, '$1- ');
+
+  // 1c. Sanitize common raw HTML tags that Gemini sometimes outputs instead of markdown
+  sanitizedRationale = sanitizedRationale
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/?b>/gi, '**')
+    .replace(/<\/?strong>/gi, '**')
+    .replace(/<\/?i>/gi, '*')
+    .replace(/<\/?em>/gi, '*')
+    .replace(/<ul>/gi, '\n')
+    .replace(/<\/ul>/gi, '\n')
+    .replace(/<li>/gi, '\n- ')
+    .replace(/<\/li>/gi, '');
 
   // 2. Clean up stray newlines immediately following standard markdown list markers
   sanitizedRationale = sanitizedRationale.replace(/(^|\n)([ \t]*-[ \t]*)[\n]+[ \t]*/g, '$1$2');

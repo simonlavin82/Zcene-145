@@ -818,7 +818,7 @@ const getNodeLabel = (node: Node, seedList: string[], detailsCache?: Map<string,
   if (node.type === 'artist') {
     const normId = normalizeArtistId(node.id);
     const seedMatch = seedList.find(s => normalizeArtistId(s) === normId);
-    if (seedMatch) return seedMatch;
+    if (seedMatch) return cleanArtistDisplayName(seedMatch);
 
     if (detailsCache) {
       const cached = detailsCache.get(node.id) || 
@@ -3735,7 +3735,7 @@ const App: React.FC = () => {
             const finalEntry: ArtistCacheEntry = entry || {
               artistId: normalizeArtistId(name),
               seedArtists: name,
-              graphData: JSON.stringify({ nodes: [{ id: name, type: 'artist', label: name, group: 1 }], links: [] }),
+              graphData: JSON.stringify({ nodes: [{ id: name, type: 'artist', label: cleanArtistDisplayName(name), group: 1 }], links: [] }),
               cacheVersion: 4,
               cachedAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
               hitCount: 0,
@@ -5080,7 +5080,14 @@ const App: React.FC = () => {
         const existing = detailsCacheRef.current.get(k);
         const isExistingLocked = existing && existing.summary && existing.summary.trim().length > 5 && !existing._isSentinel;
         if (isExistingLocked) {
-          console.log(`[Batch Hydration] Bypassing ref sync for locked artist: ${k}`);
+          console.log(`[Batch Hydration] Merging missing fields into locked artist: ${k}`);
+          detailsCacheRef.current.set(k, {
+            ...v,
+            ...existing,
+            imageUrl: v.imageUrl || existing.imageUrl || '',
+            youtubeVideoId: v.youtubeVideoId || existing.youtubeVideoId,
+            details: existing.details || v.details
+          });
           return;
         }
         detailsCacheRef.current.set(k,
@@ -5097,7 +5104,14 @@ const App: React.FC = () => {
           const existing = prev.get(k);
           const isExistingLocked = existing && existing.summary && existing.summary.trim().length > 5 && !existing._isSentinel;
           if (isExistingLocked) {
-            console.log(`[Batch Hydration] Bypassing state merge for locked artist: ${k}`);
+            console.log(`[Batch Hydration] Merging missing fields into locked artist state: ${k}`);
+            merged.set(k, {
+              ...v,
+              ...existing,
+              imageUrl: v.imageUrl || existing.imageUrl || '',
+              youtubeVideoId: v.youtubeVideoId || existing.youtubeVideoId,
+              details: existing.details || v.details
+            });
             return;
           }
           if (existing && existing.imageUrl && !v.imageUrl) {
