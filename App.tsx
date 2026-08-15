@@ -17,7 +17,7 @@ import HelpPage from './components/HelpPage';
 import GraphPage from './components/GraphPage';
 import HomePage from './components/HomePage';
 import Dashboard from './components/Dashboard';
-import { MyStackDialog, TokenConfirmationDialog, CacheChoiceDialog, DisambiguationCandidate, ExploreActionDialog } from './components/SharedModals';
+import { MyStackDialog, TokenConfirmationDialog, CacheChoiceDialog, DisambiguationCandidate, ExploreActionDialog, FilterGuidanceModal } from './components/SharedModals';
 
 import { ShareModal } from './components/ShareModal';
 import { analyticsService } from './services/analyticsService';
@@ -1180,6 +1180,7 @@ const App: React.FC = () => {
     enrichmentArtists?: string[];
     onConfirm: () => void;
     onCancel: () => void;
+    onBack?: () => void;
   } | null>(null);
   const [cacheChoiceDialog, setCacheChoiceDialog] = useState<{
     isOpen: boolean;
@@ -1191,8 +1192,15 @@ const App: React.FC = () => {
     isOpen: boolean;
     query: string;
     candidates: DisambiguationCandidate[];
-    onSelect: (choice: string | 'synthesis' | 'cancel') => void;
-    isLiveAISuggestions?: boolean;
+    showBack?: boolean;
+    onSelect: (candidateId: string | 'synthesis' | 'cancel' | 'back') => void;
+    isLiveAISuggestions: boolean;
+  } | null>(null);
+  const [filterGuidanceState, setFilterGuidanceState] = useState<{
+    isOpen: boolean;
+    seedArtists: string[];
+    filters: DiscoveryFilters;
+    errorMessage?: string;
   } | null>(null);
   const [exploreConfirmation, setExploreConfirmation] = useState<{
     isOpen: boolean;
@@ -2802,11 +2810,12 @@ const App: React.FC = () => {
     }
 
     // ─── STAGE 0: UNIFIED DISAMBIGUATION GATE & TOKEN GUARD ────────────────────
+    let sessionTokenApproved = false;
     let resolvedArtistSeeds = [...artistList];
     let activeDisambiguationHints: Record<string, string> = disambiguationHints || {};
     let hasDisambiguated = false;
 
-    if (!bypassToken && !bypassDisambiguation) {
+    if (!bypassTokenConfirmation && !bypassDisambiguation) {
       for (let i = 0; i < artistList.length; i++) {
         const rawInput = artists.split('::').map(s => s.trim()).filter(Boolean)[i] || artistList[i];
         const searchId = artistList[i];
@@ -2844,7 +2853,7 @@ const App: React.FC = () => {
 
         if (choice === 'synthesis') {
           // --- FRONT-LOADED TOKEN QUOTA GATE (Enforced BEFORE AI Validation) ---
-          if (!bypassToken) {
+          if (!bypassTokenConfirmation && !sessionTokenApproved) {
             const confirmed = await confirmTokenUsage(isLiveSynthesisTemp ? 'live_synthesis' : 'generation', [], artistList, undefined, cacheCandidates.length > 0);
             if (confirmed === 'back') {
               i--;
@@ -2856,6 +2865,7 @@ const App: React.FC = () => {
               isProjectLoadingRef.current = false;
               return;
             }
+            sessionTokenApproved = true;
           }
 
           // --- AI VALIDATION GATE (Validate Origin Modal) ---
@@ -3670,7 +3680,7 @@ const App: React.FC = () => {
                 currentProjectId || undefined,
                 `job-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
                 activeDisambiguationHints,
-                parsedGraph, // Pass the cache's parsed graph as baseGraph
+                parsedGraphData, // Pass the cache's parsed graph as baseGraph
                 true, // isSmartBypass flag
                 isSandboxMode
               ).catch(err => {
@@ -4262,7 +4272,7 @@ const App: React.FC = () => {
       }
     }
 
-    if (!bypassToken) {
+    if (!bypassTokenConfirmation && !sessionTokenApproved) {
       const confirmed = await confirmTokenUsage(isLiveSynthesis ? 'live_synthesis' : 'generation', [], artistList);
       if (!confirmed || (controller && controller.signal.aborted)) {
         isHydratingSessionRef.current = false;
@@ -4271,6 +4281,7 @@ const App: React.FC = () => {
         setSeedArtists(prevSeedArtists);
         return;
       }
+      sessionTokenApproved = true;
     }
 
 
@@ -4326,6 +4337,7 @@ const App: React.FC = () => {
               activeJobId: jobId,
               seedArtists: artists,
               name: defaultName,
+              discoveryFilters: JSON.stringify(activeDiscoveryFilters),
               updatedAt: serverTimestamp()
             });
           } catch (e) {
@@ -4338,6 +4350,7 @@ const App: React.FC = () => {
               activeJobId: jobId,
               seedArtists: artists,
               name: defaultName,
+              discoveryFilters: JSON.stringify(activeDiscoveryFilters),
               updatedAt: serverTimestamp()
             }, { merge: true });
           }
@@ -4665,8 +4678,17 @@ const App: React.FC = () => {
       isHydratingSessionRef.current = false;
     } catch (err: any) {
       if (err.name !== 'AbortError' && !(controller && controller.signal.aborted)) {
-        const snippet = err.stackSnippet ? err.stackSnippet : "";
-        showToast(humanizeError(err) + snippet);
+        if (err.message && err.message.includes("discover any relational bridges")) {
+          setFilterGuidanceState({
+            isOpen: true,
+            seedArtists: artists.split('::'),
+            filters: activeDiscoveryFilters,
+            errorMessage: err.message
+          });
+        } else {
+          const snippet = err.stackSnippet ? err.stackSnippet : "";
+          showToast(humanizeError(err) + snippet);
+        }
         setIsLoading(false);
         isFetchingDetailsRef.current = false;
       }
@@ -7484,7 +7506,7 @@ const App: React.FC = () => {
           const alreadyExists = existingSeeds.some(s => normalize(s) === normalizedName);
           if (alreadyExists) return;
           const newSeeds = existingSeeds.length > 0 ? `${seedArtists}::${name}` : name;
-          handleGenerateGraph(newSeeds, true, graphData);
+          handleGenerateGraph(newSeeds, false, null);
         }}
         seedArtists={(seedArtists || "").split('::').filter(Boolean)}
       />
@@ -7500,6 +7522,22 @@ const App: React.FC = () => {
         onClose={() => exploreConfirmation?.onCancel()}
         onConfirm={() => exploreConfirmation?.onConfirm()}
         artistName={exploreConfirmation?.artistName || ''}
+      />
+
+      <FilterGuidanceModal
+        isOpen={filterGuidanceState?.isOpen || false}
+        onClose={() => setFilterGuidanceState(null)}
+        initialFilters={filterGuidanceState?.filters || {}}
+        seedArtists={filterGuidanceState?.seedArtists || []}
+        errorMessage={filterGuidanceState?.errorMessage}
+        onReRun={(newFilters) => {
+          if (filterGuidanceState) {
+            const seeds = filterGuidanceState.seedArtists.join('::');
+            setDiscoveryFilters(newFilters);
+            setFilterGuidanceState(null);
+            handleGenerateGraph(seeds, false, null, true, true, newFilters, undefined, true);
+          }
+        }}
       />
 
       <TokenConfirmationDialog
