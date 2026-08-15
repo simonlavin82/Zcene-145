@@ -2856,22 +2856,6 @@ const App: React.FC = () => {
         }
 
         if (choice === 'synthesis') {
-          // --- FRONT-LOADED TOKEN QUOTA GATE (Enforced BEFORE AI Validation) ---
-          if (!bypassTokenConfirmation && !sessionTokenApprovedRef.current) {
-            const confirmed = await confirmTokenUsage(isLiveSynthesisTemp ? 'live_synthesis' : 'generation', [], artistList, undefined, cacheCandidates.length > 0);
-            if (confirmed === 'back') {
-              i--;
-              continue;
-            }
-            if (!confirmed) {
-              setIsLoading(false);
-              isHydratingSessionRef.current = false;
-              isProjectLoadingRef.current = false;
-              return;
-            }
-            sessionTokenApprovedRef.current = true;
-          }
-
           // --- AI VALIDATION GATE (Validate Origin Modal) ---
           setIsLoading(true);
           const flashCandidates = await resolveArtistCandidatesViaAI(rawInput, cacheCandidates, controller?.signal);
@@ -2923,6 +2907,9 @@ const App: React.FC = () => {
               activeDisambiguationHints[probeKey] = 
                 `[MANDATORY DISAMBIGUATION CONSTRAINT: The user explicitly requested the regional variant of "${rawInput}" originating from or associated with "${userInputCountry}". You MUST use this specific regional act as the root seed for your graph generation, rather than any other bands with the same name.]`;
               console.log(`[Disambiguation Override Hint Injected for ${probeKey}]:`, activeDisambiguationHints[probeKey]);
+              resolvedArtistSeeds[i] = normalizeArtistId(rawInput);
+              hasDisambiguated = true;
+              continue;
             }
           } else if (flashChoice !== 'synthesis') {
             const selectedCand = (flashCandidates || []).find(c => c.id === flashChoice);
