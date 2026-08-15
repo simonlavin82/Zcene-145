@@ -853,7 +853,6 @@ export const onCurationJobCreated = onDocumentCreated({
         graphData: JSON.stringify(result.graphData),
         artistIds: artistEntityIds,
         labelIds: labelEntityIds,
-        activeNodes: allEntityIds, // Native bulk queue population (both artists and labels)!
         activeJobId: null,
         detailsCache: result.detailsCache
       });

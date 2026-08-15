@@ -4606,7 +4606,11 @@ const App: React.FC = () => {
       });
 
       const firstSlug = resolvedArtistList[0];
-      const primaryNode = final.nodes.find(n => n.id.toLowerCase() === firstSlug.toLowerCase()) || final.nodes[0];
+      const primaryNode = final.nodes.find(n => {
+        const normN = normalizeArtistId(n.id);
+        const normF = normalizeArtistId(firstSlug);
+        return normN === normF || normN.startsWith(normF + '-') || normF.startsWith(normN + '-');
+      }) || final.nodes[0];
       let selectedNodeData = primaryNode;
 
       if (primaryNode) {
