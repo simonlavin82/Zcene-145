@@ -16,7 +16,7 @@ const db = getFirestore();
 
 async function clearTurnstile() {
   const collections = ['artists', 'labels'];
-  const ids = ['turnstile', 'turnstile-usa', 'turnstile-usa-exc_origins:russia,united-kingdom']; // common variations
+  const ids = ['turnstile', 'turnstile-usa', 'turnstile-global', 'turnstile-usa-exc_origins:russia,united-kingdom']; // common variations
 
   let deleted = 0;
   for (const coll of collections) {

@@ -4364,14 +4364,17 @@ const App: React.FC = () => {
       }
 
       let seedUpdated = false;
+      const canonicalSeedIds: string[] = [];
       const mappedSeeds = artists.split('::').map(a => {
         const trimmed = a.trim();
         const canonicalNode = findCanonicalNodeForArtist(trimmed, newData.nodes);
         if (canonicalNode && normalizeArtistId(canonicalNode.id) !== normalizeArtistId(trimmed)) {
           seedUpdated = true;
+          canonicalSeedIds.push(canonicalNode.id);
           showToast(`Did you mean ${canonicalNode.label || canonicalNode.id}? Resolved '${trimmed}' to '${canonicalNode.label || canonicalNode.id}'.`);
           return canonicalNode.label || canonicalNode.id;
         }
+        canonicalSeedIds.push(trimmed);
         return trimmed;
       });
 
@@ -4382,7 +4385,7 @@ const App: React.FC = () => {
 
       if (seedUpdated) {
         resolvedArtists = mappedSeeds.join('::');
-        resolvedArtistList = mappedSeeds.map(a => normalizeArtistId(a));
+        resolvedArtistList = canonicalSeedIds.map(a => normalizeArtistId(a));
         setSeedArtists(resolvedArtists);
 
         resolvedArtistList.forEach(name => {
@@ -4393,7 +4396,7 @@ const App: React.FC = () => {
         artists.split('::').forEach((oldSeed, idx) => {
           const newSeedLabel = mappedSeeds[idx];
           const oldSeedId = normalizeArtistId(oldSeed);
-          const newSeedId = normalizeArtistId(newSeedLabel);
+          const newSeedId = normalizeArtistId(canonicalSeedIds[idx]);
           if (oldSeedId !== newSeedId) {
             mutatedNewData = mutateGraphArtistId(mutatedNewData, oldSeed, newSeedId, newSeedLabel);
             if (mutatedPruned) {
