@@ -314,8 +314,13 @@ export const onCurationJobCreated = onDocumentCreated({
                 requiresTextHydration = true;
                 requiresImageScraping = true;
                 requiresVideoScraping = true;
-              } else if (details.summary === "Imported from Apple Music library." || details.summary.length <= 50 || !details.details?.genre) {
-                // Stub node (e.g. from frontend library import) -> Full Hydration
+              } else if (
+                details.summary === "Imported from Apple Music library." || 
+                details.summary.length <= 50 || 
+                !details.details?.genre ||
+                details.summary.includes("Mock Bio")
+              ) {
+                // Stub node (e.g. from frontend library import or test seed) -> Full Hydration
                 requiresTextHydration = true;
                 requiresImageScraping = true;
                 requiresVideoScraping = true;
@@ -420,7 +425,12 @@ export const onCurationJobCreated = onDocumentCreated({
 
           for (const res of chunkResults) {
             if (res) {
-              detailsCacheEntries.push(res);
+              const existingIndex = detailsCacheEntries.findIndex((entry: any) => isEntitySeedMatch(normalizeArtistId(res[0]), entry[0]));
+              if (existingIndex !== -1) {
+                detailsCacheEntries[existingIndex] = res;
+              } else {
+                detailsCacheEntries.push(res);
+              }
             }
           }
 
@@ -622,7 +632,7 @@ export const onCurationJobCreated = onDocumentCreated({
             if (!idRewriteMap.has(recNorm) && idRewriteMap.has(matchingSeedNorm)) {
                idRewriteMap.set(recNorm, idRewriteMap.get(matchingSeedNorm)!);
             }
-            continue; // Already seeds
+            // Do NOT continue here. Let the seed fall through so it can be evaluated for partial hydration or missing assets during a cache upgrade.
           }
           
           const recDetailsEntry = detailsCacheEntries.find(entry => isEntitySeedMatch(recNorm, entry[0]));

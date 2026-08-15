@@ -281,8 +281,11 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                             requiresImageScraping = true;
                             requiresVideoScraping = true;
                         }
-                        else if (details.summary === "Imported from Apple Music library." || details.summary.length <= 50 || !details.details?.genre) {
-                            // Stub node (e.g. from frontend library import) -> Full Hydration
+                        else if (details.summary === "Imported from Apple Music library." ||
+                            details.summary.length <= 50 ||
+                            !details.details?.genre ||
+                            details.summary.includes("Mock Bio")) {
+                            // Stub node (e.g. from frontend library import or test seed) -> Full Hydration
                             requiresTextHydration = true;
                             requiresImageScraping = true;
                             requiresVideoScraping = true;
@@ -371,7 +374,13 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                     console.log(`[Curation Backend] [Step 3: Firestore Caching] Hydration complete. Writing ${chunkResults.length} entities to Firestore cache...`);
                     for (const res of chunkResults) {
                         if (res) {
-                            detailsCacheEntries.push(res);
+                            const existingIndex = detailsCacheEntries.findIndex((entry) => isEntitySeedMatch((0, curatorService_1.normalizeArtistId)(res[0]), entry[0]));
+                            if (existingIndex !== -1) {
+                                detailsCacheEntries[existingIndex] = res;
+                            }
+                            else {
+                                detailsCacheEntries.push(res);
+                            }
                         }
                     }
                     // Add a 3-second cooldown between batches to prevent Google Search Tool quota exhaustion
@@ -555,8 +564,14 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                     const recArtist = entityObj.name;
                     const recNorm = (0, curatorService_1.normalizeArtistId)(recArtist);
                     const isLabel = entityObj.type === 'label';
-                    if (seedNorms.some((s) => isEntitySeedMatch(s, recNorm)))
-                        continue; // Already seeds
+                    const matchingSeedNorm = seedNorms.find((s) => isEntitySeedMatch(s, recNorm));
+                    if (matchingSeedNorm) {
+                        // ALIAS this duplicate reference to the canonical seed ID so it gets merged!
+                        if (!idRewriteMap.has(recNorm) && idRewriteMap.has(matchingSeedNorm)) {
+                            idRewriteMap.set(recNorm, idRewriteMap.get(matchingSeedNorm));
+                        }
+                        // Do NOT continue here. Let the seed fall through so it can be evaluated for partial hydration or missing assets during a cache upgrade.
+                    }
                     const recDetailsEntry = detailsCacheEntries.find(entry => isEntitySeedMatch(recNorm, entry[0]));
                     const recDetails = recDetailsEntry ? recDetailsEntry[1] : null;
                     if (isLabel && !recDetails) {
@@ -662,34 +677,49 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                         console.log(`[Curation Backend] Updated Bare Alias Pointer Stub in ${collName}: ${recNorm} -> ${compositeCanonicalId}`);
                     }
                 }
-                // Apply Canonical ID Rewrite to Graph Topology
+                // Apply Canonical ID Rewrite and Strict Deduplication to Graph Topology
                 if (finalGraph.nodes) {
+                    const uniqueNodesMap = new Map();
                     finalGraph.nodes.forEach((node) => {
                         const normId = (0, curatorService_1.normalizeArtistId)(node.id);
                         if (idRewriteMap.has(normId)) {
                             node.id = idRewriteMap.get(normId);
                         }
+                        if (!uniqueNodesMap.has(node.id)) {
+                            uniqueNodesMap.set(node.id, node);
+                        }
                     });
+                    finalGraph.nodes = Array.from(uniqueNodesMap.values());
                 }
                 if (finalGraph.links) {
+                    const uniqueLinksMap = new Map();
                     finalGraph.links.forEach((link) => {
                         const sId = typeof link.source === 'string' ? link.source : link.source.id;
                         const tId = typeof link.target === 'string' ? link.target : link.target.id;
                         const normS = (0, curatorService_1.normalizeArtistId)(sId);
                         const normT = (0, curatorService_1.normalizeArtistId)(tId);
-                        if (idRewriteMap.has(normS)) {
-                            if (typeof link.source === 'string')
-                                link.source = idRewriteMap.get(normS);
-                            else
-                                link.source.id = idRewriteMap.get(normS);
-                        }
-                        if (idRewriteMap.has(normT)) {
-                            if (typeof link.target === 'string')
-                                link.target = idRewriteMap.get(normT);
-                            else
-                                link.target.id = idRewriteMap.get(normT);
+                        let finalS = sId;
+                        let finalT = tId;
+                        if (idRewriteMap.has(normS))
+                            finalS = idRewriteMap.get(normS);
+                        if (idRewriteMap.has(normT))
+                            finalT = idRewriteMap.get(normT);
+                        if (typeof link.source === 'string')
+                            link.source = finalS;
+                        else
+                            link.source.id = finalS;
+                        if (typeof link.target === 'string')
+                            link.target = finalT;
+                        else
+                            link.target.id = finalT;
+                        if (finalS !== finalT) {
+                            const linkKey = [finalS, finalT].sort().join('--');
+                            if (!uniqueLinksMap.has(linkKey)) {
+                                uniqueLinksMap.set(linkKey, link);
+                            }
                         }
                     });
+                    finalGraph.links = Array.from(uniqueLinksMap.values());
                 }
                 result = {
                     graphData: finalGraph,
