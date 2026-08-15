@@ -310,6 +310,16 @@ export const onCurationJobCreated = onDocumentCreated({
               let requiresImageScraping = false;
               let requiresVideoScraping = false;
 
+              // Cache the original image URL just in case the scrape fails during a stub replacement
+              const originalImageUrl = details?.imageUrl || "";
+
+              // If the entity name is an ID slug (e.g., 'turnstile-usa') because it came from a redirect or seed insertion,
+              // and we have a valid display name in the cache, use the real name for scraping to ensure iTunes/Gemini matches.
+              let searchArtistName = artistName;
+              if (details && details.details && details.details.artist && details.details.artist !== artistName) {
+                searchArtistName = details.details.artist;
+              }
+
               if (!details) {
                 requiresTextHydration = true;
                 requiresImageScraping = true;
@@ -336,7 +346,7 @@ export const onCurationJobCreated = onDocumentCreated({
                 }
               }
 
-              const tempNode = { id: artistName, type: entityObj.type as any, group: 1 };
+              const tempNode = { id: searchArtistName, type: entityObj.type as any, group: 1 };
 
               // Stagger concurrent requests by 1000ms to prevent API burst rate limiting (iTunes & Gemini)
               if (idx > 0 && (requiresTextHydration || requiresImageScraping || requiresVideoScraping)) {
@@ -345,7 +355,7 @@ export const onCurationJobCreated = onDocumentCreated({
 
               if (requiresTextHydration) {
 
-                console.log(`[Curation Backend] Cache miss (or missing text). Hydrating details for ${isLabel ? 'label' : 'artist'}: ${artistName}...`);
+                console.log(`[Curation Backend] Cache miss (or missing text). Hydrating details for ${isLabel ? 'label' : 'artist'}: ${searchArtistName}...`);
 
                 // Change 2 — Per-node transient retry with 2-second backoff.
                 // Now also retries on JSON parse failures or schema validation errors (AI hallucination glitches).
@@ -384,7 +394,7 @@ export const onCurationJobCreated = onDocumentCreated({
                     }
                   }
                   if (!details.youtubeVideoId && details.youtubeSearchQuery) {
-                    const scrapedId = await scrapeVideoIdBackend(artistName, artistNormId);
+                    const scrapedId = await scrapeVideoIdBackend(searchArtistName, artistNormId);
                     if (scrapedId) {
                       const playable = await checkVideoPlayability(scrapedId);
                       if (playable) {
@@ -401,15 +411,15 @@ export const onCurationJobCreated = onDocumentCreated({
                 // 4. Scrape dedicated Image URL
                 if (requiresImageScraping) {
                   const fetchedImageUrl = await scrapeImageUrlBackend(
-                    artistName,
+                    searchArtistName,
                     tempNode.type,
                     details.details.genre || "",
                     details.summary || ""
                   );
-                  details.imageUrl = fetchedImageUrl || "";
+                  details.imageUrl = fetchedImageUrl || originalImageUrl || "";
                 }
 
-                details.details.artist = details.details.artist || artistName;
+                details.details.artist = details.details.artist || searchArtistName;
                 if (!details.synthesisRationale) {
                   details.synthesisRationale = `[Single-Seed Analysis]\n- Acoustic & Sonics: Resolved core musical properties and stylistic lineage.\n- Scene Context: Mapped direct influences, record label history, and geographic background.\n- Overlap Insights: Unified structural connections and surrounding chronological relationships.`;
                 }

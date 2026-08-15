@@ -276,6 +276,14 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                         let requiresTextHydration = false;
                         let requiresImageScraping = false;
                         let requiresVideoScraping = false;
+                        // Cache the original image URL just in case the scrape fails during a stub replacement
+                        const originalImageUrl = details?.imageUrl || "";
+                        // If the entity name is an ID slug (e.g., 'turnstile-usa') because it came from a redirect or seed insertion,
+                        // and we have a valid display name in the cache, use the real name for scraping to ensure iTunes/Gemini matches.
+                        let searchArtistName = artistName;
+                        if (details && details.details && details.details.artist && details.details.artist !== artistName) {
+                            searchArtistName = details.details.artist;
+                        }
                         if (!details) {
                             requiresTextHydration = true;
                             requiresImageScraping = true;
@@ -301,13 +309,13 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                                 requiresVideoScraping = true;
                             }
                         }
-                        const tempNode = { id: artistName, type: entityObj.type, group: 1 };
+                        const tempNode = { id: searchArtistName, type: entityObj.type, group: 1 };
                         // Stagger concurrent requests by 1000ms to prevent API burst rate limiting (iTunes & Gemini)
                         if (idx > 0 && (requiresTextHydration || requiresImageScraping || requiresVideoScraping)) {
                             await new Promise(resolve => setTimeout(resolve, idx * 1000));
                         }
                         if (requiresTextHydration) {
-                            console.log(`[Curation Backend] Cache miss (or missing text). Hydrating details for ${isLabel ? 'label' : 'artist'}: ${artistName}...`);
+                            console.log(`[Curation Backend] Cache miss (or missing text). Hydrating details for ${isLabel ? 'label' : 'artist'}: ${searchArtistName}...`);
                             // Change 2 — Per-node transient retry with 2-second backoff.
                             // Now also retries on JSON parse failures or schema validation errors (AI hallucination glitches).
                             const isTransientError = (err) => {
@@ -346,7 +354,7 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                                     }
                                 }
                                 if (!details.youtubeVideoId && details.youtubeSearchQuery) {
-                                    const scrapedId = await (0, curatorService_1.scrapeVideoIdBackend)(artistName, artistNormId);
+                                    const scrapedId = await (0, curatorService_1.scrapeVideoIdBackend)(searchArtistName, artistNormId);
                                     if (scrapedId) {
                                         const playable = await (0, curatorService_1.checkVideoPlayability)(scrapedId);
                                         if (playable) {
@@ -360,10 +368,10 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                             }
                             // 4. Scrape dedicated Image URL
                             if (requiresImageScraping) {
-                                const fetchedImageUrl = await (0, curatorService_1.scrapeImageUrlBackend)(artistName, tempNode.type, details.details.genre || "", details.summary || "");
-                                details.imageUrl = fetchedImageUrl || "";
+                                const fetchedImageUrl = await (0, curatorService_1.scrapeImageUrlBackend)(searchArtistName, tempNode.type, details.details.genre || "", details.summary || "");
+                                details.imageUrl = fetchedImageUrl || originalImageUrl || "";
                             }
-                            details.details.artist = details.details.artist || artistName;
+                            details.details.artist = details.details.artist || searchArtistName;
                             if (!details.synthesisRationale) {
                                 details.synthesisRationale = `[Single-Seed Analysis]\n- Acoustic & Sonics: Resolved core musical properties and stylistic lineage.\n- Scene Context: Mapped direct influences, record label history, and geographic background.\n- Overlap Insights: Unified structural connections and surrounding chronological relationships.`;
                             }
