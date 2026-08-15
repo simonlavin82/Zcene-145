@@ -904,12 +904,42 @@ Respond in strict JSON only — no prose, no markdown, no citation markers.`;
     clearTimeout(timeoutId);
     console.log(`[Diagnostic] Fetch completed successfully at ${Date.now() - startTime}ms. Status: ${response.status}`);
 
-    if (!response.ok) {
-      console.warn(`[Disambiguation Probe] API returned ${response.status} for "${artistName}"`);
-      return [];
+    let finalResponse = response;
+    
+    if (!finalResponse.ok) {
+      if (finalResponse.status === 503 && typeof window !== 'undefined') {
+        const apiKey = typeof process !== 'undefined' ? process.env.GEMINI_API_KEY : (import.meta as any).env?.VITE_GEMINI_API_KEY;
+        if (apiKey) {
+          console.warn(`[Disambiguation Probe] Proxy returned 503. Attempting direct fallback to Google API...`);
+          const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+          
+          try {
+            const fallbackResponse = await fetch(fallbackUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(requestBody),
+              signal: combinedSignal
+            });
+            
+            if (fallbackResponse.ok) {
+              finalResponse = fallbackResponse;
+              console.log(`[Disambiguation Probe] Direct fallback successful!`);
+            } else {
+              console.warn(`[Disambiguation Probe] Direct fallback also failed with status ${fallbackResponse.status}`);
+            }
+          } catch (fallbackErr) {
+            console.warn(`[Disambiguation Probe] Direct fallback fetch failed:`, fallbackErr);
+          }
+        }
+      }
+
+      if (!finalResponse.ok) {
+        console.warn(`[Disambiguation Probe] API returned ${finalResponse.status} for "${artistName}"`);
+        return [];
+      }
     }
 
-    const json = await response.json();
+    const json = await finalResponse.json();
     const rawText = json?.candidates?.[0]?.content?.parts?.[0]?.text || '';
     if (!rawText) return [];
 
