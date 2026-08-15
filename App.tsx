@@ -4366,27 +4366,9 @@ const App: React.FC = () => {
           }
         }
 
-        // [Payload Configuration]: We pass 'artists' (display names like "Turnstile::Militarie Gun")
-        // rather than 'payloadArtists' (hyphenated cache IDs) to the cloud job. This ensures the LLM
-        // receives clean textual labels for context. The backend will use 'baseGraph' and 'disambiguationHints'
-        // to map generated canonical nodes back to their cache IDs.
-        
-        // Inject exact mappings into disambiguationHints for the backend to use for topology healing
-        const rawNames = artists.split('::').map(a => a.trim()).filter(Boolean);
-        rawNames.forEach((rawName, idx) => {
-            if (artistList[idx]) {
-                activeDisambiguationHints[`__MAP__${normalizeArtistId(rawName)}`] = artistList[idx];
-            }
-        });
-        
-        // Ensure we explicitly generate a cachedSubgraphsContext if we have a pruned graph with nodes
-        let computedContext = undefined;
-        if (pruned && pruned.nodes && pruned.nodes.length > 0) {
-          computedContext = pruned.nodes.map(n => `"${n.id}" (${n.type})`).join(', ');
-        }
-        
+        const payloadArtists = artistList.map(a => normalizeArtistId(a)).join('::');
         graphPromise = generateGraphDataViaCloudJob(
-          artists, // Raw display names to prevent LLM hallucinations
+          payloadArtists,
           activeDiscoveryFilters,
           user.uid,
           controller?.signal,
@@ -4407,7 +4389,7 @@ const App: React.FC = () => {
           jobId,
           activeDisambiguationHints,
           pruned || undefined,          // Base graph context
-          computedContext,              // Stringified cached subgraphs context for multi-seed
+          undefined,                    // cachedSubgraphsContext
           undefined,                    // isSmartBypass
           isSandboxMode                 // isSandboxMode
         );

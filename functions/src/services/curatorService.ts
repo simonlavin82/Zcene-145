@@ -806,32 +806,6 @@ export const generateGraphDataBackend = async (
       });
   }
 
-  // --- SANITIZE POLLUTED IDS ---
-  // Match patterns like "-after-2020", "(After 2020)", "after 2020", etc.
-  const pollutedSuffixRegex = /(?:-|\s*\(?)?(?:after|before)\s*-?\d{4}\)?$/i;
-  
-  rawNodes.forEach(node => {
-      if (node.id) {
-          node.id = node.id.replace(pollutedSuffixRegex, '').trim();
-      }
-  });
-
-  rawLinks.forEach(link => {
-      if (link.source) {
-          if (typeof link.source === 'string') {
-              link.source = link.source.replace(pollutedSuffixRegex, '').trim();
-          } else if (link.source.id) {
-              link.source.id = link.source.id.replace(pollutedSuffixRegex, '').trim();
-          }
-      }
-      if (link.target) {
-          if (typeof link.target === 'string') {
-              link.target = link.target.replace(pollutedSuffixRegex, '').trim();
-          } else if (link.target.id) {
-              link.target.id = link.target.id.replace(pollutedSuffixRegex, '').trim();
-          }
-      }
-  });
 
   if (filters?.foundedAfter) {
       const threshold = Number(filters.foundedAfter);

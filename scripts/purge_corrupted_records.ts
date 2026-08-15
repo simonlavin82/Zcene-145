@@ -22,51 +22,76 @@ try {
 
 const db = getFirestore();
 
-async function deleteCollection(collectionPath: string) {
-  console.log(`Starting deletion of collection: ${collectionPath}`);
-  const collectionRef = db.collection(collectionPath);
-  const query = collectionRef.orderBy('__name__').limit(500);
-
-  return new Promise<void>((resolve, reject) => {
-    deleteQueryBatch(db, query, resolve).catch(reject);
-  });
-}
-
-async function deleteQueryBatch(db: Firestore, query: Query, resolve: () => void) {
-  const snapshot = await query.get();
-  
-  if (snapshot.size === 0) {
-    resolve();
-    return;
-  }
-
-  const batch = db.batch();
-  snapshot.docs.forEach((doc) => {
-    batch.delete(doc.ref);
-  });
-  
-  await batch.commit();
-  console.log(`Deleted ${snapshot.size} documents...`);
-  
-  process.nextTick(() => {
-    deleteQueryBatch(db, query, resolve);
-  });
-}
-
 async function run() {
-  try {
-    await deleteCollection('artists');
-    console.log('✅ Successfully purged artists collection.');
-    
-    await deleteCollection('labels');
-    console.log('✅ Successfully purged labels collection.');
-    
-    console.log('Purge script finished successfully.');
-    process.exit(0);
-  } catch (error) {
-    console.error("Error purging records:", error);
-    process.exit(1);
+  console.log("Starting targeted database cleanup...");
+
+  // 1. Find and delete corrupted artists (those ending in -after-YYYY or similar)
+  const pollutedSuffixRegex = /(?:-|\s*\(?)?(?:after|before)\s*-?\d{4}\)?$/i;
+  const artistsRef = db.collection('artists');
+  const artistsSnap = await artistsRef.get();
+  
+  let deletedArtistsCount = 0;
+  const batch1 = db.batch();
+  artistsSnap.forEach(doc => {
+    if (pollutedSuffixRegex.test(doc.id)) {
+      console.log(`Deleting corrupted artist: ${doc.id}`);
+      batch1.delete(doc.ref);
+      deletedArtistsCount++;
+    }
+  });
+  
+  if (deletedArtistsCount > 0) {
+    await batch1.commit();
+    console.log(`Deleted ${deletedArtistsCount} corrupted artists.`);
+  } else {
+    console.log("No corrupted artists found.");
   }
+
+  // 2. Delete all test project documents under all users
+  const usersRef = db.collection('users');
+  const usersSnap = await usersRef.get();
+  
+  let deletedProjectsCount = 0;
+  for (const userDoc of usersSnap.docs) {
+      const projectsSnap = await db.collection(`users/${userDoc.id}/projects`).get();
+      if (projectsSnap.size > 0) {
+          const batch2 = db.batch();
+          projectsSnap.forEach(projDoc => {
+              batch2.delete(projDoc.ref);
+              deletedProjectsCount++;
+          });
+          await batch2.commit();
+      }
+  }
+  console.log(`Deleted ${deletedProjectsCount} project documents.`);
+  
+  // 3. Clear curationJobs as they are likely tied to old buggy runs
+  const jobsRef = db.collection('curationJobs');
+  const jobsSnap = await jobsRef.get();
+  if (jobsSnap.size > 0) {
+      let jobsDeleted = 0;
+      let batch3 = db.batch();
+      for (const doc of jobsSnap.docs) {
+          batch3.delete(doc.ref);
+          jobsDeleted++;
+          if (jobsDeleted % 400 === 0) {
+            await batch3.commit();
+            batch3 = db.batch();
+          }
+      }
+      if (jobsDeleted % 400 !== 0) {
+        await batch3.commit();
+      }
+      console.log(`Deleted ${jobsDeleted} curation jobs.`);
+  } else {
+      console.log("No curation jobs found.");
+  }
+
+  console.log("Targeted cleanup completed successfully.");
+  process.exit(0);
 }
 
-run();
+run().catch(error => {
+  console.error("Error purging records:", error);
+  process.exit(1);
+});
