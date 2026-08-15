@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { AlertCircle, AlertTriangle, X, CheckCircle2, Key } from 'lucide-react';
 import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project, ArtistCacheEntry, COST_PER_AI_CALL } from './types';
 import { generateGraphData, fetchNodeDetails, extendGraphFromNode, resolveArtistCandidatesViaAI } from './services/geminiService';
-import { normalizeArtistId, readArtistCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, getEntityDocWithRedirect, getLabelDocWithRedirect, getAnyEntityDocWithRedirect, titleCaseArtistId, cleanArtistDisplayName, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema, stripUndefinedProperties } from './services/artistCacheService';
+import { normalizeArtistId, readArtistCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, getEntityDocWithRedirect, getLabelDocWithRedirect, getAnyEntityDocWithRedirect, titleCaseArtistId, cleanArtistDisplayName, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema, stripUndefinedProperties, isNodeInSeedList } from './services/artistCacheService';
 import { normalizeCountry } from './utils/normalization';
 import { auth, signInWithGoogle, logout, onAuthStateChanged, User, db, handleFirestoreError, OperationType } from './services/firebase';
 import { translateError, translateToast } from './services/errorTranslationLayer';
@@ -4363,8 +4363,9 @@ const App: React.FC = () => {
           }
         }
 
+        const payloadArtists = artistList.map(a => normalizeArtistId(a)).join('::');
         graphPromise = generateGraphDataViaCloudJob(
-          artists,
+          payloadArtists,
           activeDiscoveryFilters,
           user.uid,
           controller?.signal,
@@ -4389,7 +4390,8 @@ const App: React.FC = () => {
           isSandboxMode
         );
       } else {
-        graphPromise = generateGraphData(artists, pruned, activeDiscoveryFilters, user?.uid, controller?.signal, activeDisambiguationHints);
+        const payloadArtists = artistList.map(a => normalizeArtistId(a)).join('::');
+        graphPromise = generateGraphData(payloadArtists, pruned, activeDiscoveryFilters, user?.uid, controller?.signal, activeDisambiguationHints);
       }
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error("The AI is taking too long to respond. The request has timed out.")), 600000)
@@ -5755,9 +5757,9 @@ const App: React.FC = () => {
         // Auto-hydrate the Deep Cut panel on load if nothing is selected
         if (!selectedNode && hasAutoSelectedRef.current !== currentProjectId) {
           hasAutoSelectedRef.current = currentProjectId;
-          const seeds = (seedArtists || '').split('::').map(s => s.trim().toLowerCase());
+          const seedList = (seedArtists || '').split('::').map(s => s.trim());
           const firstSeedNode = graphData.nodes.find(n => 
-            (n.type === 'artist' || n.type === 'label') && seeds.includes(n.id.toLowerCase())
+            (n.type === 'artist' || n.type === 'label') && isNodeInSeedList(n.id, seedList)
           );
           const defaultNode = firstSeedNode || graphData.nodes.find(n => n.type === 'artist' || n.type === 'label');
           if (defaultNode) {

@@ -766,6 +766,32 @@ export const generateGraphDataBackend = async (
       return s != null && t != null;
   }) : [];
 
+  // --- SANITIZE POLLUTED IDS ---
+  const pollutedSuffixRegex = /-after-\d{4}$|-before-\d{4}$/i;
+  
+  rawNodes.forEach(node => {
+      if (node.id) {
+          node.id = node.id.replace(pollutedSuffixRegex, '');
+      }
+  });
+
+  rawLinks.forEach(link => {
+      if (link.source) {
+          if (typeof link.source === 'string') {
+              link.source = link.source.replace(pollutedSuffixRegex, '');
+          } else if (link.source.id) {
+              link.source.id = link.source.id.replace(pollutedSuffixRegex, '');
+          }
+      }
+      if (link.target) {
+          if (typeof link.target === 'string') {
+              link.target = link.target.replace(pollutedSuffixRegex, '');
+          } else if (link.target.id) {
+              link.target.id = link.target.id.replace(pollutedSuffixRegex, '');
+          }
+      }
+  });
+
   if (filters?.foundedAfter) {
       const threshold = Number(filters.foundedAfter);
       const artistToYear = new Map<string, number>();
@@ -790,7 +816,38 @@ export const generateGraphDataBackend = async (
       rawNodes.forEach(node => {
           if (node.type === 'artist' && !seedArtistIds.has(node.id.toLowerCase())) {
               const year = artistToYear.get(node.id.toLowerCase());
-              if (year && year <= threshold) {
+              if (year !== undefined && year < threshold) {
+                  nodesToRemove.add(node.id);
+              }
+          }
+      });
+  }
+
+  if (filters?.foundedBefore) {
+      const threshold = Number(filters.foundedBefore);
+      const artistToYear = new Map<string, number>();
+      const nodeMap = new Map(rawNodes.map(n => [n.id, n]));
+
+      rawLinks.forEach(link => {
+          const sourceId = typeof link.source === 'string' ? link.source : (link.source as Node).id;
+          const targetId = typeof link.target === 'string' ? link.target : (link.target as Node).id;
+          
+          const sourceNode = nodeMap.get(sourceId);
+          const targetNode = nodeMap.get(targetId);
+          
+          if (sourceNode?.type === 'artist' && targetNode?.type === 'founded') {
+              const year = parseInt(targetNode.id);
+              if (!isNaN(year)) artistToYear.set(sourceId.toLowerCase(), year);
+          } else if (targetNode?.type === 'artist' && sourceNode?.type === 'founded') {
+              const year = parseInt(sourceNode.id);
+              if (!isNaN(year)) artistToYear.set(targetId.toLowerCase(), year);
+          }
+      });
+
+      rawNodes.forEach(node => {
+          if (node.type === 'artist' && !seedArtistIds.has(node.id.toLowerCase())) {
+              const year = artistToYear.get(node.id.toLowerCase());
+              if (year !== undefined && year > threshold) {
                   nodesToRemove.add(node.id);
               }
           }

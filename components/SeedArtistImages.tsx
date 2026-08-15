@@ -39,8 +39,10 @@ export const SeedArtistImages: React.FC<SeedArtistImagesProps> = ({
         if (entry && entry.detailsCache) {
           try {
             const parsed = typeof entry.detailsCache === 'string' ? JSON.parse(entry.detailsCache) : entry.detailsCache;
-            if (parsed.imageUrl) {
-              url = parsed.imageUrl;
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              url = parsed[0].imageUrl || parsed[0].details?.imageUrl || '';
+            } else if (parsed) {
+              url = parsed.imageUrl || parsed.details?.imageUrl || '';
             }
           } catch (e) {
             // ignore
