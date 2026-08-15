@@ -96,7 +96,7 @@ const generateGraphDataViaCloudJob = async (
     userId,
     status: 'pending',
     jobType: 'graph_generation',
-    inputPayload: payload,
+    inputPayload: stripUndefinedProperties(payload),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     expireAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
@@ -1046,6 +1046,7 @@ const isGraphDataPresent = (data: any): boolean => {
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>(View.Home);
   const currentViewRef = useRef<View>(View.Home);
+  const sessionTokenApprovedRef = useRef<boolean>(false);
 
   const navigate = useCallback((path: string, replace = false) => {
     if (replace) {
@@ -2712,6 +2713,10 @@ const App: React.FC = () => {
     disambiguationHints?: Record<string, string>,
     bypassDisambiguation: boolean = false
   ) => {
+    if (!isRegeneration && !bypassDisambiguation && !bypassTokenConfirmation && !skipCacheLookup) {
+      sessionTokenApprovedRef.current = false;
+    }
+
     // Normalize empty graph to null to eliminate ghost-enhancement API path
     if (graphToEnhance && (!graphToEnhance.nodes || graphToEnhance.nodes.length === 0)) {
       graphToEnhance = null;
@@ -2810,7 +2815,6 @@ const App: React.FC = () => {
     }
 
     // ─── STAGE 0: UNIFIED DISAMBIGUATION GATE & TOKEN GUARD ────────────────────
-    let sessionTokenApproved = false;
     let resolvedArtistSeeds = [...artistList];
     let activeDisambiguationHints: Record<string, string> = disambiguationHints || {};
     let hasDisambiguated = false;
@@ -2853,7 +2857,7 @@ const App: React.FC = () => {
 
         if (choice === 'synthesis') {
           // --- FRONT-LOADED TOKEN QUOTA GATE (Enforced BEFORE AI Validation) ---
-          if (!bypassTokenConfirmation && !sessionTokenApproved) {
+          if (!bypassTokenConfirmation && !sessionTokenApprovedRef.current) {
             const confirmed = await confirmTokenUsage(isLiveSynthesisTemp ? 'live_synthesis' : 'generation', [], artistList, undefined, cacheCandidates.length > 0);
             if (confirmed === 'back') {
               i--;
@@ -2865,7 +2869,7 @@ const App: React.FC = () => {
               isProjectLoadingRef.current = false;
               return;
             }
-            sessionTokenApproved = true;
+            sessionTokenApprovedRef.current = true;
           }
 
           // --- AI VALIDATION GATE (Validate Origin Modal) ---
@@ -4272,7 +4276,7 @@ const App: React.FC = () => {
       }
     }
 
-    if (!bypassTokenConfirmation && !sessionTokenApproved) {
+    if (!bypassTokenConfirmation && !sessionTokenApprovedRef.current) {
       const confirmed = await confirmTokenUsage(isLiveSynthesis ? 'live_synthesis' : 'generation', [], artistList);
       if (!confirmed || (controller && controller.signal.aborted)) {
         isHydratingSessionRef.current = false;
@@ -4281,7 +4285,7 @@ const App: React.FC = () => {
         setSeedArtists(prevSeedArtists);
         return;
       }
-      sessionTokenApproved = true;
+      sessionTokenApprovedRef.current = true;
     }
 
 
@@ -5710,18 +5714,22 @@ const App: React.FC = () => {
         }
       } else if (job.status === 'failed') {
         setIsLoading(false);
-        setError(job.errorMessage || "Backend curation failed.");
-        
-        let stackSnippet = "";
-        if (job.errorDetails && job.errorDetails.stack) {
-          stackSnippet = "\\n\\nTrace: " + job.errorDetails.stack.substring(0, 300);
-          console.error("[Curation Reconnect] Backend Stack Trace:", job.errorDetails.stack);
-        } else if (job.errorDetails && job.errorDetails.rawMessage) {
-          stackSnippet = "\\n\\nDetails: " + job.errorDetails.rawMessage;
-          console.error("[Curation Reconnect] Backend Raw Error:", job.errorDetails.rawMessage);
+        if (job.errorMessage && job.errorMessage.includes("discover any relational bridges")) {
+          // Suppress global error toast; handled by FilterGuidanceModal in handleGenerateGraph
+        } else {
+          setError(job.errorMessage || "Backend curation failed.");
+          
+          let stackSnippet = "";
+          if (job.errorDetails && job.errorDetails.stack) {
+            stackSnippet = "\\n\\nTrace: " + job.errorDetails.stack.substring(0, 300);
+            console.error("[Curation Reconnect] Backend Stack Trace:", job.errorDetails.stack);
+          } else if (job.errorDetails && job.errorDetails.rawMessage) {
+            stackSnippet = "\\n\\nDetails: " + job.errorDetails.rawMessage;
+            console.error("[Curation Reconnect] Backend Raw Error:", job.errorDetails.rawMessage);
+          }
+          
+          showToast(`Curation failed: ${job.errorMessage || "System anomaly"}${stackSnippet}`);
         }
-        
-        showToast(`Curation failed: ${job.errorMessage || "System anomaly"}${stackSnippet}`);
       }
     }, (err) => {
       console.error(`[Curation Reconnect] Failed listening to job ${activeJobId}:`, err);
