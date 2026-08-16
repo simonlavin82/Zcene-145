@@ -295,8 +295,9 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                         else if (details.summary === "Imported from Apple Music library." ||
                             details.summary.length <= 50 ||
                             !details.details?.genre ||
-                            details.summary.includes("Mock Bio")) {
-                            // Stub node (e.g. from frontend library import or test seed) -> Full Hydration
+                            details.summary.includes("Mock Bio") ||
+                            !details.imageUrl) {
+                            // Stub node (e.g. from frontend library import or test seed) or missing image -> Full Hydration
                             requiresTextHydration = true;
                             requiresImageScraping = true;
                             requiresVideoScraping = true;
@@ -542,7 +543,17 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                     // ever reaches 'verified'. The integrityLockedAt field is intentionally
                     // absent from this write — it only exists on in_progress staging docs.
                     if (isSandboxMode) {
-                        console.log(`[Sandbox Mode] Bypassing Phase C global verified write and bare pointer for bespoke topology.`);
+                        console.log(`[Sandbox Mode] Updating Phase C global detailsCache for seed (bypassing graphData).`);
+                        const existingDoc = await db.collection(collName).doc(compositeCanonicalId).get();
+                        const existingData = existingDoc.exists ? existingDoc.data() : null;
+                        const finalDetailsCache = seedDetails
+                            ? (isSeedLabel ? sanitizeLabelProfile(seedDetails) : sanitizeUndefinedProperties(seedDetails))
+                            : (existingData?.detailsCache || null);
+                        await db.collection(collName).doc(compositeCanonicalId).set({
+                            detailsCache: finalDetailsCache,
+                            cacheVersion: 4,
+                            cachedAt: firestore_2.FieldValue.serverTimestamp()
+                        }, { merge: true });
                     }
                     else {
                         // Fetch existing document to safely merge detailsCache if seedDetails is missing
