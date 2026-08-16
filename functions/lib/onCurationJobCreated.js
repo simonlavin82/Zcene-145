@@ -225,7 +225,8 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                     .map((n) => ({
                     id: n.id,
                     name: n.label || n.id,
-                    type: n.type || 'artist'
+                    type: n.type || 'artist',
+                    origin: n.origin || null
                 }));
                 console.log(`[Curation Backend] [Step 2: Hydration Loop Started] Hydrating details for ${recommendedEntities.length} entities in the graph:`, recommendedEntities.map((e) => `${e.name} (${e.type})`));
                 const detailsCacheEntries = [];
@@ -235,8 +236,15 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                     const chunk = recommendedEntities.slice(i, i + batchSize);
                     console.log(`[Curation Backend] Hydrating batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(recommendedEntities.length / batchSize)} (${chunk.length} entities)...`);
                     const chunkResults = await Promise.all(chunk.map(async (entityObj, idx) => {
-                        const artistName = entityObj.name;
-                        const artistNormId = (0, curatorService_1.normalizeArtistId)(artistName);
+                        const rawName = entityObj.name;
+                        let artistNormId = (0, curatorService_1.normalizeArtistId)(rawName);
+                        // Pre-Hydration Canonicalization: Stitch the origin slug before cache lookup
+                        if (entityObj.origin) {
+                            const originSlug = (0, curatorService_1.extractCountrySlug)(entityObj.origin);
+                            if (!artistNormId.endsWith(`-${originSlug}`)) {
+                                artistNormId = `${artistNormId}-${originSlug}`;
+                            }
+                        }
                         const isLabel = entityObj.type === 'label';
                         // 1. Check local Firestore Cache first
                         let details = null;
@@ -281,10 +289,21 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                         let requiresVideoScraping = false;
                         // Cache the original image URL just in case the scrape fails during a stub replacement
                         const originalImageUrl = details?.imageUrl || "";
-                        // If the entity name is an ID slug (e.g., 'turnstile-usa') because it came from a redirect or seed insertion,
-                        // and we have a valid display name in the cache, use the real name for scraping to ensure iTunes/Gemini matches.
-                        let searchArtistName = artistName;
-                        if (details && details.details && details.details.artist && details.details.artist !== artistName) {
+                        // Extract clean human-readable name for APIs by stripping known country slugs
+                        let searchArtistName = rawName;
+                        const KNOWN_COUNTRY_SLUGS = [
+                            '-united-states', '-united-kingdom', '-global', '-australia', '-canada', '-germany', '-france',
+                            '-japan', '-sweden', '-italy', '-spain', '-brazil', '-mexico', '-netherlands', '-belgium',
+                            '-norway', '-finland', '-denmark', '-ireland', '-new-zealand', '-poland', '-austria',
+                            '-switzerland', '-uk', '-usa', '-us'
+                        ];
+                        for (const suffix of KNOWN_COUNTRY_SLUGS) {
+                            if (searchArtistName.toLowerCase().endsWith(suffix)) {
+                                searchArtistName = searchArtistName.substring(0, searchArtistName.length - suffix.length);
+                                break;
+                            }
+                        }
+                        if (details && details.details && details.details.artist && details.details.artist !== rawName) {
                             searchArtistName = details.details.artist;
                         }
                         if (!details) {
@@ -347,6 +366,10 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                                     return null;
                                 }
                             }
+                            // Realign searchArtistName if the LLM provided a cleaner, verified name
+                            if (details && details.details && details.details.artist) {
+                                searchArtistName = details.details.artist;
+                            }
                         }
                         if (details) {
                             // 3. Scrape YouTube and validate video ID (only for artists; labels do not have music videos)
@@ -381,7 +404,7 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                             }
                             console.log(`[Curation Backend] Hydration successful for: ${artistNormId}`);
                         }
-                        return [artistName, details];
+                        return [artistNormId, details];
                     }));
                     console.log(`[Curation Backend] [Step 3: Firestore Caching] Hydration complete. Writing ${chunkResults.length} entities to Firestore cache...`);
                     for (const res of chunkResults) {
@@ -457,31 +480,8 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                             detailsCacheEntries.push([seedNorm, seedDetails]);
                         }
                     }
-                    // Find connected country nodes in finalGraph
-                    const connectedCountries = (finalGraph.links || [])
-                        .filter((l) => {
-                        const sId = typeof l.source === 'string' ? l.source : l.source.id;
-                        const tId = typeof l.target === 'string' ? l.target : l.target.id;
-                        return isEntitySeedMatch(seedNorm, sId) || isEntitySeedMatch(seedNorm, tId);
-                    })
-                        .map((l) => {
-                        const sId = typeof l.source === 'string' ? l.source : l.source.id;
-                        const tId = typeof l.target === 'string' ? l.target : l.target.id;
-                        const otherId = isEntitySeedMatch(seedNorm, sId) ? tId : sId;
-                        return (finalGraph.nodes || []).find((n) => isEntitySeedMatch(otherId, n.id));
-                    })
-                        .filter((n) => n && n.type === 'country')
-                        .map((n) => n.label || n.id);
-                    let countryNorm = "";
-                    if (seedDetails?.details?.origin) {
-                        countryNorm = (0, curatorService_1.extractCountrySlug)(seedDetails.details.origin);
-                    }
-                    if (!countryNorm && connectedCountries.length > 0) {
-                        countryNorm = (0, curatorService_1.extractCountrySlug)(connectedCountries[0]);
-                    }
-                    if (!countryNorm)
-                        countryNorm = "global";
-                    const disambiguatedCanonicalId = seedNorm.endsWith(`-${countryNorm}`) ? seedNorm : `${seedNorm}-${countryNorm}`;
+                    // Use the pre-canonicalized ID from the hydration phase, or fallback to the seed norm
+                    const disambiguatedCanonicalId = seedDetailsEntry ? seedDetailsEntry[0] : seedNorm;
                     const compositeCanonicalId = (0, curatorService_1.buildCompositeCacheKey)(disambiguatedCanonicalId, inputPayload.filters || undefined);
                     idRewriteMap.set(seedNorm, compositeCanonicalId);
                     if (seedDetailsEntry)
@@ -642,31 +642,8 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                         console.warn(`[Curation Backend] Recommendation cache write skipped for "${recNorm}" — schema validation failed: ${validationErr.message}`);
                         continue;
                     }
-                    // Find connected country nodes in finalGraph
-                    const connectedCountries = (finalGraph.links || [])
-                        .filter((l) => {
-                        const sId = typeof l.source === 'string' ? l.source : l.source.id;
-                        const tId = typeof l.target === 'string' ? l.target : l.target.id;
-                        return isEntitySeedMatch(recNorm, sId) || isEntitySeedMatch(recNorm, tId);
-                    })
-                        .map((l) => {
-                        const sId = typeof l.source === 'string' ? l.source : l.source.id;
-                        const tId = typeof l.target === 'string' ? l.target : l.target.id;
-                        const otherId = isEntitySeedMatch(recNorm, sId) ? tId : sId;
-                        return (finalGraph.nodes || []).find((n) => isEntitySeedMatch(otherId, n.id));
-                    })
-                        .filter((n) => n && n.type === 'country')
-                        .map((n) => n.label || n.id);
-                    let countryNorm = "";
-                    if (recDetails?.details?.origin) {
-                        countryNorm = (0, curatorService_1.extractCountrySlug)(recDetails.details.origin);
-                    }
-                    if (!countryNorm && connectedCountries.length > 0) {
-                        countryNorm = (0, curatorService_1.extractCountrySlug)(connectedCountries[0]);
-                    }
-                    if (!countryNorm)
-                        countryNorm = "global";
-                    const disambiguatedCanonicalId = recNorm.endsWith(`-${countryNorm}`) ? recNorm : `${recNorm}-${countryNorm}`;
+                    // Use the pre-canonicalized ID from the hydration phase, or fallback to the rec norm
+                    const disambiguatedCanonicalId = recDetailsEntry ? recDetailsEntry[0] : recNorm;
                     const compositeCanonicalId = (0, curatorService_1.buildCompositeCacheKey)(disambiguatedCanonicalId, inputPayload.filters || undefined);
                     idRewriteMap.set(recNorm, compositeCanonicalId);
                     if (recDetailsEntry)

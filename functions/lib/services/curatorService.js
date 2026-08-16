@@ -448,6 +448,14 @@ exports.GRAPH_RESPONSE_SCHEMA = {
                     group: {
                         type: genai_1.Type.INTEGER,
                         description: "A group identifier for colouring or categorisation, usually based on the initial seed artists."
+                    },
+                    label: {
+                        type: genai_1.Type.STRING,
+                        description: "The raw, human-readable name of the entity, especially for artists and labels (e.g., 'Drug Church')."
+                    },
+                    origin: {
+                        type: genai_1.Type.STRING,
+                        description: "For artists and labels, the country of origin (e.g., 'USA', 'UK'). Leave empty for other node types."
                     }
                 },
                 required: ["id", "type", "group"]

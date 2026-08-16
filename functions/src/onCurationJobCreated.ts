@@ -256,7 +256,8 @@ export const onCurationJobCreated = onDocumentCreated({
           .map((n: any) => ({
             id: n.id,
             name: n.label || n.id,
-            type: n.type || 'artist'
+            type: n.type || 'artist',
+            origin: n.origin || null
           }));
 
         console.log(`[Curation Backend] [Step 2: Hydration Loop Started] Hydrating details for ${recommendedEntities.length} entities in the graph:`, recommendedEntities.map((e: any) => `${e.name} (${e.type})`));
@@ -270,8 +271,17 @@ export const onCurationJobCreated = onDocumentCreated({
           console.log(`[Curation Backend] Hydrating batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(recommendedEntities.length / batchSize)} (${chunk.length} entities)...`);
           const chunkResults = await Promise.all(
             chunk.map(async (entityObj: any, idx: number) => {
-              const artistName = entityObj.name;
-              const artistNormId = normalizeArtistId(artistName);
+              const rawName = entityObj.name;
+              let artistNormId = normalizeArtistId(rawName);
+              
+              // Pre-Hydration Canonicalization: Stitch the origin slug before cache lookup
+              if (entityObj.origin) {
+                const originSlug = extractCountrySlug(entityObj.origin);
+                if (!artistNormId.endsWith(`-${originSlug}`)) {
+                  artistNormId = `${artistNormId}-${originSlug}`;
+                }
+              }
+
               const isLabel = entityObj.type === 'label';
 
               // 1. Check local Firestore Cache first
@@ -319,10 +329,22 @@ export const onCurationJobCreated = onDocumentCreated({
               // Cache the original image URL just in case the scrape fails during a stub replacement
               const originalImageUrl = details?.imageUrl || "";
 
-              // If the entity name is an ID slug (e.g., 'turnstile-usa') because it came from a redirect or seed insertion,
-              // and we have a valid display name in the cache, use the real name for scraping to ensure iTunes/Gemini matches.
-              let searchArtistName = artistName;
-              if (details && details.details && details.details.artist && details.details.artist !== artistName) {
+              // Extract clean human-readable name for APIs by stripping known country slugs
+              let searchArtistName = rawName;
+              const KNOWN_COUNTRY_SLUGS = [
+                '-united-states', '-united-kingdom', '-global', '-australia', '-canada', '-germany', '-france',
+                '-japan', '-sweden', '-italy', '-spain', '-brazil', '-mexico', '-netherlands', '-belgium',
+                '-norway', '-finland', '-denmark', '-ireland', '-new-zealand', '-poland', '-austria',
+                '-switzerland', '-uk', '-usa', '-us'
+              ];
+              for (const suffix of KNOWN_COUNTRY_SLUGS) {
+                if (searchArtistName.toLowerCase().endsWith(suffix)) {
+                  searchArtistName = searchArtistName.substring(0, searchArtistName.length - suffix.length);
+                  break;
+                }
+              }
+
+              if (details && details.details && details.details.artist && details.details.artist !== rawName) {
                 searchArtistName = details.details.artist;
               }
 
@@ -389,6 +411,11 @@ export const onCurationJobCreated = onDocumentCreated({
                     return null;
                   }
                 }
+                
+                // Realign searchArtistName if the LLM provided a cleaner, verified name
+                if (details && details.details && details.details.artist) {
+                  searchArtistName = details.details.artist;
+                }
               }
 
               if (details) {
@@ -433,8 +460,7 @@ export const onCurationJobCreated = onDocumentCreated({
 
                 console.log(`[Curation Backend] Hydration successful for: ${artistNormId}`);
               }
-
-              return [artistName, details] as [string, any];
+              return [artistNormId, details] as [string, any];
             })
           );
 
@@ -518,32 +544,8 @@ export const onCurationJobCreated = onDocumentCreated({
             }
           }
 
-          // Find connected country nodes in finalGraph
-          const connectedCountries = (finalGraph.links || [])
-            .filter((l: any) => {
-              const sId = typeof l.source === 'string' ? l.source : (l.source as any).id;
-              const tId = typeof l.target === 'string' ? l.target : (l.target as any).id;
-              return isEntitySeedMatch(seedNorm, sId) || isEntitySeedMatch(seedNorm, tId);
-            })
-            .map((l: any) => {
-              const sId = typeof l.source === 'string' ? l.source : (l.source as any).id;
-              const tId = typeof l.target === 'string' ? l.target : (l.target as any).id;
-              const otherId = isEntitySeedMatch(seedNorm, sId) ? tId : sId;
-              return (finalGraph.nodes || []).find((n: any) => isEntitySeedMatch(otherId, n.id));
-            })
-            .filter((n: any) => n && n.type === 'country')
-            .map((n: any) => n!.label || n!.id);
-
-          let countryNorm = "";
-          if (seedDetails?.details?.origin) {
-            countryNorm = extractCountrySlug(seedDetails.details.origin);
-          }
-          if (!countryNorm && connectedCountries.length > 0) {
-            countryNorm = extractCountrySlug(connectedCountries[0]);
-          }
-          if (!countryNorm) countryNorm = "global";
-
-          const disambiguatedCanonicalId = seedNorm.endsWith(`-${countryNorm}`) ? seedNorm : `${seedNorm}-${countryNorm}`;
+          // Use the pre-canonicalized ID from the hydration phase, or fallback to the seed norm
+          const disambiguatedCanonicalId = seedDetailsEntry ? seedDetailsEntry[0] : seedNorm;
           const compositeCanonicalId = buildCompositeCacheKey(disambiguatedCanonicalId, inputPayload.filters || undefined);
           idRewriteMap.set(seedNorm, compositeCanonicalId);
           if (seedDetailsEntry) seedDetailsEntry[0] = compositeCanonicalId;
@@ -718,32 +720,8 @@ export const onCurationJobCreated = onDocumentCreated({
             continue;
           }
 
-          // Find connected country nodes in finalGraph
-          const connectedCountries = (finalGraph.links || [])
-            .filter((l: any) => {
-              const sId = typeof l.source === 'string' ? l.source : (l.source as any).id;
-              const tId = typeof l.target === 'string' ? l.target : (l.target as any).id;
-              return isEntitySeedMatch(recNorm, sId) || isEntitySeedMatch(recNorm, tId);
-            })
-            .map((l: any) => {
-              const sId = typeof l.source === 'string' ? l.source : (l.source as any).id;
-              const tId = typeof l.target === 'string' ? l.target : (l.target as any).id;
-              const otherId = isEntitySeedMatch(recNorm, sId) ? tId : sId;
-              return (finalGraph.nodes || []).find((n: any) => isEntitySeedMatch(otherId, n.id));
-            })
-            .filter((n: any) => n && n.type === 'country')
-            .map((n: any) => n!.label || n!.id);
-
-          let countryNorm = "";
-          if (recDetails?.details?.origin) {
-            countryNorm = extractCountrySlug(recDetails.details.origin);
-          }
-          if (!countryNorm && connectedCountries.length > 0) {
-            countryNorm = extractCountrySlug(connectedCountries[0]);
-          }
-          if (!countryNorm) countryNorm = "global";
-
-          const disambiguatedCanonicalId = recNorm.endsWith(`-${countryNorm}`) ? recNorm : `${recNorm}-${countryNorm}`;
+          // Use the pre-canonicalized ID from the hydration phase, or fallback to the rec norm
+          const disambiguatedCanonicalId = recDetailsEntry ? recDetailsEntry[0] : recNorm;
           const compositeCanonicalId = buildCompositeCacheKey(disambiguatedCanonicalId, inputPayload.filters || undefined);
           idRewriteMap.set(recNorm, compositeCanonicalId);
           if (recDetailsEntry) recDetailsEntry[0] = compositeCanonicalId;

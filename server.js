@@ -7,7 +7,8 @@ import admin from 'firebase-admin';
 import { getFirestore } from 'firebase-admin/firestore';
 
 // Force Firestore Emulator for local development
-if (process.env.VITE_USE_MOCKS === 'true' && !process.env.FIRESTORE_EMULATOR_HOST) {
+// We detect local environment by checking if K_SERVICE (Cloud Run) is missing.
+if (!process.env.K_SERVICE && !process.env.FIRESTORE_EMULATOR_HOST) {
   process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
   console.log("Proxy: Connecting to local Firestore emulator at 127.0.0.1:8080");
 }

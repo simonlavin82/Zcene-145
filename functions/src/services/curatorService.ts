@@ -495,6 +495,14 @@ export const GRAPH_RESPONSE_SCHEMA = {
           group: {
             type: Type.INTEGER,
             description: "A group identifier for colouring or categorisation, usually based on the initial seed artists."
+          },
+          label: {
+            type: Type.STRING,
+            description: "The raw, human-readable name of the entity, especially for artists and labels (e.g., 'Drug Church')."
+          },
+          origin: {
+            type: Type.STRING,
+            description: "For artists and labels, the country of origin (e.g., 'USA', 'UK'). Leave empty for other node types."
           }
         },
         required: ["id", "type", "group"]
