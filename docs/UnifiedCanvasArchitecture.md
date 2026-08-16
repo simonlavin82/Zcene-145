@@ -17,27 +17,30 @@ This model guarantees structural integrity, eliminates floating nodes, prevents 
   - This prevents signature collisions downstream and ensures that the foundation of the canvas is anchored to canonical global entities.
 
 ### Phase 2: Canvas Generation
-**Objective:** Generate the spiderweb topology with guaranteed connectivity and zero floating nodes.
-- **Single-Seed Flow (Unfiltered):** Remains completely untouched and backwards-compatible. Single-seed queries bypass the private canvas and target the **Global Artist Deep Cut Cache**, ensuring that standalone deep cuts remain highly shareable, instantly accessible O(1) canonical assets.
-- **Multi-Seed & Filtered Flows:** Bypasses global cache writes. The LLM is prompted to generate a complete, continuous spiderweb topology as a *single, cohesive creative act*. The output is saved **exclusively to a private Project ID canvas**.
+**Objective:** Generate the bespoke spiderweb topology with guaranteed connectivity.
+- **Single-Seed Flow (Unfiltered):** Unchanged. Single-seed queries target the **Global Artist Deep Cut Cache** ensuring canonical shareability.
+- **Multi-Seed & Filtered Flows:** The LLM generates a *lightweight bespoke spiderweb topology* (only artist names, labels, origins, and relational edges) which is held in memory. This output is specific to the user's private project canvas.
 - **Invariants:** 
-  - **Topology Guarantee:** Every generated node is structurally guaranteed to have valid relational edges to the rest of the canvas. Floating, orphaned, or disconnected nodes are strictly impossible.
-  - **Cache Isolation:** Multi-seed generations must never write directly to the global `artists/{id}` collection during generation, preventing context-specific LLM hallucinations from polluting canonical global data.
+  - **Topology Guarantee:** Every node has valid relational edges; floating nodes are impossible.
+  - **Topology Isolation:** The bespoke topology `graphData` is never written to the global cache, preventing hallucinated multi-seed artifacts from polluting canonical data.
 
 ### Phase 3: Instant Global Mapping / Zero-AI Zapping
 **Objective:** Resolve canonical entities instantly without spending LLM tokens.
-- **Process:** Immediately after the canvas is generated and saved to the project, the Engine performs an `O(1)` sweep of all generated nodes against the global database.
-- **Execution:** Existing records found in the global cache are instantly mapped into the project canvas via Firestore pointers and redirects. 
+- **Process:** Immediately after generation, the Engine performs an `O(1)` sweep of the lightweight nodes against the global database.
+- **Execution:** Existing records found in the global cache are mapped into the project canvas via Firestore pointers. 
 - **Invariants:** 
-  - Zero AI tokens are spent on nodes that have already been discovered and cached by the community.
+  - Zero AI tokens are spent on nodes already cached by the community.
 
-### Phase 4: Targeted Gap-Filling
-**Objective:** Hydrate any remaining "Deep Cuts" missing from the global registry.
-- **Process:** For the subset of nodes that resulted in a cache miss during Phase 3, the system extracts their `[Artist Name + Country]` signature and queues them for hydration.
-- **Execution:** The system fires asynchronous, surgical API creation passes (utilizing Gemini and Google Search) to construct rich profiles (biographies, metadata, and thumbnails) for these missing entities. Once constructed, they are snapped back into the Project canvas and permanently persisted to the global cache for future users.
+### Phase 4: Consolidated Gap-Filling & Global Sync
+**Objective:** Hydrate all missing "Deep Cuts" from the lightweight topology and persist them globally.
+- **Process:** The system identifies all missing Deep Cuts from Phase 3, triggers the AI API to create their full details (biographies, metadata, thumbnails) on-demand, and **saves these newly hydrated profiles globally**.
+- **Execution:** 
+  - Hydration happens via surgical, concurrent Gemini passes.
+  - The fully hydrated Deep Cut details are synced into the global `artists`/`labels` collections (with `graphData: null`), expanding Zcene's global knowledge base.
+- **Final Save:** The generated bespoke topology AND all fully hydrated global Deep Cut data are finally saved to the unique user project (`detailsCacheEntries`). All Deep Cuts must be fully hydrated at this point.
 - **Invariants:** 
-  - Executed in strictly chunked concurrency batches (e.g., `Promise.all` in blocks of 5) to respect Cloud Function execution timeouts and API rate limits.
-  - The UI must gracefully handle partial hydration states, rendering skeletons or initials until the gap-filling process syncs via real-time Firestore listeners.
+  - Deep Cuts generated during multi-seed canvases ARE saved globally, enforcing a gap-filling strategy.
+  - Executed in chunked batches to respect execution timeouts.
 
 ---
 

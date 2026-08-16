@@ -726,10 +726,7 @@ export const onCurationJobCreated = onDocumentCreated({
           idRewriteMap.set(recNorm, compositeCanonicalId);
           if (recDetailsEntry) recDetailsEntry[0] = compositeCanonicalId;
 
-          if (isSandboxMode) {
-            console.log(`[Sandbox Mode] Bypassing global cache writes for recommendation (${collName}): ${compositeCanonicalId}`);
-          } else {
-            const recDocRef = db.collection(collName).doc(compositeCanonicalId);
+          const recDocRef = db.collection(collName).doc(compositeCanonicalId);
             const recSnap = await recDocRef.get();
 
             if (!recSnap.exists) {
@@ -782,7 +779,6 @@ export const onCurationJobCreated = onDocumentCreated({
               await bareArtistIdRef.update(sanitizeUndefinedProperties(barePayload)).catch(() => {});
               console.log(`[Curation Backend] Updated Bare Alias Pointer Stub in ${collName}: ${recNorm} -> ${compositeCanonicalId}`);
             }
-          }
         }
 
         // Apply Canonical ID Rewrite and Strict Deduplication to Graph Topology

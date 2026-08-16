@@ -654,59 +654,54 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                     idRewriteMap.set(recNorm, compositeCanonicalId);
                     if (recDetailsEntry)
                         recDetailsEntry[0] = compositeCanonicalId;
-                    if (isSandboxMode) {
-                        console.log(`[Sandbox Mode] Bypassing global cache writes for recommendation (${collName}): ${compositeCanonicalId}`);
-                    }
-                    else {
-                        const recDocRef = db.collection(collName).doc(compositeCanonicalId);
-                        const recSnap = await recDocRef.get();
-                        if (!recSnap.exists) {
-                            await recDocRef.set({
-                                cacheKey: compositeCanonicalId,
-                                [idFieldKey]: recNorm,
-                                seedArtists: recArtist,
-                                graphData: null,
-                                detailsCache: isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(recDetails), // Save as structured object!
-                                filters: null, // Note: active filters are not strictly carried for proactive rec entries unless we explicitly want to
-                                cacheVersion: 4,
-                                cachedAt: firestore_2.FieldValue.serverTimestamp(),
-                                isDeep: true, // Marked Deep!
-                                isPrimarySeed: false,
-                                hasUniqueSpiderweb: false,
-                            });
-                            console.log(`[Curation Backend] Proactively created DEEP entry for recommendation (${collName}): ${compositeCanonicalId}`);
-                        }
-                        else {
-                            const updatePayload = {
-                                detailsCache: isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(recDetails),
-                                cachedAt: firestore_2.FieldValue.serverTimestamp(),
-                                cacheVersion: 4,
-                                [idFieldKey]: recNorm,
-                                cacheKey: compositeCanonicalId,
-                                isDeep: true
-                            };
-                            await recDocRef.update(sanitizeUndefinedProperties(updatePayload));
-                            console.log(`[Curation Backend] Proactively updated detailsCache for recommendation (${collName}): ${compositeCanonicalId}`);
-                        }
-                        // Create/Heal Bare Root Alias Pointer and replicate detailsCache for immediate short-ID resolution
-                        const bareArtistIdRef = db.collection(collName).doc(recNorm);
-                        const bareSnap = await bareArtistIdRef.get();
-                        const barePayload = {
-                            cacheKey: recNorm,
+                    const recDocRef = db.collection(collName).doc(compositeCanonicalId);
+                    const recSnap = await recDocRef.get();
+                    if (!recSnap.exists) {
+                        await recDocRef.set({
+                            cacheKey: compositeCanonicalId,
                             [idFieldKey]: recNorm,
                             seedArtists: recArtist,
+                            graphData: null,
+                            detailsCache: isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(recDetails), // Save as structured object!
+                            filters: null, // Note: active filters are not strictly carried for proactive rec entries unless we explicitly want to
                             cacheVersion: 4,
                             cachedAt: firestore_2.FieldValue.serverTimestamp(),
-                            redirectTo: compositeCanonicalId
+                            isDeep: true, // Marked Deep!
+                            isPrimarySeed: false,
+                            hasUniqueSpiderweb: false,
+                        });
+                        console.log(`[Curation Backend] Proactively created DEEP entry for recommendation (${collName}): ${compositeCanonicalId}`);
+                    }
+                    else {
+                        const updatePayload = {
+                            detailsCache: isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(recDetails),
+                            cachedAt: firestore_2.FieldValue.serverTimestamp(),
+                            cacheVersion: 4,
+                            [idFieldKey]: recNorm,
+                            cacheKey: compositeCanonicalId,
+                            isDeep: true
                         };
-                        if (!bareSnap.exists) {
-                            await bareArtistIdRef.set(sanitizeUndefinedProperties(barePayload));
-                            console.log(`[Curation Backend] Created Bare Alias Pointer Stub in ${collName}: ${recNorm} -> ${compositeCanonicalId}`);
-                        }
-                        else {
-                            await bareArtistIdRef.update(sanitizeUndefinedProperties(barePayload)).catch(() => { });
-                            console.log(`[Curation Backend] Updated Bare Alias Pointer Stub in ${collName}: ${recNorm} -> ${compositeCanonicalId}`);
-                        }
+                        await recDocRef.update(sanitizeUndefinedProperties(updatePayload));
+                        console.log(`[Curation Backend] Proactively updated detailsCache for recommendation (${collName}): ${compositeCanonicalId}`);
+                    }
+                    // Create/Heal Bare Root Alias Pointer and replicate detailsCache for immediate short-ID resolution
+                    const bareArtistIdRef = db.collection(collName).doc(recNorm);
+                    const bareSnap = await bareArtistIdRef.get();
+                    const barePayload = {
+                        cacheKey: recNorm,
+                        [idFieldKey]: recNorm,
+                        seedArtists: recArtist,
+                        cacheVersion: 4,
+                        cachedAt: firestore_2.FieldValue.serverTimestamp(),
+                        redirectTo: compositeCanonicalId
+                    };
+                    if (!bareSnap.exists) {
+                        await bareArtistIdRef.set(sanitizeUndefinedProperties(barePayload));
+                        console.log(`[Curation Backend] Created Bare Alias Pointer Stub in ${collName}: ${recNorm} -> ${compositeCanonicalId}`);
+                    }
+                    else {
+                        await bareArtistIdRef.update(sanitizeUndefinedProperties(barePayload)).catch(() => { });
+                        console.log(`[Curation Backend] Updated Bare Alias Pointer Stub in ${collName}: ${recNorm} -> ${compositeCanonicalId}`);
                     }
                 }
                 // Apply Canonical ID Rewrite and Strict Deduplication to Graph Topology
