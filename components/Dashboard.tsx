@@ -373,7 +373,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                           <div className="flex flex-col gap-4">
                             <div className="flex items-start justify-between gap-3">
                               <div className="flex flex-row items-center gap-4 flex-1 min-w-0">
-                                <SeedArtistImages seedArtists={project.seedArtists} userId={user?.uid} variant="grid" />
+                                <SeedArtistImages seedArtists={project.seedArtists} userId={user?.uid} variant="grid" projectDetailsCache={project.detailsCache} />
                                 <div className="flex flex-col gap-1.5 min-w-0 flex-1">
                                   <h3 className="text-base font-medium text-white group-hover:text-primary transition-colors line-clamp-2 pr-2">
                                     {displayTitle}

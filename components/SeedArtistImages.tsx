@@ -7,13 +7,15 @@ interface SeedArtistImagesProps {
   userId?: string;
   variant?: 'stack' | 'grid' | 'reel';
   fallbackGraphData?: any;
+  projectDetailsCache?: string; // Add internal project details cache
 }
 
 export const SeedArtistImages: React.FC<SeedArtistImagesProps> = ({ 
   seedArtists, 
   userId,
   variant = 'stack',
-  fallbackGraphData
+  fallbackGraphData,
+  projectDetailsCache
 }) => {
   const [images, setImages] = useState<{ id: string, url: string, name: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,6 +31,19 @@ export const SeedArtistImages: React.FC<SeedArtistImagesProps> = ({
     const normalized = list.map(normalizeArtistId);
     
     let isMounted = true;
+
+    // 1. Prioritize Project's Internal Cache (Sandbox / Multi-Seed aware)
+    let internalCacheMap: any = null;
+    if (projectDetailsCache) {
+      try {
+        const parsedMap = JSON.parse(projectDetailsCache);
+        if (Array.isArray(parsedMap)) {
+          internalCacheMap = new Map(parsedMap as [string, any][]);
+        }
+      } catch(e) {
+        // ignore parse error
+      }
+    }
     
     Promise.all(normalized.map(id => getEntityDocWithRedirect(id, 'artist'))).then(snapshots => {
       if (!isMounted) return;
@@ -38,7 +53,15 @@ export const SeedArtistImages: React.FC<SeedArtistImagesProps> = ({
         const normId = normalized[idx];
         const snap = snapshots[idx];
         let url = '';
-        if (snap && snap.exists()) {
+
+        // Check internal project cache first for Sandbox-minted images
+        if (internalCacheMap && internalCacheMap.has(normId)) {
+          const entry = internalCacheMap.get(normId);
+          url = entry?.imageUrl || entry?.details?.imageUrl || '';
+        }
+
+        // 2. Global Cache Fallback
+        if (!url && snap && snap.exists()) {
           const entry = snap.data();
           if (entry && entry.detailsCache) {
             try {

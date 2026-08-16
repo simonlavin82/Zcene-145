@@ -4,6 +4,7 @@ import { getFirestore, FieldValue, Timestamp } from "firebase-admin/firestore";
 import { translateError } from "./services/errorTranslationLayer";
 import {
   generateGraphDataBackend,
+  generateRootsBreakdownBackend,
   normalizeArtistId,
   fetchNodeDetailsBackend,
   scrapeVideoIdBackend,
@@ -469,6 +470,13 @@ export const onCurationJobCreated = onDocumentCreated({
           console.warn(`[Curation Backend] ⚠️ HYDRATION INCOMPLETE — ${failedHydrationIds.length} node(s) failed and will not be pre-cached: ${failedHydrationIds.join(', ')}`);
         } else {
           console.log(`[Curation Backend] ✅ All ${recommendedEntities.length} entities hydrated successfully — zero-miss compliance confirmed.`);
+        }
+
+        // [Stage 2 LLM Pass] Mint a full, deep-cut-aware Roots Breakdown
+        if (isSandboxMode) {
+          console.log(`[Curation Backend] Sandbox Mode detected. Minting full deep-cut-aware Roots Breakdown...`);
+          const fullRationale = await generateRootsBreakdownBackend(inputPayload.artists, detailsCacheEntries);
+          finalGraph.synthesisRationale = fullRationale;
         }
 
         // Write-back cache entries for the seed entities (deep cache: isDeep: true)

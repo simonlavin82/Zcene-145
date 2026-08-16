@@ -414,6 +414,12 @@ exports.onCurationJobCreated = (0, firestore_1.onDocumentCreated)({
                 else {
                     console.log(`[Curation Backend] ✅ All ${recommendedEntities.length} entities hydrated successfully — zero-miss compliance confirmed.`);
                 }
+                // [Stage 2 LLM Pass] Mint a full, deep-cut-aware Roots Breakdown
+                if (isSandboxMode) {
+                    console.log(`[Curation Backend] Sandbox Mode detected. Minting full deep-cut-aware Roots Breakdown...`);
+                    const fullRationale = await (0, curatorService_1.generateRootsBreakdownBackend)(inputPayload.artists, detailsCacheEntries);
+                    finalGraph.synthesisRationale = fullRationale;
+                }
                 // Write-back cache entries for the seed entities (deep cache: isDeep: true)
                 const idRewriteMap = new Map();
                 for (const seed of artistList) {
