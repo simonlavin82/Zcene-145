@@ -16,10 +16,11 @@ This model guarantees structural integrity, eliminates floating nodes, prevents 
   - Every validated seed must output an explicit, collision-resistant signature, formatted as `[Artist Name + Country]` (e.g., `nirvana-usa` vs `nirvana-gbr`).
   - This prevents signature collisions downstream and ensures that the foundation of the canvas is anchored to canonical global entities.
 
-### Phase 2: Canvas Generation
+### Phase 2: Canvas Generation & Graph Topology (Stage 1 LLM Pass)
 **Objective:** Generate the bespoke spiderweb topology with guaranteed connectivity.
+- **2-Stage LLM Pass (Stage 1):** The LLM generates the initial lightweight graph topology (artist names, labels, origins, and relational edges). During this initial creation, a lightweight root breakdown is generated and held strictly in memory.
 - **Single-Seed Flow (Unfiltered):** Unchanged. Single-seed queries target the **Global Artist Deep Cut Cache** ensuring canonical shareability.
-- **Multi-Seed & Filtered Flows:** The LLM generates a *lightweight bespoke spiderweb topology* (only artist names, labels, origins, and relational edges) which is held in memory. This output is specific to the user's private project canvas.
+- **Multi-Seed & Filtered Flows:** The LLM generates a *lightweight bespoke spiderweb topology* which is held in memory. This output is specific to the user's private project canvas.
 - **Invariants:** 
   - **Topology Guarantee:** Every node has valid relational edges; floating nodes are impossible.
   - **Topology Isolation:** The bespoke topology `graphData` is never written to the global cache, preventing hallucinated multi-seed artifacts from polluting canonical data.
@@ -31,16 +32,15 @@ This model guarantees structural integrity, eliminates floating nodes, prevents 
 - **Invariants:** 
   - Zero AI tokens are spent on nodes already cached by the community.
 
-### Phase 4: Consolidated Gap-Filling & Global Sync
-**Objective:** Hydrate all missing "Deep Cuts" from the lightweight topology and persist them globally.
-- **Process:** The system identifies all missing Deep Cuts from Phase 3, triggers the AI API to create their full details (biographies, metadata, thumbnails) on-demand, and **saves these newly hydrated profiles globally**.
-- **Execution:** 
-  - Hydration happens via surgical, concurrent Gemini passes.
-  - The fully hydrated Deep Cut details are synced into the global `artists`/`labels` collections (with `graphData: null`), expanding Zcene's global knowledge base.
-- **Final Save:** The generated bespoke topology AND all fully hydrated global Deep Cut data are finally saved to the unique user project (`detailsCacheEntries`). All Deep Cuts must be fully hydrated at this point.
-- **Invariants:** 
-  - Deep Cuts generated during multi-seed canvases ARE saved globally, enforcing a gap-filling strategy.
-  - Executed in chunked batches to respect execution timeouts.
+### Phase 4: Consolidated Gap-Filling & Master Narrative Sync (Stage 2 LLM Pass)
+**Objective:** Hydrate all missing "Deep Cuts" from the lightweight topology, finalize the master narrative, and persist them according to sandbox rules.
+- **Process:** The system identifies all missing Deep Cuts from Phase 3, triggers the AI API to create their full details (biographies, metadata, thumbnails) on-demand.
+- **2-Stage LLM Pass (Stage 2 - Roots Narrative Synthesis):** Once the deep-cut context and gap-filling pass are complete, the system mints a full root breakdown. This ensures the rationale has deep-cut-aware richness, even if it adds an extra delay to the curation job.
+- **Global Cache vs. Sandbox Isolation:** 
+  - **Single-Seed Paths:** Explicitly commit their newly minted master narrative and fully hydrated Deep Cut details back to the global registry (expanding Zcene's global knowledge base).
+  - **Multi-Seed/Filtered (Bespoke) Paths:** Cleanly bypass the global commit for the master narrative to prevent data pollution. The generated bespoke topology and master narrative are saved strictly to the unique user project (`detailsCacheEntries`).
+- **Project Thumbnail Binding:** 
+  - To prevent UI tearing and ensure accurate rendering during the curation flow, UI components (like `SeedArtistImages`) prioritize the project's internal `detailsCache` for image arrays. This guarantees that multi-seed custom images display correctly and bypasses potential stale global cache lookups.
 
 ---
 
@@ -73,10 +73,10 @@ To safely roll out this architecture without breaking the currently functioning 
    - Inject the resolved `detailsCache` payloads into the local state so the UI instantly paints thumbnails and biographies for known entities without requesting new generations.
 3. **Safety & Testing:** Clear local state but leave Firestore populated. Load a heavy multi-seed project and verify that previously cached nodes render instantly (thumbnails and bios) without triggering loading spinners or cloud jobs.
 
-### Phase D: Asynchronous Targeted Gap-Filling
-**Goal:** Surgically hydrate missing nodes in the background safely.
+### Phase D: Asynchronous Targeted Gap-Filling & Stage 2 Minting
+**Goal:** Surgically hydrate missing nodes in the background safely, followed by the Stage 2 LLM Roots Narrative pass.
 1. **Target Files:** `onCurationJobCreated.ts`, `SeedArtistImages.tsx`, Background Workers
 2. **Implementation:**
-   - **Backend:** For nodes missing in Phase 3, trigger a chunked asynchronous worker (or Pub/Sub queue) to fetch the missing details via surgical Gemini passes. Once complete, write to global cache and update the `Project` document.
-   - **Frontend:** Update `SeedArtistImages.tsx` and detail panels to fallback to `project.graphData` for partial assets. Implement loading skeletons for nodes that are currently in the gap-filling queue.
-3. **Safety & Testing:** Monitor Cloud Function execution times and quotas. Ensure the UI remains responsive and automatically snaps newly hydrated thumbnails into place as the background worker completes chunks.
+   - **Backend:** For nodes missing in Phase 3, trigger a chunked asynchronous worker to fetch the missing details via surgical Gemini passes. Once gap-filling is complete, trigger the Stage 2 LLM pass to mint the deep-cut-aware Root Breakdown. Apply Sandbox Isolation rules (write to global for single-seed, project-only for multi-seed).
+   - **Frontend:** Update `SeedArtistImages.tsx` and detail panels to prioritize `project.detailsCache` for assets to respect Project Thumbnail Binding.
+3. **Safety & Testing:** Monitor Cloud Function execution times and quotas. Ensure the UI remains responsive and automatically snaps newly hydrated thumbnails into place as the background worker completes chunks, without leaking bespoke narratives to the global cache.
