@@ -128,61 +128,7 @@ app.all('/api/gemini/*wildcard', async (req, res) => {
     });
   }
 
-  if (process.env.VITE_USE_MOCK_AI === 'true' && targetPath.includes('generateContent') && req.method === 'POST') {
-    try {
-      const parsedBody = JSON.parse(requestBodyString);
-      const userPrompt = parsedBody.contents?.[0]?.parts?.[0]?.text || '';
-      const systemInstruction = parsedBody.systemInstruction?.parts?.[0]?.text || '';
-      
-      console.log(`[Gemini Proxy] Mock AI Intercepted Request. Intent check...`);
-      
-      // 1. Disambiguation Probe Mock
-      if (systemInstruction.includes("enumerate distinct musical acts") || userPrompt.includes("enumerate distinct musical acts")) {
-        console.log(`[Gemini Proxy] Mock AI returning Disambiguation JSON.`);
-        // Extract the artist name from the userPrompt
-        const match = userPrompt.match(/named "(.*?)"/);
-        const artistName = match ? match[1] : "Spaced";
-        
-        const mockResponse = {
-          candidates: [
-            {
-              content: {
-                parts: [
-                  {
-                    text: `\`\`\`json\n[\n  {"name": "${artistName}", "country": "USA", "genre": "Hardcore Punk", "activeYears": "2021-present"},\n  {"name": "${artistName}", "country": "UK", "genre": "UK Techno", "activeYears": "1998-2005"}\n]\n\`\`\``
-                  }
-                ]
-              },
-              finishReason: "STOP"
-            }
-          ]
-        };
-        return res.status(200).json(mockResponse);
-      }
-      
-      // 2. Graph Generation Mock (if needed)
-      if (userPrompt.includes("Generate a music graph") || systemInstruction.includes("Generate a music graph")) {
-        console.log(`[Gemini Proxy] Mock AI returning Graph JSON.`);
-        const mockResponse = {
-          candidates: [
-            {
-              content: {
-                parts: [
-                  {
-                    text: `\`\`\`json\n{\n  "nodes": [{ "id": "Skeleton Node", "type": "artist", "group": 1 }],\n  "links": []\n}\n\`\`\``
-                  }
-                ]
-              },
-              finishReason: "STOP"
-            }
-          ]
-        };
-        return res.status(200).json(mockResponse);
-      }
-    } catch (e) {
-      console.warn(`[Gemini Proxy] Failed to parse JSON for mock evaluation. Proceeding to live fetch...`, e.message);
-    }
-  }
+
 
   console.log(`[Gemini Proxy] Forwarding ${req.method} ${req.originalUrl} -> ${targetUrl}`);
 

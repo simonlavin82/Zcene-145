@@ -260,6 +260,23 @@ export const processCurationJob = onDocumentCreated({
             origin: n.origin || null
           }));
 
+        // CRITICAL FIX: Ensure all seed artists are explicitly placed into the hydration queue.
+        // The architectural design dictates that seeds must go through the gap-filling phase just like deep cuts,
+        // even if the LLM omitted them or modified their IDs in the graph output.
+        for (const seed of artistList) {
+          const seedNorm = normalizeArtistId(seed);
+          const exists = recommendedEntities.some((e: any) => isEntitySeedMatch(seedNorm, e.id) || isEntitySeedMatch(seedNorm, e.name));
+          if (!exists) {
+             recommendedEntities.unshift({
+               id: seed,
+               name: seed,
+               type: 'artist',
+               origin: null // Origin slug is already embedded in the seed ID
+             });
+             console.log(`[Curation Backend] Explicitly pushing missing seed artist into gap-filling queue: ${seed}`);
+          }
+        }
+
         console.log(`[Curation Backend] [Step 2: Hydration Loop Started] Hydrating details for ${recommendedEntities.length} entities in the graph:`, recommendedEntities.map((e: any) => `${e.name} (${e.type})`));
 
         const detailsCacheEntries: [string, any][] = [];
