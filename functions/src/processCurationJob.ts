@@ -141,7 +141,7 @@ async function updateProjectStatus(userId: string, projectId: string, updates: a
   }
 }
 
-export const onCurationJobCreated = onDocumentCreated({
+export const processCurationJob = onDocumentCreated({
   document: "curationJobs/{jobId}",
   secrets: ["GEMINI_API_KEY"],
   timeoutSeconds: 540,

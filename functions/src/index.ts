@@ -1,3 +1,3 @@
-import { onCurationJobCreated } from "./onCurationJobCreated";
+import { processCurationJob } from "./processCurationJob";
 
-export { onCurationJobCreated };
+export { processCurationJob };
