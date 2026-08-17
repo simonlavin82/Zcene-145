@@ -28,19 +28,34 @@ This model guarantees structural integrity, eliminates floating nodes, prevents 
 ### Phase 3: Instant Global Mapping / Zero-AI Zapping
 **Objective:** Resolve canonical entities instantly without spending LLM tokens.
 - **Process:** Immediately after generation, the Engine performs an `O(1)` sweep of the lightweight nodes against the global database.
-- **Execution:** Existing records found in the global cache are mapped into the project canvas via Firestore pointers. 
+- **Universal Cache Validation Rule:** A cached document is only accepted as a valid hit if it is **truly complete**. All three conditions must be met:
+  1. `summary.length > 50` (non-stub biography)
+  2. `details.genre` is present and non-empty
+  3. `imageUrl` is present and non-empty
+
+  Any entity failing any condition is treated as a **cache miss** and is routed through full Gemini text hydration and iTunes/Gemini image scraping, regardless of whether it is a seed artist or a deep cut. No special-case flags are used — the predicate applies universally.
+- **Execution:** Existing records meeting all three completeness conditions are mapped into the project canvas via Firestore pointers. 
 - **Invariants:** 
-  - Zero AI tokens are spent on nodes already cached by the community.
+  - Zero AI tokens are spent on nodes already fully cached by the community.
+  - Seeds missing image artwork (e.g., from a previous failed scrape) are re-hydrated identically to deep cuts.
 
 ### Phase 4: Consolidated Gap-Filling & Master Narrative Sync (Stage 2 LLM Pass)
 **Objective:** Hydrate all missing "Deep Cuts" from the lightweight topology, finalize the master narrative, and persist them according to sandbox rules.
 - **Process:** The system identifies all missing Deep Cuts from Phase 3, triggers the AI API to create their full details (biographies, metadata, thumbnails) on-demand.
-- **2-Stage LLM Pass (Stage 2 - Roots Narrative Synthesis):** Once the deep-cut context and gap-filling pass are complete, the system mints a full root breakdown. This ensures the rationale has deep-cut-aware richness, even if it adds an extra delay to the curation job.
+- **2-Stage LLM Pass (Stage 2 - Roots Narrative Synthesis):** Once the deep-cut context and gap-filling pass are complete, the system **unconditionally** mints a full root breakdown. This fires for all job types — single-seed, multi-seed, and filtered — ensuring every Zcene has a deep-cut-aware rich narrative. The `isSandboxMode` flag governs write-back isolation only; it does not suppress Stage 2 content generation.
 - **Global Cache vs. Sandbox Isolation:** 
   - **Single-Seed Paths:** Explicitly commit their newly minted master narrative and fully hydrated Deep Cut details back to the global registry (expanding Zcene's global knowledge base).
   - **Multi-Seed/Filtered (Bespoke) Paths:** Cleanly bypass the global commit for the master narrative to prevent data pollution. The generated bespoke topology and master narrative are saved strictly to the unique user project (`detailsCacheEntries`).
 - **Project Thumbnail Binding:** 
   - To prevent UI tearing and ensure accurate rendering during the curation flow, UI components (like `SeedArtistImages`) prioritize the project's internal `detailsCache` for image arrays. This guarantees that multi-seed custom images display correctly and bypasses potential stale global cache lookups.
+
+---
+
+## Frontend Validation
+
+The `validateRootsBreakdown()` function in `App.tsx` enforces that a `synthesisRationale` is a genuine synthesized narrative before it is accepted from the cache. It rejects:
+- Empty or null strings.
+- Strings beginning with `[Single-Seed Analysis]` — the hardcoded backend stub text written by Phase 4 when Stage 2 generation was previously gated by `isSandboxMode`. Any cached Zcene carrying this stub is automatically routed to re-synthesize on next load.
 
 ---
 
@@ -80,3 +95,4 @@ To safely roll out this architecture without breaking the currently functioning 
    - **Backend:** For nodes missing in Phase 3, trigger a chunked asynchronous worker to fetch the missing details via surgical Gemini passes. Once gap-filling is complete, trigger the Stage 2 LLM pass to mint the deep-cut-aware Root Breakdown. Apply Sandbox Isolation rules (write to global for single-seed, project-only for multi-seed).
    - **Frontend:** Update `SeedArtistImages.tsx` and detail panels to prioritize `project.detailsCache` for assets to respect Project Thumbnail Binding.
 3. **Safety & Testing:** Monitor Cloud Function execution times and quotas. Ensure the UI remains responsive and automatically snaps newly hydrated thumbnails into place as the background worker completes chunks, without leaking bespoke narratives to the global cache.
+

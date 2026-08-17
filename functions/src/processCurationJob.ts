@@ -327,9 +327,23 @@ export const processCurationJob = onDocumentCreated({
                         }
                       }
                       
-                      if (cachedDetails && cachedDetails.summary && cachedDetails.summary.length > 50) {
+                      // Universal Cache Validation: A cached document is only a valid hit if it is
+                      // truly complete — it must have a meaningful summary AND a genre AND an imageUrl.
+                      // Any entity missing imageUrl or genre is considered a stale stub and must be
+                      // re-routed through full Gemini hydration and iTunes scraping. This rule applies
+                      // equally to seeds and deep cuts — no special-case flags needed.
+                      const isCacheComplete = (
+                        cachedDetails &&
+                        cachedDetails.summary &&
+                        cachedDetails.summary.length > 50 &&
+                        cachedDetails.details?.genre &&
+                        cachedDetails.imageUrl  // Must have a non-empty image URL
+                      );
+                      if (isCacheComplete) {
                         details = cachedDetails;
-                        console.log(`[Curation Backend] Direct cache hit for details of: ${artistNormId}`);
+                        console.log(`[Curation Backend] Direct cache hit (complete) for details of: ${artistNormId}`);
+                      } else if (cachedDetails) {
+                        console.log(`[Curation Backend] Cache doc found but incomplete (missing imageUrl or genre) for: ${artistNormId}. Routing to full hydration.`);
                       }
                     }
                   }
@@ -516,11 +530,13 @@ export const processCurationJob = onDocumentCreated({
         }
 
         // [Stage 2 LLM Pass] Mint a full, deep-cut-aware Roots Breakdown
-        if (isSandboxMode) {
-          console.log(`[Curation Backend] Sandbox Mode detected. Minting full deep-cut-aware Roots Breakdown...`);
-          const fullRationale = await generateRootsBreakdownBackend(inputPayload.artists, detailsCacheEntries);
-          finalGraph.synthesisRationale = fullRationale;
-        }
+        // [Stage 2 LLM Pass] Mint a full, deep-cut-aware Roots Breakdown unconditionally.
+        // Per the Unified Canvas Architecture (Phase 4), once gap-filling is complete the system
+        // ALWAYS mints a rich narrative — for single-seed, multi-seed, and filtered jobs alike.
+        // isSandboxMode governs write-back isolation only; it must not suppress content generation.
+        console.log(`[Curation Backend] [Stage 2] Minting deep-cut-aware Roots Breakdown for all jobs...`);
+        const fullRationale = await generateRootsBreakdownBackend(inputPayload.artists, detailsCacheEntries);
+        finalGraph.synthesisRationale = fullRationale;
 
         // Write-back cache entries for the seed entities (deep cache: isDeep: true)
         const idRewriteMap = new Map<string, string>();

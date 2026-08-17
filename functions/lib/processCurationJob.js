@@ -228,6 +228,22 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     type: n.type || 'artist',
                     origin: n.origin || null
                 }));
+                // CRITICAL FIX: Ensure all seed artists are explicitly placed into the hydration queue.
+                // The architectural design dictates that seeds must go through the gap-filling phase just like deep cuts,
+                // even if the LLM omitted them or modified their IDs in the graph output.
+                for (const seed of artistList) {
+                    const seedNorm = (0, curatorService_1.normalizeArtistId)(seed);
+                    const exists = recommendedEntities.some((e) => isEntitySeedMatch(seedNorm, e.id) || isEntitySeedMatch(seedNorm, e.name));
+                    if (!exists) {
+                        recommendedEntities.unshift({
+                            id: seed,
+                            name: seed,
+                            type: 'artist',
+                            origin: null // Origin slug is already embedded in the seed ID
+                        });
+                        console.log(`[Curation Backend] Explicitly pushing missing seed artist into gap-filling queue: ${seed}`);
+                    }
+                }
                 console.log(`[Curation Backend] [Step 2: Hydration Loop Started] Hydrating details for ${recommendedEntities.length} entities in the graph:`, recommendedEntities.map((e) => `${e.name} (${e.type})`));
                 const detailsCacheEntries = [];
                 // Fetch details in concurrency chunks of 5 to reduce 20-minute run times to under 3 minutes
@@ -272,9 +288,23 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                                 cachedDetails = Array.isArray(cachedDetails[0]) ? cachedDetails[0][1] : cachedDetails[0];
                                             }
                                         }
-                                        if (cachedDetails && cachedDetails.summary && cachedDetails.summary.length > 50) {
+                                        // Universal Cache Validation: A cached document is only a valid hit if it is
+                                        // truly complete — it must have a meaningful summary AND a genre AND an imageUrl.
+                                        // Any entity missing imageUrl or genre is considered a stale stub and must be
+                                        // re-routed through full Gemini hydration and iTunes scraping. This rule applies
+                                        // equally to seeds and deep cuts — no special-case flags needed.
+                                        const isCacheComplete = (cachedDetails &&
+                                            cachedDetails.summary &&
+                                            cachedDetails.summary.length > 50 &&
+                                            cachedDetails.details?.genre &&
+                                            cachedDetails.imageUrl // Must have a non-empty image URL
+                                        );
+                                        if (isCacheComplete) {
                                             details = cachedDetails;
-                                            console.log(`[Curation Backend] Direct cache hit for details of: ${artistNormId}`);
+                                            console.log(`[Curation Backend] Direct cache hit (complete) for details of: ${artistNormId}`);
+                                        }
+                                        else if (cachedDetails) {
+                                            console.log(`[Curation Backend] Cache doc found but incomplete (missing imageUrl or genre) for: ${artistNormId}. Routing to full hydration.`);
                                         }
                                     }
                                 }
@@ -438,11 +468,13 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     console.log(`[Curation Backend] ✅ All ${recommendedEntities.length} entities hydrated successfully — zero-miss compliance confirmed.`);
                 }
                 // [Stage 2 LLM Pass] Mint a full, deep-cut-aware Roots Breakdown
-                if (isSandboxMode) {
-                    console.log(`[Curation Backend] Sandbox Mode detected. Minting full deep-cut-aware Roots Breakdown...`);
-                    const fullRationale = await (0, curatorService_1.generateRootsBreakdownBackend)(inputPayload.artists, detailsCacheEntries);
-                    finalGraph.synthesisRationale = fullRationale;
-                }
+                // [Stage 2 LLM Pass] Mint a full, deep-cut-aware Roots Breakdown unconditionally.
+                // Per the Unified Canvas Architecture (Phase 4), once gap-filling is complete the system
+                // ALWAYS mints a rich narrative — for single-seed, multi-seed, and filtered jobs alike.
+                // isSandboxMode governs write-back isolation only; it must not suppress content generation.
+                console.log(`[Curation Backend] [Stage 2] Minting deep-cut-aware Roots Breakdown for all jobs...`);
+                const fullRationale = await (0, curatorService_1.generateRootsBreakdownBackend)(inputPayload.artists, detailsCacheEntries);
+                finalGraph.synthesisRationale = fullRationale;
                 // Write-back cache entries for the seed entities (deep cache: isDeep: true)
                 const idRewriteMap = new Map();
                 for (const seed of artistList) {

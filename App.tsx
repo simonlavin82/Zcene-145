@@ -932,6 +932,9 @@ export const expandDetailsCacheMap = (entries: any): Map<string, NodeDetails> =>
 
 const validateRootsBreakdown = (rationale?: string, isSingleArtist: boolean = false): boolean => {
   if (!rationale) return false;
+  // Explicitly reject the hardcoded backend stub — it is not a synthesized narrative.
+  // Any Zcene with this prefix has a placeholder from a pre-Stage-2 job and must re-synthesize.
+  if (rationale.startsWith('[Single-Seed Analysis]')) return false;
   const lower = rationale.toLowerCase();
   if (isSingleArtist) {
     return lower.includes('acoustic') && lower.includes('scene');
