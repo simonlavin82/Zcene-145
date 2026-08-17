@@ -764,7 +764,10 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         if (details?.imageUrl) {
             setImageTier('source');
         } else {
-            setImageTier('placeholder');
+            // Only regress to placeholder if we didn't previously have a valid image URL.
+            // This prevents the image from blinking out during a transient background
+            // revalidation pass that returns an empty imageUrl before the full data settles.
+            setImageTier(prev => prev === 'source' ? 'placeholder' : prev);
         }
     }, [node.id, details?.imageUrl]);
 
@@ -1134,9 +1137,21 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 const hasInsight = details.recommendationReason &&
                                     details.recommendationReason !== SENTINEL_INSIGHT &&
                                     details.recommendationReason.trim().length > 0;
-                                // Fallback: strip markdown bold markers from summary and use first 120 chars
+                                // Fallback: strip all common markdown syntax from summary before
+                                // displaying it as a quote. Raw Gemini output can contain bold (**),
+                                // italic (*/_), headings (#), links ([text](url)), and inline code (`)
+                                // which must not leak through to the serif quote display.
+                                const stripMarkdown = (text: string) =>
+                                    text
+                                        .replace(/\*\*(.+?)\*\*/g, '$1')   // bold **text**
+                                        .replace(/\*(.+?)\*/g, '$1')        // italic *text*
+                                        .replace(/_(.+?)_/g, '$1')          // italic _text_
+                                        .replace(/#{1,6}\s*/g, '')           // headings
+                                        .replace(/\[(.+?)\]\(.+?\)/g, '$1') // links
+                                        .replace(/`(.+?)`/g, '$1')          // inline code
+                                        .trim();
                                 const summaryFallback = details.summary
-                                    ? details.summary.replace(/\*\*/g, '').trim().substring(0, 120) + (details.summary.length > 120 ? '...' : '')
+                                    ? stripMarkdown(details.summary).substring(0, 120) + (details.summary.length > 120 ? '...' : '')
                                     : null;
                                 const quoteText = hasInsight ? details.recommendationReason : summaryFallback;
                                 return quoteText ? (

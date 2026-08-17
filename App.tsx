@@ -2137,19 +2137,60 @@ const App: React.FC = () => {
     }
     
     // 2. Load Locally and Block the Network
-    // Treat existing cache entries (even if incomplete or containing placeholders) as authoritative on normal click.
-    // We only trigger re-synthesis when the user explicitly clicks "Heal Cache" (which runs handleRefreshNode).
+    // Frontend Universal Cache Validation: mirrors the backend predicate.
+    // An entry is only accepted as authoritative if it has both a meaningful summary AND a non-empty imageUrl.
+    // An entry missing imageUrl is incomplete and must not block a fresher lookup (e.g. the country-suffixed key
+    // korn-united-states written by the backend may have a real image while the short-key korn still has imageUrl: "").
     const isStaleDetails = cachedDetails?.synthesisRationale ? !validateRootsBreakdown(cachedDetails.synthesisRationale, true) : false;
-    if (cachedDetails && cachedDetails.summary && cachedDetails.summary.length >= 5 && !isStaleDetails && !cachedDetails._isSentinel) {
+    const isCacheEntryComplete = (
+      cachedDetails &&
+      cachedDetails.summary &&
+      cachedDetails.summary.length >= 5 &&
+      cachedDetails.imageUrl  // Must have a non-empty imageUrl to be authoritative
+    );
+
+    // If our current cachedDetails is incomplete (missing imageUrl), check whether the disambiguated key
+    // (the country-suffixed version written by the backend) has a complete entry and prefer it.
+    if (cachedDetails && !isCacheEntryComplete && disambiguatedCacheId !== simpleId) {
+      const disambiguatedEntry = detailsCacheRef.current.get(disambiguatedCacheId) ||
+                                 healedDetailsCacheRef.current.get(disambiguatedCacheId);
+      if (disambiguatedEntry?.imageUrl) {
+        cachedDetails = disambiguatedEntry;
+        console.log(`[DetailsPanel] Upgraded stale simple-key entry to complete disambiguated entry for: ${node.id}`);
+      }
+    }
+    // Also check if any alias of the artist name in the cache has a real image (covers backend-registered aliases)
+    if (cachedDetails && !cachedDetails.imageUrl) {
+      const artistName = cachedDetails.details?.artist;
+      if (artistName) {
+        const aliasEntry = detailsCacheRef.current.get(normalizeArtistId(artistName) + '-united-states') ||
+                           detailsCacheRef.current.get(normalizeArtistId(artistName) + '-usa') ||
+                           detailsCacheRef.current.get(normalizeArtistId(artistName) + '-united-kingdom') ||
+                           detailsCacheRef.current.get(normalizeArtistId(artistName) + '-uk');
+        if (aliasEntry?.imageUrl) {
+          cachedDetails = aliasEntry;
+          console.log(`[DetailsPanel] Upgraded via country-alias to complete entry for: ${node.id}`);
+        }
+      }
+    }
+
+    const isFinalEntryComplete = (
+      cachedDetails &&
+      cachedDetails.summary &&
+      cachedDetails.summary.length >= 5 &&
+      !isStaleDetails &&
+      !cachedDetails._isSentinel
+    );
+    if (isFinalEntryComplete) {
        const hydratedNode = {
           ...node,
-          bio: cachedDetails.summary,
-          summary: cachedDetails.summary,
-          genre: cachedDetails.details?.genre || "",
-          origin: cachedDetails.details?.origin || "",
-          founded: cachedDetails.details?.founded || "",
-          name: cachedDetails.details?.artist || node.id,
-          imageUrl: cachedDetails.imageUrl || (cachedDetails as any).image || (node as any).imageUrl || "",
+          bio: cachedDetails!.summary,
+          summary: cachedDetails!.summary,
+          genre: cachedDetails!.details?.genre || "",
+          origin: cachedDetails!.details?.origin || "",
+          founded: cachedDetails!.details?.founded || "",
+          name: cachedDetails!.details?.artist || node.id,
+          imageUrl: cachedDetails!.imageUrl || (cachedDetails as any).image || (node as any).imageUrl || "",
           isLibrary: true
        };
        
@@ -2270,8 +2311,12 @@ const App: React.FC = () => {
                     console.log("[Phase 3 Cache Payload]", node.id, JSON.stringify({ youtubeVideoId: detailsPayload.youtubeVideoId, summary: detailsPayload.summary?.substring(0, 40) }));
                     setDetailsCache(prev => new Map(prev).set(node.id.toLowerCase(), detailsPayload).set(standardizedId, detailsPayload).set(node.id, detailsPayload));
 
-                    if (isIncomplete || isCacheExpired(data.cachedAt)) {
-                        console.log("[Node Click] Cache is incomplete or expired; triggering background revalidation:", node.id);
+                    // Only trigger a live Gemini revalidation if the Firestore data is critically
+                    // incomplete (no imageUrl or no bio). Cosmetic label gaps (genre/origin) are not
+                    // sufficient to justify overwriting the displayed text with a raw Gemini response.
+                    const isCriticallyIncomplete = !imageUrl || !bio || bio.trim().length < 5;
+                    if (isCriticallyIncomplete || isCacheExpired(data.cachedAt)) {
+                        console.log("[Node Click] Cache is critically incomplete or expired; triggering background revalidation:", node.id);
                         triggerBackgroundRevalidation(node, standardizedId);
                     }
 
@@ -6430,9 +6475,16 @@ const App: React.FC = () => {
       const mergedDetails = { ...freshDetails };
 
       // IMMUTABILITY RULE: If the existing cache already has a valid canonical image, protect it.
-      // We assume an existing image is canonical/trusted, whereas background fetches may be generic hits.
+      // Background Gemini fetches may return generic/wrong images; existing images are authoritative.
       if (existingDetails && existingDetails.imageUrl && existingDetails.imageUrl.length > 5) {
           mergedDetails.imageUrl = existingDetails.imageUrl;
+      }
+
+      // IMMUTABILITY RULE: If the existing cache already has a recommendationReason, protect it.
+      // The Gemini live response may return a different or empty reason, causing the quote to
+      // thrash. The Firestore-persisted reason is always considered more authoritative.
+      if (existingDetails && existingDetails.recommendationReason && existingDetails.recommendationReason.trim().length > 5) {
+          mergedDetails.recommendationReason = existingDetails.recommendationReason;
       }
 
       // Update local state details cache with the MERGED details (using deep equality to avoid infinite loops)
@@ -6447,7 +6499,9 @@ const App: React.FC = () => {
         });
       }
 
-      // Update selectedNode UI state if the user is still actively viewing it
+      // Update selectedNode UI state if the user is still actively viewing it.
+      // IMPORTANT: always carry forward the existing imageUrl from prev so the image
+      // never drops when the background revalidation settles.
       setSelectedNode(prev => {
         if (prev && normalizeArtistId(prev.id) === cacheId) {
           return {
@@ -6458,7 +6512,7 @@ const App: React.FC = () => {
             origin: mergedDetails.details?.origin || "",
             founded: mergedDetails.details?.founded || "",
             name: mergedDetails.details?.artist || prev.id,
-            imageUrl: mergedDetails.imageUrl || (prev as any).imageUrl
+            imageUrl: mergedDetails.imageUrl || (prev as any).imageUrl || ""
           };
         }
         return prev;
@@ -6922,6 +6976,7 @@ const App: React.FC = () => {
                           genre: details.details?.genre || "",
                           origin: details.details?.origin || "",
                           founded: details.details?.founded || "",
+                          imageUrl: details.imageUrl || (prev as any).imageUrl || ""
                         };
                       }
                       return prev;
