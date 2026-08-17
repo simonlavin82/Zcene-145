@@ -41,9 +41,9 @@ export const extractValidYoutubeId = (rawUrlOrId?: string | null): string | unde
   return cand && cand.length === 11 ? cand : undefined;
 };
 
-export const sanitizeImageUrl = (rawUrl?: string | null, sanitizeStrFn?: (s: string) => string): string | undefined => {
-  if (!rawUrl || typeof rawUrl !== 'string') return undefined;
-  if (rawUrl.includes('...')) return undefined;
+export const sanitizeImageUrl = (rawUrl?: string | null, sanitizeStrFn?: (s: string) => string): string => {
+  if (!rawUrl || typeof rawUrl !== 'string') return "";
+  if (rawUrl.includes('...')) return "";
   let cleaned = sanitizeStrFn ? sanitizeStrFn(rawUrl) : rawUrl;
   cleaned = cleaned.replace(/\[\d+\]/g, '').replace(/\(\d+\)/g, '').replace(/[.,;!"']+$/g, '').trim();
   if (
@@ -54,7 +54,7 @@ export const sanitizeImageUrl = (rawUrl?: string | null, sanitizeStrFn?: (s: str
     cleaned.endsWith('/Special:FilePath/') ||
     cleaned === 'https://en.wikipedia.org/wiki/Special:FilePath/'
   ) {
-    return undefined;
+    return "";
   }
 
   // Two-Tier Domain-Aware Image URL Validator — Genre-Contextual Edition.
@@ -95,8 +95,8 @@ export const sanitizeImageUrl = (rawUrl?: string | null, sanitizeStrFn?: (s: str
 
   try {
     const parsed = new URL(cleaned);
-    if (!['https:', 'http:'].includes(parsed.protocol)) return undefined;
-    if (!parsed.pathname || parsed.pathname === '/' || parsed.pathname.length <= 1) return undefined;
+    if (!['https:', 'http:'].includes(parsed.protocol)) return "";
+    if (!parsed.pathname || parsed.pathname === '/' || parsed.pathname.length <= 1) return "";
 
     const host = parsed.hostname.toLowerCase();
     const pathname = parsed.pathname;
@@ -107,9 +107,9 @@ export const sanitizeImageUrl = (rawUrl?: string | null, sanitizeStrFn?: (s: str
     if (isFromTrustedDomain || looksLikeImageAsset) {
       return cleaned;
     }
-    return undefined; // Neither Tier A nor Tier B — likely web noise
+    return ""; // Neither Tier A nor Tier B — likely web noise; scraper will replace
   } catch (e) {
-    return undefined;
+    return "";
   }
 };
 

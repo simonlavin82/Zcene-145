@@ -66,8 +66,10 @@ function validateArtistDetailsSchema(artistId: string, details: any): void {
 }
 
 /**
- * Recursively removes any undefined properties from an object,
- * replacing them with null or omitting them, to prevent Firestore serialization errors.
+ * Recursively removes any undefined properties from an object to prevent
+ * Firestore serialization errors. Note: null values are intentionally preserved —
+ * Firestore's Node.js SDK accepts null as a valid stored value, and stripping it
+ * would cause fields like imageUrl to be entirely absent from the document.
  */
 function sanitizeUndefinedProperties(obj: any): any {
   if (obj === null || obj === undefined) return null;
@@ -78,13 +80,27 @@ function sanitizeUndefinedProperties(obj: any): any {
     const clean: any = {};
     for (const key of Object.keys(obj)) {
       const val = obj[key];
-      if (val !== undefined && val !== null) {
+      if (val !== undefined) {  // Only strip undefined — null is a valid Firestore value
         clean[key] = sanitizeUndefinedProperties(val);
       }
     }
     return clean;
   }
   return obj;
+}
+
+/**
+ * Belt-and-suspenders write boundary normalizer.
+ * Guarantees that imageUrl is always written as a string (even "") to Firestore,
+ * regardless of what upstream LLM parsing or sanitization returned.
+ * Applied immediately before every sanitizeUndefinedProperties call at write time.
+ */
+function normalizeDetailsForWrite(details: any): any {
+  if (!details || typeof details !== 'object' || Array.isArray(details)) return details;
+  return {
+    ...details,
+    imageUrl: (typeof details.imageUrl === 'string') ? details.imageUrl : ""
+  };
 }
 
 /**
@@ -529,6 +545,41 @@ export const processCurationJob = onDocumentCreated({
           console.log(`[Curation Backend] ✅ All ${recommendedEntities.length} entities hydrated successfully — zero-miss compliance confirmed.`);
         }
 
+        // ─── QUALITY BASELINE: Surgical Graph Pruning ────────────────────────────
+        // Any non-seed entity that completely failed text hydration (LLM could not
+        // generate a bio/genre after all retries) is excised from the graph topology
+        // right here, before the Roots Breakdown or any write-back. This prevents
+        // hollow nodes from appearing in the Spiderweb or polluting the database.
+        // Seeds are NOT pruned here — a missing seed causes a fatal throw below.
+        const hydratedNorms = new Set<string>(
+          detailsCacheEntries.map(entry => normalizeArtistId(entry[0]))
+        );
+        const seedNormSet = new Set<string>(artistList.map((a: string) => normalizeArtistId(a)));
+
+        if (finalGraph.nodes) {
+          const prunedIds = new Set<string>();
+          finalGraph.nodes = finalGraph.nodes.filter((node: any) => {
+            const nodeNorm = normalizeArtistId(node.id);
+            const isSeedNode = Array.from(seedNormSet).some((s: string) => isEntitySeedMatch(s, nodeNorm));
+            const isHydrated = Array.from(hydratedNorms).some((h: string) => isEntitySeedMatch(nodeNorm, h));
+            if (!isHydrated && !isSeedNode) {
+              console.warn(`[Quality Baseline] Surgically pruning unhydratable node from graph topology: ${node.id}`);
+              prunedIds.add(node.id);
+              return false;
+            }
+            return true;
+          });
+
+          if (prunedIds.size > 0 && finalGraph.links) {
+            finalGraph.links = finalGraph.links.filter((link: any) => {
+              const srcId = typeof link.source === 'string' ? link.source : (link.source as any)?.id;
+              const tgtId = typeof link.target === 'string' ? link.target : (link.target as any)?.id;
+              return !prunedIds.has(srcId) && !prunedIds.has(tgtId);
+            });
+            console.log(`[Quality Baseline] Pruned ${prunedIds.size} hollow node(s) and their connections from the graph.`);
+          }
+        }
+
         // [Stage 2 LLM Pass] Mint a full, deep-cut-aware Roots Breakdown
         // [Stage 2 LLM Pass] Mint a full, deep-cut-aware Roots Breakdown unconditionally.
         // Per the Unified Canvas Architecture (Phase 4), once gap-filling is complete the system
@@ -550,31 +601,12 @@ export const processCurationJob = onDocumentCreated({
           const seedDetailsEntry = detailsCacheEntries.find(entry => isEntitySeedMatch(seedNorm, entry[0]));
           let seedDetails = seedDetailsEntry ? seedDetailsEntry[1] : null;
 
-          // Ultimate Fallback: If AI fails to hydrate the root seed completely, inject a safe stub
-          // so the job doesn't crash the Integrity Lock.
+          // QUALITY BASELINE: If the AI failed to produce text metadata for the root
+          // seed after all retries, the job cannot continue. A seed without a biography
+          // and genre context is fundamentally broken — we must not write a hollow record
+          // to the global dataset. Throw to mark the curationJob as 'failed'.
           if (!seedDetails && !isSeedLabel) {
-            console.warn(`[Integrity Lock Warning] AI failed all hydration attempts for root seed: ${seedNorm}. Injecting fallback stub.`);
-            seedDetails = {
-              summary: "Artist biography temporarily unavailable.",
-              details: {
-                artist: seedNode?.label || seedNorm,
-                genre: "",
-                origin: "",
-                founded: "",
-                notableArtists: []
-              },
-              members: [],
-              links: [],
-              discography: [],
-              tourInfo: "",
-              recommendationReason: "Fallback stub injected due to transient metadata service failure.",
-              _isStub: true
-            };
-            if (seedDetailsEntry) {
-              seedDetailsEntry[1] = seedDetails;
-            } else {
-              detailsCacheEntries.push([seedNorm, seedDetails]);
-            }
+            throw new Error(`[Quality Baseline] Critical text hydration failure for seed artist "${seedNorm}". The job cannot seal a verified record without valid text metadata for the primary seed. Check Gemini API quota and retry.`);
           }
 
           // Use the pre-canonicalized ID from the hydration phase, or fallback to the seed norm
@@ -651,7 +683,7 @@ export const processCurationJob = onDocumentCreated({
             const existingDoc = await db.collection(collName).doc(compositeCanonicalId).get();
             const existingData = existingDoc.exists ? existingDoc.data() : null;
             const finalDetailsCache = seedDetails 
-              ? (isSeedLabel ? sanitizeLabelProfile(seedDetails) : sanitizeUndefinedProperties(seedDetails))
+              ? (isSeedLabel ? sanitizeLabelProfile(seedDetails) : sanitizeUndefinedProperties(normalizeDetailsForWrite(seedDetails)))
               : (existingData?.detailsCache || null);
 
             await db.collection(collName).doc(compositeCanonicalId).set({
@@ -665,7 +697,7 @@ export const processCurationJob = onDocumentCreated({
             const existingDoc = await db.collection(collName).doc(compositeCanonicalId).get();
             const existingData = existingDoc.exists ? existingDoc.data() : null;
             const finalDetailsCache = seedDetails 
-              ? (isSeedLabel ? sanitizeLabelProfile(seedDetails) : sanitizeUndefinedProperties(seedDetails))
+              ? (isSeedLabel ? sanitizeLabelProfile(seedDetails) : sanitizeUndefinedProperties(normalizeDetailsForWrite(seedDetails)))
               : (existingData?.detailsCache || null);
 
             // Extract the canonical subgraph for this specific seed to prevent multi-seed ghost data
@@ -768,7 +800,7 @@ export const processCurationJob = onDocumentCreated({
                 [idFieldKey]: recNorm,
                 seedArtists: recArtist,
                 graphData: null,
-                detailsCache: isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(recDetails), // Save as structured object!
+                detailsCache: isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(normalizeDetailsForWrite(recDetails)), // Save as structured object!
                 filters: null, // Note: active filters are not strictly carried for proactive rec entries unless we explicitly want to
                 cacheVersion: 4,
                 cachedAt: FieldValue.serverTimestamp(),
@@ -781,7 +813,7 @@ export const processCurationJob = onDocumentCreated({
               console.log(`[Curation Backend] Proactively created DEEP entry for recommendation (${collName}): ${compositeCanonicalId}`);
             } else {
               const updatePayload: any = {
-                detailsCache: isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(recDetails),
+                detailsCache: isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(normalizeDetailsForWrite(recDetails)),
                 cachedAt: FieldValue.serverTimestamp(),
                 cacheVersion: 4,
                 [idFieldKey]: recNorm,
