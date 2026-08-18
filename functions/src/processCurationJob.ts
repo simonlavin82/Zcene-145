@@ -139,6 +139,24 @@ function isEntitySeedMatch(seedNorm: string, candidateNorm: string): boolean {
   return false;
 }
 
+const KNOWN_COUNTRY_SLUGS = [
+  '-united-states', '-united-kingdom', '-global', '-australia', '-canada', '-germany', '-france',
+  '-japan', '-sweden', '-italy', '-spain', '-brazil', '-mexico', '-netherlands', '-belgium',
+  '-norway', '-finland', '-denmark', '-ireland', '-new-zealand', '-poland', '-austria',
+  '-switzerland', '-uk', '-usa', '-us'
+];
+
+function stripCountrySlug(name: string): string {
+  let cleanName = name.trim();
+  for (const suffix of KNOWN_COUNTRY_SLUGS) {
+    if (cleanName.toLowerCase().endsWith(suffix)) {
+      cleanName = cleanName.substring(0, cleanName.length - suffix.length);
+      break;
+    }
+  }
+  return cleanName;
+}
+
 /**
  * Stateful Project UX Upgrade: Update the user's project document status
  * to reflect in-progress background curation and write back completed graphData.
@@ -265,6 +283,11 @@ export const processCurationJob = onDocumentCreated({
           .map((a: string) => a.trim())
           .filter(Boolean);
 
+        // Strip regional slugs from the seed artists string to prevent prompt hallucination
+        const cleanSeedArtistsContext = artistList
+          .map((a: string) => stripCountrySlug(a))
+          .join('::');
+
         // Gather all artist and label nodes in the final graph (seeds, recommendations, and labels)
         // Gather all artist and label nodes in the final graph (seeds, recommendations, and labels)
         const recommendedEntities = finalGraph.nodes
@@ -377,19 +400,7 @@ export const processCurationJob = onDocumentCreated({
               const originalImageUrl = details?.imageUrl || "";
 
               // Extract clean human-readable name for APIs by stripping known country slugs
-              let searchArtistName = rawName;
-              const KNOWN_COUNTRY_SLUGS = [
-                '-united-states', '-united-kingdom', '-global', '-australia', '-canada', '-germany', '-france',
-                '-japan', '-sweden', '-italy', '-spain', '-brazil', '-mexico', '-netherlands', '-belgium',
-                '-norway', '-finland', '-denmark', '-ireland', '-new-zealand', '-poland', '-austria',
-                '-switzerland', '-uk', '-usa', '-us'
-              ];
-              for (const suffix of KNOWN_COUNTRY_SLUGS) {
-                if (searchArtistName.toLowerCase().endsWith(suffix)) {
-                  searchArtistName = searchArtistName.substring(0, searchArtistName.length - suffix.length);
-                  break;
-                }
-              }
+              let searchArtistName = stripCountrySlug(rawName);
 
               if (details && details.details && details.details.artist && details.details.artist !== rawName) {
                 searchArtistName = details.details.artist;
@@ -441,13 +452,13 @@ export const processCurationJob = onDocumentCreated({
                 };
 
                 try {
-                  details = await fetchNodeDetailsBackend(tempNode, finalGraph, inputPayload.artists);
+                  details = await fetchNodeDetailsBackend(tempNode, finalGraph, cleanSeedArtistsContext);
                 } catch (firstErr: any) {
                   if (isTransientError(firstErr)) {
                     console.warn(`[Curation Backend] Transient error for ${artistNormId}. Retrying in 2s...`, firstErr.message);
                     await new Promise(resolve => setTimeout(resolve, 2000));
                     try {
-                      details = await fetchNodeDetailsBackend(tempNode, finalGraph, inputPayload.artists);
+                      details = await fetchNodeDetailsBackend(tempNode, finalGraph, cleanSeedArtistsContext);
                       console.log(`[Curation Backend] Retry succeeded for: ${artistNormId}`);
                     } catch (retryErr: any) {
                       console.error(`[Curation Backend] Retry also failed for: ${artistNormId}. Safely skipping cache write.`, retryErr.message);
