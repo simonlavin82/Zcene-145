@@ -700,6 +700,11 @@ export const processCurationJob = onDocumentCreated({
               ? (isSeedLabel ? sanitizeLabelProfile(seedDetails) : sanitizeUndefinedProperties(normalizeDetailsForWrite(seedDetails)))
               : (existingData?.detailsCache || null);
 
+            // SYNC BACK: Ensure the exact object written to Global Cache is what goes into the Project's detailsCacheEntries
+            if (seedDetailsEntry) {
+              seedDetailsEntry[1] = finalDetailsCache;
+            }
+
             // Extract the canonical subgraph for this specific seed to prevent multi-seed ghost data
             const extractedGraph = isSeedLabel ? null : extractArtistSubGraph(seedNorm, finalGraph, artistList);
 
@@ -795,12 +800,18 @@ export const processCurationJob = onDocumentCreated({
             const recSnap = await recDocRef.get();
 
             if (!recSnap.exists) {
+              const finalRecDetails = isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(normalizeDetailsForWrite(recDetails));
+              
+              if (recDetailsEntry) {
+                recDetailsEntry[1] = finalRecDetails;
+              }
+
               await recDocRef.set({
                 cacheKey: compositeCanonicalId,
                 [idFieldKey]: recNorm,
                 seedArtists: recArtist,
                 graphData: null,
-                detailsCache: isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(normalizeDetailsForWrite(recDetails)), // Save as structured object!
+                detailsCache: finalRecDetails, // Save as structured object!
                 filters: null, // Note: active filters are not strictly carried for proactive rec entries unless we explicitly want to
                 cacheVersion: 4,
                 cachedAt: FieldValue.serverTimestamp(),
@@ -812,8 +823,14 @@ export const processCurationJob = onDocumentCreated({
               });
               console.log(`[Curation Backend] Proactively created DEEP entry for recommendation (${collName}): ${compositeCanonicalId}`);
             } else {
+              const finalRecDetails = isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(normalizeDetailsForWrite(recDetails));
+              
+              if (recDetailsEntry) {
+                recDetailsEntry[1] = finalRecDetails;
+              }
+
               const updatePayload: any = {
-                detailsCache: isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(normalizeDetailsForWrite(recDetails)),
+                detailsCache: finalRecDetails,
                 cachedAt: FieldValue.serverTimestamp(),
                 cacheVersion: 4,
                 [idFieldKey]: recNorm,
