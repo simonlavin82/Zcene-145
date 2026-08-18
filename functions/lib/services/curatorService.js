@@ -47,9 +47,9 @@ const extractValidYoutubeId = (rawUrlOrId) => {
 exports.extractValidYoutubeId = extractValidYoutubeId;
 const sanitizeImageUrl = (rawUrl, sanitizeStrFn) => {
     if (!rawUrl || typeof rawUrl !== 'string')
-        return undefined;
+        return "";
     if (rawUrl.includes('...'))
-        return undefined;
+        return "";
     let cleaned = sanitizeStrFn ? sanitizeStrFn(rawUrl) : rawUrl;
     cleaned = cleaned.replace(/\[\d+\]/g, '').replace(/\(\d+\)/g, '').replace(/[.,;!"']+$/g, '').trim();
     if (!cleaned ||
@@ -58,7 +58,7 @@ const sanitizeImageUrl = (rawUrl, sanitizeStrFn) => {
         cleaned.toLowerCase().includes('path/to/') ||
         cleaned.endsWith('/Special:FilePath/') ||
         cleaned === 'https://en.wikipedia.org/wiki/Special:FilePath/') {
-        return undefined;
+        return "";
     }
     // Two-Tier Domain-Aware Image URL Validator — Genre-Contextual Edition.
     // Tier A: Expanded allowlist covering both Contemporary/Indie/Punk and Classical/Institutional domains.
@@ -98,9 +98,9 @@ const sanitizeImageUrl = (rawUrl, sanitizeStrFn) => {
     try {
         const parsed = new URL(cleaned);
         if (!['https:', 'http:'].includes(parsed.protocol))
-            return undefined;
+            return "";
         if (!parsed.pathname || parsed.pathname === '/' || parsed.pathname.length <= 1)
-            return undefined;
+            return "";
         const host = parsed.hostname.toLowerCase();
         const pathname = parsed.pathname;
         const isFromTrustedDomain = TRUSTED_IMAGE_DOMAINS.some(d => host === d || host.endsWith(`.${d}`));
@@ -108,10 +108,10 @@ const sanitizeImageUrl = (rawUrl, sanitizeStrFn) => {
         if (isFromTrustedDomain || looksLikeImageAsset) {
             return cleaned;
         }
-        return undefined; // Neither Tier A nor Tier B — likely web noise
+        return ""; // Neither Tier A nor Tier B — likely web noise; scraper will replace
     }
     catch (e) {
-        return undefined;
+        return "";
     }
 };
 exports.sanitizeImageUrl = sanitizeImageUrl;

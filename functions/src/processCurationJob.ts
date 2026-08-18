@@ -218,9 +218,6 @@ export const processCurationJob = onDocumentCreated({
       const isEmulator = false; // TEMPORARILY DISABLED: process.env.FUNCTIONS_EMULATOR === "true";
       const isMissingApiKey = !process.env.GEMINI_API_KEY;
       const forceMocks = inputPayload?.useMocks === true;
-      const isMultiSeedJob = (inputPayload?.artists || "").split('::').filter(Boolean).length > 1;
-      const hasFiltersJob = inputPayload?.filters && Object.keys(inputPayload.filters).length > 0;
-      const isSandboxMode = inputPayload?.isSandboxMode === true || isMultiSeedJob || hasFiltersJob;
 
       if (isEmulator || isMissingApiKey || forceMocks) {
         console.log(`[Curation Backend] [Step 1: Graph Generation Started] Mock conditions met. Running simulated mock.`);
@@ -288,7 +285,21 @@ export const processCurationJob = onDocumentCreated({
           .map((a: string) => stripCountrySlug(a))
           .join('::');
 
-        // Gather all artist and label nodes in the final graph (seeds, recommendations, and labels)
+        // Pre-Hydration ID Standardization for Seed Artists
+        // Force graph variants (e.g. "Korn") to match the exact UI request (e.g. "korn-usa") 
+        // before hydration begins to guarantee symmetry with deep cuts.
+        if (finalGraph.nodes) {
+          for (const seed of artistList) {
+            const seedNorm = normalizeArtistId(seed);
+            const seedNode = finalGraph.nodes.find((n: any) => isEntitySeedMatch(seedNorm, n.id) || isEntitySeedMatch(seedNorm, n.label || ''));
+            if (seedNode && normalizeArtistId(seedNode.id) !== seedNorm) {
+               console.log(`[Curation Backend] Standardizing seed node ID from ${seedNode.id} to ${seedNorm}`);
+               seedNode.id = seedNorm; // E.g., 'Korn' -> 'korn-usa'
+               seedNode.label = seed; // Also rewrite label so entityObj.name matches the exact seed requested
+            }
+          }
+        }
+
         // Gather all artist and label nodes in the final graph (seeds, recommendations, and labels)
         const recommendedEntities = finalGraph.nodes
           .filter((n: any) => n.type === 'artist' || n.type === 'label' || !n.type)
@@ -600,160 +611,7 @@ export const processCurationJob = onDocumentCreated({
         const fullRationale = await generateRootsBreakdownBackend(inputPayload.artists, detailsCacheEntries);
         finalGraph.synthesisRationale = fullRationale;
 
-        // Write-back cache entries for the seed entities (deep cache: isDeep: true)
         const idRewriteMap = new Map<string, string>();
-        for (const seed of artistList) {
-          const seedNorm = normalizeArtistId(seed);
-          const seedNode = (finalGraph.nodes || []).find((n: any) => isEntitySeedMatch(seedNorm, n.id) || isEntitySeedMatch(seedNorm, n.label || ''));
-          const isSeedLabel = seedNode?.type === 'label';
-          const collName = isSeedLabel ? "labels" : "artists";
-          const idFieldKey = isSeedLabel ? "labelId" : "artistId";
-          
-          const seedDetailsEntry = detailsCacheEntries.find(entry => isEntitySeedMatch(seedNorm, entry[0]));
-          let seedDetails = seedDetailsEntry ? seedDetailsEntry[1] : null;
-
-          // QUALITY BASELINE: If the AI failed to produce text metadata for the root
-          // seed after all retries, the job cannot continue. A seed without a biography
-          // and genre context is fundamentally broken — we must not write a hollow record
-          // to the global dataset. Throw to mark the curationJob as 'failed'.
-          if (!seedDetails && !isSeedLabel) {
-            throw new Error(`[Quality Baseline] Critical text hydration failure for seed artist "${seedNorm}". The job cannot seal a verified record without valid text metadata for the primary seed. Check Gemini API quota and retry.`);
-          }
-
-          // Use the pre-canonicalized ID from the hydration phase, or fallback to the seed norm
-          const disambiguatedCanonicalId = seedDetailsEntry ? seedDetailsEntry[0] : seedNorm;
-          const compositeCanonicalId = buildCompositeCacheKey(disambiguatedCanonicalId, inputPayload.filters || undefined);
-          idRewriteMap.set(seedNorm, compositeCanonicalId);
-          if (seedDetailsEntry) seedDetailsEntry[0] = compositeCanonicalId;
-
-          if (!isSeedLabel && !finalGraph.synthesisRationale && seedDetails?.synthesisRationale) {
-            finalGraph.synthesisRationale = seedDetails.synthesisRationale;
-          }
-
-          // ─── INTEGRITY LOCK § Phase A: Staging Write ─────────────────────────
-          // Before touching any data, check if the document already has a verified
-          // gold-standard record. If so, skip the staging write entirely to protect
-          // existing production data from being clobbered by a re-triggered job.
-          const existingDocSnap = await db.collection(collName).doc(compositeCanonicalId).get();
-          const existingDocData = existingDocSnap.exists ? existingDocSnap.data() : null;
-          const isAlreadyVerified = existingDocData?.dataIntegrityStatus === 'verified' && existingDocData?.isDeep === true;
-
-          if (isSandboxMode) {
-            console.log(`[Sandbox Mode] Bypassing Phase A global staging write for bespoke topology.`);
-          } else if (isAlreadyVerified) {
-            console.log(`[Integrity Lock] Skipping staging write for ${compositeCanonicalId} — already verified gold-standard record. Re-using existing data.`);
-          } else {
-            // Write in_progress staging placeholder so clients treat this doc as a cache miss
-            // while hydration is running. integrityLockedAt enables the 15-minute stale-lock
-            // fallback in the client's isCacheDocumentVerified() helper.
-            await db.collection(collName).doc(compositeCanonicalId).set({
-              cacheKey: compositeCanonicalId,
-              [idFieldKey]: seedNorm,
-              seedArtists: seed,
-              cacheVersion: 4,
-              cachedAt: FieldValue.serverTimestamp(),
-              isDeep: false,
-              dataIntegrityStatus: 'in_progress',
-              integrityLockedAt: new Date().toISOString(),
-            }, { merge: true });
-            console.log(`[Integrity Lock] Wrote in_progress staging placeholder for seed (${collName}): ${compositeCanonicalId}`);
-          }
-
-          // ─── INTEGRITY LOCK § Phase B: Fatal Seed Validation ─────────────────
-          // For primary seeds, schema validation is FATAL. A missing or corrupt
-          // detailsCache means the dataset cannot be sealed as verified. The outer
-          // catch block will mark the job as 'failed' and update the staging doc.
-          // REGRESSION PREVENTION: Do NOT revert this to a non-fatal warning-only
-          // check. Previously, validation failures were swallowed and corrupt seed
-          // docs were written to Firestore as gold-standard, polluting global reads.
-          if (!isSeedLabel) {
-            try {
-              validateArtistDetailsSchema(seedNorm, seedDetails);
-            } catch (validationErr: any) {
-              // Mark the staging doc as failed so clients skip it
-              await db.collection(collName).doc(compositeCanonicalId).update({
-                dataIntegrityStatus: 'failed',
-                errorMessage: `Fatal seed validation: ${validationErr.message}`,
-                updatedAt: FieldValue.serverTimestamp(),
-              }).catch(() => {}); // Best-effort; the job throw below is what matters
-              throw new Error(`[Integrity Lock] Fatal seed schema validation failed for "${seedNorm}": ${validationErr.message}`);
-            }
-          } else if (!seedDetails) {
-            console.warn(`[Curation Backend] Seed label missing detailsCache for "${seedNorm}" — proceeding to write bare pointer only.`);
-          }
-
-          // ─── INTEGRITY LOCK § Phase C: Atomic Verified Final Write ───────────
-          // ALL hydration data has been assembled and validated. Replace the staging
-          // doc in a single atomic set() that simultaneously writes the complete
-          // payload and seals dataIntegrityStatus: 'verified'. No partial state
-          // ever reaches 'verified'. The integrityLockedAt field is intentionally
-          // absent from this write — it only exists on in_progress staging docs.
-          if (isSandboxMode) {
-            console.log(`[Sandbox Mode] Updating Phase C global detailsCache for seed (bypassing graphData).`);
-            
-            const existingDoc = await db.collection(collName).doc(compositeCanonicalId).get();
-            const existingData = existingDoc.exists ? existingDoc.data() : null;
-            const finalDetailsCache = seedDetails 
-              ? (isSeedLabel ? sanitizeLabelProfile(seedDetails) : sanitizeUndefinedProperties(normalizeDetailsForWrite(seedDetails)))
-              : (existingData?.detailsCache || null);
-
-            await db.collection(collName).doc(compositeCanonicalId).set({
-              detailsCache: finalDetailsCache,
-              cacheVersion: 4,
-              cachedAt: FieldValue.serverTimestamp()
-            }, { merge: true });
-
-          } else {
-            // Fetch existing document to safely merge detailsCache if seedDetails is missing
-            const existingDoc = await db.collection(collName).doc(compositeCanonicalId).get();
-            const existingData = existingDoc.exists ? existingDoc.data() : null;
-            const finalDetailsCache = seedDetails 
-              ? (isSeedLabel ? sanitizeLabelProfile(seedDetails) : sanitizeUndefinedProperties(normalizeDetailsForWrite(seedDetails)))
-              : (existingData?.detailsCache || null);
-
-            // SYNC BACK: Ensure the exact object written to Global Cache is what goes into the Project's detailsCacheEntries
-            if (seedDetailsEntry) {
-              seedDetailsEntry[1] = finalDetailsCache;
-            }
-
-            // Extract the canonical subgraph for this specific seed to prevent multi-seed ghost data
-            const extractedGraph = isSeedLabel ? null : extractArtistSubGraph(seedNorm, finalGraph, artistList);
-
-            await db.collection(collName).doc(compositeCanonicalId).set({
-              cacheKey: compositeCanonicalId,
-              [idFieldKey]: seedNorm,
-              seedArtists: seed,
-              graphData: extractedGraph ? JSON.stringify(extractedGraph) : null,
-              detailsCache: finalDetailsCache,
-              filters: inputPayload.filters || null,
-              cacheVersion: 4,
-              cachedAt: FieldValue.serverTimestamp(),
-              isDeep: true,
-              isPrimarySeed: true,
-              hasUniqueSpiderweb: !isSeedLabel,
-              dataIntegrityStatus: seedDetails?._isStub ? 'degraded' : 'verified',   // ← COMPLETION SEAL
-            });
-            
-            console.log(`[Integrity Lock] ✅ Atomic verified write complete for seed (${collName}): ${compositeCanonicalId}`);
-
-            // Create/Heal Bare Root Alias Pointer
-            const bareArtistIdRef = db.collection(collName).doc(seedNorm);
-            const bareSnap = await bareArtistIdRef.get();
-            const bareData = bareSnap.exists ? bareSnap.data() : null;
-
-            if (!bareSnap.exists || (bareData && !bareData.redirectTo && bareSnap.id !== compositeCanonicalId)) {
-              await bareArtistIdRef.set({
-                cacheKey: seedNorm,
-                [idFieldKey]: seedNorm,
-                seedArtists: seed,
-                cacheVersion: 4,
-                cachedAt: FieldValue.serverTimestamp(),
-                redirectTo: compositeCanonicalId
-              });
-              console.log(`[Curation Backend] Created Bare Alias Pointer in ${collName}: ${seedNorm} -> ${compositeCanonicalId}`);
-            }
-          }
-        }
 
         // Proactively cache each recommended entity (artist or label) as a deep cache entry as well!
         const seedNorms = artistList.map((a: string) => normalizeArtistId(a));
@@ -817,20 +675,22 @@ export const processCurationJob = onDocumentCreated({
                 recDetailsEntry[1] = finalRecDetails;
               }
 
+              const extractedGraph = matchingSeedNorm && !isLabel ? extractArtistSubGraph(matchingSeedNorm, finalGraph, artistList) : null;
+
               await recDocRef.set({
                 cacheKey: compositeCanonicalId,
                 [idFieldKey]: recNorm,
                 seedArtists: recArtist,
-                graphData: null,
+                graphData: extractedGraph ? JSON.stringify(extractedGraph) : null,
                 detailsCache: finalRecDetails, // Save as structured object!
-                filters: null, // Note: active filters are not strictly carried for proactive rec entries unless we explicitly want to
+                filters: matchingSeedNorm && !isLabel ? inputPayload.filters || null : null,
                 cacheVersion: 4,
                 cachedAt: FieldValue.serverTimestamp(),
 
                 isDeep: true, // Marked Deep!
-                isPrimarySeed: false,
-                hasUniqueSpiderweb: false,
-
+                isPrimarySeed: !!matchingSeedNorm,
+                hasUniqueSpiderweb: matchingSeedNorm ? !isLabel : false,
+                dataIntegrityStatus: matchingSeedNorm ? (recDetails?._isStub ? 'degraded' : 'verified') : undefined,
               });
               console.log(`[Curation Backend] Proactively created DEEP entry for recommendation (${collName}): ${compositeCanonicalId}`);
             } else {
@@ -848,6 +708,18 @@ export const processCurationJob = onDocumentCreated({
                 cacheKey: compositeCanonicalId,
                 isDeep: true
               };
+
+              if (matchingSeedNorm) {
+                const extractedGraph = !isLabel ? extractArtistSubGraph(matchingSeedNorm, finalGraph, artistList) : null;
+                updatePayload.isPrimarySeed = true;
+                updatePayload.dataIntegrityStatus = recDetails?._isStub ? 'degraded' : 'verified';
+                updatePayload.hasUniqueSpiderweb = !isLabel;
+                if (!isLabel) {
+                  updatePayload.graphData = extractedGraph ? JSON.stringify(extractedGraph) : null;
+                  updatePayload.filters = inputPayload.filters || null;
+                }
+              }
+
               await recDocRef.update(sanitizeUndefinedProperties(updatePayload));
               console.log(`[Curation Backend] Proactively updated detailsCache for recommendation (${collName}): ${compositeCanonicalId}`);
             }

@@ -51,8 +51,10 @@ function validateArtistDetailsSchema(artistId, details) {
     }
 }
 /**
- * Recursively removes any undefined properties from an object,
- * replacing them with null or omitting them, to prevent Firestore serialization errors.
+ * Recursively removes any undefined properties from an object to prevent
+ * Firestore serialization errors. Note: null values are intentionally preserved —
+ * Firestore's Node.js SDK accepts null as a valid stored value, and stripping it
+ * would cause fields like imageUrl to be entirely absent from the document.
  */
 function sanitizeUndefinedProperties(obj) {
     if (obj === null || obj === undefined)
@@ -64,13 +66,27 @@ function sanitizeUndefinedProperties(obj) {
         const clean = {};
         for (const key of Object.keys(obj)) {
             const val = obj[key];
-            if (val !== undefined && val !== null) {
+            if (val !== undefined) { // Only strip undefined — null is a valid Firestore value
                 clean[key] = sanitizeUndefinedProperties(val);
             }
         }
         return clean;
     }
     return obj;
+}
+/**
+ * Belt-and-suspenders write boundary normalizer.
+ * Guarantees that imageUrl is always written as a string (even "") to Firestore,
+ * regardless of what upstream LLM parsing or sanitization returned.
+ * Applied immediately before every sanitizeUndefinedProperties call at write time.
+ */
+function normalizeDetailsForWrite(details) {
+    if (!details || typeof details !== 'object' || Array.isArray(details))
+        return details;
+    return {
+        ...details,
+        imageUrl: (typeof details.imageUrl === 'string') ? details.imageUrl : ""
+    };
 }
 /**
  * Strips artist-centric fields from a label profile before caching in Firestore.
@@ -111,6 +127,22 @@ function isEntitySeedMatch(seedNorm, candidateNorm) {
     if (s.includes(`-${c}-`) || s.endsWith(`-${c}`) || c.includes(`-${s}-`) || c.endsWith(`-${s}`))
         return true;
     return false;
+}
+const KNOWN_COUNTRY_SLUGS = [
+    '-united-states', '-united-kingdom', '-global', '-australia', '-canada', '-germany', '-france',
+    '-japan', '-sweden', '-italy', '-spain', '-brazil', '-mexico', '-netherlands', '-belgium',
+    '-norway', '-finland', '-denmark', '-ireland', '-new-zealand', '-poland', '-austria',
+    '-switzerland', '-uk', '-usa', '-us'
+];
+function stripCountrySlug(name) {
+    let cleanName = name.trim();
+    for (const suffix of KNOWN_COUNTRY_SLUGS) {
+        if (cleanName.toLowerCase().endsWith(suffix)) {
+            cleanName = cleanName.substring(0, cleanName.length - suffix.length);
+            break;
+        }
+    }
+    return cleanName;
 }
 /**
  * Stateful Project UX Upgrade: Update the user's project document status
@@ -166,9 +198,6 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
             const isEmulator = false; // TEMPORARILY DISABLED: process.env.FUNCTIONS_EMULATOR === "true";
             const isMissingApiKey = !process.env.GEMINI_API_KEY;
             const forceMocks = inputPayload?.useMocks === true;
-            const isMultiSeedJob = (inputPayload?.artists || "").split('::').filter(Boolean).length > 1;
-            const hasFiltersJob = inputPayload?.filters && Object.keys(inputPayload.filters).length > 0;
-            const isSandboxMode = inputPayload?.isSandboxMode === true || isMultiSeedJob || hasFiltersJob;
             if (isEmulator || isMissingApiKey || forceMocks) {
                 console.log(`[Curation Backend] [Step 1: Graph Generation Started] Mock conditions met. Running simulated mock.`);
                 // Keep the 5-second simulated delay for verification of loading screens
@@ -218,7 +247,24 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     .split('::')
                     .map((a) => a.trim())
                     .filter(Boolean);
-                // Gather all artist and label nodes in the final graph (seeds, recommendations, and labels)
+                // Strip regional slugs from the seed artists string to prevent prompt hallucination
+                const cleanSeedArtistsContext = artistList
+                    .map((a) => stripCountrySlug(a))
+                    .join('::');
+                // Pre-Hydration ID Standardization for Seed Artists
+                // Force graph variants (e.g. "Korn") to match the exact UI request (e.g. "korn-usa") 
+                // before hydration begins to guarantee symmetry with deep cuts.
+                if (finalGraph.nodes) {
+                    for (const seed of artistList) {
+                        const seedNorm = (0, curatorService_1.normalizeArtistId)(seed);
+                        const seedNode = finalGraph.nodes.find((n) => isEntitySeedMatch(seedNorm, n.id) || isEntitySeedMatch(seedNorm, n.label || ''));
+                        if (seedNode && (0, curatorService_1.normalizeArtistId)(seedNode.id) !== seedNorm) {
+                            console.log(`[Curation Backend] Standardizing seed node ID from ${seedNode.id} to ${seedNorm}`);
+                            seedNode.id = seedNorm; // E.g., 'Korn' -> 'korn-usa'
+                            seedNode.label = seed; // Also rewrite label so entityObj.name matches the exact seed requested
+                        }
+                    }
+                }
                 // Gather all artist and label nodes in the final graph (seeds, recommendations, and labels)
                 const recommendedEntities = finalGraph.nodes
                     .filter((n) => n.type === 'artist' || n.type === 'label' || !n.type)
@@ -320,19 +366,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         // Cache the original image URL just in case the scrape fails during a stub replacement
                         const originalImageUrl = details?.imageUrl || "";
                         // Extract clean human-readable name for APIs by stripping known country slugs
-                        let searchArtistName = rawName;
-                        const KNOWN_COUNTRY_SLUGS = [
-                            '-united-states', '-united-kingdom', '-global', '-australia', '-canada', '-germany', '-france',
-                            '-japan', '-sweden', '-italy', '-spain', '-brazil', '-mexico', '-netherlands', '-belgium',
-                            '-norway', '-finland', '-denmark', '-ireland', '-new-zealand', '-poland', '-austria',
-                            '-switzerland', '-uk', '-usa', '-us'
-                        ];
-                        for (const suffix of KNOWN_COUNTRY_SLUGS) {
-                            if (searchArtistName.toLowerCase().endsWith(suffix)) {
-                                searchArtistName = searchArtistName.substring(0, searchArtistName.length - suffix.length);
-                                break;
-                            }
-                        }
+                        let searchArtistName = stripCountrySlug(rawName);
                         if (details && details.details && details.details.artist && details.details.artist !== rawName) {
                             searchArtistName = details.details.artist;
                         }
@@ -376,14 +410,14 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                 return /429|503|resource.?exhausted|service.?unavailable|too many requests|timeout|fetch failed|network|socket|parse|invalid data|json/i.test(msg);
                             };
                             try {
-                                details = await (0, curatorService_1.fetchNodeDetailsBackend)(tempNode, finalGraph, inputPayload.artists);
+                                details = await (0, curatorService_1.fetchNodeDetailsBackend)(tempNode, finalGraph, cleanSeedArtistsContext);
                             }
                             catch (firstErr) {
                                 if (isTransientError(firstErr)) {
                                     console.warn(`[Curation Backend] Transient error for ${artistNormId}. Retrying in 2s...`, firstErr.message);
                                     await new Promise(resolve => setTimeout(resolve, 2000));
                                     try {
-                                        details = await (0, curatorService_1.fetchNodeDetailsBackend)(tempNode, finalGraph, inputPayload.artists);
+                                        details = await (0, curatorService_1.fetchNodeDetailsBackend)(tempNode, finalGraph, cleanSeedArtistsContext);
                                         console.log(`[Curation Backend] Retry succeeded for: ${artistNormId}`);
                                     }
                                     catch (retryErr) {
@@ -467,6 +501,36 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 else {
                     console.log(`[Curation Backend] ✅ All ${recommendedEntities.length} entities hydrated successfully — zero-miss compliance confirmed.`);
                 }
+                // ─── QUALITY BASELINE: Surgical Graph Pruning ────────────────────────────
+                // Any non-seed entity that completely failed text hydration (LLM could not
+                // generate a bio/genre after all retries) is excised from the graph topology
+                // right here, before the Roots Breakdown or any write-back. This prevents
+                // hollow nodes from appearing in the Spiderweb or polluting the database.
+                // Seeds are NOT pruned here — a missing seed causes a fatal throw below.
+                const hydratedNorms = new Set(detailsCacheEntries.map(entry => (0, curatorService_1.normalizeArtistId)(entry[0])));
+                const seedNormSet = new Set(artistList.map((a) => (0, curatorService_1.normalizeArtistId)(a)));
+                if (finalGraph.nodes) {
+                    const prunedIds = new Set();
+                    finalGraph.nodes = finalGraph.nodes.filter((node) => {
+                        const nodeNorm = (0, curatorService_1.normalizeArtistId)(node.id);
+                        const isSeedNode = Array.from(seedNormSet).some((s) => isEntitySeedMatch(s, nodeNorm));
+                        const isHydrated = Array.from(hydratedNorms).some((h) => isEntitySeedMatch(nodeNorm, h));
+                        if (!isHydrated && !isSeedNode) {
+                            console.warn(`[Quality Baseline] Surgically pruning unhydratable node from graph topology: ${node.id}`);
+                            prunedIds.add(node.id);
+                            return false;
+                        }
+                        return true;
+                    });
+                    if (prunedIds.size > 0 && finalGraph.links) {
+                        finalGraph.links = finalGraph.links.filter((link) => {
+                            const srcId = typeof link.source === 'string' ? link.source : link.source?.id;
+                            const tgtId = typeof link.target === 'string' ? link.target : link.target?.id;
+                            return !prunedIds.has(srcId) && !prunedIds.has(tgtId);
+                        });
+                        console.log(`[Quality Baseline] Pruned ${prunedIds.size} hollow node(s) and their connections from the graph.`);
+                    }
+                }
                 // [Stage 2 LLM Pass] Mint a full, deep-cut-aware Roots Breakdown
                 // [Stage 2 LLM Pass] Mint a full, deep-cut-aware Roots Breakdown unconditionally.
                 // Per the Unified Canvas Architecture (Phase 4), once gap-filling is complete the system
@@ -475,165 +539,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 console.log(`[Curation Backend] [Stage 2] Minting deep-cut-aware Roots Breakdown for all jobs...`);
                 const fullRationale = await (0, curatorService_1.generateRootsBreakdownBackend)(inputPayload.artists, detailsCacheEntries);
                 finalGraph.synthesisRationale = fullRationale;
-                // Write-back cache entries for the seed entities (deep cache: isDeep: true)
                 const idRewriteMap = new Map();
-                for (const seed of artistList) {
-                    const seedNorm = (0, curatorService_1.normalizeArtistId)(seed);
-                    const seedNode = (finalGraph.nodes || []).find((n) => isEntitySeedMatch(seedNorm, n.id) || isEntitySeedMatch(seedNorm, n.label || ''));
-                    const isSeedLabel = seedNode?.type === 'label';
-                    const collName = isSeedLabel ? "labels" : "artists";
-                    const idFieldKey = isSeedLabel ? "labelId" : "artistId";
-                    const seedDetailsEntry = detailsCacheEntries.find(entry => isEntitySeedMatch(seedNorm, entry[0]));
-                    let seedDetails = seedDetailsEntry ? seedDetailsEntry[1] : null;
-                    // Ultimate Fallback: If AI fails to hydrate the root seed completely, inject a safe stub
-                    // so the job doesn't crash the Integrity Lock.
-                    if (!seedDetails && !isSeedLabel) {
-                        console.warn(`[Integrity Lock Warning] AI failed all hydration attempts for root seed: ${seedNorm}. Injecting fallback stub.`);
-                        seedDetails = {
-                            summary: "Artist biography temporarily unavailable.",
-                            details: {
-                                artist: seedNode?.label || seedNorm,
-                                genre: "",
-                                origin: "",
-                                founded: "",
-                                notableArtists: []
-                            },
-                            members: [],
-                            links: [],
-                            discography: [],
-                            tourInfo: "",
-                            recommendationReason: "Fallback stub injected due to transient metadata service failure.",
-                            _isStub: true
-                        };
-                        if (seedDetailsEntry) {
-                            seedDetailsEntry[1] = seedDetails;
-                        }
-                        else {
-                            detailsCacheEntries.push([seedNorm, seedDetails]);
-                        }
-                    }
-                    // Use the pre-canonicalized ID from the hydration phase, or fallback to the seed norm
-                    const disambiguatedCanonicalId = seedDetailsEntry ? seedDetailsEntry[0] : seedNorm;
-                    const compositeCanonicalId = (0, curatorService_1.buildCompositeCacheKey)(disambiguatedCanonicalId, inputPayload.filters || undefined);
-                    idRewriteMap.set(seedNorm, compositeCanonicalId);
-                    if (seedDetailsEntry)
-                        seedDetailsEntry[0] = compositeCanonicalId;
-                    if (!isSeedLabel && !finalGraph.synthesisRationale && seedDetails?.synthesisRationale) {
-                        finalGraph.synthesisRationale = seedDetails.synthesisRationale;
-                    }
-                    // ─── INTEGRITY LOCK § Phase A: Staging Write ─────────────────────────
-                    // Before touching any data, check if the document already has a verified
-                    // gold-standard record. If so, skip the staging write entirely to protect
-                    // existing production data from being clobbered by a re-triggered job.
-                    const existingDocSnap = await db.collection(collName).doc(compositeCanonicalId).get();
-                    const existingDocData = existingDocSnap.exists ? existingDocSnap.data() : null;
-                    const isAlreadyVerified = existingDocData?.dataIntegrityStatus === 'verified' && existingDocData?.isDeep === true;
-                    if (isSandboxMode) {
-                        console.log(`[Sandbox Mode] Bypassing Phase A global staging write for bespoke topology.`);
-                    }
-                    else if (isAlreadyVerified) {
-                        console.log(`[Integrity Lock] Skipping staging write for ${compositeCanonicalId} — already verified gold-standard record. Re-using existing data.`);
-                    }
-                    else {
-                        // Write in_progress staging placeholder so clients treat this doc as a cache miss
-                        // while hydration is running. integrityLockedAt enables the 15-minute stale-lock
-                        // fallback in the client's isCacheDocumentVerified() helper.
-                        await db.collection(collName).doc(compositeCanonicalId).set({
-                            cacheKey: compositeCanonicalId,
-                            [idFieldKey]: seedNorm,
-                            seedArtists: seed,
-                            cacheVersion: 4,
-                            cachedAt: firestore_2.FieldValue.serverTimestamp(),
-                            isDeep: false,
-                            dataIntegrityStatus: 'in_progress',
-                            integrityLockedAt: new Date().toISOString(),
-                        }, { merge: true });
-                        console.log(`[Integrity Lock] Wrote in_progress staging placeholder for seed (${collName}): ${compositeCanonicalId}`);
-                    }
-                    // ─── INTEGRITY LOCK § Phase B: Fatal Seed Validation ─────────────────
-                    // For primary seeds, schema validation is FATAL. A missing or corrupt
-                    // detailsCache means the dataset cannot be sealed as verified. The outer
-                    // catch block will mark the job as 'failed' and update the staging doc.
-                    // REGRESSION PREVENTION: Do NOT revert this to a non-fatal warning-only
-                    // check. Previously, validation failures were swallowed and corrupt seed
-                    // docs were written to Firestore as gold-standard, polluting global reads.
-                    if (!isSeedLabel) {
-                        try {
-                            validateArtistDetailsSchema(seedNorm, seedDetails);
-                        }
-                        catch (validationErr) {
-                            // Mark the staging doc as failed so clients skip it
-                            await db.collection(collName).doc(compositeCanonicalId).update({
-                                dataIntegrityStatus: 'failed',
-                                errorMessage: `Fatal seed validation: ${validationErr.message}`,
-                                updatedAt: firestore_2.FieldValue.serverTimestamp(),
-                            }).catch(() => { }); // Best-effort; the job throw below is what matters
-                            throw new Error(`[Integrity Lock] Fatal seed schema validation failed for "${seedNorm}": ${validationErr.message}`);
-                        }
-                    }
-                    else if (!seedDetails) {
-                        console.warn(`[Curation Backend] Seed label missing detailsCache for "${seedNorm}" — proceeding to write bare pointer only.`);
-                    }
-                    // ─── INTEGRITY LOCK § Phase C: Atomic Verified Final Write ───────────
-                    // ALL hydration data has been assembled and validated. Replace the staging
-                    // doc in a single atomic set() that simultaneously writes the complete
-                    // payload and seals dataIntegrityStatus: 'verified'. No partial state
-                    // ever reaches 'verified'. The integrityLockedAt field is intentionally
-                    // absent from this write — it only exists on in_progress staging docs.
-                    if (isSandboxMode) {
-                        console.log(`[Sandbox Mode] Updating Phase C global detailsCache for seed (bypassing graphData).`);
-                        const existingDoc = await db.collection(collName).doc(compositeCanonicalId).get();
-                        const existingData = existingDoc.exists ? existingDoc.data() : null;
-                        const finalDetailsCache = seedDetails
-                            ? (isSeedLabel ? sanitizeLabelProfile(seedDetails) : sanitizeUndefinedProperties(seedDetails))
-                            : (existingData?.detailsCache || null);
-                        await db.collection(collName).doc(compositeCanonicalId).set({
-                            detailsCache: finalDetailsCache,
-                            cacheVersion: 4,
-                            cachedAt: firestore_2.FieldValue.serverTimestamp()
-                        }, { merge: true });
-                    }
-                    else {
-                        // Fetch existing document to safely merge detailsCache if seedDetails is missing
-                        const existingDoc = await db.collection(collName).doc(compositeCanonicalId).get();
-                        const existingData = existingDoc.exists ? existingDoc.data() : null;
-                        const finalDetailsCache = seedDetails
-                            ? (isSeedLabel ? sanitizeLabelProfile(seedDetails) : sanitizeUndefinedProperties(seedDetails))
-                            : (existingData?.detailsCache || null);
-                        // Extract the canonical subgraph for this specific seed to prevent multi-seed ghost data
-                        const extractedGraph = isSeedLabel ? null : (0, curatorService_1.extractArtistSubGraph)(seedNorm, finalGraph, artistList);
-                        await db.collection(collName).doc(compositeCanonicalId).set({
-                            cacheKey: compositeCanonicalId,
-                            [idFieldKey]: seedNorm,
-                            seedArtists: seed,
-                            graphData: extractedGraph ? JSON.stringify(extractedGraph) : null,
-                            detailsCache: finalDetailsCache,
-                            filters: inputPayload.filters || null,
-                            cacheVersion: 4,
-                            cachedAt: firestore_2.FieldValue.serverTimestamp(),
-                            isDeep: true,
-                            isPrimarySeed: true,
-                            hasUniqueSpiderweb: !isSeedLabel,
-                            dataIntegrityStatus: seedDetails?._isStub ? 'degraded' : 'verified', // ← COMPLETION SEAL
-                        });
-                        console.log(`[Integrity Lock] ✅ Atomic verified write complete for seed (${collName}): ${compositeCanonicalId}`);
-                        // Create/Heal Bare Root Alias Pointer
-                        const bareArtistIdRef = db.collection(collName).doc(seedNorm);
-                        const bareSnap = await bareArtistIdRef.get();
-                        const bareData = bareSnap.exists ? bareSnap.data() : null;
-                        if (!bareSnap.exists || (bareData && !bareData.redirectTo && bareSnap.id !== compositeCanonicalId)) {
-                            await bareArtistIdRef.set({
-                                cacheKey: seedNorm,
-                                [idFieldKey]: seedNorm,
-                                seedArtists: seed,
-                                cacheVersion: 4,
-                                cachedAt: firestore_2.FieldValue.serverTimestamp(),
-                                redirectTo: compositeCanonicalId
-                            });
-                            console.log(`[Curation Backend] Created Bare Alias Pointer in ${collName}: ${seedNorm} -> ${compositeCanonicalId}`);
-                        }
-                    }
-                }
                 // Proactively cache each recommended entity (artist or label) as a deep cache entry as well!
                 const seedNorms = artistList.map((a) => (0, curatorService_1.normalizeArtistId)(a));
                 for (const entityObj of recommendedEntities) {
@@ -683,30 +589,50 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     const recDocRef = db.collection(collName).doc(compositeCanonicalId);
                     const recSnap = await recDocRef.get();
                     if (!recSnap.exists) {
+                        const finalRecDetails = isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(normalizeDetailsForWrite(recDetails));
+                        if (recDetailsEntry) {
+                            recDetailsEntry[1] = finalRecDetails;
+                        }
+                        const extractedGraph = matchingSeedNorm && !isLabel ? (0, curatorService_1.extractArtistSubGraph)(matchingSeedNorm, finalGraph, artistList) : null;
                         await recDocRef.set({
                             cacheKey: compositeCanonicalId,
                             [idFieldKey]: recNorm,
                             seedArtists: recArtist,
-                            graphData: null,
-                            detailsCache: isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(recDetails), // Save as structured object!
-                            filters: null, // Note: active filters are not strictly carried for proactive rec entries unless we explicitly want to
+                            graphData: extractedGraph ? JSON.stringify(extractedGraph) : null,
+                            detailsCache: finalRecDetails, // Save as structured object!
+                            filters: matchingSeedNorm && !isLabel ? inputPayload.filters || null : null,
                             cacheVersion: 4,
                             cachedAt: firestore_2.FieldValue.serverTimestamp(),
                             isDeep: true, // Marked Deep!
-                            isPrimarySeed: false,
-                            hasUniqueSpiderweb: false,
+                            isPrimarySeed: !!matchingSeedNorm,
+                            hasUniqueSpiderweb: matchingSeedNorm ? !isLabel : false,
+                            dataIntegrityStatus: matchingSeedNorm ? (recDetails?._isStub ? 'degraded' : 'verified') : undefined,
                         });
                         console.log(`[Curation Backend] Proactively created DEEP entry for recommendation (${collName}): ${compositeCanonicalId}`);
                     }
                     else {
+                        const finalRecDetails = isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(normalizeDetailsForWrite(recDetails));
+                        if (recDetailsEntry) {
+                            recDetailsEntry[1] = finalRecDetails;
+                        }
                         const updatePayload = {
-                            detailsCache: isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(recDetails),
+                            detailsCache: finalRecDetails,
                             cachedAt: firestore_2.FieldValue.serverTimestamp(),
                             cacheVersion: 4,
                             [idFieldKey]: recNorm,
                             cacheKey: compositeCanonicalId,
                             isDeep: true
                         };
+                        if (matchingSeedNorm) {
+                            const extractedGraph = !isLabel ? (0, curatorService_1.extractArtistSubGraph)(matchingSeedNorm, finalGraph, artistList) : null;
+                            updatePayload.isPrimarySeed = true;
+                            updatePayload.dataIntegrityStatus = recDetails?._isStub ? 'degraded' : 'verified';
+                            updatePayload.hasUniqueSpiderweb = !isLabel;
+                            if (!isLabel) {
+                                updatePayload.graphData = extractedGraph ? JSON.stringify(extractedGraph) : null;
+                                updatePayload.filters = inputPayload.filters || null;
+                            }
+                        }
                         await recDocRef.update(sanitizeUndefinedProperties(updatePayload));
                         console.log(`[Curation Backend] Proactively updated detailsCache for recommendation (${collName}): ${compositeCanonicalId}`);
                     }
