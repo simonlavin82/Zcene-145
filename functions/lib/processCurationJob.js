@@ -230,41 +230,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 let finalGraph = inputPayload.baseGraph;
                 if (!inputPayload.isSmartBypass) {
                     console.log("[Curation Backend] [Step 1: Graph Generation Started] Executing live Gemini AI graph synthesis...");
-                    // finalGraph = await generateGraphDataBackend(
-                    //   inputPayload.artists,
-                    //   inputPayload.filters,
-                    //   inputPayload.cachedSubgraphsContext,
-                    //   inputPayload.baseGraph,
-                    //   inputPayload.disambiguationHints
-                    // );
-                    const mockGraphData = {
-                        nodes: [
-                            { id: "Korn", label: "Korn", type: "artist", group: 1 },
-                            { id: "Deftones", label: "Deftones", type: "artist", group: 1 }
-                        ],
-                        links: [
-                            { source: "Korn", target: "Deftones", value: 1, context: "associated with" }
-                        ]
-                    };
-                    await jobDocRef.update({
-                        status: "success",
-                        result: {
-                            graphData: mockGraphData,
-                            detailsCache: JSON.stringify({})
-                        },
-                        updatedAt: firestore_2.FieldValue.serverTimestamp(),
-                        completedAt: firestore_2.FieldValue.serverTimestamp(),
-                        expireAt: firestore_2.Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000)
-                    });
-                    if (inputPayload?.projectId && jobData.userId) {
-                        await updateProjectStatus(jobData.userId, inputPayload.projectId, {
-                            status: "success",
-                            graphData: JSON.stringify(mockGraphData),
-                            lastCurationAt: firestore_2.FieldValue.serverTimestamp()
-                        });
-                    }
-                    console.log("[Curation Backend] Bypassed AI and injected mock graph data successfully.");
-                    return;
+                    finalGraph = await (0, curatorService_1.generateGraphDataBackend)(inputPayload.artists, inputPayload.filters, inputPayload.cachedSubgraphsContext, inputPayload.baseGraph, inputPayload.disambiguationHints);
                 }
                 else {
                     console.log("[Curation Backend] [Step 1: Graph Generation Bypassed] Smart Bypass active. Using baseGraph directly.");
@@ -472,20 +438,26 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         if (details) {
                             // 3. Scrape YouTube and validate video ID (only for artists; labels do not have music videos)
                             if (!isLabel && requiresVideoScraping) {
-                                if (details.youtubeVideoId) {
-                                    const playable = await (0, curatorService_1.checkVideoPlayability)(details.youtubeVideoId);
-                                    if (!playable) {
-                                        details.youtubeVideoId = null;
-                                    }
-                                }
-                                if (!details.youtubeVideoId && details.youtubeSearchQuery) {
-                                    const scrapedId = await (0, curatorService_1.scrapeVideoIdBackend)(searchArtistName, artistNormId);
-                                    if (scrapedId) {
-                                        const playable = await (0, curatorService_1.checkVideoPlayability)(scrapedId);
-                                        if (playable) {
-                                            details.youtubeVideoId = scrapedId;
+                                try {
+                                    if (details.youtubeVideoId) {
+                                        const playable = await (0, curatorService_1.checkVideoPlayability)(details.youtubeVideoId);
+                                        if (!playable) {
+                                            details.youtubeVideoId = null;
                                         }
                                     }
+                                    if (!details.youtubeVideoId && details.youtubeSearchQuery) {
+                                        const scrapedId = await (0, curatorService_1.scrapeVideoIdBackend)(searchArtistName, artistNormId);
+                                        if (scrapedId) {
+                                            const playable = await (0, curatorService_1.checkVideoPlayability)(scrapedId);
+                                            if (playable) {
+                                                details.youtubeVideoId = scrapedId;
+                                            }
+                                        }
+                                    }
+                                }
+                                catch (e) {
+                                    console.warn(`[Media Sync] Soft warning: Media player validation failed for ${searchArtistName}. Bypassing sync check.`, e);
+                                    details.youtubeVideoId = null;
                                 }
                             }
                             if (!details.details) {

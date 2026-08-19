@@ -1051,7 +1051,7 @@ export const getEntityDocWithRedirect = async (
       console.warn(`[Proxy Fetch] Non-200 status (${response.status}) for ${entityId}, returning safe fallback to prevent UI crash.`);
       return {
         exists: () => true,
-        data: () => ({ imageUrl: null, bio: null, cacheKey: entityId, _isStub: true }),
+        data: () => ({ imageUrl: "", bio: "", cacheKey: entityId, _isStub: true }),
         id: entityId,
         metadata: {} as any,
         ref: {} as any,
@@ -1089,7 +1089,7 @@ export const getEntityDocWithRedirect = async (
     console.warn(`[Proxy Fetch] Failed for ${entityId}, returning safe fallback to prevent UI crash:`, error);
     return {
       exists: () => true,
-      data: () => ({ imageUrl: null, bio: null, cacheKey: entityId, _isStub: true }),
+      data: () => ({ imageUrl: "", bio: "", cacheKey: entityId, _isStub: true }),
       id: entityId,
       metadata: {} as any,
       ref: {} as any,
