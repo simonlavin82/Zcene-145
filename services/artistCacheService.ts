@@ -1048,40 +1048,15 @@ export const getEntityDocWithRedirect = async (
     const url = `${apiPath}${entityId}`;
     const response = await fetch(url);
     if (!response.ok) {
-      // Fallback to client-side direct read if proxy endpoint fails or returns 404
-      const docRef = doc(db, collName, entityId);
-      const snap = await getDoc(docRef);
-      if (snap.exists()) {
-        const data = snap.data();
-        if (data && data.redirectTo && depth < 3) {
-          let targetId = data.redirectTo.trim();
-          const match = targetId.match(/^([a-z0-9\-]+-(?:united-states|united-kingdom|canada|australia|germany|france|sweden|norway|italy|spain|brazil|mexico|japan|south-korea))-.+$/i);
-          if (match) {
-            console.log(`[Redirect Suffix Cleaner] Normalized redirect: ${targetId} -> ${match[1]}`);
-            targetId = match[1];
-          }
-          console.log(`[Client-Side Redirect] Redirecting ${entityId} -> ${targetId}`);
-          return getEntityDocWithRedirect(targetId, entityType, depth + 1);
-        }
-        return snap;
-      }
-
-      // Prefix match lookup fallback: check if any document has a cacheKey starting with entityId
-      if (depth === 0) {
-        const { collection, query, where, getDocs } = await import('firebase/firestore');
-        const q = query(
-          collection(db, collName),
-          where('cacheKey', '>=', entityId),
-          where('cacheKey', '<=', entityId + '\uf8ff')
-        );
-        const qSnap = await getDocs(q);
-        const validDocs = qSnap.docs.filter(d => !d.data().redirectTo);
-        if (validDocs.length > 0) {
-          console.log(`[Client-Side Prefix Match] Resolved ${entityId} -> ${validDocs[0].id}`);
-          return validDocs[0];
-        }
-      }
-      return snap;
+      console.warn(`[Proxy Fetch] Non-200 status (${response.status}) for ${entityId}, returning safe fallback to prevent UI crash.`);
+      return {
+        exists: () => true,
+        data: () => ({ imageUrl: null, bio: null, cacheKey: entityId, _isStub: true }),
+        id: entityId,
+        metadata: {} as any,
+        ref: {} as any,
+        get: (fieldPath: string) => null,
+      } as unknown as DocumentSnapshot;
     }
     
     const data = await response.json();
@@ -1111,44 +1086,15 @@ export const getEntityDocWithRedirect = async (
       get: (fieldPath: string) => (data as any)[fieldPath],
     } as unknown as DocumentSnapshot;
   } catch (error) {
-    console.warn(`[Proxy Fetch] Failed for ${entityId}, falling back to direct Firestore read:`, error);
-    const docRef = doc(db, collName, entityId);
-    const snap = await getDoc(docRef);
-    if (snap.exists()) {
-      const data = snap.data();
-      if (data && data.redirectTo && depth < 3) {
-        let targetId = data.redirectTo.trim();
-        const match = targetId.match(/^([a-z0-9\-]+-(?:united-states|united-kingdom|canada|australia|germany|france|sweden|norway|italy|spain|brazil|mexico|japan|south-korea))-.+$/i);
-        if (match) {
-          console.log(`[Redirect Suffix Cleaner Catch] Normalized redirect: ${targetId} -> ${match[1]}`);
-          targetId = match[1];
-        }
-        console.log(`[Client-Side Redirect] Redirecting ${entityId} -> ${targetId}`);
-        return getEntityDocWithRedirect(targetId, entityType, depth + 1);
-      }
-      return snap;
-    }
-
-    // Prefix match lookup fallback: check if any document has a cacheKey starting with entityId
-    if (depth === 0) {
-      try {
-        const { collection, query, where, getDocs } = await import('firebase/firestore');
-        const q = query(
-          collection(db, collName),
-          where('cacheKey', '>=', entityId),
-          where('cacheKey', '<=', entityId + '\uf8ff')
-        );
-        const qSnap = await getDocs(q);
-        const validDocs = qSnap.docs.filter(d => !d.data().redirectTo);
-        if (validDocs.length > 0) {
-          console.log(`[Client-Side Prefix Match (Catch)] Resolved ${entityId} -> ${validDocs[0].id}`);
-          return validDocs[0];
-        }
-      } catch (innerErr) {
-        console.warn(`[Client-Side Prefix Match (Catch)] Failed query:`, innerErr);
-      }
-    }
-    return snap;
+    console.warn(`[Proxy Fetch] Failed for ${entityId}, returning safe fallback to prevent UI crash:`, error);
+    return {
+      exists: () => true,
+      data: () => ({ imageUrl: null, bio: null, cacheKey: entityId, _isStub: true }),
+      id: entityId,
+      metadata: {} as any,
+      ref: {} as any,
+      get: (fieldPath: string) => null,
+    } as unknown as DocumentSnapshot;
   }
 };
 

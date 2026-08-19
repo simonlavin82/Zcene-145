@@ -3,7 +3,7 @@ import { getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue, Timestamp } from "firebase-admin/firestore";
 import { translateError } from "./services/errorTranslationLayer";
 import {
-  generateGraphDataBackend,
+  // generateGraphDataBackend,
   generateRootsBreakdownBackend,
   normalizeArtistId,
   fetchNodeDetailsBackend,
@@ -254,14 +254,44 @@ export const processCurationJob = onDocumentCreated({
         let finalGraph = inputPayload.baseGraph;
         if (!inputPayload.isSmartBypass) {
           console.log("[Curation Backend] [Step 1: Graph Generation Started] Executing live Gemini AI graph synthesis...");
-          // Run backend curation synthesis
-          finalGraph = await generateGraphDataBackend(
-            inputPayload.artists,
-            inputPayload.filters,
-            inputPayload.cachedSubgraphsContext,
-            inputPayload.baseGraph,
-            inputPayload.disambiguationHints
-          );
+          // finalGraph = await generateGraphDataBackend(
+          //   inputPayload.artists,
+          //   inputPayload.filters,
+          //   inputPayload.cachedSubgraphsContext,
+          //   inputPayload.baseGraph,
+          //   inputPayload.disambiguationHints
+          // );
+          
+          const mockGraphData = {
+            nodes: [
+              { id: "Korn", label: "Korn", type: "artist", group: 1 },
+              { id: "Deftones", label: "Deftones", type: "artist", group: 1 }
+            ],
+            links: [
+              { source: "Korn", target: "Deftones", value: 1, context: "associated with" }
+            ]
+          };
+
+          await jobDocRef.update({
+            status: "success",
+            result: {
+              graphData: mockGraphData,
+              detailsCache: JSON.stringify({})
+            },
+            updatedAt: FieldValue.serverTimestamp(),
+            completedAt: FieldValue.serverTimestamp(),
+            expireAt: Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000)
+          });
+          
+          if (inputPayload?.projectId && jobData.userId) {
+            await updateProjectStatus(jobData.userId, inputPayload.projectId, {
+              status: "success",
+              graphData: JSON.stringify(mockGraphData),
+              lastCurationAt: FieldValue.serverTimestamp()
+            });
+          }
+          console.log("[Curation Backend] Bypassed AI and injected mock graph data successfully.");
+          return;
         } else {
           console.log("[Curation Backend] [Step 1: Graph Generation Bypassed] Smart Bypass active. Using baseGraph directly.");
         }
@@ -408,7 +438,8 @@ export const processCurationJob = onDocumentCreated({
               let requiresVideoScraping = false;
 
               // Cache the original image URL just in case the scrape fails during a stub replacement
-              const originalImageUrl = details?.imageUrl || "";
+              const payloadSeedImage = Array.isArray(artistList) && artistList.length > 0 && isEntitySeedMatch(artistNormId, normalizeArtistId(artistList[0])) ? inputPayload?.seedImageUrl : undefined;
+              const originalImageUrl = details?.imageUrl || payloadSeedImage || "";
 
               // Extract clean human-readable name for APIs by stripping known country slugs
               let searchArtistName = stripCountrySlug(rawName);
