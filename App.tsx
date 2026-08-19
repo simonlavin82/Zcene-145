@@ -77,7 +77,8 @@ const generateGraphDataViaCloudJob = async (
   baseGraph?: GraphData,
   cachedSubgraphsContext?: string,
   isSmartBypass?: boolean,
-  isSandboxMode?: boolean
+  isSandboxMode?: boolean,
+  seedImageUrl?: string
 ): Promise<GraphData> => {
   const finalJobId = jobId || `job-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
   const jobRef = doc(db, 'curationJobs', finalJobId);
@@ -90,7 +91,8 @@ const generateGraphDataViaCloudJob = async (
     ...(baseGraph && { baseGraph }),
     ...(cachedSubgraphsContext && { cachedSubgraphsContext }),
     ...(isSmartBypass !== undefined && { isSmartBypass }),
-    ...(isSandboxMode !== undefined && { isSandboxMode })
+    ...(isSandboxMode !== undefined && { isSandboxMode }),
+    ...(seedImageUrl && { seedImageUrl })
   };
 
   await setDoc(jobRef, {
@@ -3327,6 +3329,7 @@ const App: React.FC = () => {
                     graphData: JSON.stringify(normalizedGraph),
                     activeNodes: [activeId],
                     seedArtists: artists,
+                    detailsCache: JSON.stringify(Array.from(detailsCacheRef.current.entries())),
                     status: 'completed',
                     updatedAt: serverTimestamp()
                   });
@@ -4425,6 +4428,9 @@ const App: React.FC = () => {
           computedContext = pruned.nodes.map(n => `"${n.id}" (${n.type})`).join(', ');
         }
         
+        const primarySeed = seedArtists.find((s: any) => normalizeArtistId(s.name || s.id) === normalizeArtistId(artists.split('::')[0]));
+        const seedImageUrl = primarySeed?.imageUrl || primarySeed?.image || undefined;
+
         graphPromise = generateGraphDataViaCloudJob(
           artists, // Raw display names to prevent LLM hallucinations
           activeDiscoveryFilters,
@@ -4449,7 +4455,8 @@ const App: React.FC = () => {
           pruned || undefined,          // Base graph context
           computedContext,              // Stringified cached subgraphs context for multi-seed
           undefined,                    // isSmartBypass
-          isSandboxMode                 // isSandboxMode
+          isSandboxMode,                // isSandboxMode
+          seedImageUrl                  // seedImageUrl
         );
       } else {
         const payloadArtists = artistList.map(a => normalizeArtistId(a)).join('::');
@@ -4735,6 +4742,7 @@ const App: React.FC = () => {
             graphData: JSON.stringify(final),
             activeNodes: finalActive,
             seedArtists: resolvedArtists,
+            detailsCache: JSON.stringify(Array.from(detailsCacheRef.current.entries())),
             status: 'completed',
             updatedAt: serverTimestamp()
           });
