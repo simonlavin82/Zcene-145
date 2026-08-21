@@ -635,17 +635,17 @@ export const SEED_VALIDATION_SCHEMA = {
 export const validateSeedOriginBackend = async (
   artistId: string
 ): Promise<{ id: string; origin: string; genre: string; isValid: boolean }> => {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is not defined in environment secrets.");
-  }
-
-  const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: 300000 } });
-  const currentModel = "gemini-3.5-flash-lite"; // Phase 2: Origin Validation uses Flash-Lite
-
-  const prompt = `Validate this seed artist: "${artistId}". Is this a real musical entity? Extract its canonical name, country of origin, and primary genre.`;
-  
   try {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error("GEMINI_API_KEY is not defined in environment secrets.");
+    }
+
+    const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: 300000 } });
+    const currentModel = "gemini-3.5-flash-lite"; // Phase 2: Origin Validation uses Flash-Lite
+
+    const prompt = `Validate this seed artist: "${artistId}". Is this a real musical entity? Extract its canonical name, country of origin, and primary genre.`;
+  
     const response = await ai.models.generateContent({
       model: currentModel,
       contents: prompt,
@@ -665,8 +665,8 @@ export const validateSeedOriginBackend = async (
     return data;
   } catch (err: any) {
     console.error(`[validateSeedOriginBackend] Failed to validate seed ${artistId}:`, err);
-    // If it fails, default to valid so we don't break the pipeline on AI error, but log it
-    return { id: titleCaseArtistId(artistId), origin: "", genre: "", isValid: true };
+    // Bulletproof: We now actively throw the error so the orchestrator's catch block can flag the job as failed
+    throw err;
   }
 };
 
