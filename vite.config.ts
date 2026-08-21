@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, '.', '');
+  const env = loadEnv(mode, process.cwd(), '');
   return {
     base: '/',
     server: {
@@ -22,6 +22,9 @@ export default defineConfig(({ mode }) => {
           proxyTimeout: 60000,
           configure: (proxy) => {
             proxy.on('proxyReq', (proxyReq, req) => {
+              if (env.GEMINI_API_KEY) {
+                proxyReq.setHeader('x-goog-api-key', env.GEMINI_API_KEY);
+              }
               console.log(`[Proxy Request] Path: ${req.url} -> Target: ${proxyReq.path}`);
             });
             proxy.on('proxyRes', (proxyRes, req) => {
