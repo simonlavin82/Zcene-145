@@ -12,7 +12,8 @@ import {
   scrapeImageUrlBackend,
   extractCountrySlug,
   buildCompositeCacheKey,
-  extractArtistSubGraph
+  extractArtistSubGraph,
+  validateSeedOriginBackend
 } from "./services/curatorService";
 
 // Initialize Firebase Admin SDK if not already done
@@ -251,19 +252,100 @@ export const processCurationJob = onDocumentCreated({
           detailsCache: JSON.stringify(mockDetails)
         };
       } else {
-        let finalGraph = inputPayload.baseGraph;
-        if (!inputPayload.isSmartBypass) {
-          console.log("[Curation Backend] [Step 1: Graph Generation Started] Executing live Gemini AI graph synthesis...");
-          finalGraph = await generateGraphDataBackend(
-            inputPayload.artists,
-            inputPayload.filters,
-            inputPayload.cachedSubgraphsContext,
-            inputPayload.baseGraph,
-            inputPayload.disambiguationHints
-          );
-        } else {
-          console.log("[Curation Backend] [Step 1: Graph Generation Bypassed] Smart Bypass active. Using baseGraph directly.");
+        // Parse seed artists list
+        const artistList = inputPayload.artists
+          .split('::')
+          .map((a: string) => a.trim())
+          .filter(Boolean);
+
+        console.log(\`[Curation Backend] [Phase 1: Global Cache Routing] Checking seeds: \${artistList.join(', ')}\`);
+        
+        const resolvedSeedArray: any[] = [];
+        let needsProGeneration = false;
+        
+        for (const seed of artistList) {
+           const seedNorm = normalizeArtistId(seed);
+           let cachedDetails: any = null;
+           
+           try {
+             // We check artists collection primarily for seeds
+             const cacheDoc = await db.collection("artists").doc(seedNorm).get();
+             if (cacheDoc.exists) {
+                const cacheData = cacheDoc.data();
+                if (cacheData && cacheData.detailsCache) {
+                   cachedDetails = typeof cacheData.detailsCache === 'string' ? JSON.parse(cacheData.detailsCache) : cacheData.detailsCache;
+                   if (Array.isArray(cachedDetails) && cachedDetails.length > 0) {
+                      const match = cachedDetails.find((item: any) => normalizeArtistId(item[0]) === seedNorm);
+                      if (match && match[1]) {
+                        cachedDetails = match[1];
+                      } else {
+                        cachedDetails = Array.isArray(cachedDetails[0]) ? cachedDetails[0][1] : cachedDetails[0];
+                      }
+                   }
+                }
+             }
+           } catch (e) {
+              console.warn(\`Failed cache lookup for \${seedNorm}\`, e);
+           }
+           
+           if (cachedDetails && cachedDetails.summary && cachedDetails.summary.length > 50 && cachedDetails.details?.genre && cachedDetails.imageUrl) {
+              console.log(\`[Phase 1] Cache Hit for seed: \${seed}\`);
+              resolvedSeedArray.push({
+                 id: seedNorm,
+                 name: seed,
+                 origin: cachedDetails.details.origin || "",
+                 genre: cachedDetails.details.genre || "",
+                 isCacheHit: true
+              });
+           } else {
+              console.log(\`[Phase 1] Cache Miss for seed: \${seed}. Routing to Phase 2 (Flash-Lite).\`);
+              needsProGeneration = true; // Any miss requires Pro generation
+              
+              // Phase 2: Origin Validation (Flash-Lite)
+              const validationResult = await validateSeedOriginBackend(seed);
+              if (validationResult.isValid) {
+                 resolvedSeedArray.push({
+                    id: normalizeArtistId(validationResult.id),
+                    name: validationResult.id,
+                    origin: validationResult.origin,
+                    genre: validationResult.genre,
+                    isCacheHit: false
+                 });
+              } else {
+                 throw new Error(\`Validation failed for seed: \${seed}. It is not recognized as a valid musical entity.\`);
+              }
+           }
         }
+        
+        // Multi-Seed Cache Bypass Rule: Even if all seeds hit cache, multi-seed still requires Pro generation
+        if (artistList.length > 1) {
+           needsProGeneration = true;
+        }
+
+        console.log(\`[Phase 3: The Aggregator Gate] Resolved Seed Array:\`, resolvedSeedArray);
+        
+        // --- HALT & RETURN TEMPORARY BOUNDARY FOR VERIFICATION ---
+        result = {
+           status: "halted_at_aggregator_gate",
+           resolvedSeedArray,
+           needsProGeneration
+        };
+        
+        const jobDocRefHalt = db.collection("curationJobs").doc(jobId);
+        await jobDocRefHalt.update({
+          status: "completed",
+          result,
+          updatedAt: FieldValue.serverTimestamp()
+        });
+        
+        if (inputPayload?.projectId && jobData.userId) {
+          await updateProjectStatus(jobData.userId, inputPayload.projectId, { status: "completed", result });
+        }
+        
+        return; // HALT
+        // --- END OF HALT BOUNDARY ---
+
+        let finalGraph = inputPayload.baseGraph;
 
         // Structural Integrity Guard: Verify that we received a valid, rich graph from the model
         const artistNodesCount = finalGraph.nodes?.filter((n: any) => n.type === 'artist' || !n.type).length || 0;

@@ -81,120 +81,73 @@ This sequence diagram illustrates the lifecycle of a newly created Zcene project
 
 ### 2.1 Sequence Diagram
 
+### 2.1 Sequence Diagram
+
 ```
-User (Browser)          Frontend UI          Firestore DB          Cloud Storage (GCS)       Backend Proxy        Gemini API
-   │                         │                     │                       │                       │                   │
-   ├─► Click "Create Project"│                     │                       │                       │                   │
-   │   (Dashboard.tsx)       │                     │                       │                       │                   │
-   │                         ├─► Generate UUID     │                       │                       │                   │
-   │                         │   Reset local state │                       │                       │                   │
-   │                         │                     │                       │                       │                   │
-   │                         ├─────────────────────┼───────────────────────┼───────────────────────┼───────────────────┤
-   │                         │ PHASE 01: INITIAL PROJECTS INITIALIZATION & BACKGROUND ASSETS HYDRATION                     │
+User (Browser)          Backend Orchestrator       Firestore DB          Gemini API (Flash-Lite)    Gemini API (3.1-Pro)
+   │                         │                     │                       │                       │
+   ├─► Submit Curation Job   │                     │                       │                       │
+   │   ("Band A::Band B")    ├─────────────────────┼───────────────────────┼───────────────────────┼───────────────────┤
+   │                         │ PHASE 1: GLOBAL FIRESTORE CACHE ROUTING                                                 │
    │                         ├─────────────────────┼───────────────────────┼───────────────────────┼───────────────────┤
    │                         │                     │                       │                       │                   │
-   │                         ├─► setDoc() ────────►│                       │                       │                   │
-   │                         │   (users/{uid}/     │                       │                       │                   │
-   │                         │    projects/{id})   │                       │                       │                   │
-   │                         │                     │                       │                       │                   │
-   │                         ├─► GET general bg ──────────────────────────►│                       │                   │
-   │                         │   (Zcene general background.jpeg)           │                       │                   │
-   │                         │◄────────────────────────────────────────────┤                       │                   │
-   │                         │   Renders Canvas & UI Backdrop              │                       │                   │
-   │                         │                     │                       │                       │                   │
-   │                         ├─────────────────────┼───────────────────────┼───────────────────────┼───────────────────┤
-   │                         │ PHASE 02: CACHE VERIFICATION & ORCHESTRATION                                            │
-   │                         ├─────────────────────┼───────────────────────┼───────────────────────┼───────────────────┤
-   │                         │                     │                       │                       │                   │
-   │   Enter Seed Artists    │                     │                       │                       │                   │
-   ├─► Click "Search" ──────►│                     │                       │                       │                   │
-   │   ("Band A::Band B")    ├─► readArtistCache() │                       │                       │                   │
+   │                         ├─► readArtistCache() │                       │                       │                   │
    │                         ├─► (artists/{slug}) ─►                       │                       │                   │
-   │                         │◄── [CACHE MISS] ────┤                       │                       │                   │
-   │                         │                     │                       │                       │                   │
-   │                         │   Invoke API ──────────────────────────────────────────────────────►│                   │
-   │                         │   (POST /api/gemini)                                                │                   │
-   │                         │                                                                     ├─► Inject Key      │
-   │                         │                                                                     │   Forward Request │
-   │                         │                                                                     ├──────────────────►│
-   │                         │                                                                     │   (gemini-3.1-pro)│
-   │                         │                                                                     │                   │
-   │                         │                                                                     │◄── Return JSON ───┤
-   │                         │                                                                     │    (Graph Nodes)  │
-   │                         │◄── Return raw JSON ─────────────────────────────────────────────────┤                   │
+   │                         │◄── [CACHE MISSES] ──┤                       │                       │                   │
    │                         │                     │                       │                       │                   │
    │                         ├─────────────────────┼───────────────────────┼───────────────────────┼───────────────────┤
-   │                         │ PHASE 03: POST-PROCESSING, WRITING TO CACHE & CANVAS CONVERGENCE                        │
+   │                         │ PHASE 2: ORIGIN VALIDATION (Flash-Lite)                                                 │
    │                         ├─────────────────────┼───────────────────────┼───────────────────────┼───────────────────┤
    │                         │                     │                       │                       │                   │
-   │                         ├─► Nuclear Filtering │                       │                       │                   │
-   │                         │   Orphan Link check │                       │                       │                   │
-   │                         │                     │                       │                       │                   │
-   │                         ├─► writeArtistCache()│                       │                       │                   │
-   │                         │   (extract subgraphs│                       │                       │                   │
-   │                         │    set artists/{id})│                       │                       │                   │
-   │                         ├────────────────────►│                       │                       │                   │
-   │                         │                     │                       │                       │                   │
-   │                         ├─► Initialize D3 ───►│                       │                       │                   │
-   │                         │   Simulation        │                       │                       │                   │
-   │                         │   (Dynamic physics) │                       │                       │                   │
-   │                         │                     │                       │                       │                   │
-   │                         ├─────────────────────┼───────────────────────┼───────────────────────┼───────────────────┤
-   │                         │ PHASE 04: DETAIL ENRICHMENT (DEEP CUTS)                                                 │
-   │                         ├─────────────────────┼───────────────────────┼───────────────────────┼───────────────────┤
-   │                         │                     │                       │                       │                   │
-   │   Select Node           │                     │                       │                       │                   │
-   ├─► Click Artist Node ───►│                     │                       │                       │                   │
-   │                         ├─► fetchNodeDetails()│                       │                       │                   │
-   │                         │   (Check Cache) ───►│                       │                       │                   │
-   │                         │◄── [DETAILS MISS] ──┤                       │                       │                   │
-   │                         │                     │                       │                       │                   │
-   │                         │   Invoke Details API ──────────────────────────────────────────────►│                   │
-   │                         │   (POST /api/gemini)                                                │                   │
-   │                         │                                                                     ├─► Inject Key      │
-   │                         │                                                                     │   Forward Request │
-   │                         │                                                                     ├──────────────────►│
-   │                         │                                                                     │   (gemini-3-flash │
-   │                         │                                                                     │    + Web Search)  │
-   │                         │                                                                     │                   │
-   │                         │                                                                     │◄── Return JSON ───┤
-   │                         │                                                                     │    (Bio Summary)  │
-   │                         │◄── Return raw JSON ─────────────────────────────────────────────────┤                   │
-   │                         │                     │                       │                       │                   │
-   │                         ├─► GET panel assets ────────────────────────►│                       │                   │
-   │                         │   (Artist/Deep Cut backgrounds)             │                       │                   │
+   │                         ├─► validateOrigins() ───────────────────────►│                       │                   │
+   │                         │                                             ├─► Confirm Real Artist │                   │
+   │                         │                                             ├─► Extract Origin/Genre│                   │
    │                         │◄────────────────────────────────────────────┤                       │                   │
-   │                         │   Renders Enriched Detail Bio Card          │                       │                   │
    │                         │                     │                       │                       │                   │
-   │                         ├─► updateDoc() ─────►│                       │                       │                   │
-   │                         │   (Save bio back    │                       │                       │                   │
-   │                         │    to artists/{id}) │                       │                       │                   │
+   │                         ├─────────────────────┼───────────────────────┼───────────────────────┼───────────────────┤
+   │                         │ PHASE 3: THE AGGREGATOR GATE                                                            │
+   │                         ├─────────────────────┼───────────────────────┼───────────────────────┼───────────────────┤
+   │                         │                     │                       │                       │                   │
+   │                         ├─► Converge Hits &   │                       │                       │                   │
+   │                         │   Validated Misses  │                       │                       │                   │
+   │                         │   into "Resolved    │                       │                       │                   │
+   │                         │   Seed Array"       │                       │                       │                   │
+   │                         │                     │                       │                       │                   │
+   │                         ├─────────────────────┼───────────────────────┼───────────────────────┼───────────────────┤
+   │                         │ PHASE 4: TOPOLOGY & DEEP CUTS (3.1-Pro)                                                 │
+   │                         ├─────────────────────┼───────────────────────┼───────────────────────┼───────────────────┤
+   │                         │                     │                       │                       │                   │
+   │                         ├─► generateTopology()───────────────────────────────────────────────►│                   │
+   │                         │                     │                       │                       ├─► Map Connections │
+   │                         │                     │                       │                       ├─► Mint Deep Cuts  │
+   │                         │◄────────────────────────────────────────────────────────────────────┤                   │
+   │                         │                     │                       │                       │                   │
+   │                         ├─────────────────────┼───────────────────────┼───────────────────────┼───────────────────┤
+   │                         │ PHASE 5: SPATIAL POSITIONING & ROOT BREAKDOWN (3.1-Pro)                                 │
+   │                         ├─────────────────────┼───────────────────────┼───────────────────────┼───────────────────┤
+   │                         │                     │                       │                       │                   │
+   │                         ├─► finalizeCanvas()  ───────────────────────────────────────────────►│                   │
+   │                         │                     │                       │                       ├─► Set Coordinates │
+   │                         │                     │                       │                       ├─► Write Narrative │
+   │                         │◄────────────────────────────────────────────────────────────────────┤                   │
+   │                         │                     │                       │                       │                   │
+   │                         ├─► Persist to DB    ─►                       │                       │                   │
    v                         v                     v                       v                       v                   v
 ```
 
-### 2.2 Functional Walkthrough
+### 2.2 Functional Walkthrough (The 5-Phase Pipeline)
 
-1.  **Phase 01: Project Creation & Static Hydration:**
-    *   The user initiates a project creation, prompting the frontend to generate a unique `projectId` and clear any active graph states.
-    *   The frontend initiates an asynchronous document write (`setDoc`) to `/users/{userId}/projects/{projectId}`.
-    *   Concurrently, the UI imports and paints its visual backdrop layers by requesting background assets (`Zcene general background.jpeg`) from GCS via direct HTTP paths.
-2.  **Phase 02: Verification & AI Orchestration:**
-    *   Once a user commits seed input, the application checks Firestore's `/artists` path via a multi-get operation (`readArtistCacheMany`) to query normalized artist IDs.
-    *   If a cache hit occurs, the cached nodes and links are returned, bypassing step 3.
-    *   On a cache miss (or partial hit), the frontend intercepts the flow and triggers the **Token Confirmation Dialog** displaying the estimated query cost ($0.0015/query) and splitting the inputs into cached and synthesis-required badges.
-    *   On cancellation of a partial hit, the pipeline filters out the uncached subset of artists and automatically re-routes using the cached subset. If the query has no cached subset or is canceled, the loading state is rolled back and the flow halts, cleanly resetting active states to prevent canceled entries from leaking into the slider stack. If the user confirms, the frontend formats a request containing the prompt, response schema requirements, and user filters, transmitting it to `/api/gemini` (which is completely short-circuited with a static JSON payload in sandbox configurations).
-    *   The Cloud Run proxy intercepts live requests and routes them through the two-stage sanitization pipeline: a pre-proxy Express middleware first strips the incoming `authorization` and `cookie` headers (preventing Firebase credential leaks from triggering 401 errors at Google's API gateway edge), then the `proxyReq` hook injects the server-side `x-goog-api-key` token into the now-clean outbound packet before redirecting to the Google Gemini service executing `gemini-3.1-pro-preview`.
-3.  **Phase 03: Post-Processing, Writing to Cache, and Physics convergence:**
-    *   Once the model responds with structured JSON, the frontend filters out any nodes that violate era or origin criteria.
-    *   The pruned sub-graphs are separated by artist and pushed asynchronously to Firestore under `/artists/{cacheKey}` with an initialized `hitCount: 0`.
-    *   The compiled graph is loaded into the React state. The D3 force engine initializes physics nodes, applies momentum constraints (`velocityDecay: 0.36`, `alphaDecay: 0.022`) and runs the Floral Spiderweb layout convergence. New metadata nodes are sprout-positioned at the average coordinates of their visible artist neighbors to prevent kinetic shockwaves. If a project is loaded, coordinate positions are read from `canvasLayout` and pinned (`fx`/`fy`).
-4.  **Phase 04: Detail Enrichment (Deep Cuts):**
-    *   When the user selects an artist node (on map click, My Stack details navigation, or related Scene Circle click), the details card panel mounts.
-    *   The frontend searches for biographical details under the local project state or `/artists/{cacheKey}` (Firestore global collection).
-    *   If unavailable (cache miss), the action is frozen, and the user is prompted with the **Token Confirmation Dialog** displaying the query type as `DEEP CUT CREATION` at a cost of `$0.0015`, listing the artist under the synthesis required badge.
-    *   If the user cancels, the action is aborted cleanly and the UI state (including active nodes and sidebar) remains completely unchanged. If confirmed, the request is sent through the proxy gateway—subject to the same pre-proxy header cleansing (stripping `authorization` and `cookie` headers) and secure `x-goog-api-key` injection—to Gemini `gemini-3-flash-preview` configured with Web Search grounding (`googleSearch: {}`).
-    *   The UI loads specific card backgrounds (`Artist background.png` or `Deep Cut background.png`) from Google Cloud Storage to render the details card.
-    *   The scraped biography is written back to the global `/artists/{cacheKey}` under the `detailsCache` key, ensuring subsequent lookups avoid duplicate LLM invocations.
+1.  **Phase 1: Global Firestore Cache Routing**
+    *   Once a user commits a seed input, the backend pipeline immediately checks the global Firestore `artists` and `labels` cache BEFORE invoking any expensive generation logic. 
+    *   *Multi-Seed Cache Bypass Rule:* For a Single-Seed request, a full cache hit bypasses `3.1-pro` entirely. However, for a Multi-Seed request, even if all seeds are fully cached hits, `3.1-pro` MUST still execute to generate the bespoke, combined Spiderweb typology between them.
+2.  **Phase 2: Origin Validation (`gemini-3.5-flash-lite`)**
+    *   For any seeds that resulted in a cache miss, the system passes the raw inputs to `gemini-3.5-flash-lite` configured with `"minimal"` thinking mode. This acts as a fast, cheap gatekeeper to validate that the seed is a real musical entity, and extracts its basic origin/genre metadata, preventing hallucinations from entering the pipeline.
+3.  **Phase 3: The Aggregator Gate (Resolved Seed Array)**
+    *   The system converges the successful cache hits from Phase 1 and the validated origins from Phase 2 into a single, unified "Resolved Seed Array" state. This serves as the definitive, sanitized source of truth before heavy graph generation begins.
+4.  **Phase 4: Topology & Deep Cuts (`gemini-3.1-pro`)**
+    *   The "Resolved Seed Array" is passed to `gemini-3.1-pro`. The model cross-references the validated seeds, generates the complex Spiderweb connections, and identifies any missing "Deep Cuts" in the ecosystem. It then mints the rich profile data for those missing nodes.
+5.  **Phase 5: Spatial Positioning & Root Breakdown (`gemini-3.1-pro`)**
+    *   In the final pass, `3.1-pro` acts as the spatial physics engine, determining the "Final Spiderweb node positioning" (clustering, relational distances) and generating the "Root Breakdown" (the master narrative explaining the curation). The finalized, spatially-aware graph is then committed back to Firestore.
 
 ---
 

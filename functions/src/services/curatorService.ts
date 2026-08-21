@@ -605,9 +605,70 @@ STRUCTURAL ONLY: You MUST NOT generate or include any biographies, summaries, me
         
 ABSOLUTELY CRITICAL FINAL CHECK: Before you output the JSON, verify that for EVERY SINGLE OBJECT in the 'links' array, the value of its 'source' property and the value of its 'target' property perfectly match an 'id' from an object in the 'nodes' array. THERE MUST BE NO ORPHANED LINKS. If you create a link with a 'source' or 'target' ID (e.g., "Arista Records"), you MUST ALSO define a node with that exact same 'id' (e.g., { "id": "Arista Records", "type": "label", ... }). Do not invent connections to nodes you haven't defined. This is a architecture requirement.
 
-IMPORTANT: Ensure that any double quotes within string values are properly escaped (e.g., "Artist \\"Name\\""). The final output must be perfectly valid JSON. Do not emit literal '\\n' strings; use standard JSON string encoding for line breaks. Your entire response MUST be ONLY the raw JSON object, without any surrounding text, explanations, or markdown code fences.`;
+// --- GEMINI CURATION CONFIGS ---
+
+export const SEED_VALIDATION_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    id: {
+      type: Type.STRING,
+      description: "The canonical, professional name of the artist."
+    },
+    origin: {
+      type: Type.STRING,
+      description: "The country of origin for the artist (e.g., 'USA', 'UK')."
+    },
+    genre: {
+      type: Type.STRING,
+      description: "The primary genre of the artist."
+    },
+    isValid: {
+      type: Type.BOOLEAN,
+      description: "True if this is a real, recognized musical entity. False if it is a hallucination or invalid input."
+    }
+  },
+  required: ["id", "origin", "genre", "isValid"]
+};
 
 // --- CORE CURATOR LOGIC ---
+
+export const validateSeedOriginBackend = async (
+  artistId: string
+): Promise<{ id: string; origin: string; genre: string; isValid: boolean }> => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY is not defined in environment secrets.");
+  }
+
+  const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: 300000 } });
+  const currentModel = "gemini-3.5-flash-lite"; // Phase 2: Origin Validation uses Flash-Lite
+
+  const prompt = \`Validate this seed artist: "\${artistId}". Is this a real musical entity? Extract its canonical name, country of origin, and primary genre.\`;
+  
+  try {
+    const response = await ai.models.generateContent({
+      model: currentModel,
+      contents: prompt,
+      config: {
+        systemInstruction: "You are a music data validator. Return ONLY valid JSON matching the schema.",
+        temperature: 0.1, // very low temperature for validation
+        responseMimeType: "application/json",
+        responseSchema: SEED_VALIDATION_SCHEMA
+      }
+    });
+
+    const jsonText = response.text?.trim() || "";
+    if (!jsonText) throw new Error("Empty validation response");
+
+    const cleanedJsonText = extractCleanJsonString(jsonText);
+    const data = JSON.parse(cleanedJsonText);
+    return data;
+  } catch (err: any) {
+    console.error(\`[validateSeedOriginBackend] Failed to validate seed \${artistId}:\`, err);
+    // If it fails, default to valid so we don't break the pipeline on AI error, but log it
+    return { id: titleCaseArtistId(artistId), origin: "", genre: "", isValid: true };
+  }
+};
 
 export const generateRootsBreakdownBackend = async (
   artists: string,
