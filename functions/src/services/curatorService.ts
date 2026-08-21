@@ -603,7 +603,7 @@ Follow these rules precisely:
 
 STRUCTURAL ONLY: You MUST NOT generate or include any biographies, summaries, member lists, discographies, or detailed profile metadata for the artists. The response must strictly contain only structural layout nodes (id, type, group) and connection links (source, target, value, context).
         
-ABSOLUTELY CRITICAL FINAL CHECK: Before you output the JSON, verify that for EVERY SINGLE OBJECT in the 'links' array, the value of its 'source' property and the value of its 'target' property perfectly match an 'id' from an object in the 'nodes' array. THERE MUST BE NO ORPHANED LINKS. If you create a link with a 'source' or 'target' ID (e.g., "Arista Records"), you MUST ALSO define a node with that exact same 'id' (e.g., { "id": "Arista Records", "type": "label", ... }). Do not invent connections to nodes you haven't defined. This is a architecture requirement.
+ABSOLUTELY CRITICAL FINAL CHECK: Before you output the JSON, verify that for EVERY SINGLE OBJECT in the 'links' array, the value of its 'source' property and the value of its 'target' property perfectly match an 'id' from an object in the 'nodes' array. THERE MUST BE NO ORPHANED LINKS. If you create a link with a 'source' or 'target' ID (e.g., "Arista Records"), you MUST ALSO define a node with that exact same 'id' (e.g., { "id": "Arista Records", "type": "label", ... }). Do not invent connections to nodes you haven't defined. This is a architecture requirement.`;
 
 // --- GEMINI CURATION CONFIGS ---
 
@@ -643,7 +643,7 @@ export const validateSeedOriginBackend = async (
   const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: 300000 } });
   const currentModel = "gemini-3.5-flash-lite"; // Phase 2: Origin Validation uses Flash-Lite
 
-  const prompt = \`Validate this seed artist: "\${artistId}". Is this a real musical entity? Extract its canonical name, country of origin, and primary genre.\`;
+  const prompt = `Validate this seed artist: "${artistId}". Is this a real musical entity? Extract its canonical name, country of origin, and primary genre.`;
   
   try {
     const response = await ai.models.generateContent({
@@ -664,7 +664,7 @@ export const validateSeedOriginBackend = async (
     const data = JSON.parse(cleanedJsonText);
     return data;
   } catch (err: any) {
-    console.error(\`[validateSeedOriginBackend] Failed to validate seed \${artistId}:\`, err);
+    console.error(`[validateSeedOriginBackend] Failed to validate seed ${artistId}:`, err);
     // If it fails, default to valid so we don't break the pipeline on AI error, but log it
     return { id: titleCaseArtistId(artistId), origin: "", genre: "", isValid: true };
   }

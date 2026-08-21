@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.scrapeImageUrlBackend = exports.checkVideoPlayability = exports.scrapeVideoIdBackend = exports.fetchNodeDetailsBackend = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = exports.NODE_DETAILS_SCHEMA = exports.generateGraphDataBackend = exports.generateRootsBreakdownBackend = exports.GENERATE_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = exports.GRAPH_RESPONSE_SCHEMA = exports.extractCleanJsonString = exports.extractArtistSubGraph = exports.normalizeGraphData = exports.buildCompositeCacheKey = exports.extractCountrySlug = exports.sanitizeImageUrl = exports.extractValidYoutubeId = exports.titleCaseArtistId = exports.normalizeArtistId = void 0;
+exports.scrapeImageUrlBackend = exports.checkVideoPlayability = exports.scrapeVideoIdBackend = exports.fetchNodeDetailsBackend = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = exports.NODE_DETAILS_SCHEMA = exports.generateGraphDataBackend = exports.generateRootsBreakdownBackend = exports.validateSeedOriginBackend = exports.SEED_VALIDATION_SCHEMA = exports.GENERATE_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = exports.GRAPH_RESPONSE_SCHEMA = exports.extractCleanJsonString = exports.extractArtistSubGraph = exports.normalizeGraphData = exports.buildCompositeCacheKey = exports.extractCountrySlug = exports.sanitizeImageUrl = exports.extractValidYoutubeId = exports.titleCaseArtistId = exports.normalizeArtistId = void 0;
 const genai_1 = require("@google/genai");
 // --- UTILITIES PORTED FROM artistCacheService.ts ---
 const normalizeArtistId = (name) => name
@@ -553,10 +553,64 @@ Follow these rules precisely:
 
 STRUCTURAL ONLY: You MUST NOT generate or include any biographies, summaries, member lists, discographies, or detailed profile metadata for the artists. The response must strictly contain only structural layout nodes (id, type, group) and connection links (source, target, value, context).
         
-ABSOLUTELY CRITICAL FINAL CHECK: Before you output the JSON, verify that for EVERY SINGLE OBJECT in the 'links' array, the value of its 'source' property and the value of its 'target' property perfectly match an 'id' from an object in the 'nodes' array. THERE MUST BE NO ORPHANED LINKS. If you create a link with a 'source' or 'target' ID (e.g., "Arista Records"), you MUST ALSO define a node with that exact same 'id' (e.g., { "id": "Arista Records", "type": "label", ... }). Do not invent connections to nodes you haven't defined. This is a architecture requirement.
-
-IMPORTANT: Ensure that any double quotes within string values are properly escaped (e.g., "Artist \\"Name\\""). The final output must be perfectly valid JSON. Do not emit literal '\\n' strings; use standard JSON string encoding for line breaks. Your entire response MUST be ONLY the raw JSON object, without any surrounding text, explanations, or markdown code fences.`;
+ABSOLUTELY CRITICAL FINAL CHECK: Before you output the JSON, verify that for EVERY SINGLE OBJECT in the 'links' array, the value of its 'source' property and the value of its 'target' property perfectly match an 'id' from an object in the 'nodes' array. THERE MUST BE NO ORPHANED LINKS. If you create a link with a 'source' or 'target' ID (e.g., "Arista Records"), you MUST ALSO define a node with that exact same 'id' (e.g., { "id": "Arista Records", "type": "label", ... }). Do not invent connections to nodes you haven't defined. This is a architecture requirement.`;
+// --- GEMINI CURATION CONFIGS ---
+exports.SEED_VALIDATION_SCHEMA = {
+    type: genai_1.Type.OBJECT,
+    properties: {
+        id: {
+            type: genai_1.Type.STRING,
+            description: "The canonical, professional name of the artist."
+        },
+        origin: {
+            type: genai_1.Type.STRING,
+            description: "The country of origin for the artist (e.g., 'USA', 'UK')."
+        },
+        genre: {
+            type: genai_1.Type.STRING,
+            description: "The primary genre of the artist."
+        },
+        isValid: {
+            type: genai_1.Type.BOOLEAN,
+            description: "True if this is a real, recognized musical entity. False if it is a hallucination or invalid input."
+        }
+    },
+    required: ["id", "origin", "genre", "isValid"]
+};
 // --- CORE CURATOR LOGIC ---
+const validateSeedOriginBackend = async (artistId) => {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+        throw new Error("GEMINI_API_KEY is not defined in environment secrets.");
+    }
+    const ai = new genai_1.GoogleGenAI({ apiKey, httpOptions: { timeout: 300000 } });
+    const currentModel = "gemini-3.5-flash-lite"; // Phase 2: Origin Validation uses Flash-Lite
+    const prompt = `Validate this seed artist: "${artistId}". Is this a real musical entity? Extract its canonical name, country of origin, and primary genre.`;
+    try {
+        const response = await ai.models.generateContent({
+            model: currentModel,
+            contents: prompt,
+            config: {
+                systemInstruction: "You are a music data validator. Return ONLY valid JSON matching the schema.",
+                temperature: 0.1, // very low temperature for validation
+                responseMimeType: "application/json",
+                responseSchema: exports.SEED_VALIDATION_SCHEMA
+            }
+        });
+        const jsonText = response.text?.trim() || "";
+        if (!jsonText)
+            throw new Error("Empty validation response");
+        const cleanedJsonText = (0, exports.extractCleanJsonString)(jsonText);
+        const data = JSON.parse(cleanedJsonText);
+        return data;
+    }
+    catch (err) {
+        console.error(`[validateSeedOriginBackend] Failed to validate seed ${artistId}:`, err);
+        // If it fails, default to valid so we don't break the pipeline on AI error, but log it
+        return { id: (0, exports.titleCaseArtistId)(artistId), origin: "", genre: "", isValid: true };
+    }
+};
+exports.validateSeedOriginBackend = validateSeedOriginBackend;
 const generateRootsBreakdownBackend = async (artists, detailsCacheEntries) => {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {

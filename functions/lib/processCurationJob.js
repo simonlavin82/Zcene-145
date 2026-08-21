@@ -227,25 +227,98 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 };
             }
             else {
+                // Parse seed artists list
+                const artistList = inputPayload.artists
+                    .split('::')
+                    .map((a) => a.trim())
+                    .filter(Boolean);
+                console.log(`[Curation Backend] [Phase 1: Global Cache Routing] Checking seeds: ${artistList.join(', ')}`);
+                const resolvedSeedArray = [];
+                let needsProGeneration = false;
+                for (const seed of artistList) {
+                    const seedNorm = (0, curatorService_1.normalizeArtistId)(seed);
+                    let cachedDetails = null;
+                    try {
+                        // We check artists collection primarily for seeds
+                        const cacheDoc = await db.collection("artists").doc(seedNorm).get();
+                        if (cacheDoc.exists) {
+                            const cacheData = cacheDoc.data();
+                            if (cacheData && cacheData.detailsCache) {
+                                cachedDetails = typeof cacheData.detailsCache === 'string' ? JSON.parse(cacheData.detailsCache) : cacheData.detailsCache;
+                                if (Array.isArray(cachedDetails) && cachedDetails.length > 0) {
+                                    const match = cachedDetails.find((item) => (0, curatorService_1.normalizeArtistId)(item[0]) === seedNorm);
+                                    if (match && match[1]) {
+                                        cachedDetails = match[1];
+                                    }
+                                    else {
+                                        cachedDetails = Array.isArray(cachedDetails[0]) ? cachedDetails[0][1] : cachedDetails[0];
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch (e) {
+                        console.warn(`Failed cache lookup for ${seedNorm}`, e);
+                    }
+                    if (cachedDetails && cachedDetails.summary && cachedDetails.summary.length > 50 && cachedDetails.details?.genre && cachedDetails.imageUrl) {
+                        console.log(`[Phase 1] Cache Hit for seed: ${seed}`);
+                        resolvedSeedArray.push({
+                            id: seedNorm,
+                            name: seed,
+                            origin: cachedDetails.details.origin || "",
+                            genre: cachedDetails.details.genre || "",
+                            isCacheHit: true
+                        });
+                    }
+                    else {
+                        console.log(`[Phase 1] Cache Miss for seed: ${seed}. Routing to Phase 2 (Flash-Lite).`);
+                        needsProGeneration = true; // Any miss requires Pro generation
+                        // Phase 2: Origin Validation (Flash-Lite)
+                        const validationResult = await (0, curatorService_1.validateSeedOriginBackend)(seed);
+                        if (validationResult.isValid) {
+                            resolvedSeedArray.push({
+                                id: (0, curatorService_1.normalizeArtistId)(validationResult.id),
+                                name: validationResult.id,
+                                origin: validationResult.origin,
+                                genre: validationResult.genre,
+                                isCacheHit: false
+                            });
+                        }
+                        else {
+                            throw new Error(`Validation failed for seed: ${seed}. It is not recognized as a valid musical entity.`);
+                        }
+                    }
+                }
+                // Multi-Seed Cache Bypass Rule: Even if all seeds hit cache, multi-seed still requires Pro generation
+                if (artistList.length > 1) {
+                    needsProGeneration = true;
+                }
+                console.log(`[Phase 3: The Aggregator Gate] Resolved Seed Array:`, resolvedSeedArray);
+                // --- HALT & RETURN TEMPORARY BOUNDARY FOR VERIFICATION ---
+                result = {
+                    status: "halted_at_aggregator_gate",
+                    resolvedSeedArray,
+                    needsProGeneration
+                };
+                const jobDocRefHalt = db.collection("curationJobs").doc(jobId);
+                await jobDocRefHalt.update({
+                    status: "completed",
+                    result,
+                    updatedAt: firestore_2.FieldValue.serverTimestamp()
+                });
+                if (inputPayload?.projectId && jobData.userId) {
+                    await updateProjectStatus(jobData.userId, inputPayload.projectId, { status: "completed", result });
+                }
+                return; // HALT
+                // --- END OF HALT BOUNDARY ---
                 let finalGraph = inputPayload.baseGraph;
-                if (!inputPayload.isSmartBypass) {
-                    console.log("[Curation Backend] [Step 1: Graph Generation Started] Executing live Gemini AI graph synthesis...");
-                    finalGraph = await (0, curatorService_1.generateGraphDataBackend)(inputPayload.artists, inputPayload.filters, inputPayload.cachedSubgraphsContext, inputPayload.baseGraph, inputPayload.disambiguationHints);
-                }
-                else {
-                    console.log("[Curation Backend] [Step 1: Graph Generation Bypassed] Smart Bypass active. Using baseGraph directly.");
-                }
                 // Structural Integrity Guard: Verify that we received a valid, rich graph from the model
                 const artistNodesCount = finalGraph.nodes?.filter((n) => n.type === 'artist' || !n.type).length || 0;
                 const minimumRequiredArtists = 2; // Seed artist + at least 1 recommendation
                 if (!finalGraph.nodes || finalGraph.nodes.length === 0 || artistNodesCount < minimumRequiredArtists) {
                     throw new Error(`Generated graph failed structural integrity check. Artist nodes count: ${artistNodesCount} (minimum required: ${minimumRequiredArtists}). Curation aborted.`);
                 }
-                // Parse seed artists list
-                const artistList = inputPayload.artists
-                    .split('::')
-                    .map((a) => a.trim())
-                    .filter(Boolean);
+                // Parse seed artists list (already done above)
                 // Strip regional slugs from the seed artists string to prevent prompt hallucination
                 const cleanSeedArtistsContext = artistList
                     .map((a) => stripCountrySlug(a))
@@ -560,7 +633,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         }
                         // Do NOT continue here. Let the seed fall through so it can be evaluated for partial hydration or missing assets during a cache upgrade.
                     }
-                    const recDetailsEntry = detailsCacheEntries.find(entry => isEntitySeedMatch(recNorm, entry[0]));
+                    const recDetailsEntry = detailsCacheEntries.find((entry) => isEntitySeedMatch(recNorm, entry[0]));
                     const recDetails = recDetailsEntry ? recDetailsEntry[1] : null;
                     if (isLabel && !recDetails) {
                         console.warn(`[Curation Backend] Label cache write skipped for "${recNorm}" — missing detailsCache.`);

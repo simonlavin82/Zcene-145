@@ -3,7 +3,6 @@ import { getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue, Timestamp } from "firebase-admin/firestore";
 import { translateError } from "./services/errorTranslationLayer";
 import {
-  generateGraphDataBackend,
   generateRootsBreakdownBackend,
   normalizeArtistId,
   fetchNodeDetailsBackend,
@@ -258,7 +257,7 @@ export const processCurationJob = onDocumentCreated({
           .map((a: string) => a.trim())
           .filter(Boolean);
 
-        console.log(\`[Curation Backend] [Phase 1: Global Cache Routing] Checking seeds: \${artistList.join(', ')}\`);
+        console.log(`[Curation Backend] [Phase 1: Global Cache Routing] Checking seeds: ${artistList.join(', ')}`);
         
         const resolvedSeedArray: any[] = [];
         let needsProGeneration = false;
@@ -285,11 +284,11 @@ export const processCurationJob = onDocumentCreated({
                 }
              }
            } catch (e) {
-              console.warn(\`Failed cache lookup for \${seedNorm}\`, e);
+              console.warn(`Failed cache lookup for ${seedNorm}`, e);
            }
            
            if (cachedDetails && cachedDetails.summary && cachedDetails.summary.length > 50 && cachedDetails.details?.genre && cachedDetails.imageUrl) {
-              console.log(\`[Phase 1] Cache Hit for seed: \${seed}\`);
+              console.log(`[Phase 1] Cache Hit for seed: ${seed}`);
               resolvedSeedArray.push({
                  id: seedNorm,
                  name: seed,
@@ -298,7 +297,7 @@ export const processCurationJob = onDocumentCreated({
                  isCacheHit: true
               });
            } else {
-              console.log(\`[Phase 1] Cache Miss for seed: \${seed}. Routing to Phase 2 (Flash-Lite).\`);
+              console.log(`[Phase 1] Cache Miss for seed: ${seed}. Routing to Phase 2 (Flash-Lite).`);
               needsProGeneration = true; // Any miss requires Pro generation
               
               // Phase 2: Origin Validation (Flash-Lite)
@@ -312,7 +311,7 @@ export const processCurationJob = onDocumentCreated({
                     isCacheHit: false
                  });
               } else {
-                 throw new Error(\`Validation failed for seed: \${seed}. It is not recognized as a valid musical entity.\`);
+                 throw new Error(`Validation failed for seed: ${seed}. It is not recognized as a valid musical entity.`);
               }
            }
         }
@@ -322,7 +321,7 @@ export const processCurationJob = onDocumentCreated({
            needsProGeneration = true;
         }
 
-        console.log(\`[Phase 3: The Aggregator Gate] Resolved Seed Array:\`, resolvedSeedArray);
+        console.log(`[Phase 3: The Aggregator Gate] Resolved Seed Array:`, resolvedSeedArray);
         
         // --- HALT & RETURN TEMPORARY BOUNDARY FOR VERIFICATION ---
         result = {
@@ -355,11 +354,7 @@ export const processCurationJob = onDocumentCreated({
         }
 
 
-        // Parse seed artists list
-        const artistList = inputPayload.artists
-          .split('::')
-          .map((a: string) => a.trim())
-          .filter(Boolean);
+        // Parse seed artists list (already done above)
 
         // Strip regional slugs from the seed artists string to prevent prompt hallucination
         const cleanSeedArtistsContext = artistList
@@ -716,8 +711,8 @@ export const processCurationJob = onDocumentCreated({
             // Do NOT continue here. Let the seed fall through so it can be evaluated for partial hydration or missing assets during a cache upgrade.
           }
           
-          const recDetailsEntry = detailsCacheEntries.find(entry => isEntitySeedMatch(recNorm, entry[0]));
-          const recDetails = recDetailsEntry ? recDetailsEntry[1] : null;
+          const recDetailsEntry = detailsCacheEntries.find((entry: any) => isEntitySeedMatch(recNorm, entry[0]));
+          const recDetails = recDetailsEntry ? (recDetailsEntry as any)[1] : null;
 
           if (isLabel && !recDetails) {
             console.warn(`[Curation Backend] Label cache write skipped for "${recNorm}" — missing detailsCache.`);
@@ -747,10 +742,10 @@ export const processCurationJob = onDocumentCreated({
           }
 
           // Use the pre-canonicalized ID from the hydration phase, or fallback to the rec norm
-          const disambiguatedCanonicalId = recDetailsEntry ? recDetailsEntry[0] : recNorm;
+          const disambiguatedCanonicalId = recDetailsEntry ? (recDetailsEntry as any)[0] : recNorm;
           const compositeCanonicalId = buildCompositeCacheKey(disambiguatedCanonicalId, inputPayload.filters || undefined);
           idRewriteMap.set(recNorm, compositeCanonicalId);
-          if (recDetailsEntry) recDetailsEntry[0] = compositeCanonicalId;
+          if (recDetailsEntry) (recDetailsEntry as any)[0] = compositeCanonicalId;
 
           const recDocRef = db.collection(collName).doc(compositeCanonicalId);
             const recSnap = await recDocRef.get();
@@ -759,7 +754,7 @@ export const processCurationJob = onDocumentCreated({
               const finalRecDetails = isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(normalizeDetailsForWrite(recDetails));
               
               if (recDetailsEntry) {
-                recDetailsEntry[1] = finalRecDetails;
+                (recDetailsEntry as any)[1] = finalRecDetails;
               }
 
               const extractedGraph = matchingSeedNorm && !isLabel ? extractArtistSubGraph(matchingSeedNorm, finalGraph, artistList) : null;
@@ -784,7 +779,7 @@ export const processCurationJob = onDocumentCreated({
               const finalRecDetails = isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(normalizeDetailsForWrite(recDetails));
               
               if (recDetailsEntry) {
-                recDetailsEntry[1] = finalRecDetails;
+                (recDetailsEntry as any)[1] = finalRecDetails;
               }
 
               const updatePayload: any = {
