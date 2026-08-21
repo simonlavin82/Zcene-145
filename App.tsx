@@ -95,16 +95,22 @@ const generateGraphDataViaCloudJob = async (
     ...(seedImageUrl && { seedImageUrl })
   };
 
-  await setDoc(jobRef, {
-    jobId: finalJobId,
-    userId,
-    status: 'pending',
-    jobType: 'graph_generation',
-    inputPayload: stripUndefinedProperties(payload),
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-    expireAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
-  });
+  try {
+    await setDoc(jobRef, {
+      jobId: finalJobId,
+      userId,
+      status: 'pending',
+      jobType: 'graph_generation',
+      inputPayload: stripUndefinedProperties(payload),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      expireAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
+    });
+  } catch (error) {
+    console.error("🔥 FIREBASE WRITE FAILED:", error);
+    console.log("Payload attempted:", payload);
+    throw error;
+  }
 
   return new Promise((resolve, reject) => {
     let hasAborted = false;
