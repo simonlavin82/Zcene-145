@@ -792,6 +792,7 @@ export const generateGraphDataBackend = async (
 
       filterRules += "\n\nIMPORTANT: Do NOT include any search citations or footnotes. The JSON must be clean.";
       filterRules += `\n\n(Note: The seed artists [${artists}] are the ONLY exception. ALL other artists MUST obey these rules.)`;
+      filterRules += "\n\nCAPACITY LIMIT: You MUST NOT generate more than 25 nodes in total. Quality over quantity. If you hit 25 nodes, stop adding new ones.";
       filterRules += "\n\nFINAL VERIFICATION: Audit your list. If an artist violates any rules above, delete them.";
       
       systemInstruction += filterRules;
@@ -1346,14 +1347,17 @@ export const fetchNodeDetailsBackend = async (
 
   while (attempts < MAX_ATTEMPTS && !details) {
     try {
-      const response = await ai.models.generateContent({
-        model: currentModel,
-        contents: prompt,
-        config: {
-          tools: [{ googleSearch: {} }],
-          temperature: 0.4 - (attempts * 0.1) // Lower temperature on retries
-        }
-      });
+      const response = await Promise.race([
+        ai.models.generateContent({
+          model: currentModel,
+          contents: prompt,
+          config: {
+            tools: [{ googleSearch: {} }],
+            temperature: 0.4 - (attempts * 0.1) // Lower temperature on retries
+          }
+        }),
+        new Promise<any>((_, reject) => setTimeout(() => reject(new Error('AbortError: Timeout exceeded')), 25000))
+      ]);
       lastResponse = response;
       const jsonText = response.text?.trim();
       if (!jsonText) {
@@ -1406,6 +1410,9 @@ export const fetchNodeDetailsBackend = async (
     } catch (error: any) {
       attempts++;
       console.warn(`[Curation Backend] fetchNodeDetailsBackend attempt ${attempts} failed for ${node.id}: ${error.message}`);
+      if (error.message.includes('AbortError')) {
+         return null; // Strict 12s timeout fallback
+      }
       if (attempts >= MAX_ATTEMPTS) {
         throw new Error(`fetchNodeDetailsBackend failed after ${MAX_ATTEMPTS} attempts: ${error.message}`);
       }
@@ -1498,21 +1505,28 @@ export const scrapeVideoIdBackend = async (
 Look at the top organic YouTube video in search results. Extract its 11-character video ID (the string after v= or inside the URL). Return ONLY the 11-character video ID as a plain string. Do not include any JSON, quotes, explanations, markdown, or other text. If not found, return "null".`;
 
   try {
-    const response = await ai.models.generateContent({
-      model: currentModel,
-      contents: prompt,
-      config: {
-        tools: [{ googleSearch: {} }],
-        maxOutputTokens: 200,
-      }
-    });
+    const response = await Promise.race([
+      ai.models.generateContent({
+        model: currentModel,
+        contents: prompt,
+        config: {
+          tools: [{ googleSearch: {} }],
+          maxOutputTokens: 200,
+        }
+      }),
+      new Promise<any>((_, reject) => setTimeout(() => reject(new Error('AbortError: Timeout exceeded')), 12000))
+    ]);
 
     const text = response.text?.trim();
     if (!text) return null;
 
     const id = extractValidYoutubeId(text);
     return id || null;
-  } catch (err) {
+  } catch (err: any) {
+    if (err.message && err.message.includes('AbortError')) {
+      console.warn(`[scrapeVideoIdBackend] 12s timeout exceeded for ${artistName}. Returning null.`);
+      return null;
+    }
     console.error(`[scrapeVideoIdBackend] Scrape failed for ${artistName}:`, err);
     return null;
   }
@@ -1643,14 +1657,17 @@ CRITICAL OUTPUT REQUIREMENTS:
 2. If you cannot find ANY verified image from the priority sources above, state that no verified image was found.`;
 
   try {
-    const response = await ai.models.generateContent({
-      model: currentModel,
-      contents: prompt,
-      config: {
-        tools: [{ googleSearch: {} }],
-        maxOutputTokens: 200,
-      }
-    });
+    const response = await Promise.race([
+      ai.models.generateContent({
+        model: currentModel,
+        contents: prompt,
+        config: {
+          tools: [{ googleSearch: {} }],
+          maxOutputTokens: 200,
+        }
+      }),
+      new Promise<any>((_, reject) => setTimeout(() => reject(new Error('AbortError: Timeout exceeded')), 12000))
+    ]);
 
     const text = response.text?.trim() || '';
     if (text.toLowerCase().includes('null') && !text.includes('http')) return null;
@@ -1690,7 +1707,11 @@ CRITICAL OUTPUT REQUIREMENTS:
       }
     }
     return null;
-  } catch (err) {
+  } catch (err: any) {
+    if (err.message && err.message.includes('AbortError')) {
+      console.warn(`[scrapeImageUrlBackend] 12s timeout exceeded for ${artistName}. Returning null.`);
+      return null;
+    }
     console.error(`[scrapeImageUrlBackend] Scrape failed for ${artistName}:`, err);
     return null;
   }

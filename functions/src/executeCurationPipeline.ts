@@ -104,6 +104,7 @@ export const executeCurationPipeline = onCall({
   timeoutSeconds: 540,
   memory: "1GiB",
 }, async (request) => {
+  const PIPELINE_START_TIME = Date.now();
   const payload = request.data;
   console.log(`[Curation Backend] Executing executeCurationPipeline with payload:`, payload);
 
@@ -237,10 +238,14 @@ export const executeCurationPipeline = onCall({
   console.log(`[Pipeline Diamond] -> 3.1 Pro Deep Cuts & Positioning (${recommendedEntities.length} entities)`);
 
   const detailsCacheEntries: [string, any][] = [];
-  const batchSize = 5;
+  const batchSize = 4;
   for (let i = 0; i < recommendedEntities.length; i += batchSize) {
+    if (Date.now() - PIPELINE_START_TIME > 480000) {
+      console.warn(`[Pipeline Diamond] Safe-Exit Stopwatch Triggered at ${i} entities to prevent timeout.`);
+      break;
+    }
     const chunk = recommendedEntities.slice(i, i + batchSize);
-    const chunkResults = await Promise.all(
+    const chunkResults = await Promise.allSettled(
       chunk.map(async (entityObj: any, idx: number) => {
         const rawName = entityObj.name;
         let artistNormId = normalizeArtistId(rawName);
@@ -322,13 +327,19 @@ export const executeCurationPipeline = onCall({
       })
     );
     for (const res of chunkResults) {
-      if (res) {
-        const existingIndex = detailsCacheEntries.findIndex((entry: any) => isEntitySeedMatch(normalizeArtistId(res[0]), entry[0]));
-        if (existingIndex !== -1) detailsCacheEntries[existingIndex] = res;
-        else detailsCacheEntries.push(res);
+      if (res.status === 'fulfilled' && res.value) {
+        const [normId, details] = res.value;
+        const isComplete = details && details.summary && details.summary.length > 50 && details.details?.genre && details.imageUrl;
+        if (isComplete) {
+          const existingIndex = detailsCacheEntries.findIndex((entry: any) => isEntitySeedMatch(normalizeArtistId(normId), entry[0]));
+          if (existingIndex !== -1) detailsCacheEntries[existingIndex] = res.value;
+          else detailsCacheEntries.push(res.value);
+        } else {
+          console.warn(`[Pipeline Diamond] Culling node ${normId} due to incomplete details (Quality Rule).`);
+        }
       }
     }
-    if (i + batchSize < recommendedEntities.length) await new Promise(resolve => setTimeout(resolve, 3000));
+    if (i + batchSize < recommendedEntities.length) await new Promise(resolve => setTimeout(resolve, 2000));
   }
 
   const hydratedNorms = new Set<string>(detailsCacheEntries.map(entry => normalizeArtistId(entry[0])));
@@ -362,10 +373,8 @@ export const executeCurationPipeline = onCall({
   // DB Write-back logic (Project + Cache)
   const seedNorms = artistList.map((a: string) => normalizeArtistId(a));
   
-  // NOTE: In the new architecture, the multi-seed graph is project-scoped. Single-seed writes to global cache.
-  // The backend writes to global cache as necessary. Project update is returned to the client to update directly,
-  // or we can update project here. For a direct callable, it's safer to return the final payload and let the client
-  // handle the project update locally to avoid race conditions.
+  // Note: We now update the project document synchronously on the backend to avoid 
+  // client-side disconnections stranding the project in a 'curating' state.
 
   for (const entityObj of recommendedEntities) {
       const recArtist = entityObj.name;
@@ -422,6 +431,19 @@ export const executeCurationPipeline = onCall({
               await recDocRef.update(updatePayload).catch(console.error);
           }
       }).catch(console.error);
+  }
+
+  if (payload.userId && payload.projectId) {
+    try {
+      await db.collection('users').doc(payload.userId).collection('projects').doc(payload.projectId).update({
+        graphData: JSON.stringify(finalGraph),
+        status: 'completed',
+        updatedAt: FieldValue.serverTimestamp()
+      });
+      console.log(`[Pipeline Diamond] -> Successfully updated project ${payload.projectId} via Admin SDK`);
+    } catch (err) {
+      console.error(`[Pipeline Diamond] -> Failed to update project doc ${payload.projectId}`, err);
+    }
   }
 
   console.log(`[Pipeline Diamond] -> Curation Complete, returning payload to client`);

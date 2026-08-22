@@ -85,6 +85,7 @@ const generateGraphDataViaCloudJob = async (
   const payload = {
     artists,
     filters,
+    ...(userId && { userId }),
     ...(projectId && { projectId }),
     ...(disambiguationHints && { disambiguationHints }),
     ...(baseGraph && { baseGraph }),
@@ -102,7 +103,7 @@ const generateGraphDataViaCloudJob = async (
     if (data.detailsCache && onDetailsCacheReceived) {
       onDetailsCacheReceived(data.detailsCache);
     }
-    
+
     return data.graphData;
   } catch (error) {
     console.error("🔥 HTTPS CALLABLE FAILED:", error);
