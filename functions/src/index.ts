@@ -1,4 +1,4 @@
 import { processCurationJob } from "./processCurationJob";
-import { executeCurationPipeline } from "./executeCurationPipeline";
+import { executeCurationPipeline, validateSeedOrigin } from "./executeCurationPipeline";
 
-export { processCurationJob, executeCurationPipeline };
+export { processCurationJob, executeCurationPipeline, validateSeedOrigin };

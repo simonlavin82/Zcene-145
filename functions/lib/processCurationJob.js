@@ -11,7 +11,12 @@ if ((0, app_1.getApps)().length === 0) {
     (0, app_1.initializeApp)();
 }
 const db = (0, firestore_2.getFirestore)();
-db.settings({ ignoreUndefinedProperties: true });
+try {
+    db.settings({ ignoreUndefinedProperties: true });
+}
+catch (e) {
+    // Ignore if already set by another function module
+}
 /**
  * Sanity Check: Validate that detailsCache is a structured object matching the schema,
  * and specifically reject raw strings or arrays of entries to prevent database pollution.

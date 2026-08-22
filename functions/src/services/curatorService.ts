@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { GraphData, Node, Link, DiscoveryFilters } from "../types";
+import { stripCountrySlug } from "../executeCurationPipeline";
 
 // --- UTILITIES PORTED FROM artistCacheService.ts ---
 
@@ -1297,8 +1298,13 @@ export const fetchNodeDetailsBackend = async (
 
   const currentDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
+  let searchArtistName = stripCountrySlug(node.id);
+  if (node.label && node.label !== node.id) {
+    searchArtistName = node.label;
+  }
+
   let prompt = FETCH_NODE_DETAILS_PROMPT_TEMPLATE
-    .replace('{{nodeIdentifier}}', node.label || node.id)
+    .replace('{{nodeIdentifier}}', searchArtistName)
     .replace('{{nodeType}}', node.type)
     .replace('{{seedArtists}}', seedArtists)
     .replace('{{contextNodes}}', contextNodes)

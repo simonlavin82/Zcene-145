@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.scrapeImageUrlBackend = exports.checkVideoPlayability = exports.scrapeVideoIdBackend = exports.fetchNodeDetailsBackend = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = exports.NODE_DETAILS_SCHEMA = exports.generateGraphDataBackend = exports.generateRootsBreakdownBackend = exports.validateSeedOriginBackend = exports.SEED_VALIDATION_SCHEMA = exports.GENERATE_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = exports.GRAPH_RESPONSE_SCHEMA = exports.extractCleanJsonString = exports.extractArtistSubGraph = exports.normalizeGraphData = exports.buildCompositeCacheKey = exports.extractCountrySlug = exports.sanitizeImageUrl = exports.extractValidYoutubeId = exports.titleCaseArtistId = exports.normalizeArtistId = void 0;
 const genai_1 = require("@google/genai");
+const executeCurationPipeline_1 = require("../executeCurationPipeline");
 // --- UTILITIES PORTED FROM artistCacheService.ts ---
 const normalizeArtistId = (name) => name
     .normalize("NFD")
@@ -1183,8 +1184,12 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint)
         .slice(0, 10)
         .join(', ');
     const currentDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    let searchArtistName = (0, executeCurationPipeline_1.stripCountrySlug)(node.id);
+    if (node.label && node.label !== node.id) {
+        searchArtistName = node.label;
+    }
     let prompt = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE
-        .replace('{{nodeIdentifier}}', node.label || node.id)
+        .replace('{{nodeIdentifier}}', searchArtistName)
         .replace('{{nodeType}}', node.type)
         .replace('{{seedArtists}}', seedArtists)
         .replace('{{contextNodes}}', contextNodes)

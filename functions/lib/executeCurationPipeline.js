@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.executeCurationPipeline = void 0;
+exports.executeCurationPipeline = exports.validateSeedOrigin = void 0;
+exports.stripCountrySlug = stripCountrySlug;
 const https_1 = require("firebase-functions/v2/https");
 const app_1 = require("firebase-admin/app");
 const firestore_1 = require("firebase-admin/firestore");
@@ -90,6 +91,18 @@ function stripCountrySlug(name) {
     }
     return cleanName;
 }
+exports.validateSeedOrigin = (0, https_1.onCall)({
+    secrets: ["GEMINI_API_KEY"],
+    timeoutSeconds: 60,
+    memory: "512MiB",
+}, async (request) => {
+    const { seed } = request.data;
+    if (!seed) {
+        throw new https_1.HttpsError("invalid-argument", "Missing seed in payload");
+    }
+    const validationResult = await (0, curatorService_1.validateSeedOriginBackend)(seed);
+    return validationResult;
+});
 exports.executeCurationPipeline = (0, https_1.onCall)({
     secrets: ["GEMINI_API_KEY"],
     timeoutSeconds: 540,
@@ -145,7 +158,13 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
         else {
             console.log(`[Pipeline Diamond] -> Is Hit? No -> Flash-Lite Origin Validation: ${seed}`);
             needsProGeneration = true;
-            const validationResult = await (0, curatorService_1.validateSeedOriginBackend)(seed);
+            let validationResult = null;
+            if (payload.disambiguationHints && payload.disambiguationHints[(0, curatorService_1.normalizeArtistId)(seed)]) {
+                validationResult = { isValid: true, id: seed, origin: payload.disambiguationHints[(0, curatorService_1.normalizeArtistId)(seed)], genre: "Unknown" };
+            }
+            else {
+                validationResult = await (0, curatorService_1.validateSeedOriginBackend)(seed);
+            }
             if (validationResult.isValid) {
                 resolvedSeedArray.push({
                     id: (0, curatorService_1.normalizeArtistId)(validationResult.id),
@@ -262,7 +281,7 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
                 if (!details.youtubeVideoId && !isLabel)
                     requiresVideoScraping = true;
             }
-            const tempNode = { id: searchArtistName, type: entityObj.type, group: 1 };
+            const tempNode = { id: rawName, label: searchArtistName, type: entityObj.type, group: 1 };
             if (idx > 0 && (requiresTextHydration || requiresImageScraping || requiresVideoScraping)) {
                 await new Promise(resolve => setTimeout(resolve, idx * 1000));
             }
@@ -309,7 +328,9 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
         for (const res of chunkResults) {
             if (res.status === 'fulfilled' && res.value) {
                 const [normId, details] = res.value;
-                const isComplete = details && details.summary && details.summary.length > 50 && details.details?.genre && details.imageUrl;
+                const originalNode = recommendedEntities.find((n) => (0, curatorService_1.normalizeArtistId)(n.name) === normId || (0, curatorService_1.normalizeArtistId)(n.name) === (0, curatorService_1.normalizeArtistId)(stripCountrySlug(normId)));
+                const isLabelType = originalNode?.type === 'label';
+                const isComplete = details && details.summary && details.summary.length > 50 && details.details?.genre && (details.imageUrl || isLabelType);
                 if (isComplete) {
                     const existingIndex = detailsCacheEntries.findIndex((entry) => isEntitySeedMatch((0, curatorService_1.normalizeArtistId)(normId), entry[0]));
                     if (existingIndex !== -1)
@@ -355,6 +376,32 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
                     !prunedIds.has((0, curatorService_1.normalizeArtistId)(srcId || '')) &&
                     !prunedIds.has((0, curatorService_1.normalizeArtistId)(tgtId || ''));
             });
+            const linkedNodeIds = new Set();
+            finalGraph.links.forEach((l) => {
+                const s = typeof l.source === 'string' ? l.source : l.source?.id;
+                const t = typeof l.target === 'string' ? l.target : l.target?.id;
+                if (s) {
+                    linkedNodeIds.add(s);
+                    linkedNodeIds.add(s.toLowerCase());
+                    linkedNodeIds.add((0, curatorService_1.normalizeArtistId)(s));
+                }
+                if (t) {
+                    linkedNodeIds.add(t);
+                    linkedNodeIds.add(t.toLowerCase());
+                    linkedNodeIds.add((0, curatorService_1.normalizeArtistId)(t));
+                }
+            });
+            finalGraph.nodes = finalGraph.nodes.filter((node) => {
+                if (node.type !== 'artist' && node.type !== 'label')
+                    return true;
+                const isLinked = linkedNodeIds.has(node.id) || linkedNodeIds.has(node.id.toLowerCase()) || linkedNodeIds.has((0, curatorService_1.normalizeArtistId)(node.id));
+                const isSeedNode = Array.from(seedNormSet).some((s) => isEntitySeedMatch(s, (0, curatorService_1.normalizeArtistId)(node.id)));
+                if (!isLinked && !isSeedNode) {
+                    console.warn(`[Pipeline Diamond] Sweeping orphaned node: ${node.id}`);
+                    return false;
+                }
+                return true;
+            });
         }
     }
     console.log(`[Pipeline Diamond] -> 3.1 Pro Roots Breakdown`);
@@ -366,7 +413,13 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
     // client-side disconnections stranding the project in a 'curating' state.
     for (const entityObj of recommendedEntities) {
         const recArtist = entityObj.name;
-        const recNorm = (0, curatorService_1.normalizeArtistId)(recArtist);
+        const cleanArtist = stripCountrySlug(recArtist);
+        let recNorm = (0, curatorService_1.normalizeArtistId)(cleanArtist);
+        if (entityObj.origin) {
+            const originSlug = (0, curatorService_1.extractCountrySlug)(entityObj.origin);
+            if (!recNorm.endsWith(`-${originSlug}`))
+                recNorm = `${recNorm}-${originSlug}`;
+        }
         const isLabel = entityObj.type === 'label';
         const matchingSeedNorm = seedNorms.find((s) => isEntitySeedMatch(s, recNorm));
         const recDetailsEntry = detailsCacheEntries.find((entry) => isEntitySeedMatch(recNorm, entry[0]));

@@ -88,7 +88,7 @@ const KNOWN_COUNTRY_SLUGS = [
   '-switzerland', '-uk', '-usa', '-us'
 ];
 
-function stripCountrySlug(name: string): string {
+export function stripCountrySlug(name: string): string {
   let cleanName = name.trim();
   for (const suffix of KNOWN_COUNTRY_SLUGS) {
     if (cleanName.toLowerCase().endsWith(suffix)) {
@@ -98,6 +98,19 @@ function stripCountrySlug(name: string): string {
   }
   return cleanName;
 }
+
+export const validateSeedOrigin = onCall({
+  secrets: ["GEMINI_API_KEY"],
+  timeoutSeconds: 60,
+  memory: "512MiB",
+}, async (request) => {
+  const { seed } = request.data;
+  if (!seed) {
+    throw new HttpsError("invalid-argument", "Missing seed in payload");
+  }
+  const validationResult = await validateSeedOriginBackend(seed);
+  return validationResult;
+});
 
 export const executeCurationPipeline = onCall({
   secrets: ["GEMINI_API_KEY"],
@@ -159,7 +172,12 @@ export const executeCurationPipeline = onCall({
         console.log(`[Pipeline Diamond] -> Is Hit? No -> Flash-Lite Origin Validation: ${seed}`);
         needsProGeneration = true;
         
-        const validationResult = await validateSeedOriginBackend(seed);
+        let validationResult: any = null;
+        if (payload.disambiguationHints && payload.disambiguationHints[normalizeArtistId(seed)]) {
+           validationResult = { isValid: true, id: seed, origin: payload.disambiguationHints[normalizeArtistId(seed)], genre: "Unknown" };
+        } else {
+           validationResult = await validateSeedOriginBackend(seed);
+        }
         if (validationResult.isValid) {
            resolvedSeedArray.push({
               id: normalizeArtistId(validationResult.id),
@@ -287,7 +305,7 @@ export const executeCurationPipeline = onCall({
           if (!details.youtubeVideoId && !isLabel) requiresVideoScraping = true;
         }
 
-        const tempNode = { id: searchArtistName, type: entityObj.type, group: 1 };
+        const tempNode = { id: rawName, label: searchArtistName, type: entityObj.type, group: 1 };
         if (idx > 0 && (requiresTextHydration || requiresImageScraping || requiresVideoScraping)) {
           await new Promise(resolve => setTimeout(resolve, idx * 1000));
         }
@@ -329,7 +347,9 @@ export const executeCurationPipeline = onCall({
     for (const res of chunkResults) {
       if (res.status === 'fulfilled' && res.value) {
         const [normId, details] = res.value;
-        const isComplete = details && details.summary && details.summary.length > 50 && details.details?.genre && details.imageUrl;
+        const originalNode = recommendedEntities.find((n: any) => normalizeArtistId(n.name) === normId || normalizeArtistId(n.name) === normalizeArtistId(stripCountrySlug(normId)));
+        const isLabelType = originalNode?.type === 'label';
+        const isComplete = details && details.summary && details.summary.length > 50 && details.details?.genre && (details.imageUrl || isLabelType);
         if (isComplete) {
           const existingIndex = detailsCacheEntries.findIndex((entry: any) => isEntitySeedMatch(normalizeArtistId(normId), entry[0]));
           if (existingIndex !== -1) detailsCacheEntries[existingIndex] = res.value;
@@ -374,6 +394,35 @@ export const executeCurationPipeline = onCall({
                !prunedIds.has(normalizeArtistId(srcId || '')) &&
                !prunedIds.has(normalizeArtistId(tgtId || ''));
       });
+      
+      const linkedNodeIds = new Set<string>();
+      finalGraph.links.forEach((l: any) => {
+          const s = typeof l.source === 'string' ? l.source : (l.source as any)?.id;
+          const t = typeof l.target === 'string' ? l.target : (l.target as any)?.id;
+          if (s) {
+              linkedNodeIds.add(s);
+              linkedNodeIds.add(s.toLowerCase());
+              linkedNodeIds.add(normalizeArtistId(s));
+          }
+          if (t) {
+              linkedNodeIds.add(t);
+              linkedNodeIds.add(t.toLowerCase());
+              linkedNodeIds.add(normalizeArtistId(t));
+          }
+      });
+      
+      finalGraph.nodes = finalGraph.nodes.filter((node: any) => {
+          if (node.type !== 'artist' && node.type !== 'label') return true;
+          
+          const isLinked = linkedNodeIds.has(node.id) || linkedNodeIds.has(node.id.toLowerCase()) || linkedNodeIds.has(normalizeArtistId(node.id));
+          const isSeedNode = Array.from(seedNormSet).some((s: string) => isEntitySeedMatch(s, normalizeArtistId(node.id)));
+          
+          if (!isLinked && !isSeedNode) {
+              console.warn(`[Pipeline Diamond] Sweeping orphaned node: ${node.id}`);
+              return false;
+          }
+          return true;
+      });
     }
   }
 
@@ -389,7 +438,12 @@ export const executeCurationPipeline = onCall({
 
   for (const entityObj of recommendedEntities) {
       const recArtist = entityObj.name;
-      const recNorm = normalizeArtistId(recArtist);
+      const cleanArtist = stripCountrySlug(recArtist);
+      let recNorm = normalizeArtistId(cleanArtist);
+      if (entityObj.origin) {
+          const originSlug = extractCountrySlug(entityObj.origin);
+          if (!recNorm.endsWith(`-${originSlug}`)) recNorm = `${recNorm}-${originSlug}`;
+      }
       const isLabel = entityObj.type === 'label';
       const matchingSeedNorm = seedNorms.find((s: string) => isEntitySeedMatch(s, recNorm));
       

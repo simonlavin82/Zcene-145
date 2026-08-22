@@ -2841,6 +2841,40 @@ const App: React.FC = () => {
               isLiveAISuggestions: false
             });
           });
+        } else if (!bypassTokenConfirmation) {
+          setIsLoading(true);
+          try {
+            const validate = httpsCallable(functions, 'validateSeedOrigin');
+            const result = await validate({ seed: rawInput });
+            const data = result.data as any;
+            if (data && data.isValid) {
+              const aiCandidate = {
+                id: data.id,
+                label: data.id,
+                name: data.id,
+                genre: data.genre,
+                origin: data.origin,
+                listeners: 0
+              };
+              choice = await new Promise<string | 'synthesis' | 'cancel'>((resolve) => {
+                setDisambiguationDialog({
+                  isOpen: true,
+                  query: rawInput,
+                  candidates: [aiCandidate],
+                  onSelect: (c) => { setDisambiguationDialog(null); resolve(c); },
+                  isLiveAISuggestions: true
+                });
+              });
+              if (choice !== 'cancel' && choice !== 'synthesis') {
+                activeDisambiguationHints[normalizeArtistId(rawInput)] = data.origin;
+              }
+            }
+          } catch (e) {
+            console.warn("Origin validation failed:", e);
+          }
+          setIsLoading(false);
+          isHydratingSessionRef.current = false;
+          isProjectLoadingRef.current = false;
         }
 
         if (choice === 'cancel') {
