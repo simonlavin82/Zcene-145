@@ -395,6 +395,28 @@ export const executeCurationPipeline = onCall({
                !prunedIds.has(normalizeArtistId(tgtId || ''));
       });
       
+      if (finalGraph.nodes && finalGraph.links) {
+        finalGraph.links.forEach((link: any) => {
+          const srcId = typeof link.source === 'string' ? link.source : (link.source as any)?.id;
+          const tgtId = typeof link.target === 'string' ? link.target : (link.target as any)?.id;
+          
+          if (srcId) {
+             const matchedSrc = finalGraph.nodes.find((n: any) => isEntitySeedMatch(normalizeArtistId(srcId), normalizeArtistId(n.id)));
+             if (matchedSrc) {
+                if (typeof link.source === 'string') link.source = matchedSrc.id;
+                else link.source.id = matchedSrc.id;
+             }
+          }
+          if (tgtId) {
+             const matchedTgt = finalGraph.nodes.find((n: any) => isEntitySeedMatch(normalizeArtistId(tgtId), normalizeArtistId(n.id)));
+             if (matchedTgt) {
+                if (typeof link.target === 'string') link.target = matchedTgt.id;
+                else link.target.id = matchedTgt.id;
+             }
+          }
+        });
+      }
+      
       const linkedNodeIds = new Set<string>();
       finalGraph.links.forEach((l: any) => {
           const s = typeof l.source === 'string' ? l.source : (l.source as any)?.id;
@@ -500,11 +522,26 @@ export const executeCurationPipeline = onCall({
 
   if (payload.userId && payload.projectId) {
     try {
-      await db.collection('users').doc(payload.userId).collection('projects').doc(payload.projectId).update({
+      let seedImageUrl = "";
+      if (artistList.length > 0) {
+          const primarySeedNorm = normalizeArtistId(artistList[0]);
+          const seedEntry = detailsCacheEntries.find(e => normalizeArtistId(e[0]) === primarySeedNorm);
+          if (seedEntry && seedEntry[1] && seedEntry[1].imageUrl) {
+              seedImageUrl = seedEntry[1].imageUrl;
+          }
+      }
+
+      const projectUpdate: any = {
         graphData: JSON.stringify(finalGraph),
         status: 'completed',
         updatedAt: FieldValue.serverTimestamp()
-      });
+      };
+      
+      if (seedImageUrl) {
+          projectUpdate.imageUrl = seedImageUrl;
+      }
+
+      await db.collection('users').doc(payload.userId).collection('projects').doc(payload.projectId).update(projectUpdate);
       console.log(`[Pipeline Diamond] -> Successfully updated project ${payload.projectId} via Admin SDK`);
     } catch (err) {
       console.error(`[Pipeline Diamond] -> Failed to update project doc ${payload.projectId}`, err);

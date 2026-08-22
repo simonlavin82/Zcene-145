@@ -376,6 +376,30 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
                     !prunedIds.has((0, curatorService_1.normalizeArtistId)(srcId || '')) &&
                     !prunedIds.has((0, curatorService_1.normalizeArtistId)(tgtId || ''));
             });
+            if (finalGraph.nodes && finalGraph.links) {
+                finalGraph.links.forEach((link) => {
+                    const srcId = typeof link.source === 'string' ? link.source : link.source?.id;
+                    const tgtId = typeof link.target === 'string' ? link.target : link.target?.id;
+                    if (srcId) {
+                        const matchedSrc = finalGraph.nodes.find((n) => isEntitySeedMatch((0, curatorService_1.normalizeArtistId)(srcId), (0, curatorService_1.normalizeArtistId)(n.id)));
+                        if (matchedSrc) {
+                            if (typeof link.source === 'string')
+                                link.source = matchedSrc.id;
+                            else
+                                link.source.id = matchedSrc.id;
+                        }
+                    }
+                    if (tgtId) {
+                        const matchedTgt = finalGraph.nodes.find((n) => isEntitySeedMatch((0, curatorService_1.normalizeArtistId)(tgtId), (0, curatorService_1.normalizeArtistId)(n.id)));
+                        if (matchedTgt) {
+                            if (typeof link.target === 'string')
+                                link.target = matchedTgt.id;
+                            else
+                                link.target.id = matchedTgt.id;
+                        }
+                    }
+                });
+            }
             const linkedNodeIds = new Set();
             finalGraph.links.forEach((l) => {
                 const s = typeof l.source === 'string' ? l.source : l.source?.id;
@@ -474,11 +498,23 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
     }
     if (payload.userId && payload.projectId) {
         try {
-            await db.collection('users').doc(payload.userId).collection('projects').doc(payload.projectId).update({
+            let seedImageUrl = "";
+            if (artistList.length > 0) {
+                const primarySeedNorm = (0, curatorService_1.normalizeArtistId)(artistList[0]);
+                const seedEntry = detailsCacheEntries.find(e => (0, curatorService_1.normalizeArtistId)(e[0]) === primarySeedNorm);
+                if (seedEntry && seedEntry[1] && seedEntry[1].imageUrl) {
+                    seedImageUrl = seedEntry[1].imageUrl;
+                }
+            }
+            const projectUpdate = {
                 graphData: JSON.stringify(finalGraph),
                 status: 'completed',
                 updatedAt: firestore_1.FieldValue.serverTimestamp()
-            });
+            };
+            if (seedImageUrl) {
+                projectUpdate.imageUrl = seedImageUrl;
+            }
+            await db.collection('users').doc(payload.userId).collection('projects').doc(payload.projectId).update(projectUpdate);
             console.log(`[Pipeline Diamond] -> Successfully updated project ${payload.projectId} via Admin SDK`);
         }
         catch (err) {
