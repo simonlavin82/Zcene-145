@@ -330,11 +330,16 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
     if (finalGraph.nodes) {
         const prunedIds = new Set();
         finalGraph.nodes = finalGraph.nodes.filter((node) => {
+            if (node.type !== 'artist' && node.type !== 'label') {
+                return true;
+            }
             const nodeNorm = (0, curatorService_1.normalizeArtistId)(node.id);
             const isSeedNode = Array.from(seedNormSet).some((s) => isEntitySeedMatch(s, nodeNorm));
             const isHydrated = Array.from(hydratedNorms).some((h) => isEntitySeedMatch(nodeNorm, h));
             if (!isHydrated && !isSeedNode) {
                 prunedIds.add(node.id);
+                prunedIds.add(node.id.toLowerCase());
+                prunedIds.add(nodeNorm);
                 return false;
             }
             return true;
@@ -343,7 +348,12 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
             finalGraph.links = finalGraph.links.filter((link) => {
                 const srcId = typeof link.source === 'string' ? link.source : link.source?.id;
                 const tgtId = typeof link.target === 'string' ? link.target : link.target?.id;
-                return !prunedIds.has(srcId) && !prunedIds.has(tgtId);
+                return !prunedIds.has(srcId) &&
+                    !prunedIds.has(tgtId) &&
+                    !prunedIds.has(srcId?.toLowerCase()) &&
+                    !prunedIds.has(tgtId?.toLowerCase()) &&
+                    !prunedIds.has((0, curatorService_1.normalizeArtistId)(srcId || '')) &&
+                    !prunedIds.has((0, curatorService_1.normalizeArtistId)(tgtId || ''));
             });
         }
     }
