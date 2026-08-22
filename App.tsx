@@ -7,7 +7,7 @@ import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, St
 import { generateGraphData, fetchNodeDetails, extendGraphFromNode, resolveArtistCandidatesViaAI } from './services/geminiService';
 import { normalizeArtistId, readArtistCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, getEntityDocWithRedirect, getLabelDocWithRedirect, getAnyEntityDocWithRedirect, titleCaseArtistId, cleanArtistDisplayName, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema, stripUndefinedProperties, isNodeInSeedList } from './services/artistCacheService';
 import { normalizeCountry } from './utils/normalization';
-import { auth, signInWithGoogle, logout, onAuthStateChanged, User, db, handleFirestoreError, OperationType } from './services/firebase';
+import { auth, signInWithGoogle, logout, onAuthStateChanged, User, db, functions, handleFirestoreError, OperationType } from './services/firebase';
 import { translateError, translateToast } from './services/errorTranslationLayer';
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, getDocFromServer, serverTimestamp, addDoc, getDoc, getDocs, orderBy, where, writeBatch, getDocFromCache, updateDoc, increment, limit } from 'firebase/firestore';
 const StyleGuidePage = React.lazy(() => import('./components/DesignSystem').then(m => ({ default: m.StyleGuidePage })));
@@ -65,6 +65,8 @@ const isArtistIdMatch = (nodeId: string, activeId: string): boolean => {
   return false;
 };
 
+import { httpsCallable } from 'firebase/functions';
+
 const generateGraphDataViaCloudJob = async (
   artists: string,
   filters: DiscoveryFilters,
@@ -80,9 +82,6 @@ const generateGraphDataViaCloudJob = async (
   isSandboxMode?: boolean,
   seedImageUrl?: string
 ): Promise<GraphData> => {
-  const finalJobId = jobId || `job-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
-  const jobRef = doc(db, 'curationJobs', finalJobId);
-
   const payload = {
     artists,
     filters,
@@ -96,81 +95,20 @@ const generateGraphDataViaCloudJob = async (
   };
 
   try {
-    await setDoc(jobRef, {
-      jobId: finalJobId,
-      userId,
-      status: 'pending',
-      jobType: 'graph_generation',
-      inputPayload: stripUndefinedProperties(payload),
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-      expireAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
-    });
+    const curate = httpsCallable(functions, 'executeCurationPipeline');
+    const result = await curate(payload);
+    const data = result.data as any;
+
+    if (data.detailsCache && onDetailsCacheReceived) {
+      onDetailsCacheReceived(data.detailsCache);
+    }
+    
+    return data.graphData;
   } catch (error) {
-    console.error("🔥 FIREBASE WRITE FAILED:", error);
+    console.error("🔥 HTTPS CALLABLE FAILED:", error);
     console.log("Payload attempted:", payload);
     throw error;
   }
-
-  return new Promise((resolve, reject) => {
-    let hasAborted = false;
-    let unsubscribe: () => void = () => {};
-
-    if (signal) {
-      if (signal.aborted) {
-        reject(new DOMException("Aborted", "AbortError"));
-        return;
-      }
-      signal.addEventListener('abort', () => {
-        hasAborted = true;
-        unsubscribe();
-        updateDoc(jobRef, { status: 'cancelled' }).catch(err => {
-          console.warn("[Cloud Job] Failed to mark job as cancelled:", err);
-        });
-        reject(new DOMException("Aborted", "AbortError"));
-      });
-    }
-
-    unsubscribe = onSnapshot(jobRef, (snapshot) => {
-      if (hasAborted) {
-        unsubscribe();
-        return;
-      }
-      
-      const job = snapshot.data();
-      if (!job) {
-        unsubscribe();
-        reject(new Error("Curation job was deleted or not found."));
-        return;
-      }
-
-      console.log(`[Cloud Curation Listener] Job ${finalJobId} status: ${job.status}`);
-
-      if (job.status === 'completed') {
-        unsubscribe();
-        if (job.result && job.result.graphData) {
-          if (job.result.detailsCache && onDetailsCacheReceived) {
-            onDetailsCacheReceived(job.result.detailsCache);
-          }
-          resolve(job.result.graphData);
-        } else {
-          reject(new Error("Job completed but did not return graphData."));
-        }
-      } else if (job.status === 'failed') {
-        unsubscribe();
-        const serverError = new Error(job.errorMessage || "Backend curation failed.");
-        (serverError as any).errorDetails = job.errorDetails;
-        if (job.errorDetails && job.errorDetails.stack) {
-          (serverError as any).stackSnippet = job.errorDetails.stack.substring(0, 300);
-          console.error("[Cloud Job Listener] Backend Stack Trace:", job.errorDetails.stack);
-        }
-        reject(serverError);
-      }
-    }, (error) => {
-      unsubscribe();
-      reject(error);
-    });
-  });
 };
 
 
@@ -2930,91 +2868,8 @@ const App: React.FC = () => {
             sessionTokenApprovedRef.current = true;
           }
 
-          // --- AI VALIDATION GATE (Validate Origin Modal) ---
-          setIsLoading(true);
-          const flashCandidates = await resolveArtistCandidatesViaAI(rawInput, cacheCandidates, controller?.signal);
-          setIsLoading(false);
-
-          // Validate Origin Verification Gate
-          const flashChoice = await new Promise<string | 'synthesis' | 'cancel' | 'back'>((resolve) => {
-            setDisambiguationDialog({
-              isOpen: true,
-              query: rawInput,
-              candidates: flashCandidates || [],
-              showBack: cacheCandidates.length > 0,
-              onSelect: (c) => { setDisambiguationDialog(null); resolve(c); },
-              isLiveAISuggestions: true
-            });
-          });
-
-          if (flashChoice === 'back') {
-            i--;
-            continue;
-          }
-
-          if (flashChoice === 'cancel') {
-            setIsLoading(false);
-            isHydratingSessionRef.current = false;
-            isProjectLoadingRef.current = false;
-            setActiveNodeIds(prevActiveNodeIds);
-            setSeedArtists(prevSeedArtists);
-            return;
-          }
-
-          if (flashChoice.startsWith('override::')) {
-            const userInputCountry = flashChoice.split('::')[1];
-            const normalizedCountry = normalizeCountry(userInputCountry);
-            
-            const cacheHit = cacheCandidates.find(c => 
-              c.origin && c.origin.toLowerCase().includes(normalizedCountry.toLowerCase())
-            );
-
-            if (cacheHit) {
-              console.log(`[Disambiguation Override] Cache collision detected for ${normalizedCountry}. Routing to ${cacheHit.id}`);
-              resolvedArtistSeeds[i] = normalizeArtistId(cacheHit.id);
-              hasDisambiguated = true;
-              const nonSelected = cacheCandidates.filter(c => c.id !== cacheHit.id);
-              nonSelected.forEach(ns => mergeAndCleanupArtists(cacheHit.id, ns.id));
-              continue;
-            } else {
-              const probeKey = normalizeArtistId(rawInput);
-              activeDisambiguationHints[probeKey] = 
-                `[MANDATORY DISAMBIGUATION CONSTRAINT: The user explicitly requested the regional variant of "${rawInput}" originating from or associated with "${userInputCountry}". You MUST use this specific regional act as the root seed for your graph generation, rather than any other bands with the same name.]`;
-              console.log(`[Disambiguation Override Hint Injected for ${probeKey}]:`, activeDisambiguationHints[probeKey]);
-              resolvedArtistSeeds[i] = normalizeArtistId(rawInput);
-              hasDisambiguated = true;
-              continue;
-            }
-          } else if (flashChoice !== 'synthesis') {
-            const selectedCand = (flashCandidates || []).find(c => c.id === flashChoice);
-            if (selectedCand) {
-              const probeKey = normalizeArtistId(rawInput);
-              activeDisambiguationHints[probeKey] = 
-                `[MANDATORY DISAMBIGUATION CONSTRAINT: The user explicitly selected the following regional entity: "${selectedCand.label}" from ${selectedCand.origin} (${selectedCand.genre}). You MUST use this specific act as the root seed for your graph generation, rather than any other bands with the same name.]`;
-              console.log(`[Flash Validation Hint Injected for ${probeKey}]:`, activeDisambiguationHints[probeKey]);
-              resolvedArtistSeeds[i] = selectedCand.id; // Fix: Use canonical ID!
-              hasDisambiguated = true;
-              continue;
-            }
-          }
-
-          if (cacheCandidates && cacheCandidates.length > 0) {
-            const rejectedDescriptions = cacheCandidates.map(c => 
-              `"${c.label}"${c.origin ? ` from ${c.origin}` : ''}${c.genre ? ` (${c.genre})` : ''}`
-            ).join(', ');
-
-            const probeKey = normalizeArtistId(rawInput);
-            const rejectionHint = 
-              `[DISAMBIGUATION REJECTION CONSTRAINTS: The user explicitly rejected the cached artist ` +
-              `candidate(s): ${rejectedDescriptions}. Synthesize a DIFFERENT regional or genre act ` +
-              `sharing the name "${rawInput}". Do NOT synthesize any of the rejected candidates.]`;
-            
-            activeDisambiguationHints[probeKey] = activeDisambiguationHints[probeKey] 
-              ? activeDisambiguationHints[probeKey] + '\n' + rejectionHint 
-              : rejectionHint;
-            console.log(`[Disambiguation Rejection Hint Injected for ${probeKey}]:`, activeDisambiguationHints[probeKey]);
-          }
-
+          // --- AI VALIDATION GATE REMOVED ---
+          // Validation is now natively handled by the executeCurationPipeline in the backend.
           const currentResolvedStr = resolvedArtistSeeds.join('::');
           handleGenerateGraph(currentResolvedStr, isRegeneration, graphToEnhance, true, true, overrideFilters, activeDisambiguationHints, true);
           return;
@@ -4434,8 +4289,7 @@ const App: React.FC = () => {
           computedContext = pruned.nodes.map(n => `"${n.id}" (${n.type})`).join(', ');
         }
         
-        const primarySeed = seedArtists.find((s: any) => normalizeArtistId(s.name || s.id) === normalizeArtistId(artists.split('::')[0]));
-        const seedImageUrl = primarySeed?.imageUrl || primarySeed?.image || undefined;
+        const seedImageUrl = undefined;
 
         graphPromise = generateGraphDataViaCloudJob(
           artists, // Raw display names to prevent LLM hallucinations
