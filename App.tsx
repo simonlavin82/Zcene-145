@@ -4233,17 +4233,7 @@ const App: React.FC = () => {
       }
     }
 
-    if (!bypassTokenConfirmation && !sessionTokenApprovedRef.current) {
-      const confirmed = await confirmTokenUsage(isLiveSynthesis ? 'live_synthesis' : 'generation', [], artistList);
-      if (!confirmed || (controller && controller.signal.aborted)) {
-        isHydratingSessionRef.current = false;
-        setIsLoading(false);
-        setActiveNodeIds(prevActiveNodeIds);
-        setSeedArtists(prevSeedArtists);
-        return;
-      }
-      sessionTokenApprovedRef.current = true;
-    }
+
 
 
     // [Selection Lifecycle Reset] ✦

@@ -452,6 +452,26 @@ export const executeCurationPipeline = onCall({
   const fullRationale = await generateRootsBreakdownBackend(payload.artists, detailsCacheEntries);
   finalGraph.synthesisRationale = fullRationale;
 
+  const primarySeedNorm = artistList.length > 0 ? normalizeArtistId(artistList[0]) : null;
+  if (primarySeedNorm) {
+      const primarySeedEntry = detailsCacheEntries.find(e => normalizeArtistId(e[0]) === primarySeedNorm);
+      if (primarySeedEntry && primarySeedEntry[1]) {
+          primarySeedEntry[1].synthesisRationale = fullRationale;
+      }
+  }
+
+  if (finalGraph.nodes) {
+      finalGraph.nodes.forEach((node: any) => {
+          const recNorm = normalizeArtistId(node.id);
+          const recDetailsEntry = detailsCacheEntries.find((entry: any) => isEntitySeedMatch(recNorm, entry[0]));
+          if (recDetailsEntry && recDetailsEntry[1]) {
+              const recDetails = recDetailsEntry[1];
+              const isLabel = node.type === 'label';
+              node.details = isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(normalizeDetailsForWrite(recDetails));
+          }
+      });
+  }
+
   // DB Write-back logic (Project + Cache)
   const seedNorms = artistList.map((a: string) => normalizeArtistId(a));
   
@@ -552,6 +572,7 @@ export const executeCurationPipeline = onCall({
 
   return {
       graphData: finalGraph,
-      detailsCache: JSON.stringify(detailsCacheEntries)
+      detailsCache: JSON.stringify(detailsCacheEntries),
+      rootBreakdown: fullRationale
   };
 });

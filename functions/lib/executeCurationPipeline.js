@@ -431,6 +431,24 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
     console.log(`[Pipeline Diamond] -> 3.1 Pro Roots Breakdown`);
     const fullRationale = await (0, curatorService_1.generateRootsBreakdownBackend)(payload.artists, detailsCacheEntries);
     finalGraph.synthesisRationale = fullRationale;
+    const primarySeedNorm = artistList.length > 0 ? (0, curatorService_1.normalizeArtistId)(artistList[0]) : null;
+    if (primarySeedNorm) {
+        const primarySeedEntry = detailsCacheEntries.find(e => (0, curatorService_1.normalizeArtistId)(e[0]) === primarySeedNorm);
+        if (primarySeedEntry && primarySeedEntry[1]) {
+            primarySeedEntry[1].synthesisRationale = fullRationale;
+        }
+    }
+    if (finalGraph.nodes) {
+        finalGraph.nodes.forEach((node) => {
+            const recNorm = (0, curatorService_1.normalizeArtistId)(node.id);
+            const recDetailsEntry = detailsCacheEntries.find((entry) => isEntitySeedMatch(recNorm, entry[0]));
+            if (recDetailsEntry && recDetailsEntry[1]) {
+                const recDetails = recDetailsEntry[1];
+                const isLabel = node.type === 'label';
+                node.details = isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(normalizeDetailsForWrite(recDetails));
+            }
+        });
+    }
     // DB Write-back logic (Project + Cache)
     const seedNorms = artistList.map((a) => (0, curatorService_1.normalizeArtistId)(a));
     // Note: We now update the project document synchronously on the backend to avoid 
@@ -524,7 +542,8 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
     console.log(`[Pipeline Diamond] -> Curation Complete, returning payload to client`);
     return {
         graphData: finalGraph,
-        detailsCache: JSON.stringify(detailsCacheEntries)
+        detailsCache: JSON.stringify(detailsCacheEntries),
+        rootBreakdown: fullRationale
     };
 });
 //# sourceMappingURL=executeCurationPipeline.js.map
