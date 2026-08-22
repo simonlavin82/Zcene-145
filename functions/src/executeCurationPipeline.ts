@@ -267,7 +267,8 @@ export const executeCurationPipeline = onCall({
       chunk.map(async (entityObj: any, idx: number) => {
         const rawName = entityObj.name;
         let artistNormId = normalizeArtistId(rawName);
-        if (entityObj.origin) {
+        const isSeed = artistList.some((s: string) => isEntitySeedMatch(normalizeArtistId(s), artistNormId));
+        if (entityObj.origin && isSeed) {
           const originSlug = extractCountrySlug(entityObj.origin);
           if (!artistNormId.endsWith(`-${originSlug}`)) artistNormId = `${artistNormId}-${originSlug}`;
         }
@@ -482,12 +483,13 @@ export const executeCurationPipeline = onCall({
       const recArtist = entityObj.name;
       const cleanArtist = stripCountrySlug(recArtist);
       let recNorm = normalizeArtistId(cleanArtist);
-      if (entityObj.origin) {
+      const matchingSeedNorm = seedNorms.find((s: string) => isEntitySeedMatch(s, recNorm));
+      
+      if (entityObj.origin && matchingSeedNorm) {
           const originSlug = extractCountrySlug(entityObj.origin);
           if (!recNorm.endsWith(`-${originSlug}`)) recNorm = `${recNorm}-${originSlug}`;
       }
       const isLabel = entityObj.type === 'label';
-      const matchingSeedNorm = seedNorms.find((s: string) => isEntitySeedMatch(s, recNorm));
       
       const recDetailsEntry = detailsCacheEntries.find((entry: any) => isEntitySeedMatch(recNorm, entry[0]));
       const recDetails = recDetailsEntry ? (recDetailsEntry as any)[1] : null;

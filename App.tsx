@@ -3273,7 +3273,10 @@ const App: React.FC = () => {
               setActiveNodeIds([searchId]);
             }
 
-            const confirmed = await confirmTokenUsage('cache_upgrade', [], [searchId], []);
+            let confirmed: boolean | 'back' = true;
+            if (!bypassTokenConfirmation) {
+              confirmed = await confirmTokenUsage('cache_upgrade', [], [searchId], []);
+            }
             if (confirmed) {
               console.log(`[Front Gate Cache] User confirmed cache upgrade. Overwriting old entry.`);
               bypassToken = true;
@@ -3941,12 +3944,15 @@ const App: React.FC = () => {
           setActiveNodeIds(optimisticActiveIds);
         }
 
-        const confirmed = await confirmTokenUsage(
-          enrichmentRequired.length > 0 && missing.length === 0 ? 'cache_upgrade' : 'generation',
-          fullHits,
-          missing,
-          enrichmentRequired
-        );
+        let confirmed: boolean | 'back' = true;
+        if (!bypassTokenConfirmation) {
+          confirmed = await confirmTokenUsage(
+            enrichmentRequired.length > 0 && missing.length === 0 ? 'cache_upgrade' : 'generation',
+            fullHits,
+            missing,
+            enrichmentRequired
+          );
+        }
         if (!confirmed || controller.signal.aborted) {
           setIsLoading(false);
           const legacyArtists = [...fullHits, ...enrichmentRequired];

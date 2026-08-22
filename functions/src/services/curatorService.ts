@@ -793,7 +793,7 @@ export const generateGraphDataBackend = async (
 
       filterRules += "\n\nIMPORTANT: Do NOT include any search citations or footnotes. The JSON must be clean.";
       filterRules += `\n\n(Note: The seed artists [${artists}] are the ONLY exception. ALL other artists MUST obey these rules.)`;
-      filterRules += "\n\nCAPACITY LIMIT: You MUST NOT generate more than 25 nodes in total. Quality over quantity. If you hit 25 nodes, stop adding new ones.";
+      filterRules += "\n\nCAPACITY LIMIT: You MUST NOT generate more than 12-15 NEW artist nodes. Including metadata nodes, do not exceed 60 nodes in total. Quality over quantity.";
       filterRules += "\n\nFINAL VERIFICATION: Audit your list. If an artist violates any rules above, delete them.";
       
       systemInstruction += filterRules;
