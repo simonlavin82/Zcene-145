@@ -559,7 +559,7 @@ Follow these rules precisely:
 1.  CANONICAL NAMING: For ALL nodes, use the canonical, professional spelling and capitalization as recognized by the music industry. For example, use "Radiohead" even if the seed provided was "radiohead", and "blink-182" with a lowercase 'b' and hyphen if that is its official name.
 2.  MANDATORY: You MUST create an 'artist' node for EVERY seed artist provided in the list: {{artists}}. Assign a unique 'group' number for each seed artist.
 3.  For each seed artist, find and add nodes for their primary genre, record label, country of origin, and the year they were formed/founded (YYYY). The 'id' for the year node must be the 4-digit year (e.g. "1994") and its type must be 'founded'.
-4.  In addition, find and add 18-21 NEW related artists that are musically connected to the seed artists, but you have the flexibility to scale down if the specific musical scene is smaller and fewer genuine connections exist. Do not pad the graph with irrelevant artists just to hit the number. For these NEW artists, you MUST also identify and create their respective genre, label, country, and especially their 'founded' year nodes (YYYY) to ensure the spiderweb is rich with chronological data. ONLY include artists that strictly meet any provided discovery filters.
+4.  In addition, find and add 12 to 18 NEW related artists that are musically connected to the seed artists, but you have the flexibility to scale down if the specific musical scene is smaller and fewer genuine connections exist. Do not pad the graph with irrelevant artists just to hit the number. For these NEW artists, you MUST also identify and create their respective genre, label, country, and especially their 'founded' year nodes (YYYY) to ensure the spiderweb is rich with chronological data. ONLY include artists that strictly meet any provided discovery filters. Labels are explicitly EXCLUDED from this cap; generate the natural amount of Label nodes required to accurately connect the generated artists together.
 5.  For all artists (seed and related), create links connecting them to their respective genre, label, country, and founded year nodes. CRITICAL TOPOLOGY RULE: You MUST create direct links connecting the seed artist(s) to the NEW related artists you introduce. Every new artist MUST be connected back to the central spiderweb, either directly to the seed artist, or through a chain of artist-to-artist links. DO NOT leave any artist nodes floating or only connected to metadata nodes. All direct connections of a seed artist should share their 'group' number. Each link MUST include a 'context' string explaining the relationship (e.g., 'releases music on XL Recordings' or 'founded in 1985' or 'is a genre of'). Keep the context to a brief 3-7 words in present tense.
 6.  TEMPORAL ECOSYSTEM & SCENE AUTHENTICITY RULE (STRICT): You MUST reconstruct the true historical scene and temporal ecosystem of the seed artist(s). Node selection must be strictly restricted to the primary active era, geographic scene, and lived touring ecosystem of the seed(s). For example, if a seed artist was primarily active in a late-1990s scene, you MUST surface their exact period-accurate peers from that specific 1990s era. If the seed is a modern 2020s band, you MUST surface contemporary peers from their current 2020s ecosystem. Do NOT suggest modern algorithmic equivalents for legacy bands, and do NOT pull in historical legacy ancestors for modern bands unless they genuinely shared the same active touring scene. The graph must represent a period-accurate, contemporary snapshot of the artist's specific moment in time.
 7.  CRITICAL: Each 'founded' node MUST be linked ONLY to the correct artist who was founded in that year.
@@ -606,7 +606,7 @@ export const validateSeedOriginBackend = async (
     }
 
     const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: 300000 } });
-    const currentModel = "gemini-3.5-flash-lite"; // Phase 2: Origin Validation uses Flash-Lite
+    const currentModel = "gemini-3.5-flash"; // Phase 1: Origin Validation uses 3.5 Flash
 
     const prompt = `Validate this seed artist: "${artistId}". Is this a real musical entity? Extract its canonical name, country of origin, and primary genre.`;
   
@@ -692,7 +692,7 @@ export const generateGraphDataBackend = async (
     apiKey,
     httpOptions: { timeout: 300000 } // 5 minutes
   });
-  const currentModel = "gemini-2.5-flash";
+  const currentModel = "gemini-3.1-pro";
   const artistList = artists.split('::').map(a => a.trim()).filter(Boolean);
 
   let userPrompt: string;

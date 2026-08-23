@@ -45,7 +45,7 @@ export function stripCountrySlug(name: string): string {
   return cleanName;
 }
 
-export const validateSeedOrigin = onCall({
+export const validateSeedOriginCallable = onCall({
   secrets: ["GEMINI_API_KEY"],
   timeoutSeconds: 60,
   memory: "512MiB",
