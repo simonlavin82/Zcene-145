@@ -635,7 +635,7 @@ const generateGraphDataBackend = async (artists, filters, cachedSubgraphsContext
         apiKey,
         httpOptions: { timeout: 300000 } // 5 minutes
     });
-    const currentModel = "gemini-3.1-pro";
+    const currentModel = "gemini-3.1-pro-preview";
     const artistList = artists.split('::').map(a => a.trim()).filter(Boolean);
     let userPrompt;
     let systemInstruction;

@@ -2862,7 +2862,7 @@ const App: React.FC = () => {
           if (cacheCandidates.length === 0) {
             setIsLoading(true);
             try {
-              const validate = httpsCallable(functions, 'validateSeedOrigin');
+              const validate = httpsCallable(functions, 'validateSeedOriginCallable');
               const result = await validate({ seed: rawInput });
               const data = result.data as any;
               if (data && data.isValid) {
