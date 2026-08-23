@@ -221,14 +221,8 @@ export const extractArtistSubGraph = (
   const seedsNorm = new Set(allSeeds.map(s => normalizeArtistId(s)));
   seedsNorm.delete(artistNameNorm);
 
-  const isArtistIdMatch = (a: string, b: string) => {
-    const na = normalizeArtistId(a);
-    const nb = normalizeArtistId(b);
-    return na === nb || na.startsWith(nb + '-') || nb.startsWith(na + '-');
-  };
-
   const artistNode = fullGraph.nodes.find(
-    n => (n.type === 'artist' || n.type === 'label') && (normalizeArtistId(n.id) === artistNameNorm || isArtistIdMatch(n.id, artistName))
+    n => (n.type === 'artist' || n.type === 'label') && normalizeArtistId(n.id) === artistNameNorm
   );
 
   if (!artistNode) {
@@ -241,91 +235,60 @@ export const extractArtistSubGraph = (
   const resolveId = (endpoint: string | Node): string =>
     typeof endpoint === 'string' ? endpoint : endpoint.id;
 
-  const peerArtistIds = new Set<string>();
-  (fullGraph.links || []).forEach(link => {
-    const s = resolveId(link.source);
-    const t = resolveId(link.target);
-    const sNorm = normalizeArtistId(s);
-    const tNorm = normalizeArtistId(t);
+  const keptNodeIdsNorm = new Set<string>();
 
-    if (sNorm === artistNodeIdNorm || tNorm === artistNodeIdNorm) {
-      const otherId = sNorm === artistNodeIdNorm ? t : s;
-      const otherNorm = normalizeArtistId(otherId);
-      
-      const otherNode = fullGraph.nodes.find(n => normalizeArtistId(n.id) === otherNorm);
-      if (otherNode && (otherNode.type === 'artist' || otherNode.type === 'label') && !seedsNorm.has(otherNorm)) {
-        peerArtistIds.add(otherNode.id);
-      }
+  if (seedsNorm.size === 0) {
+    // Single-seed generation: include everything (even disjointed clusters)
+    fullGraph.nodes.forEach(n => keptNodeIdsNorm.add(normalizeArtistId(n.id)));
+  } else {
+    // Multi-seed generation: BFS to extract only the component reachable from this seed, stopping at other seeds.
+    const adjList = new Map<string, string[]>();
+    (fullGraph.links || []).forEach(link => {
+       const sNorm = normalizeArtistId(resolveId(link.source));
+       const tNorm = normalizeArtistId(resolveId(link.target));
+       if (!adjList.has(sNorm)) adjList.set(sNorm, []);
+       if (!adjList.has(tNorm)) adjList.set(tNorm, []);
+       adjList.get(sNorm)!.push(tNorm);
+       adjList.get(tNorm)!.push(sNorm);
+    });
+
+    const queue = [artistNodeIdNorm];
+    keptNodeIdsNorm.add(artistNodeIdNorm);
+
+    while (queue.length > 0) {
+       const current = queue.shift()!;
+       const neighbors = adjList.get(current) || [];
+       for (const neighbor of neighbors) {
+           if (!keptNodeIdsNorm.has(neighbor) && !seedsNorm.has(neighbor)) {
+               keptNodeIdsNorm.add(neighbor);
+               queue.push(neighbor);
+           }
+       }
     }
+  }
+
+  const keptNodes = fullGraph.nodes.filter(n => keptNodeIdsNorm.has(normalizeArtistId(n.id)));
+  const keptLinks = (fullGraph.links || []).filter(link => {
+      const sNorm = normalizeArtistId(resolveId(link.source));
+      const tNorm = normalizeArtistId(resolveId(link.target));
+      return keptNodeIdsNorm.has(sNorm) && keptNodeIdsNorm.has(tNorm);
   });
 
-  const keptArtistIds = new Set<string>([originalArtistNodeId]);
-  peerArtistIds.forEach(id => keptArtistIds.add(id));
-  const keptArtistIdsNorm = new Set<string>(
-    Array.from(keptArtistIds).map(id => normalizeArtistId(id))
-  );
-
-  const metadataNodeIds = new Set<string>();
-  (fullGraph.links || []).forEach(link => {
-    const s = resolveId(link.source);
-    const t = resolveId(link.target);
-    const sNorm = normalizeArtistId(s);
-    const tNorm = normalizeArtistId(t);
-
-    const sIsKeptArtist = keptArtistIdsNorm.has(sNorm);
-    const tIsKeptArtist = keptArtistIdsNorm.has(tNorm);
-
-    if (sIsKeptArtist || tIsKeptArtist) {
-      const otherId = sIsKeptArtist ? t : s;
-      const otherLower = otherId.trim().toLowerCase();
-      const otherNode = fullGraph.nodes.find(n => n.id.trim().toLowerCase() === otherLower);
-      if (otherNode && (otherNode.type !== 'artist' && otherNode.type !== 'label')) {
-        metadataNodeIds.add(otherNode.id);
-      }
-    }
-  });
-
-  const keptNodeIds = new Set<string>();
-  keptNodeIds.add(originalArtistNodeId);
-  peerArtistIds.forEach(id => keptNodeIds.add(id));
-  metadataNodeIds.forEach(id => keptNodeIds.add(id));
-
-  const keptNodeIdsLower = new Set<string>(
-    Array.from(keptNodeIds).map(id => id.trim().toLowerCase())
-  );
-  const keptNodeIdsNorm = new Set<string>(
-    Array.from(keptNodeIds).map(id => normalizeArtistId(id))
-  );
-
-  const ownNodes = fullGraph.nodes.filter(n => {
-    const norm = normalizeArtistId(n.id);
-    const lower = n.id.trim().toLowerCase();
-    return keptNodeIdsNorm.has(norm) || keptNodeIdsLower.has(lower);
-  });
-  const ownLinks = (fullGraph.links || []).filter(link => {
-    const s = resolveId(link.source);
-    const t = resolveId(link.target);
-    const sNorm = normalizeArtistId(s);
-    const tNorm = normalizeArtistId(t);
-    const sLower = s.trim().toLowerCase();
-    const tLower = t.trim().toLowerCase();
-    return (keptNodeIdsNorm.has(sNorm) || keptNodeIdsLower.has(sLower)) && 
-           (keptNodeIdsNorm.has(tNorm) || keptNodeIdsLower.has(tLower));
-  });
-
-  const ownNodesMapped = ownNodes.map(n => {
+  const ownNodesMapped = keptNodes.map(n => {
     if (n.id === originalArtistNodeId) {
       return { ...n, id: artistName };
     }
     return n;
   });
 
-  const ownLinksMapped = ownLinks.map(link => {
-    const s = resolveId(link.source);
-    const t = resolveId(link.target);
-    const newSource = s === originalArtistNodeId ? artistName : s;
-    const newTarget = t === originalArtistNodeId ? artistName : t;
-    return { ...link, source: newSource, target: newTarget };
+  const ownLinksMapped = keptLinks.map(l => {
+    const s = resolveId(l.source);
+    const t = resolveId(l.target);
+    return {
+      ...l,
+      source: s === originalArtistNodeId ? artistName : s,
+      target: t === originalArtistNodeId ? artistName : t
+    };
   });
 
   return { nodes: ownNodesMapped, links: ownLinksMapped };

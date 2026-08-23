@@ -6534,10 +6534,11 @@ const App: React.FC = () => {
 
         const isLocked = !!(cachedDetails && cachedDetails.summary && cachedDetails.summary.trim().length > 5 && !cachedDetails._isSentinel);
 
-        const isCorruptOrStale = checkIsProfileStaleOrCorrupt(cachedDetails) &&
-                                 !healedNodeIdsRef.current.has(simpleId) &&
-                                 !healedNodeIdsRef.current.has(disambiguatedCacheId) &&
-                                 !healedNodeIdsRef.current.has(n.id.toLowerCase());
+        const hasBeenHealed = healedNodeIdsRef.current.has(simpleId) ||
+                              healedNodeIdsRef.current.has(disambiguatedCacheId) ||
+                              healedNodeIdsRef.current.has(n.id.toLowerCase());
+
+        const isCorruptOrStale = checkIsProfileStaleOrCorrupt(cachedDetails) && !hasBeenHealed;
 
         const hasHydratedBio = isSelected && 
                                (selectedNode as any)?.bio && 
@@ -6549,7 +6550,8 @@ const App: React.FC = () => {
                          (detailsCache.has(n.id.toLowerCase()) && !isSimpleKeyMismatched);
 
         return !isLocked &&
-               (!isCached || isCorruptOrStale) && 
+               (!isCached || isCorruptOrStale) &&
+               !hasBeenHealed &&
                !fetchingNodeIdsRef.current.has(n.id) &&
                isSelected &&
                (!hasHydratedBio || isCorruptOrStale);

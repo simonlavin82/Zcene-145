@@ -205,86 +205,64 @@ const extractArtistSubGraph = (artistName, fullGraph, allSeeds = []) => {
     const artistNameNorm = (0, exports.normalizeArtistId)(artistName);
     const seedsNorm = new Set(allSeeds.map(s => (0, exports.normalizeArtistId)(s)));
     seedsNorm.delete(artistNameNorm);
-    const isArtistIdMatch = (a, b) => {
-        const na = (0, exports.normalizeArtistId)(a);
-        const nb = (0, exports.normalizeArtistId)(b);
-        return na === nb || na.startsWith(nb + '-') || nb.startsWith(na + '-');
-    };
-    const artistNode = fullGraph.nodes.find(n => (n.type === 'artist' || n.type === 'label') && ((0, exports.normalizeArtistId)(n.id) === artistNameNorm || isArtistIdMatch(n.id, artistName)));
+    const artistNode = fullGraph.nodes.find(n => (n.type === 'artist' || n.type === 'label') && (0, exports.normalizeArtistId)(n.id) === artistNameNorm);
     if (!artistNode) {
         return { nodes: [], links: [] };
     }
     const originalArtistNodeId = artistNode.id;
     const artistNodeIdNorm = (0, exports.normalizeArtistId)(originalArtistNodeId);
     const resolveId = (endpoint) => typeof endpoint === 'string' ? endpoint : endpoint.id;
-    const peerArtistIds = new Set();
-    (fullGraph.links || []).forEach(link => {
-        const s = resolveId(link.source);
-        const t = resolveId(link.target);
-        const sNorm = (0, exports.normalizeArtistId)(s);
-        const tNorm = (0, exports.normalizeArtistId)(t);
-        if (sNorm === artistNodeIdNorm || tNorm === artistNodeIdNorm) {
-            const otherId = sNorm === artistNodeIdNorm ? t : s;
-            const otherNorm = (0, exports.normalizeArtistId)(otherId);
-            const otherNode = fullGraph.nodes.find(n => (0, exports.normalizeArtistId)(n.id) === otherNorm);
-            if (otherNode && (otherNode.type === 'artist' || otherNode.type === 'label') && !seedsNorm.has(otherNorm)) {
-                peerArtistIds.add(otherNode.id);
+    const keptNodeIdsNorm = new Set();
+    if (seedsNorm.size === 0) {
+        // Single-seed generation: include everything (even disjointed clusters)
+        fullGraph.nodes.forEach(n => keptNodeIdsNorm.add((0, exports.normalizeArtistId)(n.id)));
+    }
+    else {
+        // Multi-seed generation: BFS to extract only the component reachable from this seed, stopping at other seeds.
+        const adjList = new Map();
+        (fullGraph.links || []).forEach(link => {
+            const sNorm = (0, exports.normalizeArtistId)(resolveId(link.source));
+            const tNorm = (0, exports.normalizeArtistId)(resolveId(link.target));
+            if (!adjList.has(sNorm))
+                adjList.set(sNorm, []);
+            if (!adjList.has(tNorm))
+                adjList.set(tNorm, []);
+            adjList.get(sNorm).push(tNorm);
+            adjList.get(tNorm).push(sNorm);
+        });
+        const queue = [artistNodeIdNorm];
+        keptNodeIdsNorm.add(artistNodeIdNorm);
+        while (queue.length > 0) {
+            const current = queue.shift();
+            const neighbors = adjList.get(current) || [];
+            for (const neighbor of neighbors) {
+                if (!keptNodeIdsNorm.has(neighbor) && !seedsNorm.has(neighbor)) {
+                    keptNodeIdsNorm.add(neighbor);
+                    queue.push(neighbor);
+                }
             }
         }
+    }
+    const keptNodes = fullGraph.nodes.filter(n => keptNodeIdsNorm.has((0, exports.normalizeArtistId)(n.id)));
+    const keptLinks = (fullGraph.links || []).filter(link => {
+        const sNorm = (0, exports.normalizeArtistId)(resolveId(link.source));
+        const tNorm = (0, exports.normalizeArtistId)(resolveId(link.target));
+        return keptNodeIdsNorm.has(sNorm) && keptNodeIdsNorm.has(tNorm);
     });
-    const keptArtistIds = new Set([originalArtistNodeId]);
-    peerArtistIds.forEach(id => keptArtistIds.add(id));
-    const keptArtistIdsNorm = new Set(Array.from(keptArtistIds).map(id => (0, exports.normalizeArtistId)(id)));
-    const metadataNodeIds = new Set();
-    (fullGraph.links || []).forEach(link => {
-        const s = resolveId(link.source);
-        const t = resolveId(link.target);
-        const sNorm = (0, exports.normalizeArtistId)(s);
-        const tNorm = (0, exports.normalizeArtistId)(t);
-        const sIsKeptArtist = keptArtistIdsNorm.has(sNorm);
-        const tIsKeptArtist = keptArtistIdsNorm.has(tNorm);
-        if (sIsKeptArtist || tIsKeptArtist) {
-            const otherId = sIsKeptArtist ? t : s;
-            const otherLower = otherId.trim().toLowerCase();
-            const otherNode = fullGraph.nodes.find(n => n.id.trim().toLowerCase() === otherLower);
-            if (otherNode && (otherNode.type !== 'artist' && otherNode.type !== 'label')) {
-                metadataNodeIds.add(otherNode.id);
-            }
-        }
-    });
-    const keptNodeIds = new Set();
-    keptNodeIds.add(originalArtistNodeId);
-    peerArtistIds.forEach(id => keptNodeIds.add(id));
-    metadataNodeIds.forEach(id => keptNodeIds.add(id));
-    const keptNodeIdsLower = new Set(Array.from(keptNodeIds).map(id => id.trim().toLowerCase()));
-    const keptNodeIdsNorm = new Set(Array.from(keptNodeIds).map(id => (0, exports.normalizeArtistId)(id)));
-    const ownNodes = fullGraph.nodes.filter(n => {
-        const norm = (0, exports.normalizeArtistId)(n.id);
-        const lower = n.id.trim().toLowerCase();
-        return keptNodeIdsNorm.has(norm) || keptNodeIdsLower.has(lower);
-    });
-    const ownLinks = (fullGraph.links || []).filter(link => {
-        const s = resolveId(link.source);
-        const t = resolveId(link.target);
-        const sNorm = (0, exports.normalizeArtistId)(s);
-        const tNorm = (0, exports.normalizeArtistId)(t);
-        const sLower = s.trim().toLowerCase();
-        const tLower = t.trim().toLowerCase();
-        return (keptNodeIdsNorm.has(sNorm) || keptNodeIdsLower.has(sLower)) &&
-            (keptNodeIdsNorm.has(tNorm) || keptNodeIdsLower.has(tLower));
-    });
-    const ownNodesMapped = ownNodes.map(n => {
+    const ownNodesMapped = keptNodes.map(n => {
         if (n.id === originalArtistNodeId) {
             return { ...n, id: artistName };
         }
         return n;
     });
-    const ownLinksMapped = ownLinks.map(link => {
-        const s = resolveId(link.source);
-        const t = resolveId(link.target);
-        const newSource = s === originalArtistNodeId ? artistName : s;
-        const newTarget = t === originalArtistNodeId ? artistName : t;
-        return { ...link, source: newSource, target: newTarget };
+    const ownLinksMapped = keptLinks.map(l => {
+        const s = resolveId(l.source);
+        const t = resolveId(l.target);
+        return {
+            ...l,
+            source: s === originalArtistNodeId ? artistName : s,
+            target: t === originalArtistNodeId ? artistName : t
+        };
     });
     return { nodes: ownNodesMapped, links: ownLinksMapped };
 };
@@ -716,7 +694,7 @@ const generateGraphDataBackend = async (artists, filters, cachedSubgraphsContext
         }
         filterRules += "\n\nIMPORTANT: Do NOT include any search citations or footnotes. The JSON must be clean.";
         filterRules += `\n\n(Note: The seed artists [${artists}] are the ONLY exception. ALL other artists MUST obey these rules.)`;
-        filterRules += "\n\nCAPACITY LIMIT: You MUST NOT generate more than 25 nodes in total. Quality over quantity. If you hit 25 nodes, stop adding new ones.";
+        filterRules += "\n\nCAPACITY LIMIT: You MUST NOT generate more than 12-15 NEW artist nodes. Including metadata nodes, do not exceed 60 nodes in total. Quality over quantity.";
         filterRules += "\n\nFINAL VERIFICATION: Audit your list. If an artist violates any rules above, delete them.";
         systemInstruction += filterRules;
         let reminder = `\n\nREMINDER: All new artists MUST meet the active filters:`;

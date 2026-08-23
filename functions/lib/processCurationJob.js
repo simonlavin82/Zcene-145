@@ -369,8 +369,9 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 }
                 console.log(`[Curation Backend] [Step 2: Hydration Loop Started] Hydrating details for ${recommendedEntities.length} entities in the graph:`, recommendedEntities.map((e) => `${e.name} (${e.type})`));
                 const detailsCacheEntries = [];
-                // Fetch details in concurrency chunks of 5 to reduce 20-minute run times to under 3 minutes
-                const batchSize = 5;
+                // Fetch details in concurrency chunks of 3 to respect the 15 RPM Gemini limit
+                // (1 text + 1 image req per node = ~6 requests per batch)
+                const batchSize = 3;
                 for (let i = 0; i < recommendedEntities.length; i += batchSize) {
                     const chunk = recommendedEntities.slice(i, i + batchSize);
                     console.log(`[Curation Backend] Hydrating batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(recommendedEntities.length / batchSize)} (${chunk.length} entities)...`);
@@ -566,10 +567,10 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             }
                         }
                     }
-                    // Add a 3-second cooldown between batches to prevent Google Search Tool quota exhaustion
+                    // Add a 25-second cooldown between batches to stay safely under 15 RPM
                     if (i + batchSize < recommendedEntities.length) {
-                        console.log(`[Curation Backend] Batch complete. Cooling down for 3 seconds before next batch...`);
-                        await new Promise(resolve => setTimeout(resolve, 3000));
+                        console.log(`[Curation Backend] Batch complete. Cooling down for 25 seconds to respect rate limits...`);
+                        await new Promise(resolve => setTimeout(resolve, 25000));
                     }
                 }
                 // Change 3 — Hydration Completeness Audit Log.
