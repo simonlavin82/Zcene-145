@@ -132,6 +132,8 @@ export const executeCurationPipeline = onCall({
 
   console.log(`[Pipeline Diamond] -> Cache Lookup: Checking seeds: ${artistList.join(', ')}`);
   
+  const detailsCacheEntries: [string, any][] = [];
+  
   const resolvedSeedArray: any[] = [];
   let needsProGeneration = false;
   
@@ -168,6 +170,7 @@ export const executeCurationPipeline = onCall({
            genre: cachedDetails.details.genre || "",
            isCacheHit: true
         });
+        detailsCacheEntries.push([seedNorm, cachedDetails]);
      } else {
         console.log(`[Pipeline Diamond] -> Is Hit? No -> Flash-Lite Origin Validation: ${seed}`);
         needsProGeneration = true;
@@ -255,7 +258,6 @@ export const executeCurationPipeline = onCall({
 
   console.log(`[Pipeline Diamond] -> 3.1 Pro Deep Cuts & Positioning (${recommendedEntities.length} entities)`);
 
-  const detailsCacheEntries: [string, any][] = [];
   const batchSize = 4;
   for (let i = 0; i < recommendedEntities.length; i += batchSize) {
     if (Date.now() - PIPELINE_START_TIME > 480000) {
@@ -479,7 +481,7 @@ export const executeCurationPipeline = onCall({
   // Note: We now update the project document synchronously on the backend to avoid 
   // client-side disconnections stranding the project in a 'curating' state.
 
-  for (const entityObj of recommendedEntities) {
+  const cacheWritePromises = recommendedEntities.map(async (entityObj: any) => {
       const recArtist = entityObj.name;
       const cleanArtist = stripCountrySlug(recArtist);
       let recNorm = normalizeArtistId(cleanArtist);
@@ -494,7 +496,7 @@ export const executeCurationPipeline = onCall({
       const recDetailsEntry = detailsCacheEntries.find((entry: any) => isEntitySeedMatch(recNorm, entry[0]));
       const recDetails = recDetailsEntry ? (recDetailsEntry as any)[1] : null;
 
-      if (!recDetails) continue;
+      if (!recDetails) return;
 
       const collName = isLabel ? "labels" : "artists";
       const idFieldKey = isLabel ? "labelId" : "artistId";
@@ -504,8 +506,9 @@ export const executeCurationPipeline = onCall({
       if (recDetailsEntry) (recDetailsEntry as any)[0] = compositeCanonicalId;
 
       const recDocRef = db.collection(collName).doc(compositeCanonicalId);
-      // Fire-and-forget the cache writes to speed up return
-      recDocRef.get().then(async (recSnap) => {
+      
+      try {
+          const recSnap = await recDocRef.get();
           const finalRecDetails = isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(normalizeDetailsForWrite(recDetails));
           if (!recSnap.exists) {
               const extractedGraph = matchingSeedNorm && !isLabel ? extractArtistSubGraph(matchingSeedNorm, finalGraph, artistList) : null;
@@ -521,7 +524,7 @@ export const executeCurationPipeline = onCall({
                   isDeep: true,
                   isPrimarySeed: !!matchingSeedNorm,
                   hasUniqueSpiderweb: matchingSeedNorm ? !isLabel : false
-              }).catch(console.error);
+              });
           } else {
               const updatePayload: any = {
                   detailsCache: finalRecDetails,
@@ -537,10 +540,14 @@ export const executeCurationPipeline = onCall({
                   updatePayload.hasUniqueSpiderweb = !isLabel;
                   if (!isLabel) updatePayload.graphData = extractedGraph ? JSON.stringify(extractedGraph) : null;
               }
-              await recDocRef.update(updatePayload).catch(console.error);
+              await recDocRef.update(updatePayload);
           }
-      }).catch(console.error);
-  }
+      } catch (error) {
+          console.error(error);
+      }
+  });
+
+  await Promise.allSettled(cacheWritePromises);
 
   if (payload.userId && payload.projectId) {
     try {
@@ -555,6 +562,7 @@ export const executeCurationPipeline = onCall({
 
       const projectUpdate: any = {
         graphData: JSON.stringify(finalGraph),
+        detailsCache: JSON.stringify(detailsCacheEntries),
         status: 'completed',
         updatedAt: FieldValue.serverTimestamp()
       };

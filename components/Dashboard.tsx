@@ -347,7 +347,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                           const pg = typeof project.graphData === 'string' ? JSON.parse(project.graphData) : project.graphData;
                           if (pg && Array.isArray(pg.nodes)) {
                             const seedSet = new Set(seedList.map((s: string) => normalizeArtistId(s)));
-                            deepCutsCount = pg.nodes.filter((n: any) => (n.type === 'artist' || !n.type) && seedSet.has(normalizeArtistId(n.id))).length;
+                            deepCutsCount = pg.nodes.filter((n: any) => (n.type === 'artist' || !n.type) && !seedSet.has(normalizeArtistId(n.id))).length;
                           }
                         } catch (e) { /* ignore */ }
                       }
@@ -552,7 +552,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                             const pg = typeof project.graphData === 'string' ? JSON.parse(project.graphData) : project.graphData;
                             if (pg && Array.isArray(pg.nodes)) {
                               const seedSet = new Set(seedList.map((s: string) => normalizeArtistId(s)));
-                              deepCutsCount = pg.nodes.filter((n: any) => (n.type === 'artist' || !n.type) && seedSet.has(normalizeArtistId(n.id))).length;
+                              deepCutsCount = pg.nodes.filter((n: any) => (n.type === 'artist' || !n.type) && !seedSet.has(normalizeArtistId(n.id))).length;
                             }
                           } catch (e) { /* ignore */ }
                         }
