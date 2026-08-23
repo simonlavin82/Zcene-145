@@ -87,6 +87,7 @@ const generateGraphDataViaCloudJob = async (
     filters,
     ...(userId && { userId }),
     ...(projectId && { projectId }),
+    ...(jobId && { jobId }),
     ...(disambiguationHints && { disambiguationHints }),
     ...(baseGraph && { baseGraph }),
     ...(cachedSubgraphsContext && { cachedSubgraphsContext }),
@@ -5202,7 +5203,7 @@ const App: React.FC = () => {
       try {
         let loadedFromGraphData = false;
         let hydratedNodes: Node[] = [];
-        if (data.graphData && typeof data.graphData === 'string' && data.graphData.trim().length > 20) {
+        if (data.status !== 'curating' && data.graphData && typeof data.graphData === 'string' && data.graphData.trim().length > 20) {
           try {
             const parsed = JSON.parse(data.graphData);
             if (parsed && parsed.nodes && parsed.nodes.length > 0) {

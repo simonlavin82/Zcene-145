@@ -239,7 +239,6 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     .filter(Boolean);
                 console.log(`[Curation Backend] [Phase 1: Global Cache Routing] Checking seeds: ${artistList.join(', ')}`);
                 const resolvedSeedArray = [];
-                let needsProGeneration = false;
                 for (const seed of artistList) {
                     const seedNorm = (0, curatorService_1.normalizeArtistId)(seed);
                     let cachedDetails = null;
@@ -277,7 +276,6 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     }
                     else {
                         console.log(`[Phase 1] Cache Miss for seed: ${seed}. Routing to Phase 2 (Flash-Lite).`);
-                        needsProGeneration = true; // Any miss requires Pro generation
                         // Phase 2: Origin Validation (Flash-Lite)
                         const validationResult = await (0, curatorService_1.validateSeedOriginBackend)(seed);
                         if (validationResult.isValid) {
@@ -294,28 +292,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         }
                     }
                 }
-                // Multi-Seed Cache Bypass Rule: Even if all seeds hit cache, multi-seed still requires Pro generation
-                if (artistList.length > 1) {
-                    needsProGeneration = true;
-                }
                 console.log(`[Phase 3: The Aggregator Gate] Resolved Seed Array:`, resolvedSeedArray);
-                // --- HALT & RETURN TEMPORARY BOUNDARY FOR VERIFICATION ---
-                result = {
-                    status: "halted_at_aggregator_gate",
-                    resolvedSeedArray,
-                    needsProGeneration
-                };
-                const jobDocRefHalt = db.collection("curationJobs").doc(jobId);
-                await jobDocRefHalt.update({
-                    status: "completed",
-                    result,
-                    updatedAt: firestore_2.FieldValue.serverTimestamp()
-                });
-                if (inputPayload?.projectId && jobData.userId) {
-                    await updateProjectStatus(jobData.userId, inputPayload.projectId, { status: "completed", result });
-                }
-                return; // HALT
-                // --- END OF HALT BOUNDARY ---
                 let finalGraph = inputPayload.baseGraph;
                 // Structural Integrity Guard: Verify that we received a valid, rich graph from the model
                 const artistNodesCount = finalGraph.nodes?.filter((n) => n.type === 'artist' || !n.type).length || 0;

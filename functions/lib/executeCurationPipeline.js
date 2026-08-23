@@ -191,8 +191,8 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
             };
             await db.collection('users').doc(payload.userId).collection('projects').doc(payload.projectId).update(projectUpdate);
             console.log(`[Pipeline Diamond] -> Successfully updated project ${payload.projectId} graphData via Admin SDK`);
-            const jobRef = db.collection('curationJobs').doc();
-            curationJobId = jobRef.id;
+            curationJobId = payload.jobId || db.collection('curationJobs').doc().id;
+            const jobRef = db.collection('curationJobs').doc(curationJobId);
             await jobRef.set({
                 status: "pending",
                 jobType: "graph_generation",
