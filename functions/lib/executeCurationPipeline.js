@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.executeCurationPipeline = exports.validateSeedOrigin = void 0;
+exports.executeCurationPipeline = exports.validateSeedOriginCallable = void 0;
 exports.stripCountrySlug = stripCountrySlug;
 const https_1 = require("firebase-functions/v2/https");
 const app_1 = require("firebase-admin/app");
@@ -45,7 +45,7 @@ function stripCountrySlug(name) {
     }
     return cleanName;
 }
-exports.validateSeedOrigin = (0, https_1.onCall)({
+exports.validateSeedOriginCallable = (0, https_1.onCall)({
     secrets: ["GEMINI_API_KEY"],
     timeoutSeconds: 60,
     memory: "512MiB",

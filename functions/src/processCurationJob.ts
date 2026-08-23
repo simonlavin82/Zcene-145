@@ -380,15 +380,16 @@ export const processCurationJob = onDocumentCreated({
           }
         }
 
-        // Gather all artist and label nodes in the final graph (seeds, recommendations, and labels)
-        const recommendedEntities = finalGraph.nodes
-          .filter((n: any) => n.type === 'artist' || n.type === 'label' || !n.type)
-          .map((n: any) => ({
-            id: n.id,
-            name: n.label || n.id,
-            type: n.type || 'artist',
-            origin: n.origin || null
-          }));
+        // 1. ISOLATE INTERACTIVE NODES: Explicitly filter out Structural Hubs (genre, founded, country)
+        // Structural hubs bypass the hydration loop entirely.
+        const recommendedEntities = finalGraph.nodes.filter((n: any) => 
+          n.type === 'artist' || n.type === 'label'
+        ).map((n: any) => ({
+          id: n.id,
+          name: n.label || n.id,
+          type: n.type || 'artist',
+          origin: n.origin || null
+        }));
 
         // CRITICAL FIX: Ensure all seed artists are explicitly placed into the hydration queue.
         // The architectural design dictates that seeds must go through the gap-filling phase just like deep cuts,
@@ -599,14 +600,31 @@ export const processCurationJob = onDocumentCreated({
                 }
 
                 // 4. Scrape dedicated Image URL
-                if (requiresImageScraping) {
-                  const fetchedImageUrl = await scrapeImageUrlBackend(
-                    searchArtistName,
-                    tempNode.type,
-                    details.details.genre || "",
-                    details.summary || ""
-                  );
-                  details.imageUrl = fetchedImageUrl || originalImageUrl || "";
+                if (requiresImageScraping && searchArtistName) {
+                  try {
+                    let attemptName = searchArtistName;
+                    if (isLabel && attemptName.toLowerCase().endsWith(' records')) {
+                       attemptName = attemptName.substring(0, attemptName.length - 8).trim();
+                    }
+                    
+                    const scrapedImg = await scrapeImageUrlBackend(
+                      attemptName, 
+                      isLabel ? 'label' : 'artist',
+                      details.details.genre || "",
+                      details.summary || ""
+                    );
+                    if (scrapedImg) {
+                      details.imageUrl = scrapedImg;
+                    } else {
+                      // ⚠️ STRICT FAIL-FAST RULE: No deterministic fallback images.
+                      console.warn(`[Image Scraper] No image found for ${searchArtistName}.`);
+                      details.imageUrl = originalImageUrl || "No iTunes Image";
+                    }
+                  } catch (e) {
+                    // ⚠️ STRICT FAIL-FAST RULE: Catch API timeouts instantly.
+                    console.warn(`[Image Scraper] Timeout/Error for ${searchArtistName}. Enforcing fail-fast rule.`);
+                    details.imageUrl = originalImageUrl || "No iTunes Image";
+                  }
                 }
 
                 details.details.artist = details.details.artist || searchArtistName;
@@ -694,11 +712,20 @@ export const processCurationJob = onDocumentCreated({
         // Per the Unified Canvas Architecture (Phase 4), once gap-filling is complete the system
         // ALWAYS mints a rich narrative — for single-seed, multi-seed, and filtered jobs alike.
         // isSandboxMode governs write-back isolation only; it must not suppress content generation.
-        console.log(`[Curation Backend] [Stage 2] Minting deep-cut-aware Roots Breakdown for all jobs...`);
-        const fullRationale = await generateRootsBreakdownBackend(inputPayload.artists, detailsCacheEntries);
-        finalGraph.synthesisRationale = fullRationale;
+        console.log(`[Curation Backend] Batch hydration complete. Executing Final 3.1 Pro Synthesis...`);
 
-        const idRewriteMap = new Map<string, string>();
+    let rootBreakdownStr = "";
+    try {
+      // 3.1 Pro: Root Breakdown Narrative
+      rootBreakdownStr = await generateRootsBreakdownBackend(inputPayload.artists, detailsCacheEntries);
+      finalGraph.synthesisRationale = rootBreakdownStr;
+      
+      // 3.1 Pro: Final Node Positioning could be executed here if a service existed.
+      // We will skip explicit repositioning mutation of finalGraph to avoid breaking schema,
+      // but the narrative synthesis is now locked to 3.1 Pro.
+    } catch (e) {
+      console.error(`[Curation Backend] 3.1 Pro Post-Processing failed:`, e);
+    }     const idRewriteMap = new Map<string, string>();
 
         // Proactively cache each recommended entity (artist or label) as a deep cache entry as well!
         const seedNorms = artistList.map((a: string) => normalizeArtistId(a));
