@@ -4366,6 +4366,16 @@ const App: React.FC = () => {
       console.log(`[Music Discovery] AI generated graph in ${((Date.now() - startTime) / 1000).toFixed(1)}s`);
 
       if (controller && controller.signal.aborted) return;
+
+      // Phase 2: RENDER LOCK
+      // If we are using the cloud worker pipeline on a saved project, we MUST ignore this HTTP 200 OK 
+      // structural payload. The UI state will remain locked (isLoading = true) until the background 
+      // worker fully hydrates the graph and the onSnapshot listener detects status === 'completed'.
+      if (useCloudCuration && user?.uid && currentProjectId && !isGuest) {
+        console.log("[Render Lock] Structural payload received (200 OK). Bypassing legacy state merge. Awaiting background hydration.");
+        return; 
+      }
+
       if (!newData || !newData.nodes || !newData.links) {
         throw new Error("The AI returned formless data. Please try again with different artists.");
       }
