@@ -5131,15 +5131,33 @@ const App: React.FC = () => {
       try {
         const strip = (g: any) => ({
           nodes: g.nodes.map((n: any) => ({ id: n.id, type: n.type, label: n.label, group: n.group })),
-          links: g.links.map((l: any) => ({ 
-            source: typeof l.source === 'object' ? l.source.id : l.source, 
-            target: typeof l.target === 'object' ? l.target.id : l.target 
-          }))
+          links: g.links.map((l: any) => ({
+            source: typeof l.source === 'object' ? l.source.id : l.source,
+            target: typeof l.target === 'object' ? l.target.id : l.target
+          })),
+          // Include synthesisRationale so a graph with a Root Breakdown is never
+          // considered equal to one without — preventing the Roots button from going
+          // dark on cache hits where the onSnapshot guard keeps the old prev state.
+          synthesisRationale: g.synthesisRationale || null
         });
         return JSON.stringify(strip(g1)) === JSON.stringify(strip(g2));
       } catch (e) {
         return false;
       }
+    };
+
+    // Merge-aware setGraphData updater: if topology is equal but the incoming graph
+    // carries a synthesisRationale that the current state is missing, splice it in
+    // rather than discarding the update entirely. This ensures the Roots Breakdown
+    // is never dropped during the onSnapshot → cache hit render cycle.
+    const mergeGraphData = (prev: any, g: any): any => {
+      if (isGraphEqual(prev, g)) return prev;
+      // Even if topology differed above, if prev already had a rationale and the
+      // incoming g doesn't (e.g. an intermediate partial write), protect prev's rationale.
+      if (prev?.synthesisRationale && !g.synthesisRationale) {
+        return { ...g, synthesisRationale: prev.synthesisRationale };
+      }
+      return g;
     };
 
     const handleSnap = async (snap: any): Promise<boolean> => {
@@ -5246,7 +5264,7 @@ const App: React.FC = () => {
               }
 
               g.nodes.forEach((n: any) => { n.fx = n.fx ?? null; n.fy = n.fy ?? null; });
-              setGraphData((prev: any) => isGraphEqual(prev, g) ? prev : g);
+              setGraphData((prev: any) => mergeGraphData(prev, g));
 
               if (data.detailsCache) {
                 try {
@@ -5395,7 +5413,7 @@ const App: React.FC = () => {
               await batchHydrateDetailsCache(g.nodes, g.links);
               hydratedNodes = g.nodes;
               
-              setGraphData((prev: any) => isGraphEqual(prev, g) ? prev : g);
+              setGraphData((prev: any) => mergeGraphData(prev, g));
 
               if (missing.length > 0) {
                 console.warn(`[ProjectLoader] ${missing.length} artist doc(s) missing from cache: [${missing.join(', ')}]. They will be re-fetched on next graph generation.`);
@@ -5444,7 +5462,7 @@ const App: React.FC = () => {
               await batchHydrateDetailsCache(g.nodes, g.links);
               hydratedNodes = g.nodes;
               
-              setGraphData((prev: any) => isGraphEqual(prev, g) ? prev : g);
+              setGraphData((prev: any) => mergeGraphData(prev, g));
 
 
               if (legacyEntry.detailsCache) {
@@ -5481,7 +5499,7 @@ const App: React.FC = () => {
                   // ── FIRESTORE-FIRST: batch-load biographies from global collection
                   await batchHydrateDetailsCache(g.nodes, g.links);
                   
-                  setGraphData((prev: any) => isGraphEqual(prev, g) ? prev : g);
+                  setGraphData((prev: any) => mergeGraphData(prev, g));
                   hydratedNodes = g.nodes;
                     if (data.activeNodes && Array.isArray(data.activeNodes)) {
                       let resolvedActiveNodes = data.activeNodes;
@@ -5509,7 +5527,7 @@ const App: React.FC = () => {
             await batchHydrateDetailsCache(g.nodes, g.links);
             hydratedNodes = g.nodes;
             
-            setGraphData((prev: any) => isGraphEqual(prev, g) ? prev : g);
+            setGraphData((prev: any) => mergeGraphData(prev, g));
 
             let preHydratedIds: string[] = [];
 
