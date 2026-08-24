@@ -78,14 +78,44 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
     for (const seed of artistList) {
         const seedNorm = (0, curatorService_1.normalizeArtistId)(seed);
         let cachedDetails = null;
+        // ── Slug Deduplication Guard ───────────────────────────────────────────────
+        // Before reading artists/{seedNorm}, check if a canonical variation already
+        // exists in Firestore (e.g. sick-of-it-all-usa when searching sick-of-it-all).
+        // If found, adopt the existing canonical ID to prevent duplicate document creation.
+        let resolvedSeedNorm = seedNorm;
         try {
-            const cacheDoc = await db.collection("artists").doc(seedNorm).get();
+            const dedupQuery = await db.collection("artists")
+                .where("artistId", ">=", seedNorm)
+                .where("artistId", "<=", `${seedNorm}\uf8ff`)
+                .limit(5)
+                .get();
+            if (!dedupQuery.empty) {
+                // Prefer a doc that has graphData (most complete)
+                for (const snap of dedupQuery.docs) {
+                    const snapData = snap.data();
+                    if (snap.id !== seedNorm && snapData.artistId && snapData.artistId.startsWith(seedNorm)) {
+                        if (snapData.graphData) {
+                            console.log(`[Pipeline Diamond] Slug Dedup: Adopting canonical seed "${snap.id}" over "${seedNorm}"`);
+                            resolvedSeedNorm = snap.id;
+                            break;
+                        }
+                        // Even without graphData, prefer the canonical ID to keep naming consistent
+                        resolvedSeedNorm = snap.id;
+                    }
+                }
+            }
+        }
+        catch (dedupErr) {
+            console.warn(`[Pipeline Diamond] Seed slug dedup query failed for "${seedNorm}", proceeding with derived ID:`, dedupErr);
+        }
+        try {
+            const cacheDoc = await db.collection("artists").doc(resolvedSeedNorm).get();
             if (cacheDoc.exists) {
                 const cacheData = cacheDoc.data();
                 if (cacheData && cacheData.detailsCache) {
                     cachedDetails = typeof cacheData.detailsCache === 'string' ? JSON.parse(cacheData.detailsCache) : cacheData.detailsCache;
                     if (Array.isArray(cachedDetails) && cachedDetails.length > 0) {
-                        const match = cachedDetails.find((item) => (0, curatorService_1.normalizeArtistId)(item[0]) === seedNorm);
+                        const match = cachedDetails.find((item) => (0, curatorService_1.normalizeArtistId)(item[0]) === resolvedSeedNorm);
                         if (match && match[1]) {
                             cachedDetails = match[1];
                         }
@@ -97,18 +127,18 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
             }
         }
         catch (e) {
-            console.warn(`Failed cache lookup for ${seedNorm}`, e);
+            console.warn(`Failed cache lookup for ${resolvedSeedNorm}`, e);
         }
         if (cachedDetails && cachedDetails.summary && cachedDetails.summary.length > 50 && cachedDetails.details?.genre && cachedDetails.imageUrl) {
             console.log(`[Pipeline Diamond] -> Is Hit? Yes -> Full Data? Yes -> Merge into Canvas: ${seed}`);
             resolvedSeedArray.push({
-                id: seedNorm,
+                id: resolvedSeedNorm,
                 name: seed,
                 origin: cachedDetails.details.origin || "",
                 genre: cachedDetails.details.genre || "",
                 isCacheHit: true
             });
-            detailsCacheEntries.push([seedNorm, cachedDetails]);
+            detailsCacheEntries.push([resolvedSeedNorm, cachedDetails]);
         }
         else {
             console.log(`[Pipeline Diamond] -> Is Hit? No -> Flash-Lite Origin Validation: ${seed}`);

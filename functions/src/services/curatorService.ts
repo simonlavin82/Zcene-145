@@ -1244,7 +1244,7 @@ export const fetchNodeDetailsBackend = async (
     apiKey,
     httpOptions: { timeout: 300000 } // 5 minutes
   });
-  const currentModel = "gemini-2.5-flash";
+  const currentModel = "gemini-3.5-flash";
 
   const contextNodes = graphData.links
     .filter(l => (typeof l.source === 'string' ? l.source : (l.source as Node).id) === node.id || (typeof l.target === 'string' ? l.target : (l.target as Node).id) === node.id)
@@ -1468,7 +1468,7 @@ export const scrapeVideoIdBackend = async (
     apiKey,
     httpOptions: { timeout: 300000 } // 5 minutes
   });
-  const currentModel = "gemini-2.5-flash";
+  const currentModel = "gemini-3.5-flash";
 
   const prompt = `Perform a Google Search for: '${artistName} official music video youtube'. 
 Look at the top organic YouTube video in search results. Extract its 11-character video ID (the string after v= or inside the URL). Return ONLY the 11-character video ID as a plain string. Do not include any JSON, quotes, explanations, markdown, or other text. If not found, return "null".`;
@@ -1597,7 +1597,7 @@ export const scrapeImageUrlBackend = async (
     apiKey,
     httpOptions: { timeout: 300000 } // 5 minutes
   });
-  const currentModel = "gemini-2.5-flash";
+  const currentModel = "gemini-3.5-flash";
 
   const prompt = `Find a high-quality, direct HTTPS image URL representing the music ${type}: "${artistName}".
   

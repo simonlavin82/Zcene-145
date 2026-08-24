@@ -362,6 +362,43 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             }
                         }
                         const isLabel = entityObj.type === 'label';
+                        // ── Slug Deduplication Guard ───────────────────────────────────────────
+                        // Before using artistNormId (which may be derived from a new slug), query
+                        // Firestore by the base artistId field to detect if a canonical variation
+                        // already exists (e.g., sick-of-it-all-usa already in DB when we are about
+                        // to create sick-of-it-all). If a canonical doc is found, adopt its ID.
+                        if (!isLabel) {
+                            try {
+                                const baseNormId = (0, curatorService_1.normalizeArtistId)(rawName); // without country suffix
+                                const existingQuery = await db.collection("artists")
+                                    .where("artistId", ">=", baseNormId)
+                                    .where("artistId", "<=", `${baseNormId}\uf8ff`)
+                                    .limit(5)
+                                    .get();
+                                if (!existingQuery.empty) {
+                                    // Pick the most-complete canonical doc (has graphData preferred)
+                                    let bestDocId = artistNormId;
+                                    for (const snap of existingQuery.docs) {
+                                        const snapData = snap.data();
+                                        if (snap.id !== artistNormId && snapData.artistId && snapData.artistId.startsWith(baseNormId)) {
+                                            // Prefer docs that already have graphData (fully curated)
+                                            if (snapData.graphData || snap.id === artistNormId) {
+                                                bestDocId = snap.id;
+                                                break;
+                                            }
+                                            bestDocId = snap.id;
+                                        }
+                                    }
+                                    if (bestDocId !== artistNormId) {
+                                        console.log(`[Curation Backend] Slug Dedup: Adopting existing canonical ID "${bestDocId}" instead of minting "${artistNormId}"`);
+                                        artistNormId = bestDocId;
+                                    }
+                                }
+                            }
+                            catch (dedupErr) {
+                                console.warn(`[Curation Backend] Slug dedup query failed for "${rawName}", proceeding with derived ID:`, dedupErr);
+                            }
+                        }
                         // 1. Check local Firestore Cache first
                         let details = null;
                         try {

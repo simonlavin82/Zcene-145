@@ -1416,24 +1416,43 @@ const App: React.FC = () => {
         let genreVal = "";
         let labelVal = docId;
         
-        if (data.detailsCache) {
-          const parsed = parseDetailsCacheSafely(data.detailsCache);
-          labelVal = parsed?.details?.artist || parsed?.name || docId;
-          originVal = parsed?.details?.origin || parsed?.origin || "";
-          genreVal = parsed?.details?.genre || parsed?.genre || "";
-        } else if (data.graphData) {
+        // ── Topology Cache Guard ─────────────────────────────────────────────────
+        // Only treat this Firestore document as a valid disambiguation candidate if it
+        // contains a fully-mapped graph (Topology Cache Hit). A document with only a
+        // detailsCache biography but no graphData is an Artist Cache Stub — it must
+        // NOT trigger the 'Look What I Found' modal; instead the pipeline will run
+        // fresh synthesis automatically. This is the fix for the Cache Hit Mirage.
+        let hasTopology = false;
+        if (data.graphData) {
           try {
             const parsed = JSON.parse(data.graphData);
             const nodes = parsed.nodes || [];
-            const primaryNode = nodes.find((n: any) => n.type === 'artist' && n.id.toLowerCase() === docId.toLowerCase()) || nodes[0];
-            if (primaryNode) {
-              labelVal = primaryNode.label || primaryNode.id;
+            if (nodes.length > 0) {
+              hasTopology = true;
+              const primaryNode = nodes.find((n: any) => n.type === 'artist' && n.id.toLowerCase() === docId.toLowerCase()) || nodes[0];
+              if (primaryNode) {
+                labelVal = primaryNode.label || primaryNode.id;
+              }
+              const countries = nodes.filter((n: any) => n.type === 'country').map((n: any) => n.label || n.id);
+              originVal = countries.join(', ');
+              const genres = nodes.filter((n: any) => n.type === 'genre').map((n: any) => n.label || n.id);
+              genreVal = genres.join(', ');
             }
-            const countries = nodes.filter((n: any) => n.type === 'country').map((n: any) => n.label || n.id);
-            originVal = countries.join(', ');
-            const genres = nodes.filter((n: any) => n.type === 'genre').map((n: any) => n.label || n.id);
-            genreVal = genres.join(', ');
           } catch (e) {}
+        }
+        // Fall back to detailsCache for label/origin/genre enrichment ONLY if topology exists
+        if (hasTopology && data.detailsCache) {
+          const parsed = parseDetailsCacheSafely(data.detailsCache);
+          if (parsed) {
+            labelVal = parsed?.details?.artist || parsed?.name || labelVal;
+            originVal = originVal || parsed?.details?.origin || parsed?.origin || "";
+            genreVal = genreVal || parsed?.details?.genre || parsed?.genre || "";
+          }
+        }
+
+        if (!hasTopology) {
+          console.log(`[Disambiguation] Skipping "${docId}" — Artist Cache Stub (no topology). Will proceed to fresh synthesis.`);
+          continue;
         }
         
         const candidateKey = normalizeArtistId(docId);
