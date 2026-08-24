@@ -359,7 +359,7 @@ export const processCurationJob = onDocumentCreated({
         ).map((n: any) => ({
           id: n.id,
           name: n.label || n.id,
-          type: n.type || 'artist',
+          type: n.type,
           origin: n.origin || null
         }));
 
@@ -461,9 +461,7 @@ export const processCurationJob = onDocumentCreated({
               let requiresImageScraping = false;
               let requiresVideoScraping = false;
 
-              // Cache the original image URL just in case the scrape fails during a stub replacement
-              const payloadSeedImage = Array.isArray(artistList) && artistList.length > 0 && isEntitySeedMatch(artistNormId, normalizeArtistId(artistList[0])) ? inputPayload?.seedImageUrl : undefined;
-              const originalImageUrl = details?.imageUrl || payloadSeedImage || "";
+              // Extract clean human-readable name for APIs by stripping known country slugs
 
               // Extract clean human-readable name for APIs by stripping known country slugs
               let searchArtistName = stripCountrySlug(rawName);
@@ -571,17 +569,13 @@ export const processCurationJob = onDocumentCreated({
                   details.details = { genre: "", origin: "", founded: "", notableArtists: [] };
                 }
 
-                // 4. Scrape dedicated Image URL
-                if (requiresImageScraping && searchArtistName) {
+                // 4. Scrape dedicated Image URL (Artists Only)
+                if (requiresImageScraping && searchArtistName && !isLabel) {
                   try {
                     let attemptName = searchArtistName;
-                    if (isLabel && attemptName.toLowerCase().endsWith(' records')) {
-                       attemptName = attemptName.substring(0, attemptName.length - 8).trim();
-                    }
-                    
                     const scrapedImg = await scrapeImageUrlBackend(
                       attemptName, 
-                      isLabel ? 'label' : 'artist',
+                      'artist',
                       details.details.genre || "",
                       details.summary || ""
                     );
@@ -590,12 +584,12 @@ export const processCurationJob = onDocumentCreated({
                     } else {
                       // ⚠️ STRICT FAIL-FAST RULE: No deterministic fallback images.
                       console.warn(`[Image Scraper] No image found for ${searchArtistName}.`);
-                      details.imageUrl = originalImageUrl || "No iTunes Image";
+                      details.imageUrl = null;
                     }
                   } catch (e) {
                     // ⚠️ STRICT FAIL-FAST RULE: Catch API timeouts instantly.
                     console.warn(`[Image Scraper] Timeout/Error for ${searchArtistName}. Enforcing fail-fast rule.`);
-                    details.imageUrl = originalImageUrl || "No iTunes Image";
+                    details.imageUrl = null;
                   }
                 }
 
@@ -660,7 +654,8 @@ export const processCurationJob = onDocumentCreated({
           const prunedIds = new Set<string>();
           finalGraph.nodes = finalGraph.nodes.filter((node: any) => {
             const nodeNorm = normalizeArtistId(node.id);
-            const isStructural = !['artist', 'label'].includes(node.type);
+            const typeLower = (node.type || 'artist').toLowerCase();
+            const isStructural = !['artist', 'label'].includes(typeLower);
             const isSeedNode = Array.from(seedNormSet).some((s: string) => isEntitySeedMatch(s, nodeNorm));
             const isHydrated = Array.from(hydratedNorms).some((h: string) => isEntitySeedMatch(nodeNorm, h));
             if (!isHydrated && !isSeedNode && !isStructural) {

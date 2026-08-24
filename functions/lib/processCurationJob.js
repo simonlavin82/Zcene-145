@@ -324,7 +324,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 const recommendedEntities = finalGraph.nodes.filter((n) => n.type === 'artist' || n.type === 'label').map((n) => ({
                     id: n.id,
                     name: n.label || n.id,
-                    type: n.type || 'artist',
+                    type: n.type,
                     origin: n.origin || null
                 }));
                 // CRITICAL FIX: Ensure all seed artists are explicitly placed into the hydration queue.
@@ -417,9 +417,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         let requiresTextHydration = false;
                         let requiresImageScraping = false;
                         let requiresVideoScraping = false;
-                        // Cache the original image URL just in case the scrape fails during a stub replacement
-                        const payloadSeedImage = Array.isArray(artistList) && artistList.length > 0 && isEntitySeedMatch(artistNormId, (0, curatorService_1.normalizeArtistId)(artistList[0])) ? inputPayload?.seedImageUrl : undefined;
-                        const originalImageUrl = details?.imageUrl || payloadSeedImage || "";
+                        // Extract clean human-readable name for APIs by stripping known country slugs
                         // Extract clean human-readable name for APIs by stripping known country slugs
                         let searchArtistName = stripCountrySlug(rawName);
                         if (details && details.details && details.details.artist && details.details.artist !== rawName) {
@@ -518,27 +516,24 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             if (!details.details) {
                                 details.details = { genre: "", origin: "", founded: "", notableArtists: [] };
                             }
-                            // 4. Scrape dedicated Image URL
-                            if (requiresImageScraping && searchArtistName) {
+                            // 4. Scrape dedicated Image URL (Artists Only)
+                            if (requiresImageScraping && searchArtistName && !isLabel) {
                                 try {
                                     let attemptName = searchArtistName;
-                                    if (isLabel && attemptName.toLowerCase().endsWith(' records')) {
-                                        attemptName = attemptName.substring(0, attemptName.length - 8).trim();
-                                    }
-                                    const scrapedImg = await (0, curatorService_1.scrapeImageUrlBackend)(attemptName, isLabel ? 'label' : 'artist', details.details.genre || "", details.summary || "");
+                                    const scrapedImg = await (0, curatorService_1.scrapeImageUrlBackend)(attemptName, 'artist', details.details.genre || "", details.summary || "");
                                     if (scrapedImg) {
                                         details.imageUrl = scrapedImg;
                                     }
                                     else {
                                         // ⚠️ STRICT FAIL-FAST RULE: No deterministic fallback images.
                                         console.warn(`[Image Scraper] No image found for ${searchArtistName}.`);
-                                        details.imageUrl = originalImageUrl || "No iTunes Image";
+                                        details.imageUrl = null;
                                     }
                                 }
                                 catch (e) {
                                     // ⚠️ STRICT FAIL-FAST RULE: Catch API timeouts instantly.
                                     console.warn(`[Image Scraper] Timeout/Error for ${searchArtistName}. Enforcing fail-fast rule.`);
-                                    details.imageUrl = originalImageUrl || "No iTunes Image";
+                                    details.imageUrl = null;
                                 }
                             }
                             details.details.artist = details.details.artist || searchArtistName;
@@ -547,6 +542,8 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             }
                             console.log(`[Curation Backend] Hydration successful for: ${artistNormId}`);
                         }
+                        if (!details)
+                            return null;
                         return [artistNormId, details];
                     }));
                     console.log(`[Curation Backend] [Step 3: Firestore Caching] Hydration complete. Writing ${chunkResults.length} entities to Firestore cache...`);
@@ -592,9 +589,11 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     const prunedIds = new Set();
                     finalGraph.nodes = finalGraph.nodes.filter((node) => {
                         const nodeNorm = (0, curatorService_1.normalizeArtistId)(node.id);
+                        const typeLower = (node.type || 'artist').toLowerCase();
+                        const isStructural = !['artist', 'label'].includes(typeLower);
                         const isSeedNode = Array.from(seedNormSet).some((s) => isEntitySeedMatch(s, nodeNorm));
                         const isHydrated = Array.from(hydratedNorms).some((h) => isEntitySeedMatch(nodeNorm, h));
-                        if (!isHydrated && !isSeedNode) {
+                        if (!isHydrated && !isSeedNode && !isStructural) {
                             console.warn(`[Quality Baseline] Surgically pruning unhydratable node from graph topology: ${node.id}`);
                             prunedIds.add(node.id);
                             return false;

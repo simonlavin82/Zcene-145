@@ -154,6 +154,14 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
         }
     }
     if (finalGraph.nodes) {
+        for (const n of finalGraph.nodes) {
+            if (n.type) {
+                n.type = n.type.toLowerCase();
+            }
+            else {
+                n.type = 'artist';
+            }
+        }
         for (const seed of artistList) {
             const seedNorm = (0, curatorService_1.normalizeArtistId)(seed);
             const seedNode = finalGraph.nodes.find((n) => isEntitySeedMatch(seedNorm, n.id) || isEntitySeedMatch(seedNorm, n.label || ''));
@@ -164,11 +172,11 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
         }
     }
     const recommendedEntities = (finalGraph.nodes || [])
-        .filter((n) => n.type === 'artist' || n.type === 'label' || !n.type)
+        .filter((n) => n.type === 'artist' || n.type === 'label')
         .map((n) => ({
         id: n.id,
         name: n.label || n.id,
-        type: n.type || 'artist',
+        type: n.type,
         origin: n.origin || null
     }));
     for (const seed of artistList) {

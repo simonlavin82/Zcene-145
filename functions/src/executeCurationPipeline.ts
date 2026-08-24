@@ -168,6 +168,14 @@ export const executeCurationPipeline = onCall({
   }
 
   if (finalGraph.nodes) {
+    for (const n of finalGraph.nodes) {
+      if (n.type) {
+        n.type = n.type.toLowerCase();
+      } else {
+        n.type = 'artist';
+      }
+    }
+    
     for (const seed of artistList) {
       const seedNorm = normalizeArtistId(seed);
       const seedNode = finalGraph.nodes.find((n: any) => isEntitySeedMatch(seedNorm, n.id) || isEntitySeedMatch(seedNorm, n.label || ''));
@@ -179,11 +187,11 @@ export const executeCurationPipeline = onCall({
   }
 
   const recommendedEntities = (finalGraph.nodes || [])
-    .filter((n: any) => n.type === 'artist' || n.type === 'label' || !n.type)
+    .filter((n: any) => n.type === 'artist' || n.type === 'label')
     .map((n: any) => ({
       id: n.id,
       name: n.label || n.id,
-      type: n.type || 'artist',
+      type: n.type,
       origin: n.origin || null
     }));
 
