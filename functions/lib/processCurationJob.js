@@ -170,7 +170,7 @@ async function updateProjectStatus(userId, projectId, updates) {
 exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
     document: "curationJobs/{jobId}",
     secrets: ["GEMINI_API_KEY"],
-    timeoutSeconds: 540,
+    timeoutSeconds: 540, // Firebase Functions v2 SDK enforces a hard 540s cap for Firestore event triggers
     memory: "1GiB",
 }, async (event) => {
     const snapshot = event.data;
@@ -351,6 +351,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 for (let i = 0; i < recommendedEntities.length; i += batchSize) {
                     const chunk = recommendedEntities.slice(i, i + batchSize);
                     console.log(`[Curation Backend] Hydrating batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(recommendedEntities.length / batchSize)} (${chunk.length} entities)...`);
+                    const batchStartTime = Date.now();
                     const chunkResults = await Promise.all(chunk.map(async (entityObj, idx) => {
                         const rawName = entityObj.name;
                         let artistNormId = (0, curatorService_1.normalizeArtistId)(rawName);
@@ -504,8 +505,8 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             }
                             catch (firstErr) {
                                 if (isTransientError(firstErr)) {
-                                    console.warn(`[Curation Backend] Transient error for ${artistNormId}. Retrying in 2s...`, firstErr.message);
-                                    await new Promise(resolve => setTimeout(resolve, 2000));
+                                    console.warn(`[Curation Backend] Transient error for ${artistNormId}. Retrying in 8s...`, firstErr.message);
+                                    await new Promise(resolve => setTimeout(resolve, 8000));
                                     try {
                                         details = await (0, curatorService_1.fetchNodeDetailsBackend)(tempNode, finalGraph, cleanSeedArtistsContext);
                                         console.log(`[Curation Backend] Retry succeeded for: ${artistNormId}`);
@@ -595,10 +596,23 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             }
                         }
                     }
-                    // Add a 25-second cooldown between batches to stay safely under 15 RPM
+                    // ── Dynamic Rate-Limit Cooldown ──────────────────────────────────────────────
+                    // The Gemini 15 RPM quota requires a minimum 25-second window between batches
+                    // of 3 entities (~6 calls). If the batch itself consumed ≥25s (e.g. because
+                    // one entity needed full googleSearch grounding), the rate-limit window has
+                    // already elapsed and no additional sleep is needed. We recover this dead time
+                    // by sleeping only the remaining delta — or zero if the batch ran long.
                     if (i + batchSize < recommendedEntities.length) {
-                        console.log(`[Curation Backend] Batch complete. Cooling down for 25 seconds to respect rate limits...`);
-                        await new Promise(resolve => setTimeout(resolve, 25000));
+                        const batchElapsedMs = Date.now() - batchStartTime;
+                        const RATE_LIMIT_WINDOW_MS = 25000;
+                        const remainingCooldownMs = Math.max(0, RATE_LIMIT_WINDOW_MS - batchElapsedMs);
+                        if (remainingCooldownMs > 0) {
+                            console.log(`[Curation Backend] Batch complete (${Math.round(batchElapsedMs / 1000)}s active). Cooling down for ${Math.round(remainingCooldownMs / 1000)}s to respect rate limits...`);
+                            await new Promise(resolve => setTimeout(resolve, remainingCooldownMs));
+                        }
+                        else {
+                            console.log(`[Curation Backend] Batch complete (${Math.round(batchElapsedMs / 1000)}s active). Rate-limit window already elapsed — skipping cooldown.`);
+                        }
                     }
                 }
                 // Change 3 — Hydration Completeness Audit Log.

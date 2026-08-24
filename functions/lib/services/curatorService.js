@@ -1223,7 +1223,7 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint)
                         temperature: 0.4 - (attempts * 0.1) // Lower temperature on retries
                     }
                 }),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('AbortError: Timeout exceeded')), 25000))
+                new Promise((_, reject) => setTimeout(() => reject(new Error('AbortError: Timeout exceeded')), 55000))
             ]);
             lastResponse = response;
             const jsonText = response.text?.trim();

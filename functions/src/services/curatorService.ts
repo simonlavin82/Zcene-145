@@ -1325,7 +1325,7 @@ export const fetchNodeDetailsBackend = async (
             temperature: 0.4 - (attempts * 0.1) // Lower temperature on retries
           }
         }),
-        new Promise<any>((_, reject) => setTimeout(() => reject(new Error('AbortError: Timeout exceeded')), 25000))
+        new Promise<any>((_, reject) => setTimeout(() => reject(new Error('AbortError: Timeout exceeded')), 55000))
       ]);
       lastResponse = response;
       const jsonText = response.text?.trim();
