@@ -632,9 +632,10 @@ export const processCurationJob = onDocumentCreated({
                 }
 
                 details.details.artist = details.details.artist || searchArtistName;
-                if (!details.synthesisRationale) {
-                  details.synthesisRationale = `[Single-Seed Analysis]\n- Acoustic & Sonics: Resolved core musical properties and stylistic lineage.\n- Scene Context: Mapped direct influences, record label history, and geographic background.\n- Overlap Insights: Unified structural connections and surrounding chronological relationships.`;
-                }
+                // Note: synthesisRationale is NOT stamped here. The real Root Breakdown is
+                // generated after all hydration completes (Step 4) and written back to the
+                // seed artist doc explicitly. Pre-stamping a stub would pollute the artist
+                // doc and corrupt the Roots Breakdown displayed on cache hits.
 
                 console.log(`[Curation Backend] Hydration successful for: ${artistNormId}`);
               }
@@ -738,7 +739,27 @@ export const processCurationJob = onDocumentCreated({
       // 3.1 Pro: Root Breakdown Narrative
       rootBreakdownStr = await generateRootsBreakdownBackend(inputPayload.artists, detailsCacheEntries);
       finalGraph.synthesisRationale = rootBreakdownStr;
-      
+
+      // ── Step 5: Root Breakdown Write-Back to Seed Artist Docs ────────────────
+      // Per the Unified Canvas Architecture (Column 3, Step 5), Single-Seed jobs persist
+      // the Root Breakdown to the seed artist's Firestore doc so that future cache hits
+      // serve the full 3.1 Pro narrative without re-generating it. This write-back
+      // overwrites any absent or stub value left from the earlier hydration pass.
+      if (rootBreakdownStr) {
+        for (const seedName of artistList) {
+          const seedNorm = normalizeArtistId(seedName);
+          const seedDocRef = db.collection('artists').doc(seedNorm);
+          await seedDocRef.update({
+            'detailsCache.synthesisRationale': rootBreakdownStr,
+            cachedAt: FieldValue.serverTimestamp()
+          }).catch((e: any) => {
+            // Non-fatal: the project graphData is the canonical ground truth.
+            console.warn(`[Curation Backend] Root Breakdown write-back skipped for artist doc: ${seedNorm}`, e.message);
+          });
+          console.log(`[Curation Backend] ✅ Root Breakdown written to seed artist doc: ${seedNorm}`);
+        }
+      }
+
       // 3.1 Pro: Final Node Positioning could be executed here if a service existed.
       // We will skip explicit repositioning mutation of finalGraph to avoid breaking schema,
       // but the narrative synthesis is now locked to 3.1 Pro.

@@ -6382,9 +6382,20 @@ const App: React.FC = () => {
        window.location.hostname === '127.0.0.1' ||
        window.location.port === '3000');
     
+    // Guardrail: Cloud Curation Mode — backend proxy is the sole authority.
+    // When VITE_USE_CLOUD_CURATION=true, all node data must come from the backend
+    // pipeline (Firestore / zcene-backend-proxy). The frontend must never call
+    // Gemini directly. Missing data means hydration is still in-flight; show a
+    // skeleton, not a panic fetch.
+    const isCloudCurationMode = import.meta.env.VITE_USE_CLOUD_CURATION === 'true';
+
     const shouldMock = (import.meta.env.VITE_USE_MOCKS === 'true') || (import.meta.env.VITE_USE_MOCKS !== 'false' && (isLocal || import.meta.env.DEV));
-    if (shouldMock) {
-      console.log("[Revalidation] Sandbox Mode: Suppressed background refresh for: " + node.id);
+    if (shouldMock || isCloudCurationMode) {
+      console.log("[Revalidation] Suppressed: " +
+        (isCloudCurationMode
+          ? "Cloud Curation Mode — backend proxy is authoritative. Skipping direct Gemini call."
+          : "Sandbox/Mock Mode — local environment.") +
+        " Node: " + node.id);
       return;
     }
 

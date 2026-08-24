@@ -1048,6 +1048,19 @@ export const getEntityDocWithRedirect = async (
     const url = `${apiPath}${entityId}`;
     const response = await fetch(url);
     if (!response.ok) {
+      // Fix 3 — 404 Suffix Fallback: If the country-disambiguated ID (e.g. 'korn-usa')
+      // returns 404, the doc may only exist as a bare ID alias with a redirectTo pointer
+      // (e.g. 'korn'). Strip the last country-suffix segment and retry once so the
+      // redirect chain can resolve correctly. This eliminates the 404 waterfall on page
+      // load for graph nodes whose IDs include an origin suffix.
+      if (response.status === 404 && depth === 0) {
+        const suffixMatch = entityId.match(/^(.+)-(?:usa|uk|united-states|united-kingdom|canada|australia|germany|france|sweden|norway|italy|spain|brazil|mexico|japan|south-korea)$/i);
+        if (suffixMatch) {
+          const bareId = suffixMatch[1];
+          console.log(`[Proxy Fetch] 404 for ${entityId} — retrying with bare ID: ${bareId}`);
+          return getEntityDocWithRedirect(bareId, entityType, depth + 1);
+        }
+      }
       console.warn(`[Proxy Fetch] Non-200 status (${response.status}) for ${entityId}, returning safe fallback to prevent UI crash.`);
       return {
         exists: () => true,
