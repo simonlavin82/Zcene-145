@@ -606,6 +606,7 @@ export const processCurationJob = onDocumentCreated({
 
                 console.log(`[Curation Backend] Hydration successful for: ${artistNormId}`);
               }
+              if (!details) return null;
               return [artistNormId, details] as [string, any];
             })
           );
@@ -659,9 +660,10 @@ export const processCurationJob = onDocumentCreated({
           const prunedIds = new Set<string>();
           finalGraph.nodes = finalGraph.nodes.filter((node: any) => {
             const nodeNorm = normalizeArtistId(node.id);
+            const isStructural = !['artist', 'label'].includes(node.type);
             const isSeedNode = Array.from(seedNormSet).some((s: string) => isEntitySeedMatch(s, nodeNorm));
             const isHydrated = Array.from(hydratedNorms).some((h: string) => isEntitySeedMatch(nodeNorm, h));
-            if (!isHydrated && !isSeedNode) {
+            if (!isHydrated && !isSeedNode && !isStructural) {
               console.warn(`[Quality Baseline] Surgically pruning unhydratable node from graph topology: ${node.id}`);
               prunedIds.add(node.id);
               return false;
