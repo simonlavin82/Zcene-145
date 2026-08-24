@@ -3168,7 +3168,7 @@ const App: React.FC = () => {
                                 : undefined,
                             tourDates: parsedDetails?.tourDates || [],
                             tourCachedAt: parsedDetails?.tourCachedAt || "",
-                            synthesisRationale: parsedDetails?.synthesisRationale
+                            synthesisRationale: parsedDetails?.synthesisRationale || normalizedGraph.synthesisRationale || undefined
                          };
                           console.log("[Phase 3 Cache Payload – Front Gate]", searchId, JSON.stringify({ youtubeVideoId: detailsPayload.youtubeVideoId, youtubeSearchQuery: detailsPayload.youtubeSearchQuery }));
                           
