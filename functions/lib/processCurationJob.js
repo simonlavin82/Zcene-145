@@ -335,7 +335,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         if (seedNode && (0, curatorService_1.normalizeArtistId)(seedNode.id) !== seedNorm) {
                             console.log(`[Curation Backend] Standardizing seed node ID from ${seedNode.id} to ${seedNorm}`);
                             seedNode.id = seedNorm; // E.g., 'Korn' -> 'korn-usa'
-                            seedNode.label = seed; // Also rewrite label so entityObj.name matches the exact seed requested
+                            seedNode.label = stripCountrySlug(seed); // Use bare display name so recNorm stays un-slugged (e.g. 'spaced', not 'spaced-usa')
                         }
                     }
                 }
@@ -359,7 +359,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         const hintEntry = Object.entries(disambiguationHints).find(([k]) => (0, curatorService_1.normalizeArtistId)(k) === seedNorm);
                         recommendedEntities.unshift({
                             id: seed,
-                            name: seed,
+                            name: stripCountrySlug(seed), // Bare display name (e.g. 'spaced') — mirrors the standardization label above
                             type: 'artist',
                             origin: hintEntry ? hintEntry[1] : null
                         });

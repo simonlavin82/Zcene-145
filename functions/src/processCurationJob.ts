@@ -371,7 +371,7 @@ export const processCurationJob = onDocumentCreated({
             if (seedNode && normalizeArtistId(seedNode.id) !== seedNorm) {
                console.log(`[Curation Backend] Standardizing seed node ID from ${seedNode.id} to ${seedNorm}`);
                seedNode.id = seedNorm; // E.g., 'Korn' -> 'korn-usa'
-               seedNode.label = seed; // Also rewrite label so entityObj.name matches the exact seed requested
+               seedNode.label = stripCountrySlug(seed); // Use bare display name so recNorm stays un-slugged (e.g. 'spaced', not 'spaced-usa')
             }
           }
         }
@@ -401,7 +401,7 @@ export const processCurationJob = onDocumentCreated({
             );
             recommendedEntities.unshift({
               id: seed,
-              name: seed,
+              name: stripCountrySlug(seed), // Bare display name (e.g. 'spaced') — mirrors the standardization label above
               type: 'artist',
               origin: hintEntry ? hintEntry[1] as string : null
             });
