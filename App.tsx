@@ -3596,7 +3596,8 @@ const App: React.FC = () => {
                     recommendationReason: parsedData?.recommendationReason || parsedData?.reason || "",
                     groundingLinks: parsedData?.groundingLinks || [],
                     tourDates: parsedData?.tourDates || [],
-                    tourCachedAt: parsedData?.tourCachedAt || ""
+                    tourCachedAt: parsedData?.tourCachedAt || "",
+                    synthesisRationale: parsedData?.synthesisRationale || ""
                   };
 
                   next.set(key.toLowerCase(), detailsObj);

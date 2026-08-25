@@ -751,6 +751,7 @@ export const processCurationJob = onDocumentCreated({
           const seedDocRef = db.collection('artists').doc(seedNorm);
           await seedDocRef.update({
             'detailsCache.synthesisRationale': rootBreakdownStr,
+            synthesisRationale: rootBreakdownStr,
             cachedAt: FieldValue.serverTimestamp()
           }).catch((e: any) => {
             // Non-fatal: the project graphData is the canonical ground truth.

@@ -683,6 +683,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             const seedDocRef = db.collection('artists').doc(seedNorm);
                             await seedDocRef.update({
                                 'detailsCache.synthesisRationale': rootBreakdownStr,
+                                synthesisRationale: rootBreakdownStr,
                                 cachedAt: firestore_2.FieldValue.serverTimestamp()
                             }).catch((e) => {
                                 // Non-fatal: the project graphData is the canonical ground truth.
