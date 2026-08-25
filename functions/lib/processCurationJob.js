@@ -232,11 +232,31 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 };
             }
             else {
-                // Parse seed artists list
-                const artistList = inputPayload.artists
+                // Parse seed artists list and immediately enforce the global slugging convention.
+                // disambiguationHints (collected by the Validate Origin modal) carries the user-confirmed
+                // country for each seed. We apply the slug here — before Phase 1 cache routing — so that
+                // every downstream reference (cache lookups, seed node standardisation, Firestore writes,
+                // alias pointers, Root Breakdown write-back) uses the canonical <artist>-<country> ID.
+                // This prevents namespace collisions between artists sharing the same name from different countries.
+                const rawArtistList = inputPayload.artists
                     .split('::')
                     .map((a) => a.trim())
                     .filter(Boolean);
+                const disambiguationHints = inputPayload.disambiguationHints || {};
+                const artistList = rawArtistList.map((seed) => {
+                    const seedNorm = (0, curatorService_1.normalizeArtistId)(seed);
+                    // Find the matching hint by comparing bare normalised names (hint keys are bare, e.g. 'spaced')
+                    const hintEntry = Object.entries(disambiguationHints).find(([k]) => (0, curatorService_1.normalizeArtistId)(k) === seedNorm);
+                    if (hintEntry) {
+                        const originSlug = (0, curatorService_1.extractCountrySlug)(hintEntry[1]);
+                        if (originSlug && originSlug !== 'global' && !seedNorm.endsWith(`-${originSlug}`)) {
+                            const slugged = `${seedNorm}-${originSlug}`;
+                            console.log(`[Curation Backend] [Slug Enforcement] Rewrote seed ID: '${seedNorm}' → '${slugged}' (origin: ${hintEntry[1]})`);
+                            return slugged;
+                        }
+                    }
+                    return seedNorm; // Already slugged, or no disambiguation hint available
+                });
                 console.log(`[Curation Backend] [Phase 1: Global Cache Routing] Checking seeds: ${artistList.join(', ')}`);
                 const resolvedSeedArray = [];
                 for (const seed of artistList) {
@@ -334,11 +354,14 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     const seedNorm = (0, curatorService_1.normalizeArtistId)(seed);
                     const exists = recommendedEntities.some((e) => isEntitySeedMatch(seedNorm, e.id) || isEntitySeedMatch(seedNorm, e.name));
                     if (!exists) {
+                        // Pass the origin string from disambiguationHints so the Pre-Hydration Canonicalization
+                        // guard in the hydration loop has a second source of truth (defensive belt-and-suspenders).
+                        const hintEntry = Object.entries(disambiguationHints).find(([k]) => (0, curatorService_1.normalizeArtistId)(k) === seedNorm);
                         recommendedEntities.unshift({
                             id: seed,
                             name: seed,
                             type: 'artist',
-                            origin: null // Origin slug is already embedded in the seed ID
+                            origin: hintEntry ? hintEntry[1] : null
                         });
                         console.log(`[Curation Backend] Explicitly pushing missing seed artist into gap-filling queue: ${seed}`);
                     }
