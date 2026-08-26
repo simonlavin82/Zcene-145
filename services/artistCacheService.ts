@@ -128,11 +128,23 @@ export const isCacheDocumentVerified = (data: Record<string, any>): boolean => {
   return true;
 };
 
+const COUNTRY_ISO_MAP: Record<string, string> = {
+  'united states': 'us', 'usa': 'us', 'us': 'us',
+  'united kingdom': 'gb', 'uk': 'gb', 'england': 'gb', 'great britain': 'gb',
+  'australia': 'au', 'canada': 'ca', 'germany': 'de',
+  'france': 'fr', 'japan': 'jp', 'sweden': 'se',
+  'italy': 'it', 'spain': 'es', 'brazil': 'br',
+  'mexico': 'mx', 'netherlands': 'nl', 'belgium': 'be',
+  'norway': 'no', 'finland': 'fi', 'denmark': 'dk',
+  'ireland': 'ie', 'new zealand': 'nz', 'poland': 'pl',
+  'austria': 'at', 'switzerland': 'ch'
+};
+
 /**
  * Extracts a clean, normalized country slug from origin strings.
- * e.g. "San Diego, CA, United States" -> "united-states"
- * e.g. "London, England, United Kingdom" -> "united-kingdom"
- * e.g. "Italy" -> "italy"
+ * e.g. "San Diego, CA, United States" -> "us"
+ * e.g. "London, England, United Kingdom" -> "gb"
+ * e.g. "Italy" -> "it"
  */
 export const extractCountrySlug = (originStr?: string): string => {
   if (!originStr || typeof originStr !== 'string' || originStr.trim().length === 0) {
@@ -141,8 +153,13 @@ export const extractCountrySlug = (originStr?: string): string => {
 
   const parts = originStr.split(',').map(s => s.trim()).filter(Boolean);
   const rawCountry = parts.length > 0 ? parts[parts.length - 1] : originStr;
-  const slug = normalizeArtistId(rawCountry);
+  const lowerCountry = rawCountry.toLowerCase();
+  
+  if (COUNTRY_ISO_MAP[lowerCountry]) {
+    return COUNTRY_ISO_MAP[lowerCountry];
+  }
 
+  const slug = normalizeArtistId(rawCountry);
   return slug || 'global';
 };
 
@@ -773,6 +790,7 @@ export const writeArtistCacheMany = async (
             cacheVersion: 4,
             hitCount: (existing.hitCount || 0) + 1,
             cachedAt: existing.cachedAt || serverTimestamp(),
+            updatedAt: serverTimestamp(),
             isDeep: preserveFullGraph || false,
             isPrimarySeed: !isLabel,
             hasUniqueSpiderweb: !isLabel,
@@ -787,7 +805,8 @@ export const writeArtistCacheMany = async (
           // Update detailsCache if it was missing or stale
           const updatePayload: any = {
             detailsCache: isLabel ? sanitizeLabelProfile(artistDetails) : (typeof artistDetails === 'string' ? JSON.parse(artistDetails) : artistDetails),
-            cachedAt: serverTimestamp(),
+            cachedAt: existing?.cachedAt || serverTimestamp(),
+            updatedAt: serverTimestamp(),
             cacheVersion: 4,
             [idFieldKey]: canonicalId,
             cacheKey: compositeCanonicalId,
