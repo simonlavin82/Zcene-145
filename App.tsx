@@ -2885,30 +2885,40 @@ const App: React.FC = () => {
               const validate = httpsCallable(functions, 'validateSeedOriginCallable');
               const result = await validate({ seed: rawInput });
               const data = result.data as any;
+              let candidates: any[] = [];
               if (data && data.isValid) {
-                const aiCandidate = {
+                candidates = [{
                   id: data.id,
                   label: data.id,
                   name: data.id,
                   genre: data.genre,
                   origin: data.origin,
                   listeners: 0
-                };
-                choice = await new Promise<string | 'synthesis' | 'cancel'>((resolve) => {
-                  setDisambiguationDialog({
-                    isOpen: true,
-                    query: rawInput,
-                    candidates: [aiCandidate],
-                    onSelect: (c) => { setDisambiguationDialog(null); resolve(c); },
-                    isLiveAISuggestions: true
-                  });
+                }];
+              }
+              choice = await new Promise<string | 'synthesis' | 'cancel'>((resolve) => {
+                setDisambiguationDialog({
+                  isOpen: true,
+                  query: rawInput,
+                  candidates,
+                  onSelect: (c) => { setDisambiguationDialog(null); resolve(c); },
+                  isLiveAISuggestions: true
                 });
-                if (choice !== 'cancel' && choice !== 'synthesis') {
-                  activeDisambiguationHints[normalizeArtistId(rawInput)] = data.origin;
-                }
+              });
+              if (choice !== 'cancel' && choice !== 'synthesis' && !choice.startsWith('override::') && candidates.length > 0) {
+                activeDisambiguationHints[normalizeArtistId(rawInput)] = data.origin;
               }
             } catch (e) {
               console.warn("Origin validation failed:", e);
+              choice = await new Promise<string | 'synthesis' | 'cancel'>((resolve) => {
+                setDisambiguationDialog({
+                  isOpen: true,
+                  query: rawInput,
+                  candidates: [],
+                  onSelect: (c) => { setDisambiguationDialog(null); resolve(c); },
+                  isLiveAISuggestions: true
+                });
+              });
             }
             setIsLoading(false);
             isHydratingSessionRef.current = false;
@@ -2932,6 +2942,14 @@ const App: React.FC = () => {
           const currentResolvedStr = resolvedArtistSeeds.join('::');
           handleGenerateGraph(currentResolvedStr, isRegeneration, graphToEnhance, true, true, overrideFilters, activeDisambiguationHints, true);
           return;
+        } else if (choice.startsWith('override::')) {
+          const countrySlug = choice.split('::')[1];
+          const newSeed = normalizeArtistId(`${searchId}-${countrySlug}`);
+          resolvedArtistSeeds[i] = newSeed;
+          activeDisambiguationHints[newSeed] = countrySlug;
+          hasDisambiguated = true;
+          // Clean up cache candidates just in case
+          cacheCandidates.forEach(ns => mergeAndCleanupArtists(newSeed, ns.id));
         } else {
           // User accepted a specific candidate card from the cache.
           resolvedArtistSeeds[i] = normalizeArtistId(choice);

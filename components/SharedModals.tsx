@@ -993,7 +993,7 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
           <ModalBody className="overflow-visible flex flex-col gap-4">
             <p className="text-sm font-light text-zinc-400 leading-relaxed">
               {isLiveAISuggestions 
-                ? <>No specific regional variants were identified for <span className="text-primary font-semibold">"{query}"</span> by the AI probe. Proceed by typing an origin below, or proceed without one.</>
+                ? <>We ran a quick live check and did not find a distinct regional entity for <span className="text-primary font-semibold">"{query}"</span>.</>
                 : <>No cached records found for <span className="text-primary font-semibold">"{query}"</span>. This artist may be new to the platform, or multiple regional acts share this name.</>}
             </p>
 
