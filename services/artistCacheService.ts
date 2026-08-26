@@ -153,7 +153,7 @@ export const extractCountrySlug = (originStr?: string): string => {
 
   const parts = originStr.split(',').map(s => s.trim()).filter(Boolean);
   const rawCountry = parts.length > 0 ? parts[parts.length - 1] : originStr;
-  const lowerCountry = rawCountry.toLowerCase();
+  const lowerCountry = rawCountry.toLowerCase().trim();
   
   if (COUNTRY_ISO_MAP[lowerCountry]) {
     return COUNTRY_ISO_MAP[lowerCountry];
@@ -733,6 +733,7 @@ export const writeArtistCacheMany = async (
           filters: filters || {},
           cacheVersion: 4,
           cachedAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
           hitCount: 0,
           isDeep: preserveFullGraph || false,
           isPrimarySeed: isPrimarySeed && !isLabel,

@@ -3286,7 +3286,7 @@ const App: React.FC = () => {
               
               if (!isQualified) {
                 console.log('[Front Gate Cache] Cache doc found but not fully qualified. Background revalidation queued.');
-              } else {
+              } else if (data?.hasUniqueSpiderweb) {
                 showCacheToast();
               }
               return;

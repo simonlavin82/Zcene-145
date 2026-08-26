@@ -114,6 +114,18 @@ export const sanitizeImageUrl = (rawUrl?: string | null, sanitizeStrFn?: (s: str
   }
 };
 
+const COUNTRY_ISO_MAP: Record<string, string> = {
+  'united states': 'us', 'usa': 'us', 'us': 'us',
+  'united kingdom': 'gb', 'uk': 'gb', 'england': 'gb', 'great britain': 'gb',
+  'australia': 'au', 'canada': 'ca', 'germany': 'de',
+  'france': 'fr', 'japan': 'jp', 'sweden': 'se',
+  'italy': 'it', 'spain': 'es', 'brazil': 'br',
+  'mexico': 'mx', 'netherlands': 'nl', 'belgium': 'be',
+  'norway': 'no', 'finland': 'fi', 'denmark': 'dk',
+  'ireland': 'ie', 'new zealand': 'nz', 'poland': 'pl',
+  'austria': 'at', 'switzerland': 'ch'
+};
+
 export const extractCountrySlug = (originStr?: string): string => {
   if (!originStr || typeof originStr !== 'string' || originStr.trim().length === 0) {
     return 'global';
@@ -121,8 +133,13 @@ export const extractCountrySlug = (originStr?: string): string => {
 
   const parts = originStr.split(',').map(s => s.trim()).filter(Boolean);
   const rawCountry = parts.length > 0 ? parts[parts.length - 1] : originStr;
-  const slug = normalizeArtistId(rawCountry);
+  const lowerCountry = rawCountry.toLowerCase().trim();
+  
+  if (COUNTRY_ISO_MAP[lowerCountry]) {
+    return COUNTRY_ISO_MAP[lowerCountry];
+  }
 
+  const slug = normalizeArtistId(rawCountry);
   return slug || 'global';
 };
 

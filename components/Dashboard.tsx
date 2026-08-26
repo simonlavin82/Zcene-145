@@ -448,7 +448,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 <span className="text-[9px] uppercase tracking-wider text-red-500/80 font-bold px-1.5 py-0.5 bg-red-500/10 rounded-md border border-red-500/10 whitespace-nowrap">
                                   Failed
                                 </span>
-                              ) : hasGraphNodes ? (
+                              ) : project.status === 'completed' ? (
                                 <>
                                   <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
                                     AI ARTISTS: {recommendedCount}
@@ -542,7 +542,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         const displayTitle = cleanArtistDisplayName(project.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene"));
                         const formattedDate = formatSystemTimestamp(project.updatedAt);
                         const hasGraphNodes = !!project.graphData && !project.graphData.includes('"nodes":[]');
-                        const isMapped = project.status === 'completed' || hasGraphNodes;
+                        const isMapped = project.status === 'completed';
                         
                         // Derive deep cuts count: prefer the persisted activeNodes queue.
                         // Fallback for stale documents: count seed artists present in graphData.
@@ -619,7 +619,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 <span className="text-[10px] uppercase tracking-wider text-red-500/80 font-bold px-2 py-0.5 bg-red-500/10 rounded-md border border-red-500/10 whitespace-nowrap">
                                   Failed
                                 </span>
-                              ) : isMapped ? (
+                              ) : project.status === 'completed' ? (
                                 <span className="text-[10px] uppercase tracking-widest text-primary/70 font-bold px-2 py-0.5 bg-primary/10 rounded-md border border-primary/20 whitespace-nowrap">
                                   Mapped
                                   </span>
