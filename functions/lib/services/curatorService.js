@@ -1442,9 +1442,12 @@ const scrapeImageUrlBackend = async (artistName, type, genre, summary) => {
                         selectedArtistId = strictMatches[0].artistId;
                     }
                     else {
-                        console.warn(`[scrapeImageUrlBackend] iTunes validation blocked for ${artistName}. No strict genre overlap found, skipping to Gemini fallback.`);
-                        selectedArtistId = null;
+                        console.warn(`[scrapeImageUrlBackend] iTunes validation blocked for ${artistName}. No strict genre overlap found, aborting.`);
+                        return null;
                     }
+                }
+                else {
+                    return null; // No exact matches found
                 }
                 if (selectedArtistId) {
                     // Step 2: Fetch their albums for the high-res artwork using the exact artistId
@@ -1466,104 +1469,11 @@ const scrapeImageUrlBackend = async (artistName, type, genre, summary) => {
             }
         }
         catch (itunesErr) {
-            console.warn(`[scrapeImageUrlBackend] iTunes fallback bypassed for ${artistName}:`, itunesErr.message);
-        }
-    }
-    // Strategy 2: Gemini Google Search Fallback (for Labels or obscure deep cuts)
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey)
-        return null;
-    const ai = new genai_1.GoogleGenAI({
-        apiKey,
-        httpOptions: { timeout: 300000 } // 5 minutes
-    });
-    const currentModel = "gemini-3.5-flash";
-    const prompt = `Find a high-quality, direct HTTPS image URL representing the music ${type}: "${artistName}".
-  
-Context:
-Genre: ${genre}
-Bio: ${summary}
-
-USE GOOGLE SEARCH to find a verified artist photo, album cover, or official logo. 
-
-GENRE-CONTEXTUAL IMAGE SOURCING HIERARCHY (STRICTLY ENFORCED):
-▸ FOR ALL GENRES:
-  Priority 1 — Spotify CDN (i.scdn.co) or Last.fm CDN (lastfm.freetls.fastly.net) artist images.
-  Priority 2 — Discogs (i.discogs.com) or AllMusic artist entries.
-  Priority 3 — Wikimedia Commons.
-  Priority 4 — Official press sites or established music publications (Pitchfork, Stereogum).
-
-CRITICAL ANTI-HALLUCINATION RULE:
-DO NOT guess or invent random 10-digit IDs for Bandcamp (f4.bcbits.com) or other CDNs. Only return a URL if you extracted the exact, complete HTTPS image path directly from your Google Search results. If you cannot find a verified direct image path, state that no verified image was found.
-
-ACCEPTED IMAGE TYPES (all genre contexts): press photos, live performance photos, official band/artist portraits, album artwork, release covers, band logos, and official banners.
-
-FORBIDDEN IMAGE SOURCES: Generic stock photo sites (Unsplash, Pexels, Shutterstock, Getty Images), news article thumbnails, social media preview cards, YouTube thumbnails, retail product listing images from general music stores.
-
-CRITICAL OUTPUT REQUIREMENTS:
-1. Provide the direct HTTPS image URL in your response.
-2. If you cannot find ANY verified image from the priority sources above, state that no verified image was found.`;
-    try {
-        const response = await Promise.race([
-            ai.models.generateContent({
-                model: currentModel,
-                contents: prompt,
-                config: {
-                    tools: [{ googleSearch: {} }],
-                    maxOutputTokens: 200,
-                }
-            }),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('AbortError: Timeout exceeded')), 12000))
-        ]);
-        const text = response.text?.trim() || '';
-        if (text.toLowerCase().includes('null') && !text.includes('http'))
-            return null;
-        // Extract the first HTTPS URL from the response
-        const urlMatch = text.match(/https:\/\/[^\s"'<>()\[\]]+/i);
-        if (urlMatch) {
-            const extractedUrl = urlMatch[0];
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 5000);
-                const imgRes = await fetch(extractedUrl, {
-                    method: 'GET',
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
-                    },
-                    signal: controller.signal
-                });
-                clearTimeout(timeoutId);
-                if (imgRes.ok) {
-                    const contentType = imgRes.headers.get('content-type') || '';
-                    if (!contentType || contentType.startsWith('image/') || contentType.includes('octet-stream')) {
-                        return extractedUrl;
-                    }
-                    else {
-                        console.warn(`[scrapeImageUrlBackend] Extracted URL returned valid status but unexpected content-type (${contentType}): ${extractedUrl}. Accepting anyway.`);
-                        return extractedUrl;
-                    }
-                }
-                else {
-                    console.warn(`[scrapeImageUrlBackend] Extracted URL returned ${imgRes.status}: ${extractedUrl}`);
-                    return null;
-                }
-            }
-            catch (fetchErr) {
-                console.warn(`[scrapeImageUrlBackend] URL validation failed for ${extractedUrl}:`, fetchErr.message);
-                return null;
-            }
-        }
-        return null;
-    }
-    catch (err) {
-        if (err.message && err.message.includes('AbortError')) {
-            console.warn(`[scrapeImageUrlBackend] 12s timeout exceeded for ${artistName}. Returning null.`);
+            console.warn(`[scrapeImageUrlBackend] iTunes search failed for ${artistName}:`, itunesErr.message);
             return null;
         }
-        console.error(`[scrapeImageUrlBackend] Scrape failed for ${artistName}:`, err);
-        return null;
     }
+    return null;
 };
 exports.scrapeImageUrlBackend = scrapeImageUrlBackend;
 //# sourceMappingURL=curatorService.js.map

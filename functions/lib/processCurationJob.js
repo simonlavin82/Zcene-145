@@ -137,7 +137,8 @@ const KNOWN_COUNTRY_SLUGS = [
     '-united-states', '-united-kingdom', '-global', '-australia', '-canada', '-germany', '-france',
     '-japan', '-sweden', '-italy', '-spain', '-brazil', '-mexico', '-netherlands', '-belgium',
     '-norway', '-finland', '-denmark', '-ireland', '-new-zealand', '-poland', '-austria',
-    '-switzerland', '-uk', '-usa', '-us'
+    '-switzerland', '-uk', '-usa', '-us', '-gb', '-au', '-ca', '-de', '-fr', '-jp', '-se', '-it', '-es',
+    '-br', '-mx', '-nl', '-be', '-no', '-fi', '-dk', '-ie', '-nz', '-pl', '-at', '-ch'
 ];
 function stripCountrySlug(name) {
     let cleanName = name.trim();
@@ -458,8 +459,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                             cachedDetails.summary &&
                                             cachedDetails.summary.length > 50 &&
                                             cachedDetails.details?.genre &&
-                                            cachedDetails.imageUrl // Must have a non-empty image URL
-                                        );
+                                            (isLabel || cachedDetails.imageUrl));
                                         if (isCacheComplete) {
                                             details = cachedDetails;
                                             console.log(`[Curation Backend] Direct cache hit (complete) for details of: ${artistNormId}`);
@@ -588,13 +588,13 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                     else {
                                         // ⚠️ STRICT FAIL-FAST RULE: No deterministic fallback images.
                                         console.warn(`[Image Scraper] No image found for ${searchArtistName}.`);
-                                        details.imageUrl = null;
+                                        details.imageUrl = 'not-found';
                                     }
                                 }
                                 catch (e) {
                                     // ⚠️ STRICT FAIL-FAST RULE: Catch API timeouts instantly.
                                     console.warn(`[Image Scraper] Timeout/Error for ${searchArtistName}. Enforcing fail-fast rule.`);
-                                    details.imageUrl = null;
+                                    details.imageUrl = 'not-found';
                                 }
                             }
                             details.details.artist = details.details.artist || searchArtistName;
