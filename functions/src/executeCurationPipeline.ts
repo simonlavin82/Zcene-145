@@ -226,7 +226,13 @@ export const executeCurationPipeline = onCall({
       const originalNormId = normalizeArtistId(n.id);
       let newId = originalNormId;
       
-      if (n.type !== 'label' && n.origin) {
+      const seedMatch = resolvedSeedArray.find(s => isEntitySeedMatch(s.id, originalNormId));
+      if (seedMatch) {
+         if (seedMatch.origin && !n.origin) {
+            n.origin = seedMatch.origin;
+         }
+         newId = seedMatch.id;
+      } else if (n.type !== 'label' && n.origin) {
          const originSlug = extractCountrySlug(n.origin);
          if (originSlug && originSlug !== 'global' && !originalNormId.endsWith(`-${originSlug}`)) {
             newId = `${originalNormId}-${originSlug}`;

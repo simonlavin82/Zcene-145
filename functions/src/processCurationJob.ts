@@ -9,7 +9,6 @@ import {
   scrapeVideoIdBackend,
   checkVideoPlayability,
   scrapeImageUrlBackend,
-  extractCountrySlug,
   buildCompositeCacheKey,
   extractArtistSubGraph,
   validateSeedOriginBackend
@@ -370,6 +369,7 @@ export const processCurationJob = onDocumentCreated({
         for (const seed of artistList) {
           const seedNorm = normalizeArtistId(seed);
           const exists = recommendedEntities.some((e: any) => isEntitySeedMatch(seedNorm, e.id) || isEntitySeedMatch(seedNorm, e.name));
+          if (!exists) {
             recommendedEntities.unshift({
               id: seed,
               name: seed,
@@ -741,11 +741,11 @@ export const processCurationJob = onDocumentCreated({
         for (const seedName of artistList) {
           const seedNorm = normalizeArtistId(seedName);
           const seedDocRef = db.collection('artists').doc(seedNorm);
-          await seedDocRef.update({
+          await seedDocRef.set({
             'detailsCache.synthesisRationale': rootBreakdownStr,
             synthesisRationale: rootBreakdownStr,
             cachedAt: FieldValue.serverTimestamp()
-          }).catch((e: any) => {
+          }, { merge: true }).catch((e: any) => {
             // Non-fatal: the project graphData is the canonical ground truth.
             console.warn(`[Curation Backend] Root Breakdown write-back skipped for artist doc: ${seedNorm}`, e.message);
           });

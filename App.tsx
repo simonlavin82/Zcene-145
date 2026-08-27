@@ -4928,6 +4928,7 @@ const App: React.FC = () => {
           activeNodes: data.activeNodes,
           isMagazineViewOpen: data.isMagazineViewOpen,
           status: data.status,
+          coverImage: data.coverImage,
           activeJobId: data.activeJobId,
           authorId: data.authorId
         });

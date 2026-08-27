@@ -152,13 +152,21 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
                 validationResult = await (0, curatorService_1.validateSeedOriginBackend)(seed);
             }
             if (validationResult.isValid) {
+                let normId = (0, curatorService_1.normalizeArtistId)(validationResult.id);
+                if (validationResult.origin) {
+                    const originSlug = (0, curatorService_1.extractCountrySlug)(validationResult.origin);
+                    if (originSlug && originSlug !== 'global' && !normId.endsWith(`-${originSlug}`)) {
+                        normId = `${normId}-${originSlug}`;
+                    }
+                }
                 resolvedSeedArray.push({
-                    id: (0, curatorService_1.normalizeArtistId)(validationResult.id),
+                    id: normId,
                     name: validationResult.id,
                     origin: validationResult.origin,
                     genre: validationResult.genre,
                     isCacheHit: false
                 });
+                console.log(`[Pipeline Diamond] -> Seed Slugging: ${validationResult.id} -> ${normId}`);
             }
             else {
                 throw new https_1.HttpsError("failed-precondition", `Validation failed for seed: ${seed}.`);
@@ -180,11 +188,18 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
         if (cacheDoc.exists) {
             const cacheData = cacheDoc.data();
             if (cacheData && cacheData.graphData) {
-                finalGraph = typeof cacheData.graphData === 'string' ? JSON.parse(cacheData.graphData) : cacheData.graphData;
+                const rawGraph = typeof cacheData.graphData === 'string' ? JSON.parse(cacheData.graphData) : cacheData.graphData;
+                // Deep clone to ensure we do not mutate any in-memory objects
+                finalGraph = JSON.parse(JSON.stringify(rawGraph));
+                // Critical Fix: Explicitly map the synthesisRationale from the cache root (or inside graphData)
+                if (cacheData.synthesisRationale || rawGraph.synthesisRationale) {
+                    finalGraph.synthesisRationale = cacheData.synthesisRationale || rawGraph.synthesisRationale;
+                }
             }
         }
     }
     if (finalGraph.nodes) {
+        const idRewriteMap = new Map();
         for (const n of finalGraph.nodes) {
             if (n.type) {
                 n.type = n.type.toLowerCase();
@@ -192,13 +207,61 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
             else {
                 n.type = 'artist';
             }
+            const originalNormId = (0, curatorService_1.normalizeArtistId)(n.id);
+            let newId = originalNormId;
+            const seedMatch = resolvedSeedArray.find(s => isEntitySeedMatch(s.id, originalNormId));
+            if (seedMatch) {
+                if (seedMatch.origin && !n.origin) {
+                    n.origin = seedMatch.origin;
+                }
+                newId = seedMatch.id;
+            }
+            else if (n.type !== 'label' && n.origin) {
+                const originSlug = (0, curatorService_1.extractCountrySlug)(n.origin);
+                if (originSlug && originSlug !== 'global' && !originalNormId.endsWith(`-${originSlug}`)) {
+                    newId = `${originalNormId}-${originSlug}`;
+                }
+            }
+            if (newId !== n.id) {
+                idRewriteMap.set(n.id, newId);
+            }
+            n.id = newId;
+        }
+        if (finalGraph.links) {
+            for (const link of finalGraph.links) {
+                const sId = typeof link.source === 'object' && link.source !== null ? link.source.id : link.source;
+                const tId = typeof link.target === 'object' && link.target !== null ? link.target.id : link.target;
+                if (idRewriteMap.size > 0 && idRewriteMap.has(sId)) {
+                    link.source = idRewriteMap.get(sId);
+                }
+                else {
+                    link.source = sId; // Ensure string format
+                }
+                if (idRewriteMap.size > 0 && idRewriteMap.has(tId)) {
+                    link.target = idRewriteMap.get(tId);
+                }
+                else {
+                    link.target = tId; // Ensure string format
+                }
+            }
         }
         for (const seed of artistList) {
             const seedNorm = (0, curatorService_1.normalizeArtistId)(seed);
+            const resolvedSeed = resolvedSeedArray.find(r => (0, curatorService_1.normalizeArtistId)(r.name) === seedNorm || r.id === seedNorm);
+            const sluggedSeedNorm = resolvedSeed ? resolvedSeed.id : seedNorm;
             const seedNode = finalGraph.nodes.find((n) => isEntitySeedMatch(seedNorm, n.id) || isEntitySeedMatch(seedNorm, n.label || ''));
-            if (seedNode && (0, curatorService_1.normalizeArtistId)(seedNode.id) !== seedNorm) {
-                seedNode.id = seedNorm;
-                seedNode.label = seed;
+            if (seedNode && seedNode.id !== sluggedSeedNorm) {
+                const oldId = seedNode.id;
+                seedNode.id = sluggedSeedNorm;
+                seedNode.label = resolvedSeed ? resolvedSeed.name : seed;
+                if (finalGraph.links) {
+                    for (const link of finalGraph.links) {
+                        if (link.source === oldId)
+                            link.source = sluggedSeedNorm;
+                        if (link.target === oldId)
+                            link.target = sluggedSeedNorm;
+                    }
+                }
             }
         }
     }

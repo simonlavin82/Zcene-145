@@ -10,6 +10,13 @@ import { normalizeArtistId, cleanArtistDisplayName } from '../services/artistCac
 import { formatSystemTimestamp } from '../utils/formatters';
 import { SeedArtistImages } from './SeedArtistImages';
 
+const isSeedMatch = (nId: string, seeds: string[]) => {
+  const normNId = normalizeArtistId(nId);
+  return seeds.some(s => {
+    const normS = normalizeArtistId(s);
+    return normS === normNId || normNId.startsWith(`${normS}-`) || normS.startsWith(`${normNId}-`);
+  });
+};
 interface DashboardProps {
   user: User | null;
   projects: Project[];
@@ -346,8 +353,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         try {
                           const pg = typeof project.graphData === 'string' ? JSON.parse(project.graphData) : project.graphData;
                           if (pg && Array.isArray(pg.nodes)) {
-                            const seedSet = new Set(seedList.map((s: string) => normalizeArtistId(s)));
-                            deepCutsCount = pg.nodes.filter((n: any) => (n.type === 'artist' || !n.type) && !seedSet.has(normalizeArtistId(n.id))).length;
+                            deepCutsCount = pg.nodes.filter((n: any) => (n.type === 'artist' || !n.type) && !isSeedMatch(n.id, seedList)).length;
                           }
                         } catch (e) { /* ignore */ }
                       }
@@ -357,9 +363,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                         try {
                           const parsedGraph = typeof project.graphData === 'string' ? JSON.parse(project.graphData) : project.graphData;
                           if (parsedGraph && Array.isArray(parsedGraph.nodes)) {
-                            const seedSet = new Set(seedList.map(s => normalizeArtistId(s)));
                             const artistNodes = parsedGraph.nodes.filter((n: any) => n.type === 'artist' || !n.type);
-                            recommendedCount = artistNodes.filter((n: any) => !seedSet.has(normalizeArtistId(n.id))).length;
+                            recommendedCount = artistNodes.filter((n: any) => !isSeedMatch(n.id, seedList)).length;
                           }
                         } catch (e) { /* ignore */ }
                       }
@@ -551,8 +556,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                           try {
                             const pg = typeof project.graphData === 'string' ? JSON.parse(project.graphData) : project.graphData;
                             if (pg && Array.isArray(pg.nodes)) {
-                              const seedSet = new Set(seedList.map((s: string) => normalizeArtistId(s)));
-                              deepCutsCount = pg.nodes.filter((n: any) => (n.type === 'artist' || !n.type) && !seedSet.has(normalizeArtistId(n.id))).length;
+                              deepCutsCount = pg.nodes.filter((n: any) => (n.type === 'artist' || !n.type) && !isSeedMatch(n.id, seedList)).length;
                             }
                           } catch (e) { /* ignore */ }
                         }
@@ -562,9 +566,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                           try {
                             const parsedGraph = typeof project.graphData === 'string' ? JSON.parse(project.graphData) : project.graphData;
                             if (parsedGraph && Array.isArray(parsedGraph.nodes)) {
-                              const seedSet = new Set(seedList.map(s => normalizeArtistId(s)));
                               const artistNodes = parsedGraph.nodes.filter((n: any) => n.type === 'artist' || !n.type);
-                              recommendedCount = artistNodes.filter((n: any) => !seedSet.has(normalizeArtistId(n.id))).length;
+                              recommendedCount = artistNodes.filter((n: any) => !isSeedMatch(n.id, seedList)).length;
                             }
                           } catch (e) {
                             console.warn(`Failed to parse graphData for project ${project.id}:`, e);

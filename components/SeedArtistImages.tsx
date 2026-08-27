@@ -98,7 +98,7 @@ export const SeedArtistImages: React.FC<SeedArtistImagesProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [seedArtists, userId]);
+  }, [seedArtists, userId, projectDetailsCache, fallbackGraphData]);
 
   if (loading) {
     if (variant === 'grid') {
