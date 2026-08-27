@@ -4926,7 +4926,10 @@ const App: React.FC = () => {
           detailsCache: data.detailsCache,
           canvasLayout: data.canvasLayout,
           activeNodes: data.activeNodes,
-          isMagazineViewOpen: data.isMagazineViewOpen
+          isMagazineViewOpen: data.isMagazineViewOpen,
+          status: data.status,
+          activeJobId: data.activeJobId,
+          authorId: data.authorId
         });
       });
       setProjects(projs);
