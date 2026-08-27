@@ -1,0 +1,6 @@
+--- App.tsx
++++ App.tsx
+@@ -4928,2 +4928,3 @@
+           status: data.status,
++          coverImage: data.coverImage,
+           activeJobId: data.activeJobId,
