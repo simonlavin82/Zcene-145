@@ -3284,7 +3284,7 @@ const App: React.FC = () => {
               isFetchingDetailsRef.current = false;
               isHydratingSessionRef.current = false;
               
-              if (!isQualified) {
+              if (!validation.isFullyQualified) {
                 console.log('[Front Gate Cache] Cache doc found but not fully qualified. Background revalidation queued.');
               } else if (data?.hasUniqueSpiderweb) {
                 showCacheToast();
@@ -4266,7 +4266,8 @@ const App: React.FC = () => {
             setGraphData(normalizedGraph);
             setIsLoading(false);
             isHydratingSessionRef.current = false;
-            showCacheToast();
+            const allQualified = hardGuardEntries.every(e => validateCacheEntry(e, artistList.length === 1).isFullyQualified);
+            if (allQualified) showCacheToast();
             console.log(`[HARD GUARD] Cache loaded successfully. Nodes: ${normalizedGraph.nodes.length}. Synthesis blocked.`);
             return;
           }

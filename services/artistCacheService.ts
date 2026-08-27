@@ -826,13 +826,14 @@ export const writeArtistCacheMany = async (
       const bareData = bareSnap.exists() ? bareSnap.data() : null;
       const idFieldKeyLocal = isLabel ? 'labelId' : 'artistId';
 
-      if (!bareSnap.exists() || (bareData && !bareData.redirectTo && bareSnap.id !== compositeCanonicalId)) {
+      if (artistId !== compositeCanonicalId && (!bareSnap.exists() || (bareData && !bareData.redirectTo && bareSnap.id !== compositeCanonicalId))) {
         await setDoc(bareArtistIdRef, stripUndefinedProperties({
           cacheKey: artistId,
           [idFieldKeyLocal]: artistId,
           seedArtists: name,
           cacheVersion: 4,
           cachedAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
           redirectTo: compositeCanonicalId
         }));
         console.log(`[${isLabel ? 'LabelCache' : 'ArtistCache'}] Created/Healed Bare Alias Pointer Stub: ${artistId} -> ${compositeCanonicalId}`);

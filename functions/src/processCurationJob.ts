@@ -256,35 +256,11 @@ export const processCurationJob = onDocumentCreated({
           detailsCache: JSON.stringify(mockDetails)
         };
       } else {
-        // Parse seed artists list and immediately enforce the global slugging convention.
-        // disambiguationHints (collected by the Validate Origin modal) carries the user-confirmed
-        // country for each seed. We apply the slug here — before Phase 1 cache routing — so that
-        // every downstream reference (cache lookups, seed node standardisation, Firestore writes,
-        // alias pointers, Root Breakdown write-back) uses the canonical <artist>-<country> ID.
-        // This prevents namespace collisions between artists sharing the same name from different countries.
-        const rawArtistList = inputPayload.artists
+        const artistList = inputPayload.artists
           .split('::')
           .map((a: string) => a.trim())
           .filter(Boolean);
 
-        const disambiguationHints: Record<string, string> = inputPayload.disambiguationHints || {};
-
-        const artistList = rawArtistList.map((seed: string) => {
-          const seedNorm = normalizeArtistId(seed);
-          // Find the matching hint by comparing bare normalised names (hint keys are bare, e.g. 'spaced')
-          const hintEntry = Object.entries(disambiguationHints).find(
-            ([k]) => normalizeArtistId(k) === seedNorm
-          );
-          if (hintEntry) {
-            const originSlug = extractCountrySlug(hintEntry[1] as string);
-            if (originSlug && originSlug !== 'global' && !seedNorm.endsWith(`-${originSlug}`)) {
-              const slugged = `${seedNorm}-${originSlug}`;
-              console.log(`[Curation Backend] [Slug Enforcement] Rewrote seed ID: '${seedNorm}' → '${slugged}' (origin: ${hintEntry[1]})`);
-              return slugged;
-            }
-          }
-          return seedNorm; // Already slugged, or no disambiguation hint available
-        });
 
         console.log(`[Curation Backend] [Phase 1: Global Cache Routing] Checking seeds: ${artistList.join(', ')}`);
         
@@ -394,17 +370,11 @@ export const processCurationJob = onDocumentCreated({
         for (const seed of artistList) {
           const seedNorm = normalizeArtistId(seed);
           const exists = recommendedEntities.some((e: any) => isEntitySeedMatch(seedNorm, e.id) || isEntitySeedMatch(seedNorm, e.name));
-          if (!exists) {
-            // Pass the origin string from disambiguationHints so the Pre-Hydration Canonicalization
-            // guard in the hydration loop has a second source of truth (defensive belt-and-suspenders).
-            const hintEntry = Object.entries(disambiguationHints).find(
-              ([k]) => normalizeArtistId(k) === seedNorm
-            );
             recommendedEntities.unshift({
               id: seed,
-              name: stripCountrySlug(seed), // Bare display name (e.g. 'spaced') — mirrors the standardization label above
+              name: seed,
               type: 'artist',
-              origin: hintEntry ? hintEntry[1] as string : null
+              origin: null
             });
             console.log(`[Curation Backend] Explicitly pushing missing seed artist into gap-filling queue: ${seed}`);
           }
@@ -426,14 +396,6 @@ export const processCurationJob = onDocumentCreated({
               const rawName = entityObj.name;
               let artistNormId = normalizeArtistId(rawName);
               
-              // Pre-Hydration Canonicalization: Stitch the origin slug before cache lookup
-              if (entityObj.origin) {
-                const originSlug = extractCountrySlug(entityObj.origin);
-                if (!artistNormId.endsWith(`-${originSlug}`)) {
-                  artistNormId = `${artistNormId}-${originSlug}`;
-                }
-              }
-
               const isLabel = entityObj.type === 'label';
 
               // ── Slug Deduplication Guard ───────────────────────────────────────────
@@ -871,6 +833,7 @@ export const processCurationJob = onDocumentCreated({
                 filters: matchingSeedNorm && !isLabel ? inputPayload.filters || null : null,
                 cacheVersion: 4,
                 cachedAt: FieldValue.serverTimestamp(),
+                updatedAt: FieldValue.serverTimestamp(),
 
                 isDeep: true, // Marked Deep!
                 isPrimarySeed: !!matchingSeedNorm,
@@ -888,6 +851,7 @@ export const processCurationJob = onDocumentCreated({
               const updatePayload: any = {
                 detailsCache: finalRecDetails,
                 cachedAt: FieldValue.serverTimestamp(),
+                updatedAt: FieldValue.serverTimestamp(),
                 cacheVersion: 4,
                 [idFieldKey]: recNorm,
                 cacheKey: compositeCanonicalId,
@@ -909,27 +873,7 @@ export const processCurationJob = onDocumentCreated({
               console.log(`[Curation Backend] Proactively updated detailsCache for recommendation (${collName}): ${compositeCanonicalId}`);
             }
 
-            // Create/Heal Bare Root Alias Pointer and replicate detailsCache for immediate short-ID resolution
-            const bareArtistIdRef = db.collection(collName).doc(recNorm);
-            const bareSnap = await bareArtistIdRef.get();
-
-            const barePayload: any = {
-              cacheKey: recNorm,
-              [idFieldKey]: recNorm,
-              seedArtists: recArtist,
-              cacheVersion: 4,
-              cachedAt: FieldValue.serverTimestamp(),
-              redirectTo: compositeCanonicalId
-            };
-
-            if (!bareSnap.exists) {
-              await bareArtistIdRef.set(sanitizeUndefinedProperties(barePayload));
-              console.log(`[Curation Backend] Created Bare Alias Pointer Stub in ${collName}: ${recNorm} -> ${compositeCanonicalId}`);
-            } else {
-              await bareArtistIdRef.update(sanitizeUndefinedProperties(barePayload)).catch(() => {});
-              console.log(`[Curation Backend] Updated Bare Alias Pointer Stub in ${collName}: ${recNorm} -> ${compositeCanonicalId}`);
             }
-        }
 
         // Apply Canonical ID Rewrite and Strict Deduplication to Graph Topology
         if (finalGraph.nodes) {

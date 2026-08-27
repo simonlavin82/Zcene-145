@@ -57,105 +57,35 @@ To prevent layout computation leaks, trailing dark voids, and mobile padding cli
 `;
 
 const ARCHITECTURE_DOCUMENTATION = `
-[BASELINE V-fe0bd91: STABLE]
+[BASELINE V-3COLUMN: STABLE]
 Zcene is built on a modern, serverless full-stack architecture that prioritizes 
-real-time intelligence and global scalability.
+real-time intelligence and global scalability. The core Curation Engine is governed by a strict 3-Column Pipeline to guarantee data consistency and robust cold-start hydration.
 
-1. AI ORCHESTRATION (Google AI Studio):
-   The platform leverages Google Gemini models for all musical intelligence. 
-   - Gemini 3.1 Pro Preview: Powers all high-fidelity generative graph synthesis and 
-     Stage 0 live AI searches, ensuring rich, interconnected musical network topology.
-   - Gemini 2.5 Flash / Gemini 3 Flash: Standardized for high-speed Deep Cut node 
-     details extraction, conversational chat ("Consult AI"), and background hydration.
-   - AI Studio Integration: Native environment for rapid prompt engineering, 
-     schema definition, and secure API key management during 
-     the prototype-to-production lifecycle.
+### THE 3-COLUMN CURATION PIPELINE
+The fundamental rule of the Zcene architecture is that all foundational data (canonical slugging, initial timestamps, and baseline topology) is firmly anchored during the HTTP Fast-Track (Column 2) before background hydration ever begins.
 
-2. COMPUTE & SERVING (Cloud Run & Functions):
-   The application is containerized and hosted on Google Cloud Run, supported by 
-   Firebase Cloud Functions for event-driven orchestration.
-   - Autoscaling: The containers scale dynamically based on request traffic, 
-     ensuring the interactive D3 simulations remain responsive.
-   - Cloud-Side Orchestrated Background Curation: Curation jobs are delegated 
-     to an event-driven queue. Upon a new document in 'curationJobs', a gen2 
-     Cloud Function manages the heavy lifting of calling Gemini, scraping YouTube 
-     playability, and formatting metadata, fully offloading the client browser.
-   - PARALLEL CURATION ARCHITECTURE (~3-MINUTE EXECUTION):
-     The hydration pipeline has been re-engineered from a sequential per-node loop
-     into a chunked concurrent batch execution model. All node profiles (AI artists,
-     record labels, and untyped deep cuts) are processed in parallel chunks of 5
-     nodes at a time via Promise.all(), dramatically reducing total curation time
-     from ~20 minutes to approximately 3 minutes. This architecture is the
-     authoritative resilience standard: it prevents Cloud Function timeouts. 
-     To ensure data integrity, any node experiencing a transient network timeout 
-     during hydration explicitly returns null to bypass Firestore caching. This 
-     prevents writing toxic fallback skeletons to the database and seamlessly delegates
-     the missed node to the frontend's on-demand 'Consult AI' hydration fallback.
-   - UPFRONT UNIVERSAL HYDRATION MANDATE:
-     All curation jobs are required to fully hydrate ALL node types upfront during
-     the initial background run. This includes: primary AI artist nodes, record label
-     nodes (/labels/{labelSlug}), and untyped deep cut artist nodes. Transient network
-     timeouts are the sole permitted exception, gracefully skipping the cache write to 
-     leverage the frontend's robust on-demand hydration.
-   - LIGHTWEIGHT REDIRECT STUBS & COLD-START HYDRATION GUARDS (No Cache Bloat):
-     When the backend creates or updates alias pointer documents (e.g., for regional
-     variants like 'artist-united-states'), it writes a pure lightweight stub to the 
-     bare root document (e.g., 'artist') containing ONLY routing metadata: 
-     { artistId, cacheKey, cacheVersion, cachedAt, redirectTo, seedArtists }.
-     It explicitly strips detailsCache and graphData to prevent data duplication and bloat. 
-     To guarantee cold-start hydration succeeds and prevent frontend cache poisoning:
-     1. BACKEND CANONICAL ID REWRITE (onCurationJobCreated): Before returning the finalized 
-        graph payload, the Cloud Function maps all alias IDs (e.g., 'scowl') in finalGraph.nodes 
-        and finalGraph.links to their disambiguated canonical IDs (e.g., 'scowl-usa').
-     2. FRONTEND COLD-START CACHE GUARDS (artistCacheService): The frontend caching layer 
-        strictly enforces an 'if (existing.redirectTo) return' guard clause. This prevents 
-        legacy UI state from mistakenly injecting heavy detailsCache payloads onto bare stubs,
-        ensuring the alias stubs remain pristine and the UI correctly achieves O(1) memory hits.
-   - Stateful Project Orchestration: When a curation job begins, the frontend
-      immediately saves the project status as 'curating', recording seedArtists
-      and activeJobId. Even if the browser tab is closed, the background Cloud
-      Function writes the completed graphData, artistIds, detailsCache, and
-      activeNodes directly to the project document upon completion, allowing
-      seamless session restoration on page reload. The activeNodes field is
-      seeded with the normalized IDs of the seed artists confirmed present in
-      the generated graph, so the Deep Cut panel opens to the correct artist
-      on the user's first load without any user interaction.
-   - Curation Job TTL Expiration Policy (expireAt): All curation job documents in
-     '/curationJobs' are tagged with a 24-hour Firestore Time-to-Live (TTL) timestamp
-     upon creation, completion, or failure. This ensures completed and failed jobs
-     are autonomously purged by Firestore without requiring manual intervention.
-     Crucially, we implement a 24-hour TTL rather than immediate deletion upon
-     completion to prevent real-time WebSocket snapshot coalescing and to allow
-     reconnecting clients or refreshed tabs to recover their curation state cleanly.
-   - Global Deployment: Serves at sub-second speeds by leveraging 
-     Google's global edge network.
+#### [COLUMN 1: REACT UI (App.tsx / Dashboard.tsx)]
+The user interface is completely decoupled from heavy LLM orchestration.
+1. Submit Seed Artist: The user enters a seed artist (e.g., "Korn").
+2. Front Gate Cache Guard: Checks if a valid cache document exists for the node.
+   - HIT: Bypasses all network calls and instantly renders the cached graph.
+   - MISS: Sends the raw string to Column 2.
+3. Fast Track Local Hydration: The UI instantly paints the unhydrated topology received synchronously from Column 2.
+4. Background Hydration Listener: The App subscribes to project updates, displaying a "Mapping..." loader until Column 3 completes its background hydration job.
 
-3. DATA & AUTHENTICATION (Firebase):
-   - Firebase Auth: Provides secure, frictionless Google Login, 
-     enabling users to save and persist their music discovery projects.
-   - Cloud Firestore: A NoSQL real-time database used to store Project 
-     states, seed artists, graph snapshots, and discovery filters.
-   - Universal Dual-Collection Cache (/artists vs /labels): Two top-level Firestore
-     collections act as permanent, site-wide caches for discovery entities. Primary
-     drivers (/artists) store computed graph structures and enriched Deep Cut metadata,
-     while secondary deep cuts (/labels) store lightweight publishing house cards
-     with graphData explicitly set to null.
-   - Prompt Decoupling & Immutable Global Deep Cuts: Deep cut biographies synthesized 
-     by the Cloud Function are strictly decoupled from the active project's seed artist. 
-     The backend prompts rely purely on organic genre and entity mapping without injecting 
-     the active seed into the LLM context, guaranteeing that all generated biographies are 
-     standalone, universally reusable, and free of context leaks across different project 
-     workspaces. These decoupled profiles are subsequently cached globally (in /artists 
-     and /labels) as well as embedded immutably within the project's detailsCache 
-     snapshots (/sharedZcenes), allowing instant UI hydration on cache hits without 
-     requiring dynamic re-synthesis.
-   - Rules Engine & ABAC Security: Attribute-Based Access Control ensures every 
-     music discovery journey remains private and secure. Both global cache collections
-     are publicly readable but write-protected: authenticated users may CREATE new
-     entries on a cache miss, and may UPDATE existing entries strictly to perform
-     telemetry write-backs (hitCount, detailsCache, cachedAt) or upgrade legacy
-     cache versions (< 2) to version 2. Arbitrary graph overwrites are blocked
-     to prevent cache poisoning.
+#### [COLUMN 2: HTTP FAST-TRACK (executeCurationPipeline.ts)]
+This layer executes synchronously, returning within seconds to provide an immediate user experience. It lays the unalterable foundation for the graph.
+1. Pre-Flight Origin Slugging: The raw seed string is rigorously normalized and appended with its country code (e.g., "Korn" -> "korn-us") using \`extractCountrySlug\` before ANY database writes or LLM calls occur.
+2. Fast-Track Cache Fallback: Checks the exact canonical slug against Firestore. If a miss occurs, proceeds to generative topology.
+3. Gemini Topology Generation: Invokes Gemini 3.1 Pro to synthesize the barebones relational graph structure (Topology).
+4. Save Baseline Topology & Fast-Track Payload: Saves the initial unhydrated graph to Firestore. CRITICAL: This step MUST stamp the document with \`updatedAt: serverTimestamp()\` to anchor its creation time. The topology is returned instantly to Column 1.
+
+#### [COLUMN 3: BACKGROUND WORKER (processCurationJob.ts)]
+This asynchronous background queue is strictly a hydration layer. It NEVER creates foundational topology or rewrites canonical slugs; it only enriches existing data.
+1. Listen for Jobs: Eventarc triggers this worker upon detecting a new document in \`curationJobs\`.
+2. Full Node Hydration: Iterates through the baseline nodes generated by Column 2. It fetches rich metadata (biography, genres, active years) via Google Search and Gemini Flash, and scrapes iTunes/Spotify for imagery.
+3. Save Hydrated Nodes to Cache: Writes the fully enriched, fully qualified nodes back to \`/artists/\` in Firestore.
+4. Mark Job Complete: Updates the Project document status to 'completed'. The React UI (Column 1) listener detects this and seamlessly removes the "Mapping..." loader, allowing the cache toast to fire correctly.
 `;
 
 const GRAPH_INTELLIGENCE_DOCUMENTATION = `

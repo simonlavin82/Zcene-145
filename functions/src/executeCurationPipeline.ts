@@ -4,7 +4,8 @@ import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { 
   generateGraphDataBackend, 
   validateSeedOriginBackend,
-  normalizeArtistId
+  normalizeArtistId,
+  extractCountrySlug
 } from "./services/curatorService";
 
 if (getApps().length === 0) {
@@ -158,13 +159,21 @@ export const executeCurationPipeline = onCall({
            validationResult = await validateSeedOriginBackend(seed);
         }
         if (validationResult.isValid) {
+           let normId = normalizeArtistId(validationResult.id);
+           if (validationResult.origin) {
+              const originSlug = extractCountrySlug(validationResult.origin);
+              if (originSlug && originSlug !== 'global' && !normId.endsWith(`-${originSlug}`)) {
+                 normId = `${normId}-${originSlug}`;
+              }
+           }
            resolvedSeedArray.push({
-              id: normalizeArtistId(validationResult.id),
+              id: normId,
               name: validationResult.id,
               origin: validationResult.origin,
               genre: validationResult.genre,
               isCacheHit: false
            });
+           console.log(`[Pipeline Diamond] -> Seed Slugging: ${validationResult.id} -> ${normId}`);
         } else {
            throw new HttpsError("failed-precondition", `Validation failed for seed: ${seed}.`);
         }
@@ -199,20 +208,58 @@ export const executeCurationPipeline = onCall({
   }
 
   if (finalGraph.nodes) {
+    const idRewriteMap = new Map<string, string>();
     for (const n of finalGraph.nodes) {
       if (n.type) {
         n.type = n.type.toLowerCase();
       } else {
         n.type = 'artist';
       }
+      
+      const originalNormId = normalizeArtistId(n.id);
+      let newId = originalNormId;
+      
+      if (n.type !== 'label' && n.origin) {
+         const originSlug = extractCountrySlug(n.origin);
+         if (originSlug && originSlug !== 'global' && !originalNormId.endsWith(`-${originSlug}`)) {
+            newId = `${originalNormId}-${originSlug}`;
+         }
+      }
+      
+      if (newId !== n.id) {
+         idRewriteMap.set(n.id, newId);
+      }
+      n.id = newId;
+    }
+    
+    if (finalGraph.links && idRewriteMap.size > 0) {
+       for (const link of finalGraph.links) {
+          if (idRewriteMap.has(link.source)) {
+             link.source = idRewriteMap.get(link.source);
+          }
+          if (idRewriteMap.has(link.target)) {
+             link.target = idRewriteMap.get(link.target);
+          }
+       }
     }
     
     for (const seed of artistList) {
       const seedNorm = normalizeArtistId(seed);
+      const resolvedSeed = resolvedSeedArray.find(r => normalizeArtistId(r.name) === seedNorm || r.id === seedNorm);
+      const sluggedSeedNorm = resolvedSeed ? resolvedSeed.id : seedNorm;
+
       const seedNode = finalGraph.nodes.find((n: any) => isEntitySeedMatch(seedNorm, n.id) || isEntitySeedMatch(seedNorm, n.label || ''));
-      if (seedNode && normalizeArtistId(seedNode.id) !== seedNorm) {
-         seedNode.id = seedNorm;
-         seedNode.label = seed;
+      if (seedNode && seedNode.id !== sluggedSeedNorm) {
+         const oldId = seedNode.id;
+         seedNode.id = sluggedSeedNorm;
+         seedNode.label = resolvedSeed ? resolvedSeed.name : seed;
+         
+         if (finalGraph.links) {
+            for (const link of finalGraph.links) {
+               if (link.source === oldId) link.source = sluggedSeedNorm;
+               if (link.target === oldId) link.target = sluggedSeedNorm;
+            }
+         }
       }
     }
   }
