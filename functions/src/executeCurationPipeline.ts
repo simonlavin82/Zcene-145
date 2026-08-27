@@ -202,7 +202,14 @@ export const executeCurationPipeline = onCall({
     if (cacheDoc.exists) {
         const cacheData = cacheDoc.data();
         if (cacheData && cacheData.graphData) {
-            finalGraph = typeof cacheData.graphData === 'string' ? JSON.parse(cacheData.graphData) : cacheData.graphData;
+            const rawGraph = typeof cacheData.graphData === 'string' ? JSON.parse(cacheData.graphData) : cacheData.graphData;
+            // Deep clone to ensure we do not mutate any in-memory objects
+            finalGraph = JSON.parse(JSON.stringify(rawGraph));
+            
+            // Critical Fix: Explicitly map the synthesisRationale from the cache root (or inside graphData)
+            if (cacheData.synthesisRationale || rawGraph.synthesisRationale) {
+               finalGraph.synthesisRationale = cacheData.synthesisRationale || rawGraph.synthesisRationale;
+            }
         }
     }
   }
@@ -232,13 +239,21 @@ export const executeCurationPipeline = onCall({
       n.id = newId;
     }
     
-    if (finalGraph.links && idRewriteMap.size > 0) {
+    if (finalGraph.links) {
        for (const link of finalGraph.links) {
-          if (idRewriteMap.has(link.source)) {
-             link.source = idRewriteMap.get(link.source);
+          const sId = typeof link.source === 'object' && link.source !== null ? link.source.id : link.source;
+          const tId = typeof link.target === 'object' && link.target !== null ? link.target.id : link.target;
+          
+          if (idRewriteMap.size > 0 && idRewriteMap.has(sId)) {
+             link.source = idRewriteMap.get(sId);
+          } else {
+             link.source = sId; // Ensure string format
           }
-          if (idRewriteMap.has(link.target)) {
-             link.target = idRewriteMap.get(link.target);
+          
+          if (idRewriteMap.size > 0 && idRewriteMap.has(tId)) {
+             link.target = idRewriteMap.get(tId);
+          } else {
+             link.target = tId; // Ensure string format
           }
        }
     }

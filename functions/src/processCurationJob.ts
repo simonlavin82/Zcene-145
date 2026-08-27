@@ -822,15 +822,31 @@ export const processCurationJob = onDocumentCreated({
                 (recDetailsEntry as any)[1] = finalRecDetails;
               }
 
-              const extractedGraph = matchingSeedNorm && !isLabel ? extractArtistSubGraph(matchingSeedNorm, finalGraph, artistList) : null;
+              let safeExtractedGraph = null;
+              if (matchingSeedNorm && !isLabel) {
+                 const rawExtracted = extractArtistSubGraph(matchingSeedNorm, finalGraph, artistList);
+                 if (rawExtracted) {
+                    safeExtractedGraph = JSON.parse(JSON.stringify(rawExtracted));
+                    if (safeExtractedGraph.links) {
+                       for (const link of safeExtractedGraph.links) {
+                          link.source = typeof link.source === 'object' && link.source !== null ? link.source.id : link.source;
+                          link.target = typeof link.target === 'object' && link.target !== null ? link.target.id : link.target;
+                       }
+                    }
+                    if (finalGraph.synthesisRationale) {
+                       safeExtractedGraph.synthesisRationale = finalGraph.synthesisRationale;
+                    }
+                 }
+              }
 
               await recDocRef.set({
                 cacheKey: compositeCanonicalId,
                 [idFieldKey]: recNorm,
                 seedArtists: recArtist,
-                graphData: extractedGraph ? JSON.stringify(extractedGraph) : null,
+                graphData: safeExtractedGraph ? JSON.stringify(safeExtractedGraph) : null,
                 detailsCache: finalRecDetails, // Save as structured object!
                 filters: matchingSeedNorm && !isLabel ? inputPayload.filters || null : null,
+                synthesisRationale: matchingSeedNorm && finalGraph.synthesisRationale ? finalGraph.synthesisRationale : null,
                 cacheVersion: 4,
                 cachedAt: FieldValue.serverTimestamp(),
                 updatedAt: FieldValue.serverTimestamp(),
@@ -859,13 +875,29 @@ export const processCurationJob = onDocumentCreated({
               };
 
               if (matchingSeedNorm) {
-                const extractedGraph = !isLabel ? extractArtistSubGraph(matchingSeedNorm, finalGraph, artistList) : null;
+                let safeExtractedGraph = null;
+                if (!isLabel) {
+                   const rawExtracted = extractArtistSubGraph(matchingSeedNorm, finalGraph, artistList);
+                   if (rawExtracted) {
+                      safeExtractedGraph = JSON.parse(JSON.stringify(rawExtracted));
+                      if (safeExtractedGraph.links) {
+                         for (const link of safeExtractedGraph.links) {
+                            link.source = typeof link.source === 'object' && link.source !== null ? link.source.id : link.source;
+                            link.target = typeof link.target === 'object' && link.target !== null ? link.target.id : link.target;
+                         }
+                      }
+                      if (finalGraph.synthesisRationale) {
+                         safeExtractedGraph.synthesisRationale = finalGraph.synthesisRationale;
+                      }
+                   }
+                }
                 updatePayload.isPrimarySeed = true;
                 updatePayload.dataIntegrityStatus = recDetails?._isStub ? 'degraded' : 'verified';
                 updatePayload.hasUniqueSpiderweb = !isLabel;
                 if (!isLabel) {
-                  updatePayload.graphData = extractedGraph ? JSON.stringify(extractedGraph) : null;
+                  updatePayload.graphData = safeExtractedGraph ? JSON.stringify(safeExtractedGraph) : null;
                   updatePayload.filters = inputPayload.filters || null;
+                  updatePayload.synthesisRationale = finalGraph.synthesisRationale || null;
                 }
               }
 
