@@ -3556,7 +3556,8 @@ const App: React.FC = () => {
           let maxG = parsedGraphData.nodes.reduce((m: number, n: Node) => Math.max(m, n.group || 0), 0);
           artistList.forEach((name, idx) => {
             const normName = name.toLowerCase();
-            if (!returnedIds.has(normName)) {
+            const existsInGraph = parsedGraphData.nodes.some((n: Node) => isNodeInSeedList(n.id, [normName]));
+            if (!existsInGraph) {
               maxG++;
               const rawName = originalSeeds[idx] || name;
               parsedGraphData.nodes.push({ id: normName, type: 'artist', label: rawName, group: maxG });
@@ -3853,7 +3854,8 @@ const App: React.FC = () => {
         let maxG = parsedGraphData.nodes.reduce((m: number, n: Node) => Math.max(m, n.group || 0), 0);
         artistList.forEach((name, idx) => {
           const normName = name.toLowerCase();
-          if (!returnedIds.has(normName)) {
+          const existsInGraph = parsedGraphData.nodes.some((n: Node) => isNodeInSeedList(n.id, [normName]));
+          if (!existsInGraph) {
             maxG++;
             const rawName = originalSeeds[idx] || name;
             parsedGraphData.nodes.push({ id: normName, type: 'artist', label: rawName, group: maxG });
@@ -4136,10 +4138,10 @@ const App: React.FC = () => {
 
         // Assemble the cached portion and merge with the fresh Gemini data
         const cachedGraph = assembleGraphFromCache(cached);
-        const returnedIds = new Set(freshData.nodes.map(n => n.id.toLowerCase()));
-        let maxG = freshData.nodes.reduce((m, n) => Math.max(m, n.group || 0), 0);
+        let maxG = freshData.nodes.reduce((m: number, n: Node) => Math.max(m, n.group || 0), 0);
         toFetch.forEach(name => {
-          if (!returnedIds.has(name.toLowerCase())) { maxG++; freshData.nodes.push({ id: name, type: 'artist', group: maxG }); }
+          const existsInGraph = freshData.nodes.some((n: Node) => isNodeInSeedList(n.id, [name.toLowerCase()]));
+          if (!existsInGraph) { maxG++; freshData.nodes.push({ id: name, type: 'artist', group: maxG }); }
         });
 
         let merged = mergeGraphData(cachedGraph, freshData);
@@ -4488,9 +4490,11 @@ const App: React.FC = () => {
         });
       }
 
-      const returnedIds = new Set(mutatedNewData.nodes.map(n => n.id.toLowerCase()));
-      let maxG = mutatedNewData.nodes.reduce((m, n) => Math.max(m, n.group || 0), 0);
-      resolvedArtistList.forEach(name => { if (!returnedIds.has(name.toLowerCase())) { maxG++; mutatedNewData.nodes.push({ id: name, type: 'artist', group: maxG }); } });
+      let maxG = mutatedNewData.nodes.reduce((m: number, n: Node) => Math.max(m, n.group || 0), 0);
+      resolvedArtistList.forEach(name => { 
+        const existsInGraph = mutatedNewData.nodes.some((n: Node) => isNodeInSeedList(n.id, [name.toLowerCase()]));
+        if (!existsInGraph) { maxG++; mutatedNewData.nodes.push({ id: name, type: 'artist', group: maxG }); } 
+      });
       let final = mutatedPruned ? mergeGraphData(mutatedPruned, mutatedNewData) : mutatedNewData;
       final = applyHumanCasedLabels(final, resolvedArtists);
       final = filterGraphByDiscoveryFilters(final, activeDiscoveryFilters, resolvedArtists);
