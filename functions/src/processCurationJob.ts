@@ -509,7 +509,7 @@ export const processCurationJob = onDocumentCreated({
                 details.summary.length <= 50 || 
                 !details.details?.genre ||
                 details.summary.includes("Mock Bio") ||
-                !details.imageUrl
+                (!details.imageUrl && !isLabel)
               ) {
                 // Stub node (e.g. from frontend library import or test seed) or missing image -> Full Hydration
                 requiresTextHydration = true;
@@ -519,11 +519,17 @@ export const processCurationJob = onDocumentCreated({
                 // Complete canonical cache hit -> STRICT BYPASS
                 // We do not mutate or re-scrape existing global records.
                 // However, we MUST check if it's missing assets due to a past failure.
-                if (!details.imageUrl) {
+                let isReadOnly = true;
+                if (!details.imageUrl && !isLabel) {
                    requiresImageScraping = true;
+                   isReadOnly = false;
                 }
                 if (!details.youtubeVideoId && !isLabel) {
                    requiresVideoScraping = true;
+                   isReadOnly = false;
+                }
+                if (isReadOnly) {
+                   details._isReadOnly = true;
                 }
               }
 
@@ -742,7 +748,6 @@ export const processCurationJob = onDocumentCreated({
           const seedNorm = normalizeArtistId(seedName);
           const seedDocRef = db.collection('artists').doc(seedNorm);
           await seedDocRef.set({
-            'detailsCache.synthesisRationale': rootBreakdownStr,
             synthesisRationale: rootBreakdownStr,
             cachedAt: FieldValue.serverTimestamp()
           }, { merge: true }).catch((e: any) => {
@@ -806,14 +811,20 @@ export const processCurationJob = onDocumentCreated({
             continue;
           }
 
-          // Use the pre-canonicalized ID from the hydration phase, or fallback to the rec norm
           const disambiguatedCanonicalId = recDetailsEntry ? (recDetailsEntry as any)[0] : recNorm;
           const compositeCanonicalId = buildCompositeCacheKey(disambiguatedCanonicalId, inputPayload.filters || undefined);
           idRewriteMap.set(recNorm, compositeCanonicalId);
           if (recDetailsEntry) (recDetailsEntry as any)[0] = compositeCanonicalId;
 
           const recDocRef = db.collection(collName).doc(compositeCanonicalId);
-            const recSnap = await recDocRef.get();
+          
+          // Bug 2: The Overwrite Violation - skip proactive cache update for perfect hits
+          if (recDetails && recDetails._isReadOnly && !matchingSeedNorm) {
+            console.log(`[Curation Backend] Skipping proactive cache update for perfect hit (${collName}): ${compositeCanonicalId}`);
+            continue;
+          }
+
+          const recSnap = await recDocRef.get();
 
             if (!recSnap.exists) {
               const finalRecDetails = isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(normalizeDetailsForWrite(recDetails));

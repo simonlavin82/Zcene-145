@@ -1062,10 +1062,20 @@ export const generateGraphDataBackend = async (
   const seedList = artists.split('::').map(a => a.trim()).filter(Boolean);
   for (const seed of seedList) {
       const seedNorm = normalizeArtistId(seed);
+      let sluggedSeedId = seedNorm;
+      
+      // Phase 3 Fix: Natively Slug Seed Nodes using origin data before graph injection
+      if (disambiguationHints && disambiguationHints[seedNorm]) {
+          const originSlug = extractCountrySlug(disambiguationHints[seedNorm]);
+          if (originSlug && originSlug !== 'global') {
+              sluggedSeedId = `${seedNorm}-${originSlug}`;
+          }
+      }
+
       const exists = finalNodes.some(n => {
           const nNorm = normalizeArtistId(n.id);
           const lNorm = normalizeArtistId(n.label || '');
-          return nNorm === seedNorm || lNorm === seedNorm || nNorm.startsWith(`${seedNorm}-`) || lNorm.startsWith(`${seedNorm}-`);
+          return nNorm === sluggedSeedId || lNorm === sluggedSeedId || nNorm.startsWith(`${sluggedSeedId}-`) || lNorm.startsWith(`${sluggedSeedId}-`);
       });
       
       // Consult disambiguationHints if available to map generated nodes to canonical cache IDs
@@ -1086,8 +1096,8 @@ export const generateGraphDataBackend = async (
       
       if (!exists && !isMapped) {
           finalNodes.push({
-              id: seed,
-              label: seed,
+              id: sluggedSeedId,
+              label: titleCaseArtistId(seed),
               type: 'artist',
               group: 1
           });
