@@ -394,7 +394,7 @@ export const processCurationJob = onDocumentCreated({
           const chunkResults = await Promise.all(
             chunk.map(async (entityObj: any, idx: number) => {
               const rawName = entityObj.name;
-              let artistNormId = normalizeArtistId(rawName);
+              let artistNormId = entityObj.id; // Bug 1 & 2 Fix: Preserve the pre-slugged ID
               
               const isLabel = entityObj.type === 'label';
 
@@ -749,6 +749,7 @@ export const processCurationJob = onDocumentCreated({
           const seedDocRef = db.collection('artists').doc(seedNorm);
           await seedDocRef.set({
             synthesisRationale: rootBreakdownStr,
+            'detailsCache.synthesisRationale': FieldValue.delete(), // Bug 3 Fix: explicitly purge legacy bloat
             cachedAt: FieldValue.serverTimestamp()
           }, { merge: true }).catch((e: any) => {
             // Non-fatal: the project graphData is the canonical ground truth.

@@ -45,7 +45,21 @@ export const SeedArtistImages: React.FC<SeedArtistImagesProps> = ({
       }
     }
     
-    Promise.all(normalized.map(id => getEntityDocWithRedirect(id, 'artist'))).then(snapshots => {
+    // Bug 4 Fix: Short-circuit the network request if the image is in the project's internal cache
+    // This prevents stale local Firestore caches from overriding fresh data during curation completion.
+    const promises = normalized.map(id => {
+      if (internalCacheMap && internalCacheMap.has(id)) {
+        const entry = internalCacheMap.get(id);
+        const url = entry?.imageUrl || entry?.details?.imageUrl || '';
+        if (url) {
+          // Wrap in a pseudo-snapshot to avoid the network call
+          return Promise.resolve({ exists: () => true, data: () => ({ detailsCache: { imageUrl: url } }) } as any);
+        }
+      }
+      return getEntityDocWithRedirect(id, 'artist');
+    });
+
+    Promise.all(promises).then(snapshots => {
       if (!isMounted) return;
       const loadedImages: { id: string, url: string, name: string }[] = [];
       
