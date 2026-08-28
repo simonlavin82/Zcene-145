@@ -9,8 +9,17 @@ const db = getFirestore();
 
 async function main() {
   try {
-    const doc = await db.collection('artists').doc('spaced-us').get();
-    console.log(JSON.stringify(doc.data(), null, 2));
+    const spaced = await db.collection('artists').doc('spaced').get();
+    const spacedUs = await db.collection('artists').doc('spaced-us').get();
+    
+    console.log("artists/spaced exists:", spaced.exists);
+    console.log("artists/spaced redirectTo:", spaced.data()?.redirectTo);
+    console.log("artists/spaced has graphData:", !!spaced.data()?.graphData);
+    
+    console.log("artists/spaced-us exists:", spacedUs.exists);
+    console.log("artists/spaced-us redirectTo:", spacedUs.data()?.redirectTo);
+    console.log("artists/spaced-us has graphData:", !!spacedUs.data()?.graphData);
+    
   } catch (error) {
     console.error("Error:", error);
   } finally {
