@@ -48,12 +48,18 @@ export const SeedArtistImages: React.FC<SeedArtistImagesProps> = ({
     // Bug 4 Fix: Short-circuit the network request if the image is in the project's internal cache
     // This prevents stale local Firestore caches from overriding fresh data during curation completion.
     const promises = normalized.map(id => {
-      if (internalCacheMap && internalCacheMap.has(id)) {
-        const entry = internalCacheMap.get(id);
-        const url = entry?.imageUrl || entry?.details?.imageUrl || '';
-        if (url) {
-          // Wrap in a pseudo-snapshot to avoid the network call
-          return Promise.resolve({ exists: () => true, data: () => ({ detailsCache: { imageUrl: url } }) } as any);
+      if (internalCacheMap) {
+        let entry = internalCacheMap.get(id);
+        if (!entry) {
+          const fallbackKey = Array.from(internalCacheMap.keys()).find(k => k.startsWith(`${id}-`));
+          if (fallbackKey) entry = internalCacheMap.get(fallbackKey);
+        }
+        if (entry) {
+          const url = entry.imageUrl || entry.details?.imageUrl || '';
+          if (url && url !== 'not-found') {
+            // Wrap in a pseudo-snapshot to avoid the network call
+            return Promise.resolve({ exists: () => true, data: () => ({ detailsCache: { imageUrl: url } }) } as any);
+          }
         }
       }
       return getEntityDocWithRedirect(id, 'artist');
@@ -69,9 +75,16 @@ export const SeedArtistImages: React.FC<SeedArtistImagesProps> = ({
         let url = '';
 
         // Check internal project cache first for Sandbox-minted images
-        if (internalCacheMap && internalCacheMap.has(normId)) {
-          const entry = internalCacheMap.get(normId);
-          url = entry?.imageUrl || entry?.details?.imageUrl || '';
+        if (internalCacheMap) {
+          let entry = internalCacheMap.get(normId);
+          if (!entry) {
+            const fallbackKey = Array.from(internalCacheMap.keys()).find(k => k.startsWith(`${normId}-`));
+            if (fallbackKey) entry = internalCacheMap.get(fallbackKey);
+          }
+          if (entry) {
+            url = entry.imageUrl || entry.details?.imageUrl || '';
+            if (url === 'not-found') url = '';
+          }
         }
 
         // 2. Global Cache Fallback
@@ -85,6 +98,7 @@ export const SeedArtistImages: React.FC<SeedArtistImagesProps> = ({
               } else if (parsed) {
                 url = parsed.imageUrl || parsed.details?.imageUrl || '';
               }
+              if (url === 'not-found') url = '';
             } catch (e) {
               // ignore
             }
@@ -99,6 +113,7 @@ export const SeedArtistImages: React.FC<SeedArtistImagesProps> = ({
           );
           if (fallbackNode && fallbackNode.imageUrl) {
             url = fallbackNode.imageUrl;
+            if (url === 'not-found') url = '';
           }
         }
         
