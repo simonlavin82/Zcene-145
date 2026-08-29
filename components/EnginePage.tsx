@@ -1139,59 +1139,52 @@ const ArchitectureDiagram: React.FC = () => (
 );
 
 const DiscoveryFlowDiagram: React.FC = () => (
-    <div className="w-full py-12 px-4 bg-zinc-950/50 rounded-xl border border-zinc-800 mb-8">
-        <div className="max-w-3xl mx-auto flex flex-col items-center gap-4">
-            {/* Step 1: Input */}
-            <div className="w-full flex flex-col items-center">
-                <div className="px-6 py-4 rounded-xl border border-zinc-700 bg-zinc-900 text-center w-full max-w-sm">
-                    <div className="text-primary text-[10px] font-mono mb-1 uppercase tracking-tighter">Phase 01: Formulation</div>
-                    <div className="text-white font-medium">Artist Selection & Filters</div>
-                    <div className="text-[11px] text-zinc-500 mt-1">Up to 5 Seed Artists + Year/Origin Logic</div>
+    <div className="w-full py-12 px-4 bg-zinc-950/50 rounded-xl border border-zinc-800 mb-8 overflow-x-auto">
+        <div className="min-w-[800px] flex flex-row items-stretch justify-center gap-6 px-4">
+            {/* Column 1: React UI */}
+            <div className="flex-1 flex flex-col">
+                <div className="px-6 py-6 rounded-xl border border-zinc-700 bg-zinc-900 h-full">
+                    <div className="text-primary text-[10px] font-mono mb-1 uppercase tracking-tighter">Column 1</div>
+                    <div className="text-white font-medium mb-4">React UI</div>
+                    <ul className="text-[12px] text-zinc-400 space-y-4">
+                        <li><span className="text-primary font-medium">Front Gate Cache Guard:</span> Bypasses network entirely if a valid, complete cache document exists.</li>
+                        <li><span className="text-primary font-medium">Fast Track Local Hydration:</span> Instantly paints the unhydrated graph topology received synchronously.</li>
+                    </ul>
                 </div>
-                <div className="h-8 w-0.5 bg-zinc-800 my-2" />
             </div>
 
-            {/* Step 2: Orchestration */}
-            <div className="w-full flex flex-col items-center">
-                <div className="px-6 py-4 rounded-xl border-2 border-primary bg-zinc-900/50 text-center w-full max-w-md shadow-[0_0_15px_rgba(255,255,255,0.03)]">
-                    <div className="text-primary text-[10px] font-mono mb-1 uppercase tracking-tighter">Phase 02: Orchestration</div>
-                    <div className="text-white font-medium">Global Cache Check → Gemini 1.5</div>
-                    <div className="text-[11px] text-zinc-500 mt-1">Probes the global 'artists' cache first, evaluating our dual-layer cache windows: Core Artist Metadata features a 1-year persistence window before triggering a structural background refresh, while Live Tour Data uses a strict 7-day Time-To-Live (TTL) cache window before the UI automatically resets to an 'idle' state. <span className="text-primary font-semibold">⚡ Cache Hit</span> skips directly to Phase 04. Cache Miss calls Gemini to map relational bridges, then writes the result to the global cache.</div>
+            {/* Arrow */}
+            <div className="flex flex-col justify-center">
+                <span className="material-symbols-outlined text-zinc-700">arrow_forward</span>
+            </div>
+            
+            {/* Column 2: HTTP Fast-Track */}
+            <div className="flex-1 flex flex-col">
+                <div className="px-6 py-6 rounded-xl border-2 border-primary bg-zinc-900/50 h-full shadow-[0_0_15px_rgba(255,255,255,0.03)] relative">
+                    <div className="text-primary text-[10px] font-mono mb-1 uppercase tracking-tighter">Column 2 (Synchronous)</div>
+                    <div className="text-white font-medium mb-4">HTTP Fast-Track</div>
+                    <ul className="text-[12px] text-zinc-400 space-y-4">
+                        <li><span className="text-primary font-semibold">Defensive Alias Matching:</span> <code>isNodeInSeedList</code> strictly enforces canonical mapping without naive substrings.</li>
+                        <li><span className="text-primary font-semibold">Strict Seed Hoisting:</span> Seed nodes anchor the generated relational topology.</li>
+                        <li><span className="text-primary font-semibold">Topology Anchor:</span> Saves the baseline graph to Firestore with an unalterable <code>updatedAt</code> stamp.</li>
+                    </ul>
                 </div>
-                <div className="h-8 w-0.5 bg-zinc-800 my-2" />
             </div>
 
-            {/* Step 3: Serial Queue */}
-            <div className="w-full flex flex-col items-center">
-                <div className="px-6 py-4 rounded-xl border border-zinc-700 bg-zinc-900 text-center w-full max-w-sm relative group">
-                    <div className="text-primary text-[10px] font-mono mb-1 uppercase tracking-tighter">Phase 03: Enrichment</div>
-                    <div className="text-white font-medium text-sm">Serial Extraction Queue (Deep Cuts)</div>
-                    <div className="text-[11px] text-zinc-500 mt-1">Each Deep Cut fetch incrementally writes back to the global cache entry, so future cache hits include pre-populated metadata.</div>
-                    <div className="flex gap-1 justify-center mt-3">
-                        {[1, 2, 3].map(i => (
-                            <div key={i} className="w-2 h-2 rounded-full bg-primary/40 animate-pulse" style={{ animationDelay: `${i * 200}ms` }} />
-                        ))}
-                    </div>
-                </div>
-                <div className="h-8 w-0.5 bg-zinc-800 my-2" />
+            {/* Arrow */}
+            <div className="flex flex-col justify-center">
+                <span className="material-symbols-outlined text-zinc-700">arrow_forward</span>
             </div>
 
-            {/* Step 4: Verification & Physics */}
-            <div className="w-full flex flex-col items-center">
-                <div className="px-6 py-4 rounded-xl border border-zinc-700 bg-zinc-900/50 text-center w-full max-w-sm italic">
-                    <div className="text-primary text-[10px] font-mono mb-1 uppercase tracking-tighter">Phase 04: Validation</div>
-                    <div className="text-white font-medium text-sm">D3.js Force Field Convergence</div>
-                    <div className="text-[11px] text-zinc-500 mt-1 italic">Nodes stabilize into organic clusters. Saved artist positions are re-applied from canvasLayout on project load.</div>
-                </div>
-                <div className="h-8 w-0.5 bg-zinc-800 my-2" />
-            </div>
-
-            {/* Step 5: Save */}
-            <div className="w-full flex flex-col items-center">
-                <div className="px-6 py-4 rounded-xl border border-primary/20 bg-primary/5 text-center w-full max-w-md">
-                    <div className="text-primary text-[10px] font-mono mb-1 uppercase tracking-tighter">Phase 05: Persistence</div>
-                    <div className="text-white font-medium">Lightweight Firestore Commit</div>
-                    <div className="text-[11px] text-zinc-400 mt-1">Project record stores seed list inputs + artist <span className="text-primary font-mono">canvasLayout</span> positions. Heavy graph data lives in the global artists cache, structured with our dual-layer cache windows (1-year persistence for core metadata, 7-day TTL for live tour data).</div>
+            {/* Column 3: Background Worker */}
+            <div className="flex-1 flex flex-col">
+                <div className="px-6 py-6 rounded-xl border border-zinc-700 bg-zinc-900 h-full">
+                    <div className="text-primary text-[10px] font-mono mb-1 uppercase tracking-tighter">Column 3 (Asynchronous)</div>
+                    <div className="text-white font-medium mb-4">Background Worker</div>
+                    <ul className="text-[12px] text-zinc-400 space-y-4">
+                        <li><span className="text-primary font-medium">Fail-Fast Media Gatekeeper:</span> Re-hydrates any node missing crucial iTunes/Spotify imagery or biography.</li>
+                        <li><span className="text-primary font-medium">Metadata Hydration:</span> Fetches rich data via Gemini Flash & Google Search, then writes back to cache.</li>
+                    </ul>
                 </div>
             </div>
         </div>
