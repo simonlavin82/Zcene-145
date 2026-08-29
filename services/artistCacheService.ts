@@ -240,17 +240,33 @@ export const cleanArtistDisplayName = (rawIdOrName?: string | null, graphNodes?:
  */
 export const isNodeInSeedList = (nodeIdOrLabel?: string | null, seedList?: string[] | null): boolean => {
   if (!nodeIdOrLabel || !seedList || !Array.isArray(seedList) || seedList.length === 0) return false;
+  
   const targetNorm = normalizeArtistId(nodeIdOrLabel);
+  // Explicitly strip country routing suffixes to ensure base string matches
+  const countrySuffixRegex = /-(united-states|united-kingdom|global|australia|canada|germany|france|japan|sweden|italy|spain|brazil|mexico|netherlands|belgium|norway|finland|denmark|ireland|new-zealand|poland|austria|switzerland|uk|usa|us)$/;
+  const strippedTargetNorm = targetNorm.replace(countrySuffixRegex, '');
+  
   const targetClean = cleanArtistDisplayName(nodeIdOrLabel).toLowerCase();
 
   return seedList.some(seed => {
     if (!seed || typeof seed !== 'string') return false;
     if (seed === nodeIdOrLabel) return true;
+    
     const seedNorm = normalizeArtistId(seed);
+    const strippedSeedNorm = seedNorm.replace(countrySuffixRegex, '');
+
+    // Direct and alias comparisons
     if (seedNorm === targetNorm) return true;
+    if (strippedSeedNorm === strippedTargetNorm) return true;
+    if (strippedSeedNorm === targetNorm) return true;
+    if (seedNorm === strippedTargetNorm) return true;
+    
     if (seed.toLowerCase() === nodeIdOrLabel.toLowerCase() || cleanArtistDisplayName(seed).toLowerCase() === targetClean) return true;
+    
+    // Legacy defensive checks
     if (seedNorm.startsWith(`${targetNorm}-`) || targetNorm.startsWith(`${seedNorm}-`)) return true;
     if (seedNorm.includes(`-${targetNorm}-`) || seedNorm.endsWith(`-${targetNorm}`) || targetNorm.includes(`-${seedNorm}-`) || targetNorm.endsWith(`-${seedNorm}`)) return true;
+    
     return false;
   });
 };

@@ -3098,6 +3098,10 @@ const App: React.FC = () => {
           if (resolvedSearchId !== searchId) {
             console.log(`[Front Gate Cache] Redirect resolved inline: ${searchId} -> ${resolvedSearchId} (data already in hand, no re-dispatch)`);
             setSeedArtists(resolvedSearchId);
+            
+            // CRITICAL FIX: Synchronize artistList with the resolved aliases so downstream cache-hit rendering
+            // checks the correct node IDs instead of the raw input, preventing duplicates
+            artistList.splice(0, artistList.length, resolvedSearchId);
           }
 
 
@@ -3262,10 +3266,26 @@ const App: React.FC = () => {
               if (currentProjectIdRef.current && user && !isGuest) {
                 const projectPath = `users/${user.uid}/projects/${currentProjectIdRef.current}`;
                 try {
-                  const activeId = primaryNode ? primaryNode.id : searchId;
+                  const seeds = artists.split('::').map(a => normalizeArtistId(a.trim()));
+                  const hoistedActiveNodes: string[] = [];
+                  
+                  // 1. Identify canonical seed nodes from the graph and hoist them
+                  normalizedGraph.nodes.forEach((n: any) => {
+                    if (isNodeInSeedList(n.id, seeds)) {
+                      hoistedActiveNodes.push(n.id);
+                    }
+                  });
+                  
+                  // 2. Append all remaining non-seed nodes
+                  normalizedGraph.nodes.forEach((n: any) => {
+                    if (!isNodeInSeedList(n.id, seeds)) {
+                      hoistedActiveNodes.push(n.id);
+                    }
+                  });
+
                   await updateDoc(doc(db, projectPath), {
                     graphData: JSON.stringify(normalizedGraph),
-                    activeNodes: [activeId],
+                    activeNodes: hoistedActiveNodes,
                     seedArtists: artists,
                     detailsCache: JSON.stringify(Array.from(detailsCacheRef.current.entries())),
                     status: 'completed',
@@ -3572,14 +3592,30 @@ const App: React.FC = () => {
           setGraphData(final);
 
           setActiveNodeIds(prev => {
-            const seedIds = new Set(artistList.map(name => name.toLowerCase()));
-            const finalActive = [...artistList];
-            prev.forEach(id => {
-              if (!seedIds.has(id.toLowerCase())) {
-                finalActive.push(id);
-                seedIds.add(id.toLowerCase());
+            const seeds = artistList.map(name => name.toLowerCase());
+            const finalActive: string[] = [];
+            
+            // 1. Extract the actual canonical seed IDs from the cached graph
+            parsedGraphData.nodes.forEach((n: Node) => {
+              if (isNodeInSeedList(n.id, seeds)) {
+                finalActive.push(n.id);
               }
             });
+            
+            // 2. Maintain UX continuity for previously active nodes (non-seeds)
+            prev.forEach(id => {
+              if (!isNodeInSeedList(id, seeds) && !finalActive.includes(id)) {
+                finalActive.push(id);
+              }
+            });
+            
+            // 3. Explicitly append ALL remaining nodes from the cached graph
+            parsedGraphData.nodes.forEach((n: Node) => {
+              if (!isNodeInSeedList(n.id, seeds) && !finalActive.includes(n.id)) {
+                finalActive.push(n.id);
+              }
+            });
+            
             return finalActive;
           });
 
