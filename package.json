@@ -10,7 +10,8 @@
     "lint": "eslint . && tsc --noEmit",
     "deploy": "npx firebase-tools deploy",
     "seed:cache-hit": "node scripts/seed_cache_hit.cjs",
-    "seed:cache-miss": "node scripts/seed_cache_miss.cjs"
+    "seed:cache-miss": "node scripts/seed_cache_miss.cjs",
+    "test:regression": "node scratch/test_pipeline_regression.cjs"
   },
   "dependencies": {
     "@google/genai": "^1.22.0",
