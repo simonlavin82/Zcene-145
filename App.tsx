@@ -1712,18 +1712,30 @@ const App: React.FC = () => {
         .filter(n => n.type === 'artist' || n.type === 'label')
         .map(n => ({ nodeId: n.id, x: n.x, y: n.y, fx: n.fx ?? null, fy: n.fy ?? null }));
 
+      const artistEntityIds = graphData!.nodes
+        .filter((n: any) => n.type === 'artist')
+        .map((n: any) => normalizeArtistId(n.id));
+      const labelEntityIds = graphData!.nodes
+        .filter((n: any) => n.type === 'label')
+        .map((n: any) => normalizeArtistId(n.id));
+      const seedList = seedArtists.split('::').map((a: string) => a.trim()).filter(Boolean);
+      const normalizedIds = seedList.map((name: string) => normalizeArtistId(name));
+
       const sharePayload: Record<string, any> = {
-        name: projectName || "Shared Zcene",
+        name: projectName || (seedArtists ? seedArtists.split('::')[0] : 'Shared Zcene'),
         seedArtists,
-        activeNodes: graphData?.nodes ? graphData.nodes.map((n: any) => n.id) : activeNodeIds,
-        artistIds: graphData?.nodes ? graphData.nodes.filter((n: any) => n.type === 'artist').map((n: any) => normalizeArtistId(n.id)) : [],
-        labelIds: graphData?.nodes ? graphData.nodes.filter((n: any) => n.type === 'label').map((n: any) => normalizeArtistId(n.id)) : [],
-        canvasLayout: JSON.stringify(canvasLayout),
+        activeNodes: activeNodes.map(n => n.id),
+        artistIds: artistEntityIds.length > 0 ? artistEntityIds : normalizedIds,
+        labelIds: labelEntityIds,
+        chatHistories: JSON.stringify(Array.from(chatHistories.entries())),
         discoveryFilters: JSON.stringify(discoveryFilters),
+        lastViewedStackCount,
+        isMagazineViewOpen: false,
         schemaVersion: 2,
         supportsLabelDeepCuts: true,
         authorId: user.uid,
         createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       };
 
       if (currentCacheKey) {
@@ -1731,10 +1743,12 @@ const App: React.FC = () => {
         // Also include the full graphData as an inline fallback — guests can render the canvas
         // immediately even if the artists cache document is unavailable.
         sharePayload.cacheKey = currentCacheKey;
+        sharePayload.canvasLayout = JSON.stringify(canvasLayout);
         sharePayload.graphData = JSON.stringify(graphData);
         sharePayload.detailsCache = JSON.stringify(Array.from(detailsCache.entries()));
       } else {
         // Fallback: no cache key, write full blobs directly
+        sharePayload.canvasLayout = JSON.stringify(canvasLayout);
         sharePayload.graphData = JSON.stringify(graphData);
         sharePayload.detailsCache = JSON.stringify(Array.from(detailsCache.entries()));
       }
