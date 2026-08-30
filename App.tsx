@@ -1716,7 +1716,7 @@ const App: React.FC = () => {
         seedArtists,
         activeNodes: graphData?.nodes ? graphData.nodes.map((n: any) => n.id) : activeNodeIds,
         canvasLayout: JSON.stringify(canvasLayout),
-        discoveryFilters: JSON.stringify(activeDiscoveryFilters),
+        discoveryFilters: JSON.stringify(discoveryFilters),
         authorId: user.uid,
         createdAt: serverTimestamp(),
       };
