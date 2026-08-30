@@ -1714,7 +1714,7 @@ const App: React.FC = () => {
 
       const sharePayload: Record<string, any> = {
         seedArtists,
-        activeNodes: activeNodes.map(n => n.id),
+        activeNodes: activeNodeIds,
         authorId: user.uid,
         createdAt: serverTimestamp(),
       };
@@ -1758,7 +1758,7 @@ const App: React.FC = () => {
     } finally {
       setIsSharing(false);
     }
-  }, [user, graphData, seedArtists, activeNodes, detailsCache, isSharing, currentCacheKey, showToast, handleLogin, isGuest]);
+  }, [user, graphData, seedArtists, activeNodeIds, detailsCache, isSharing, currentCacheKey, showToast, handleLogin, isGuest]);
 
 
   const handleTriggerShareModal = useCallback(async () => {
@@ -5881,7 +5881,7 @@ const App: React.FC = () => {
       seedArtists,
       discoveryFilters: JSON.stringify(discoveryFilters),
       lastViewedStackCount,
-      activeNodes: activeNodes.map(n => n.id),
+      activeNodes: activeNodeIds,
       isMagazineViewOpen: isMagazineViewOpen && activeNodes.length > 0,
       chatHistories: JSON.stringify(Array.from(chatHistories.entries())),
       canvasLayout: JSON.stringify(canvasLayout),
@@ -5904,7 +5904,7 @@ const App: React.FC = () => {
           seedArtists,
           discoveryFilters: JSON.stringify(discoveryFilters),
           lastViewedStackCount,
-          activeNodes: activeNodes.map(n => n.id),
+          activeNodes: activeNodeIds,
           isMagazineViewOpen: isMagazineViewOpen && activeNodes.length > 0,
           chatHistories: JSON.stringify(Array.from(chatHistories.entries())),
           authorId: user.uid,
