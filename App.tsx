@@ -1715,6 +1715,8 @@ const App: React.FC = () => {
       const sharePayload: Record<string, any> = {
         seedArtists,
         activeNodes: graphData?.nodes ? graphData.nodes.map((n: any) => n.id) : activeNodeIds,
+        canvasLayout: JSON.stringify(canvasLayout),
+        discoveryFilters: JSON.stringify(activeDiscoveryFilters),
         authorId: user.uid,
         createdAt: serverTimestamp(),
       };
@@ -1724,7 +1726,6 @@ const App: React.FC = () => {
         // Also include the full graphData as an inline fallback — guests can render the canvas
         // immediately even if the artists cache document is unavailable.
         sharePayload.cacheKey = currentCacheKey;
-        sharePayload.canvasLayout = JSON.stringify(canvasLayout);
         sharePayload.graphData = JSON.stringify(graphData);
         sharePayload.detailsCache = JSON.stringify(Array.from(detailsCache.entries()));
       } else {

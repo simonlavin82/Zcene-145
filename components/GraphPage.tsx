@@ -1211,9 +1211,10 @@ const GraphPage: React.FC<GraphPageProps> = ({
   }, [isLeftPanelCollapsed, isDetailsPanelCollapsed]);
 
   const selectFirstUnread = useCallback(() => {
+    if (isGuest) return;
     const firstUnread = activeNodes.find(n => !readNodeIds.has(n.id.trim().toLowerCase()));
     if (firstUnread) onNodeClick(firstUnread);
-  }, [activeNodes, readNodeIds, onNodeClick]);
+  }, [activeNodes, readNodeIds, onNodeClick, isGuest]);
   
   const toggleDetailsPanel = useCallback(() => {
     const isOpening = isDetailsPanelCollapsed;
