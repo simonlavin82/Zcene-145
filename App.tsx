@@ -1714,7 +1714,7 @@ const App: React.FC = () => {
 
       const sharePayload: Record<string, any> = {
         seedArtists,
-        activeNodes: activeNodeIds,
+        activeNodes: graphData?.nodes ? graphData.nodes.map((n: any) => n.id) : activeNodeIds,
         authorId: user.uid,
         createdAt: serverTimestamp(),
       };
@@ -5363,7 +5363,7 @@ const App: React.FC = () => {
               if (data.activeNodes && Array.isArray(data.activeNodes)) {
                 let resolvedActiveNodes = data.activeNodes;
                 const availableEntities = g.nodes.map((n: any) => n.id);
-                if (resolvedActiveNodes.length <= 1 && availableEntities.length > resolvedActiveNodes.length) {
+                if (availableEntities.length > resolvedActiveNodes.length) {
                   resolvedActiveNodes = availableEntities;
                 }
                 setActiveNodeIds(resolvedActiveNodes);
@@ -5491,7 +5491,7 @@ const App: React.FC = () => {
             if (data.activeNodes && Array.isArray(data.activeNodes)) {
               let resolvedActiveNodes = data.activeNodes;
               const availableEntities = hydratedNodes.map((n: any) => n.id);
-              if (resolvedActiveNodes.length <= 1 && availableEntities.length > resolvedActiveNodes.length) {
+              if (availableEntities.length > resolvedActiveNodes.length) {
                  resolvedActiveNodes = availableEntities;
               }
               setActiveNodeIds(resolvedActiveNodes);
@@ -5544,7 +5544,7 @@ const App: React.FC = () => {
               if (data.activeNodes && Array.isArray(data.activeNodes)) {
                 let resolvedActiveNodes = data.activeNodes;
                 const availableEntities = g.nodes.map((n: any) => n.id);
-                if (resolvedActiveNodes.length <= 1 && availableEntities.length > resolvedActiveNodes.length) {
+                if (availableEntities.length > resolvedActiveNodes.length) {
                    resolvedActiveNodes = availableEntities;
                 }
                 setActiveNodeIds(resolvedActiveNodes);
@@ -5570,7 +5570,7 @@ const App: React.FC = () => {
                     if (data.activeNodes && Array.isArray(data.activeNodes)) {
                       let resolvedActiveNodes = data.activeNodes;
                       const availableEntities = g.nodes.map((n: any) => n.id);
-                      if (resolvedActiveNodes.length <= 1 && availableEntities.length > resolvedActiveNodes.length) {
+                      if (availableEntities.length > resolvedActiveNodes.length) {
                          resolvedActiveNodes = availableEntities;
                       }
                       setActiveNodeIds(resolvedActiveNodes);
@@ -5616,7 +5616,7 @@ const App: React.FC = () => {
             if (data.activeNodes && Array.isArray(data.activeNodes)) {
               let resolvedActiveNodes = data.activeNodes;
               const availableEntities = g.nodes.map((n: any) => n.id);
-              if (resolvedActiveNodes.length <= 1 && availableEntities.length > resolvedActiveNodes.length) {
+              if (availableEntities.length > resolvedActiveNodes.length) {
                  resolvedActiveNodes = availableEntities;
               }
               setActiveNodeIds(resolvedActiveNodes);
@@ -5881,7 +5881,7 @@ const App: React.FC = () => {
       seedArtists,
       discoveryFilters: JSON.stringify(discoveryFilters),
       lastViewedStackCount,
-      activeNodes: activeNodeIds,
+      activeNodes: graphData?.nodes ? graphData.nodes.map(n => n.id) : activeNodeIds,
       isMagazineViewOpen: isMagazineViewOpen && activeNodes.length > 0,
       chatHistories: JSON.stringify(Array.from(chatHistories.entries())),
       canvasLayout: JSON.stringify(canvasLayout),
@@ -5904,7 +5904,7 @@ const App: React.FC = () => {
           seedArtists,
           discoveryFilters: JSON.stringify(discoveryFilters),
           lastViewedStackCount,
-          activeNodes: activeNodeIds,
+          activeNodes: graphData?.nodes ? graphData.nodes.map(n => n.id) : activeNodeIds,
           isMagazineViewOpen: isMagazineViewOpen && activeNodes.length > 0,
           chatHistories: JSON.stringify(Array.from(chatHistories.entries())),
           authorId: user.uid,
