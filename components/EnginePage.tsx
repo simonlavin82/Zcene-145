@@ -56,33 +56,6 @@ To prevent layout computation leaks, trailing dark voids, and mobile padding cli
    to enforce crisp, uniform grid column tracks and snug row hugging.
 `;
 
-const ARCHITECTURE_DOCUMENTATION = `
-[BASELINE V-3COLUMN: STABLE]
-Zcene is built on a modern, serverless full-stack architecture that prioritizes 
-real-time intelligence and global scalability. The core Curation Engine is governed by a strict 3-Column Pipeline and Immutable Architectural Laws to guarantee data consistency.
-
-### THE IMMUTABLE ARCHITECTURAL LAWS
-
-#### 1. The 3-Column Curation Pipeline
-The fundamental rule is that all foundational data is firmly anchored during the HTTP Fast-Track (Column 2) before background hydration begins.
-- [COLUMN 1: REACT UI]: Purely presentation. Handles the Front Gate Cache Guard and fast-track local hydration based on synchronous responses.
-- [COLUMN 2: HTTP FAST-TRACK]: Synchronous execution layer. Responsible for pre-flight origin slugging, generative topology synthesis, and saving the baseline topology to Firestore with an unalterable \`updatedAt\` anchor.
-- [COLUMN 3: BACKGROUND WORKER]: Asynchronous hydration layer. Never creates foundational topology. Triggered via Eventarc to fetch rich metadata and scrape imagery. Writes fully hydrated nodes back to cache.
-
-#### 2. Strict Seed Hoisting Law
-Seed nodes must ALWAYS be elevated to the highest priority in the topology. Active node order processing is strictly governed by Seed Hoisting to ensure seeds are visually and programmatically anchored as the roots of the network.
-
-#### 3. Defensive Alias Matching (isNodeInSeedList)
-Naive string matching is strictly forbidden. Alias matching must be purely canonical. Variations of aliases must resolve cleanly to a canonical node without producing duplicates. The \`isNodeInSeedList\` utility MUST be used to reliably resolve node identity across the pipeline.
-
-#### 4. Fail-Fast Media Gatekeeper
-The cache validation predicate enforces strict completeness. Nodes lacking crucial media or complete context (e.g., missing imagery from iTunes/Spotify, empty biography) are instantly flagged as cache misses. Only fully hydrated, media-rich nodes pass through the zero-AI zapping threshold without re-triggering hydration.
-
-### CRITICAL SCHEMA RULES FOR CACHE
-- \`synthesisRationale\` MUST be written explicitly to the root level of the global artist cache document.
-- D3 Link Objects MUST be safely serialized back to strings before caching \`graphData\`.
-- Column 2 cache-loading MUST safely parse and clone the cache objects, and strictly deduplicate loaded node IDs.
-`;
 
 const GRAPH_INTELLIGENCE_DOCUMENTATION = `
 Zcene implements an incremental exploration engine. Instead of re-generating 
@@ -1080,63 +1053,6 @@ const SitemapNode: React.FC<{ title: string; description: string; children?: Rea
     </li>
 );
 
-const ArchitectureDiagram: React.FC = () => (
-    <div className="w-full py-8 px-4 bg-zinc-950/50 rounded-xl border border-zinc-800 mb-8 overflow-x-auto">
-        <div className="min-w-[600px] flex flex-col items-center gap-12">
-            {/* Top Layer: External Intelligence */}
-            <div className="flex justify-center gap-24 w-full">
-                <div className="flex flex-col items-center">
-                    <div className="w-40 h-16 rounded-lg border border-primary/40 bg-zinc-900 flex items-center justify-center text-primary font-medium text-sm text-center px-4">
-                        Google AI Studio (Gemini 1.5)
-                    </div>
-                    <div className="text-[10px] text-zinc-500 mt-2 uppercase tracking-widest font-mono">Orchestration</div>
-                </div>
-            </div>
-
-            {/* Middle Layer: Application Core */}
-            <div className="relative w-full flex justify-center">
-                <div className="absolute top-[-32px] left-[calc(50%-1px)] w-0.5 h-8 bg-zinc-800" />
-                
-                <div className="flex flex-col items-center relative">
-                    <div className="w-64 h-24 rounded-xl border-2 border-primary bg-zinc-900 shadow-[0_0_20px_rgba(255,255,255,0.05)] flex flex-col items-center justify-center p-4 z-10">
-                        <ZceneLogo className="h-6 w-auto text-primary mb-2" />
-                        <span className="text-white font-semibold tracking-tight">Cloud Run Container</span>
-                        <span className="text-[10px] text-zinc-500 font-mono mt-1">Node.js + React + Vite</span>
-                    </div>
-                </div>
-
-                {/* Arrows to sides */}
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-between w-[480px]">
-                    <div className="flex items-center">
-                        <div className="h-0.5 w-16 bg-zinc-800" />
-                        <div className="w-2 h-2 rounded-full bg-zinc-700 -ml-1" />
-                    </div>
-                    <div className="flex items-center">
-                        <div className="w-2 h-2 rounded-full bg-zinc-700 -mr-1" />
-                        <div className="h-0.5 w-16 bg-zinc-800" />
-                    </div>
-                </div>
-            </div>
-
-            {/* Bottom Layer: Clients & Data */}
-            <div className="flex justify-between gap-24 w-full max-w-4xl px-12">
-                <div className="flex flex-col items-center">
-                    <div className="w-36 h-16 rounded-lg border border-zinc-700 bg-zinc-900/80 flex items-center justify-center text-zinc-300 text-sm font-medium">
-                        User Interface (React)
-                    </div>
-                    <div className="text-[10px] text-zinc-500 mt-2 uppercase tracking-widest font-mono">Client Edge</div>
-                </div>
-
-                <div className="flex flex-col items-center">
-                    <div className="w-36 h-16 rounded-lg border border-zinc-700 bg-zinc-900/80 flex items-center justify-center text-zinc-300 text-sm font-medium">
-                        Firebase (Auth/DB)
-                    </div>
-                    <div className="text-[10px] text-zinc-500 mt-2 uppercase tracking-widest font-mono">Persistence</div>
-                </div>
-            </div>
-        </div>
-    </div>
-);
 
 const DiscoveryFlowDiagram: React.FC = () => (
     <div className="w-full py-12 px-4 bg-zinc-950/50 rounded-xl border border-zinc-800 mb-8 overflow-x-auto">
@@ -1656,8 +1572,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                     {/* ── ARCHITECTURE ── */}
                     <section id="architecture">
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">Architecture</h2>
-                        <ArchitectureDiagram />
-                        <CodeBlock title="Cloud Infrastructure & Orchestration" content={ARCHITECTURE_DOCUMENTATION} />
+                        <AsyncHydrationDiagram />
                     </section>
 
                     {/* ── GRAPH INTELLIGENCE ── */}
@@ -1825,7 +1740,6 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                     {/* ── DATA SYNTHESIS & PERSISTENCE ── */}
                     <section id="data-synthesis">
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">Data Synthesis & Persistence</h2>
-                        <AsyncHydrationDiagram />
                         <CodeBlock title="Architectural Separation: Artists vs. Labels & Simultaneous Pre-Caching" content={ARCHITECTURAL_SEPARATION_DOCUMENTATION} />
                         <CodeBlock title="AI Parsing Resilience & Anti-Leakage Defense" content={AI_PARSING_RESILIENCE_DOCUMENTATION} />
                     </section>
