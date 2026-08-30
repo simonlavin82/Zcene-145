@@ -1713,10 +1713,15 @@ const App: React.FC = () => {
         .map(n => ({ nodeId: n.id, x: n.x, y: n.y, fx: n.fx ?? null, fy: n.fy ?? null }));
 
       const sharePayload: Record<string, any> = {
+        name: projectName || "Shared Zcene",
         seedArtists,
         activeNodes: graphData?.nodes ? graphData.nodes.map((n: any) => n.id) : activeNodeIds,
+        artistIds: graphData?.nodes ? graphData.nodes.filter((n: any) => n.type === 'artist').map((n: any) => normalizeArtistId(n.id)) : [],
+        labelIds: graphData?.nodes ? graphData.nodes.filter((n: any) => n.type === 'label').map((n: any) => normalizeArtistId(n.id)) : [],
         canvasLayout: JSON.stringify(canvasLayout),
         discoveryFilters: JSON.stringify(discoveryFilters),
+        schemaVersion: 2,
+        supportsLabelDeepCuts: true,
         authorId: user.uid,
         createdAt: serverTimestamp(),
       };
