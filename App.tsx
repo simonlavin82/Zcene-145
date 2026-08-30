@@ -6255,10 +6255,12 @@ const App: React.FC = () => {
           }
         }
 
-        // Only initialize empty graph if it's actually null (initial state)
-        if (graphData === null) {
-          setGraphData({ nodes: [], links: [] });
-        }
+        // Only initialize empty graph if it's actually null (initial state), using a functional
+        // update to avoid destroying data just fetched within this effect due to stale closures.
+        setGraphData(prev => {
+          if (prev === null) return { nodes: [], links: [] };
+          return prev;
+        });
       } else if (pathname === '/source') {
         if (currentViewRef.current !== View.Engine) setCurrentView(View.Engine);
       } else {
@@ -7308,7 +7310,12 @@ const App: React.FC = () => {
   }, [activeNodeIds, activeNodes, detailsCache, graphData, seedArtists, selectedNode, urlOriginHint, humanizeError, user, isLoading, incrementDeepCutsOpenedCount, triggerBackgroundRevalidation, loadingNodeIds, isViewingShare]);
 
   const handleViewChange = useCallback((newView: View) => {
-    if (newView === View.Graph && !graphData) setGraphData({ nodes: [], links: [] });
+    if (newView === View.Graph) {
+      setGraphData(prev => {
+        if (!prev) return { nodes: [], links: [] };
+        return prev;
+      });
+    }
     const targetPath = {
       [View.Graph]: '/app',
       [View.Dashboard]: '/dashboard',
