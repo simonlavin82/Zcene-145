@@ -1633,7 +1633,7 @@ const App: React.FC = () => {
     setSupportsLabelDeepCuts(true);
 
     // Update route immediately
-    navigate(`/z/${newId}`);
+    navigate(`/p/${newId}`);
     setIsCreatingProject(true);
 
     const path = `users/${user.uid}/projects/${newId}`;
@@ -2633,7 +2633,7 @@ const App: React.FC = () => {
 
       await setDoc(newDocRef, docPayload);
       showToast('Zcene saved to your dashboard!');
-      navigate(`/z/${newId}`);
+      navigate(`/p/${newId}`);
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, path);
     } finally {
@@ -2790,7 +2790,7 @@ const App: React.FC = () => {
       const newId = newDocRef.id;
       setCurrentProjectId(newId);
       currentProjectIdRef.current = newId;
-      navigate(`/z/${newId}`);
+      navigate(`/p/${newId}`);
 
       let defaultName = projectName || "Untitled Zcene";
       if (!projectName || projectName === "Untitled Zcene") {
@@ -7242,7 +7242,7 @@ const App: React.FC = () => {
     if (previousWorkspace) {
       if (previousWorkspace.view === View.Graph && previousWorkspace.projectId) {
         setCurrentView(View.Graph);
-        navigate(`/z/${previousWorkspace.projectId}`);
+        navigate(`/p/${previousWorkspace.projectId}`);
       } else {
         setCurrentView(View.Dashboard);
         navigate('/dashboard');
@@ -7250,7 +7250,7 @@ const App: React.FC = () => {
     } else {
       if (currentProjectId) {
         setCurrentView(View.Graph);
-        navigate(`/z/${currentProjectId}`);
+        navigate(`/p/${currentProjectId}`);
       } else {
         setCurrentView(View.Dashboard);
         navigate('/dashboard');
@@ -7637,7 +7637,7 @@ const App: React.FC = () => {
               handleNodeClick(node);
               if (currentView !== View.Graph) {
                 setCurrentView(View.Graph);
-                if (currentProjectId) navigate(`/z/${currentProjectId}`);
+                if (currentProjectId) navigate(`/p/${currentProjectId}`);
               }
             }
           }
