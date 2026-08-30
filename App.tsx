@@ -2387,7 +2387,7 @@ const App: React.FC = () => {
       approvedSeedsRef.current.add(node.id.toLowerCase());
       await handleGenerateDeepCutRef.current(node);
     }
-  }, [confirmTokenUsage, selectedNode, peekedNode, loadingNodeIds, isSmallScreen, supportsLabelDeepCuts, showToast]);
+  }, [confirmTokenUsage, selectedNode, peekedNode, loadingNodeIds, isSmallScreen, supportsLabelDeepCuts, showToast, isGuest]);
 
   const handleGenerateDeepCut = useCallback(async (node: Node) => {
     if (node.type === 'label' && !supportsLabelDeepCuts) {
@@ -6137,21 +6137,64 @@ const App: React.FC = () => {
                 const g = normalizeGraphData(typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData);
                 g.links = g.links.map((l: any) => ({
                   ...l,
-                  source: typeof l.source === 'string' ? l.source : l.source.id,
-                  target: typeof l.target === 'string' ? l.target : l.target.id
+                  source: typeof l.source === 'object' ? l.source.id : l.source,
+                  target: typeof l.target === 'object' ? l.target.id : l.target
                 }));
-                g.nodes.forEach((n: any) => { n.fx = null; n.fy = null; });
 
+                // Re-apply saved canvas positions
+                if (data.canvasLayout) {
+                  try {
+                    const positions: Array<{ nodeId: string; x?: number; y?: number; fx?: number | null; fy?: number | null }> = typeof data.canvasLayout === 'string' ? JSON.parse(data.canvasLayout) : data.canvasLayout;
+                    positions.forEach(ref => {
+                      const node = g.nodes.find((n: any) => n.id === ref.nodeId);
+                      if (node) { node.x = ref.x; node.y = ref.y; node.fx = ref.fx ?? null; node.fy = ref.fy ?? null; }
+                    });
+                  } catch (e) { console.warn('[Router] canvasLayout parse failed:', e); }
+                }
+
+                g.nodes.forEach((n: any) => { n.fx = n.fx ?? null; n.fy = n.fy ?? null; });
                 setGraphData(g);
                 setSeedArtists(data.seedArtists);
+                
+                let expandedCache = new Map();
                 if (data.detailsCache) {
-                  const expandedCache = expandDetailsCacheMap(data.detailsCache);
+                  expandedCache = expandDetailsCacheMap(data.detailsCache);
                   setDetailsCache(expandedCache);
                   detailsCacheRef.current = expandedCache;
                 }
                 
                 if (data.activeNodes && Array.isArray(data.activeNodes)) {
-                  setActiveNodeIds(data.activeNodes);
+                  let resolvedActiveNodes = data.activeNodes;
+                  const availableEntities = g.nodes.map((n: any) => n.id);
+                  if (availableEntities.length > resolvedActiveNodes.length) {
+                    resolvedActiveNodes = availableEntities;
+                  }
+                  setActiveNodeIds(resolvedActiveNodes);
+                  
+                  // Synchronously auto-select/hydrate the first active node if nothing is selected
+                  if (!selectedNode && resolvedActiveNodes.length > 0) {
+                    const defaultNodeId = resolvedActiveNodes[0];
+                    const defaultNode = g.nodes.find((n: any) => n.id.toLowerCase() === defaultNodeId.toLowerCase() || normalizeArtistId(n.id) === normalizeArtistId(defaultNodeId));
+                    if (defaultNode) {
+                      const normId = normalizeArtistId(defaultNode.id);
+                      const cachedDetails = expandedCache.get(normId) || expandedCache.get(defaultNode.id.toLowerCase());
+                      if (cachedDetails && cachedDetails.summary && !cachedDetails._isSentinel) {
+                        const hydratedNode = {
+                          ...defaultNode,
+                          bio: cachedDetails.summary,
+                          summary: cachedDetails.summary,
+                          genre: cachedDetails.details?.genre || "",
+                          origin: cachedDetails.details?.origin || "",
+                          founded: cachedDetails.details?.founded || "",
+                          name: cachedDetails.details?.artist || defaultNode.id,
+                          imageUrl: cachedDetails.imageUrl || ""
+                        };
+                        setSelectedNode(hydratedNode);
+                      } else {
+                        setSelectedNode(defaultNode);
+                      }
+                    }
+                  }
                 }
                 showToast("Shared Zcene Loaded");
               } else {
