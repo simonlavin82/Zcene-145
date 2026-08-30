@@ -5702,18 +5702,7 @@ const App: React.FC = () => {
           return;
         }
 
-        // 1. Try Shared Zcenes (top-level)
-        const shareRef = doc(db, 'sharedZcenes', currentProjectId);
-        try {
-          const shareSnap = await getDoc(shareRef);
-          if (!isMounted) return;
-          if (await handleSnap(shareSnap)) {
-            console.log(`[ProjectLoader] Found in sharedZcenes`);
-            return;
-          }
-        } catch (e) {
-          console.log(`[ProjectLoader] Shared probe failed or denied`);
-        }
+        // Shared Zcenes are handled entirely in processDeepLink now.
 
         // 2. Try Projects (top-level flat)
         const flatProjectRef = doc(db, 'projects', currentProjectId);
@@ -6017,10 +6006,11 @@ const App: React.FC = () => {
 
       const isAppPath = pathname === '/app' || pathname.startsWith('/app/');
       const isDashboardPath = pathname === '/dashboard';
-      const isProjectPath = pathname.startsWith('/z/') || pathname.startsWith('/project/');
+      const isSharePath = pathname.startsWith('/z/');
+      const isProjectPath = pathname.startsWith('/project/') || pathname.startsWith('/p/');
 
       // --- ROUTING LOGIC ---
-      if (isAppPath || isDashboardPath || isProjectPath || pathname === '/help' || pathname.startsWith('/design') || pathname === '/engine' || pathname === '/analytics' || shareIdFromQuery || projectIdFromQuery) {
+      if (isAppPath || isDashboardPath || isProjectPath || pathname === '/help' || pathname.startsWith('/design') || pathname === '/engine' || pathname === '/analytics' || shareIdFromQuery || projectIdFromQuery || isSharePath) {
         // Optimization: Pre-capture pathname + search for redirection if auth is not ready
         if (!isAuthInitialized) {
           authRedirectPathRef.current = pathname + window.location.search;
@@ -6028,7 +6018,7 @@ const App: React.FC = () => {
         }
 
         // Allow access to app if we have a deep link ID, even if not logged in
-        if (!user && !projectIdFromQuery && !shareIdFromQuery && !isProjectPath) {
+        if (!user && !projectIdFromQuery && !shareIdFromQuery && !isProjectPath && !isSharePath) {
           authRedirectPathRef.current = pathname + window.location.search;
           if (currentViewRef.current !== View.Home) {
             setCurrentView(View.Home);
@@ -6046,10 +6036,10 @@ const App: React.FC = () => {
             setCurrentProjectId(null);
             setCurrentProjectOwnerId(null);
           }
-        } else if (isProjectPath || projectIdFromQuery || shareIdFromQuery) {
-          let projectId = projectIdFromQuery || shareIdFromQuery;
+        } else if (isProjectPath || projectIdFromQuery) {
+          let projectId = projectIdFromQuery;
           if (!projectId) {
-            if (pathname.startsWith('/z/')) {
+            if (pathname.startsWith('/p/')) {
               projectId = pathname.substring(3).split('?')[0];
             } else if (pathname.startsWith('/project/')) {
               projectId = pathname.substring(9).split('?')[0];
@@ -6085,6 +6075,64 @@ const App: React.FC = () => {
               }
               setCurrentProjectId(projectId);
               setCurrentView(View.Graph);
+            }
+          }
+        } else if (isSharePath || shareIdFromQuery) {
+          let shareId = shareIdFromQuery;
+          if (!shareId && isSharePath) {
+            shareId = pathname.substring(3).split('?')[0];
+          }
+          if (shareId && shareId !== lastProcessedSeedsRef.current && !isLoading) {
+            lastProcessedSeedsRef.current = shareId;
+            setIsLoading(true);
+            
+            // Set view to Graph, but keep project ID NULL for read-only share
+            setPreviousWorkspace({ view: View.Graph, projectId: null });
+            if (currentViewRef.current !== View.Graph) {
+              setCurrentView(View.Graph);
+            }
+            setCurrentProjectId(null);
+            setCurrentProjectOwnerId(null);
+            setGraphData({ nodes: [], links: [] });
+            setActiveNodeIds([]);
+            setDetailsCache(new Map());
+            setChatHistories(new Map());
+            setCurrentCacheKey(null);
+            setSeedArtists('');
+            setProjectName('');
+            setProjectStatus(null);
+            setActiveJobId(null);
+
+            try {
+              console.log(`[Router] Loading Shared Zcene: ${shareId}`);
+              const shareRef = doc(db, 'sharedZcenes', shareId);
+              const shareSnap = await getDoc(shareRef);
+              if (shareSnap.exists()) {
+                const data = shareSnap.data();
+                const g = normalizeGraphData(typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData);
+                g.links = g.links.map((l: any) => ({
+                  ...l,
+                  source: typeof l.source === 'string' ? l.source : l.source.id,
+                  target: typeof l.target === 'string' ? l.target : l.target.id
+                }));
+                g.nodes.forEach((n: any) => { n.fx = null; n.fy = null; });
+
+                setGraphData(g);
+                setSeedArtists(data.seedArtists);
+                if (data.detailsCache) setDetailsCache(expandDetailsCacheMap(data.detailsCache));
+                await batchHydrateDetailsCache(g.nodes, g.links);
+                if (data.activeNodes && Array.isArray(data.activeNodes)) {
+                  setActiveNodeIds(data.activeNodes);
+                }
+                showToast("Shared Zcene Loaded");
+              } else {
+                setError("Shared Zcene not found.");
+              }
+            } catch (err: any) {
+              console.error("Shared load failed:", err);
+              setError("This shared link appears to be broken or corrupted.");
+            } finally {
+              setIsLoading(false);
             }
           }
         } else if (isAppPath) {
@@ -6149,43 +6197,7 @@ const App: React.FC = () => {
 
       if (origin) setUrlOriginHint(origin);
 
-      // Handle Share Import
-      if (shareId && shareId !== lastProcessedSeedsRef.current && !isLoading) {
-        lastProcessedSeedsRef.current = shareId;
-        setIsLoading(true);
-        try {
-          console.log(`[Router] Importing Share: ${shareId}`);
-          const shareRef = doc(db, 'sharedZcenes', shareId);
-          const shareSnap = await getDoc(shareRef);
-          if (shareSnap.exists()) {
-            const data = shareSnap.data();
-            const g = normalizeGraphData(typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData);
-            g.links = g.links.map((l: any) => ({
-              ...l,
-              source: typeof l.source === 'string' ? l.source : l.source.id,
-              target: typeof l.target === 'string' ? l.target : l.target.id
-            }));
-            g.nodes.forEach((n: any) => { n.fx = null; n.fy = null; });
-
-            setGraphData(g);
-            setSeedArtists(data.seedArtists);
-            if (data.detailsCache) setDetailsCache(expandDetailsCacheMap(data.detailsCache));
-            await batchHydrateDetailsCache(g.nodes, g.links);
-            if (data.activeNodes && Array.isArray(data.activeNodes)) {
-              setActiveNodeIds(data.activeNodes);
-            }
-            showToast("Zcene Imported");
-          } else {
-            setError("Shared Zcene not found.");
-          }
-        } catch (err: any) {
-          console.error("Import failed:", err);
-          setError("This shared link appears to be broken or corrupted.");
-        } finally {
-          setIsLoading(false);
-        }
-        return;
-      }
+      // Share imports are handled structurally above now
 
       // Handle Seed Import
       if (seeds && seeds !== seedArtists && seeds !== lastProcessedSeedsRef.current && !isLoading) {
@@ -7353,7 +7365,7 @@ const App: React.FC = () => {
             projects={projects}
             stack={stack}
             isStackNew={stack.length > lastViewedStackCount}
-            onSelectProject={(id) => navigate(`/z/${id}`)}
+            onSelectProject={(id) => navigate(`/p/${id}`)}
             onCreateProject={handleCreateProject}
             isCreatingProject={isCreatingProject}
             onDeleteProject={handleDeleteProject}
