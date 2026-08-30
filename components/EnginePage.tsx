@@ -1329,6 +1329,101 @@ const Table: React.FC<{ headers: string[]; children: React.ReactNode }> = ({ hea
     </div>
 );
 
+const AsyncHydrationDiagram: React.FC = () => (
+    <div className="bg-zinc-900/30 p-8 rounded-xl border border-zinc-700/50 mb-12">
+        <h3 className="text-zinc-200 font-medium text-lg mb-6 uppercase tracking-wider">Async Hydration Decoupling</h3>
+        <div className="flex flex-col gap-6">
+            <div className="flex items-center gap-4">
+                <div className="bg-primary/20 p-3 rounded-lg border border-primary/50 text-primary w-48 text-center font-bold shadow-[0_0_15px_rgba(168,85,247,0.4)]">
+                    HTTP Fast-Track
+                </div>
+                <div className="flex-1 h-px bg-primary/50 relative">
+                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-zinc-900 text-xs text-primary px-2">Sync: Render Spiderweb</span>
+                </div>
+                <div className="bg-zinc-800 p-3 rounded-lg border border-zinc-600 text-zinc-300 w-48 text-center">
+                    Graph Data Written
+                </div>
+            </div>
+            <div className="flex items-center gap-4 opacity-80">
+                <div className="bg-amber-500/20 p-3 rounded-lg border border-amber-500/50 text-amber-500 w-48 text-center font-bold">
+                    Background Worker
+                </div>
+                <div className="flex-1 h-px bg-amber-500/50 relative border-dashed border-b">
+                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-zinc-900 text-xs text-amber-500 px-2">Async: Hydrate Metadata</span>
+                </div>
+                <div className="flex flex-col gap-2 w-48">
+                    <div className="bg-zinc-800 p-2 rounded border border-zinc-700 text-xs text-center text-zinc-400">Hydrate Node 1 ⏳</div>
+                    <div className="bg-zinc-800 p-2 rounded border border-zinc-700 text-xs text-center text-zinc-400">Hydrate Node 2 ⏳</div>
+                </div>
+            </div>
+        </div>
+    </div>
+);
+
+const SeedHoistingVisualizer: React.FC = () => (
+    <div className="bg-zinc-900/30 p-8 rounded-xl border border-zinc-700/50 mb-12 flex flex-col md:flex-row gap-8">
+        <div className="flex-1">
+            <h3 className="text-zinc-200 font-medium text-lg mb-6 uppercase tracking-wider text-center">Defensive Alias Matching</h3>
+            <div className="flex flex-col items-center gap-4">
+                <div className="flex gap-2">
+                    <span className="bg-red-500/10 text-red-400 border border-red-500/30 px-3 py-1 rounded text-xs">spaced-united-states</span>
+                    <span className="bg-red-500/10 text-red-400 border border-red-500/30 px-3 py-1 rounded text-xs">spaced-uk</span>
+                </div>
+                <span className="material-symbols-outlined text-zinc-500">arrow_downward</span>
+                <div className="bg-zinc-800 px-4 py-2 border border-zinc-600 rounded font-mono text-zinc-300 text-sm">
+                    isNodeInSeedList()
+                </div>
+                <span className="material-symbols-outlined text-zinc-500">arrow_downward</span>
+                <span className="bg-green-500/10 text-green-400 border border-green-500/30 px-4 py-2 rounded font-bold">spaced</span>
+            </div>
+        </div>
+        <div className="w-px bg-zinc-700/50 hidden md:block"></div>
+        <div className="flex-1">
+            <h3 className="text-zinc-200 font-medium text-lg mb-6 uppercase tracking-wider text-center">Strict Seed Hoisting</h3>
+            <div className="flex flex-col gap-2">
+                <div className="bg-primary/20 border border-primary/50 text-primary p-3 rounded flex items-center justify-between shadow-[0_0_10px_rgba(168,85,247,0.3)]">
+                    <span className="font-bold">0. spaced (Seed)</span>
+                    <span className="material-symbols-outlined text-sm">lock</span>
+                </div>
+                <div className="bg-zinc-800 border border-zinc-700 text-zinc-400 p-3 rounded text-sm">1. buggin (AI Rec)</div>
+                <div className="bg-zinc-800 border border-zinc-700 text-zinc-400 p-3 rounded text-sm">2. turnstile (AI Rec)</div>
+            </div>
+        </div>
+    </div>
+);
+
+const GatekeeperFlowchart: React.FC = () => (
+    <div className="bg-zinc-900/30 p-8 rounded-xl border border-zinc-700/50 mb-12">
+        <h3 className="text-zinc-200 font-medium text-lg mb-6 uppercase tracking-wider text-center">Fail-Fast iTunes Image Gatekeeper</h3>
+        <div className="flex flex-col items-center gap-4">
+            <div className="bg-zinc-800 px-6 py-2 rounded-full border border-zinc-600 text-zinc-200">Image Requested</div>
+            <span className="material-symbols-outlined text-zinc-500">arrow_downward</span>
+            
+            <div className="flex flex-col md:flex-row gap-12 items-start w-full justify-center">
+                <div className="flex flex-col items-center gap-3 w-48">
+                    <div className="bg-blue-500/10 border border-blue-500/30 text-blue-400 p-3 rounded w-full text-center text-sm font-bold">
+                        Primary: iTunes API
+                    </div>
+                    <span className="material-symbols-outlined text-green-500">check_circle</span>
+                    <div className="bg-green-500/10 border border-green-500/30 text-green-400 p-2 rounded w-full text-center text-xs">
+                        Valid Artwork? Lock & Cache
+                    </div>
+                </div>
+
+                <div className="flex flex-col items-center gap-3 w-48">
+                    <div className="bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 p-3 rounded w-full text-center text-sm font-bold">
+                        Secondary: Google Search
+                    </div>
+                    <span className="material-symbols-outlined text-red-500">cancel</span>
+                    <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-2 rounded w-full text-center text-xs">
+                        404 / Invalid? Discard to Null
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+);
+
 export const EnginePage: React.FC<SourcePageProps> = ({ 
     onNavigate, 
     isActive, 
@@ -1569,7 +1664,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                     <section id="graph-intelligence">
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">Graph Intelligence</h2>
                         <DiscoveryFlowDiagram />
-                        <CodeBlock title="State Maintenance & lifecycle" content={GRAPH_INTELLIGENCE_DOCUMENTATION} />
+                        <SeedHoistingVisualizer />
                     </section>
 
                     {/* ── VISUALIZATION ENGINE ── */}
@@ -1594,7 +1689,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                     {/* ── SYSTEM RESILIENCE ── */}
                     <section id="system-resilience">
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">System Resilience</h2>
-                        <CodeBlock title="Network Logic & Selection strategy" content={RESILIENCE_DOCUMENTATION} />
+                        <GatekeeperFlowchart />
                         
                         <div className="mb-12">
                             <h3 className="text-zinc-200 font-medium text-lg mb-6 uppercase tracking-wider">Error Strategy Matrix</h3>
@@ -1730,7 +1825,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                     {/* ── DATA SYNTHESIS & PERSISTENCE ── */}
                     <section id="data-synthesis">
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">Data Synthesis & Persistence</h2>
-                        <CodeBlock title="Atomicity, API Gateway & Sanitization Specification" content={DATA_SYNTHESIS_PERSISTENCE_DOCUMENTATION} />
+                        <AsyncHydrationDiagram />
                         <CodeBlock title="Architectural Separation: Artists vs. Labels & Simultaneous Pre-Caching" content={ARCHITECTURAL_SEPARATION_DOCUMENTATION} />
                         <CodeBlock title="AI Parsing Resilience & Anti-Leakage Defense" content={AI_PARSING_RESILIENCE_DOCUMENTATION} />
                     </section>
