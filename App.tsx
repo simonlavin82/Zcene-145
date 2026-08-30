@@ -6134,20 +6134,42 @@ const App: React.FC = () => {
               const shareSnap = await getDoc(shareRef);
               if (shareSnap.exists()) {
                 const data = shareSnap.data();
-                const g = normalizeGraphData(typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData);
-                g.links = g.links.map((l: any) => ({
-                  ...l,
-                  source: typeof l.source === 'object' ? l.source.id : l.source,
-                  target: typeof l.target === 'object' ? l.target.id : l.target
-                }));
+                const parsedGraphData = typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData;
+                
+                // Strip D3 physics state from nodes to prevent NaN cascades
+                if (parsedGraphData && Array.isArray(parsedGraphData.nodes)) {
+                  parsedGraphData.nodes = parsedGraphData.nodes.map((n: any) => {
+                    const { index, vx, vy, ...rest } = n;
+                    // Delete x and y if invalid so D3 freshly initializes them
+                    if (rest.x == null || isNaN(rest.x)) delete rest.x;
+                    if (rest.y == null || isNaN(rest.y)) delete rest.y;
+                    return rest;
+                  });
+                }
+                
+                // Strip D3 object references from links
+                if (parsedGraphData && Array.isArray(parsedGraphData.links)) {
+                  parsedGraphData.links = parsedGraphData.links.map((l: any) => ({
+                    ...l,
+                    source: typeof l.source === 'object' ? l.source.id : l.source,
+                    target: typeof l.target === 'object' ? l.target.id : l.target
+                  }));
+                }
 
-                // Re-apply saved canvas positions
+                const g = normalizeGraphData(parsedGraphData);
+
+                // Re-apply saved canvas positions securely
                 if (data.canvasLayout) {
                   try {
                     const positions: Array<{ nodeId: string; x?: number; y?: number; fx?: number | null; fy?: number | null }> = typeof data.canvasLayout === 'string' ? JSON.parse(data.canvasLayout) : data.canvasLayout;
                     positions.forEach(ref => {
                       const node = g.nodes.find((n: any) => n.id === ref.nodeId);
-                      if (node) { node.x = ref.x; node.y = ref.y; node.fx = ref.fx ?? null; node.fy = ref.fy ?? null; }
+                      if (node) { 
+                        if (ref.x != null && !isNaN(ref.x)) node.x = ref.x; 
+                        if (ref.y != null && !isNaN(ref.y)) node.y = ref.y; 
+                        node.fx = ref.fx ?? null; 
+                        node.fy = ref.fy ?? null; 
+                      }
                     });
                   } catch (e) { console.warn('[Router] canvasLayout parse failed:', e); }
                 }
