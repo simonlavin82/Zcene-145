@@ -1012,6 +1012,7 @@ const App: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const currentProjectIdRef = useRef<string | null>(null);
+  const [isViewingShare, setIsViewingShare] = useState<boolean>(false);
   const [currentProjectOwnerId, setCurrentProjectOwnerId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string>('');
   const [projectStatus, setProjectStatus] = useState<string | null>(null);
@@ -1551,10 +1552,11 @@ const App: React.FC = () => {
   useEffect(() => { currentCacheKeyRef.current = currentCacheKey; }, [currentCacheKey]);
 
   const isGuest = useMemo(() => {
+    if (isViewingShare) return true;
     if (!currentProjectId) return false;
     if (!user) return true;
     return currentProjectOwnerId !== null && currentProjectOwnerId !== user.uid;
-  }, [user, currentProjectId, currentProjectOwnerId]);
+  }, [user, currentProjectId, currentProjectOwnerId, isViewingShare]);
 
   const [isSmallScreen, setIsSmallScreen] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -6050,6 +6052,7 @@ const App: React.FC = () => {
             if (currentViewRef.current !== View.Graph || currentProjectIdRef.current !== projectId) {
               if (currentProjectIdRef.current !== projectId) {
                 isProjectLoadingRef.current = true;
+                setIsViewingShare(false);
                 setGraphData({ nodes: [], links: [] });
                 setActiveNodeIds([]);
                 setDetailsCache(new Map());
@@ -6093,6 +6096,7 @@ const App: React.FC = () => {
             }
             setCurrentProjectId(null);
             setCurrentProjectOwnerId(null);
+            setIsViewingShare(true);
             setGraphData({ nodes: [], links: [] });
             setActiveNodeIds([]);
             setDetailsCache(new Map());
@@ -6119,8 +6123,12 @@ const App: React.FC = () => {
 
                 setGraphData(g);
                 setSeedArtists(data.seedArtists);
-                if (data.detailsCache) setDetailsCache(expandDetailsCacheMap(data.detailsCache));
-                await batchHydrateDetailsCache(g.nodes, g.links);
+                if (data.detailsCache) {
+                  const expandedCache = expandDetailsCacheMap(data.detailsCache);
+                  setDetailsCache(expandedCache);
+                  detailsCacheRef.current = expandedCache;
+                }
+                
                 if (data.activeNodes && Array.isArray(data.activeNodes)) {
                   setActiveNodeIds(data.activeNodes);
                 }
@@ -6600,7 +6608,7 @@ const App: React.FC = () => {
   }, [currentProjectId]);
 
   useEffect(() => {
-    if (isLoading || isProjectLoadingRef.current) return;
+    if (isLoading || isProjectLoadingRef.current || isViewingShare) return;
     const fetch = async () => {
       // 1. Block Automated Background Fetches: ✦
       // ONLY process the actively selected node to prevent neighbor chain-fetching
@@ -7211,7 +7219,7 @@ const App: React.FC = () => {
       } finally { isFetchingDetailsRef.current = false; }
     };
     fetch();
-  }, [activeNodeIds, activeNodes, detailsCache, graphData, seedArtists, selectedNode, urlOriginHint, humanizeError, user, isLoading, incrementDeepCutsOpenedCount, triggerBackgroundRevalidation, loadingNodeIds]);
+  }, [activeNodeIds, activeNodes, detailsCache, graphData, seedArtists, selectedNode, urlOriginHint, humanizeError, user, isLoading, incrementDeepCutsOpenedCount, triggerBackgroundRevalidation, loadingNodeIds, isViewingShare]);
 
   const handleViewChange = useCallback((newView: View) => {
     if (newView === View.Graph && !graphData) setGraphData({ nodes: [], links: [] });
