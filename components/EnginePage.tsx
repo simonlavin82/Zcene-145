@@ -1250,8 +1250,12 @@ const AsyncHydrationDiagram: React.FC = () => (
         <h3 className="text-zinc-200 font-medium text-lg mb-6 uppercase tracking-wider">Async Hydration Decoupling</h3>
         <div className="flex flex-col gap-6">
             <div className="flex items-center gap-4">
-                <div className="bg-primary/20 p-3 rounded-lg border border-primary/50 text-primary w-48 text-center font-bold shadow-[0_0_15px_rgba(168,85,247,0.4)]">
+                <div className="bg-primary/20 p-3 rounded-lg border border-primary/50 text-primary w-64 text-center font-bold shadow-[0_0_15px_rgba(168,85,247,0.4)]">
                     HTTP Fast-Track
+                    <div className="text-[10px] font-normal mt-2 opacity-80">
+                        Origin Validation: Gemini 3.5 Flash<br/>
+                        Topology Creation: Gemini 3.1 Pro
+                    </div>
                 </div>
                 <div className="flex-1 h-px bg-primary/50 relative">
                     <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-zinc-900 text-xs text-primary px-2">Sync: Render Spiderweb</span>
@@ -1261,8 +1265,12 @@ const AsyncHydrationDiagram: React.FC = () => (
                 </div>
             </div>
             <div className="flex items-center gap-4 opacity-80">
-                <div className="bg-amber-500/20 p-3 rounded-lg border border-amber-500/50 text-amber-500 w-48 text-center font-bold">
+                <div className="bg-amber-500/20 p-3 rounded-lg border border-amber-500/50 text-amber-500 w-64 text-center font-bold">
                     Background Worker
+                    <div className="text-[10px] font-normal mt-2 opacity-80">
+                        Node Positioning: Gemini 3.1 Pro<br/>
+                        Root Breakdowns: Gemini 3.1 Pro
+                    </div>
                 </div>
                 <div className="flex-1 h-px bg-amber-500/50 relative border-dashed border-b">
                     <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-zinc-900 text-xs text-amber-500 px-2">Async: Hydrate Metadata</span>
