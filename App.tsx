@@ -2170,16 +2170,17 @@ const App: React.FC = () => {
       !isStaleDetails &&
       !cachedDetails._isSentinel
     );
-    if (isFinalEntryComplete) {
+    if (isFinalEntryComplete || isGuest) {
+       const fallbackSummary = cachedDetails?.summary || "";
        const hydratedNode = {
           ...node,
-          bio: cachedDetails!.summary,
-          summary: cachedDetails!.summary,
-          genre: cachedDetails!.details?.genre || "",
-          origin: cachedDetails!.details?.origin || "",
-          founded: cachedDetails!.details?.founded || "",
-          name: cachedDetails!.details?.artist || node.id,
-          imageUrl: cachedDetails!.imageUrl || (cachedDetails as any).image || (node as any).imageUrl || "",
+          bio: fallbackSummary,
+          summary: fallbackSummary,
+          genre: cachedDetails?.details?.genre || "",
+          origin: cachedDetails?.details?.origin || "",
+          founded: cachedDetails?.details?.founded || "",
+          name: cachedDetails?.details?.artist || node.id,
+          imageUrl: cachedDetails?.imageUrl || (cachedDetails as any)?.image || (node as any).imageUrl || "",
           isLibrary: true
        };
        
