@@ -6157,6 +6157,14 @@ const App: React.FC = () => {
                   detailsCacheRef.current = expandedCache;
                 }
                 
+                // ── GUEST HYDRATION FALLBACK ──
+                // Guarantee that guests fetch live bios if the author's shared detailsCache was empty
+                try {
+                  await batchHydrateDetailsCache(g.nodes, g.links);
+                } catch (err) {
+                  console.warn("Guest batch hydration failed:", err);
+                }
+                
                 if (data.activeNodes && Array.isArray(data.activeNodes)) {
                   let resolvedActiveNodes = data.activeNodes;
                   const availableEntities = g.nodes.map((n: any) => n.id);
