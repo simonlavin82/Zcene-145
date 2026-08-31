@@ -1,23 +1,11 @@
 const admin = require('firebase-admin');
-const { getFirestore } = require('firebase-admin/firestore');
-const fs = require('fs');
-
-if (fs.existsSync('firebase-service-account.json')) {
-  process.env.GOOGLE_APPLICATION_CREDENTIALS = 'firebase-service-account.json';
-}
-admin.initializeApp();
-const db = getFirestore();
-
-async function main() {
-  const snap = await db.collection('curationJobs').get();
-  console.log(`Total documents in /curationJobs: ${snap.size}`);
-  for (const doc of snap.docs) {
+const config = require('../firebase-service-account.json');
+admin.initializeApp({ credential: admin.credential.cert(config) });
+const db = admin.firestore();
+db.collection('curationJobs').orderBy('createdAt', 'desc').limit(5).get().then(snap => {
+  if (snap.empty) { console.log("No jobs found"); return; }
+  snap.forEach(doc => {
     const data = doc.data();
-    console.log(`- Job ID: ${doc.id} | Status: ${data.status} | Created: ${data.createdAt ? data.createdAt.toDate().toISOString() : 'N/A'}`);
-  }
-}
-
-main().then(() => process.exit(0)).catch(e => {
-  console.error(e);
-  process.exit(1);
-});
+    console.log(`Job: ${doc.id} | createdAt: ${data.createdAt?.toDate().toISOString()} | status: ${data.status}`);
+  });
+}).catch(console.error);
