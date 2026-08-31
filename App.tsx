@@ -1716,10 +1716,42 @@ const App: React.FC = () => {
       const seedList = seedArtists.split('::').map((a: string) => a.trim()).filter(Boolean);
       const normalizedIds = seedList.map((name: string) => normalizeArtistId(name));
 
+      // Phase 2A (share path): Build canonical seed-first activeNodes order for the share doc.
+      // Mirrors the same hoisting applied by the background worker (Phase 2B) so Guest Mode
+      // always receives resolvedActiveNodes[0] === seed artist.
+      const shareSeedNorms = seedList.map((s: string) => normalizeArtistId(s));
+      const hoistedShareActiveNodes: string[] = [];
+      activeNodes.forEach(n => { if (isNodeInSeedList(n.id, shareSeedNorms)) hoistedShareActiveNodes.push(n.id); });
+      activeNodes.forEach(n => { if (!isNodeInSeedList(n.id, shareSeedNorms)) hoistedShareActiveNodes.push(n.id); });
+
+      // Phase 3: Resolve seed artist image URL for deterministic Open Graph routing.
+      // Denormalising onto the share doc eliminates the server's secondary Firestore
+      // round-trip to /artists/{id}, which can miss on cold-start or unhydrated Direct Hit seeds.
+      const primaryShareSeedNorm = shareSeedNorms[0] || '';
+      const shareImageDetails = primaryShareSeedNorm
+        ? (detailsCache.get(primaryShareSeedNorm) || detailsCache.get((seedList[0] || '').toLowerCase()))
+        : null;
+      const resolvedSeedImageUrl: string = (shareImageDetails as any)?.imageUrl || '';
+
+      // Phase 1: Build a coordinate-clean graphData for the share payload.
+      // The in-memory graphData React state carries runtime D3 fields (fx:null, fy:null)
+      // injected by the onSnapshot handler. Strip them at write time so Guest Mode always
+      // receives a clean topology that D3 can lay out organically.
+      const shareCleanNodes = (graphData!.nodes || []).map((n: any) => {
+        const { x, y, vx, vy, fx, fy, index, ...cleanNode } = n as any;
+        return cleanNode;
+      });
+      const shareCleanLinks = (graphData!.links || []).map((l: any) => ({
+        ...l,
+        source: typeof l.source === 'object' ? l.source.id : l.source,
+        target: typeof l.target === 'object' ? l.target.id : l.target,
+      }));
+      const shareCleanGraphData = { ...graphData!, nodes: shareCleanNodes, links: shareCleanLinks };
+
       const sharePayload: Record<string, any> = {
         name: projectName || (seedArtists ? seedArtists.split('::')[0] : 'Shared Zcene'),
         seedArtists,
-        activeNodes: activeNodes.map(n => n.id),
+        activeNodes: hoistedShareActiveNodes,  // Phase 2A: seed-first ordering
         artistIds: artistEntityIds.length > 0 ? artistEntityIds : normalizedIds,
         labelIds: labelEntityIds,
         chatHistories: JSON.stringify(Array.from(chatHistories.entries())),
@@ -1733,16 +1765,21 @@ const App: React.FC = () => {
         updatedAt: serverTimestamp(),
       };
 
-      // Ensure discovery filters are saved accurately 
+      // Phase 3: Append seedImageUrl if resolved — enables O(1) OG image lookup in server.js
+      if (resolvedSeedImageUrl) {
+        sharePayload.seedImageUrl = resolvedSeedImageUrl;
+      }
+
+      // Ensure discovery filters are saved accurately
       const currentFilters = discoveryFiltersRef.current;
       sharePayload.discoveryFilters = currentFilters;
 
       if (currentCacheKey) {
         sharePayload.cacheKey = currentCacheKey;
-        sharePayload.graphData = JSON.stringify(graphData);
+        sharePayload.graphData = JSON.stringify(shareCleanGraphData);  // Phase 1: coord-stripped
         sharePayload.detailsCache = JSON.stringify(Array.from(detailsCache.entries()));
       } else {
-        sharePayload.graphData = JSON.stringify(graphData);
+        sharePayload.graphData = JSON.stringify(shareCleanGraphData);  // Phase 1: coord-stripped
         sharePayload.detailsCache = JSON.stringify(Array.from(detailsCache.entries()));
       }
 
@@ -1786,16 +1823,59 @@ const App: React.FC = () => {
   const handleDashboardShareProject = useCallback(async (project: Project) => {
     if (!user) return;
     try {
+      // Phase 3 (dashboard share path): Resolve seedImageUrl from the project's detailsCache
+      // so the Cloud Run OG proxy can serve album art without a secondary Firestore lookup.
+      let dashboardSeedImageUrl = '';
+      if (project.seedArtists) {
+        const dashboardSeeds = project.seedArtists.split('::').map((s: string) => s.trim()).filter(Boolean);
+        if (dashboardSeeds.length > 0) {
+          const primarySeedNorm = normalizeArtistId(dashboardSeeds[0]);
+          // Try to resolve from the project's own detailsCache blob
+          if (project.detailsCache) {
+            try {
+              const dashCacheMap = expandDetailsCacheMap(project.detailsCache);
+              const seedEntry = dashCacheMap.get(primarySeedNorm) || dashCacheMap.get(dashboardSeeds[0].toLowerCase());
+              dashboardSeedImageUrl = (seedEntry as any)?.imageUrl || '';
+            } catch (e) {
+              console.warn('[Dashboard Share] Failed to parse project detailsCache for seedImageUrl:', e);
+            }
+          }
+        }
+      }
+
+      // Phase 1 (dashboard share path): Strip D3 runtime coordinates from graphData.
+      let dashboardCleanGraphData: any = project.graphData;
+      if (project.graphData) {
+        try {
+          const parsedDashGraph = typeof project.graphData === 'string' ? JSON.parse(project.graphData) : project.graphData;
+          if (parsedDashGraph && Array.isArray(parsedDashGraph.nodes)) {
+            parsedDashGraph.nodes = parsedDashGraph.nodes.map((n: any) => {
+              const { x, y, vx, vy, fx, fy, index, ...cleanN } = n;
+              return cleanN;
+            });
+          }
+          dashboardCleanGraphData = JSON.stringify(parsedDashGraph);
+        } catch (e) {
+          console.warn('[Dashboard Share] graphData parse failed during coord strip:', e);
+        }
+      }
+
       const sharePayload: Record<string, any> = {
         ...project,
+        graphData: dashboardCleanGraphData,  // Phase 1: coord-stripped
         authorId: user.uid,
         createdAt: serverTimestamp(),
       };
       delete sharePayload.id; // Exclude the local ID
-      
+
+      // Phase 3: Append seedImageUrl if resolved
+      if (dashboardSeedImageUrl) {
+        sharePayload.seedImageUrl = dashboardSeedImageUrl;
+      }
+
       const sharedRef = await addDoc(collection(db, 'sharedZcenes'), sharePayload);
       const shareUrl = `${window.location.origin}/z/${sharedRef.id}`;
-      
+
       setActiveShareUrl(shareUrl);
       setIsShareModalOpen(true);
     } catch (err) {
@@ -2591,6 +2671,18 @@ const App: React.FC = () => {
 
   const handleSaveToDashboard = useCallback(async () => {
     if (!user) {
+      // Phase 4A — Auth Handoff Preserver:
+      // Google Sign-In may perform a full-page redirect, destroying all React in-memory state
+      // (including pendingAuthAction). Stash the shareId in sessionStorage so the post-auth
+      // effect can restore the clone intent even if the redirect wipes the component tree.
+      if (isViewingShare) {
+        const currentShareId = window.location.pathname.startsWith('/z/')
+          ? window.location.pathname.substring(3).split('?')[0]
+          : null;
+        if (currentShareId) {
+          try { sessionStorage.setItem('zcene_pending_share_save', currentShareId); } catch (e) {}
+        }
+      }
       setPendingAuthAction({ type: 'saveToDashboard', payload: null });
       handleLogin();
       return;
@@ -2610,10 +2702,19 @@ const App: React.FC = () => {
 
     const path = `users/${user.uid}/projects/${newId}`;
     try {
+      // Phase 2A — Canonical Seed Pinning:
+      // Always hoist seed artist(s) to activeNodes[0..k] before persisting.
+      // This guarantees that the onSnapshot handler's auto-select (L5387) opens the
+      // Deep Cut panel on the seed artist, not on a scrambled non-seed node.
+      const saveSeedNorms = seedArtists.split('::').map((a: string) => normalizeArtistId(a.trim())).filter(Boolean);
+      const hoistedSaveActiveNodes: string[] = [];
+      activeNodes.forEach(n => { if (isNodeInSeedList(n.id, saveSeedNorms)) hoistedSaveActiveNodes.push(n.id); });
+      activeNodes.forEach(n => { if (!isNodeInSeedList(n.id, saveSeedNorms)) hoistedSaveActiveNodes.push(n.id); });
+
       const docPayload: Record<string, any> = {
         name: projectName || (seedArtists ? seedArtists.split('::')[0] : 'Saved Zcene'),
         seedArtists,
-        activeNodes: activeNodes.map(n => n.id),
+        activeNodes: hoistedSaveActiveNodes,  // Phase 2A: seed-first ordering
         chatHistories: JSON.stringify(Array.from(chatHistories.entries())),
         discoveryFilters: JSON.stringify(discoveryFilters),
         lastViewedStackCount,
@@ -2647,6 +2748,8 @@ const App: React.FC = () => {
       }
 
       await setDoc(newDocRef, docPayload);
+      // Phase 4A: Cleanup — remove stash once the save has committed successfully
+      try { sessionStorage.removeItem('zcene_pending_share_save'); } catch (e) {}
       showToast('Zcene saved to your dashboard!');
       navigate(`/p/${newId}`);
     } catch (err) {
@@ -2654,7 +2757,7 @@ const App: React.FC = () => {
     } finally {
       setIsCreatingProject(false);
     }
-  }, [user, graphData, seedArtists, projectName, activeNodes, detailsCache, chatHistories, discoveryFilters, lastViewedStackCount, currentCacheKey, handleLogin, showToast, navigate]);
+  }, [user, graphData, seedArtists, projectName, activeNodes, detailsCache, chatHistories, discoveryFilters, lastViewedStackCount, currentCacheKey, handleLogin, showToast, navigate, isViewingShare]);
 
   const handleDashboardRestartWalkthrough = useCallback(async () => {
     if (user) {
@@ -4911,6 +5014,26 @@ const App: React.FC = () => {
       }
     }
   }, [user, isAuthInitialized, pendingAuthAction, handleToggleStack, handleGenerateGraph, handleSaveToDashboard]);
+
+  // Phase 4B — Auth Handoff Restore:
+  // After a successful Google Sign-In (which may have been a full-page redirect), check
+  // sessionStorage for a stashed shareId from Phase 4A. If found, the user arrived at
+  // this effect having been redirected from a /z/:id guest view. We must ensure
+  // isViewingShare is still true (router will have re-mounted on /z/:id) before
+  // handleSaveToDashboard fires — which it will via the pendingAuthAction above.
+  // This effect only needs to clean up any orphaned stash if the normal path above
+  // didn't execute (e.g. user completed auth but navigated away from the share URL).
+  useEffect(() => {
+    if (isAuthInitialized && user) {
+      const stagedShareId = sessionStorage.getItem('zcene_pending_share_save');
+      if (stagedShareId && !isViewingShare) {
+        // The user authenticated but is no longer on the share page.
+        // Clean up the orphaned stash to avoid triggering a stale save on future logins.
+        console.log(`[Phase 4B] Clearing orphaned share stash for: ${stagedShareId}`);
+        try { sessionStorage.removeItem('zcene_pending_share_save'); } catch (e) {}
+      }
+    }
+  }, [isAuthInitialized, user, isViewingShare]);
 
   const hasInitialRedirectOccurredRef = useRef(false);
 

@@ -992,13 +992,45 @@ export const processCurationJob = onDocumentCreated({
         ? graphObj.nodes.filter((n: any) => n.type === 'label').map((n: any) => normalizeArtistId(n.id))
         : [];
 
+      // Phase 2B — Canonical Seed Pinning: build a seed-first ordered activeNodes array
+      // from the completed graph topology. The worker previously never wrote activeNodes,
+      // leaving the project doc with a stale frontend-written array (seed could be at any
+      // index). This write makes the worker the authoritative source of truth for ordering.
+      const seedNormList = (inputPayload.artists || '')
+        .split('::')
+        .map((a: string) => normalizeArtistId(a.trim()))
+        .filter(Boolean);
+
+      const isSeedNode = (nodeId: string): boolean => {
+        const normId = normalizeArtistId(nodeId);
+        return seedNormList.some(
+          (s: string) => normId === s || normId.startsWith(s + '-') || s.startsWith(normId + '-')
+        );
+      };
+
+      const hoistedActiveNodes: string[] = [];
+      // 1. Seeds first — in the order they appear in the graph topology
+      if (graphObj.nodes) {
+        graphObj.nodes.forEach((n: any) => {
+          if (isSeedNode(n.id)) hoistedActiveNodes.push(n.id);
+        });
+        // 2. All remaining non-seed nodes
+        graphObj.nodes.forEach((n: any) => {
+          if (!isSeedNode(n.id) && !hoistedActiveNodes.includes(n.id)) {
+            hoistedActiveNodes.push(n.id);
+          }
+        });
+      }
+      console.log(`[Curation Backend] [Phase 2B] Hoisted activeNodes: seed at [0]="${hoistedActiveNodes[0]}", total=${hoistedActiveNodes.length}`);
+
       await updateProjectStatus(jobData.userId, inputPayload.projectId, {
         status: "completed",
         graphData: JSON.stringify(result.graphData),
         artistIds: artistEntityIds,
         labelIds: labelEntityIds,
         activeJobId: null,
-        detailsCache: result.detailsCache
+        detailsCache: result.detailsCache,
+        activeNodes: hoistedActiveNodes  // Phase 2B: canonical seed-first ordering
       });
     }
 

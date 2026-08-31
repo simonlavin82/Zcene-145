@@ -1108,11 +1108,19 @@ app.use(async (req, res) => {
             ? `Explore this Zcene seeded by ${cleanSeeds.join(', ')}. Own music discovery.`
             : `Explore customised music maps and discover underground artists on Zcene.`;
 
-          if (seedList.length > 0) {
+          // Phase 3: Fast path — share document carries its own pre-resolved seed image.
+          // Written by handleShareZcene / handleDashboardShareProject at creation time,
+          // eliminating a secondary Firestore round-trip that could miss on cold-start
+          // or for unhydrated Direct Hit seeds.
+          if (projectData.seedImageUrl) {
+            imageUrl = projectData.seedImageUrl;
+            console.log(`[OG Injection] Using denormalised seedImageUrl for ${projectId}`);
+          } else if (seedList.length > 0) {
+            // Legacy fallback: look up artist image from the global artists collection.
+            // Retained for shares created before Phase 3 landed.
             const primarySeedId = normalizeArtistId(seedList[0]);
             
             try {
-              // Try to fetch primary seed artist's artwork
               const artistSnap = await db.collection('artists').doc(primarySeedId).get();
               if (artistSnap.exists) {
                 const artistData = artistSnap.data();
@@ -1120,6 +1128,7 @@ app.use(async (req, res) => {
                   const parsedDetails = typeof artistData.detailsCache === 'string' ? JSON.parse(artistData.detailsCache) : artistData.detailsCache;
                   if (parsedDetails.imageUrl) {
                     imageUrl = parsedDetails.imageUrl;
+                    console.log(`[OG Injection] Legacy fallback: resolved image from artists/${primarySeedId}`);
                   }
                 }
               }
