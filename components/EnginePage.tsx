@@ -518,6 +518,25 @@ designed to minimize friction for new users while rewarding existing authors.
    - Ownership Transfer: The user becomes the full 'Author' of the clone, 
      instantly unlocking all discovery engine features (Spiderweb expansion, 
      Consult AI, and project renaming).
+
+4. COORDINATE AMNESIA ("Fresh Slate" Data Cloning):
+   When a user shares a project, we capture the raw graphData but aggressively 
+   strip all D3 physics coordinates (x, y, fx, fy, vx, vy) from the payload. 
+   This is a deliberate, load-bearing feature. By enforcing spatial amnesia, 
+   the guest's D3 engine natively detects the nodes as "new" and organically 
+   recalculates the entire layout from scratch. This completely prevents viewport 
+   scaling crashes and NaN cascades. 
+   > RULE: Never attempt to extract, parse, or save live D3 layout coordinates. 
+   > The share payload must be a pure, location-less data clone.
+
+5. DYNAMIC GUEST HYDRATION:
+   The Guest routing block (/z/:id) bypasses standard API generation (curation 
+   pipelines), as it receives a pre-compiled JSON payload. However, it explicitly 
+   and forcefully runs 'batchHydrateDetailsCache(g.nodes)'. 
+   > RULE: This fallback is mandatory. It guarantees that if a project is shared 
+   > with an empty local cache (e.g., if the author shared the project straight 
+   > from their Dashboard without opening it), the guest browser will dynamically 
+   > fetch any missing artist bios from Firestore before rendering the UI.
 `;
 
 const DATA_SYNTHESIS_PERSISTENCE_DOCUMENTATION = `
