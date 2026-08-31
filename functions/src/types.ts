@@ -174,6 +174,7 @@ export interface Project {
   authorId?: string;
   status?: string;
   activeJobId?: string | null;
+  coverImage?: string;
   createdAt?: any;
   updatedAt?: any;
 }
