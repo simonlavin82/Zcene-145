@@ -3387,16 +3387,21 @@ const App: React.FC = () => {
                   const seeds = artists.split('::').map(a => normalizeArtistId(a.trim()));
                   const hoistedActiveNodes: string[] = [];
                   
-                  // 1. Identify canonical seed nodes from the graph and hoist them
+                  // 1. Hoist the exact primary node first if resolved
+                  if (primaryNode) {
+                    hoistedActiveNodes.push(primaryNode.id);
+                  }
+                  
+                  // 2. Identify any other canonical seed nodes from the graph and hoist them
                   normalizedGraph.nodes.forEach((n: any) => {
-                    if (isNodeInSeedList(n.id, seeds)) {
+                    if (isNodeInSeedList(n.id, seeds) && n.id !== primaryNode?.id) {
                       hoistedActiveNodes.push(n.id);
                     }
                   });
                   
-                  // 2. Append all remaining non-seed nodes
+                  // 3. Append all remaining non-seed nodes
                   normalizedGraph.nodes.forEach((n: any) => {
-                    if (!isNodeInSeedList(n.id, seeds)) {
+                    if (!hoistedActiveNodes.includes(n.id)) {
                       hoistedActiveNodes.push(n.id);
                     }
                   });

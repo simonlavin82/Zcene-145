@@ -51,7 +51,7 @@ export const SeedArtistImages: React.FC<SeedArtistImagesProps> = ({
       if (internalCacheMap) {
         let entry = internalCacheMap.get(id);
         if (!entry) {
-          const fallbackKey = Array.from(internalCacheMap.keys()).find(k => k.startsWith(`${id}-`));
+          const fallbackKey = Array.from(internalCacheMap.keys()).find(k => (k as string).startsWith(`${id}-`));
           if (fallbackKey) entry = internalCacheMap.get(fallbackKey);
         }
         if (entry) {
@@ -78,7 +78,7 @@ export const SeedArtistImages: React.FC<SeedArtistImagesProps> = ({
         if (internalCacheMap) {
           let entry = internalCacheMap.get(normId);
           if (!entry) {
-            const fallbackKey = Array.from(internalCacheMap.keys()).find(k => k.startsWith(`${normId}-`));
+            const fallbackKey = Array.from(internalCacheMap.keys()).find(k => (k as string).startsWith(`${normId}-`));
             if (fallbackKey) entry = internalCacheMap.get(fallbackKey);
           }
           if (entry) {
