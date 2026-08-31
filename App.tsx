@@ -1707,11 +1707,6 @@ const App: React.FC = () => {
     setIsSharing(true);
     const path = 'sharedZcenes';
     try {
-      // Build lightweight canvas layout — artist and label positions
-      const canvasLayout = graphData!.nodes
-        .filter(n => n.type === 'artist' || n.type === 'label')
-        .map(n => ({ nodeId: n.id, x: n.x, y: n.y, fx: n.fx ?? null, fy: n.fy ?? null }));
-
       const artistEntityIds = graphData!.nodes
         .filter((n: any) => n.type === 'artist')
         .map((n: any) => normalizeArtistId(n.id));
@@ -1738,21 +1733,18 @@ const App: React.FC = () => {
         updatedAt: serverTimestamp(),
       };
 
+      // Ensure discovery filters are saved accurately 
+      const currentFilters = discoveryFiltersRef.current;
+      sharePayload.discoveryFilters = currentFilters;
+
       if (currentCacheKey) {
-        // New format: store cacheKey + canvasLayout for fast hydration from artists cache.
-        // Also include the full graphData as an inline fallback — guests can render the canvas
-        // immediately even if the artists cache document is unavailable.
         sharePayload.cacheKey = currentCacheKey;
-        sharePayload.canvasLayout = JSON.stringify(canvasLayout);
         sharePayload.graphData = JSON.stringify(graphData);
         sharePayload.detailsCache = JSON.stringify(Array.from(detailsCache.entries()));
       } else {
-        // Fallback: no cache key, write full blobs directly
-        sharePayload.canvasLayout = JSON.stringify(canvasLayout);
         sharePayload.graphData = JSON.stringify(graphData);
         sharePayload.detailsCache = JSON.stringify(Array.from(detailsCache.entries()));
       }
-
 
       const docRef = await addDoc(collection(db, path), sharePayload);
 
@@ -6136,13 +6128,9 @@ const App: React.FC = () => {
                 const data = shareSnap.data();
                 const parsedGraphData = typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData;
                 
-                // Strip D3 physics state from nodes to prevent NaN cascades
                 if (parsedGraphData && Array.isArray(parsedGraphData.nodes)) {
                   parsedGraphData.nodes = parsedGraphData.nodes.map((n: any) => {
-                    const { index, vx, vy, ...rest } = n;
-                    // Delete x and y if invalid so D3 freshly initializes them
-                    if (rest.x == null || isNaN(rest.x)) delete rest.x;
-                    if (rest.y == null || isNaN(rest.y)) delete rest.y;
+                    const { index, vx, vy, x, y, fx, fy, ...rest } = n;
                     return rest;
                   });
                 }
@@ -6157,22 +6145,6 @@ const App: React.FC = () => {
                 }
 
                 const g = normalizeGraphData(parsedGraphData);
-
-                // Re-apply saved canvas positions securely
-                if (data.canvasLayout) {
-                  try {
-                    const positions: Array<{ nodeId: string; x?: number; y?: number; fx?: number | null; fy?: number | null }> = typeof data.canvasLayout === 'string' ? JSON.parse(data.canvasLayout) : data.canvasLayout;
-                    positions.forEach(ref => {
-                      const node = g.nodes.find((n: any) => n.id === ref.nodeId);
-                      if (node) { 
-                        if (ref.x != null && !isNaN(ref.x)) node.x = ref.x; 
-                        if (ref.y != null && !isNaN(ref.y)) node.y = ref.y; 
-                        node.fx = ref.fx ?? null; 
-                        node.fy = ref.fy ?? null; 
-                      }
-                    });
-                  } catch (e) { console.warn('[Router] canvasLayout parse failed:', e); }
-                }
 
                 g.nodes.forEach((n: any) => { n.fx = n.fx ?? null; n.fy = n.fy ?? null; });
                 setGraphData(g);
