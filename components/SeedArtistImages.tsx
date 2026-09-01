@@ -49,7 +49,7 @@ export const SeedArtistImages: React.FC<SeedArtistImagesProps> = ({
     
     // Bug 4 Fix: Short-circuit the network request if the image is in the project's internal cache
     // This prevents stale local Firestore caches from overriding fresh data during curation completion.
-    const promises = normalized.map(id => {
+    const promises = normalized.map((id, idx) => {
       if (internalCacheMap) {
         let entry = internalCacheMap.get(id);
         if (!entry) {
@@ -64,6 +64,12 @@ export const SeedArtistImages: React.FC<SeedArtistImagesProps> = ({
           }
         }
       }
+
+      // Fast-path bypass for Cloned Zcenes / Dashboard Cards that explicitly provide a seedImageUrl
+      if (idx === 0 && seedImageUrl && seedImageUrl !== 'not-found') {
+        return Promise.resolve({ exists: () => true, data: () => ({ detailsCache: { imageUrl: seedImageUrl } }) } as any);
+      }
+
       return getEntityDocWithRedirect(id, 'artist');
     });
 

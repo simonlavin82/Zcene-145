@@ -5135,6 +5135,7 @@ const App: React.FC = () => {
           isMagazineViewOpen: data.isMagazineViewOpen,
           status: data.status,
           coverImage: data.coverImage,
+          seedImageUrl: data.seedImageUrl,
           activeJobId: data.activeJobId,
           authorId: data.authorId
         });
