@@ -1721,8 +1721,8 @@ const App: React.FC = () => {
       // always receives resolvedActiveNodes[0] === seed artist.
       const shareSeedNorms = seedList.map((s: string) => normalizeArtistId(s));
       const hoistedShareActiveNodes: string[] = [];
-      activeNodes.forEach(n => { if (isNodeInSeedList(n.id, shareSeedNorms)) hoistedShareActiveNodes.push(n.id); });
-      activeNodes.forEach(n => { if (!isNodeInSeedList(n.id, shareSeedNorms)) hoistedShareActiveNodes.push(n.id); });
+      activeNodeIds.forEach(id => { if (isNodeInSeedList(id, shareSeedNorms)) hoistedShareActiveNodes.push(id); });
+      activeNodeIds.forEach(id => { if (!isNodeInSeedList(id, shareSeedNorms)) hoistedShareActiveNodes.push(id); });
 
       // Phase 3: Resolve seed artist image URL for deterministic Open Graph routing.
       // Denormalising onto the share doc eliminates the server's secondary Firestore
@@ -2708,8 +2708,8 @@ const App: React.FC = () => {
       // Deep Cut panel on the seed artist, not on a scrambled non-seed node.
       const saveSeedNorms = seedArtists.split('::').map((a: string) => normalizeArtistId(a.trim())).filter(Boolean);
       const hoistedSaveActiveNodes: string[] = [];
-      activeNodes.forEach(n => { if (isNodeInSeedList(n.id, saveSeedNorms)) hoistedSaveActiveNodes.push(n.id); });
-      activeNodes.forEach(n => { if (!isNodeInSeedList(n.id, saveSeedNorms)) hoistedSaveActiveNodes.push(n.id); });
+      activeNodeIds.forEach(id => { if (isNodeInSeedList(id, saveSeedNorms)) hoistedSaveActiveNodes.push(id); });
+      activeNodeIds.forEach(id => { if (!isNodeInSeedList(id, saveSeedNorms)) hoistedSaveActiveNodes.push(id); });
 
       const docPayload: Record<string, any> = {
         name: projectName || (seedArtists ? seedArtists.split('::')[0] : 'Saved Zcene'),
@@ -5505,8 +5505,9 @@ const App: React.FC = () => {
                 let resolvedActiveNodes = data.activeNodes;
                 const availableEntities = g.nodes.map((n: any) => n.id);
                 if (availableEntities.length > resolvedActiveNodes.length) {
-                  resolvedActiveNodes = availableEntities;
-                }
+  const missingEntities = availableEntities.filter((id: string) => !resolvedActiveNodes.includes(id));
+  resolvedActiveNodes = [...resolvedActiveNodes, ...missingEntities];
+}
                 setActiveNodeIds(resolvedActiveNodes);
                 
                 // Synchronously auto-select/hydrate the first active node if nothing is selected
@@ -5633,8 +5634,9 @@ const App: React.FC = () => {
               let resolvedActiveNodes = data.activeNodes;
               const availableEntities = hydratedNodes.map((n: any) => n.id);
               if (availableEntities.length > resolvedActiveNodes.length) {
-                 resolvedActiveNodes = availableEntities;
-              }
+  const missingEntities = availableEntities.filter((id: string) => !resolvedActiveNodes.includes(id));
+  resolvedActiveNodes = [...resolvedActiveNodes, ...missingEntities];
+}
               setActiveNodeIds(resolvedActiveNodes);
             }
 
@@ -5686,8 +5688,9 @@ const App: React.FC = () => {
                 let resolvedActiveNodes = data.activeNodes;
                 const availableEntities = g.nodes.map((n: any) => n.id);
                 if (availableEntities.length > resolvedActiveNodes.length) {
-                   resolvedActiveNodes = availableEntities;
-                }
+  const missingEntities = availableEntities.filter((id: string) => !resolvedActiveNodes.includes(id));
+  resolvedActiveNodes = [...resolvedActiveNodes, ...missingEntities];
+}
                 setActiveNodeIds(resolvedActiveNodes);
               }
 
@@ -5712,8 +5715,9 @@ const App: React.FC = () => {
                       let resolvedActiveNodes = data.activeNodes;
                       const availableEntities = g.nodes.map((n: any) => n.id);
                       if (availableEntities.length > resolvedActiveNodes.length) {
-                         resolvedActiveNodes = availableEntities;
-                      }
+  const missingEntities = availableEntities.filter((id: string) => !resolvedActiveNodes.includes(id));
+  resolvedActiveNodes = [...resolvedActiveNodes, ...missingEntities];
+}
                       setActiveNodeIds(resolvedActiveNodes);
                     }
 
@@ -5758,8 +5762,9 @@ const App: React.FC = () => {
               let resolvedActiveNodes = data.activeNodes;
               const availableEntities = g.nodes.map((n: any) => n.id);
               if (availableEntities.length > resolvedActiveNodes.length) {
-                 resolvedActiveNodes = availableEntities;
-              }
+  const missingEntities = availableEntities.filter((id: string) => !resolvedActiveNodes.includes(id));
+  resolvedActiveNodes = [...resolvedActiveNodes, ...missingEntities];
+}
               setActiveNodeIds(resolvedActiveNodes);
             }
 
@@ -6297,8 +6302,9 @@ const App: React.FC = () => {
                   let resolvedActiveNodes = data.activeNodes;
                   const availableEntities = g.nodes.map((n: any) => n.id);
                   if (availableEntities.length > resolvedActiveNodes.length) {
-                    resolvedActiveNodes = availableEntities;
-                  }
+  const missingEntities = availableEntities.filter((id: string) => !resolvedActiveNodes.includes(id));
+  resolvedActiveNodes = [...resolvedActiveNodes, ...missingEntities];
+}
                   setActiveNodeIds(resolvedActiveNodes);
                   
                   // Synchronously auto-select/hydrate the first active node if nothing is selected
