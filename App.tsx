@@ -2750,10 +2750,21 @@ const App: React.FC = () => {
 
       // Phase 3: Extract and append seedImageUrl from active detailsCache to the newly cloned project
       const primarySaveSeedNorm = saveSeedNorms[0] || '';
-      const saveImageDetails = primarySaveSeedNorm
-        ? (detailsCache.get(primarySaveSeedNorm) || detailsCache.get((seedArtists.split('::')[0] || '').trim().toLowerCase()))
-        : null;
-      const resolvedSeedImageUrl: string = (saveImageDetails as any)?.imageUrl || '';
+      
+      let saveImageDetails = null;
+      if (primarySaveSeedNorm) {
+        saveImageDetails = detailsCache.get(primarySaveSeedNorm) || detailsCache.get((seedArtists.split('::')[0] || '').trim().toLowerCase());
+        
+        // AI canonical slugs (e.g., spaced-us-usa) won't match 'spaced'. Find prefix matches.
+        if (!saveImageDetails) {
+          const fallbackKey = Array.from(detailsCache.keys()).find(k => (k as string).startsWith(primarySaveSeedNorm + '-'));
+          if (fallbackKey) {
+            saveImageDetails = detailsCache.get(fallbackKey);
+          }
+        }
+      }
+      
+      const resolvedSeedImageUrl: string = (saveImageDetails as any)?.imageUrl || (saveImageDetails as any)?.details?.imageUrl || '';
       
       if (resolvedSeedImageUrl) {
         docPayload.seedImageUrl = resolvedSeedImageUrl;
