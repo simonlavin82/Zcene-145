@@ -348,14 +348,21 @@ const Dashboard: React.FC<DashboardProps> = ({
                       // (legacy projects always have activeNodes: []), fall back to counting
                       // how many seed artists are present in the graphData — which is always
                       // at least 1 for a mapped project.
-                      let deepCutsCount = (project.activeNodes || []).length;
-                      if (deepCutsCount === 0 && project.graphData) {
+                      let deepCutsCount = 0;
+                      const rawActiveNodes = project.activeNodes || [];
+                      if (project.graphData) {
                         try {
                           const pg = typeof project.graphData === 'string' ? JSON.parse(project.graphData) : project.graphData;
                           if (pg && Array.isArray(pg.nodes)) {
-                            deepCutsCount = pg.nodes.filter((n: any) => (n.type === 'artist' || !n.type) && !isSeedMatch(n.id, seedList)).length;
+                            deepCutsCount = pg.nodes.filter((n: any) => 
+                              rawActiveNodes.includes(n.id) && (n.type === 'artist' || n.type === 'label' || !n.type)
+                            ).length;
+                          } else {
+                            deepCutsCount = rawActiveNodes.length;
                           }
-                        } catch (e) { /* ignore */ }
+                        } catch (e) { deepCutsCount = rawActiveNodes.length; }
+                      } else {
+                        deepCutsCount = rawActiveNodes.length;
                       }
 
                       let recommendedCount = 0;
@@ -551,14 +558,21 @@ const Dashboard: React.FC<DashboardProps> = ({
                         
                         // Derive deep cuts count: prefer the persisted activeNodes queue.
                         // Fallback for stale documents: count seed artists present in graphData.
-                        let deepCutsCount = (project.activeNodes || []).length;
-                        if (deepCutsCount === 0 && project.graphData) {
+                        let deepCutsCount = 0;
+                        const rawActiveNodes = project.activeNodes || [];
+                        if (project.graphData) {
                           try {
                             const pg = typeof project.graphData === 'string' ? JSON.parse(project.graphData) : project.graphData;
                             if (pg && Array.isArray(pg.nodes)) {
-                              deepCutsCount = pg.nodes.filter((n: any) => (n.type === 'artist' || !n.type) && !isSeedMatch(n.id, seedList)).length;
+                              deepCutsCount = pg.nodes.filter((n: any) => 
+                                rawActiveNodes.includes(n.id) && (n.type === 'artist' || n.type === 'label' || !n.type)
+                              ).length;
+                            } else {
+                              deepCutsCount = rawActiveNodes.length;
                             }
-                          } catch (e) { /* ignore */ }
+                          } catch (e) { deepCutsCount = rawActiveNodes.length; }
+                        } else {
+                          deepCutsCount = rawActiveNodes.length;
                         }
                         
                         let recommendedCount = 0;

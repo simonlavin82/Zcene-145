@@ -2720,6 +2720,7 @@ const App: React.FC = () => {
         lastViewedStackCount,
         isMagazineViewOpen: false,
         authorId: user.uid,
+        status: 'completed',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
