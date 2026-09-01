@@ -8,7 +8,9 @@
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0 --port $PORT",
     "lint": "eslint . && tsc --noEmit",
-    "deploy": "npx firebase-tools deploy",
+    "deploy:hosting": "npx firebase-tools deploy",
+    "deploy:backend": "CLOUDSDK_PYTHON=/opt/homebrew/bin/python3.11 gcloud run deploy zcene-backend-proxy --source . --region us-central1 --project zcene-production --quiet",
+    "deploy": "npm run deploy:hosting && npm run deploy:backend",
     "seed:cache-hit": "node scripts/seed_cache_hit.cjs",
     "seed:cache-miss": "node scripts/seed_cache_miss.cjs",
     "test:regression": "node scratch/test_pipeline_regression.cjs"
