@@ -8,6 +8,7 @@ interface SeedArtistImagesProps {
   variant?: 'stack' | 'grid' | 'reel';
   fallbackGraphData?: any;
   projectDetailsCache?: string; // Add internal project details cache
+  seedImageUrl?: string; // Appended for Root Gen cloned projects
 }
 
 export const SeedArtistImages: React.FC<SeedArtistImagesProps> = ({ 
@@ -15,7 +16,8 @@ export const SeedArtistImages: React.FC<SeedArtistImagesProps> = ({
   userId,
   variant = 'stack',
   fallbackGraphData,
-  projectDetailsCache
+  projectDetailsCache,
+  seedImageUrl
 }) => {
   const [images, setImages] = useState<{ id: string, url: string, name: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,6 +89,12 @@ export const SeedArtistImages: React.FC<SeedArtistImagesProps> = ({
           }
         }
 
+        // 1.5. Check explicit seedImageUrl if provided (for cloned projects)
+        if (!url && idx === 0 && seedImageUrl) {
+          url = seedImageUrl;
+          if (url === 'not-found') url = '';
+        }
+
         // 2. Global Cache Fallback
         if (!url && snap && snap.exists()) {
           const entry = snap.data();
@@ -108,11 +116,10 @@ export const SeedArtistImages: React.FC<SeedArtistImagesProps> = ({
         // Fallback to project internal graph data if global cache is empty
         if (!url && fallbackGraphData && fallbackGraphData.nodes) {
           const fallbackNode = fallbackGraphData.nodes.find((fn: any) => 
-            fn.id.toLowerCase() === normId.toLowerCase() || 
-            (fn.label && fn.label.toLowerCase() === name.toLowerCase())
+            normalizeArtistId(fn.id) === normId || normalizeArtistId(fn.label) === normId || (fn.label && fn.label.toLowerCase() === name.toLowerCase())
           );
-          if (fallbackNode && fallbackNode.imageUrl) {
-            url = fallbackNode.imageUrl;
+          if (fallbackNode) {
+            url = fallbackNode.imageUrl || '';
             if (url === 'not-found') url = '';
           }
         }
