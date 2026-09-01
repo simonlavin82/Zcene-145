@@ -1023,6 +1023,25 @@ export const processCurationJob = onDocumentCreated({
       }
       console.log(`[Curation Backend] [Phase 2B] Hoisted activeNodes: seed at [0]="${hoistedActiveNodes[0]}", total=${hoistedActiveNodes.length}`);
 
+      let extractedSeedImageUrl = null;
+      try {
+        if (result.detailsCache) {
+           const parsedCache = typeof result.detailsCache === 'string' ? JSON.parse(result.detailsCache) : result.detailsCache;
+           const primarySeedId = hoistedActiveNodes[0];
+           if (primarySeedId && Array.isArray(parsedCache)) {
+             const match = parsedCache.find((item: any) => {
+                const key = normalizeArtistId(item[0]);
+                return key === primarySeedId || key.startsWith(primarySeedId + '-') || primarySeedId.startsWith(key + '-');
+             });
+             if (match && match[1]) {
+                extractedSeedImageUrl = match[1].imageUrl || match[1].details?.imageUrl || null;
+             }
+           }
+        }
+      } catch (e) {
+        console.warn(`[Curation Backend] Failed to extract seedImageUrl:`, e);
+      }
+
       await updateProjectStatus(jobData.userId, inputPayload.projectId, {
         status: "completed",
         graphData: JSON.stringify(result.graphData),
@@ -1030,7 +1049,8 @@ export const processCurationJob = onDocumentCreated({
         labelIds: labelEntityIds,
         activeJobId: null,
         detailsCache: result.detailsCache,
-        activeNodes: hoistedActiveNodes  // Phase 2B: canonical seed-first ordering
+        activeNodes: hoistedActiveNodes,  // Phase 2B: canonical seed-first ordering
+        ...(extractedSeedImageUrl ? { seedImageUrl: extractedSeedImageUrl } : {})
       });
     }
 
