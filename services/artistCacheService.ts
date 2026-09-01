@@ -1090,7 +1090,7 @@ export const getEntityDocWithRedirect = async (
       // (e.g. 'korn'). Strip the last country-suffix segment and retry once so the
       // redirect chain can resolve correctly. This eliminates the 404 waterfall on page
       // load for graph nodes whose IDs include an origin suffix.
-      if (response.status === 404 && depth === 0) {
+      if (response.status === 404 && depth < 3) {
         const suffixMatch = entityId.match(/^(.+)-(?:usa|uk|united-states|united-kingdom|canada|australia|germany|france|sweden|norway|italy|spain|brazil|mexico|japan|south-korea)$/i);
         if (suffixMatch) {
           const bareId = suffixMatch[1];
