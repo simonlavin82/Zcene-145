@@ -2748,6 +2748,17 @@ const App: React.FC = () => {
         docPayload.graphData = JSON.stringify(graphData);
       }
 
+      // Phase 3: Extract and append seedImageUrl from active detailsCache to the newly cloned project
+      const primarySaveSeedNorm = saveSeedNorms[0] || '';
+      const saveImageDetails = primarySaveSeedNorm
+        ? (detailsCache.get(primarySaveSeedNorm) || detailsCache.get((seedArtists.split('::')[0] || '').trim().toLowerCase()))
+        : null;
+      const resolvedSeedImageUrl: string = (saveImageDetails as any)?.imageUrl || '';
+      
+      if (resolvedSeedImageUrl) {
+        docPayload.seedImageUrl = resolvedSeedImageUrl;
+      }
+
       await setDoc(newDocRef, docPayload);
       // Phase 4A: Cleanup — remove stash once the save has committed successfully
       try { sessionStorage.removeItem('zcene_pending_share_save'); } catch (e) {}
