@@ -1528,6 +1528,7 @@ const App: React.FC = () => {
   const currentProjectOwnerIdRef = useRef<string | null>(null);
   const projectNameRef = useRef<string>('');
   const graphDataRef = useRef<GraphData | null>(null);
+  const sharedSeedImageUrlRef = useRef<string | null>(null);
   const seedArtistsRef = useRef<string>('');
   const activeNodesRef = useRef<Node[]>([]);
   const detailsCacheRef = useRef<Map<string, NodeDetails>>(new Map());
@@ -2764,7 +2765,10 @@ const App: React.FC = () => {
         }
       }
       
-      const resolvedSeedImageUrl: string = (saveImageDetails as any)?.imageUrl || (saveImageDetails as any)?.details?.imageUrl || '';
+      let resolvedSeedImageUrl: string = (saveImageDetails as any)?.imageUrl || (saveImageDetails as any)?.details?.imageUrl || '';
+      if (!resolvedSeedImageUrl && sharedSeedImageUrlRef.current) {
+        resolvedSeedImageUrl = sharedSeedImageUrlRef.current;
+      }
       
       if (resolvedSeedImageUrl) {
         docPayload.seedImageUrl = resolvedSeedImageUrl;
@@ -6307,6 +6311,7 @@ const App: React.FC = () => {
                 setGraphData(g);
                 setSeedArtists(data.seedArtists);
                 if (data.name !== undefined) setProjectName(data.name);
+                if (data.seedImageUrl) sharedSeedImageUrlRef.current = data.seedImageUrl;
                 
                 let expandedCache = new Map();
                 if (data.detailsCache) {

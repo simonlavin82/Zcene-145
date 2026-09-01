@@ -713,6 +713,7 @@ async function handleEntityGet(req, res, collectionName = 'artists') {
     const docSnap = await docRef.get();
     
     if (!docSnap.exists) {
+      res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
       return res.status(404).json({ error: `${collectionName === 'labels' ? 'Label' : 'Artist'} not found` });
     }
     
