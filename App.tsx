@@ -6282,6 +6282,7 @@ const App: React.FC = () => {
                 g.nodes.forEach((n: any) => { n.fx = n.fx ?? null; n.fy = n.fy ?? null; });
                 setGraphData(g);
                 setSeedArtists(data.seedArtists);
+                if (data.name !== undefined) setProjectName(data.name);
                 
                 let expandedCache = new Map();
                 if (data.detailsCache) {
