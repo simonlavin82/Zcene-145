@@ -337,20 +337,9 @@ export const processCurationJob = onDocumentCreated({
           .map((a: string) => stripCountrySlug(a))
           .join('::');
 
-        // Pre-Hydration ID Standardization for Seed Artists
-        // Force graph variants (e.g. "Korn") to match the exact UI request (e.g. "korn-usa") 
-        // before hydration begins to guarantee symmetry with deep cuts.
-        if (finalGraph.nodes) {
-          for (const seed of artistList) {
-            const seedNorm = normalizeArtistId(seed);
-            const seedNode = finalGraph.nodes.find((n: any) => isEntitySeedMatch(seedNorm, n.id) || isEntitySeedMatch(seedNorm, n.label || ''));
-            if (seedNode && normalizeArtistId(seedNode.id) !== seedNorm) {
-               console.log(`[Curation Backend] Standardizing seed node ID from ${seedNode.id} to ${seedNorm}`);
-               seedNode.id = seedNorm; // E.g., 'Korn' -> 'korn-usa'
-               seedNode.label = stripCountrySlug(seed); // Use bare display name so recNorm stays un-slugged (e.g. 'spaced', not 'spaced-usa')
-            }
-          }
-        }
+        // [Pre-Hydration ID Standardization Removed]
+        // executeCurationPipeline already correctly assigns canonical slugged IDs (e.g. 'buggin-us')
+        // to both the node AND its links. Muting it here prevents disconnected spiderwebs.
 
         // 1. ISOLATE INTERACTIVE NODES: Explicitly filter out Structural Hubs (genre, founded, country)
         // Structural hubs bypass the hydration loop entirely.
