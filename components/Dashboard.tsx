@@ -348,6 +348,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                       // (legacy projects always have activeNodes: []), fall back to counting
                       // how many seed artists are present in the graphData — which is always
                       // at least 1 for a mapped project.
+                      // ARCHITECTURE: Dynamic Dashboard Integrity
+                      // Derive deep cuts count dynamically from actual rendered nodes, prohibiting static placeholders.
                       let deepCutsCount = 0;
                       const rawActiveNodes = project.activeNodes || [];
                       if (project.graphData) {
@@ -563,8 +565,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                         const hasGraphNodes = !!project.graphData && !project.graphData.includes('"nodes":[]');
                         const isMapped = project.status === 'completed';
                         
-                        // Derive deep cuts count: prefer the persisted activeNodes queue.
-                        // Fallback for stale documents: count seed artists present in graphData.
+                        // ARCHITECTURE: Dynamic Dashboard Integrity
+                        // Derive deep cuts count dynamically from actual rendered nodes, prohibiting static placeholders.
                         let deepCutsCount = 0;
                         const rawActiveNodes = project.activeNodes || [];
                         if (project.graphData) {

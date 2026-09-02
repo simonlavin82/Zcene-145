@@ -1109,6 +1109,7 @@ app.use(async (req, res) => {
             ? `Explore this Zcene seeded by ${cleanSeeds.join(', ')}. Own music discovery.`
             : `Explore customised music maps and discover underground artists on Zcene.`;
 
+          // ARCHITECTURE: Deterministic Open Graph Routing
           // Phase 3: Fast path — share document carries its own pre-resolved seed image.
           // Written by handleShareZcene / handleDashboardShareProject at creation time,
           // eliminating a secondary Firestore round-trip that could miss on cold-start

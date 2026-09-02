@@ -1717,6 +1717,7 @@ const App: React.FC = () => {
       const seedList = seedArtists.split('::').map((a: string) => a.trim()).filter(Boolean);
       const normalizedIds = seedList.map((name: string) => normalizeArtistId(name));
 
+      // ARCHITECTURE: Strict Seed Pinning
       // Phase 2A (share path): Build canonical seed-first activeNodes order for the share doc.
       // Mirrors the same hoisting applied by the background worker (Phase 2B) so Guest Mode
       // always receives resolvedActiveNodes[0] === seed artist.
@@ -1725,6 +1726,7 @@ const App: React.FC = () => {
       activeNodeIds.forEach(id => { if (isNodeInSeedList(id, shareSeedNorms)) hoistedShareActiveNodes.push(id); });
       activeNodeIds.forEach(id => { if (!isNodeInSeedList(id, shareSeedNorms)) hoistedShareActiveNodes.push(id); });
 
+      // ARCHITECTURE: Deterministic Open Graph Routing
       // Phase 3: Resolve seed artist image URL for deterministic Open Graph routing.
       // Denormalising onto the share doc eliminates the server's secondary Firestore
       // round-trip to /artists/{id}, which can miss on cold-start or unhydrated Direct Hit seeds.
@@ -1734,6 +1736,7 @@ const App: React.FC = () => {
         : null;
       const resolvedSeedImageUrl: string = (shareImageDetails as any)?.imageUrl || '';
 
+      // ARCHITECTURE: Universal Coordinate Amnesia
       // Phase 1: Build a coordinate-clean graphData for the share payload.
       // The in-memory graphData React state carries runtime D3 fields (fx:null, fy:null)
       // injected by the onSnapshot handler. Strip them at write time so Guest Mode always
@@ -1844,6 +1847,7 @@ const App: React.FC = () => {
         }
       }
 
+      // ARCHITECTURE: Universal Coordinate Amnesia
       // Phase 1 (dashboard share path): Strip D3 runtime coordinates from graphData.
       let dashboardCleanGraphData: any = project.graphData;
       if (project.graphData) {
@@ -6320,7 +6324,7 @@ const App: React.FC = () => {
                   detailsCacheRef.current = expandedCache;
                 }
                 
-                // ── GUEST HYDRATION FALLBACK ──
+                // ARCHITECTURE: Guest Hydration Fallback
                 // Guarantee that guests fetch live bios if the author's shared detailsCache was empty
                 try {
                   await batchHydrateDetailsCache(g.nodes, g.links);

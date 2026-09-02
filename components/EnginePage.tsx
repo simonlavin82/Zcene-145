@@ -481,6 +481,7 @@ for transient API errors on the client.
 
 10. AUTOMATIC DEEP CUT BACKGROUND BATCH-HYDRATION (App.tsx):
     - Active Node Initialization: When a project is loaded from cache (via handleSnap or initial mount), the frontend actively maps all available artist IDs from the graph's nodes array directly into the \`activeNodeIds\` state queue.
+    - ARCHITECTURE: Native Index [0] Loading. The Deep Cut sidebar accurately loads the seed natively from index [0] of the activeNodes array, eliminating the need for superficial local overrides.
     - Client-Side Sparse Queue Fallback: To support legacy or cached projects where the database's \`activeNodes\` array was hardcoded or sparse (e.g., length <= 1), the loader gracefully falls back to injecting all discovered graph artists, ensuring the Deep Cut panel always opens fully populated without requiring manual user clicks on the spiderweb.
     - Continuous Session Sync: Auto-queueing strictly runs as a one-time initialization event. During the active session, the \`activeNodeIds\` queue safely mutates in isolation, respecting the user's manual curation (such as deleting or prioritizing nodes) without disruptive background overwrites.
     - Regression Prevention (The "Why"): Previously, cached projects loaded with empty queues, forcing users to manually click every node to re-hydrate the Deep Cut panel. This frontend fallback ensures legacy databases hydrate gracefully, while continuous session sync prevents auto-population from overwriting deliberate user deletions during an active session.
