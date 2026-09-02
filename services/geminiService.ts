@@ -900,9 +900,13 @@ Respond in strict JSON only — no prose, no markdown, no citation markers.`;
       console.warn(`[Diagnostic] signal 'abort' event fired at ${Date.now() - startTime}ms! Reason:`, combinedSignal.reason);
     });
 
+    const password = typeof window !== 'undefined' ? sessionStorage.getItem('zcene_api_password') : null;
     const response = await fetch(targetUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        ...(password && { 'x-zcene-password': password })
+      },
       body: JSON.stringify(requestBody),
       signal: combinedSignal
     });
@@ -920,9 +924,13 @@ Respond in strict JSON only — no prose, no markdown, no citation markers.`;
           const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
           
           try {
+            const password = typeof window !== 'undefined' ? sessionStorage.getItem('zcene_api_password') : null;
             const fallbackResponse = await fetch(fallbackUrl, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: { 
+                'Content-Type': 'application/json',
+                ...(password && { 'x-zcene-password': password })
+              },
               body: JSON.stringify(requestBody),
               signal: combinedSignal
             });
@@ -1153,11 +1161,13 @@ export const generateGraphData = async (
       };
 
       const url = `${baseUrl}/v1beta/models/${currentModel}:generateContent`;
+      const password = typeof window !== 'undefined' ? sessionStorage.getItem('zcene_api_password') : null;
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-goog-api-key': proxyKey
+          'x-goog-api-key': proxyKey,
+          ...(password && { 'x-zcene-password': password })
         },
         body: JSON.stringify(requestBody),
         signal
@@ -1499,11 +1509,13 @@ export const extendGraphFromNode = async (node: Node, baseGraph: GraphData): Pro
   };
 
   const url = `${baseUrl}/v1beta/models/gemini-3.1-pro-preview:generateContent`;
+  const password = typeof window !== 'undefined' ? sessionStorage.getItem('zcene_api_password') : null;
   const response = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-goog-api-key': proxyKey
+      'x-goog-api-key': proxyKey,
+      ...(password && { 'x-zcene-password': password })
     },
     body: JSON.stringify(requestBody)
   });
@@ -1725,11 +1737,13 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
     };
 
     const url = `${baseUrl}/v1beta/models/gemini-3.5-flash:generateContent`;
+    const password = typeof window !== 'undefined' ? sessionStorage.getItem('zcene_api_password') : null;
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-goog-api-key': proxyKey
+        'x-goog-api-key': proxyKey,
+        ...(password && { 'x-zcene-password': password })
       },
       body: JSON.stringify(requestBody)
     });
@@ -2012,9 +2026,15 @@ export const streamNodeChat = async (
 ) => {
     const proxyKey = 'backend-proxy-key';
     const baseUrl = typeof window !== 'undefined' ? window.location.origin + '/api/gemini' : 'http://localhost:8080/api/gemini';
+    const password = typeof window !== 'undefined' ? sessionStorage.getItem('zcene_api_password') : null;
     const ai = new GoogleGenAI({ 
         apiKey: proxyKey,
-        httpOptions: { baseUrl }
+        httpOptions: { 
+            baseUrl,
+            customHeaders: {
+                ...(password && { 'x-zcene-password': password })
+            }
+        }
     });
     
     const contextNodes = graphData.nodes.map(n => `"${n.id}" (${n.type})`).slice(0, 30).join(', ');
@@ -2107,11 +2127,13 @@ export const fetchLiveTourData = async (artistName: string): Promise<string> => 
     };
 
     const url = `${baseUrl}/v1beta/models/gemini-3.5-flash:generateContent`;
+    const password = typeof window !== 'undefined' ? sessionStorage.getItem('zcene_api_password') : null;
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-goog-api-key': proxyKey
+        'x-goog-api-key': proxyKey,
+        ...(password && { 'x-zcene-password': password })
       },
       body: JSON.stringify(requestBody)
     });

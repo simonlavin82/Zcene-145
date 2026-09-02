@@ -80,37 +80,67 @@ const generateGraphDataViaCloudJob = async (
   cachedSubgraphsContext?: string,
   isSmartBypass?: boolean,
   isSandboxMode?: boolean,
-  seedImageUrl?: string
+  seedImageUrl?: string,
+  confirmTokenUsageHook?: (type: any, cached: any, missing: any, enrichment: any, showBack: any, errorMsg?: string) => Promise<string | false | 'back'>,
+  closeTokenConfirmationHook?: () => void
 ): Promise<GraphData> => {
-  const payload = {
-    artists,
-    filters,
-    ...(userId && { userId }),
-    ...(projectId && { projectId }),
-    ...(jobId && { jobId }),
-    ...(disambiguationHints && { disambiguationHints }),
-    ...(baseGraph && { baseGraph }),
-    ...(cachedSubgraphsContext && { cachedSubgraphsContext }),
-    ...(isSmartBypass !== undefined && { isSmartBypass }),
-    ...(isSandboxMode !== undefined && { isSandboxMode }),
-    ...(seedImageUrl && { seedImageUrl })
-  };
+  let success = false;
+  let currentError: string | undefined = undefined;
+  let finalGraphData = null;
 
-  try {
-    const curate = httpsCallable(functions, 'executeCurationPipeline');
-    const result = await curate(payload);
-    const data = result.data as any;
+  while (!success) {
+    const password = sessionStorage.getItem('zcene_api_password');
+    const payload = {
+      artists,
+      filters,
+      ...(userId && { userId }),
+      ...(projectId && { projectId }),
+      ...(jobId && { jobId }),
+      ...(disambiguationHints && { disambiguationHints }),
+      ...(baseGraph && { baseGraph }),
+      ...(cachedSubgraphsContext && { cachedSubgraphsContext }),
+      ...(isSmartBypass !== undefined && { isSmartBypass }),
+      ...(isSandboxMode !== undefined && { isSandboxMode }),
+      ...(seedImageUrl && { seedImageUrl }),
+      ...(password && { password })
+    };
 
-    if (data.detailsCache && onDetailsCacheReceived) {
-      onDetailsCacheReceived(data.detailsCache);
+    try {
+      const curate = httpsCallable(functions, 'executeCurationPipeline');
+      const result = await curate(payload);
+      const data = result.data as any;
+
+      if (data.detailsCache && onDetailsCacheReceived) {
+        onDetailsCacheReceived(data.detailsCache);
+      }
+
+      if (closeTokenConfirmationHook) closeTokenConfirmationHook();
+      finalGraphData = data.graphData;
+      success = true;
+    } catch (error: any) {
+      console.error("🔥 HTTPS CALLABLE FAILED:", error);
+      console.log("Payload attempted:", payload);
+      
+      if (error.code === 'unauthenticated' || (error.message && error.message.toLowerCase().includes('password'))) {
+        if (confirmTokenUsageHook) {
+          const newPassword = await confirmTokenUsageHook('generation', [], artists.split('::'), undefined, false, currentError || 'Invalid or missing API password. Please try again.');
+          if (!newPassword || newPassword === 'back') {
+            if (closeTokenConfirmationHook) closeTokenConfirmationHook();
+            throw new Error("Password confirmation cancelled");
+          }
+          currentError = 'Invalid API password. Please try again.';
+          // Loop will retry with the new password stored in sessionStorage by confirmTokenUsageHook
+        } else {
+          throw error;
+        }
+      } else {
+        if (closeTokenConfirmationHook) closeTokenConfirmationHook();
+        throw error;
+      }
     }
-
-    return data.graphData;
-  } catch (error) {
-    console.error("🔥 HTTPS CALLABLE FAILED:", error);
-    console.log("Payload attempted:", payload);
-    throw error;
   }
+
+  return finalGraphData;
 };
 
 
@@ -1133,9 +1163,10 @@ const App: React.FC = () => {
     cachedArtists: string[];
     missingArtists: string[];
     enrichmentArtists?: string[];
-    onConfirm: () => void;
+    onConfirm: (password: string) => void;
     onCancel: () => void;
     onBack?: () => void;
+    error?: string | null;
   } | null>(null);
   const [cacheChoiceDialog, setCacheChoiceDialog] = useState<{
     isOpen: boolean;
@@ -1186,9 +1217,10 @@ const App: React.FC = () => {
     cachedArtists: string[],
     missingArtists: string[],
     enrichmentArtists?: string[],
-    showBack?: boolean
+    showBack?: boolean,
+    errorMsg?: string
   ) => {
-    return new Promise<boolean | 'back'>((resolve) => {
+    return new Promise<string | false | 'back'>((resolve) => {
       setTokenConfirmation({
         isOpen: true,
         type,
@@ -1196,9 +1228,12 @@ const App: React.FC = () => {
         cachedArtists,
         missingArtists,
         enrichmentArtists,
-        onConfirm: () => {
-          setTokenConfirmation(null);
-          resolve(true);
+        error: errorMsg,
+        onConfirm: (password: string) => {
+          sessionStorage.setItem('zcene_api_password', password);
+          // Do not close the modal here. The caller is responsible for closing it
+          // upon successful API execution, or updating it with an error.
+          resolve(password);
         },
         onCancel: () => {
           setTokenConfirmation(null);
@@ -1210,6 +1245,14 @@ const App: React.FC = () => {
         } : undefined
       });
     });
+  }, []);
+
+  const closeTokenConfirmation = useCallback(() => {
+    setTokenConfirmation(null);
+  }, []);
+
+  const setTokenConfirmationError = useCallback((errorMsg: string) => {
+    setTokenConfirmation(prev => prev ? { ...prev, error: errorMsg } : null);
   }, []);
 
   const confirmCacheChoice = useCallback((artists: string[]) => {
@@ -3029,13 +3072,17 @@ const App: React.FC = () => {
           }
 
           if (cacheCandidates.length === 0) {
-            setIsLoading(true);
-            try {
-              const validate = httpsCallable(functions, 'validateSeedOriginCallable');
-              const result = await validate({ seed: rawInput });
-              const data = result.data as any;
-              let candidates: any[] = [];
-              if (data && data.isValid) {
+            let success = false;
+            let currentPassword = sessionStorage.getItem('zcene_api_password') || undefined;
+            let currentError = undefined;
+            
+            while (!success) {
+              try {
+                const validate = httpsCallable(functions, 'validateSeedOriginCallable');
+                const result = await validate({ seed: rawInput, ...(currentPassword && { password: currentPassword }) });
+                const data = result.data as any;
+                let candidates: any[] = [];
+                if (data && data.isValid) {
                 candidates = [{
                   id: data.id,
                   label: data.id,
@@ -7935,13 +7982,14 @@ const App: React.FC = () => {
       <TokenConfirmationDialog
         isOpen={!!tokenConfirmation}
         onClose={() => tokenConfirmation?.onCancel()}
-        onConfirm={() => tokenConfirmation?.onConfirm()}
+        onConfirm={(password) => tokenConfirmation?.onConfirm(password)}
         type={tokenConfirmation?.type || 'generation'}
         cost={tokenConfirmation?.cost || 0}
         cachedArtists={tokenConfirmation?.cachedArtists || []}
         missingArtists={tokenConfirmation?.missingArtists || []}
         enrichmentArtists={tokenConfirmation?.enrichmentArtists || []}
         onBack={tokenConfirmation?.onBack}
+        error={tokenConfirmation?.error}
       />
 
       <CacheChoiceDialog

@@ -42,6 +42,20 @@ export const InputSizes = {
   }
 };
 
+export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  variant?: 'sm' | 'md';
+}
+
+export const Input: React.FC<InputProps> = ({ variant = 'md', className = '', ...props }) => {
+  const size = InputSizes[variant];
+  return (
+    <input 
+      className={`w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none ${size.base} px-4 ${className}`}
+      {...props}
+    />
+  );
+};
+
 export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   variant?: 'sm' | 'md';
 }

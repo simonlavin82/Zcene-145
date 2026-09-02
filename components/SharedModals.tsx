@@ -1,4 +1,5 @@
 import { ModalFooter, ModalContainer, ModalBackdrop, ModalHeader, ModalBody } from './ui/Dialog';
+import { Input } from './DesignSystem';
 import React, { useState, useMemo } from 'react';
 import { StackItem, Node, UserTaste } from '../types';
 import { StackIcon } from './Icons';
@@ -374,14 +375,19 @@ export const MyTasteDialog: React.FC<{
 export const TokenConfirmationDialog: React.FC<{
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: (password: string) => void;
   type: 'generation' | 'extension' | 'deep_cut_creation' | 'partial_synthesis' | 'cache_upgrade' | 'data_quality_optimization' | 'live_tour_search' | 'live_synthesis' | 'live_chat_search';
   cost: number;
   cachedArtists: string[];
   missingArtists: string[];
   enrichmentArtists?: string[];
   onBack?: () => void;
-}> = ({ isOpen, onClose, onConfirm, type, cost, cachedArtists, missingArtists, enrichmentArtists, onBack }) => {
+  error?: string | null;
+}> = ({ isOpen, onClose, onConfirm, type, cost, cachedArtists, missingArtists, enrichmentArtists, onBack, error }) => {
+  const [password, setPassword] = useState(() => {
+    try { return sessionStorage.getItem('zcene_api_password') || ''; } catch(e) { return ''; }
+  });
+
   if (!isOpen) return null;
 
   return (
@@ -496,8 +502,25 @@ export const TokenConfirmationDialog: React.FC<{
               </div>
             )}
           </div>
+
+          <div className="pt-2">
+            <Input 
+              type="password" 
+              placeholder="API Access Password" 
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && password) onConfirm(password);
+              }}
+              autoFocus
+            />
+            {error && (
+              <p className="text-red-400 text-xs mt-2 font-medium">{error}</p>
+            )}
+          </div>
+
           {import.meta.env.DEV && (
-            <p className="text-xs text-zinc-500 leading-relaxed">
+            <p className="text-xs text-zinc-500 leading-relaxed pt-2">
               Note: All live outbound API dispatches are completely short-circuited with a static JSON payload in sandbox mode to protect billing limits.
             </p>
           )}
@@ -520,8 +543,9 @@ export const TokenConfirmationDialog: React.FC<{
             </button>
           )}
           <button 
-            onClick={onConfirm} 
-            className="px-4 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90"
+            onClick={() => onConfirm(password)} 
+            disabled={!password}
+            className="px-4 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90 disabled:opacity-50"
           >
             Confirm
           </button>

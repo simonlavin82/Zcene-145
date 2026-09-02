@@ -100,8 +100,16 @@ const extractCleanJsonString = (rawText) => {
 
 // Proxy all requests starting with /api/gemini/ to the Google GenAI API
 app.all('/api/gemini/*wildcard', async (req, res) => {
+  const expectedPassword = process.env.API_PASSWORD;
+  const providedPassword = req.headers['x-zcene-password'];
+  
+  if (expectedPassword && providedPassword !== expectedPassword) {
+    return res.status(401).json({ error: "Invalid or missing API password" });
+  }
+
   const headers = { ...req.headers };
   // Cleanse credentials
+  delete headers['x-zcene-password'];
   delete headers['authorization'];
   delete headers['Authorization'];
   delete headers['cookie'];

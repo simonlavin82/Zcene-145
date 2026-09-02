@@ -48,20 +48,26 @@ export function stripCountrySlug(name: string): string {
 }
 
 export const validateSeedOriginCallable = onCall({
-  secrets: ["GEMINI_API_KEY"],
+  secrets: ["GEMINI_API_KEY", "API_PASSWORD"],
   timeoutSeconds: 60,
   memory: "512MiB",
 }, async (request) => {
-  const { seed } = request.data;
+  const { seed, password } = request.data;
   if (!seed) {
     throw new HttpsError("invalid-argument", "Missing seed in payload");
   }
+  
+  const expectedPassword = process.env.API_PASSWORD;
+  if (expectedPassword && password !== expectedPassword) {
+    throw new HttpsError("unauthenticated", "Invalid or missing API password");
+  }
+
   const validationResult = await validateSeedOriginBackend(seed);
   return validationResult;
 });
 
 export const executeCurationPipeline = onCall({
-  secrets: ["GEMINI_API_KEY"],
+  secrets: ["GEMINI_API_KEY", "API_PASSWORD"],
   timeoutSeconds: 540,
   memory: "1GiB",
 }, async (request) => {
@@ -70,6 +76,11 @@ export const executeCurationPipeline = onCall({
 
   if (!payload || !payload.artists) {
     throw new HttpsError("invalid-argument", "Missing artists in payload");
+  }
+
+  const expectedPassword = process.env.API_PASSWORD;
+  if (expectedPassword && payload.password !== expectedPassword) {
+    throw new HttpsError("unauthenticated", "Invalid or missing API password");
   }
 
   const artistList = payload.artists
