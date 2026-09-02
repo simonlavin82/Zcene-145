@@ -243,7 +243,7 @@ export const isNodeInSeedList = (nodeIdOrLabel?: string | null, seedList?: strin
   
   const targetNorm = normalizeArtistId(nodeIdOrLabel);
   // Explicitly strip country routing suffixes to ensure base string matches
-  const countrySuffixRegex = /-(united-states|united-kingdom|global|australia|canada|germany|france|japan|sweden|italy|spain|brazil|mexico|netherlands|belgium|norway|finland|denmark|ireland|new-zealand|poland|austria|switzerland|uk|usa|us)$/;
+  const countrySuffixRegex = /-(united-states|united-kingdom|global|australia|canada|germany|france|japan|sweden|italy|spain|brazil|mexico|netherlands|belgium|norway|finland|denmark|ireland|new-zealand|poland|austria|switzerland|uk|usa|us|portugal|argentina|colombia)$/;
   const strippedTargetNorm = targetNorm.replace(countrySuffixRegex, '');
   
   const targetClean = cleanArtistDisplayName(nodeIdOrLabel).toLowerCase();

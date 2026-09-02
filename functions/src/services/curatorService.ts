@@ -1075,7 +1075,7 @@ export const generateGraphDataBackend = async (
       const exists = finalNodes.some(n => {
           const nNorm = normalizeArtistId(n.id);
           const lNorm = normalizeArtistId(n.label || '');
-          return nNorm === sluggedSeedId || lNorm === sluggedSeedId || nNorm.startsWith(`${sluggedSeedId}-`) || lNorm.startsWith(`${sluggedSeedId}-`);
+          return nNorm === sluggedSeedId || lNorm === sluggedSeedId || sluggedSeedId.startsWith(`${nNorm}-`) || sluggedSeedId.startsWith(`${lNorm}-`);
       });
       
       // Consult disambiguationHints if available to map generated nodes to canonical cache IDs

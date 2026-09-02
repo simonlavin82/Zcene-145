@@ -1,2 +1,2 @@
-import { isNodeInSeedList } from '../services/artistCacheService';
-console.log("spaced-us, spaced:", isNodeInSeedList("spaced-us", ["spaced"]));
+import { isNodeInSeedList } from '../services/artistCacheService.js';
+console.log(isNodeInSeedList('b-fachada-portugal', ['b-fachada']));
