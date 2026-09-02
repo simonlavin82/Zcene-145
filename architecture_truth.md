@@ -40,3 +40,9 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 - **Dynamic Dashboard Integrity:** Dashboard metadata (like the `deepCuts` count) must dynamically match the actual rendered nodes in the graph data, strictly prohibiting static placeholders.
 - D3 **Link Objects MUST** be safely serialized back to strings (e.g. `link.source.id`) before caching `graphData`.
 - Column 2 cache-loading MUST safely parse and clone the cache objects to avoid polluting the memory references, and strictly deduplicate loaded node IDs.
+
+### 8. Strict Topology Verification (Stub Routing)
+- The pipeline MUST differentiate between a "Partial Cache Hit" (Stub) and a "Full Cache Hit".
+- A document possessing media and biography data but lacking populated `graphData` topology is an Artist Stub.
+- Column 2 cache-loading MUST explicitly verify the presence of `graphData`. Stubs MUST be strictly routed to Generative Topology (`needsProGeneration = true`) to build the required node map before asynchronous hydration.
+- **The Fast-Track:** Stubs uniquely bypass both the Column 1 Disambiguation Modals and the Column 2 Flash Validation phase, being fast-tracked directly into Generative Topology.

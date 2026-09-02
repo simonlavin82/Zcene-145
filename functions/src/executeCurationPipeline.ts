@@ -118,37 +118,57 @@ export const executeCurationPipeline = onCall({
        console.warn(`[Pipeline Diamond] Seed slug dedup query failed for "${seedNorm}", proceeding with derived ID:`, dedupErr);
      }
 
-     try {
-       const cacheDoc = await db.collection("artists").doc(resolvedSeedNorm).get();
-       if (cacheDoc.exists) {
-          const cacheData = cacheDoc.data();
-          if (cacheData && cacheData.detailsCache) {
-             cachedDetails = typeof cacheData.detailsCache === 'string' ? JSON.parse(cacheData.detailsCache) : cacheData.detailsCache;
-             if (Array.isArray(cachedDetails) && cachedDetails.length > 0) {
-                const match = cachedDetails.find((item: any) => normalizeArtistId(item[0]) === resolvedSeedNorm);
-                if (match && match[1]) {
-                  cachedDetails = match[1];
-                } else {
-                  cachedDetails = Array.isArray(cachedDetails[0]) ? cachedDetails[0][1] : cachedDetails[0];
-                }
-             }
-          }
-       }
-     } catch (e) {
-        console.warn(`Failed cache lookup for ${resolvedSeedNorm}`, e);
-     }
-     
-     if (cachedDetails && cachedDetails.summary && cachedDetails.summary.length > 50 && cachedDetails.details?.genre && cachedDetails.imageUrl) {
-        console.log(`[Pipeline Diamond] -> Is Hit? Yes -> Full Data? Yes -> Merge into Canvas: ${seed}`);
-        resolvedSeedArray.push({
-           id: resolvedSeedNorm,
-           name: seed,
-           origin: cachedDetails.details.origin || "",
-           genre: cachedDetails.details.genre || "",
-           isCacheHit: true
-        });
-        detailsCacheEntries.push([resolvedSeedNorm, cachedDetails]);
-     } else {
+     let hasGraphData = false;
+      try {
+        const cacheDoc = await db.collection("artists").doc(resolvedSeedNorm).get();
+        if (cacheDoc.exists) {
+           const cacheData = cacheDoc.data();
+           if (cacheData && cacheData.graphData) {
+               const rawGraph = typeof cacheData.graphData === 'string' ? JSON.parse(cacheData.graphData) : cacheData.graphData;
+               if (rawGraph && rawGraph.nodes && rawGraph.nodes.length > 0) {
+                   hasGraphData = true;
+               }
+           }
+           if (cacheData && cacheData.detailsCache) {
+              cachedDetails = typeof cacheData.detailsCache === 'string' ? JSON.parse(cacheData.detailsCache) : cacheData.detailsCache;
+              if (Array.isArray(cachedDetails) && cachedDetails.length > 0) {
+                 const match = cachedDetails.find((item: any) => normalizeArtistId(item[0]) === resolvedSeedNorm);
+                 if (match && match[1]) {
+                   cachedDetails = match[1];
+                 } else {
+                   cachedDetails = Array.isArray(cachedDetails[0]) ? cachedDetails[0][1] : cachedDetails[0];
+                 }
+              }
+           }
+        }
+      } catch (e) {
+         console.warn(`Failed cache lookup for ${resolvedSeedNorm}`, e);
+      }
+      
+      if (cachedDetails && cachedDetails.summary && cachedDetails.summary.length > 50 && cachedDetails.details?.genre && cachedDetails.imageUrl) {
+         if (hasGraphData) {
+            console.log(`[Pipeline Diamond] -> Is Hit? Yes -> Full Data? Yes -> Merge into Canvas: ${seed}`);
+            resolvedSeedArray.push({
+               id: resolvedSeedNorm,
+               name: seed,
+               origin: cachedDetails.details.origin || "",
+               genre: cachedDetails.details.genre || "",
+               isCacheHit: true
+            });
+            detailsCacheEntries.push([resolvedSeedNorm, cachedDetails]);
+         } else {
+            console.log(`[Pipeline Diamond] -> Is Hit? Partial (Stub) -> Missing Topology -> Triggering Pro Gen: ${seed}`);
+            needsProGeneration = true;
+            resolvedSeedArray.push({
+               id: resolvedSeedNorm,
+               name: seed,
+               origin: cachedDetails.details.origin || "",
+               genre: cachedDetails.details.genre || "",
+               isCacheHit: true
+            });
+            detailsCacheEntries.push([resolvedSeedNorm, cachedDetails]);
+         }
+      } else {
         console.log(`[Pipeline Diamond] -> Is Hit? No -> Flash-Lite Origin Validation: ${seed}`);
         needsProGeneration = true;
         
