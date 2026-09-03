@@ -290,7 +290,7 @@ the entire dataset, the app evolves existing visual structures.
     Redirect Pointer Immunity (Split-Brain Remediation, Sprint Fix):
     The hydration loop slug-dedup query in processCurationJob.ts iterates docs whose artistId starts with the seed
     slug. Orphaned alias stubs created by Fix E carry a redirectTo field pointing to the canonical document. The
-    dedup loop MUST include the guard `if (snapData.redirectTo) continue;` to skip these pointer documents.
+    dedup loop MUST include the guard 'if (snapData.redirectTo) continue;' to skip these pointer documents.
     Without this guard the loop incorrectly adopts the redirect pointer as the canonical ID, causing a failed
     detailsCache lookup, an unnecessary external API call, and ultimately an empty graphData write timeout —
     re-introducing the original cache persistence failure. See Immutable Law §10 in architecture_truth.md.
