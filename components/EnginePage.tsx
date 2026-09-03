@@ -277,8 +277,23 @@ the entire dataset, the app evolves existing visual structures.
     documents are healed into alias pointers across both frontend and backend writes.
 
     Suffix-Deduplication Safeguard: To prevent runaway recursive keys (e.g., "i-wish-i-united-states-united-states"),
-    all region concatenation logic now utilizes '.endsWith()' deduplication checks. This ensures that countryNorm
+    all region concatenation logic now utilises '.endsWith()' deduplication checks. This ensures that countryNorm
     suffixes are never double-appended during frontend cache lookups, backend curation, or cache hydration loops.
+
+    Token Quota Modal Immediate-Close Contract (Sprint Fix):
+    The Token Quota Warning modal MUST call setTokenConfirmation(null) synchronously within the onConfirm handler
+    in App.tsx BEFORE the pipeline re-invocation. This guarantees the modal unmounts immediately on confirm and does
+    not linger while the subsequent Validate Origin modal (or canvas) is mounting. Any implementation that relies
+    on the modal closing via a downstream state flush (e.g., a resolved Promise) is strictly forbidden, as it
+    produces a stale overlay that the user must manually dismiss.
+
+    Redirect Pointer Immunity (Split-Brain Remediation, Sprint Fix):
+    The hydration loop slug-dedup query in processCurationJob.ts iterates docs whose artistId starts with the seed
+    slug. Orphaned alias stubs created by Fix E carry a redirectTo field pointing to the canonical document. The
+    dedup loop MUST include the guard `if (snapData.redirectTo) continue;` to skip these pointer documents.
+    Without this guard the loop incorrectly adopts the redirect pointer as the canonical ID, causing a failed
+    detailsCache lookup, an unnecessary external API call, and ultimately an empty graphData write timeout —
+    re-introducing the original cache persistence failure. See Immutable Law §10 in architecture_truth.md.
 
 11. HYBRID AI PROBING & GLOBAL STATE-RESET PIPELINE:
     - Lightweight Flash Probe (resolveArtistCandidatesViaAI): Before triggering heavy Pro synthesis, a rapid

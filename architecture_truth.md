@@ -46,3 +46,16 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 - A document possessing media and biography data but lacking populated `graphData` topology is an Artist Stub.
 - Column 2 cache-loading MUST explicitly verify the presence of `graphData`. Stubs MUST be strictly routed to Generative Topology (`needsProGeneration = true`) to build the required node map before asynchronous hydration.
 - **The Fast-Track:** Stubs uniquely bypass both the Column 1 Disambiguation Modals and the Column 2 Flash Validation phase, being fast-tracked directly into Generative Topology.
+
+### 9. Canonical Seed Slug Resolution via `resolvedSeedNormMap` (Split-Brain Prevention)
+- At the **entry point** of `processCurationJob`, before any Phase 1 cache lookup or hydration loop begins, a `resolvedSeedNormMap` MUST be built by querying Firestore for all existing docs whose `artistId` field starts with each seed's base normalised slug.
+- This map resolves the authoritative canonical document ID for each seed (e.g., `"buggin" → "buggin-us"`).
+- **All downstream writes in the job — `synthesisRationale`, `graphData`, `detailsCache` — MUST target the canonical ID from this map, not the raw seed string.** Failure to use this map is the direct cause of split-brain writes, where data is fractured across two separate Firestore documents.
+- The `extractArtistSubGraph` call (Fix D) MUST receive the canonical ID and its result MUST be validated as non-empty before writing. An empty extracted subgraph (`safeExtractedGraph = null`) MUST prevent overwriting a real, populated `graphData` in the canonical document.
+
+### 10. Redirect Pointer Immunity in the Hydration Loop Slug Dedup
+- Fix E remediation creates redirect pointer documents (e.g., `artists/buggin` with `{ redirectTo: "buggin-us" }`) to alias orphaned stubs to their canonical equivalents.
+- The hydration loop's slug deduplication query (which uses an `artistId` range query to find existing canonical docs) MUST explicitly **skip any document that has a `redirectTo` field set**.
+- **Rationale:** Redirect pointer documents share the same `artistId` value as the canonical document and appear in the same Firestore range query. Without this guard, the dedup logic adopts the redirect pointer as the canonical ID, looks up a `detailsCache` that doesn't exist there, falls back to external API hydration, and on timeout skips the entire Firestore write — leaving `graphData` permanently empty on the canonical document.
+- **Rule:** `if (snapData.redirectTo) continue;` is an immutable guard in the slug dedup loop. It must never be removed.
+
