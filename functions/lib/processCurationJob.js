@@ -717,29 +717,76 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     // 3.1 Pro: Root Breakdown Narrative
                     rootBreakdownStr = await (0, curatorService_1.generateRootsBreakdownBackend)(inputPayload.artists, detailsCacheEntries, usageCollector);
                     finalGraph.synthesisRationale = rootBreakdownStr;
-                    // ── Step 5: Root Breakdown Write-Back to Seed Artist Docs ────────────────
+                    // ── Step 5: Root Breakdown Write-Back to Seed Artist Docs (Atomic Self-Heal) ────────────────
                     // Per the Unified Canvas Architecture (Column 3, Step 5), Single-Seed jobs persist
                     // the Root Breakdown to the seed artist's Firestore doc so that future cache hits
-                    // serve the full 3.1 Pro narrative without re-generating it. This write-back
-                    // overwrites any absent or stub value left from the earlier hydration pass.
-                    if (rootBreakdownStr) {
-                        for (const seedName of artistList) {
-                            const seedNorm = (0, curatorService_1.normalizeArtistId)(seedName);
-                            // Fix B: Target the canonical slug document, not the raw norm.
-                            // Previously wrote synthesisRationale to artists/buggin instead of artists/buggin-us,
-                            // violating architecture_truth.md Law §3. resolvedSeedNormMap (Fix A) provides
-                            // the correct canonical target established during Column 2 pre-flight.
-                            const canonicalSeedId = resolvedSeedNormMap.get(seedNorm) ?? seedNorm;
-                            const seedDocRef = db.collection('artists').doc(canonicalSeedId);
-                            await seedDocRef.set({
-                                synthesisRationale: rootBreakdownStr,
-                                'detailsCache.synthesisRationale': firestore_2.FieldValue.delete(), // Bug 3 Fix: explicitly purge legacy bloat
-                                cachedAt: firestore_2.FieldValue.serverTimestamp()
-                            }, { merge: true }).catch((e) => {
-                                // Non-fatal: the project graphData is the canonical ground truth.
-                                console.warn(`[Curation Backend] Root Breakdown write-back skipped for artist doc: ${canonicalSeedId}`, e.message);
+                    // serve the full 3.1 Pro narrative without re-generating it.
+                    // This step uses an atomic transaction to detect and heal legacy split-brain orphans.
+                    for (const seedName of artistList) {
+                        const seedNorm = (0, curatorService_1.normalizeArtistId)(seedName);
+                        const canonicalSeedId = resolvedSeedNormMap.get(seedNorm) ?? seedNorm;
+                        const canonicalDocRef = db.collection('artists').doc(canonicalSeedId);
+                        const rawSeedDocRef = db.collection('artists').doc(seedNorm);
+                        try {
+                            await db.runTransaction(async (transaction) => {
+                                const canonicalSnap = await transaction.get(canonicalDocRef);
+                                const canonicalData = canonicalSnap.exists ? canonicalSnap.data() : null;
+                                let rawData = null;
+                                if (canonicalSeedId !== seedNorm) {
+                                    const rawSnap = await transaction.get(rawSeedDocRef);
+                                    if (rawSnap.exists) {
+                                        rawData = rawSnap.data();
+                                    }
+                                }
+                                const canonicalUpdate = {
+                                    'detailsCache.synthesisRationale': firestore_2.FieldValue.delete(),
+                                    cachedAt: firestore_2.FieldValue.serverTimestamp()
+                                };
+                                let finalRationale = rootBreakdownStr;
+                                // Topology Hydration Check for Stubs
+                                const hasGraph = canonicalData?.graphData && ((typeof canonicalData.graphData === 'string' && canonicalData.graphData.length > 10) ||
+                                    (typeof canonicalData.graphData === 'object' && canonicalData.graphData.nodes));
+                                if (!hasGraph) {
+                                    const rawExtracted = (0, curatorService_1.extractArtistSubGraph)(canonicalSeedId, finalGraph, artistList);
+                                    if (rawExtracted) {
+                                        const safeExtractedGraph = JSON.parse(JSON.stringify(rawExtracted));
+                                        if (safeExtractedGraph.nodes && safeExtractedGraph.nodes.length > 0) {
+                                            if (safeExtractedGraph.links) {
+                                                for (const link of safeExtractedGraph.links) {
+                                                    link.source = typeof link.source === 'object' && link.source !== null ? link.source.id : link.source;
+                                                    link.target = typeof link.target === 'object' && link.target !== null ? link.target.id : link.target;
+                                                }
+                                            }
+                                            canonicalUpdate.graphData = JSON.stringify(safeExtractedGraph);
+                                            console.log(`[Self-Heal] Hydrating graphData for empty stub: ${canonicalSeedId}`);
+                                        }
+                                    }
+                                }
+                                // Merge Orphan Data & Redirect
+                                if (canonicalSeedId !== seedNorm && rawData) {
+                                    if (!finalRationale && rawData.synthesisRationale) {
+                                        finalRationale = rawData.synthesisRationale;
+                                        console.log(`[Self-Heal] Adopting orphaned synthesisRationale for ${canonicalSeedId} in transaction`);
+                                    }
+                                    if (!rawData.redirectTo) {
+                                        transaction.set(rawSeedDocRef, { redirectTo: canonicalSeedId }, { merge: true });
+                                        console.log(`[Self-Heal] Queued redirectTo for orphaned stub ${seedNorm} -> ${canonicalSeedId}`);
+                                    }
+                                }
+                                if (finalRationale) {
+                                    canonicalUpdate.synthesisRationale = finalRationale;
+                                    if (canonicalUpdate.graphData) {
+                                        const parsedGraph = JSON.parse(canonicalUpdate.graphData);
+                                        parsedGraph.synthesisRationale = finalRationale;
+                                        canonicalUpdate.graphData = JSON.stringify(parsedGraph);
+                                    }
+                                }
+                                transaction.set(canonicalDocRef, canonicalUpdate, { merge: true });
                             });
-                            console.log(`[Curation Backend] ✅ Root Breakdown written to canonical seed doc: ${canonicalSeedId}`);
+                            console.log(`[Curation Backend] ✅ Atomic write-back & self-heal completed for canonical seed doc: ${canonicalSeedId}`);
+                        }
+                        catch (e) {
+                            console.warn(`[Curation Backend] Root Breakdown / Atomic Heal failed for artist doc: ${canonicalSeedId}`, e.message);
                         }
                     }
                     // 3.1 Pro: Final Node Positioning could be executed here if a service existed.
@@ -900,9 +947,13 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             updatePayload.dataIntegrityStatus = recDetails?._isStub ? 'degraded' : 'verified';
                             updatePayload.hasUniqueSpiderweb = !isLabel;
                             if (!isLabel) {
-                                updatePayload.graphData = safeExtractedGraph ? JSON.stringify(safeExtractedGraph) : null;
+                                if (safeExtractedGraph) {
+                                    updatePayload.graphData = JSON.stringify(safeExtractedGraph);
+                                }
                                 updatePayload.filters = inputPayload.filters || null;
-                                updatePayload.synthesisRationale = finalGraph.synthesisRationale || null;
+                                if (finalGraph.synthesisRationale) {
+                                    updatePayload.synthesisRationale = finalGraph.synthesisRationale;
+                                }
                             }
                         }
                         await recDocRef.update(sanitizeUndefinedProperties(updatePayload));
