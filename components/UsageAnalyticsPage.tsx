@@ -33,6 +33,15 @@ export interface UserTelemetry {
     };
     exactCost: number;
     hasExactCost: boolean;
+    projects: ProjectTelemetry[];
+}
+
+export interface ProjectTelemetry {
+    id: string;
+    seedArtist: string;
+    generationType: string;
+    cost: number;
+    isEstimate: boolean;
 }
 
 export interface TelemetryOverviewCardsProps {
@@ -264,6 +273,36 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
                                                          </div>
                                                      </div>
 
+                                                     {/* Full Width: Projects Ledger */}
+                                                     <div className="col-span-1 md:col-span-2 pt-4 border-t border-zinc-900 mt-4">
+                                                         <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mb-4">Projects Ledger</h4>
+                                                         <div className="bg-black/50 border border-zinc-800 rounded-md overflow-hidden">
+                                                             <table className="w-full text-left border-collapse">
+                                                                 <thead>
+                                                                     <tr className="border-b border-zinc-800 bg-zinc-900/30">
+                                                                         <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Project / Seed</th>
+                                                                         <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Generation Type</th>
+                                                                         <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Cost</th>
+                                                                     </tr>
+                                                                 </thead>
+                                                                 <tbody>
+                                                                     {user.projects.map((proj, idx) => {
+                                                                         const isDirectHit = proj.generationType === "Direct Hit";
+                                                                         return (
+                                                                             <tr key={idx} className="border-b border-zinc-800/50 last:border-0 hover:bg-zinc-900/20">
+                                                                                 <td className="p-3 text-xs text-zinc-300 font-medium">{proj.seedArtist}</td>
+                                                                                 <td className="p-3 text-xs text-zinc-400">{proj.generationType}</td>
+                                                                                 <td className={`p-3 text-xs text-right font-mono ${isDirectHit ? 'text-primary/80' : 'text-red-400/80'}`}>
+                                                                                     {proj.isEstimate ? '~' : ''}${proj.cost.toFixed(4)}
+                                                                                 </td>
+                                                                             </tr>
+                                                                         );
+                                                                     })}
+                                                                 </tbody>
+                                                             </table>
+                                                         </div>
+                                                     </div>
+
                                                  </div>
                                              </td>
                                          </tr>
@@ -316,6 +355,7 @@ const calculateTelemetryForUser = (
     let exactCost = 0;
     let hasExactCost = false;
     const artistFrequencyMap: Record<string, number> = {};
+    const projects: ProjectTelemetry[] = [];
 
     projectDocs.forEach((pDoc) => {
         const pData = pDoc.data();
@@ -350,20 +390,44 @@ const calculateTelemetryForUser = (
         totalLiveQueries += projectLiveQueries;
         totalCacheHits += projectCacheHits;
         totalUpdates += activeCount;
-        
+        let projectExactCost = 0;
+        let projectHasExactCost = false;
+        let hasProCall = false;
+
         if (pData.apiUsage) {
-            hasExactCost = true;
+            projectHasExactCost = true;
             for (const [model, usage] of Object.entries(pData.apiUsage)) {
                 const u = usage as any;
                 if (model.includes('gemini-3.1-pro') || model.includes('gemini-1.5-pro')) {
-                    exactCost += (u.prompt / 1000000) * 3.50;
-                    exactCost += (u.candidates / 1000000) * 10.50;
+                    hasProCall = true;
+                    projectExactCost += (u.prompt / 1000000) * 3.50;
+                    projectExactCost += (u.candidates / 1000000) * 10.50;
                 } else if (model.includes('gemini-3.5-flash') || model.includes('gemini-1.5-flash')) {
-                    exactCost += (u.prompt / 1000000) * 0.075;
-                    exactCost += (u.candidates / 1000000) * 0.30;
+                    projectExactCost += (u.prompt / 1000000) * 0.075;
+                    projectExactCost += (u.candidates / 1000000) * 0.30;
                 }
             }
+            exactCost += projectExactCost;
+            hasExactCost = true;
         }
+
+        let generationType = "Direct Hit";
+        if (seeds.length > 1) {
+            generationType = "Partial Hit";
+        } else if (hasProCall || (!projectHasExactCost && activeCount > projectLiveQueries)) {
+            // Older projects logic: If we don't have exact cost, we guess New Root if there are more nodes than seeds.
+            // Wait, actually for older projects, if activeCount > 1, it's a generated graph.
+            generationType = (activeCount > 1) ? "New Root" : "Direct Hit";
+            if (hasProCall) generationType = "New Root";
+        }
+
+        projects.push({
+            id: pDoc.id,
+            seedArtist: seedStr || "Unknown",
+            generationType,
+            cost: projectHasExactCost ? projectExactCost : (projectLiveQueries * COST_PER_AI_CALL),
+            isEstimate: !projectHasExactCost
+        });
     });
 
     // Sort frequency map to get top searches
@@ -392,7 +456,8 @@ const calculateTelemetryForUser = (
         deepCutsOpened: deepCutsOpened || 0,
         onboardingProgress: onboardingProgress || {},
         exactCost,
-        hasExactCost
+        hasExactCost,
+        projects
     };
 };
 
