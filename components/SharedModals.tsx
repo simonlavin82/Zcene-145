@@ -2,7 +2,7 @@ import { ModalFooter, ModalContainer, ModalBackdrop, ModalHeader, ModalBody } fr
 import { Input } from './DesignSystem';
 import React, { useState, useMemo } from 'react';
 import { StackItem, Node, UserTaste } from '../types';
-import { StackIcon } from './Icons';
+import { StackIcon, VisibilityIcon, VisibilityOffIcon } from './Icons';
 import Markdown from 'react-markdown';
 import { isNodeInSeedList } from '../services/artistCacheService';
 import { Flame, Waypoints } from 'lucide-react';
@@ -387,6 +387,7 @@ export const TokenConfirmationDialog: React.FC<{
   const [password, setPassword] = useState(() => {
     try { return sessionStorage.getItem('zcene_api_password') || ''; } catch(e) { return ''; }
   });
+  const [showPassword, setShowPassword] = useState(false);
 
   if (!isOpen) return null;
 
@@ -504,16 +505,30 @@ export const TokenConfirmationDialog: React.FC<{
           </div>
 
           <div className="pt-2">
-            <Input 
-              type="password" 
-              placeholder="API Access Password" 
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && password) onConfirm(password);
-              }}
-              autoFocus
-            />
+            <div className="relative">
+              <Input 
+                type={showPassword ? 'text' : 'password'}
+                placeholder="API Access Password" 
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && password) onConfirm(password);
+                }}
+                className="pr-10"
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(p => !p)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
+                tabIndex={-1}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword
+                  ? <VisibilityOffIcon className="w-4 h-4" />
+                  : <VisibilityIcon className="w-4 h-4" />}
+              </button>
+            </div>
             {error && (
               <p className="text-red-400 text-xs mt-2 font-medium">{error}</p>
             )}

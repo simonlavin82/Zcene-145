@@ -1231,8 +1231,11 @@ const App: React.FC = () => {
         error: errorMsg,
         onConfirm: (password: string) => {
           sessionStorage.setItem('zcene_api_password', password);
-          // Do not close the modal here. The caller is responsible for closing it
-          // upon successful API execution, or updating it with an error.
+          // Close immediately — the pipeline receives the password via resolve() and
+          // proceeds asynchronously. Any downstream error is surfaced via toast, not
+          // by re-opening this modal. All callers of closeTokenConfirmation() after
+          // a successful API call will safely no-op against null state.
+          setTokenConfirmation(null);
           resolve(password);
         },
         onCancel: () => {
