@@ -47,11 +47,12 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 - Column 2 cache-loading MUST explicitly verify the presence of `graphData`. Stubs MUST be strictly routed to Generative Topology (`needsProGeneration = true`) to build the required node map before asynchronous hydration.
 - **The Fast-Track:** Stubs uniquely bypass both the Column 1 Disambiguation Modals and the Column 2 Flash Validation phase, being fast-tracked directly into Generative Topology.
 
-### 9. Canonical Seed Slug Resolution via `resolvedSeedNormMap` (Split-Brain Prevention)
+### 9. Canonical Seed Slug Resolution via `resolvedSeedNormMap` & `idRewriteMap` (Split-Brain Prevention)
 - At the **entry point** of `processCurationJob`, before any Phase 1 cache lookup or hydration loop begins, a `resolvedSeedNormMap` MUST be built by querying Firestore for all existing docs whose `artistId` field starts with each seed's base normalised slug.
 - This map resolves the authoritative canonical document ID for each seed (e.g., `"buggin" → "buggin-us"`).
 - **All downstream writes in the job — `synthesisRationale`, `graphData`, `detailsCache` — MUST target the canonical ID from this map, not the raw seed string.** Failure to use this map is the direct cause of split-brain writes, where data is fractured across two separate Firestore documents.
-- The `extractArtistSubGraph` call (Fix D) MUST receive the canonical ID and its result MUST be validated as non-empty before writing. An empty extracted subgraph (`safeExtractedGraph = null`) MUST prevent overwriting a real, populated `graphData` in the canonical document.
+- **Pre-computed `idRewriteMap` (Topology Standardization):** Before extracting subgraphs (Fix D), the job MUST compile an `idRewriteMap` resolving raw IDs to their canonical forms. The entire unified `finalGraph`'s nodes and edges MUST be rewritten using this map *before* subgraph extraction occurs.
+- The `extractArtistSubGraph` call MUST receive the canonical ID and its result MUST be validated as non-empty before writing. An empty extracted subgraph (`safeExtractedGraph = null`) MUST prevent overwriting a real, populated `graphData` in the canonical document.
 
 ### 10. Redirect Pointer Immunity in the Hydration Loop Slug Dedup
 - Fix E remediation creates redirect pointer documents (e.g., `artists/buggin` with `{ redirectTo: "buggin-us" }`) to alias orphaned stubs to their canonical equivalents.

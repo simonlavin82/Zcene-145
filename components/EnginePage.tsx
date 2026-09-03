@@ -279,6 +279,10 @@ the entire dataset, the app evolves existing visual structures.
     Suffix-Deduplication Safeguard: To prevent runaway recursive keys (e.g., "i-wish-i-united-states-united-states"),
     all region concatenation logic now utilises '.endsWith()' deduplication checks. This ensures that countryNorm
     suffixes are never double-appended during frontend cache lookups, backend curation, or cache hydration loops.
+    Furthermore, frontend detail batch-hydration (App.tsx) explicitly uses extractCountrySlug rather than standard 
+    normalization to robustly compute canonical keys, ensuring that nodes with non-standard country suffixes are 
+    properly resolved without proxy routing loops. This mirrors the backend's pre-computed idRewriteMap which rewrites
+    all graph topology IDs to their canonical forms before subgraph extraction.
 
     Token Quota Modal Immediate-Close Contract (Sprint Fix):
     The Token Quota Warning modal MUST call setTokenConfirmation(null) synchronously within the onConfirm handler
