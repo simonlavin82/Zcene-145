@@ -57,9 +57,9 @@ async function runRegressionSuite() {
 
     // 2. Payload Hygiene Tests
     console.log("\n--- 2. Payload Hygiene Tests ---");
-    // process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
+    process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
     try {
-        initializeApp({ projectId: "zcene-production" });
+        initializeApp({ projectId: "demo-zcene" });
     } catch(e) {
         // already initialized
     }
