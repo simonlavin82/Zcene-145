@@ -712,11 +712,84 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 // ALWAYS mints a rich narrative — for single-seed, multi-seed, and filtered jobs alike.
                 // isSandboxMode governs write-back isolation only; it must not suppress content generation.
                 console.log(`[Curation Backend] Batch hydration complete. Executing Final 3.1 Pro Synthesis...`);
+                const idRewriteMap = new Map();
+                const seedNorms = artistList.map((a) => (0, curatorService_1.normalizeArtistId)(a));
                 let rootBreakdownStr = "";
                 try {
                     // 3.1 Pro: Root Breakdown Narrative
                     rootBreakdownStr = await (0, curatorService_1.generateRootsBreakdownBackend)(inputPayload.artists, detailsCacheEntries, usageCollector);
                     finalGraph.synthesisRationale = rootBreakdownStr;
+                    // --- PRE-COMPUTE ID REWRITE MAP BEFORE GRAPH EXTRACTION ---
+                    for (const entityObj of recommendedEntities) {
+                        const recNorm = (0, curatorService_1.normalizeArtistId)(entityObj.name);
+                        const matchingSeedNorm = seedNorms.find((s) => isEntitySeedMatch(s, recNorm));
+                        const recDetailsEntry = detailsCacheEntries.find((entry) => isEntitySeedMatch(recNorm, entry[0]));
+                        const disambiguatedCanonicalId = recDetailsEntry ? recDetailsEntry[0] : recNorm;
+                        const compositeCanonicalId = (0, curatorService_1.buildCompositeCacheKey)(disambiguatedCanonicalId, inputPayload.filters || undefined);
+                        idRewriteMap.set(recNorm, compositeCanonicalId);
+                        if (matchingSeedNorm) {
+                            idRewriteMap.set(matchingSeedNorm, compositeCanonicalId);
+                        }
+                        if (recDetailsEntry) {
+                            recDetailsEntry[0] = compositeCanonicalId; // update entry in-place for later logic
+                        }
+                    }
+                    // Also ensure primary seeds are correctly mapped
+                    for (const seed of artistList) {
+                        const seedNorm = (0, curatorService_1.normalizeArtistId)(seed);
+                        const canonicalSeedId = resolvedSeedNormMap.get(seedNorm) ?? seedNorm;
+                        const compositeCanonicalId = (0, curatorService_1.buildCompositeCacheKey)(canonicalSeedId, inputPayload.filters || undefined);
+                        if (!idRewriteMap.has(seedNorm)) {
+                            idRewriteMap.set(seedNorm, compositeCanonicalId);
+                        }
+                        if (canonicalSeedId !== seedNorm && !idRewriteMap.has(canonicalSeedId)) {
+                            idRewriteMap.set(canonicalSeedId, compositeCanonicalId);
+                        }
+                    }
+                    // ── Apply Canonical ID Rewrite and Strict Deduplication to Graph Topology BEFORE Extraction ──
+                    if (finalGraph.nodes) {
+                        const uniqueNodesMap = new Map();
+                        finalGraph.nodes.forEach((node) => {
+                            const normId = (0, curatorService_1.normalizeArtistId)(node.id);
+                            if (idRewriteMap.has(normId)) {
+                                node.id = idRewriteMap.get(normId);
+                            }
+                            if (!uniqueNodesMap.has(node.id)) {
+                                uniqueNodesMap.set(node.id, node);
+                            }
+                        });
+                        finalGraph.nodes = Array.from(uniqueNodesMap.values());
+                    }
+                    if (finalGraph.links) {
+                        const uniqueLinksMap = new Map();
+                        finalGraph.links.forEach((link) => {
+                            const sId = typeof link.source === 'string' ? link.source : link.source.id;
+                            const tId = typeof link.target === 'string' ? link.target : link.target.id;
+                            const normS = (0, curatorService_1.normalizeArtistId)(sId);
+                            const normT = (0, curatorService_1.normalizeArtistId)(tId);
+                            let finalS = sId;
+                            let finalT = tId;
+                            if (idRewriteMap.has(normS))
+                                finalS = idRewriteMap.get(normS);
+                            if (idRewriteMap.has(normT))
+                                finalT = idRewriteMap.get(normT);
+                            if (typeof link.source === 'string')
+                                link.source = finalS;
+                            else
+                                link.source.id = finalS;
+                            if (typeof link.target === 'string')
+                                link.target = finalT;
+                            else
+                                link.target.id = finalT;
+                            if (finalS !== finalT) {
+                                const linkKey = [finalS, finalT].sort().join('--');
+                                if (!uniqueLinksMap.has(linkKey)) {
+                                    uniqueLinksMap.set(linkKey, link);
+                                }
+                            }
+                        });
+                        finalGraph.links = Array.from(uniqueLinksMap.values());
+                    }
                     // ── Step 5: Root Breakdown Write-Back to Seed Artist Docs (Atomic Self-Heal) ────────────────
                     // Per the Unified Canvas Architecture (Column 3, Step 5), Single-Seed jobs persist
                     // the Root Breakdown to the seed artist's Firestore doc so that future cache hits
@@ -747,7 +820,8 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                 const hasGraph = canonicalData?.graphData && ((typeof canonicalData.graphData === 'string' && canonicalData.graphData.length > 10) ||
                                     (typeof canonicalData.graphData === 'object' && canonicalData.graphData.nodes));
                                 if (!hasGraph) {
-                                    const rawExtracted = (0, curatorService_1.extractArtistSubGraph)(canonicalSeedId, finalGraph, artistList);
+                                    const finalExtractId = idRewriteMap.get(canonicalSeedId) ?? idRewriteMap.get(seedNorm) ?? canonicalSeedId;
+                                    const rawExtracted = (0, curatorService_1.extractArtistSubGraph)(finalExtractId, finalGraph, artistList);
                                     if (rawExtracted) {
                                         const safeExtractedGraph = JSON.parse(JSON.stringify(rawExtracted));
                                         if (safeExtractedGraph.nodes && safeExtractedGraph.nodes.length > 0) {
@@ -796,19 +870,13 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 catch (e) {
                     console.error(`[Curation Backend] 3.1 Pro Post-Processing failed:`, e);
                 }
-                const idRewriteMap = new Map();
                 // Proactively cache each recommended entity (artist or label) as a deep cache entry as well!
-                const seedNorms = artistList.map((a) => (0, curatorService_1.normalizeArtistId)(a));
                 for (const entityObj of recommendedEntities) {
                     const recArtist = entityObj.name;
                     const recNorm = (0, curatorService_1.normalizeArtistId)(recArtist);
                     const isLabel = entityObj.type === 'label';
                     const matchingSeedNorm = seedNorms.find((s) => isEntitySeedMatch(s, recNorm));
                     if (matchingSeedNorm) {
-                        // ALIAS this duplicate reference to the canonical seed ID so it gets merged!
-                        if (!idRewriteMap.has(recNorm) && idRewriteMap.has(matchingSeedNorm)) {
-                            idRewriteMap.set(recNorm, idRewriteMap.get(matchingSeedNorm));
-                        }
                         // Do NOT continue here. Let the seed fall through so it can be evaluated for partial hydration or missing assets during a cache upgrade.
                     }
                     const recDetailsEntry = detailsCacheEntries.find((entry) => isEntitySeedMatch(recNorm, entry[0]));
@@ -839,9 +907,6 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     }
                     const disambiguatedCanonicalId = recDetailsEntry ? recDetailsEntry[0] : recNorm;
                     const compositeCanonicalId = (0, curatorService_1.buildCompositeCacheKey)(disambiguatedCanonicalId, inputPayload.filters || undefined);
-                    idRewriteMap.set(recNorm, compositeCanonicalId);
-                    if (recDetailsEntry)
-                        recDetailsEntry[0] = compositeCanonicalId;
                     const recDocRef = db.collection(collName).doc(compositeCanonicalId);
                     // Bug 2: The Overwrite Violation - skip proactive cache update for perfect hits
                     if (recDetails && recDetails._isReadOnly && !matchingSeedNorm) {
@@ -861,7 +926,8 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             // by executeCurationPipeline; extractArtistSubGraph uses strict equality, so
                             // "buggin" will never match a node whose id is "buggin-us". (Law §6)
                             const canonicalSeedForExtract = resolvedSeedNormMap.get(matchingSeedNorm) ?? matchingSeedNorm;
-                            const rawExtracted = (0, curatorService_1.extractArtistSubGraph)(canonicalSeedForExtract, finalGraph, artistList);
+                            const finalExtractId = idRewriteMap.get(canonicalSeedForExtract) ?? canonicalSeedForExtract;
+                            const rawExtracted = (0, curatorService_1.extractArtistSubGraph)(finalExtractId, finalGraph, artistList);
                             if (rawExtracted) {
                                 safeExtractedGraph = JSON.parse(JSON.stringify(rawExtracted));
                                 // Fix D-1 Guard: An empty subgraph { nodes: [], links: [] } is truthy but
@@ -923,7 +989,8 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                 // applied to the update (recSnap.exists) path. Both call sites must be
                                 // consistent — one unguarded site is enough to corrupt the cache. (Law §1, §8)
                                 const canonicalSeedForExtract = resolvedSeedNormMap.get(matchingSeedNorm) ?? matchingSeedNorm;
-                                const rawExtracted = (0, curatorService_1.extractArtistSubGraph)(canonicalSeedForExtract, finalGraph, artistList);
+                                const finalExtractId = idRewriteMap.get(canonicalSeedForExtract) ?? canonicalSeedForExtract;
+                                const rawExtracted = (0, curatorService_1.extractArtistSubGraph)(finalExtractId, finalGraph, artistList);
                                 if (rawExtracted) {
                                     safeExtractedGraph = JSON.parse(JSON.stringify(rawExtracted));
                                     if (!safeExtractedGraph.nodes || safeExtractedGraph.nodes.length === 0) {
@@ -960,50 +1027,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         console.log(`[Curation Backend] Proactively updated detailsCache for recommendation (${collName}): ${compositeCanonicalId}`);
                     }
                 }
-                // Apply Canonical ID Rewrite and Strict Deduplication to Graph Topology
-                if (finalGraph.nodes) {
-                    const uniqueNodesMap = new Map();
-                    finalGraph.nodes.forEach((node) => {
-                        const normId = (0, curatorService_1.normalizeArtistId)(node.id);
-                        if (idRewriteMap.has(normId)) {
-                            node.id = idRewriteMap.get(normId);
-                        }
-                        if (!uniqueNodesMap.has(node.id)) {
-                            uniqueNodesMap.set(node.id, node);
-                        }
-                    });
-                    finalGraph.nodes = Array.from(uniqueNodesMap.values());
-                }
-                if (finalGraph.links) {
-                    const uniqueLinksMap = new Map();
-                    finalGraph.links.forEach((link) => {
-                        const sId = typeof link.source === 'string' ? link.source : link.source.id;
-                        const tId = typeof link.target === 'string' ? link.target : link.target.id;
-                        const normS = (0, curatorService_1.normalizeArtistId)(sId);
-                        const normT = (0, curatorService_1.normalizeArtistId)(tId);
-                        let finalS = sId;
-                        let finalT = tId;
-                        if (idRewriteMap.has(normS))
-                            finalS = idRewriteMap.get(normS);
-                        if (idRewriteMap.has(normT))
-                            finalT = idRewriteMap.get(normT);
-                        if (typeof link.source === 'string')
-                            link.source = finalS;
-                        else
-                            link.source.id = finalS;
-                        if (typeof link.target === 'string')
-                            link.target = finalT;
-                        else
-                            link.target.id = finalT;
-                        if (finalS !== finalT) {
-                            const linkKey = [finalS, finalT].sort().join('--');
-                            if (!uniqueLinksMap.has(linkKey)) {
-                                uniqueLinksMap.set(linkKey, link);
-                            }
-                        }
-                    });
-                    finalGraph.links = Array.from(uniqueLinksMap.values());
-                }
+                // Topology already rewritten and deduplicated in the pre-computation block before Step 5.
                 result = {
                     graphData: finalGraph,
                     detailsCache: JSON.stringify(detailsCacheEntries)
