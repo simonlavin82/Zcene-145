@@ -3104,17 +3104,34 @@ const App: React.FC = () => {
               if (choice !== 'cancel' && choice !== 'synthesis' && !choice.startsWith('override::') && candidates.length > 0) {
                 activeDisambiguationHints[normalizeArtistId(rawInput)] = data.origin;
               }
-            } catch (e) {
-              console.warn("Origin validation failed:", e);
-              choice = await new Promise<string | 'synthesis' | 'cancel'>((resolve) => {
-                setDisambiguationDialog({
-                  isOpen: true,
-                  query: rawInput,
-                  candidates: [],
-                  onSelect: (c) => { setDisambiguationDialog(null); resolve(c); },
-                  isLiveAISuggestions: true
-                });
-              });
+                success = true;
+                closeTokenConfirmation();
+              } catch (e: any) {
+                if (e.code === 'unauthenticated' || (e.message && e.message.toLowerCase().includes('password'))) {
+                  currentError = "Invalid API password. Please try again.";
+                  currentPassword = await confirmTokenUsage(isLiveSynthesisTemp ? 'live_synthesis' : 'generation', [], artistList, undefined, cacheCandidates.length > 0, currentError) || undefined;
+                  if (!currentPassword || currentPassword === 'back') {
+                    closeTokenConfirmation();
+                    setIsLoading(false);
+                    isHydratingSessionRef.current = false;
+                    isProjectLoadingRef.current = false;
+                    return;
+                  }
+                } else {
+                  console.warn("Origin validation failed:", e);
+                  closeTokenConfirmation();
+                  choice = await new Promise<string | 'synthesis' | 'cancel'>((resolve) => {
+                    setDisambiguationDialog({
+                      isOpen: true,
+                      query: rawInput,
+                      candidates: [],
+                      onSelect: (c) => { setDisambiguationDialog(null); resolve(c); },
+                      isLiveAISuggestions: true
+                    });
+                  });
+                  success = true;
+                }
+              }
             }
             setIsLoading(false);
             isHydratingSessionRef.current = false;
@@ -3532,7 +3549,7 @@ const App: React.FC = () => {
               setActiveNodeIds([searchId]);
             }
 
-            let confirmed: boolean | 'back' = true;
+            let confirmed: string | false | 'back' | true = true;
             if (!bypassTokenConfirmation) {
               confirmed = await confirmTokenUsage('cache_upgrade', [], [searchId], []);
             }
@@ -4222,7 +4239,7 @@ const App: React.FC = () => {
           setActiveNodeIds(optimisticActiveIds);
         }
 
-        let confirmed: boolean | 'back' = true;
+        let confirmed: string | false | 'back' | true = true;
         if (!bypassTokenConfirmation) {
           confirmed = await confirmTokenUsage(
             enrichmentRequired.length > 0 && missing.length === 0 ? 'cache_upgrade' : 'generation',

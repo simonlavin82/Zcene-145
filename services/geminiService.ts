@@ -2031,8 +2031,8 @@ export const streamNodeChat = async (
         apiKey: proxyKey,
         httpOptions: { 
             baseUrl,
-            customHeaders: {
-                ...(password && { 'x-zcene-password': password })
+            headers: {
+                ...(password ? { 'x-zcene-password': password } : {})
             }
         }
     });
