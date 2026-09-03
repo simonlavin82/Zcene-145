@@ -248,13 +248,54 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     .map((a) => a.trim())
                     .filter(Boolean);
                 console.log(`[Curation Backend] [Phase 1: Global Cache Routing] Checking seeds: ${artistList.join(', ')}`);
+                // ── Fix A: Canonical Slug Resolution Map ──────────────────────────────────
+                // Performs the same slug-dedup query that executeCurationPipeline runs in Column 2,
+                // building a single authoritative map of raw seed norm → canonical Firestore doc ID.
+                // All subsequent seed document writes (synthesisRationale, Phase 1 lookup, subgraph
+                // extraction) MUST use this map as their sole source of truth.
+                // Aligns with architecture_truth.md Law §6 (Canonical Alias Resolution).
+                const resolvedSeedNormMap = new Map();
+                for (const seed of artistList) {
+                    const seedNorm = (0, curatorService_1.normalizeArtistId)(seed);
+                    let canonicalId = seedNorm; // default: raw norm (no country suffix found)
+                    try {
+                        const dedupQuery = await db.collection('artists')
+                            .where('artistId', '>=', seedNorm)
+                            .where('artistId', '<=', `${seedNorm}\uf8ff`)
+                            .limit(5)
+                            .get();
+                        if (!dedupQuery.empty) {
+                            for (const snap of dedupQuery.docs) {
+                                const snapData = snap.data();
+                                // Prefer the doc with graphData (most complete). If none has graphData,
+                                // still adopt the canonical slug ID to keep naming consistent.
+                                if (snap.id !== seedNorm && snapData.artistId && snapData.artistId.startsWith(seedNorm)) {
+                                    canonicalId = snap.id; // e.g. "buggin-us"
+                                    if (snapData.graphData)
+                                        break; // prefer fully-populated doc
+                                }
+                            }
+                        }
+                    }
+                    catch (dedupErr) {
+                        console.warn(`[Curation Backend] [Fix A] Seed slug dedup failed for "${seedNorm}", proceeding with raw norm.`, dedupErr);
+                    }
+                    resolvedSeedNormMap.set(seedNorm, canonicalId);
+                    console.log(`[Curation Backend] [Fix A] Seed slug resolved: "${seedNorm}" → "${canonicalId}"`);
+                }
+                // ─────────────────────────────────────────────────────────────────────────
                 const resolvedSeedArray = [];
                 for (const seed of artistList) {
                     const seedNorm = (0, curatorService_1.normalizeArtistId)(seed);
+                    // Fix C: Use the canonical slug from resolvedSeedNormMap, not the raw seedNorm.
+                    // Without this, Phase 1 reads artists/buggin (2 fields) instead of
+                    // artists/buggin-us (14 fields), evaluating as a cache miss every time.
+                    // Aligns with architecture_truth.md Law §1 (Column 3 must not re-synthesize hydrated data).
+                    const canonicalSeedId = resolvedSeedNormMap.get(seedNorm) ?? seedNorm;
                     let cachedDetails = null;
                     try {
-                        // We check artists collection primarily for seeds
-                        const cacheDoc = await db.collection("artists").doc(seedNorm).get();
+                        // We check artists collection primarily for seeds (Fix C: use canonical slug doc)
+                        const cacheDoc = await db.collection("artists").doc(canonicalSeedId).get();
                         if (cacheDoc.exists) {
                             const cacheData = cacheDoc.data();
                             if (cacheData && cacheData.detailsCache) {
@@ -677,16 +718,21 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     if (rootBreakdownStr) {
                         for (const seedName of artistList) {
                             const seedNorm = (0, curatorService_1.normalizeArtistId)(seedName);
-                            const seedDocRef = db.collection('artists').doc(seedNorm);
+                            // Fix B: Target the canonical slug document, not the raw norm.
+                            // Previously wrote synthesisRationale to artists/buggin instead of artists/buggin-us,
+                            // violating architecture_truth.md Law §3. resolvedSeedNormMap (Fix A) provides
+                            // the correct canonical target established during Column 2 pre-flight.
+                            const canonicalSeedId = resolvedSeedNormMap.get(seedNorm) ?? seedNorm;
+                            const seedDocRef = db.collection('artists').doc(canonicalSeedId);
                             await seedDocRef.set({
                                 synthesisRationale: rootBreakdownStr,
                                 'detailsCache.synthesisRationale': firestore_2.FieldValue.delete(), // Bug 3 Fix: explicitly purge legacy bloat
                                 cachedAt: firestore_2.FieldValue.serverTimestamp()
                             }, { merge: true }).catch((e) => {
                                 // Non-fatal: the project graphData is the canonical ground truth.
-                                console.warn(`[Curation Backend] Root Breakdown write-back skipped for artist doc: ${seedNorm}`, e.message);
+                                console.warn(`[Curation Backend] Root Breakdown write-back skipped for artist doc: ${canonicalSeedId}`, e.message);
                             });
-                            console.log(`[Curation Backend] ✅ Root Breakdown written to seed artist doc: ${seedNorm}`);
+                            console.log(`[Curation Backend] ✅ Root Breakdown written to canonical seed doc: ${canonicalSeedId}`);
                         }
                     }
                     // 3.1 Pro: Final Node Positioning could be executed here if a service existed.
@@ -756,17 +802,31 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         }
                         let safeExtractedGraph = null;
                         if (matchingSeedNorm && !isLabel) {
-                            const rawExtracted = (0, curatorService_1.extractArtistSubGraph)(matchingSeedNorm, finalGraph, artistList);
+                            // Fix D-1: Pass the canonical slug ID (e.g. "buggin-us") instead of the raw
+                            // matchingSeedNorm (e.g. "buggin"). finalGraph nodes carry slugged IDs assigned
+                            // by executeCurationPipeline; extractArtistSubGraph uses strict equality, so
+                            // "buggin" will never match a node whose id is "buggin-us". (Law §6)
+                            const canonicalSeedForExtract = resolvedSeedNormMap.get(matchingSeedNorm) ?? matchingSeedNorm;
+                            const rawExtracted = (0, curatorService_1.extractArtistSubGraph)(canonicalSeedForExtract, finalGraph, artistList);
                             if (rawExtracted) {
                                 safeExtractedGraph = JSON.parse(JSON.stringify(rawExtracted));
-                                if (safeExtractedGraph.links) {
-                                    for (const link of safeExtractedGraph.links) {
-                                        link.source = typeof link.source === 'object' && link.source !== null ? link.source.id : link.source;
-                                        link.target = typeof link.target === 'object' && link.target !== null ? link.target.id : link.target;
-                                    }
+                                // Fix D-1 Guard: An empty subgraph { nodes: [], links: [] } is truthy but
+                                // produces graphData that the frontend topology guard rejects as a stub.
+                                // Coerce to null so no graphData is written — Law §1 (never write null data).
+                                if (!safeExtractedGraph.nodes || safeExtractedGraph.nodes.length === 0) {
+                                    console.warn(`[Curation Backend] [Fix D] extractArtistSubGraph returned empty topology for "${canonicalSeedForExtract}". Nulling graphData write to prevent stub corruption.`);
+                                    safeExtractedGraph = null;
                                 }
-                                if (finalGraph.synthesisRationale) {
-                                    safeExtractedGraph.synthesisRationale = finalGraph.synthesisRationale;
+                                else {
+                                    if (safeExtractedGraph.links) {
+                                        for (const link of safeExtractedGraph.links) {
+                                            link.source = typeof link.source === 'object' && link.source !== null ? link.source.id : link.source;
+                                            link.target = typeof link.target === 'object' && link.target !== null ? link.target.id : link.target;
+                                        }
+                                    }
+                                    if (finalGraph.synthesisRationale) {
+                                        safeExtractedGraph.synthesisRationale = finalGraph.synthesisRationale;
+                                    }
                                 }
                             }
                         }
@@ -805,17 +865,27 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         if (matchingSeedNorm) {
                             let safeExtractedGraph = null;
                             if (!isLabel) {
-                                const rawExtracted = (0, curatorService_1.extractArtistSubGraph)(matchingSeedNorm, finalGraph, artistList);
+                                // Fix D-2: Same canonical slug resolution and empty-topology guard as Fix D-1,
+                                // applied to the update (recSnap.exists) path. Both call sites must be
+                                // consistent — one unguarded site is enough to corrupt the cache. (Law §1, §8)
+                                const canonicalSeedForExtract = resolvedSeedNormMap.get(matchingSeedNorm) ?? matchingSeedNorm;
+                                const rawExtracted = (0, curatorService_1.extractArtistSubGraph)(canonicalSeedForExtract, finalGraph, artistList);
                                 if (rawExtracted) {
                                     safeExtractedGraph = JSON.parse(JSON.stringify(rawExtracted));
-                                    if (safeExtractedGraph.links) {
-                                        for (const link of safeExtractedGraph.links) {
-                                            link.source = typeof link.source === 'object' && link.source !== null ? link.source.id : link.source;
-                                            link.target = typeof link.target === 'object' && link.target !== null ? link.target.id : link.target;
-                                        }
+                                    if (!safeExtractedGraph.nodes || safeExtractedGraph.nodes.length === 0) {
+                                        console.warn(`[Curation Backend] [Fix D] extractArtistSubGraph returned empty topology for "${canonicalSeedForExtract}". Nulling graphData write.`);
+                                        safeExtractedGraph = null;
                                     }
-                                    if (finalGraph.synthesisRationale) {
-                                        safeExtractedGraph.synthesisRationale = finalGraph.synthesisRationale;
+                                    else {
+                                        if (safeExtractedGraph.links) {
+                                            for (const link of safeExtractedGraph.links) {
+                                                link.source = typeof link.source === 'object' && link.source !== null ? link.source.id : link.source;
+                                                link.target = typeof link.target === 'object' && link.target !== null ? link.target.id : link.target;
+                                            }
+                                        }
+                                        if (finalGraph.synthesisRationale) {
+                                            safeExtractedGraph.synthesisRationale = finalGraph.synthesisRationale;
+                                        }
                                     }
                                 }
                             }
