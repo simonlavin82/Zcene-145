@@ -47,19 +47,23 @@ function stripCountrySlug(name) {
     return cleanName;
 }
 exports.validateSeedOriginCallable = (0, https_1.onCall)({
-    secrets: ["GEMINI_API_KEY"],
+    secrets: ["GEMINI_API_KEY", "API_PASSWORD"],
     timeoutSeconds: 60,
     memory: "512MiB",
 }, async (request) => {
-    const { seed } = request.data;
+    const { seed, password } = request.data;
     if (!seed) {
         throw new https_1.HttpsError("invalid-argument", "Missing seed in payload");
+    }
+    const expectedPassword = process.env.API_PASSWORD;
+    if (expectedPassword && password !== expectedPassword) {
+        throw new https_1.HttpsError("unauthenticated", "Invalid or missing API password");
     }
     const validationResult = await (0, curatorService_1.validateSeedOriginBackend)(seed);
     return validationResult;
 });
 exports.executeCurationPipeline = (0, https_1.onCall)({
-    secrets: ["GEMINI_API_KEY"],
+    secrets: ["GEMINI_API_KEY", "API_PASSWORD"],
     timeoutSeconds: 540,
     memory: "1GiB",
 }, async (request) => {
@@ -68,12 +72,26 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
     if (!payload || !payload.artists) {
         throw new https_1.HttpsError("invalid-argument", "Missing artists in payload");
     }
+    const expectedPassword = process.env.API_PASSWORD;
+    if (expectedPassword && payload.password !== expectedPassword) {
+        throw new https_1.HttpsError("unauthenticated", "Invalid or missing API password");
+    }
     const artistList = payload.artists
         .split('::')
         .map((a) => a.trim())
         .filter(Boolean);
     console.log(`[Pipeline Diamond] -> Cache Lookup: Checking seeds: ${artistList.join(', ')}`);
     const detailsCacheEntries = [];
+    const collectedTokens = {};
+    const usageCollector = {
+        push: (model, usage) => {
+            if (!collectedTokens[model])
+                collectedTokens[model] = { prompt: 0, candidates: 0, total: 0 };
+            collectedTokens[model].prompt += usage.promptTokenCount;
+            collectedTokens[model].candidates += usage.candidatesTokenCount;
+            collectedTokens[model].total += usage.totalTokenCount;
+        }
+    };
     const resolvedSeedArray = [];
     let needsProGeneration = false;
     for (const seed of artistList) {
@@ -170,7 +188,7 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
                 validationResult = { isValid: true, id: seed, origin: payload.disambiguationHints[(0, curatorService_1.normalizeArtistId)(seed)], genre: "Unknown" };
             }
             else {
-                validationResult = await (0, curatorService_1.validateSeedOriginBackend)(seed);
+                validationResult = await (0, curatorService_1.validateSeedOriginBackend)(seed, usageCollector);
             }
             if (validationResult.isValid) {
                 let normId = (0, curatorService_1.normalizeArtistId)(validationResult.id);
@@ -200,7 +218,7 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
     let finalGraph = payload.baseGraph || { nodes: [], links: [] };
     if (needsProGeneration) {
         console.log(`[Pipeline Diamond] -> 3.1 Pro Topology Generation`);
-        finalGraph = await (0, curatorService_1.generateGraphDataBackend)(payload.artists, payload.filters, payload.cachedSubgraphsContext, payload.baseGraph, payload.disambiguationHints);
+        finalGraph = await (0, curatorService_1.generateGraphDataBackend)(payload.artists, payload.filters, payload.cachedSubgraphsContext, payload.baseGraph, payload.disambiguationHints, usageCollector);
     }
     else if (!payload.baseGraph || payload.baseGraph.nodes.length === 0) {
         console.log(`[Pipeline Diamond] -> Single Seed Cache Hit: Extracting topology from cache`);
@@ -324,7 +342,8 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
                 updatedAt: firestore_1.FieldValue.serverTimestamp(),
                 inputPayload: {
                     ...payload,
-                    baseGraph: finalGraph
+                    baseGraph: finalGraph,
+                    foregroundApiUsage: collectedTokens
                 }
             });
             console.log(`[Pipeline Diamond] -> Created curation job ${curationJobId} for background hydration`);

@@ -199,6 +199,16 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
     try {
         console.log(`[Curation Backend] Executing ${jobType} for user ${jobData.userId} with payload:`, inputPayload);
         let result = null;
+        const collectedTokens = {};
+        const usageCollector = {
+            push: (model, usage) => {
+                if (!collectedTokens[model])
+                    collectedTokens[model] = { prompt: 0, candidates: 0, total: 0 };
+                collectedTokens[model].prompt += usage.promptTokenCount;
+                collectedTokens[model].candidates += usage.candidatesTokenCount;
+                collectedTokens[model].total += usage.totalTokenCount;
+            }
+        };
         if (jobType === "graph_generation") {
             // Determine if we should run in mock mode
             const isEmulator = false; // TEMPORARILY DISABLED: process.env.FUNCTIONS_EMULATOR === "true";
@@ -277,7 +287,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     else {
                         console.log(`[Phase 1] Cache Miss for seed: ${seed}. Routing to Phase 2 (Flash-Lite).`);
                         // Phase 2: Origin Validation (Flash-Lite)
-                        const validationResult = await (0, curatorService_1.validateSeedOriginBackend)(seed);
+                        const validationResult = await (0, curatorService_1.validateSeedOriginBackend)(seed, usageCollector);
                         if (validationResult.isValid) {
                             resolvedSeedArray.push({
                                 id: (0, curatorService_1.normalizeArtistId)(validationResult.id),
@@ -488,14 +498,14 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                 return /429|503|resource.?exhausted|service.?unavailable|too many requests|timeout|fetch failed|network|socket|parse|invalid data|json/i.test(msg);
                             };
                             try {
-                                details = await (0, curatorService_1.fetchNodeDetailsBackend)(tempNode, finalGraph, cleanSeedArtistsContext);
+                                details = await (0, curatorService_1.fetchNodeDetailsBackend)(tempNode, finalGraph, cleanSeedArtistsContext, null, usageCollector);
                             }
                             catch (firstErr) {
                                 if (isTransientError(firstErr)) {
                                     console.warn(`[Curation Backend] Transient error for ${artistNormId}. Retrying in 8s...`, firstErr.message);
                                     await new Promise(resolve => setTimeout(resolve, 8000));
                                     try {
-                                        details = await (0, curatorService_1.fetchNodeDetailsBackend)(tempNode, finalGraph, cleanSeedArtistsContext);
+                                        details = await (0, curatorService_1.fetchNodeDetailsBackend)(tempNode, finalGraph, cleanSeedArtistsContext, null, usageCollector);
                                         console.log(`[Curation Backend] Retry succeeded for: ${artistNormId}`);
                                     }
                                     catch (retryErr) {
@@ -657,7 +667,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 let rootBreakdownStr = "";
                 try {
                     // 3.1 Pro: Root Breakdown Narrative
-                    rootBreakdownStr = await (0, curatorService_1.generateRootsBreakdownBackend)(inputPayload.artists, detailsCacheEntries);
+                    rootBreakdownStr = await (0, curatorService_1.generateRootsBreakdownBackend)(inputPayload.artists, detailsCacheEntries, usageCollector);
                     finalGraph.synthesisRationale = rootBreakdownStr;
                     // ── Step 5: Root Breakdown Write-Back to Seed Artist Docs ────────────────
                     // Per the Unified Canvas Architecture (Column 3, Step 5), Single-Seed jobs persist
@@ -938,6 +948,16 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
             catch (e) {
                 console.warn(`[Curation Backend] Failed to extract seedImageUrl:`, e);
             }
+            const mergedApiUsage = {
+                ...(inputPayload?.foregroundApiUsage || {})
+            };
+            for (const [model, usage] of Object.entries(collectedTokens)) {
+                if (!mergedApiUsage[model])
+                    mergedApiUsage[model] = { prompt: 0, candidates: 0, total: 0 };
+                mergedApiUsage[model].prompt += usage.prompt;
+                mergedApiUsage[model].candidates += usage.candidates;
+                mergedApiUsage[model].total += usage.total;
+            }
             await updateProjectStatus(jobData.userId, inputPayload.projectId, {
                 status: "completed",
                 graphData: JSON.stringify(result.graphData),
@@ -946,6 +966,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 activeJobId: null,
                 detailsCache: result.detailsCache,
                 activeNodes: hoistedActiveNodes, // Phase 2B: canonical seed-first ordering
+                apiUsage: mergedApiUsage,
                 ...(extractedSeedImageUrl ? { seedImageUrl: extractedSeedImageUrl } : {})
             });
         }

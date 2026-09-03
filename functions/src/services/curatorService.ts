@@ -2,6 +2,16 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { GraphData, Node, Link, DiscoveryFilters } from "../types";
 import { stripCountrySlug } from "../executeCurationPipeline";
 
+export interface TokenUsage {
+  promptTokenCount: number;
+  candidatesTokenCount: number;
+  totalTokenCount: number;
+}
+
+export interface UsageCollector {
+  push: (model: string, usage: TokenUsage) => void;
+}
+
 // --- UTILITIES PORTED FROM artistCacheService.ts ---
 
 export const normalizeArtistId = (name: string): string =>
@@ -614,7 +624,8 @@ export const SEED_VALIDATION_SCHEMA = {
 // --- CORE CURATOR LOGIC ---
 
 export const validateSeedOriginBackend = async (
-  artistId: string
+  artistId: string,
+  usageCollector?: UsageCollector
 ): Promise<{ id: string; origin: string; genre: string; isValid: boolean }> => {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -641,6 +652,14 @@ export const validateSeedOriginBackend = async (
     const jsonText = response.text?.trim() || "";
     if (!jsonText) throw new Error("Empty validation response");
 
+    if (usageCollector && response.usageMetadata) {
+      usageCollector.push(currentModel, {
+        promptTokenCount: response.usageMetadata.promptTokenCount || 0,
+        candidatesTokenCount: response.usageMetadata.candidatesTokenCount || 0,
+        totalTokenCount: response.usageMetadata.totalTokenCount || 0,
+      });
+    }
+
     const cleanedJsonText = extractCleanJsonString(jsonText);
     const data = JSON.parse(cleanedJsonText);
     return data;
@@ -653,7 +672,8 @@ export const validateSeedOriginBackend = async (
 
 export const generateRootsBreakdownBackend = async (
   artists: string,
-  detailsCacheEntries: any[]
+  detailsCacheEntries: any[],
+  usageCollector?: UsageCollector
 ): Promise<string> => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -685,6 +705,15 @@ ${JSON.stringify(detailsCacheEntries, null, 2)}`;
             temperature: 0.7,
         }
     });
+
+    if (usageCollector && response.usageMetadata) {
+      usageCollector.push(currentModel, {
+        promptTokenCount: response.usageMetadata.promptTokenCount || 0,
+        candidatesTokenCount: response.usageMetadata.candidatesTokenCount || 0,
+        totalTokenCount: response.usageMetadata.totalTokenCount || 0,
+      });
+    }
+
     const text = response.text || `[Roots Breakdown Unavailable]\n- Synthesis returned empty response.`;
     return text;
   } catch (err) {
@@ -698,7 +727,8 @@ export const generateGraphDataBackend = async (
   filters?: DiscoveryFilters,
   cachedSubgraphsContext?: string,
   baseGraph?: GraphData,
-  disambiguationHints?: Record<string, string>
+  disambiguationHints?: Record<string, string>,
+  usageCollector?: UsageCollector
 ): Promise<GraphData> => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -816,6 +846,14 @@ export const generateGraphDataBackend = async (
 
       jsonText = response.text?.trim() || "";
       if (!jsonText) throw new Error("The AI returned an empty response.");
+
+      if (usageCollector && response.usageMetadata) {
+        usageCollector.push(currentModel, {
+          promptTokenCount: response.usageMetadata.promptTokenCount || 0,
+          candidatesTokenCount: response.usageMetadata.candidatesTokenCount || 0,
+          totalTokenCount: response.usageMetadata.totalTokenCount || 0,
+        });
+      }
 
       const cleanedJsonText = extractCleanJsonString(jsonText);
 
@@ -1260,7 +1298,8 @@ export const fetchNodeDetailsBackend = async (
   node: Node,
   graphData: GraphData,
   seedArtists: string,
-  originHint?: string | null
+  originHint?: string | null,
+  usageCollector?: UsageCollector
 ): Promise<any> => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -1355,6 +1394,15 @@ export const fetchNodeDetailsBackend = async (
         new Promise<any>((_, reject) => setTimeout(() => reject(new Error('AbortError: Timeout exceeded')), 55000))
       ]);
       lastResponse = response;
+
+      if (usageCollector && response.usageMetadata) {
+        usageCollector.push(currentModel, {
+          promptTokenCount: response.usageMetadata.promptTokenCount || 0,
+          candidatesTokenCount: response.usageMetadata.candidatesTokenCount || 0,
+          totalTokenCount: response.usageMetadata.totalTokenCount || 0,
+        });
+      }
+
       const jsonText = response.text?.trim();
       if (!jsonText) {
         throw new Error("The AI returned an empty response for details.");

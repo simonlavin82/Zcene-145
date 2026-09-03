@@ -92,6 +92,16 @@ export const executeCurationPipeline = onCall({
   
   const detailsCacheEntries: [string, any][] = [];
   
+  const collectedTokens: Record<string, { prompt: number, candidates: number, total: number }> = {};
+  const usageCollector = {
+    push: (model: string, usage: any) => {
+      if (!collectedTokens[model]) collectedTokens[model] = { prompt: 0, candidates: 0, total: 0 };
+      collectedTokens[model].prompt += usage.promptTokenCount;
+      collectedTokens[model].candidates += usage.candidatesTokenCount;
+      collectedTokens[model].total += usage.totalTokenCount;
+    }
+  };
+  
   const resolvedSeedArray: any[] = [];
   let needsProGeneration = false;
   
@@ -187,7 +197,7 @@ export const executeCurationPipeline = onCall({
         if (payload.disambiguationHints && payload.disambiguationHints[normalizeArtistId(seed)]) {
            validationResult = { isValid: true, id: seed, origin: payload.disambiguationHints[normalizeArtistId(seed)], genre: "Unknown" };
         } else {
-           validationResult = await validateSeedOriginBackend(seed);
+           validationResult = await validateSeedOriginBackend(seed, usageCollector);
         }
         if (validationResult.isValid) {
            let normId = normalizeArtistId(validationResult.id);
@@ -224,7 +234,8 @@ export const executeCurationPipeline = onCall({
       payload.filters, 
       payload.cachedSubgraphsContext, 
       payload.baseGraph, 
-      payload.disambiguationHints
+      payload.disambiguationHints,
+      usageCollector
     );
   } else if (!payload.baseGraph || payload.baseGraph.nodes.length === 0) {
     console.log(`[Pipeline Diamond] -> Single Seed Cache Hit: Extracting topology from cache`);
@@ -360,7 +371,8 @@ export const executeCurationPipeline = onCall({
         updatedAt: FieldValue.serverTimestamp(),
         inputPayload: {
            ...payload,
-           baseGraph: finalGraph
+           baseGraph: finalGraph,
+           foregroundApiUsage: collectedTokens
         }
       });
       console.log(`[Pipeline Diamond] -> Created curation job ${curationJobId} for background hydration`);

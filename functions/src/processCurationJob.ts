@@ -217,6 +217,16 @@ export const processCurationJob = onDocumentCreated({
 
     let result: any = null;
 
+    const collectedTokens: Record<string, { prompt: number, candidates: number, total: number }> = {};
+    const usageCollector = {
+      push: (model: string, usage: any) => {
+        if (!collectedTokens[model]) collectedTokens[model] = { prompt: 0, candidates: 0, total: 0 };
+        collectedTokens[model].prompt += usage.promptTokenCount;
+        collectedTokens[model].candidates += usage.candidatesTokenCount;
+        collectedTokens[model].total += usage.totalTokenCount;
+      }
+    };
+
     if (jobType === "graph_generation") {
       // Determine if we should run in mock mode
       const isEmulator = false; // TEMPORARILY DISABLED: process.env.FUNCTIONS_EMULATOR === "true";
@@ -303,7 +313,7 @@ export const processCurationJob = onDocumentCreated({
               console.log(`[Phase 1] Cache Miss for seed: ${seed}. Routing to Phase 2 (Flash-Lite).`);
               
               // Phase 2: Origin Validation (Flash-Lite)
-              const validationResult = await validateSeedOriginBackend(seed);
+              const validationResult = await validateSeedOriginBackend(seed, usageCollector);
               if (validationResult.isValid) {
                  resolvedSeedArray.push({
                     id: normalizeArtistId(validationResult.id),
@@ -541,13 +551,13 @@ export const processCurationJob = onDocumentCreated({
                 };
 
                 try {
-                  details = await fetchNodeDetailsBackend(tempNode, finalGraph, cleanSeedArtistsContext);
+                  details = await fetchNodeDetailsBackend(tempNode, finalGraph, cleanSeedArtistsContext, null, usageCollector);
                 } catch (firstErr: any) {
                   if (isTransientError(firstErr)) {
                     console.warn(`[Curation Backend] Transient error for ${artistNormId}. Retrying in 8s...`, firstErr.message);
                     await new Promise(resolve => setTimeout(resolve, 8000));
                     try {
-                      details = await fetchNodeDetailsBackend(tempNode, finalGraph, cleanSeedArtistsContext);
+                      details = await fetchNodeDetailsBackend(tempNode, finalGraph, cleanSeedArtistsContext, null, usageCollector);
                       console.log(`[Curation Backend] Retry succeeded for: ${artistNormId}`);
                     } catch (retryErr: any) {
                       console.error(`[Curation Backend] Retry also failed for: ${artistNormId}. Safely skipping cache write.`, retryErr.message);
@@ -724,7 +734,7 @@ export const processCurationJob = onDocumentCreated({
     let rootBreakdownStr = "";
     try {
       // 3.1 Pro: Root Breakdown Narrative
-      rootBreakdownStr = await generateRootsBreakdownBackend(inputPayload.artists, detailsCacheEntries);
+      rootBreakdownStr = await generateRootsBreakdownBackend(inputPayload.artists, detailsCacheEntries, usageCollector);
       finalGraph.synthesisRationale = rootBreakdownStr;
 
       // ── Step 5: Root Breakdown Write-Back to Seed Artist Docs ────────────────
@@ -1031,6 +1041,17 @@ export const processCurationJob = onDocumentCreated({
         console.warn(`[Curation Backend] Failed to extract seedImageUrl:`, e);
       }
 
+      const mergedApiUsage: Record<string, { prompt: number, candidates: number, total: number }> = {
+        ...(inputPayload?.foregroundApiUsage || {})
+      };
+      
+      for (const [model, usage] of Object.entries(collectedTokens)) {
+        if (!mergedApiUsage[model]) mergedApiUsage[model] = { prompt: 0, candidates: 0, total: 0 };
+        mergedApiUsage[model].prompt += usage.prompt;
+        mergedApiUsage[model].candidates += usage.candidates;
+        mergedApiUsage[model].total += usage.total;
+      }
+
       await updateProjectStatus(jobData.userId, inputPayload.projectId, {
         status: "completed",
         graphData: JSON.stringify(result.graphData),
@@ -1039,6 +1060,7 @@ export const processCurationJob = onDocumentCreated({
         activeJobId: null,
         detailsCache: result.detailsCache,
         activeNodes: hoistedActiveNodes,  // Phase 2B: canonical seed-first ordering
+        apiUsage: mergedApiUsage,
         ...(extractedSeedImageUrl ? { seedImageUrl: extractedSeedImageUrl } : {})
       });
     }

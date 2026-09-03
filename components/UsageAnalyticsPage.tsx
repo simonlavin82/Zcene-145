@@ -31,6 +31,8 @@ export interface UserTelemetry {
         step4?: boolean;
         step5?: boolean;
     };
+    exactCost: number;
+    hasExactCost: boolean;
 }
 
 export interface TelemetryOverviewCardsProps {
@@ -147,8 +149,9 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
                             const totalActions = user.actionTriggers.createCount + user.actionTriggers.updateCount;
                             const queryTotal = user.cacheEfficiency.liveQueries + user.cacheEfficiency.cacheHits;
                             const efficiency = queryTotal > 0 ? (user.cacheEfficiency.cacheHits / queryTotal) * 100 : 0;
-                            const cost = user.cacheEfficiency.liveQueries * COST_PER_AI_CALL;
+                            const cost = user.hasExactCost ? user.exactCost : (user.cacheEfficiency.liveQueries * COST_PER_AI_CALL);
                             const savings = user.cacheEfficiency.cacheHits * COST_PER_AI_CALL;
+                            const costPrefix = user.hasExactCost ? '' : '~';
                             const isExpanded = expandedRow === user.email;
 
                             return (
@@ -174,7 +177,7 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
                                                 </span>
                                             </div>
                                         </td>
-                                        <td className="p-4 text-right font-mono text-red-400/80">${cost.toFixed(4)}</td>
+                                        <td className="p-4 text-right font-mono text-red-400/80">{costPrefix}${cost.toFixed(4)}</td>
                                         <td className="p-4 text-right font-mono text-primary">${savings.toFixed(4)}</td>
                                         <td className="p-4 text-center">
                                             <span className="material-symbols-outlined text-zinc-500">
@@ -310,6 +313,8 @@ const calculateTelemetryForUser = (
     let totalUpdates = 0;
     let totalLiveQueries = 0;
     let totalCacheHits = 0;
+    let exactCost = 0;
+    let hasExactCost = false;
     const artistFrequencyMap: Record<string, number> = {};
 
     projectDocs.forEach((pDoc) => {
@@ -345,6 +350,20 @@ const calculateTelemetryForUser = (
         totalLiveQueries += projectLiveQueries;
         totalCacheHits += projectCacheHits;
         totalUpdates += activeCount;
+        
+        if (pData.apiUsage) {
+            hasExactCost = true;
+            for (const [model, usage] of Object.entries(pData.apiUsage)) {
+                const u = usage as any;
+                if (model.includes('gemini-3.1-pro') || model.includes('gemini-1.5-pro')) {
+                    exactCost += (u.prompt / 1000000) * 3.50;
+                    exactCost += (u.candidates / 1000000) * 10.50;
+                } else if (model.includes('gemini-3.5-flash') || model.includes('gemini-1.5-flash')) {
+                    exactCost += (u.prompt / 1000000) * 0.075;
+                    exactCost += (u.candidates / 1000000) * 0.30;
+                }
+            }
+        }
     });
 
     // Sort frequency map to get top searches
@@ -371,7 +390,9 @@ const calculateTelemetryForUser = (
             cacheHits: totalCacheHits
         },
         deepCutsOpened: deepCutsOpened || 0,
-        onboardingProgress: onboardingProgress || {}
+        onboardingProgress: onboardingProgress || {},
+        exactCost,
+        hasExactCost
     };
 };
 
@@ -492,6 +513,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
         let totalUpdates = 0;
         let totalLiveQueries = 0;
         let totalCacheHits = 0;
+        let totalExactCosts = 0;
 
         ledgerData.forEach(user => {
             totalProjects += user.projectsCount;
@@ -499,11 +521,11 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
             totalUpdates += user.actionTriggers.updateCount;
             totalLiveQueries += user.cacheEfficiency.liveQueries;
             totalCacheHits += user.cacheEfficiency.cacheHits;
+            totalExactCosts += user.hasExactCost ? user.exactCost : (user.cacheEfficiency.liveQueries * COST_PER_AI_CALL);
         });
 
         const totalQueries = totalLiveQueries + totalCacheHits;
         const overallEfficiency = totalQueries > 0 ? (totalCacheHits / totalQueries) * 100 : 0;
-        const totalCosts = totalLiveQueries * COST_PER_AI_CALL;
         const totalSavings = totalCacheHits * COST_PER_AI_CALL;
 
         return {
@@ -512,7 +534,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
             totalLiveQueries,
             totalCacheHits,
             overallEfficiency,
-            totalCosts,
+            totalCosts: totalExactCosts,
             totalSavings
         };
     }, [ledgerData]);

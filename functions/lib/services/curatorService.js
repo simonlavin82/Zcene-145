@@ -572,7 +572,7 @@ exports.SEED_VALIDATION_SCHEMA = {
     required: ["id", "origin", "genre", "isValid"]
 };
 // --- CORE CURATOR LOGIC ---
-const validateSeedOriginBackend = async (artistId) => {
+const validateSeedOriginBackend = async (artistId, usageCollector) => {
     try {
         const apiKey = process.env.GEMINI_API_KEY;
         if (!apiKey) {
@@ -594,6 +594,13 @@ const validateSeedOriginBackend = async (artistId) => {
         const jsonText = response.text?.trim() || "";
         if (!jsonText)
             throw new Error("Empty validation response");
+        if (usageCollector && response.usageMetadata) {
+            usageCollector.push(currentModel, {
+                promptTokenCount: response.usageMetadata.promptTokenCount || 0,
+                candidatesTokenCount: response.usageMetadata.candidatesTokenCount || 0,
+                totalTokenCount: response.usageMetadata.totalTokenCount || 0,
+            });
+        }
         const cleanedJsonText = (0, exports.extractCleanJsonString)(jsonText);
         const data = JSON.parse(cleanedJsonText);
         return data;
@@ -605,7 +612,7 @@ const validateSeedOriginBackend = async (artistId) => {
     }
 };
 exports.validateSeedOriginBackend = validateSeedOriginBackend;
-const generateRootsBreakdownBackend = async (artists, detailsCacheEntries) => {
+const generateRootsBreakdownBackend = async (artists, detailsCacheEntries, usageCollector) => {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
         throw new Error("GEMINI_API_KEY is not defined in environment secrets.");
@@ -632,6 +639,13 @@ ${JSON.stringify(detailsCacheEntries, null, 2)}`;
                 temperature: 0.7,
             }
         });
+        if (usageCollector && response.usageMetadata) {
+            usageCollector.push(currentModel, {
+                promptTokenCount: response.usageMetadata.promptTokenCount || 0,
+                candidatesTokenCount: response.usageMetadata.candidatesTokenCount || 0,
+                totalTokenCount: response.usageMetadata.totalTokenCount || 0,
+            });
+        }
         const text = response.text || `[Roots Breakdown Unavailable]\n- Synthesis returned empty response.`;
         return text;
     }
@@ -641,7 +655,7 @@ ${JSON.stringify(detailsCacheEntries, null, 2)}`;
     }
 };
 exports.generateRootsBreakdownBackend = generateRootsBreakdownBackend;
-const generateGraphDataBackend = async (artists, filters, cachedSubgraphsContext, baseGraph, disambiguationHints) => {
+const generateGraphDataBackend = async (artists, filters, cachedSubgraphsContext, baseGraph, disambiguationHints, usageCollector) => {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
         throw new Error("GEMINI_API_KEY is not defined in environment secrets.");
@@ -748,6 +762,13 @@ const generateGraphDataBackend = async (artists, filters, cachedSubgraphsContext
             jsonText = response.text?.trim() || "";
             if (!jsonText)
                 throw new Error("The AI returned an empty response.");
+            if (usageCollector && response.usageMetadata) {
+                usageCollector.push(currentModel, {
+                    promptTokenCount: response.usageMetadata.promptTokenCount || 0,
+                    candidatesTokenCount: response.usageMetadata.candidatesTokenCount || 0,
+                    totalTokenCount: response.usageMetadata.totalTokenCount || 0,
+                });
+            }
             const cleanedJsonText = (0, exports.extractCleanJsonString)(jsonText);
             try {
                 data = JSON.parse(cleanedJsonText);
@@ -1162,7 +1183,7 @@ exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed informatio
     WIKIPEDIA ORDERING RULE (MANDATORY):
     If a Wikipedia link is found, it MUST be the very first item (index 0) in the links array.`;
 // --- DETAILS HYDRATION MODULES ---
-const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint) => {
+const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint, usageCollector) => {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
         throw new Error("GEMINI_API_KEY is not defined in environment secrets.");
@@ -1249,6 +1270,13 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint)
                 new Promise((_, reject) => setTimeout(() => reject(new Error('AbortError: Timeout exceeded')), 55000))
             ]);
             lastResponse = response;
+            if (usageCollector && response.usageMetadata) {
+                usageCollector.push(currentModel, {
+                    promptTokenCount: response.usageMetadata.promptTokenCount || 0,
+                    candidatesTokenCount: response.usageMetadata.candidatesTokenCount || 0,
+                    totalTokenCount: response.usageMetadata.totalTokenCount || 0,
+                });
+            }
             const jsonText = response.text?.trim();
             if (!jsonText) {
                 throw new Error("The AI returned an empty response for details.");
