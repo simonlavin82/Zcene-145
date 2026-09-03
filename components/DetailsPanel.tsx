@@ -408,9 +408,10 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
   onUpdateTasteProfile, onShowToast, onOpenTasteModal
 }) => {
     const handleAddToTaste = async (node: Node, details: NodeDetails) => {
-        if (!userTaste || !onUpdateTasteProfile) return;
+        if (!onUpdateTasteProfile) return;
+        const currentTaste = userTaste || [];
 
-        if (userTaste.length >= 5) {
+        if (currentTaste.length >= 5) {
             if (onShowToast) {
                 onShowToast("Maximum 5 taste profiles reached");
             }
@@ -450,8 +451,8 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
         const newProfile: TasteProfile = {
             id: crypto.randomUUID(),
-            name: profileName || `Profile ${userTaste.length + 1}`,
-            color: PROFILE_COLORS[userTaste.length % PROFILE_COLORS.length].name,
+            name: profileName || `Profile ${currentTaste.length + 1}`,
+            color: PROFILE_COLORS[currentTaste.length % PROFILE_COLORS.length].name,
             isActive: true,
             favoriteGenre: genre,
             style: style,
@@ -460,7 +461,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
             eraMax: null
         };
 
-        const updatedTaste = [...userTaste, newProfile];
+        const updatedTaste = [...currentTaste, newProfile];
         await onUpdateTasteProfile(updatedTaste);
         if (onShowToast) {
             onShowToast(`Added ${newProfile.name} to Taste Profiles`);
