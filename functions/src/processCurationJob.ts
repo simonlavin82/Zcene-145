@@ -455,6 +455,12 @@ export const processCurationJob = onDocumentCreated({
                     let bestDocId = artistNormId;
                     for (const snap of existingQuery.docs) {
                       const snapData = snap.data();
+                      // Fix: Skip redirect pointer documents (created by Fix E remediation).
+                      // A doc with redirectTo set is an alias stub, NOT a canonical record.
+                      // Without this guard, artists/buggin (redirectTo: "buggin-us") is
+                      // mistakenly adopted as the canonical ID, starving the hydration loop
+                      // of the real detailsCache in artists/buggin-us. (Law §6)
+                      if (snapData.redirectTo) continue;
                       if (snap.id !== artistNormId && snapData.artistId && snapData.artistId.startsWith(baseNormId)) {
                         // Prefer docs that already have graphData (fully curated)
                         if (snapData.graphData || snap.id === artistNormId) {
