@@ -3586,8 +3586,15 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             </div>
                             
                             <div className="rounded-xl overflow-hidden border border-zinc-800">
-                                 <img src="https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg" alt="Graph Background" className="w-full h-48 object-cover opacity-60" />
-                                 <div className="p-4 bg-zinc-900 text-xs font-mono text-zinc-500">Texture: Organic Grid Overlays</div>
+                                 <div 
+                                    className="w-full h-48"
+                                    style={{
+                                      backgroundImage: 'linear-gradient(rgba(17, 17, 19, 0.8), rgba(17, 17, 19, 0.8)), url("https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg")',
+                                      backgroundSize: 'cover',
+                                      backgroundPosition: 'center'
+                                    }}
+                                 />
+                                 <div className="p-4 bg-zinc-900 text-xs font-mono text-zinc-500">Texture: Organic Grid Overlays (with 80% dark wash overlay)</div>
                             </div>
                         </div>
                     </section>

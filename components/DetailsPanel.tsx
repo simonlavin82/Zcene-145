@@ -1995,7 +1995,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         <div 
           className="w-full h-full flex flex-col bg-zinc-900 overflow-hidden relative min-h-0 outline-none"
           style={isMagazineViewOpen ? {
-            backgroundImage: 'url("https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg")',
+            backgroundImage: 'linear-gradient(rgba(17, 17, 19, 0.8), rgba(17, 17, 19, 0.8)), url("https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg")',
             backgroundSize: 'cover',
             backgroundPosition: 'center'
           } : {}}

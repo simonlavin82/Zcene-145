@@ -1526,7 +1526,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
     <div 
         className="absolute inset-0 flex flex-col overflow-hidden"
         style={{
-            backgroundImage: 'url("https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg")',
+            backgroundImage: 'linear-gradient(rgba(17, 17, 19, 0.8), rgba(17, 17, 19, 0.8)), url("https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg")',
             backgroundSize: 'cover',
             backgroundPosition: 'center'
         }}
