@@ -1,7 +1,7 @@
 import React from 'react';
 import Header from './Header';
 import ViewToggle from './ViewToggle';
-import { Project, StackItem } from '../types';
+import { Project, StackItem, UserTaste } from '../types';
 import { User } from 'firebase/auth';
 import { motion } from 'framer-motion';
 import { normalizeArtistId, cleanArtistDisplayName } from '../services/artistCacheService';
@@ -42,6 +42,8 @@ interface DashboardProps {
   setIsMenuOpen: (open: boolean) => void;
   onRestartWalkthrough?: () => void;
   onShareProject?: (project: Project) => void;
+  userTaste?: UserTaste;
+  onSaveTaste?: (taste: UserTaste) => Promise<void>;
 }
 
 const Dashboard: React.FC<DashboardProps> = ({
@@ -68,7 +70,9 @@ const Dashboard: React.FC<DashboardProps> = ({
   isMenuOpen,
   setIsMenuOpen,
   onRestartWalkthrough,
-  onShareProject
+  onShareProject,
+  userTaste,
+  onSaveTaste
 }) => {
   const [projectToDelete, setProjectToDelete] = React.useState<string | null>(null);
   const [projectToRename, setProjectToRename] = React.useState<Project | null>(null);
@@ -231,6 +235,8 @@ const Dashboard: React.FC<DashboardProps> = ({
         isMenuOpen={isMenuOpen}
         setIsMenuOpen={setIsMenuOpen}
         onRestartWalkthrough={onRestartWalkthrough}
+        userTaste={userTaste}
+        onSaveTaste={onSaveTaste}
       />
 
       

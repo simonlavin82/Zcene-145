@@ -7703,6 +7703,8 @@ const App: React.FC = () => {
             setIsMenuOpen={setIsMenuOpen}
             onNavigate={handleMenuNavigate}
             onRestartWalkthrough={handleDashboardRestartWalkthrough}
+            userTaste={profile?.taste}
+            onSaveTaste={(taste) => handleUpdateProfile({ taste })}
           />
         </div>
         <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Graph ? 'z-10' : 'z-0 opacity-0 pointer-events-none'}`}>
