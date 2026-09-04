@@ -207,7 +207,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   return (
     <div 
-      className="h-full w-full overflow-y-auto bg-background-dark text-zinc-200 font-display flex flex-col relative"
+      className="h-full w-full overflow-hidden bg-background-dark text-zinc-200 font-display flex flex-col relative"
       style={{
         backgroundImage: 'linear-gradient(rgba(17, 17, 19, 0.8), rgba(17, 17, 19, 0.8)), url("https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg")',
         backgroundSize: 'cover',
@@ -240,7 +240,8 @@ const Dashboard: React.FC<DashboardProps> = ({
       />
 
       
-      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow">
+      <div className="flex-grow w-full overflow-y-auto relative">
+        <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="w-full space-y-8">
           <div className="flex flex-col-reverse items-start text-left md:flex-row md:justify-between md:items-center gap-4">
             <h1 className="text-lg font-medium uppercase tracking-widest text-zinc-200">YOUR ZCENES</h1>
@@ -723,7 +724,8 @@ const Dashboard: React.FC<DashboardProps> = ({
             </div>
           )}
         </div>
-      </main>
+        </main>
+      </div>
 
       {/* Custom Rename Confirmation Modal */}
       {projectToRename && (
