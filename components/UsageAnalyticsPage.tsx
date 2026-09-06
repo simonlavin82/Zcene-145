@@ -411,22 +411,44 @@ const calculateTelemetryForUser = (
             hasExactCost = true;
         }
 
-        let generationType = "Direct Hit";
-        if (seeds.length > 1) {
-            generationType = "Partial Hit";
-        } else if (hasProCall || (!projectHasExactCost && activeCount > projectLiveQueries)) {
-            // Older projects logic: If we don't have exact cost, we guess New Root if there are more nodes than seeds.
-            // Wait, actually for older projects, if activeCount > 1, it's a generated graph.
-            generationType = (activeCount > 1) ? "New Root" : "Direct Hit";
-            if (hasProCall) generationType = "New Root";
+        let generationType = pData.generationType;
+        let cost = 0;
+        let isEstimate = false;
+
+        if (generationType) {
+            if (generationType === "Direct Hit") {
+                cost = 0;
+            } else if (projectHasExactCost) {
+                cost = projectExactCost;
+            } else {
+                cost = projectLiveQueries * COST_PER_AI_CALL;
+                isEstimate = true;
+            }
+        } else {
+            // Legacy Fallback Logic
+            generationType = "Direct Hit";
+            if (seeds.length > 1 || (pData.discoveryFilters && pData.discoveryFilters !== "{}")) {
+                generationType = "Complex Generation";
+            } else if (hasProCall || (!projectHasExactCost && activeCount > projectLiveQueries)) {
+                generationType = (activeCount > 1) ? "Root Generation" : "Direct Hit";
+                if (hasProCall) generationType = "Root Generation";
+            }
+            
+            cost = projectHasExactCost ? projectExactCost : (projectLiveQueries * COST_PER_AI_CALL);
+            isEstimate = !projectHasExactCost;
+            
+            if (generationType === "Direct Hit") {
+                cost = 0;
+                isEstimate = false;
+            }
         }
 
         projects.push({
             id: pDoc.id,
             seedArtist: seedStr || "Unknown",
             generationType,
-            cost: projectHasExactCost ? projectExactCost : (projectLiveQueries * COST_PER_AI_CALL),
-            isEstimate: !projectHasExactCost
+            cost,
+            isEstimate
         });
     });
 

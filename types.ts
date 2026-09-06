@@ -176,6 +176,7 @@ export interface Project {
   activeJobId?: string | null;
   coverImage?: string;
   seedImageUrl?: string;
+  generationType?: "Root Generation" | "Partial Generation" | "Direct Hit" | "Complex Generation" | string;
   createdAt?: any;
   updatedAt?: any;
 }

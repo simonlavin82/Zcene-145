@@ -105,6 +105,9 @@ export const executeCurationPipeline = onCall({
   const resolvedSeedArray: any[] = [];
   let needsProGeneration = false;
   
+  let hasStubHit = false;
+  let hasCacheMiss = false;
+  
   for (const seed of artistList) {
      const seedNorm = normalizeArtistId(seed);
      let cachedDetails: any = null;
@@ -180,6 +183,7 @@ export const executeCurationPipeline = onCall({
          } else {
             console.log(`[Pipeline Diamond] -> Is Hit? Partial (Stub) -> Missing Topology -> Triggering Pro Gen: ${seed}`);
             needsProGeneration = true;
+            hasStubHit = true;
             resolvedSeedArray.push({
                id: resolvedSeedNorm,
                name: seed,
@@ -192,6 +196,7 @@ export const executeCurationPipeline = onCall({
       } else {
         console.log(`[Pipeline Diamond] -> Is Hit? No -> Flash-Lite Origin Validation: ${seed}`);
         needsProGeneration = true;
+        hasCacheMiss = true;
         
         let validationResult: any = null;
         if (payload.disambiguationHints && payload.disambiguationHints[normalizeArtistId(seed)]) {
@@ -348,13 +353,25 @@ export const executeCurationPipeline = onCall({
 
   let curationJobId = null;
 
+  let determinedGenerationType = "Direct Hit";
+  if (artistList.length > 1 || (payload.filters && Object.keys(payload.filters).length > 0)) {
+     determinedGenerationType = "Complex Generation";
+  } else if (needsProGeneration) {
+     if (hasStubHit && !hasCacheMiss) {
+        determinedGenerationType = "Partial Generation";
+     } else {
+        determinedGenerationType = "Root Generation";
+     }
+  }
+
   if (payload.userId && payload.projectId) {
     try {
-      console.log(`[Pipeline Diamond] -> Initiating Curation Pipeline for ${payload.projectId}`);
+      console.log(`[Pipeline Diamond] -> Initiating Curation Pipeline for ${payload.projectId} with type: ${determinedGenerationType}`);
       const projectUpdate: any = {
         graphData: JSON.stringify(finalGraph),
         schemaVersion: 2,
         supportsLabelDeepCuts: true,
+        generationType: determinedGenerationType,
         updatedAt: FieldValue.serverTimestamp()
       };
       
@@ -372,6 +389,7 @@ export const executeCurationPipeline = onCall({
         inputPayload: {
            ...payload,
            baseGraph: finalGraph,
+           generationType: determinedGenerationType,
            foregroundApiUsage: collectedTokens
         }
       });

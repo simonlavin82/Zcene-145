@@ -1228,6 +1228,7 @@ export const processCurationJob = onDocumentCreated({
         detailsCache: result.detailsCache,
         activeNodes: hoistedActiveNodes,  // Phase 2B: canonical seed-first ordering
         apiUsage: mergedApiUsage,
+        ...(inputPayload?.generationType ? { generationType: inputPayload.generationType } : {}),
         ...(extractedSeedImageUrl ? { seedImageUrl: extractedSeedImageUrl } : {})
       });
     }
