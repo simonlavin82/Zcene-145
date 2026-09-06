@@ -42,6 +42,7 @@ export interface ProjectTelemetry {
     generationType: string;
     cost: number;
     isEstimate: boolean;
+    createdAt: number;
 }
 
 export interface TelemetryOverviewCardsProps {
@@ -281,6 +282,7 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
                                                                  <thead>
                                                                      <tr className="border-b border-zinc-800 bg-zinc-900/30">
                                                                          <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Project / Seed</th>
+                                                                         <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Date</th>
                                                                          <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Generation Type</th>
                                                                          <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Cost</th>
                                                                      </tr>
@@ -288,9 +290,11 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
                                                                  <tbody>
                                                                      {user.projects.map((proj, idx) => {
                                                                          const isDirectHit = proj.generationType === "Direct Hit";
+                                                                         const dateStr = proj.createdAt ? new Date(proj.createdAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).replace(',', ',') : '';
                                                                          return (
                                                                              <tr key={idx} className="border-b border-zinc-800/50 last:border-0 hover:bg-zinc-900/20">
                                                                                  <td className="p-3 text-xs text-zinc-300 font-medium">{proj.seedArtist}</td>
+                                                                                 <td className="p-3 text-xs text-zinc-400 whitespace-nowrap">{dateStr}</td>
                                                                                  <td className="p-3 text-xs text-zinc-400">{proj.generationType}</td>
                                                                                  <td className={`p-3 text-xs text-right font-mono ${isDirectHit ? 'text-primary/80' : 'text-red-400/80'}`}>
                                                                                      {proj.isEstimate ? '~' : ''}${proj.cost.toFixed(4)}
@@ -443,14 +447,22 @@ const calculateTelemetryForUser = (
             }
         }
 
+        let createdAt = 0;
+        if (pData.createdAt) {
+            createdAt = typeof pData.createdAt.toMillis === 'function' ? pData.createdAt.toMillis() : (pData.createdAt.seconds ? pData.createdAt.seconds * 1000 : Date.now());
+        }
+
         projects.push({
             id: pDoc.id,
             seedArtist: seedStr || "Unknown",
             generationType,
             cost,
-            isEstimate
+            isEstimate,
+            createdAt
         });
     });
+
+    projects.sort((a, b) => b.createdAt - a.createdAt);
 
     // Sort frequency map to get top searches
     const sortedSearches = Object.entries(artistFrequencyMap)

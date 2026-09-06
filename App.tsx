@@ -3510,6 +3510,7 @@ const App: React.FC = () => {
                     seedArtists: artists,
                     detailsCache: JSON.stringify(Array.from(detailsCacheRef.current.entries())),
                     status: 'completed',
+                    generationType: 'Direct Hit',
                     updatedAt: serverTimestamp()
                   });
                   console.log("[Phase 3 Hydration Guard] Updated project doc via Cache Hit. Awaiting onSnapshot.");
