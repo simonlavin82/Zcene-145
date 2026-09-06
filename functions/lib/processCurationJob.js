@@ -1119,6 +1119,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 detailsCache: result.detailsCache,
                 activeNodes: hoistedActiveNodes, // Phase 2B: canonical seed-first ordering
                 apiUsage: mergedApiUsage,
+                ...(inputPayload?.generationType ? { generationType: inputPayload.generationType } : {}),
                 ...(extractedSeedImageUrl ? { seedImageUrl: extractedSeedImageUrl } : {})
             });
         }

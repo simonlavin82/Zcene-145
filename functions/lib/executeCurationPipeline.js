@@ -94,6 +94,8 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
     };
     const resolvedSeedArray = [];
     let needsProGeneration = false;
+    let hasStubHit = false;
+    let hasCacheMiss = false;
     for (const seed of artistList) {
         const seedNorm = (0, curatorService_1.normalizeArtistId)(seed);
         let cachedDetails = null;
@@ -170,6 +172,7 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
             else {
                 console.log(`[Pipeline Diamond] -> Is Hit? Partial (Stub) -> Missing Topology -> Triggering Pro Gen: ${seed}`);
                 needsProGeneration = true;
+                hasStubHit = true;
                 resolvedSeedArray.push({
                     id: resolvedSeedNorm,
                     name: seed,
@@ -183,6 +186,7 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
         else {
             console.log(`[Pipeline Diamond] -> Is Hit? No -> Flash-Lite Origin Validation: ${seed}`);
             needsProGeneration = true;
+            hasCacheMiss = true;
             let validationResult = null;
             if (payload.disambiguationHints && payload.disambiguationHints[(0, curatorService_1.normalizeArtistId)(seed)]) {
                 validationResult = { isValid: true, id: seed, origin: payload.disambiguationHints[(0, curatorService_1.normalizeArtistId)(seed)], genre: "Unknown" };
@@ -321,13 +325,26 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
     }
     console.log(`[Pipeline Diamond] -> Skipping synchronous hydration (Delegated to processCurationJob)`);
     let curationJobId = null;
+    let determinedGenerationType = "Direct Hit";
+    if (artistList.length > 1 || (payload.filters && Object.keys(payload.filters).length > 0)) {
+        determinedGenerationType = "Complex Generation";
+    }
+    else if (needsProGeneration) {
+        if (hasStubHit && !hasCacheMiss) {
+            determinedGenerationType = "Partial Generation";
+        }
+        else {
+            determinedGenerationType = "Root Generation";
+        }
+    }
     if (payload.userId && payload.projectId) {
         try {
-            console.log(`[Pipeline Diamond] -> Initiating Curation Pipeline for ${payload.projectId}`);
+            console.log(`[Pipeline Diamond] -> Initiating Curation Pipeline for ${payload.projectId} with type: ${determinedGenerationType}`);
             const projectUpdate = {
                 graphData: JSON.stringify(finalGraph),
                 schemaVersion: 2,
                 supportsLabelDeepCuts: true,
+                generationType: determinedGenerationType,
                 updatedAt: firestore_1.FieldValue.serverTimestamp()
             };
             await db.collection('users').doc(payload.userId).collection('projects').doc(payload.projectId).update(projectUpdate);
@@ -343,6 +360,7 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
                 inputPayload: {
                     ...payload,
                     baseGraph: finalGraph,
+                    generationType: determinedGenerationType,
                     foregroundApiUsage: collectedTokens
                 }
             });
