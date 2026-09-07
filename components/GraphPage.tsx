@@ -1482,7 +1482,8 @@ const GraphPage: React.FC<GraphPageProps> = ({
     return (
         <div className="relative flex items-center gap-2">
             <div className="relative">
-                <input type="search" placeholder="Search" value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); if (selectedNode) onNodeClick(null); }} onFocus={() => { if (selectedNode) onNodeClick(null); }} className="w-48 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-1.5 pl-4 pr-10 text-xs font-normal focus:ring-1 focus:ring-primary focus:outline-none backdrop-blur-sm" />
+                <span className={`material-symbols-outlined absolute top-1/2 -translate-y-1/2 text-zinc-500 ${InputSizes.sm.leftIcon}`}>search</span>
+                <input type="search" placeholder="Search" value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); if (selectedNode) onNodeClick(null); }} onFocus={() => { if (selectedNode) onNodeClick(null); }} className={`w-48 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 font-normal focus:ring-1 focus:ring-primary focus:outline-none backdrop-blur-sm ${InputSizes.sm.search}`} />
                 <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">{!searchQuery && (<button onClick={() => handleSpeechToText('graph')} className={`w-6 h-6 flex items-center justify-center rounded-[8px] transition-colors leading-none ${isListeningForGraph ? 'text-primary animate-pulse' : 'text-zinc-500 hover:text-white'}`} title="Search by voice"><MicIcon className="!text-[14px]" /></button>)}{searchQuery && (<button onClick={() => setSearchQuery('')} className="w-6 h-6 flex items-center justify-center rounded-[8px] text-zinc-400 hover:text-white transition-colors leading-none" aria-label="Clear search"><span className="material-symbols-outlined !text-[14px]">close</span></button>)}</div>
             </div>
         </div>
@@ -1546,7 +1547,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
         {isSmallScreen ? (
             <>
                 <div className="flex-grow flex-shrink min-h-0 flex flex-col overflow-hidden relative">
-                    <div className={`flex-shrink-0 h-16 border-y border-zinc-700/50 bg-zinc-900 relative z-20 ${isMagazineViewOpen ? 'hidden' : ''}`}>
+                    <div className={`flex-shrink-0 ${LayoutSizes.headerBar} border-b border-zinc-700/50 bg-zinc-900 relative z-20 ${isMagazineViewOpen ? 'hidden' : ''}`}>
                         <nav className="flex h-full">
                             {(['artists', 'spiderweb', 'details'] as MobileTab[]).map(tab => {
                                 const totalDetails = displayBadgeCount;
@@ -1577,7 +1578,8 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                         <div className="flex items-center gap-2 px-4">
                                             <div className="relative flex-grow min-w-0 flex items-center gap-2">
                                                 <div className="relative flex-grow min-w-0">
-                                                    <input type="search" placeholder="Search" value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); if (selectedNode) onNodeClick(null); }} onFocus={() => { if (selectedNode) onNodeClick(null); }} className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-1.5 pl-4 pr-10 text-xs font-normal focus:ring-1 focus:ring-primary focus:outline-none backdrop-blur-sm" />
+                                                    <span className={`material-symbols-outlined absolute top-1/2 -translate-y-1/2 text-zinc-500 ${InputSizes.sm.leftIcon}`}>search</span>
+                                                    <input type="search" placeholder="Search" value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); if (selectedNode) onNodeClick(null); }} onFocus={() => { if (selectedNode) onNodeClick(null); }} className={`w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 font-normal focus:ring-1 focus:ring-primary focus:outline-none backdrop-blur-sm ${InputSizes.sm.search}`} />
                                                     <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">{!searchQuery && (<button onClick={() => handleSpeechToText('graph')} className={`w-6 h-6 flex items-center justify-center rounded-[8px] transition-colors leading-none ${isListeningForGraph ? 'text-primary animate-pulse' : 'text-zinc-500 hover:text-white'}`} title="Search by voice"><MicIcon className="!text-[14px]" /></button>)}{searchQuery && (<button onClick={() => setSearchQuery('')} className="w-6 h-6 flex items-center justify-center rounded-[8px] text-zinc-400 hover:text-white transition-colors leading-none" aria-label="Clear search"><span className="material-symbols-outlined !text-[14px]">close</span></button>)}</div>
                                                 </div>
                                             </div>

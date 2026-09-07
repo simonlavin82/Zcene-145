@@ -28,7 +28,7 @@ export const LayoutSizes = {
 export const InputSizes = {
   sm: {
     base: 'py-1.5 text-xs',
-    search: 'py-1.5 pl-4 pr-10 text-xs',
+    search: 'py-1.5 pl-8 pr-10 text-xs',
     magazineSearch: 'py-1.5 pl-8 pr-10 text-xs',
     iconBtn: 'w-6 h-6 rounded-[8px]',
     icon: '!text-[14px]',
