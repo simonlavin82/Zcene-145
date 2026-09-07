@@ -1992,6 +1992,15 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         return Math.max(0, count);
     }, [loadingNodeIds, viewedNode]);
 
+    const seedCount = seedArtists.length || 1;
+    const aiArtistsCount = useMemo(() => {
+        if (!graphData?.nodes) return 0;
+        return graphData.nodes.filter(n => !n.isSeed && n.type !== 'label').length;
+    }, [graphData]);
+    const deepCutsCount = useMemo(() => {
+        return activeNodes.filter(n => n.type === 'artist' || n.type === 'label' || !n.type).length;
+    }, [activeNodes]);
+
     const sanitizedRationaleText = useMemo(() => {
         if (!graphData?.synthesisRationale) return '';
         let sanitized = graphData.synthesisRationale;
@@ -2074,17 +2083,10 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                 </div>
             ) : (
                 isMagazineViewOpen ? (
-                    <div className="h-12 flex-shrink-0 border-b border-zinc-600/50 bg-zinc-900 z-[60] relative">
-                        <div className="max-w-[1400px] mx-auto w-full h-full px-4 md:px-6 lg:px-8 flex items-center justify-between relative">
+                    <div className="h-12 flex-shrink-0 border-b border-zinc-600/50 bg-zinc-900 z-[60] relative px-4 md:px-6 lg:px-8">
+                        <div className="max-w-[1400px] mx-auto w-full h-full flex items-center justify-between relative">
                             <div className="flex items-center gap-4 overflow-hidden w-full h-full">
-                                <div className="flex items-center gap-2">
-                                    <h2 className="text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Deep Cut</h2>
-                                    <span className={`h-5 w-5 flex flex-shrink-0 items-center justify-center text-[9px] font-bold border rounded-md transition-all duration-500 ${unreadCount > 0 ? 'bg-brand-black text-primary border-primary/50' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>
-                                        {activeNodes.length}
-                                    </span>
-                                </div>
                                 <div className="flex items-center gap-4 flex-grow animate-in fade-in slide-in-from-left-4 duration-500">
-                                    <div className="h-6 w-px bg-zinc-700 mx-2 hidden md:block" />
                                     <div className="flex items-center gap-3 flex-grow max-w-md">
                                         <div className="relative flex-grow">
                                             <span className={`material-symbols-outlined absolute top-1/2 -translate-y-1/2 text-zinc-500 ${InputSizes.sm.leftIcon}`}>search</span>
@@ -2253,6 +2255,17 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     >
                         {isMagazineViewOpen && graphData?.synthesisRationale && (
                             <div className="max-w-[1400px] mx-auto pt-12 md:pt-16 pb-12 mb-8 border-b border-zinc-800/50 transition-opacity duration-500 ease-in-out opacity-100 px-0">
+                                <div className="flex items-center gap-2 mb-6 animate-in fade-in slide-in-from-bottom-2 duration-700">
+                                    <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                                        SEED: {seedCount}
+                                    </span>
+                                    <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                                        AI ARTISTS: {aiArtistsCount}
+                                    </span>
+                                    <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                                        DEEP CUTS: {deepCutsCount}
+                                    </span>
+                                </div>
                                 <h1 className="text-7xl font-bold tracking-tighter text-white mb-10 leading-tight" style={{ wordBreak: 'break-word' }}>
                                     {projectName || (seedArtists && seedArtists.length > 0 ? seedArtists.join(' / ') : 'Magazine')}
                                 </h1>
