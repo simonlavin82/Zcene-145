@@ -1686,6 +1686,7 @@ interface DetailsPanelProps {
   onUpdateTasteProfile?: (taste: UserTaste) => Promise<void>;
   onShowToast?: (message: string) => void;
   onOpenTasteModal?: () => void;
+  projectName?: string;
 }
 
 export const DetailsPanel: React.FC<DetailsPanelProps> = ({
@@ -1694,7 +1695,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
   isSmallScreen, onNodeClick, onGenerateDeepCut, onExtendNode, onNavigate, isGlobalLoading, onCancelGlobalLoading, unreadCount, isActive, collapseBtnRef,
   isMagazineViewOpen, onMagazineViewToggle, chatHistories, onUpdateChatHistories, stack, onToggleStack,
   isGuest = false, onAuthRequest, user, userTaste, isAdmin = false,
-  onUpdateTasteProfile, onShowToast, onOpenTasteModal
+  onUpdateTasteProfile, onShowToast, onOpenTasteModal, projectName
 }) => {
     const [viewedIndex, setViewedIndex] = useState(0);
     const [chatLoadingMap, setChatLoadingMap] = useState<Map<string, boolean>>(new Map());
@@ -2253,7 +2254,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                         {isMagazineViewOpen && graphData?.synthesisRationale && (
                             <div className="max-w-[1400px] mx-auto pt-12 md:pt-16 pb-12 mb-8 border-b border-zinc-800/50 transition-opacity duration-500 ease-in-out opacity-100 px-0">
                                 <h1 className="text-7xl font-bold tracking-tighter text-white mb-10 leading-tight" style={{ wordBreak: 'break-word' }}>
-                                    {seedArtists && seedArtists.length > 0 ? seedArtists.join(' / ') : 'Magazine'}
+                                    {projectName || (seedArtists && seedArtists.length > 0 ? seedArtists.join(' / ') : 'Magazine')}
                                 </h1>
                                 <div className="markdown-bio text-base leading-relaxed text-zinc-300 columns-1 md:columns-2 lg:columns-3 gap-12 font-sans">
                                     <Markdown

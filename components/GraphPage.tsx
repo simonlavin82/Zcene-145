@@ -1590,6 +1590,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                             <div className={`w-full flex-shrink-0 h-full flex flex-col min-h-0 overflow-hidden relative ${isMagazineViewOpen ? 'fixed inset-0 z-[1000] pt-0 md:pt-4' : ''}`}>
                                 <div className="h-full flex flex-col overflow-hidden bg-zinc-900" style={{ overscrollBehaviorY: 'contain' }}>
                                     <DetailsPanel 
+                                        projectName={projectName}
                                         selectedNode={selectedNode} 
                                         activeNodes={activeNodes} 
                                         isAdmin={isAdmin}
@@ -1706,6 +1707,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                          </div>
                        )}
                        <DetailsPanel 
+                         projectName={projectName}
                          selectedNode={selectedNode} 
                          activeNodes={activeNodes} 
                          isAdmin={isAdmin}
