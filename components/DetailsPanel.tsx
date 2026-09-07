@@ -2028,26 +2028,9 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
           } : {}}
         >
             {isSmallScreen ? (
-                <div className={`flex-shrink-0 border-b border-zinc-600/50 bg-zinc-900 z-[60] transition-all duration-300 ${isMagazineViewOpen ? 'h-fit py-3' : 'h-0 overflow-hidden'}`}>
-                    <div className="px-4 flex flex-col gap-3">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <h2 className="text-base text-white font-medium uppercase tracking-widest">Deep Cut</h2>
-                                <span className="h-5 w-5 flex items-center justify-center text-[9px] font-bold border rounded-md bg-zinc-800 text-zinc-500 border-zinc-700">
-                                    {activeNodes.length}
-                                </span>
-                            </div>
-                            <button 
-                                onClick={() => onMagazineViewToggle(false)}
-                                className="flex items-center gap-1.5 px-3 py-1.5 border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 focus:outline-none transition-all duration-200 text-xs font-medium shrink-0 leading-none backdrop-blur-sm"
-                                title="Exit Magazine View"
-                            >
-                                <span>Exit Magazine</span>
-                                <span className="material-symbols-outlined !text-[16px]">close</span>
-                            </button>
-                        </div>
-                        
-                        <div className="flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-500">
+                <div className={`flex-shrink-0 border-b border-zinc-600/50 bg-zinc-900 z-[60] transition-all duration-300 ${isMagazineViewOpen ? 'h-fit py-1.5' : 'h-0 overflow-hidden'}`}>
+                    <div className="px-4 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-grow animate-in fade-in slide-in-from-top-2 duration-500">
                             <div className="relative flex-grow">
                                 <span className={`material-symbols-outlined absolute top-1/2 -translate-y-1/2 text-zinc-500 ${InputSizes.sm.leftIcon}`}>search</span>
                                 <input 
@@ -2067,7 +2050,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                 </div>
                             </div>
 
-                            <div className="relative shrink-0 w-[110px]">
+                            <div className="relative shrink-0 w-[90px]">
                                 <Select 
                                     variant="sm"
                                     value={magazineSortBy}
@@ -2079,11 +2062,19 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                 </Select>
                             </div>
                         </div>
+
+                        <button 
+                            onClick={() => onMagazineViewToggle(false)}
+                            className="flex items-center justify-center w-7 h-7 border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 focus:outline-none transition-all duration-200 shrink-0 leading-none backdrop-blur-sm"
+                            title="Exit Magazine View"
+                        >
+                            <span className="material-symbols-outlined !text-[16px]">close</span>
+                        </button>
                     </div>
                 </div>
             ) : (
                 isMagazineViewOpen ? (
-                    <div className="h-12 flex-shrink-0 border-b border-zinc-600/50 bg-zinc-900 z-[60] relative px-4 md:px-6 lg:px-8">
+                    <div className="h-10 flex-shrink-0 border-b border-zinc-600/50 bg-zinc-900 z-[60] relative px-4 md:px-6 lg:px-8">
                         <div className="max-w-[1400px] mx-auto w-full h-full flex items-center justify-between relative">
                             <div className="flex items-center gap-4 overflow-hidden w-full h-full">
                                 <div className="flex items-center gap-4 flex-grow animate-in fade-in slide-in-from-left-4 duration-500">
