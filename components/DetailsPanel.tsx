@@ -1991,6 +1991,23 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         return Math.max(0, count);
     }, [loadingNodeIds, viewedNode]);
 
+    const sanitizedRationaleText = useMemo(() => {
+        if (!graphData?.synthesisRationale) return '';
+        let sanitized = graphData.synthesisRationale;
+        
+        sanitized = sanitized.replace(/^[ \t]*([•\-\*])[ \t]+/gm, '- ');
+        sanitized = sanitized.replace(/(^|\n)([ \t]*-[ \t]*)[\n]+[ \t]*/g, '$1$2');
+        sanitized = sanitized.replace(/([^\n])\n([ \t]*- )/g, '$1\n\n$2');
+        
+        const cleanLines = sanitized.split('\n').filter(line => {
+            const isFallback = (!graphData.synthesisRationale && (graphData.nodes?.length === 1 || graphData.nodes?.length === 2));
+            if (isFallback && line.trim().startsWith('[')) return false;
+            return true;
+        });
+        
+        return cleanLines.join('\n');
+    }, [graphData?.synthesisRationale, graphData?.nodes?.length]);
+
     return (
         <div 
           className="w-full h-full flex flex-col bg-zinc-900 overflow-hidden relative min-h-0 outline-none"
@@ -2233,6 +2250,25 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                         onTouchEnd={handleTouchEnd}
                         style={isMagazineViewOpen ? { touchAction: 'pan-y', overscrollBehaviorY: 'auto' } : {}}
                     >
+                        {isMagazineViewOpen && graphData?.synthesisRationale && (
+                            <div className="max-w-[1400px] mx-auto pt-12 md:pt-16 pb-12 mb-8 border-b border-zinc-800/50 transition-opacity duration-500 ease-in-out opacity-100 px-0">
+                                <h1 className="text-7xl font-bold tracking-tighter text-white mb-10 leading-tight" style={{ wordBreak: 'break-word' }}>
+                                    {seedArtists && seedArtists.length > 0 ? seedArtists.join(' / ') : 'Magazine'}
+                                </h1>
+                                <div className="markdown-bio text-base leading-relaxed text-zinc-300 columns-1 md:columns-2 lg:columns-3 gap-12 font-sans">
+                                    <Markdown
+                                        components={{
+                                            p: ({node, ...props}) => <p className="mb-6 break-inside-avoid" {...props} />,
+                                            strong: ({node, ...props}) => <strong className="font-semibold text-white" {...props} />,
+                                            ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-6 break-inside-avoid space-y-2" {...props} />,
+                                            li: ({node, ...props}) => <li className="marker:text-primary" {...props} />
+                                        }}
+                                    >
+                                        {sanitizedRationaleText}
+                                    </Markdown>
+                                </div>
+                            </div>
+                        )}
                         <div 
                             className={`${renderMode === 'magazine' 
                                 ? `grid grid-cols-[repeat(auto-fit,minmax(min(100%,400px),1fr))] gap-6 items-start max-w-[1400px] mx-auto pt-4 md:pt-6 lg:pt-8 pb-12 transition-opacity duration-300 ease-in-out ${!isMagazineViewOpen || isTransitioning ? 'opacity-0 min-w-[100vw]' : 'opacity-100 w-full'}` 
