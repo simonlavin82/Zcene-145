@@ -17,13 +17,19 @@ import { Waypoints } from 'lucide-react';
 import { TelemetryOverviewCards, DiscoveryLedgerTable, UserTelemetry } from './UsageAnalyticsPage';
 import { CountryFilterDropdown } from './SharedModals';
 
+// --- Layout Primitives & Sizings ---
+
+export const LayoutSizes = {
+  headerBar: 'h-12', // Universal strict standard for all structural panel/control bars
+};
+
 // --- Input Primitives & Sizings ---
 
 export const InputSizes = {
   sm: {
     base: 'py-1.5 text-xs',
     search: 'py-1.5 pl-4 pr-10 text-xs',
-    magazineSearch: 'py-1 pl-8 pr-10 text-xs',
+    magazineSearch: 'py-1.5 pl-8 pr-10 text-xs',
     iconBtn: 'w-6 h-6 rounded-[8px]',
     icon: '!text-[14px]',
     leftIcon: '!text-[16px] left-2.5',
