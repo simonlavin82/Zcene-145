@@ -18,6 +18,7 @@ import GraphPage from './components/GraphPage';
 import HomePage from './components/HomePage';
 import Dashboard from './components/Dashboard';
 import { MyStackDialog, TokenConfirmationDialog, CacheChoiceDialog, DisambiguationCandidate, ExploreActionDialog, FilterGuidanceModal } from './components/SharedModals';
+import { ModalBackdrop, ModalContainer, ModalHeader, ModalFooter, ModalBody } from './components/ui/Dialog';
 
 import { ShareModal } from './components/ShareModal';
 import { analyticsService } from './services/analyticsService';
@@ -7879,12 +7880,9 @@ const App: React.FC = () => {
       {/* Global Modals */}
       <AnimatePresence>
         {isDeleteAccountModalOpen && (
-          <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="w-full max-w-sm rounded-none bg-zinc-900 border border-zinc-800 p-8 shadow-2xl relative overflow-hidden"
+          <ModalBackdrop className="z-[1000]">
+            <ModalContainer
+              className="max-w-sm rounded-t-2xl sm:rounded-none p-8"
             >
               {isDeletingAccount && (
                 <div className="absolute top-0 left-0 w-full h-1 bg-zinc-800 overflow-hidden">
@@ -7930,8 +7928,8 @@ const App: React.FC = () => {
                   Cancel
                 </button>
               </div>
-            </motion.div>
-          </div>
+            </ModalContainer>
+          </ModalBackdrop>
         )}
       </AnimatePresence>
 
@@ -8028,19 +8026,9 @@ const App: React.FC = () => {
 
       <AnimatePresence>
         {isExitBlockerModalOpen && (
-          <div 
-            className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/60 animate-fade-in-down"
-            style={{ animationDuration: '200ms' }}
-            onClick={() => setIsExitBlockerModalOpen(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-hidden text-left"
-              onClick={e => e.stopPropagation()}
-            >
-              <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
+          <ModalBackdrop onClick={() => setIsExitBlockerModalOpen(false)}>
+            <ModalContainer className="text-left">
+              <ModalHeader>
                 <div className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-red-500 !text-[18px]">warning</span>
                   <h3 className="text-base font-medium text-white">Exit Preview?</h3>
@@ -8051,15 +8039,15 @@ const App: React.FC = () => {
                 >
                   <span className="material-symbols-outlined !text-[18px]">close</span>
                 </button>
-              </header>
+              </ModalHeader>
 
-              <div className="p-5 space-y-4 text-sm text-zinc-400">
+              <ModalBody className="space-y-4">
                 <p className="leading-relaxed">
                   Your preview session will be lost unless saved. Sign in or save this Zcene to your account to preserve your changes.
                 </p>
-              </div>
+              </ModalBody>
 
-              <footer className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2">
+              <ModalFooter>
                 <button 
                   onClick={() => setIsExitBlockerModalOpen(false)} 
                   className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors"

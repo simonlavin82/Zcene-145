@@ -73,6 +73,10 @@
     animation: fadeInDown 0.5s ease-out forwards;
   }
 
+  .animate-slide-up-sheet {
+    animation: slideUpSheet 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
   @keyframes loading-sliver {
     0% { transform: translateX(-100%); }
     100% { transform: translateX(400%); }
@@ -147,6 +151,15 @@
   }
   to {
     opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideUpSheet {
+  from {
+    transform: translateY(100%);
+  }
+  to {
     transform: translateY(0);
   }
 }

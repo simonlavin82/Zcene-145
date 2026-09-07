@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { ModalBackdrop, ModalContainer, ModalHeader, ModalBody, ModalFooter } from './ui/Dialog';
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -23,24 +24,9 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, shareUr
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          {/* Backdrop */}
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-          />
-
-          {/* Modal */}
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative bg-background-dark border border-zinc-600 rounded-none max-w-md w-full overflow-hidden shadow-2xl"
-          >
-            <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex justify-between items-center">
+        <ModalBackdrop onClick={onClose} className="z-[100]">
+          <ModalContainer>
+            <ModalHeader>
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary !text-[18px]">share</span>
                 <h3 className="font-medium text-white text-base">Share Zcene</h3>
@@ -51,10 +37,10 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, shareUr
               >
                 <span className="material-symbols-outlined !text-[18px]">close</span>
               </button>
-            </header>
+            </ModalHeader>
 
-            <div className="p-4 space-y-4">
-              <p className="text-sm text-zinc-400 leading-relaxed">
+            <ModalBody className="space-y-4">
+              <p className="leading-relaxed">
                 Anyone with the link can view this music discovery journey.
               </p>
 
@@ -76,18 +62,18 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, shareUr
                   {copied ? 'Copied!' : 'Copy'}
                 </button>
               </div>
-            </div>
+            </ModalBody>
 
-            <footer className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end">
+            <ModalFooter>
               <button 
                 onClick={onClose}
                 className="px-6 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm hover:opacity-90 transition-opacity"
               >
                 Done
               </button>
-            </footer>
-          </motion.div>
-        </div>
+            </ModalFooter>
+          </ModalContainer>
+        </ModalBackdrop>
       )}
     </AnimatePresence>
   );

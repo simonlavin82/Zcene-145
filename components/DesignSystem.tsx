@@ -2665,30 +2665,30 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Dialogs</h2>
                         <div className="space-y-12">
                             <p className="text-base text-zinc-400 leading-relaxed max-w-3xl">
-                                Dialogs follow a strict modal pattern to ensure focus during critical user actions or configuration changes. All dialog containers use a **hard edge (0px)** radius to signify structural permanence.
+                                Dialogs utilize a viewport-aware dual-architecture pattern to ensure focus and ergonomics. On mobile viewports, modals render as a fluid, bottom-anchored slide-up sheet with rounded top corners. On desktop viewports, they render as centered, hard-edged containers to signify structural permanence.
                             </p>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                                 <div className="space-y-6">
                                     <h3 className="text-xl font-medium text-zinc-200">Visual Anatomy</h3>
                                     <div className="bg-zinc-950 p-8 rounded-xl border border-zinc-800">
-                                        <div className="bg-background-dark border border-zinc-600 rounded-none overflow-hidden shadow-2xl">
-                                            <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex justify-between items-center">
+                                        <div className="bg-background-dark border border-zinc-600 rounded-none overflow-hidden shadow-2xl relative max-w-[300px] mx-auto rounded-t-2xl sm:rounded-none">
+                                            <div className="p-3 bg-zinc-900 border-b border-zinc-700 flex justify-between items-center">
                                                 <div className="flex items-center gap-2">
                                                     <span className="material-symbols-outlined text-primary !text-[18px]">info</span>
                                                     <h3 className="font-medium text-white text-base">Modal Title</h3>
                                                 </div>
                                                 <span className="material-symbols-outlined text-zinc-500 !text-[18px]">close</span>
-                                            </header>
+                                            </div>
                                             <div className="p-4 text-sm text-zinc-400">
                                                 Dialog content description area. Components inside match the zinc-900/60 utility style.
                                             </div>
-                                            <footer className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2">
+                                            <div className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2">
                                                 <button className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors">Cancel</button>
                                                 <button className="px-4 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2">
                                                     <span className="material-symbols-outlined !text-[16px]">check</span>
                                                     Action
                                                 </button>
-                                            </footer>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -2697,11 +2697,11 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <div className="space-y-4">
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Backdrop</h4>
-                                            <code className="text-xs bg-zinc-950 text-primary px-2 py-1 rounded-xl border border-zinc-800 block w-fit">fixed inset-0 bg-black/60 z-[100]</code>
+                                            <p className="text-sm text-zinc-400">Wraps content in <code>&lt;ModalBackdrop&gt;</code>. Handles safe-area padding and <code>animate-slide-up-sheet</code> on mobile.</p>
                                         </div>
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Container</h4>
-                                            <p className="text-sm text-zinc-400">Sized as <strong>max-w-md</strong> (alerts) or <strong>max-w-2xl</strong> (complex lists). Uses <strong>bg-background-dark</strong> and <strong>rounded-none</strong> (0px).</p>
+                                            <p className="text-sm text-zinc-400">Wraps content in <code>&lt;ModalContainer&gt;</code>. Responsive classes automatically toggle <strong>rounded-t-2xl</strong> (mobile) and <strong>rounded-none</strong> (desktop).</p>
                                         </div>
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Header/Footer</h4>

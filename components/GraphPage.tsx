@@ -13,6 +13,7 @@ import AdSenseUnit from './AdSenseUnit';
 import OnboardingTooltip from './OnboardingTooltip';
 import * as d3 from 'd3';
 import { RootsBreakdownButton, Select, InputSizes, LayoutSizes } from './DesignSystem';
+import { ModalBackdrop, ModalContainer, ModalHeader, ModalBody, ModalFooter } from './ui/Dialog';
 
 // Inform TypeScript about the SpeechRecognition and WakeLock APIs
 declare global {
@@ -328,9 +329,9 @@ const ZceneEmptyState: React.FC<{ onNavigate: (view: View) => void }> = ({ onNav
 const LimitReachedDialog: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpen, onClose }) => {
     if (!isOpen) return null;
     return (
-        <div className="fixed inset-0 bg-black/60 z-[110] flex items-center justify-center p-4 animate-fade-in-down" style={{ animationDuration: '200ms' }} onClick={onClose}>
-            <div className="bg-background-dark border border-zinc-600 rounded-none w-full sm:max-w-md shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
-                <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
+        <ModalBackdrop className="z-[110]" onClick={onClose}>
+            <ModalContainer className="sm:max-w-md">
+                <ModalHeader>
                     <div className="flex items-center gap-2">
                         <span className="material-symbols-outlined text-yellow-400 !text-[18px]">warning</span>
                         <h3 className="font-medium text-white text-base">Artist Limit Reached</h3>
@@ -338,17 +339,17 @@ const LimitReachedDialog: React.FC<{ isOpen: boolean; onClose: () => void; }> = 
                     <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">
                         <span className="material-symbols-outlined !text-[18px]">close</span>
                     </button>
-                </header>
-                <div className="p-4 text-sm text-zinc-400 leading-relaxed">
+                </ModalHeader>
+                <ModalBody>
                     To ensure the best performance and graph quality, you can only add up to 5 seed artists.
-                </div>
-                <footer className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end">
+                </ModalBody>
+                <ModalFooter>
                     <button onClick={onClose} className="px-4 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm transition-colors hover:bg-primary/90">
                         Got it
                     </button>
-                </footer>
-            </div>
-        </div>
+                </ModalFooter>
+            </ModalContainer>
+        </ModalBackdrop>
     );
 };
 
@@ -472,9 +473,9 @@ const LibraryDialog: React.FC<{
   }, [libraryArtists, searchTerm, sortConfig, selectedGenres, artistGenreMap, selectedArtistNames]);
 
   if (!isOpen) return null;  return (
-    <div className="fixed inset-0 bg-black/60 z-[110] flex items-center justify-center p-4 animate-fade-in-down" style={{animationDuration: '200ms'}} onClick={onClose}>
-        <div className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-2xl h-[90vh] max-h-[700px] shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
-            <header className="p-3 bg-zinc-900 flex-shrink-0 border-b border-zinc-700 flex items-center justify-between">
+    <ModalBackdrop className="z-[110]" onClick={onClose}>
+        <ModalContainer className="max-w-2xl h-[90vh] max-h-[700px]">
+            <ModalHeader>
                 <div className="flex items-center gap-2">
                     <LibraryIcon className="text-primary !text-[18px]" />
                     <h3 className="text-lg font-medium text-white">Your Music Library ({libraryArtists.length})</h3>
@@ -589,15 +590,15 @@ const LibraryDialog: React.FC<{
                 )}
             </div>
 
-            <footer className="p-4 bg-zinc-900 flex-shrink-0 border-t border-zinc-700 flex justify-between items-center">
+            <ModalFooter className="justify-between">
                 <button onClick={onTriggerClear} className="flex items-center gap-2 rounded-xl border border-red-500/50 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/20 transition-colors">
                     <span className="material-symbols-outlined !text-[18px]">delete_sweep</span>
                     Clear Library
                 </button>
                 <button onClick={onClose} className="rounded-xl bg-primary px-6 py-2 text-sm font-medium text-brand-black transition-opacity hover:opacity-90">Done</button>
-            </footer>
-        </div>
-    </div>
+            </ModalFooter>
+        </ModalContainer>
+    </ModalBackdrop>
   );
 };
 
@@ -1242,16 +1243,9 @@ const GraphPage: React.FC<GraphPageProps> = ({
   }, [data.nodes, onNodeClick, isSmallScreen, isDetailsPanelCollapsed, toggleDetailsPanel, onShowToast]);
 
   const ConfirmDeleteModal = () => (
-    <div 
-      className="fixed inset-0 bg-black/60 z-[110] flex items-center justify-center p-4 animate-fade-in-down"
-      style={{ animationDuration: '200ms' }}
-      onClick={() => setShowConfirmDelete(false)}
-    >
-      <div 
-        className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-hidden text-left"
-        onClick={e => e.stopPropagation()}
-      >
-        <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
+    <ModalBackdrop className="z-[110]" onClick={() => setShowConfirmDelete(false)}>
+      <ModalContainer className="text-left">
+        <ModalHeader>
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-red-400 !text-[18px]">delete</span>
             <h3 className="text-base font-medium text-white">Clear Library</h3>
@@ -1288,9 +1282,9 @@ const GraphPage: React.FC<GraphPageProps> = ({
           >
             Clear
           </button>
-        </footer>
-      </div>
-    </div>
+        </ModalFooter>
+      </ModalContainer>
+    </ModalBackdrop>
   );
 
   const enabledArtistsCount = selectedSeedArtists.filter(a => a.enabled).length;

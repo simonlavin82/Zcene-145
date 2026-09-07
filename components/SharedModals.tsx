@@ -18,13 +18,20 @@ export const MyStackDialog: React.FC<{
   onAddArtist: (artistName: string) => void;
   seedArtists: string[];
 }> = ({ isOpen, onClose, stack, onRemove, onView, onAddArtist, seedArtists }) => {
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleCopy = (id: string, name: string) => {
+    navigator.clipboard.writeText(name);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
   if (!isOpen) return null;
 
-
   return (
-    <div className="fixed inset-0 bg-black/60 z-[110] flex items-center justify-center p-4 animate-fade-in-down" style={{ animationDuration: '200ms' }} onClick={onClose}>
-        <div className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-lg h-[80vh] max-h-[600px] shadow-2xl flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
-            <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
+    <ModalBackdrop onClick={onClose}>
+        <ModalContainer>
+            <ModalHeader>
                 <div className="flex items-center gap-2">
                     <StackIcon className="text-primary !text-[18px]" />
                     <h3 className="text-lg font-medium text-white">My Stack ({stack.length})</h3>
@@ -32,8 +39,8 @@ export const MyStackDialog: React.FC<{
                 <button onClick={onClose} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none aspect-square">
                     <span className="material-symbols-outlined !text-[18px]">close</span>
                 </button>
-            </header>
-            <div className="flex-grow overflow-y-auto p-4 space-y-3">
+            </ModalHeader>
+            <ModalBody className="p-4 space-y-3">
                 {stack.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-4">
                         <div className="w-16 h-16 rounded-none bg-zinc-800/50 flex items-center justify-center text-zinc-600">
@@ -46,43 +53,30 @@ export const MyStackDialog: React.FC<{
                     </div>
                 ) : (
                     [...stack].reverse().map(item => {
-                        const isArtist = item.type === 'artist';
-                        const isSeedArtist = isArtist && isNodeInSeedList(item.id || (item as any).name || '', seedArtists);
+                        const nameToCopy = item.id.replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                        const isCopied = copiedId === item.id;
                         
                         return (
                             <div key={item.id} className="group bg-zinc-900/60 border border-zinc-700/50 p-4 rounded-xl flex items-center justify-between gap-4 hover:border-zinc-500 transition-colors">
-                                <div className="flex-grow min-w-0">
+                                <div 
+                                    className="flex-grow min-w-0 cursor-pointer flex flex-col"
+                                    onClick={() => handleCopy(item.id, nameToCopy)}
+                                    title="Click to copy name"
+                                >
                                     <div className="flex items-center gap-2 mb-1">
                                         <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded-md">{item.type}</span>
                                         <span className="font-mono text-xs text-zinc-300 font-normal">{formatSystemTimestamp(item.dateSaved)}</span>
                                     </div>
-                                    <h4 className="text-lg font-medium text-white truncate">{item.id.replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</h4>
+                                    <div className="flex items-center gap-2">
+                                        <h4 className="text-lg font-medium text-white truncate">{nameToCopy}</h4>
+                                        {isCopied ? (
+                                            <span className="material-symbols-outlined text-primary !text-[16px]">check_circle</span>
+                                        ) : (
+                                            <span className="material-symbols-outlined text-zinc-500 opacity-0 group-hover:opacity-100 transition-opacity !text-[16px]">content_copy</span>
+                                        )}
+                                    </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    {item.link && (
-                                        <a href={item.link} target="_blank" rel="noopener noreferrer" className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-primary hover:bg-primary/10 transition-colors" title="External Link">
-                                            <span className="material-symbols-outlined !text-[18px]">public</span>
-                                        </a>
-                                    )}
-                                    {isArtist && (
-                                        <button 
-                                            onClick={() => onAddArtist(item.id)}
-                                            disabled={isSeedArtist}
-                                            className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 disabled:text-primary transition-colors active:text-primary disabled:cursor-not-allowed leading-none"
-                                            title={isSeedArtist ? "Seed Artist" : "Add to Seeds"}
-                                        >
-                                            <span className="material-symbols-outlined !text-[18px]">
-                                                {isSeedArtist ? 'check_circle' : 'add_circle'}
-                                            </span>
-                                        </button>
-                                    )}
-                                    <button 
-                                        onClick={() => { onView(item.id); onClose(); }}
-                                        className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
-                                        title="View on map"
-                                    >
-                                        <span className="material-symbols-outlined !text-[18px]">visibility</span>
-                                    </button>
+                                <div className="flex items-center gap-2 flex-shrink-0">
                                     <button 
                                         onClick={() => onRemove({ id: item.id, type: item.type as any, group: 0 })}
                                         className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-red-400 hover:bg-red-400/10 transition-colors"
@@ -95,7 +89,7 @@ export const MyStackDialog: React.FC<{
                         );
                     })
                 )}
-            </div>
+            </ModalBody>
             <ModalFooter>
                 <button onClick={onClose} className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors">
                     Cancel
@@ -104,8 +98,8 @@ export const MyStackDialog: React.FC<{
                     Done
                 </button>
             </ModalFooter>
-        </div>
-    </div>
+        </ModalContainer>
+    </ModalBackdrop>
   );
 };
 
@@ -202,10 +196,9 @@ export const MyTasteDialog: React.FC<{
     return colorObj ? colorObj.class : 'bg-zinc-500';
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/60 z-[120] flex items-center justify-center p-4 animate-fade-in-down pointer-events-auto" style={{ animationDuration: '200ms' }} onClick={onClose}>
-      <div className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-hidden animate-fade-in-down" style={{ animationDuration: '200ms' }} onClick={e => e.stopPropagation()}>
-        <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
+    <ModalBackdrop className="z-[120]" onClick={onClose}>
+      <ModalContainer>
+        <ModalHeader>
           <div className="flex items-center gap-2">
             <Flame size={18} className="text-primary" />
             <h3 className="text-lg font-medium text-white">Style Profiles</h3>
@@ -213,7 +206,7 @@ export const MyTasteDialog: React.FC<{
           <button onClick={onClose} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none">
             <span className="material-symbols-outlined !text-[18px]">close</span>
           </button>
-        </header>
+        </ModalHeader>
 
         <div className="bg-zinc-900/50 border-b border-zinc-800 px-3 py-2 flex flex-wrap items-center overflow-x-auto scrollbar-hide gap-1.5">
           {profiles.map(p => (
@@ -366,8 +359,8 @@ export const MyTasteDialog: React.FC<{
             </div>
           </div>
         </ModalFooter>
-      </div>
-    </div>
+      </ModalContainer>
+    </ModalBackdrop>
   );
 };
 
@@ -392,17 +385,9 @@ export const TokenConfirmationDialog: React.FC<{
   if (!isOpen) return null;
 
   return (
-    <div 
-      className="fixed inset-0 bg-black/60 z-[130] flex items-center justify-center p-4 animate-fade-in-down pointer-events-auto" 
-      style={{ animationDuration: '200ms' }}
-      onClick={onClose}
-    >
-      <div 
-        className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-hidden animate-fade-in-down" 
-        style={{ animationDuration: '200ms' }}
-        onClick={e => e.stopPropagation()}
-      >
-        <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
+    <ModalBackdrop className="z-[130]" onClick={onClose}>
+      <ModalContainer>
+        <ModalHeader>
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary !text-[18px]">info</span>
             <h3 className="text-lg font-medium text-white">
@@ -415,7 +400,7 @@ export const TokenConfirmationDialog: React.FC<{
           >
             <span className="material-symbols-outlined !text-[18px]">close</span>
           </button>
-        </header>
+        </ModalHeader>
 
         <div className="p-5 space-y-4 text-sm text-zinc-400">
           <p className="leading-relaxed">
@@ -565,8 +550,8 @@ export const TokenConfirmationDialog: React.FC<{
             Confirm
           </button>
         </ModalFooter>
-      </div>
-    </div>
+      </ModalContainer>
+    </ModalBackdrop>
   );
 };
 
@@ -580,19 +565,9 @@ export const CacheChoiceDialog: React.FC<{
   if (!isOpen) return null;
 
   return (
-    <div 
-      className="fixed inset-0 bg-black/60 z-[130] flex items-center justify-center p-4 animate-fade-in-down pointer-events-auto" 
-      style={{ animationDuration: '200ms' }}
-      onClick={() => onSelect('cancel')}
-    >
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="bg-background-dark border border-zinc-700 rounded-none w-full max-w-lg shadow-2xl flex flex-col overflow-hidden" 
-        onClick={e => e.stopPropagation()}
-      >
-        <header className="p-4 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
+    <ModalBackdrop className="z-[130]" onClick={() => onSelect('cancel')}>
+      <ModalContainer>
+        <ModalHeader>
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary !text-[20px]">layers</span>
             <h3 className="text-base font-semibold text-white tracking-wide">Select Spiderweb Depth</h3>
@@ -603,7 +578,7 @@ export const CacheChoiceDialog: React.FC<{
           >
             <span className="material-symbols-outlined !text-[18px]">close</span>
           </button>
-        </header>
+        </ModalHeader>
 
         <div className="p-6 space-y-4">
           <p className="text-sm text-zinc-400 leading-relaxed">
@@ -687,8 +662,9 @@ export const CacheChoiceDialog: React.FC<{
             Cancel
           </button>
         </ModalFooter>
-      </motion.div>
-    </div>
+        </ModalFooter>
+      </ModalContainer>
+    </ModalBackdrop>
   );
 };
 
@@ -702,17 +678,9 @@ export const FullItineraryDialog: React.FC<{
   if (!isOpen) return null;
 
   return (
-    <div 
-      className="fixed inset-0 bg-black/60 z-[130] flex items-center justify-center p-4 animate-fade-in-down pointer-events-auto"
-      style={{ animationDuration: '200ms' }}
-      onClick={onClose}
-    >
-      <div 
-        className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-hidden animate-fade-in-down"
-        style={{ animationDuration: '200ms' }}
-        onClick={e => e.stopPropagation()}
-      >
-        <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
+    <ModalBackdrop className="z-[130]" onClick={onClose}>
+      <ModalContainer>
+        <ModalHeader>
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary !text-[18px]">calendar_month</span>
             <h3 className="text-base font-medium text-white">Full Itinerary: {artistName}</h3>
@@ -723,7 +691,7 @@ export const FullItineraryDialog: React.FC<{
           >
             <span className="material-symbols-outlined !text-[18px]">close</span>
           </button>
-        </header>
+        </ModalHeader>
 
         <div className="flex-grow overflow-y-auto p-5 space-y-2 max-h-[60vh]">
           {tourDates.map((date, idx) => (
@@ -741,8 +709,9 @@ export const FullItineraryDialog: React.FC<{
             Close
           </button>
         </ModalFooter>
-      </div>
-    </div>
+        </ModalFooter>
+      </ModalContainer>
+    </ModalBackdrop>
   );
 };
 
@@ -806,17 +775,9 @@ export const GenerativeRationaleModal: React.FC<{
   const cleanRationaleMarkdown = cleanRationaleLines.join('\n');
 
   return (
-    <div 
-      className="fixed inset-0 bg-black/70 z-[130] flex items-center justify-center p-4 animate-fade-in-down pointer-events-auto"
-      style={{ animationDuration: '200ms' }}
-      onClick={onClose}
-    >
-      <div 
-        className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-lg shadow-2xl flex flex-col overflow-hidden animate-fade-in-down max-h-[85vh]"
-        style={{ animationDuration: '200ms' }}
-        onClick={e => e.stopPropagation()}
-      >
-        <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
+    <ModalBackdrop className="z-[130]" onClick={onClose}>
+      <ModalContainer>
+        <ModalHeader>
           <div className="flex items-center gap-2">
             <Waypoints size={18} className="text-primary" />
             <h3 className="text-base font-medium text-white">Roots Breakdown</h3>
@@ -828,7 +789,7 @@ export const GenerativeRationaleModal: React.FC<{
           >
             <span className="material-symbols-outlined !text-[18px]">close</span>
           </button>
-        </header>
+        </ModalHeader>
 
         <div className="flex-grow overflow-y-auto p-5 space-y-4">
           <div className="space-y-1">
@@ -846,8 +807,8 @@ export const GenerativeRationaleModal: React.FC<{
             Done
           </button>
         </ModalFooter>
-      </div>
-    </div>
+      </ModalContainer>
+    </ModalBackdrop>
   );
 };
 
@@ -1297,17 +1258,9 @@ export const ExploreActionDialog: React.FC<{
   if (!isOpen) return null;
 
   return (
-    <div 
-      className="fixed inset-0 bg-black/60 z-[130] flex items-center justify-center p-4 animate-fade-in-down pointer-events-auto" 
-      style={{ animationDuration: '200ms' }}
-      onClick={onClose}
-    >
-      <div 
-        className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-hidden animate-fade-in-down" 
-        style={{ animationDuration: '200ms' }}
-        onClick={e => e.stopPropagation()}
-      >
-        <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
+    <ModalBackdrop className="z-[130]" onClick={onClose}>
+      <ModalContainer>
+        <ModalHeader>
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary !text-[18px]">explore</span>
             <h3 className="text-lg font-medium text-white">Explore & Expand Spiderweb</h3>
@@ -1318,7 +1271,7 @@ export const ExploreActionDialog: React.FC<{
           >
             <span className="material-symbols-outlined !text-[18px]">close</span>
           </button>
-        </header>
+        </ModalHeader>
 
         <div className="p-5 text-sm text-zinc-300">
           <p className="leading-relaxed">
@@ -1340,8 +1293,8 @@ export const ExploreActionDialog: React.FC<{
             Continue
           </button>
         </ModalFooter>
-      </div>
-    </div>
+      </ModalContainer>
+    </ModalBackdrop>
   );
 };
 
@@ -1381,17 +1334,9 @@ export const FilterGuidanceModal: React.FC<{
   };
 
   return (
-    <div 
-      className="fixed inset-0 bg-black/60 z-[130] flex items-center justify-center p-4 animate-fade-in-down pointer-events-auto" 
-      style={{ animationDuration: '200ms' }}
-      onClick={onClose}
-    >
-      <div 
-        className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-hidden animate-fade-in-down" 
-        style={{ animationDuration: '200ms' }}
-        onClick={e => e.stopPropagation()}
-      >
-        <header className="p-3 bg-red-950 border-b border-red-900/50 flex items-center justify-between">
+    <ModalBackdrop className="z-[130]" onClick={onClose}>
+      <ModalContainer>
+        <ModalHeader className="bg-red-950 border-red-900/50">
           <div className="flex items-center gap-2 text-red-400">
             <span className="material-symbols-outlined !text-[18px]">error</span>
             <h3 className="text-lg font-medium">Synthesis Constrained</h3>
@@ -1402,7 +1347,7 @@ export const FilterGuidanceModal: React.FC<{
           >
             <span className="material-symbols-outlined !text-[18px]">close</span>
           </button>
-        </header>
+        </ModalHeader>
 
         <div className="flex-grow overflow-y-auto p-5 space-y-5 max-h-[70vh]">
           <div className="text-sm text-zinc-300 leading-relaxed space-y-3">
@@ -1519,8 +1464,9 @@ export const FilterGuidanceModal: React.FC<{
             <span className="material-symbols-outlined !text-[16px]">refresh</span>
             Re-run with adjusted filters
           </button>
+          </button>
         </ModalFooter>
-      </div>
-    </div>
+      </ModalContainer>
+    </ModalBackdrop>
   );
 };

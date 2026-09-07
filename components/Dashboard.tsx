@@ -9,6 +9,8 @@ import { normalizeArtistId, cleanArtistDisplayName } from '../services/artistCac
 
 import { formatSystemTimestamp } from '../utils/formatters';
 import { SeedArtistImages } from './SeedArtistImages';
+import { ModalBackdrop, ModalContainer, ModalHeader, ModalBody, ModalFooter } from './ui/Dialog';
+
 
 const isSeedMatch = (nId: string, seeds: string[]) => {
   const normNId = normalizeArtistId(nId);
@@ -729,16 +731,9 @@ const Dashboard: React.FC<DashboardProps> = ({
 
       {/* Custom Rename Confirmation Modal */}
       {projectToRename && (
-        <div 
-          className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 animate-fade-in-down"
-          style={{ animationDuration: '200ms' }}
-          onClick={() => setProjectToRename(null)}
-        >
-          <div 
-            className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-hidden text-left"
-            onClick={e => e.stopPropagation()}
-          >
-            <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
+        <ModalBackdrop className="z-[110]" onClick={() => setProjectToRename(null)}>
+          <ModalContainer className="text-left">
+            <ModalHeader>
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary !text-[18px]">edit</span>
                 <h3 className="text-base font-medium text-white">Rename Zcene</h3>
@@ -749,9 +744,9 @@ const Dashboard: React.FC<DashboardProps> = ({
               >
                 <span className="material-symbols-outlined !text-[18px]">close</span>
               </button>
-            </header>
+            </ModalHeader>
 
-            <div className="p-5">
+            <ModalBody>
               <input 
                 type="text" 
                 value={renameValue}
@@ -768,9 +763,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                 }}
                 className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none" 
               />
-            </div>
+            </ModalBody>
 
-            <footer className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2">
+            <ModalFooter>
               <button 
                 onClick={() => setProjectToRename(null)} 
                 className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors"
@@ -790,25 +785,16 @@ const Dashboard: React.FC<DashboardProps> = ({
               >
                 Save
               </button>
-            </footer>
-          </div>
-        </div>
+            </ModalFooter>
+          </ModalContainer>
+        </ModalBackdrop>
       )}
 
       {/* Custom Delete Confirmation Modal */}
       {projectToDelete && (
-        <div 
-          className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 animate-fade-in-down"
-          style={{ animationDuration: '200ms' }}
-          onClick={() => setProjectToDelete(null)}
-        >
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-hidden text-left"
-            onClick={e => e.stopPropagation()}
-          >
-            <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
+        <ModalBackdrop className="z-[110]" onClick={() => setProjectToDelete(null)}>
+          <ModalContainer className="text-left">
+            <ModalHeader>
               <div className="flex items-center gap-2">
                 <span className="material-symbols-outlined text-red-500 !text-[18px]">warning</span>
                 <h3 className="text-base font-medium text-white">
@@ -821,15 +807,15 @@ const Dashboard: React.FC<DashboardProps> = ({
               >
                 <span className="material-symbols-outlined !text-[18px]">close</span>
               </button>
-            </header>
+            </ModalHeader>
 
-            <div className="p-5 space-y-4 text-sm text-zinc-400">
+            <ModalBody className="space-y-4">
               <p className="leading-relaxed">
                 Are you sure you want to delete <span className="font-semibold text-white">{projects.find(p => p.id === projectToDelete)?.name || 'this Zcene'}</span>? This action cannot be undone. All mapping and chat history for this Zcene will be permanently removed.
               </p>
-            </div>
+            </ModalBody>
 
-            <footer className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2">
+            <ModalFooter>
               <button 
                 onClick={() => setProjectToDelete(null)} 
                 className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors"
@@ -845,9 +831,9 @@ const Dashboard: React.FC<DashboardProps> = ({
               >
                 Confirm
               </button>
-            </footer>
-          </motion.div>
-        </div>
+            </ModalFooter>
+          </ModalContainer>
+        </ModalBackdrop>
       )}
     </div>
   );
