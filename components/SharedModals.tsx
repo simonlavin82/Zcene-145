@@ -196,6 +196,7 @@ export const MyTasteDialog: React.FC<{
     return colorObj ? colorObj.class : 'bg-zinc-500';
   };
 
+  return (
     <ModalBackdrop className="z-[120]" onClick={onClose}>
       <ModalContainer>
         <ModalHeader>
@@ -662,7 +663,6 @@ export const CacheChoiceDialog: React.FC<{
             Cancel
           </button>
         </ModalFooter>
-        </ModalFooter>
       </ModalContainer>
     </ModalBackdrop>
   );
@@ -708,7 +708,6 @@ export const FullItineraryDialog: React.FC<{
           >
             Close
           </button>
-        </ModalFooter>
         </ModalFooter>
       </ModalContainer>
     </ModalBackdrop>
@@ -1463,7 +1462,6 @@ export const FilterGuidanceModal: React.FC<{
           >
             <span className="material-symbols-outlined !text-[16px]">refresh</span>
             Re-run with adjusted filters
-          </button>
           </button>
         </ModalFooter>
       </ModalContainer>

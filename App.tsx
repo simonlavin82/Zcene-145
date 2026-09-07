@@ -8063,9 +8063,9 @@ const App: React.FC = () => {
                 >
                   Exit without Saving
                 </button>
-              </footer>
-            </motion.div>
-          </div>
+              </ModalFooter>
+            </ModalContainer>
+          </ModalBackdrop>
         )}
       </AnimatePresence>
       <CookieConsent />
