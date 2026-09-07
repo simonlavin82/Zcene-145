@@ -483,7 +483,7 @@ const LibraryDialog: React.FC<{
                 <button onClick={onClose} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none aspect-square">
                     <span className="material-symbols-outlined !text-[18px]">close</span>
                 </button>
-            </header>
+            </ModalHeader>
 
             <div className="relative z-10 p-4 flex-shrink-0 border-b border-zinc-700 space-y-3">
                 <div className="relative">
@@ -1256,7 +1256,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
           >
             <span className="material-symbols-outlined !text-[18px]">close</span>
           </button>
-        </header>
+        </ModalHeader>
 
         <div className="p-5 space-y-4 text-sm text-zinc-400">
           <p className="leading-relaxed">
