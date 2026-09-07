@@ -2028,7 +2028,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
           } : {}}
         >
             {isSmallScreen ? (
-                <div className={`flex-shrink-0 border-b border-zinc-600/50 bg-zinc-900 z-[60] transition-all duration-300 ${isMagazineViewOpen ? LayoutSizes.headerBar : 'h-0 overflow-hidden'}`}>
+                <div className={`flex-shrink-0 bg-zinc-900 z-[60] transition-all duration-300 ${isMagazineViewOpen ? `${LayoutSizes.headerBar} border-b border-zinc-600/50` : 'h-0 overflow-hidden border-transparent'}`}>
                     <div className="px-4 flex items-center justify-between gap-4 h-full">
                         <div className="flex items-center gap-2 flex-grow animate-in fade-in slide-in-from-top-2 duration-500">
                             <div className="relative flex-grow max-w-[180px]">
