@@ -2670,24 +2670,55 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                                 <div className="space-y-6">
                                     <h3 className="text-xl font-medium text-zinc-200">Visual Anatomy</h3>
-                                    <div className="bg-zinc-950 p-8 rounded-xl border border-zinc-800">
-                                        <div className="bg-background-dark border border-zinc-600 rounded-none overflow-hidden shadow-2xl relative max-w-[300px] mx-auto rounded-t-2xl sm:rounded-none">
-                                            <div className="p-3 bg-zinc-900 border-b border-zinc-700 flex justify-between items-center">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="material-symbols-outlined text-primary !text-[18px]">info</span>
-                                                    <h3 className="font-medium text-white text-base">Modal Title</h3>
+                                    <div className="bg-zinc-950 p-6 rounded-xl border border-zinc-800 space-y-8">
+                                        <div>
+                                            <h4 className="text-sm font-medium text-zinc-400 mb-3">Desktop (Centered)</h4>
+                                            <div className="bg-zinc-900/50 p-4 rounded-lg border border-zinc-800 flex items-center justify-center min-h-[200px]">
+                                                <div className="bg-background-dark border border-zinc-600 rounded-none overflow-hidden shadow-2xl relative w-full max-w-[300px]">
+                                                    <div className="p-3 bg-zinc-900 border-b border-zinc-700 flex justify-between items-center">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="material-symbols-outlined text-primary !text-[18px]">info</span>
+                                                            <h3 className="font-medium text-white text-base">Modal Title</h3>
+                                                        </div>
+                                                        <span className="material-symbols-outlined text-zinc-500 !text-[18px]">close</span>
+                                                    </div>
+                                                    <div className="p-4 text-sm text-zinc-400">
+                                                        Desktop content description area. Components inside match the zinc-900/60 utility style.
+                                                    </div>
+                                                    <div className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2">
+                                                        <button className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors">Cancel</button>
+                                                        <button className="px-4 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2">
+                                                            <span className="material-symbols-outlined !text-[16px]">check</span>
+                                                            Action
+                                                        </button>
+                                                    </div>
                                                 </div>
-                                                <span className="material-symbols-outlined text-zinc-500 !text-[18px]">close</span>
                                             </div>
-                                            <div className="p-4 text-sm text-zinc-400">
-                                                Dialog content description area. Components inside match the zinc-900/60 utility style.
-                                            </div>
-                                            <div className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2">
-                                                <button className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors">Cancel</button>
-                                                <button className="px-4 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2">
-                                                    <span className="material-symbols-outlined !text-[16px]">check</span>
-                                                    Action
-                                                </button>
+                                        </div>
+
+                                        <div>
+                                            <h4 className="text-sm font-medium text-zinc-400 mb-3">Mobile (Bottom Sheet)</h4>
+                                            <div className="bg-zinc-900/50 rounded-lg border border-zinc-800 flex flex-col justify-end min-h-[250px] relative overflow-hidden max-w-[350px] mx-auto">
+                                                <div className="absolute inset-0 bg-black/60" />
+                                                <div className="bg-background-dark border border-zinc-600 border-b-0 rounded-t-2xl overflow-hidden shadow-2xl relative w-full">
+                                                    <div className="p-3 bg-zinc-900 border-b border-zinc-700 flex justify-between items-center">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="material-symbols-outlined text-primary !text-[18px]">info</span>
+                                                            <h3 className="font-medium text-white text-base">Modal Title</h3>
+                                                        </div>
+                                                        <span className="material-symbols-outlined text-zinc-500 !text-[18px]">close</span>
+                                                    </div>
+                                                    <div className="p-4 text-sm text-zinc-400">
+                                                        Mobile bottom-anchored content. Uses <code>rounded-t-2xl</code> and safe-area footer padding.
+                                                    </div>
+                                                    <div className="p-3 pb-6 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2">
+                                                        <button className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors">Cancel</button>
+                                                        <button className="px-4 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2">
+                                                            <span className="material-symbols-outlined !text-[16px]">check</span>
+                                                            Action
+                                                        </button>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
