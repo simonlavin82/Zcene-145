@@ -20,7 +20,7 @@ export const ModalContainer: React.FC<{ children: React.ReactNode; className?: s
 );
 
 export const ModalHeader: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
-  <header className={`p-3 bg-zinc-900 border-b border-zinc-700 flex justify-between items-center ${className}`}>
+  <header className={`p-3 bg-zinc-900 border-b border-zinc-700 flex justify-between items-center rounded-t-2xl sm:rounded-none ${className}`}>
     {children}
   </header>
 );
