@@ -1264,7 +1264,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
           </p>
         </div>
 
-        <footer className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2">
+        <ModalFooter>
           <button 
             onClick={() => setShowConfirmDelete(false)} 
             className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors"
