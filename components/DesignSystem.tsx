@@ -20,6 +20,7 @@ import { CountryFilterDropdown } from './SharedModals';
 // --- Layout Primitives & Sizings ---
 
 export const LayoutSizes = {
+  topHeader: 'h-16', // Restored roomier height for the main project header
   headerBar: 'h-12', // Universal strict standard for all structural panel/control bars
 };
 
