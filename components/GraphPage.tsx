@@ -1584,7 +1584,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                                 </div>
                                             </div>
                                         </div>
-                                        <div className="mt-2.5 w-full h-px bg-zinc-700" />
+                                        <div className="mt-2.5 w-full h-px bg-zinc-700/50" />
                                     </div>
                                     <div className="flex-grow relative min-h-0 bg-zinc-900" ref={mobileGraphAreaRef}>{(isLoading || isHydrating) && (<div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-md z-[90] flex flex-col items-center justify-center gap-4 pointer-events-auto"><LoadingSpinner subtext={loadingSubtext} /></div>)}{isFirstGeneration && !(isLoading || isHydrating) && (<div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none"><ZceneEmptyState onNavigate={onNavigate} /></div>)}{data.nodes.length > 0 && (<MusicGraph data={data} libraryArtists={memoizedLibraryArtists} seedArtists={memoizedSeedArtists} onNodeClick={handleNodeClickInternal} selectedNode={selectedNode} peekedNode={peekedNode} isSmallScreen={isSmallScreen} activeFilters={activeFilters} searchQuery={searchQuery} setSearchQuery={setSearchQuery} toggleFilter={toggleFilterInternal} legendConfig={legendConfig} legendOrder={legendOrder} legendRef={desktopLegendAreaRef} onInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onLegendInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} isGuest={isGuest} detailsCache={detailsCache} isActive={isActive} />)}</div>
                                 </div>

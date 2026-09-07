@@ -32,7 +32,7 @@ export const InputSizes = {
     magazineSearch: 'py-1.5 pl-8 pr-10 text-xs',
     iconBtn: 'w-6 h-6 rounded-[8px]',
     icon: '!text-[14px]',
-    leftIcon: '!text-[16px] left-2.5',
+    leftIcon: '!text-[16px] left-2.5 z-10 pointer-events-none',
     select: 'py-1.5 pl-3 pr-8 text-xs',
     selectIcon: '!text-[16px] right-2'
   },
@@ -42,7 +42,7 @@ export const InputSizes = {
     magazineSearch: 'py-2 pl-10 pr-12 text-sm',
     iconBtn: 'w-8 h-8 rounded-[10px]',
     icon: '!text-[18px]',
-    leftIcon: '!text-[18px] left-3',
+    leftIcon: '!text-[18px] left-3 z-10 pointer-events-none',
     select: 'py-2 pl-4 pr-10 text-sm',
     selectIcon: '!text-[18px] right-3'
   }

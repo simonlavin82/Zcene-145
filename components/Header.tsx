@@ -1,5 +1,6 @@
 import React from 'react';
 import { FaviconLogo, StackIcon, Spinner } from './Icons';
+import { LayoutSizes } from './DesignSystem';
 import { User } from 'firebase/auth';
 import { AnimatePresence, motion } from 'framer-motion';
 import { UserTaste } from '../types';
@@ -151,7 +152,7 @@ const Header: React.FC<HeaderProps> = ({
   }, [projectName]);
 
   return (
-    <header className={`relative z-[100] flex-shrink-0 flex items-center pointer-events-none transition-all duration-300 ${isMagazineViewOpen ? 'hidden md:block h-0 opacity-0 overflow-hidden' : 'h-16 px-4 sm:px-6 lg:px-8'} ${isMagazineViewOpen ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100'}`}>
+    <header className={`relative z-[100] flex-shrink-0 flex items-center pointer-events-none transition-all duration-300 ${isMagazineViewOpen ? 'hidden md:block h-0 opacity-0 overflow-hidden' : `${LayoutSizes.headerBar} border-b border-zinc-700/50 px-4 sm:px-6 lg:px-8`} ${isMagazineViewOpen ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100'}`}>
         <div className="flex items-center w-full h-full">
             <div className="flex items-center flex-grow transition-all gap-2">
                 <button 
