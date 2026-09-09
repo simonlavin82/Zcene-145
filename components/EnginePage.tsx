@@ -91,12 +91,11 @@ the entire dataset, the app evolves existing visual structures.
      to approximately 3 minutes. This pipeline integrates real-time YouTube scraping
      and status check routines and covers primary AI artist nodes, record labels, and
      previously-unhydrated untyped deep cut nodes in a single unified pass.
-   - Dual-Strategy iTunes Fast-Path & Genre Confidence Validation: The image scraper bypasses
+   - iTunes Fast-Path & Taxonomic Confidence Validation: The image scraper bypasses
      LLM hallucination by querying the iTunes API for \`entity=musicArtist\`. It enforces a deterministic
-     case-insensitive exact match on the artist name, and crucially, disambiguates shared names
-     (like "Gel" or "Sunami") by strictly enforcing a bidirectional substring intersection between the iTunes \`primaryGenreName\` and the 
-     generated Zcene scene genre. If the iTunes genre does not strictly intersect with the Zcene genre, 
-     it safely drops the image rather than display a false match.
+     case-insensitive exact match on the artist name, and disambiguates homonyms using a
+     normalized taxonomic dictionary (see ITUNES_SCRAPER_DOCUMENTATION) to validate niche
+     subgenres against Apple's broad primary categories.
    - Organic Deep-Cut Range Targeting: The LLM graph generator prompt is explicitly configured
      to aim for a rich spiderweb density (18 to 21 organic related artists). However, the model is
      given explicit natural flexibility to scale this number down if a smaller musical scene calls
@@ -366,6 +365,37 @@ the entire dataset, the app evolves existing visual structures.
     - The 'isLibrary: true' flag is hardcoded in the frontend (App.tsx -> handleNodeClick) for *every* node that is loaded or generated locally from the cache during an on-demand fallback.
     - It is NOT exclusively tied to the Apple Music XML import process.
     - If the backend curation job bypasses a seed node, the frontend is forced to generate the data on-demand and stamp it with 'isLibrary: true'. This must be understood when debugging hydration bypasses to avoid misidentifying the source of the flag.
+`;
+
+const ITUNES_SCRAPER_DOCUMENTATION = `
+The iTunes Image Scraper (scrapeImageUrlBackend) is designed to rapidly fetch high-resolution (600x600) 
+artwork for artists without relying on token-heavy LLM image hallucination. Because artist names often 
+collide with unrelated entities (e.g., "Method Man" the rapper vs. a hypothetical country artist), 
+the scraper employs a multi-step Taxonomy Validation Engine:
+
+1. EXACT ARTIST MATCHING:
+   The iTunes API (entity=musicArtist) is queried. The scraper filters the results strictly 
+   for case-insensitive exact string matches against the artist name. Generic substring matches 
+   are immediately discarded.
+
+2. STRING NORMALIZATION:
+   Both the Zcene-generated genre and the iTunes primaryGenreName are normalized before comparison.
+   Non-alphanumeric characters (hyphens, slashes, ampersands) are stripped and collapsed into single 
+   spaces (e.g., "Hip-Hop/Rap" -> "hip hop rap", "Hardcore Hip-Hop" -> "hardcore hip hop").
+
+3. CORE KEYWORD INTERSECTION:
+   The engine first checks for direct lexical overlap of significant keywords (length > 2). 
+   If both normalized genres share a core word (e.g., "hip" or "hop"), the match is validated.
+
+4. TAXONOMY DICTIONARY FALLBACK:
+   Because Zcene generates highly specific subgenres (e.g., "Boom Bap", "East Coast Hip Hop", "Dubstep") 
+   that share zero overlapping substrings with Apple's broad master categories (e.g., "Hip-Hop/Rap", "Electronic"), 
+   the validation falls back to a curated taxonomy dictionary.
+   - The engine checks if the iTunes genre aligns with a master category in the dictionary.
+   - If it does, it checks if the Zcene genre contains any of the mapped subgenres for that category.
+   - If a match is found (e.g., iTunes="Hip-Hop/Rap" -> Map -> Zcene="Boom Bap"), the artist is 
+     validated and their album artwork is scraped.
+   - If no match is found, the scraper aborts, preferring to render no image rather than a false positive.
 `;
 
 
