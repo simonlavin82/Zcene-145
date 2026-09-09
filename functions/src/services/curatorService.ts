@@ -1623,24 +1623,48 @@ export const scrapeImageUrlBackend = async (
         const exactMatches = data.results?.filter((r: any) => (r.artistName || "").toLowerCase() === artistName.toLowerCase()) || [];
         
         let selectedArtistId = null;
-        const zceneGenreLower = (genre || "").toLowerCase();
+        
+        // Helper to normalize genre strings: lowercase, remove non-alphanumeric (except spaces), collapse spaces
+        const normalizeGenre = (g: string) => (g || "").toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\\s+/g, ' ').trim();
+        const zceneGenreNorm = normalizeGenre(genre);
+
+        // Taxonomy map for mapping iTunes master genres to broad subgenres
+        const genreTaxonomy: Record<string, string[]> = {
+          'hip hop rap': ['boom bap', 'g funk', 'trap', 'drill', 'crunk', 'grime', 'lo fi', 'hip hop', 'rap'],
+          'electronic': ['techno', 'house', 'trance', 'dubstep', 'edm', 'dance', 'idm', 'drum and bass', 'jungle'],
+          'rock': ['metal', 'punk', 'grunge', 'alternative', 'indie', 'emo', 'hardcore', 'post rock'],
+          'r b soul': ['funk', 'motown', 'neo soul', 'rnb', 'r b', 'soul'],
+          'pop': ['pop', 'synthpop', 'electropop', 'k pop'],
+          'country': ['country', 'bluegrass', 'americana'],
+          'jazz': ['jazz', 'bebop', 'swing', 'fusion'],
+        };
 
         if (exactMatches.length > 0) {
           const strictMatches = exactMatches.filter((r: any) => {
-            const itunesGenre = (r.primaryGenreName || "").toLowerCase();
+            const itunesGenre = r.primaryGenreName || "";
             if (!itunesGenre) return false;
+            const itunesGenreNorm = normalizeGenre(itunesGenre);
             
-            // Match 1: Direct intersection with Zcene's determined genre
-            const directMatch = zceneGenreLower.includes(itunesGenre) || itunesGenre.includes(zceneGenreLower);
+            // 1. Core keyword intersection (e.g., both have "hip hop")
+            const zceneWords = zceneGenreNorm.split(' ').filter(w => w.length > 2);
+            const itunesWords = itunesGenreNorm.split(' ').filter(w => w.length > 2);
+            const keywordMatch = zceneWords.some(w => itunesGenreNorm.includes(w)) || 
+                                 itunesWords.some(w => zceneGenreNorm.includes(w));
             
-            // Match 2: Broad genre fallback for niche genres (e.g. "Hardcore Punk" matches "Metal", "Rock", "Alternative")
-            let broadMatch = false;
-            if (zceneGenreLower.includes('hardcore') || zceneGenreLower.includes('punk') || zceneGenreLower.includes('metal')) {
-               const broadGenres = ['metal', 'rock', 'alternative', 'punk'];
-               broadMatch = broadGenres.some(bg => itunesGenre.includes(bg));
+            // 2. Taxonomy fallback match
+            let taxonomyMatch = false;
+            for (const [masterGenre, subgenres] of Object.entries(genreTaxonomy)) {
+              // If iTunes genre aligns with a master category
+              if (itunesGenreNorm.includes(masterGenre) || masterGenre.includes(itunesGenreNorm)) {
+                // Check if Zcene genre matches any known subgenre
+                if (subgenres.some(sub => zceneGenreNorm.includes(sub))) {
+                  taxonomyMatch = true;
+                  break;
+                }
+              }
             }
             
-            return directMatch || broadMatch;
+            return keywordMatch || taxonomyMatch;
           });
 
           if (strictMatches.length > 0) {

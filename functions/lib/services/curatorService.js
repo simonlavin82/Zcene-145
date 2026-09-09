@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.scrapeImageUrlBackend = exports.checkVideoPlayability = exports.scrapeVideoIdBackend = exports.fetchNodeDetailsBackend = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = exports.NODE_DETAILS_SCHEMA = exports.generateGraphDataBackend = exports.generateRootsBreakdownBackend = exports.validateSeedOriginBackend = exports.SEED_VALIDATION_SCHEMA = exports.GENERATE_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = exports.GRAPH_RESPONSE_SCHEMA = exports.extractCleanJsonString = exports.extractArtistSubGraph = exports.normalizeGraphData = exports.buildCompositeCacheKey = exports.extractCountrySlug = exports.sanitizeImageUrl = exports.extractValidYoutubeId = exports.titleCaseArtistId = exports.normalizeArtistId = void 0;
 const genai_1 = require("@google/genai");
@@ -1134,14 +1167,13 @@ exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed informatio
     The summary (bio) MUST be globally universal and entity-focused. DO NOT mention or reference the "Temporal Era Anchors" or any of the disambiguation peers in the generated text. They are provided strictly to lock your Google Search grounding to the entity's exact historical era and lived scene. Do NOT inject historical predecessors into the narrative of a modern band just because they share a hometown or genre.
 
     
-    USE GOOGLE SEARCH to find:
-    1. The most accurate bio and cultural significance. You MUST dynamically adapt your search strategy to target authoritative sources and knowledge bases specific to the artist's musical genre (e.g., Resident Advisor/Beatport for electronic, DownBeat/Blue Note archives for jazz, Gramophone/publisher databases for classical, or Bandcamp/Discogs/AllMusic for independent rock/punk). Avoid single-genre biases or rigid source hierarchies. Use scannability techniques:
+    Synthesize the biography, origin, and discography strictly using the EXTERNAL SEARCH CONTEXT provided below. If the context is empty or insufficient, fall back to your pre-training knowledge. You MUST dynamically adapt your synthesis strategy to authoritative sources and knowledge bases specific to the artist's musical genre. Use scannability techniques:
        - Chunking: Break information into smaller, digestible units.
        - Text Segmentation: Use short paragraphs and meaningful phrases.
        - Formatting: Use bolding for key terms and bullet points where appropriate to create white space.
        - Semantic Splitting: Group related content together by meaning.
-    2. Confirmed top 3 studio albums.
-    3. A verified, active YouTube video for the artist. You MUST run a dedicated search query like "[Artist Name] official music video site:youtube.com" or "[Artist Name] live performance site:youtube.com" to find a real, active video URL. Extract the 11-character video ID (e.g. from watch?v=XXXXXXXXXXX) only from verified Search results. If you cannot find a verified active video ID, or if the search results do not show the full URL, you MUST return null. Never guess or hallucinate a video ID.
+    
+    Extract the 11-character YouTube video ID directly from the URLs provided in the EXTERNAL SEARCH CONTEXT. Do not hallucinate URLs. If you cannot find a verified active video ID, or if the search results do not show the full URL, you MUST return null. Never guess or hallucinate a video ID.
     
     CRITICAL OUTPUT REQUIREMENTS (STRICTLY ENFORCED):
     1. You MUST respond with a single, valid JSON object matching the schema below. Do NOT write any conversational text or prose outside the JSON.
@@ -1168,17 +1200,14 @@ exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed informatio
     }
 
     YOUTUBE VIDEO SELECTION RULES (CRITICAL):
-    - Use Google Search to find the best official YouTube video for this artist.
+    - Use the EXTERNAL SEARCH CONTEXT provided to find the best official YouTube video for this artist.
     - Priority: (1) Most iconic/popular official music video from their official YouTube channel, (2) high-profile full professional live set on an official or reputable label channel.
     - ABSOLUTELY FORBIDDEN: lyric videos, fan-cam bootlegs, low-resolution uploads, non-musical interview clips, or YouTube Shorts (do not return vertical formats or '/shorts/' routes; prioritize landscape videos longer than 2 minutes).
     - The youtubeVideoId value must be ONLY the 11-character YouTube video ID (e.g. "dQw4w9WgXcQ"), NOT a full URL.
-    - Set youtubeVideoId to null if no high-quality, officially-sourced video can be confirmed via search.
+    - Set youtubeVideoId to null if no high-quality, officially-sourced video can be confirmed.
     - youtubeSearchQuery MUST always be populated as a non-null fallback. Format: "[Artist Name] [genre] [live OR official video]". This is MANDATORY.
-    - QUERY MODIFICATION: Append semantic terms such as "full set", "live performance", or "official music video" to your search queries before resolving an asset hash.
     - NEGATIVE SHORTS CONSTRAINT: DO NOT parse or return video hashes derived from search queries matching vertical formats or the '/shorts/' route structure. Prioritize landscape video IDs with durations longer than 2 minutes.
-    - ENTITY VALIDATION: Ensure the chosen video belongs strictly to verified artist channels, high-fidelity archive channels (e.g., Hate5six, KEXP, Audiotree), or standard label uploads (e.g., Relapse Records, Epitaph Records).
-    - ZERO HALLUCINATION (MANDATORY): You must only return a youtubeVideoId if you can extract the exact 11-character ID from a YouTube watch URL (e.g., youtube.com/watch?v=...) present in your Google Search results. If you do not see the exact URL or video ID in the search results, set youtubeVideoId to null. NEVER guess or hallucinate a video ID under any circumstances.
-    - AMBIGUITY RESOLUTION (CRITICAL): For entities with common or ambiguous names (such as "Missing Link"), you MUST combine the entity name with its Connected Network (e.g., its genre, label, or the Seed Artist) in your search query to prevent entity collisions. For example, search "Missing Link hardcore punk band" or "Missing Link Triple B Records" instead of just "Missing Link band".
+    - ZERO HALLUCINATION (MANDATORY): You must only return a youtubeVideoId if you can extract the exact 11-character ID from a YouTube watch URL (e.g., youtube.com/watch?v=...) present in your EXTERNAL SEARCH CONTEXT. If you do not see the exact URL or video ID in the context, set youtubeVideoId to null. NEVER guess or hallucinate a video ID under any circumstances.
 
     WIKIPEDIA ORDERING RULE (MANDATORY):
     If a Wikipedia link is found, it MUST be the very first item (index 0) in the links array.`;
@@ -1222,6 +1251,15 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint,
     else {
         prompt = prompt.replace(/{{#if originHint}}[\s\S]*?{{\/if}}/g, '');
     }
+    const { fetchSerpContext } = await Promise.resolve().then(() => __importStar(require('./serpService')));
+    const serpBioContext = await fetchSerpContext(`${searchArtistName} ${originHint || ''} music biography`);
+    const serpVideoContext = await fetchSerpContext(`${searchArtistName} official music video site:youtube.com`);
+    prompt += `\n\nEXTERNAL SEARCH CONTEXT (USE THIS TO GROUND YOUR RESPONSE):
+Bios & Discography Snippets:
+${serpBioContext.snippets.join('\n')}
+
+YouTube Search Results (Extract 11-char ID from these URLs):
+${serpVideoContext.rawUrls.join('\n')}`;
     let details = null;
     let attempts = 0;
     const MAX_ATTEMPTS = 3;
@@ -1263,7 +1301,6 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint,
                     model: currentModel,
                     contents: prompt,
                     config: {
-                        tools: [{ googleSearch: {} }],
                         temperature: 0.4 - (attempts * 0.1) // Lower temperature on retries
                     }
                 }),
@@ -1412,15 +1449,19 @@ const scrapeVideoIdBackend = async (artistName, artistId) => {
         httpOptions: { timeout: 300000 } // 5 minutes
     });
     const currentModel = "gemini-3.5-flash";
-    const prompt = `Perform a Google Search for: '${artistName} official music video youtube'. 
-Look at the top organic YouTube video in search results. Extract its 11-character video ID (the string after v= or inside the URL). Return ONLY the 11-character video ID as a plain string. Do not include any JSON, quotes, explanations, markdown, or other text. If not found, return "null".`;
+    const { fetchSerpContext } = await Promise.resolve().then(() => __importStar(require('./serpService')));
+    const serpContext = await fetchSerpContext(`${artistName} official music video site:youtube.com`);
+    const prompt = `Extract the best official 11-character YouTube video ID for '${artistName}' from the following search context URLs.
+Return ONLY the 11-character video ID as a plain string. Do not include any JSON, quotes, explanations, markdown, or other text. If no valid YouTube watch URL is present in the context, return "null".
+
+SEARCH CONTEXT URLS:
+${serpContext.rawUrls.join('\n')}`;
     try {
         const response = await Promise.race([
             ai.models.generateContent({
                 model: currentModel,
                 contents: prompt,
                 config: {
-                    tools: [{ googleSearch: {} }],
                     maxOutputTokens: 200,
                 }
             }),
@@ -1473,21 +1514,43 @@ const scrapeImageUrlBackend = async (artistName, type, genre, summary) => {
                 const data = await res.json();
                 const exactMatches = data.results?.filter((r) => (r.artistName || "").toLowerCase() === artistName.toLowerCase()) || [];
                 let selectedArtistId = null;
-                const zceneGenreLower = (genre || "").toLowerCase();
+                // Helper to normalize genre strings: lowercase, remove non-alphanumeric (except spaces), collapse spaces
+                const normalizeGenre = (g) => (g || "").toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\\s+/g, ' ').trim();
+                const zceneGenreNorm = normalizeGenre(genre);
+                // Taxonomy map for mapping iTunes master genres to broad subgenres
+                const genreTaxonomy = {
+                    'hip hop rap': ['boom bap', 'g funk', 'trap', 'drill', 'crunk', 'grime', 'lo fi', 'hip hop', 'rap'],
+                    'electronic': ['techno', 'house', 'trance', 'dubstep', 'edm', 'dance', 'idm', 'drum and bass', 'jungle'],
+                    'rock': ['metal', 'punk', 'grunge', 'alternative', 'indie', 'emo', 'hardcore', 'post rock'],
+                    'r b soul': ['funk', 'motown', 'neo soul', 'rnb', 'r b', 'soul'],
+                    'pop': ['pop', 'synthpop', 'electropop', 'k pop'],
+                    'country': ['country', 'bluegrass', 'americana'],
+                    'jazz': ['jazz', 'bebop', 'swing', 'fusion'],
+                };
                 if (exactMatches.length > 0) {
                     const strictMatches = exactMatches.filter((r) => {
-                        const itunesGenre = (r.primaryGenreName || "").toLowerCase();
+                        const itunesGenre = r.primaryGenreName || "";
                         if (!itunesGenre)
                             return false;
-                        // Match 1: Direct intersection with Zcene's determined genre
-                        const directMatch = zceneGenreLower.includes(itunesGenre) || itunesGenre.includes(zceneGenreLower);
-                        // Match 2: Broad genre fallback for niche genres (e.g. "Hardcore Punk" matches "Metal", "Rock", "Alternative")
-                        let broadMatch = false;
-                        if (zceneGenreLower.includes('hardcore') || zceneGenreLower.includes('punk') || zceneGenreLower.includes('metal')) {
-                            const broadGenres = ['metal', 'rock', 'alternative', 'punk'];
-                            broadMatch = broadGenres.some(bg => itunesGenre.includes(bg));
+                        const itunesGenreNorm = normalizeGenre(itunesGenre);
+                        // 1. Core keyword intersection (e.g., both have "hip hop")
+                        const zceneWords = zceneGenreNorm.split(' ').filter(w => w.length > 2);
+                        const itunesWords = itunesGenreNorm.split(' ').filter(w => w.length > 2);
+                        const keywordMatch = zceneWords.some(w => itunesGenreNorm.includes(w)) ||
+                            itunesWords.some(w => zceneGenreNorm.includes(w));
+                        // 2. Taxonomy fallback match
+                        let taxonomyMatch = false;
+                        for (const [masterGenre, subgenres] of Object.entries(genreTaxonomy)) {
+                            // If iTunes genre aligns with a master category
+                            if (itunesGenreNorm.includes(masterGenre) || masterGenre.includes(itunesGenreNorm)) {
+                                // Check if Zcene genre matches any known subgenre
+                                if (subgenres.some(sub => zceneGenreNorm.includes(sub))) {
+                                    taxonomyMatch = true;
+                                    break;
+                                }
+                            }
                         }
-                        return directMatch || broadMatch;
+                        return keywordMatch || taxonomyMatch;
                     });
                     if (strictMatches.length > 0) {
                         selectedArtistId = strictMatches[0].artistId;

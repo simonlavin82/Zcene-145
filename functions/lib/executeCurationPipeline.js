@@ -47,7 +47,7 @@ function stripCountrySlug(name) {
     return cleanName;
 }
 exports.validateSeedOriginCallable = (0, https_1.onCall)({
-    secrets: ["GEMINI_API_KEY", "API_PASSWORD"],
+    secrets: ["GEMINI_API_KEY", "API_PASSWORD", "GOOGLE_SEARCH_API_KEY", "GOOGLE_SEARCH_CX"],
     timeoutSeconds: 60,
     memory: "512MiB",
 }, async (request) => {
@@ -63,7 +63,7 @@ exports.validateSeedOriginCallable = (0, https_1.onCall)({
     return validationResult;
 });
 exports.executeCurationPipeline = (0, https_1.onCall)({
-    secrets: ["GEMINI_API_KEY", "API_PASSWORD"],
+    secrets: ["GEMINI_API_KEY", "API_PASSWORD", "GOOGLE_SEARCH_API_KEY", "GOOGLE_SEARCH_CX"],
     timeoutSeconds: 540,
     memory: "1GiB",
 }, async (request) => {
