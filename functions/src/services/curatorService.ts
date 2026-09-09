@@ -1243,14 +1243,13 @@ export const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed infor
     The summary (bio) MUST be globally universal and entity-focused. DO NOT mention or reference the "Temporal Era Anchors" or any of the disambiguation peers in the generated text. They are provided strictly to lock your Google Search grounding to the entity's exact historical era and lived scene. Do NOT inject historical predecessors into the narrative of a modern band just because they share a hometown or genre.
 
     
-    USE GOOGLE SEARCH to find:
-    1. The most accurate bio and cultural significance. You MUST dynamically adapt your search strategy to target authoritative sources and knowledge bases specific to the artist's musical genre (e.g., Resident Advisor/Beatport for electronic, DownBeat/Blue Note archives for jazz, Gramophone/publisher databases for classical, or Bandcamp/Discogs/AllMusic for independent rock/punk). Avoid single-genre biases or rigid source hierarchies. Use scannability techniques:
+    Synthesize the biography, origin, and discography strictly using the EXTERNAL SEARCH CONTEXT provided below. If the context is empty or insufficient, fall back to your pre-training knowledge. You MUST dynamically adapt your synthesis strategy to authoritative sources and knowledge bases specific to the artist's musical genre. Use scannability techniques:
        - Chunking: Break information into smaller, digestible units.
        - Text Segmentation: Use short paragraphs and meaningful phrases.
        - Formatting: Use bolding for key terms and bullet points where appropriate to create white space.
        - Semantic Splitting: Group related content together by meaning.
-    2. Confirmed top 3 studio albums.
-    3. A verified, active YouTube video for the artist. You MUST run a dedicated search query like "[Artist Name] official music video site:youtube.com" or "[Artist Name] live performance site:youtube.com" to find a real, active video URL. Extract the 11-character video ID (e.g. from watch?v=XXXXXXXXXXX) only from verified Search results. If you cannot find a verified active video ID, or if the search results do not show the full URL, you MUST return null. Never guess or hallucinate a video ID.
+    
+    Extract the 11-character YouTube video ID directly from the URLs provided in the EXTERNAL SEARCH CONTEXT. Do not hallucinate URLs. If you cannot find a verified active video ID, or if the search results do not show the full URL, you MUST return null. Never guess or hallucinate a video ID.
     
     CRITICAL OUTPUT REQUIREMENTS (STRICTLY ENFORCED):
     1. You MUST respond with a single, valid JSON object matching the schema below. Do NOT write any conversational text or prose outside the JSON.
@@ -1277,17 +1276,14 @@ export const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed infor
     }
 
     YOUTUBE VIDEO SELECTION RULES (CRITICAL):
-    - Use Google Search to find the best official YouTube video for this artist.
+    - Use the EXTERNAL SEARCH CONTEXT provided to find the best official YouTube video for this artist.
     - Priority: (1) Most iconic/popular official music video from their official YouTube channel, (2) high-profile full professional live set on an official or reputable label channel.
     - ABSOLUTELY FORBIDDEN: lyric videos, fan-cam bootlegs, low-resolution uploads, non-musical interview clips, or YouTube Shorts (do not return vertical formats or '/shorts/' routes; prioritize landscape videos longer than 2 minutes).
     - The youtubeVideoId value must be ONLY the 11-character YouTube video ID (e.g. "dQw4w9WgXcQ"), NOT a full URL.
-    - Set youtubeVideoId to null if no high-quality, officially-sourced video can be confirmed via search.
+    - Set youtubeVideoId to null if no high-quality, officially-sourced video can be confirmed.
     - youtubeSearchQuery MUST always be populated as a non-null fallback. Format: "[Artist Name] [genre] [live OR official video]". This is MANDATORY.
-    - QUERY MODIFICATION: Append semantic terms such as "full set", "live performance", or "official music video" to your search queries before resolving an asset hash.
     - NEGATIVE SHORTS CONSTRAINT: DO NOT parse or return video hashes derived from search queries matching vertical formats or the '/shorts/' route structure. Prioritize landscape video IDs with durations longer than 2 minutes.
-    - ENTITY VALIDATION: Ensure the chosen video belongs strictly to verified artist channels, high-fidelity archive channels (e.g., Hate5six, KEXP, Audiotree), or standard label uploads (e.g., Relapse Records, Epitaph Records).
-    - ZERO HALLUCINATION (MANDATORY): You must only return a youtubeVideoId if you can extract the exact 11-character ID from a YouTube watch URL (e.g., youtube.com/watch?v=...) present in your Google Search results. If you do not see the exact URL or video ID in the search results, set youtubeVideoId to null. NEVER guess or hallucinate a video ID under any circumstances.
-    - AMBIGUITY RESOLUTION (CRITICAL): For entities with common or ambiguous names (such as "Missing Link"), you MUST combine the entity name with its Connected Network (e.g., its genre, label, or the Seed Artist) in your search query to prevent entity collisions. For example, search "Missing Link hardcore punk band" or "Missing Link Triple B Records" instead of just "Missing Link band".
+    - ZERO HALLUCINATION (MANDATORY): You must only return a youtubeVideoId if you can extract the exact 11-character ID from a YouTube watch URL (e.g., youtube.com/watch?v=...) present in your EXTERNAL SEARCH CONTEXT. If you do not see the exact URL or video ID in the context, set youtubeVideoId to null. NEVER guess or hallucinate a video ID under any circumstances.
 
     WIKIPEDIA ORDERING RULE (MANDATORY):
     If a Wikipedia link is found, it MUST be the very first item (index 0) in the links array.`;
@@ -1346,6 +1342,17 @@ export const fetchNodeDetailsBackend = async (
     prompt = prompt.replace(/{{#if originHint}}[\s\S]*?{{\/if}}/g, '');
   }
 
+  const { fetchSerpContext } = await import('./serpService');
+  const serpBioContext = await fetchSerpContext(`${searchArtistName} ${originHint || ''} music biography`);
+  const serpVideoContext = await fetchSerpContext(`${searchArtistName} official music video site:youtube.com`);
+
+  prompt += `\n\nEXTERNAL SEARCH CONTEXT (USE THIS TO GROUND YOUR RESPONSE):
+Bios & Discography Snippets:
+${serpBioContext.snippets.join('\n')}
+
+YouTube Search Results (Extract 11-char ID from these URLs):
+${serpVideoContext.rawUrls.join('\n')}`;
+
   let details: any = null;
   let attempts = 0;
   const MAX_ATTEMPTS = 3;
@@ -1387,7 +1394,6 @@ export const fetchNodeDetailsBackend = async (
           model: currentModel,
           contents: prompt,
           config: {
-            tools: [{ googleSearch: {} }],
             temperature: 0.4 - (attempts * 0.1) // Lower temperature on retries
           }
         }),
