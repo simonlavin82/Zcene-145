@@ -1545,8 +1545,14 @@ export const scrapeVideoIdBackend = async (
   });
   const currentModel = "gemini-3.5-flash";
 
-  const prompt = `Perform a Google Search for: '${artistName} official music video youtube'. 
-Look at the top organic YouTube video in search results. Extract its 11-character video ID (the string after v= or inside the URL). Return ONLY the 11-character video ID as a plain string. Do not include any JSON, quotes, explanations, markdown, or other text. If not found, return "null".`;
+  const { fetchSerpContext } = await import('./serpService');
+  const serpContext = await fetchSerpContext(`${artistName} official music video site:youtube.com`);
+
+  const prompt = `Extract the best official 11-character YouTube video ID for '${artistName}' from the following search context URLs.
+Return ONLY the 11-character video ID as a plain string. Do not include any JSON, quotes, explanations, markdown, or other text. If no valid YouTube watch URL is present in the context, return "null".
+
+SEARCH CONTEXT URLS:
+${serpContext.rawUrls.join('\n')}`;
 
   try {
     const response = await Promise.race([
@@ -1554,7 +1560,6 @@ Look at the top organic YouTube video in search results. Extract its 11-characte
         model: currentModel,
         contents: prompt,
         config: {
-          tools: [{ googleSearch: {} }],
           maxOutputTokens: 200,
         }
       }),
