@@ -1620,7 +1620,12 @@ export const scrapeImageUrlBackend = async (
 
       if (res.ok) {
         const data = await res.json();
-        const exactMatches = data.results?.filter((r: any) => (r.artistName || "").toLowerCase() === artistName.toLowerCase()) || [];
+
+        // Normalize names by removing punctuation and spaces for comparison
+        const normName = (name: string) => (name || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+        const targetNameNorm = normName(artistName);
+
+        const exactMatches = data.results?.filter((r: any) => normName(r.artistName) === targetNameNorm) || [];
         
         let selectedArtistId = null;
         
@@ -1630,7 +1635,7 @@ export const scrapeImageUrlBackend = async (
 
         // Taxonomy map for mapping iTunes master genres to broad subgenres
         const genreTaxonomy: Record<string, string[]> = {
-          'hip hop rap': ['boom bap', 'g funk', 'trap', 'drill', 'crunk', 'grime', 'lo fi', 'hip hop', 'rap'],
+          'hip hop rap': ['boom bap', 'g funk', 'trap', 'drill', 'crunk', 'grime', 'lo fi', 'hip hop', 'rap', 'east coast', 'west coast', 'hardcore'],
           'electronic': ['techno', 'house', 'trance', 'dubstep', 'edm', 'dance', 'idm', 'drum and bass', 'jungle'],
           'rock': ['metal', 'punk', 'grunge', 'alternative', 'indie', 'emo', 'hardcore', 'post rock'],
           'r b soul': ['funk', 'motown', 'neo soul', 'rnb', 'r b', 'soul'],
@@ -1663,8 +1668,15 @@ export const scrapeImageUrlBackend = async (
                 }
               }
             }
+
+            // 3. Summary fallback match (if genre was empty or esoteric)
+            let summaryMatch = false;
+            if (!keywordMatch && !taxonomyMatch && summary) {
+              const summaryNorm = normalizeGenre(summary);
+              summaryMatch = itunesWords.some(w => summaryNorm.includes(w));
+            }
             
-            return keywordMatch || taxonomyMatch;
+            return keywordMatch || taxonomyMatch || summaryMatch;
           });
 
           if (strictMatches.length > 0) {

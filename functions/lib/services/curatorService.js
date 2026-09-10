@@ -1512,14 +1512,17 @@ const scrapeImageUrlBackend = async (artistName, type, genre, summary) => {
             clearTimeout(timeoutId);
             if (res.ok) {
                 const data = await res.json();
-                const exactMatches = data.results?.filter((r) => (r.artistName || "").toLowerCase() === artistName.toLowerCase()) || [];
+                // Normalize names by removing punctuation and spaces for comparison
+                const normName = (name) => (name || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+                const targetNameNorm = normName(artistName);
+                const exactMatches = data.results?.filter((r) => normName(r.artistName) === targetNameNorm) || [];
                 let selectedArtistId = null;
                 // Helper to normalize genre strings: lowercase, remove non-alphanumeric (except spaces), collapse spaces
                 const normalizeGenre = (g) => (g || "").toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
                 const zceneGenreNorm = normalizeGenre(genre);
                 // Taxonomy map for mapping iTunes master genres to broad subgenres
                 const genreTaxonomy = {
-                    'hip hop rap': ['boom bap', 'g funk', 'trap', 'drill', 'crunk', 'grime', 'lo fi', 'hip hop', 'rap'],
+                    'hip hop rap': ['boom bap', 'g funk', 'trap', 'drill', 'crunk', 'grime', 'lo fi', 'hip hop', 'rap', 'east coast', 'west coast', 'hardcore'],
                     'electronic': ['techno', 'house', 'trance', 'dubstep', 'edm', 'dance', 'idm', 'drum and bass', 'jungle'],
                     'rock': ['metal', 'punk', 'grunge', 'alternative', 'indie', 'emo', 'hardcore', 'post rock'],
                     'r b soul': ['funk', 'motown', 'neo soul', 'rnb', 'r b', 'soul'],
@@ -1550,7 +1553,13 @@ const scrapeImageUrlBackend = async (artistName, type, genre, summary) => {
                                 }
                             }
                         }
-                        return keywordMatch || taxonomyMatch;
+                        // 3. Summary fallback match (if genre was empty or esoteric)
+                        let summaryMatch = false;
+                        if (!keywordMatch && !taxonomyMatch && summary) {
+                            const summaryNorm = normalizeGenre(summary);
+                            summaryMatch = itunesWords.some(w => summaryNorm.includes(w));
+                        }
+                        return keywordMatch || taxonomyMatch || summaryMatch;
                     });
                     if (strictMatches.length > 0) {
                         selectedArtistId = strictMatches[0].artistId;
