@@ -371,13 +371,12 @@ export const TokenConfirmationDialog: React.FC<{
   onClose: () => void;
   onConfirm: (password: string) => void;
   type: 'generation' | 'extension' | 'deep_cut_creation' | 'partial_synthesis' | 'cache_upgrade' | 'data_quality_optimization' | 'live_tour_search' | 'live_synthesis' | 'live_chat_search';
-  cost: number;
   cachedArtists: string[];
   missingArtists: string[];
   enrichmentArtists?: string[];
   onBack?: () => void;
   error?: string | null;
-}> = ({ isOpen, onClose, onConfirm, type, cost, cachedArtists, missingArtists, enrichmentArtists, onBack, error }) => {
+}> = ({ isOpen, onClose, onConfirm, type, cachedArtists, missingArtists, enrichmentArtists, onBack, error }) => {
   const [password, setPassword] = useState(() => {
     try { return sessionStorage.getItem('zcene_api_password') || ''; } catch(e) { return ''; }
   });
@@ -438,9 +437,14 @@ export const TokenConfirmationDialog: React.FC<{
             </div>
             <div className="flex justify-between font-mono text-xs border-b border-zinc-800 pb-1.5">
               <span className="text-zinc-500">Estimated Cost:</span>
-              <span className="text-primary font-bold">
-                ${cost.toFixed(4)} / query
-              </span>
+              <div className="text-right">
+                <span className="text-primary font-bold">
+                  ~$0.40 – $0.85 (~£0.30 – £0.65)
+                </span>
+                <span className="text-[9px] text-zinc-500 block mt-0.5 lowercase tracking-wide">
+                  Final cost depends on cache recovery and graph complexity.
+                </span>
+              </div>
             </div>
 
             {/* Split breakdown of cached vs synthesis required */}
@@ -477,7 +481,7 @@ export const TokenConfirmationDialog: React.FC<{
             {missingArtists && missingArtists.length > 0 && (
               <div className="space-y-1">
                 <span className="text-[10px] font-semibold text-red-400 uppercase tracking-widest block">
-                  Synthesis Required (${cost.toFixed(4)} / AI)
+                  Synthesis Required (~$0.40 – $0.85)
                 </span>
                 <div className="flex flex-wrap gap-1.5">
                   {missingArtists.map(artist => (

@@ -404,11 +404,16 @@ const calculateTelemetryForUser = (
                 const u = usage as any;
                 if (model.includes('gemini-3.1-pro') || model.includes('gemini-1.5-pro')) {
                     hasProCall = true;
-                    projectExactCost += (u.prompt / 1000000) * 3.50;
-                    projectExactCost += (u.candidates / 1000000) * 10.50;
+                    if (u.prompt > 128000) {
+                        projectExactCost += (u.prompt / 1000000) * 7.00;
+                        projectExactCost += (u.candidates / 1000000) * 21.00;
+                    } else {
+                        projectExactCost += (u.prompt / 1000000) * 3.50;
+                        projectExactCost += (u.candidates / 1000000) * 10.50;
+                    }
                 } else if (model.includes('gemini-3.5-flash') || model.includes('gemini-1.5-flash')) {
-                    projectExactCost += (u.prompt / 1000000) * 0.075;
-                    projectExactCost += (u.candidates / 1000000) * 0.30;
+                    projectExactCost += (u.prompt / 1000000) * 1.50;
+                    projectExactCost += (u.candidates / 1000000) * 9.00;
                 }
             }
             exactCost += projectExactCost;

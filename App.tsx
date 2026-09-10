@@ -1160,7 +1160,6 @@ const App: React.FC = () => {
   const [tokenConfirmation, setTokenConfirmation] = useState<{
     isOpen: boolean;
     type: 'generation' | 'extension' | 'deep_cut_creation' | 'partial_synthesis' | 'cache_upgrade' | 'data_quality_optimization' | 'live_tour_search' | 'live_synthesis';
-    cost: number;
     cachedArtists: string[];
     missingArtists: string[];
     enrichmentArtists?: string[];
@@ -1225,7 +1224,6 @@ const App: React.FC = () => {
       setTokenConfirmation({
         isOpen: true,
         type,
-        cost: COST_PER_AI_CALL,
         cachedArtists,
         missingArtists,
         enrichmentArtists,
@@ -8007,7 +8005,6 @@ const App: React.FC = () => {
         onClose={() => tokenConfirmation?.onCancel()}
         onConfirm={(password) => tokenConfirmation?.onConfirm(password)}
         type={tokenConfirmation?.type || 'generation'}
-        cost={tokenConfirmation?.cost || 0}
         cachedArtists={tokenConfirmation?.cachedArtists || []}
         missingArtists={tokenConfirmation?.missingArtists || []}
         enrichmentArtists={tokenConfirmation?.enrichmentArtists || []}

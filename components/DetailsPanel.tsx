@@ -1625,7 +1625,6 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                     onClose={() => setTourStatus('idle')}
                     onConfirm={handleFetchTourData}
                     type="live_tour_search"
-                    cost={COST_PER_AI_CALL}
                     cachedArtists={[]}
                     missingArtists={[getArtistDisplayName(details, node)]}
                 />,
@@ -2387,7 +2386,6 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                         setPendingChatMessage(null);
                     }}
                     type="live_chat_search"
-                    cost={COST_PER_AI_CALL}
                     cachedArtists={[]}
                     missingArtists={["Live Chat Search (3 Messages)"]}
                 />,
