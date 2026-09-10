@@ -533,11 +533,6 @@ async function triggerReSynthesis(artistId, originalData, collectionName = 'arti
         ]
       }
     ],
-    tools: [
-      {
-        googleSearch: {}
-      }
-    ],
     generationConfig: {
       maxOutputTokens: 4000,
     }
@@ -858,11 +853,6 @@ If you cannot find a clear YouTube video ID for this artist, return null for the
       {
         role: "user",
         parts: [{ text: prompt }]
-      }
-    ],
-    tools: [
-      {
-        googleSearch: {}
       }
     ],
     generationConfig: {
