@@ -1726,11 +1726,6 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
           ]
         }
       ],
-      tools: [
-        {
-          googleSearch: {}
-        }
-      ],
       generationConfig: {
         maxOutputTokens: 4000,
       }
@@ -2114,11 +2109,6 @@ export const fetchLiveTourData = async (artistName: string): Promise<string> => 
               text: prompt
             }
           ]
-        }
-      ],
-      tools: [
-        {
-          googleSearch: {}
         }
       ],
       generationConfig: {

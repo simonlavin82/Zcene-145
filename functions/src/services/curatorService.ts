@@ -1625,7 +1625,7 @@ export const scrapeImageUrlBackend = async (
         let selectedArtistId = null;
         
         // Helper to normalize genre strings: lowercase, remove non-alphanumeric (except spaces), collapse spaces
-        const normalizeGenre = (g: string) => (g || "").toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\\s+/g, ' ').trim();
+        const normalizeGenre = (g: string) => (g || "").toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
         const zceneGenreNorm = normalizeGenre(genre);
 
         // Taxonomy map for mapping iTunes master genres to broad subgenres

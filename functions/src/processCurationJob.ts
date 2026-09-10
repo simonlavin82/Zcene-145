@@ -11,7 +11,8 @@ import {
   scrapeImageUrlBackend,
   buildCompositeCacheKey,
   extractArtistSubGraph,
-  validateSeedOriginBackend
+  validateSeedOriginBackend,
+  extractCountrySlug
 } from "./services/curatorService";
 
 // Initialize Firebase Admin SDK if not already done
@@ -792,7 +793,16 @@ export const processCurationJob = onDocumentCreated({
         const matchingSeedNorm = seedNorms.find((s: string) => isEntitySeedMatch(s, recNorm));
         const recDetailsEntry = detailsCacheEntries.find((entry: any) => isEntitySeedMatch(recNorm, entry[0]));
         
-        const disambiguatedCanonicalId = recDetailsEntry ? (recDetailsEntry as any)[0] : recNorm;
+        let disambiguatedCanonicalId = recDetailsEntry ? (recDetailsEntry as any)[0] : recNorm;
+        
+        if (recDetailsEntry && entityObj.type !== 'label' && !matchingSeedNorm) {
+            const originStr = (recDetailsEntry as any)[1]?.details?.origin;
+            const originSlug = extractCountrySlug(originStr);
+            if (originSlug && originSlug !== 'global') {
+                disambiguatedCanonicalId = `${recNorm}-${originSlug}`;
+            }
+        }
+        
         const compositeCanonicalId = buildCompositeCacheKey(disambiguatedCanonicalId, inputPayload.filters || undefined);
         idRewriteMap.set(recNorm, compositeCanonicalId);
         
