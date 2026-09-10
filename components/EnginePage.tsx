@@ -83,7 +83,7 @@ the entire dataset, the app evolves existing visual structures.
      normalized slugs ('isSameNodeId') to resolve raw artist name and selection mismatches.
 
 4. DATA INTEGRITY & PARALLEL HYDRATION PIPELINE:
-   - Temporal Isolation & Search Grounding (v4): The prompt architecture strictly enforces period-accurate temporal isolation by excluding explicit token-biasing band examples (e.g., Snapcase) that previously caused generation leakage. To ensure the Google Search tool correctly grounds its deep cuts into the specific historical era of the seed, contemporary artist nodes are explicitly included as 'Temporal Era Anchors' in the backend search context, whilst a strict Universality Rule forbids the LLM from mentioning these anchors in the final returned biography.
+   - Temporal Isolation (v4): The prompt architecture strictly enforces period-accurate temporal isolation by excluding explicit token-biasing band examples (e.g., Snapcase) that previously caused generation leakage. Native googleSearch grounding tools and external SERP queries (Google Custom Search API) have been fully stripped from the Cloud Run proxy and Firebase Cloud Functions to eradicate Search Grounding surcharges (dropping cost from ~£4.30+ to ~$0.15 / £0.12 – £0.48 per 40-node generation) and eliminate third-party API dependencies (avoiding $5/1K query costs and 400 Bad Request errors). Entity hydration now relies strictly on Gemini 3.5 Flash's parametric memory.
    - Chunked Concurrent Backend Hydration: Curation details (biographies, genres, origins,
      formed years, member lists, and image URLs) for ALL node types are resolved via a
      chunked Promise.all() execution model on the backend. Nodes are batched into groups
@@ -93,7 +93,7 @@ the entire dataset, the app evolves existing visual structures.
      previously-unhydrated untyped deep cut nodes in a single unified pass.
    - iTunes Fast-Path & Taxonomic Confidence Validation: The image scraper bypasses
      LLM hallucination by querying the iTunes API for \`entity=musicArtist\`. It enforces a deterministic
-     case-insensitive exact match on the artist name, and disambiguates homonyms using a
+     punctuation-agnostic exact match on the artist name, and disambiguates homonyms using a
      normalized taxonomic dictionary (see ITUNES_SCRAPER_DOCUMENTATION) to validate niche
      subgenres against Apple's broad primary categories.
    - Organic Deep-Cut Range Targeting: The LLM graph generator prompt is explicitly configured
@@ -105,12 +105,11 @@ the entire dataset, the app evolves existing visual structures.
      represent untyped deep cuts) are treated as artists and hydrated via /artists/{id}.
      This universal filter is the authoritative safeguard against the legacy regression
      where untyped deep cuts were silently skipped during background hydration.
-   - Strict Entity Disambiguation & Contextual Grounding: Node details fetches (fetchNodeDetails) strictly 
+   - Strict Entity Disambiguation & Contextual Anchoring: Node details fetches (fetchNodeDetails) strictly 
      incorporate the original seed artists (Ecosystem Anchors) and strongly-typed context edges (e.g., Genres, 
-     Labels, connected Artists) directly into the LLM prompt. This forces the model to execute highly specific 
-     Google searches (e.g., factoring in the hardcore punk scene or New York origin), completely eliminating 
-     historical homonym collisions where obscure local bands were previously conflated with identically-named 
-     legacy acts from different eras and genres.
+     Labels, connected Artists) directly into the LLM prompt. This forces the model to synthesize period-accurate 
+     biographies utilizing its parametric memory, completely eliminating historical homonym collisions where obscure 
+     local bands were previously conflated with identically-named legacy acts from different eras and genres.
    - Orphaned Link Mitigation (geminiService.ts): Filters the AI response to 
      ensure every link's 'source' and 'target' corresponds to a validated node ID.
    - Client detailsCache callback: The client subscribes to job updates, immediately 
@@ -373,19 +372,22 @@ artwork for artists without relying on token-heavy LLM image hallucination. Beca
 collide with unrelated entities (e.g., "Method Man" the rapper vs. a hypothetical country artist), 
 the scraper employs a multi-step Taxonomy Validation Engine:
 
-1. EXACT ARTIST MATCHING:
-   The iTunes API (entity=musicArtist) is queried. The scraper filters the results strictly 
-   for case-insensitive exact string matches against the artist name. Generic substring matches 
-   are immediately discarded.
+1. EXACT ARTIST MATCHING & PUNCTUATION-AGNOSTIC NORMALIZATION:
+   The iTunes API (entity=musicArtist) is queried. The scraper filters the results using a 
+   strict punctuation-agnostic normalization rule (toLowerCase().replace(/[^a-z0-9]/g, '')) 
+   to resolve equality edge cases (e.g., "Jay Z" vs "JAY-Z"). Generic substring matches are discarded.
 
 2. STRING NORMALIZATION:
    Both the Zcene-generated genre and the iTunes primaryGenreName are normalized before comparison.
    Non-alphanumeric characters (hyphens, slashes, ampersands) are stripped and collapsed into single 
    spaces (e.g., "Hip-Hop/Rap" -> "hip hop rap", "Hardcore Hip-Hop" -> "hardcore hip hop").
 
-3. CORE KEYWORD INTERSECTION:
+3. CORE KEYWORD INTERSECTION & SUMMARY FALLBACK:
    The engine first checks for direct lexical overlap of significant keywords (length > 2). 
    If both normalized genres share a core word (e.g., "hip" or "hop"), the match is validated.
+   If Gemini produces an empty or highly esoteric genre string, a summaryMatch fallback is triggered:
+   the validator scans the artist biography (summary) for core iTunes taxonomy keywords to guarantee 
+   100% hydration while preserving strict homonym protection.
 
 4. TAXONOMY DICTIONARY FALLBACK:
    Because Zcene generates highly specific subgenres (e.g., "Boom Bap", "East Coast Hip Hop", "Dubstep") 

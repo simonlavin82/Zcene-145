@@ -60,3 +60,10 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 - **Rationale:** Redirect pointer documents share the same `artistId` value as the canonical document and appear in the same Firestore range query. Without this guard, the dedup logic adopts the redirect pointer as the canonical ID, looks up a `detailsCache` that doesn't exist there, falls back to external API hydration, and on timeout skips the entire Firestore write — leaving `graphData` permanently empty on the canonical document.
 - **Rule:** `if (snapData.redirectTo) continue;` is an immutable guard in the slug dedup loop. It must never be removed.
 
+### 11. Cost-Optimized Parametric Hydration (No Grounding)
+- **Eradication of Google Grounding Surcharge:** Native googleSearch grounding tools MUST remain fully stripped from both the Cloud Run proxy and Firebase Cloud Functions. The architecture relies purely on Gemini 3.5 Flash's parametric memory. This enforcement dropped the real-world cost per 40-node root generation from ~£4.30+ down to an average of ~$0.15 / £0.12 – £0.48.
+- **Deprecation of external SERP queries:** The legacy `serpService.ts` (Google Custom Search API) has been completely removed to avoid unnecessary third-party API costs ($5 per 1,000 queries), quota limits, and 400 Bad Request errors.
+
+### 12. Resilient iTunes Artwork Pipeline
+- **Punctuation-Agnostic Normalization:** The iTunes scraper MUST use the punctuation-agnostic normalization rule (`toLowerCase().replace(/[^a-z0-9]/g, '')`) to resolve strict equality naming edge cases (e.g., "Jay Z" vs "JAY-Z").
+- **Summary Match Fallback:** If the LLM produces an empty genre string or a highly esoteric subgenre that fails the iTunes master taxonomy, the validator MUST fall back to scanning the artist biography (summary) for core iTunes taxonomy keywords (e.g., "hip", "hop", "rap"). This guarantees 100% hydration while preserving strict homonym protection.
