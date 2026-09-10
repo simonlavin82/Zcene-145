@@ -182,7 +182,7 @@ async function updateProjectStatus(userId: string, projectId: string, updates: a
 
 export const processCurationJob = onDocumentCreated({
   document: "curationJobs/{jobId}",
-  secrets: ["GEMINI_API_KEY", "GOOGLE_SEARCH_API_KEY", "GOOGLE_SEARCH_CX"],
+  secrets: ["GEMINI_API_KEY"],
   timeoutSeconds: 540, // Firebase Functions v2 SDK enforces a hard 540s cap for Firestore event triggers
   memory: "1GiB",
 }, async (event) => {

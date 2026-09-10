@@ -1,37 +1,4 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.scrapeImageUrlBackend = exports.checkVideoPlayability = exports.scrapeVideoIdBackend = exports.fetchNodeDetailsBackend = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = exports.NODE_DETAILS_SCHEMA = exports.generateGraphDataBackend = exports.generateRootsBreakdownBackend = exports.validateSeedOriginBackend = exports.SEED_VALIDATION_SCHEMA = exports.GENERATE_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = exports.GRAPH_RESPONSE_SCHEMA = exports.extractCleanJsonString = exports.extractArtistSubGraph = exports.normalizeGraphData = exports.buildCompositeCacheKey = exports.extractCountrySlug = exports.sanitizeImageUrl = exports.extractValidYoutubeId = exports.titleCaseArtistId = exports.normalizeArtistId = void 0;
 const genai_1 = require("@google/genai");
@@ -1251,15 +1218,6 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint,
     else {
         prompt = prompt.replace(/{{#if originHint}}[\s\S]*?{{\/if}}/g, '');
     }
-    const { fetchSerpContext } = await Promise.resolve().then(() => __importStar(require('./serpService')));
-    const serpBioContext = await fetchSerpContext(`${searchArtistName} ${originHint || ''} music biography`);
-    const serpVideoContext = await fetchSerpContext(`${searchArtistName} official music video site:youtube.com`);
-    prompt += `\n\nEXTERNAL SEARCH CONTEXT (USE THIS TO GROUND YOUR RESPONSE):
-Bios & Discography Snippets:
-${serpBioContext.snippets.join('\n')}
-
-YouTube Search Results (Extract 11-char ID from these URLs):
-${serpVideoContext.rawUrls.join('\n')}`;
     let details = null;
     let attempts = 0;
     const MAX_ATTEMPTS = 3;
@@ -1449,13 +1407,8 @@ const scrapeVideoIdBackend = async (artistName, artistId) => {
         httpOptions: { timeout: 300000 } // 5 minutes
     });
     const currentModel = "gemini-3.5-flash";
-    const { fetchSerpContext } = await Promise.resolve().then(() => __importStar(require('./serpService')));
-    const serpContext = await fetchSerpContext(`${artistName} official music video site:youtube.com`);
-    const prompt = `Extract the best official 11-character YouTube video ID for '${artistName}' from the following search context URLs.
-Return ONLY the 11-character video ID as a plain string. Do not include any JSON, quotes, explanations, markdown, or other text. If no valid YouTube watch URL is present in the context, return "null".
-
-SEARCH CONTEXT URLS:
-${serpContext.rawUrls.join('\n')}`;
+    const prompt = `What is the best official 11-character YouTube video ID for '${artistName}'?
+Return ONLY the 11-character video ID as a plain string. Do not include any JSON, quotes, explanations, markdown, or other text. If you are not highly confident, return "null".`;
     try {
         const response = await Promise.race([
             ai.models.generateContent({

@@ -1342,16 +1342,7 @@ export const fetchNodeDetailsBackend = async (
     prompt = prompt.replace(/{{#if originHint}}[\s\S]*?{{\/if}}/g, '');
   }
 
-  const { fetchSerpContext } = await import('./serpService');
-  const serpBioContext = await fetchSerpContext(`${searchArtistName} ${originHint || ''} music biography`);
-  const serpVideoContext = await fetchSerpContext(`${searchArtistName} official music video site:youtube.com`);
 
-  prompt += `\n\nEXTERNAL SEARCH CONTEXT (USE THIS TO GROUND YOUR RESPONSE):
-Bios & Discography Snippets:
-${serpBioContext.snippets.join('\n')}
-
-YouTube Search Results (Extract 11-char ID from these URLs):
-${serpVideoContext.rawUrls.join('\n')}`;
 
   let details: any = null;
   let attempts = 0;
@@ -1551,14 +1542,8 @@ export const scrapeVideoIdBackend = async (
   });
   const currentModel = "gemini-3.5-flash";
 
-  const { fetchSerpContext } = await import('./serpService');
-  const serpContext = await fetchSerpContext(`${artistName} official music video site:youtube.com`);
-
-  const prompt = `Extract the best official 11-character YouTube video ID for '${artistName}' from the following search context URLs.
-Return ONLY the 11-character video ID as a plain string. Do not include any JSON, quotes, explanations, markdown, or other text. If no valid YouTube watch URL is present in the context, return "null".
-
-SEARCH CONTEXT URLS:
-${serpContext.rawUrls.join('\n')}`;
+  const prompt = `What is the best official 11-character YouTube video ID for '${artistName}'?
+Return ONLY the 11-character video ID as a plain string. Do not include any JSON, quotes, explanations, markdown, or other text. If you are not highly confident, return "null".`;
 
   try {
     const response = await Promise.race([

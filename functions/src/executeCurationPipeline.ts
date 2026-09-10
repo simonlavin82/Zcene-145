@@ -48,7 +48,7 @@ export function stripCountrySlug(name: string): string {
 }
 
 export const validateSeedOriginCallable = onCall({
-  secrets: ["GEMINI_API_KEY", "API_PASSWORD", "GOOGLE_SEARCH_API_KEY", "GOOGLE_SEARCH_CX"],
+  secrets: ["GEMINI_API_KEY", "API_PASSWORD"],
   timeoutSeconds: 60,
   memory: "512MiB",
 }, async (request) => {
@@ -67,7 +67,7 @@ export const validateSeedOriginCallable = onCall({
 });
 
 export const executeCurationPipeline = onCall({
-  secrets: ["GEMINI_API_KEY", "API_PASSWORD", "GOOGLE_SEARCH_API_KEY", "GOOGLE_SEARCH_CX"],
+  secrets: ["GEMINI_API_KEY", "API_PASSWORD"],
   timeoutSeconds: 540,
   memory: "1GiB",
 }, async (request) => {
