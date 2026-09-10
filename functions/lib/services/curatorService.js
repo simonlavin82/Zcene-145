@@ -1515,7 +1515,7 @@ const scrapeImageUrlBackend = async (artistName, type, genre, summary) => {
                 const exactMatches = data.results?.filter((r) => (r.artistName || "").toLowerCase() === artistName.toLowerCase()) || [];
                 let selectedArtistId = null;
                 // Helper to normalize genre strings: lowercase, remove non-alphanumeric (except spaces), collapse spaces
-                const normalizeGenre = (g) => (g || "").toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\\s+/g, ' ').trim();
+                const normalizeGenre = (g) => (g || "").toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
                 const zceneGenreNorm = normalizeGenre(genre);
                 // Taxonomy map for mapping iTunes master genres to broad subgenres
                 const genreTaxonomy = {

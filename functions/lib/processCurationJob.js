@@ -724,7 +724,14 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         const recNorm = (0, curatorService_1.normalizeArtistId)(entityObj.name);
                         const matchingSeedNorm = seedNorms.find((s) => isEntitySeedMatch(s, recNorm));
                         const recDetailsEntry = detailsCacheEntries.find((entry) => isEntitySeedMatch(recNorm, entry[0]));
-                        const disambiguatedCanonicalId = recDetailsEntry ? recDetailsEntry[0] : recNorm;
+                        let disambiguatedCanonicalId = recDetailsEntry ? recDetailsEntry[0] : recNorm;
+                        if (recDetailsEntry && entityObj.type !== 'label' && !matchingSeedNorm) {
+                            const originStr = recDetailsEntry[1]?.details?.origin;
+                            const originSlug = (0, curatorService_1.extractCountrySlug)(originStr);
+                            if (originSlug && originSlug !== 'global') {
+                                disambiguatedCanonicalId = `${recNorm}-${originSlug}`;
+                            }
+                        }
                         const compositeCanonicalId = (0, curatorService_1.buildCompositeCacheKey)(disambiguatedCanonicalId, inputPayload.filters || undefined);
                         idRewriteMap.set(recNorm, compositeCanonicalId);
                         if (matchingSeedNorm) {
