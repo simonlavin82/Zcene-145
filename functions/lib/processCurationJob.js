@@ -1107,12 +1107,21 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
             catch (e) {
                 console.warn(`[Curation Backend] Failed to extract seedImageUrl:`, e);
             }
-            const mergedApiUsage = {
-                ...(inputPayload?.foregroundApiUsage || {})
-            };
+            const mergedApiUsage = {};
+            if (inputPayload?.foregroundApiUsage) {
+                for (const [model, usage] of Object.entries(inputPayload.foregroundApiUsage)) {
+                    const safeUsage = usage;
+                    mergedApiUsage[model] = {
+                        prompt: safeUsage.prompt || 0,
+                        candidates: safeUsage.candidates || 0,
+                        total: safeUsage.total || 0,
+                    };
+                }
+            }
             for (const [model, usage] of Object.entries(collectedTokens)) {
-                if (!mergedApiUsage[model])
+                if (!mergedApiUsage[model]) {
                     mergedApiUsage[model] = { prompt: 0, candidates: 0, total: 0 };
+                }
                 mergedApiUsage[model].prompt += usage.prompt;
                 mergedApiUsage[model].candidates += usage.candidates;
                 mergedApiUsage[model].total += usage.total;
