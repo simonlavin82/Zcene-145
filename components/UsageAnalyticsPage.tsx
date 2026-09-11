@@ -402,18 +402,24 @@ const calculateTelemetryForUser = (
             projectHasExactCost = true;
             for (const [model, usage] of Object.entries(pData.apiUsage)) {
                 const u = usage as any;
+                
+                // Calculate hidden reasoning/cached tokens
+                const reportedSum = (u.prompt || 0) + (u.candidates || 0);
+                const total = u.total || reportedSum;
+                const reasoningTokens = Math.max(0, total - reportedSum);
+
                 if (model.includes('gemini-3.1-pro') || model.includes('gemini-1.5-pro')) {
                     hasProCall = true;
                     if (u.prompt > 128000) {
                         projectExactCost += (u.prompt / 1000000) * 7.00;
-                        projectExactCost += (u.candidates / 1000000) * 21.00;
+                        projectExactCost += ((u.candidates + reasoningTokens) / 1000000) * 21.00;
                     } else {
                         projectExactCost += (u.prompt / 1000000) * 3.50;
-                        projectExactCost += (u.candidates / 1000000) * 10.50;
+                        projectExactCost += ((u.candidates + reasoningTokens) / 1000000) * 10.50;
                     }
                 } else if (model.includes('gemini-3.5-flash') || model.includes('gemini-1.5-flash')) {
                     projectExactCost += (u.prompt / 1000000) * 1.50;
-                    projectExactCost += (u.candidates / 1000000) * 9.00;
+                    projectExactCost += ((u.candidates + reasoningTokens) / 1000000) * 9.00;
                 }
             }
             exactCost += projectExactCost;
