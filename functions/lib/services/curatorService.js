@@ -1127,7 +1127,6 @@ exports.NODE_DETAILS_SCHEMA = {
 exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed information for the music entity: "{{nodeIdentifier}}" (type: {{nodeType}}).
     
     Context:
-    - Seed Artist(s) / Ecosystem Anchor: {{seedArtists}}.
     - Search Disambiguation & Temporal Era Anchors: {{contextNodes}}.
     - Date: {{currentDate}}.
     {{#if originHint}}
@@ -1135,7 +1134,7 @@ exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed informatio
     {{/if}}
     
     CRITICAL UNIVERSALITY & TEMPORAL RULE:
-    The summary (bio) MUST be globally universal and entity-focused. DO NOT mention or reference the "Temporal Era Anchors" or any of the disambiguation peers in the generated text. They are provided strictly to lock your Google Search grounding to the entity's exact historical era and lived scene. Do NOT inject historical predecessors into the narrative of a modern band just because they share a hometown or genre.
+    The summary (bio) MUST be globally universal and entity-focused. DO NOT mention or reference the "Temporal Era Anchors" or any other specific bands from the context in the generated text. They are provided strictly to lock your Google Search grounding to the entity's exact historical era and lived scene. Do NOT inject historical predecessors into the narrative of a modern band just because they share a hometown or genre. All generated fields must describe the band's own history, sonic identity, and subgenre standing intrinsically.
 
     
     Synthesize the biography, origin, and discography strictly using the EXTERNAL SEARCH CONTEXT provided below. If the context is empty or insufficient, fall back to your pre-training knowledge. You MUST dynamically adapt your synthesis strategy to authoritative sources and knowledge bases specific to the artist's musical genre. Use scannability techniques:
@@ -1165,7 +1164,7 @@ exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed informatio
         {"site": "Wikipedia", "url": "https://en.wikipedia.org/wiki/..."}
       ],
       "discography": [{"albumName": "Name", "releaseYear": "YYYY"}],
-      "recommendationReason": "A 1-2 sentence curator insight explaining exactly why they matter to this specific scene.",
+      "recommendationReason": "A 1-2 sentence curator insight explaining exactly why they matter to their genre and musical era, focusing strictly on their intrinsic artistic contributions. DO NOT reference any other specific bands or the search context.",
       "youtubeVideoId": "dQw4w9WgXcQ",
       "youtubeSearchQuery": "Turnstile hardcore punk official music video"
     }
@@ -1213,7 +1212,6 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint,
     let prompt = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE
         .replace('{{nodeIdentifier}}', searchArtistName)
         .replace('{{nodeType}}', node.type)
-        .replace('{{seedArtists}}', seedArtists)
         .replace('{{contextNodes}}', contextNodes)
         .replace(/{{currentDate}}/g, currentDate);
     if (originHint) {
