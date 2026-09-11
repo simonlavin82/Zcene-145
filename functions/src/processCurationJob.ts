@@ -354,7 +354,10 @@ export const processCurationJob = onDocumentCreated({
               console.log(`[Phase 1] Cache Miss for seed: ${seed}. Routing to Phase 2 (Flash-Lite).`);
               
               // Phase 2: Origin Validation (Flash-Lite)
-              const validationResult = await validateSeedOriginBackend(seed, usageCollector);
+              const validationResult = await validateSeedOriginBackend(seed);
+              if (validationResult.apiUsage) {
+                usageCollector.push(validationResult.apiUsage.model, validationResult.apiUsage);
+              }
               if (validationResult.isValid) {
                  resolvedSeedArray.push({
                     id: normalizeArtistId(validationResult.id),
@@ -1219,7 +1222,7 @@ export const processCurationJob = onDocumentCreated({
       }
 
       const mergedApiUsage: Record<string, { prompt: number, candidates: number, total: number }> = {};
-      if (inputPayload?.foregroundApiUsage) {
+      if (inputPayload?.foregroundApiUsage && Object.keys(inputPayload.foregroundApiUsage).length > 0) {
         for (const [model, usage] of Object.entries(inputPayload.foregroundApiUsage)) {
           const safeUsage = usage as any;
           mergedApiUsage[model] = {
@@ -1228,6 +1231,8 @@ export const processCurationJob = onDocumentCreated({
             total: safeUsage.total || 0,
           };
         }
+      } else {
+        console.warn(`[Curation Backend] CRITICAL WARNING: inputPayload.foregroundApiUsage is empty or missing! Tokens dropped from Phase 1. Payload:`, inputPayload?.foregroundApiUsage);
       }
       
       for (const [model, usage] of Object.entries(collectedTokens)) {

@@ -328,7 +328,10 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     else {
                         console.log(`[Phase 1] Cache Miss for seed: ${seed}. Routing to Phase 2 (Flash-Lite).`);
                         // Phase 2: Origin Validation (Flash-Lite)
-                        const validationResult = await (0, curatorService_1.validateSeedOriginBackend)(seed, usageCollector);
+                        const validationResult = await (0, curatorService_1.validateSeedOriginBackend)(seed);
+                        if (validationResult.apiUsage) {
+                            usageCollector.push(validationResult.apiUsage.model, validationResult.apiUsage);
+                        }
                         if (validationResult.isValid) {
                             resolvedSeedArray.push({
                                 id: (0, curatorService_1.normalizeArtistId)(validationResult.id),
@@ -1108,7 +1111,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 console.warn(`[Curation Backend] Failed to extract seedImageUrl:`, e);
             }
             const mergedApiUsage = {};
-            if (inputPayload?.foregroundApiUsage) {
+            if (inputPayload?.foregroundApiUsage && Object.keys(inputPayload.foregroundApiUsage).length > 0) {
                 for (const [model, usage] of Object.entries(inputPayload.foregroundApiUsage)) {
                     const safeUsage = usage;
                     mergedApiUsage[model] = {
@@ -1117,6 +1120,9 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         total: safeUsage.total || 0,
                     };
                 }
+            }
+            else {
+                console.warn(`[Curation Backend] CRITICAL WARNING: inputPayload.foregroundApiUsage is empty or missing! Tokens dropped from Phase 1. Payload:`, inputPayload?.foregroundApiUsage);
             }
             for (const [model, usage] of Object.entries(collectedTokens)) {
                 if (!mergedApiUsage[model]) {

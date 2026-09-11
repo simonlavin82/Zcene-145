@@ -572,7 +572,7 @@ exports.SEED_VALIDATION_SCHEMA = {
     required: ["id", "origin", "genre", "isValid"]
 };
 // --- CORE CURATOR LOGIC ---
-const validateSeedOriginBackend = async (artistId, usageCollector) => {
+const validateSeedOriginBackend = async (artistId) => {
     try {
         const apiKey = process.env.GEMINI_API_KEY;
         if (!apiKey) {
@@ -594,16 +594,18 @@ const validateSeedOriginBackend = async (artistId, usageCollector) => {
         const jsonText = response.text?.trim() || "";
         if (!jsonText)
             throw new Error("Empty validation response");
-        if (usageCollector && response.usageMetadata) {
-            usageCollector.push(currentModel, {
+        const cleanedJsonText = (0, exports.extractCleanJsonString)(jsonText);
+        const data = JSON.parse(cleanedJsonText);
+        let apiUsage = null;
+        if (response.usageMetadata) {
+            apiUsage = {
+                model: currentModel,
                 promptTokenCount: response.usageMetadata.promptTokenCount || 0,
                 candidatesTokenCount: response.usageMetadata.candidatesTokenCount || 0,
                 totalTokenCount: response.usageMetadata.totalTokenCount || 0,
-            });
+            };
         }
-        const cleanedJsonText = (0, exports.extractCleanJsonString)(jsonText);
-        const data = JSON.parse(cleanedJsonText);
-        return data;
+        return { ...data, apiUsage };
     }
     catch (err) {
         console.error(`[validateSeedOriginBackend] Failed to validate seed ${artistId}:`, err);
@@ -655,7 +657,7 @@ ${JSON.stringify(detailsCacheEntries, null, 2)}`;
     }
 };
 exports.generateRootsBreakdownBackend = generateRootsBreakdownBackend;
-const generateGraphDataBackend = async (artists, filters, cachedSubgraphsContext, baseGraph, disambiguationHints, usageCollector) => {
+const generateGraphDataBackend = async (artists, filters, cachedSubgraphsContext, baseGraph, disambiguationHints) => {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
         throw new Error("GEMINI_API_KEY is not defined in environment secrets.");
@@ -742,6 +744,7 @@ const generateGraphDataBackend = async (artists, filters, cachedSubgraphsContext
     const finalizedSystemInstruction = systemInstruction.replace(/{{artists}}/g, artists);
     let jsonText = "";
     let data = null;
+    let finalApiUsage = null;
     let attempts = 0;
     const MAX_ATTEMPTS = 3;
     while (attempts < MAX_ATTEMPTS && !data) {
@@ -762,12 +765,13 @@ const generateGraphDataBackend = async (artists, filters, cachedSubgraphsContext
             jsonText = response.text?.trim() || "";
             if (!jsonText)
                 throw new Error("The AI returned an empty response.");
-            if (usageCollector && response.usageMetadata) {
-                usageCollector.push(currentModel, {
+            if (response.usageMetadata) {
+                finalApiUsage = {
+                    model: currentModel,
                     promptTokenCount: response.usageMetadata.promptTokenCount || 0,
                     candidatesTokenCount: response.usageMetadata.candidatesTokenCount || 0,
                     totalTokenCount: response.usageMetadata.totalTokenCount || 0,
-                });
+                };
             }
             const cleanedJsonText = (0, exports.extractCleanJsonString)(jsonText);
             try {
@@ -1044,7 +1048,7 @@ const generateGraphDataBackend = async (artists, filters, cachedSubgraphsContext
     if (data) {
         finalGraph.synthesisRationale = data.synthesisRationale || data.synthesis_rationale;
     }
-    return finalGraph;
+    return { graphData: finalGraph, apiUsage: finalApiUsage };
 };
 exports.generateGraphDataBackend = generateGraphDataBackend;
 // --- NODE DETAILS SCHEMAS & PROMPTS ---

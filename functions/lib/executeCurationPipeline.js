@@ -192,7 +192,11 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
                 validationResult = { isValid: true, id: seed, origin: payload.disambiguationHints[(0, curatorService_1.normalizeArtistId)(seed)], genre: "Unknown" };
             }
             else {
-                validationResult = await (0, curatorService_1.validateSeedOriginBackend)(seed, usageCollector);
+                const valResult = await (0, curatorService_1.validateSeedOriginBackend)(seed);
+                validationResult = valResult;
+                if (valResult.apiUsage) {
+                    usageCollector.push(valResult.apiUsage.model, valResult.apiUsage);
+                }
             }
             if (validationResult.isValid) {
                 let normId = (0, curatorService_1.normalizeArtistId)(validationResult.id);
@@ -222,7 +226,11 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
     let finalGraph = payload.baseGraph || { nodes: [], links: [] };
     if (needsProGeneration) {
         console.log(`[Pipeline Diamond] -> 3.1 Pro Topology Generation`);
-        finalGraph = await (0, curatorService_1.generateGraphDataBackend)(payload.artists, payload.filters, payload.cachedSubgraphsContext, payload.baseGraph, payload.disambiguationHints, usageCollector);
+        const result = await (0, curatorService_1.generateGraphDataBackend)(payload.artists, payload.filters, payload.cachedSubgraphsContext, payload.baseGraph, payload.disambiguationHints);
+        finalGraph = result.graphData;
+        if (result.apiUsage) {
+            usageCollector.push(result.apiUsage.model, result.apiUsage);
+        }
     }
     else if (!payload.baseGraph || payload.baseGraph.nodes.length === 0) {
         console.log(`[Pipeline Diamond] -> Single Seed Cache Hit: Extracting topology from cache`);

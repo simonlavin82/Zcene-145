@@ -202,7 +202,11 @@ export const executeCurationPipeline = onCall({
         if (payload.disambiguationHints && payload.disambiguationHints[normalizeArtistId(seed)]) {
            validationResult = { isValid: true, id: seed, origin: payload.disambiguationHints[normalizeArtistId(seed)], genre: "Unknown" };
         } else {
-           validationResult = await validateSeedOriginBackend(seed, usageCollector);
+           const valResult = await validateSeedOriginBackend(seed);
+           validationResult = valResult;
+           if (valResult.apiUsage) {
+              usageCollector.push(valResult.apiUsage.model, valResult.apiUsage);
+           }
         }
         if (validationResult.isValid) {
            let normId = normalizeArtistId(validationResult.id);
@@ -234,14 +238,17 @@ export const executeCurationPipeline = onCall({
 
   if (needsProGeneration) {
     console.log(`[Pipeline Diamond] -> 3.1 Pro Topology Generation`);
-    finalGraph = await generateGraphDataBackend(
+    const result = await generateGraphDataBackend(
       payload.artists, 
       payload.filters, 
       payload.cachedSubgraphsContext, 
       payload.baseGraph, 
-      payload.disambiguationHints,
-      usageCollector
+      payload.disambiguationHints
     );
+    finalGraph = result.graphData;
+    if (result.apiUsage) {
+       usageCollector.push(result.apiUsage.model, result.apiUsage);
+    }
   } else if (!payload.baseGraph || payload.baseGraph.nodes.length === 0) {
     console.log(`[Pipeline Diamond] -> Single Seed Cache Hit: Extracting topology from cache`);
     const seedNorm = normalizeArtistId(artistList[0]);

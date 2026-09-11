@@ -624,9 +624,8 @@ export const SEED_VALIDATION_SCHEMA = {
 // --- CORE CURATOR LOGIC ---
 
 export const validateSeedOriginBackend = async (
-  artistId: string,
-  usageCollector?: UsageCollector
-): Promise<{ id: string; origin: string; genre: string; isValid: boolean }> => {
+  artistId: string
+): Promise<{ id: string; origin: string; genre: string; isValid: boolean; apiUsage?: any }> => {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -652,17 +651,20 @@ export const validateSeedOriginBackend = async (
     const jsonText = response.text?.trim() || "";
     if (!jsonText) throw new Error("Empty validation response");
 
-    if (usageCollector && response.usageMetadata) {
-      usageCollector.push(currentModel, {
+    const cleanedJsonText = extractCleanJsonString(jsonText);
+    const data = JSON.parse(cleanedJsonText);
+    
+    let apiUsage = null;
+    if (response.usageMetadata) {
+      apiUsage = {
+        model: currentModel,
         promptTokenCount: response.usageMetadata.promptTokenCount || 0,
         candidatesTokenCount: response.usageMetadata.candidatesTokenCount || 0,
         totalTokenCount: response.usageMetadata.totalTokenCount || 0,
-      });
+      };
     }
-
-    const cleanedJsonText = extractCleanJsonString(jsonText);
-    const data = JSON.parse(cleanedJsonText);
-    return data;
+    
+    return { ...data, apiUsage };
   } catch (err: any) {
     console.error(`[validateSeedOriginBackend] Failed to validate seed ${artistId}:`, err);
     // Bulletproof: We now actively throw the error so the orchestrator's catch block can flag the job as failed
@@ -727,9 +729,8 @@ export const generateGraphDataBackend = async (
   filters?: DiscoveryFilters,
   cachedSubgraphsContext?: string,
   baseGraph?: GraphData,
-  disambiguationHints?: Record<string, string>,
-  usageCollector?: UsageCollector
-): Promise<GraphData> => {
+  disambiguationHints?: Record<string, string>
+): Promise<{ graphData: GraphData; apiUsage?: any }> => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY is not defined in environment secrets.");
@@ -825,6 +826,7 @@ export const generateGraphDataBackend = async (
 
   let jsonText = "";
   let data: GraphData | null = null;
+  let finalApiUsage: any = null;
   let attempts = 0;
   const MAX_ATTEMPTS = 3;
 
@@ -847,12 +849,13 @@ export const generateGraphDataBackend = async (
       jsonText = response.text?.trim() || "";
       if (!jsonText) throw new Error("The AI returned an empty response.");
 
-      if (usageCollector && response.usageMetadata) {
-        usageCollector.push(currentModel, {
+      if (response.usageMetadata) {
+        finalApiUsage = {
+          model: currentModel,
           promptTokenCount: response.usageMetadata.promptTokenCount || 0,
           candidatesTokenCount: response.usageMetadata.candidatesTokenCount || 0,
           totalTokenCount: response.usageMetadata.totalTokenCount || 0,
-        });
+        };
       }
 
       const cleanedJsonText = extractCleanJsonString(jsonText);
@@ -1151,7 +1154,7 @@ export const generateGraphDataBackend = async (
       finalGraph.synthesisRationale = (data as any).synthesisRationale || (data as any).synthesis_rationale;
   }
 
-  return finalGraph;
+  return { graphData: finalGraph, apiUsage: finalApiUsage };
 };
 
 // --- NODE DETAILS SCHEMAS & PROMPTS ---
