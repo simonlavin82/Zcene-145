@@ -1,65 +1,49 @@
-# Clean Slate Architecture: End-to-End Curation Pipeline
+# Investigatory Report & Implementation Plan: Share Zcene White Screen Bug (/z/{id})
 
-We are completely replacing the legacy `processCurationJob` (Firestore-triggered background function) and its brittle `setDoc` -> `onSnapshot` frontend polling system with a **direct, clean HTTPS Callable Cloud Function** (`executeCurationPipeline`).
+## Investigatory Report
 
-This bypasses all legacy proxy hacks (no more Vite routing issues, no CORS headaches, no silent serialization crashes) by enabling the frontend to securely trigger the backend execution directly, passing the payload, and awaiting the resolved `GraphData` in a single promise.
+### 1. The Observation & Symptoms
+When users visit a path-based share link (e.g., `zcene.online/z/...`), the application renders a blank white screen.
+The backend correctly generates and stores the document in the `sharedZcenes` collection, meaning the failure is entirely localized to the front-end rendering phase upon cold-booting the shared URL.
 
-## User Review Required
+### 2. Tracing the Guest Hydration Pipeline
+The front-end correctly intercepts the `/z/{id}` route in `App.tsx` (around lines 6330-6450). It executes the following pipeline:
+1. **Fetching**: Retrieves the `sharedZcenes` document from Firestore.
+2. **Deserialization**: Parses `graphData` from a string back into an object, and reconstructs the `detailsCache` Map via `expandDetailsCacheMap()`.
+3. **Hydration**: Unconditionally calls `batchHydrateDetailsCache()` to fetch missing live bios for guests if the author's cache was sparse.
+4. **State Commitment**: Sets `graphData`, `activeNodeIds`, and `selectedNode`.
 
-> [!WARNING]
-> This plan will deprecate `processCurationJob` and replace it with a Gen2 Firebase Callable Function. The frontend trigger `generateGraphDataViaCloudJob` will be rewritten to use the Firebase SDK's `httpsCallable`, eliminating the need to write to the `curationJobs` collection. Please confirm this architectural shift aligns with your vision.
+The entire logic above is wrapped in a robust `try...catch` block. If any data parsing or hydration logic threw a synchronous error, it would be caught, and the app would render the `<ErrorOverlay>` component with a dark background. However, the screen is completely white.
+
+### 3. The Root Cause: React Lazy Suspense Failure
+A completely white screen in a dark-mode React application indicates that the root component tree has unmounted (crashing before the `ErrorBoundary` can render its UI, or bypassing it entirely).
+
+In `App.tsx`, three components are dynamically imported using `React.lazy`:
+```tsx
+const StyleGuidePage = React.lazy(() => import('./components/DesignSystem').then(m => ({ default: m.StyleGuidePage })));
+const EnginePage = React.lazy(() => import('./components/EnginePage').then(m => ({ default: m.EnginePage })));
+const UsageAnalyticsPage = React.lazy(() => import('./components/UsageAnalyticsPage').then(m => ({ default: m.UsageAnalyticsPage })));
+```
+
+These components are rendered unconditionally inside hidden structural `div`s at the bottom of the `App.tsx` render tree:
+```tsx
+<div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Engine ? 'z-10' : 'z-0 opacity-0 pointer-events-none'}`}>
+  <EnginePage ... />
+</div>
+```
+
+**The Bug:** There is absolutely no `<React.Suspense>` boundary wrapping these lazy-loaded components in `App.tsx` or `index.tsx`. 
+When a user cold-boots the app directly via a deep link (`/z/{id}`), React immediately attempts to mount `<EnginePage>`, `<StyleGuidePage>`, and `<UsageAnalyticsPage>`. Because the Javascript chunks have not yet loaded over the network, `React.lazy` throws a Promise to suspend rendering. 
+Since there is no `<Suspense>` boundary anywhere in the tree to catch this Promise, React 18/19 treats it as a fatal unhandled suspension, bypasses the standard synchronous `ErrorBoundary`, and forcefully unmounts the entire `<App />` tree, resulting in a blank white screen.
 
 ## Proposed Changes
 
-### Backend - Cloud Functions
-#### [NEW] `functions/src/executeCurationPipeline.ts`
-We will create a clean-room modular function utilizing Gemini 3.5 Flash-Lite and Gemini 3.1 Pro via the `@google/genai` SDK directly in the backend. 
-- **Step 1: Cache Lookup:** Perform `O(1)` query against the global `artists` cache.
-- **Step 2: Origin Validation (Flash-Lite):** Any cache miss hits Flash-Lite for origin validation and resolving the seed array.
-- **Step 3: Topology Generation (3.1 Pro):** Multi-seed requests or cache misses are passed to 3.1 Pro to mint the unified spiderweb topology.
-- **Step 4: Deep Cuts & Positioning (3.1 Pro):** Iterate missing deep cuts, perform structural positioning, and synthesize the Roots Breakdown.
-- **Step 5: Logging:** Inject explicit `console.log("[Pipeline Diamond] -> ...")` trace statements at every flowchart decision point.
+### [Component Name]
+Front-End Core (`App.tsx`)
 
-#### [MODIFY] `functions/src/index.ts`
-- Export the new `executeCurationPipeline` function.
-
-### Frontend - React Client
-#### [MODIFY] `App.tsx` (and relevant services)
-- Deprecate `generateGraphDataViaCloudJob`'s `setDoc` approach.
-- Implement `const curate = httpsCallable(functions, 'executeCurationPipeline');`
-- The frontend will await this promise directly, receiving the complete GraphData and DetailsCache in a single synchronized response.
-- Fallback UI handling for the single promise loading state.
-
-## Verification Plan
-
-### Manual Verification
-1. We will# Architectural Confession & Rollback Plan
-
-## Phase 1: Architectural Confession & Cleanup
-I made a critical error by violating the established 3-Column Architecture. I attempted to patch foundational data (node slugging and the initial `updatedAt` timestamps) inside the Background Worker (Column 3: `processCurationJob.ts`). Column 3 is strictly meant to hydrate existing nodes created by Column 2. Anchoring data like timestamps and country-coded slugs MUST happen synchronously in Column 2 (HTTP Fast-Track) before the background hydration even begins.
-
-I have already searched for and deleted the outdated `EngineDocumentation.md` file which contradicted this architecture.
-
-## Phase 2: Source of Truth Overhaul
-I will overhaul `EnginePage.tsx` to perfectly reflect the 3-Column Pipeline:
-- **Column 1: React UI**: Submits the seed, handles the Front Gate Cache Guard, performs Fast Track Local Hydration, and listens for Background Hydration.
-- **Column 2: HTTP Fast-Track (`executeCurationPipeline.ts`)**: Performs Pre-Flight Origin Slugging (appending the `<kebab-case>-<country-code>`), handles Gemini Topology Generation, and saves the Baseline Topology Payload (including `updatedAt: serverTimestamp()`).
-- **Column 3: Background Worker (`processCurationJob.ts`)**: Listens for jobs, hydrates missing info (bio, image), saves to cache, and marks the job complete.
-
-I will also create a new `architecture_truth.md` file containing this exact logic to serve as a permanent system prompt anchor.
-
-## Phase 3: Rollback & Fix Plan
-
-### 1. Revert Broken Column 3 Logic (`processCurationJob.ts`)
-I will remove the flawed self-referential alias logic and the slugging manipulation that I mistakenly placed in `processCurationJob.ts`. Column 3 will revert to purely hydrating the canonical ID that it receives from Column 2.
-
-### 2. Correct Column 2 Logic (`executeCurationPipeline.ts` & `artistCacheService.ts`)
-- **Origin Slugging**: In `executeCurationPipeline.ts`, I will ensure that the initial seed artist and all nodes in the topology are correctly slugged with their country code (e.g., `harvey-danger-us`) during the "Pre-Flight Origin Validation" and graph generation phase. I will ensure that `extractCountrySlug` correctly extracts and appends the ISO-2 suffix to the canonical IDs before the baseline topology is saved.
-- **Timestamps**: In `artistCacheService.ts` and `executeCurationPipeline.ts`, when the baseline topology and cache stubs are created, I will explicitly inject `updatedAt: serverTimestamp()` so the documents have their timestamps anchored immediately in Column 2.
-
-### 3. Sync React UI (`Dashboard.tsx` & `App.tsx`)
-The React UI will seamlessly sync with this repaired flow. Because Column 2 will lay down the baseline topology and initial timestamps, Column 1 can instantly paint the unhydrated topology. The 'Mapping...' loader will only drop, and the toast will only show, when the Background Hydration Listener (Column 1) detects that Column 3 has marked the project status as 'completed' and the node is fully qualified in the cache.
+#### [MODIFY] App.tsx
+- Wrap the main rendering viewport (or specifically the lazy-loaded components) in a `<React.Suspense>` boundary.
+- Provide a seamless fallback (e.g., `<LoadingScreen />`) so that if a user deep-links into the app, it gracefully displays the loading state while the `EnginePage` and other lazy chunks resolve in the background.
 
 ## User Review Required
-Please review this Implementation Plan and the overhauled `EnginePage.tsx` (which I will update next). Once you approve, I will execute the code changes.he Lookup -> Hit -> Merge" diamond.
-3. We will trigger a Multi-Seed curation from the UI and trace the backend terminal output, ensuring it follows the 3.1 Pro bespoke topology and Roots Breakdown diamond.
+Please review this root cause analysis. The fix requires wrapping the App's main view router inside a `<React.Suspense>` block. Let me know if you approve this approach so I can proceed with the code edits.

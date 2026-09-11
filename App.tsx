@@ -7664,7 +7664,8 @@ const App: React.FC = () => {
         {toast && <Toast key={toast.id} message={toast.message} onClose={() => setToast(null)} />}
       </AnimatePresence>
       <div className="flex-grow relative overflow-hidden h-full">
-        <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Home ? 'z-10' : 'z-0 opacity-0 pointer-events-none'}`}>
+        <React.Suspense fallback={<div className="flex h-full w-full items-center justify-center bg-brand-black"><div className="w-8 h-8 border-4 border-zinc-800 border-t-primary rounded-full animate-spin"></div></div>}>
+          <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Home ? 'z-10' : 'z-0 opacity-0 pointer-events-none'}`}>
           <HomePage
             onNavigate={handleViewChange}
             hasExistingGraph={projects.length > 0}
@@ -7873,6 +7874,7 @@ const App: React.FC = () => {
             onClose={handleSubpageClose}
           />
         </div>
+        </React.Suspense>
       </div>
 
       {/* Global Modals */}
