@@ -717,6 +717,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 console.log(`[Curation Backend] Batch hydration complete. Executing Final 3.1 Pro Synthesis...`);
                 const idRewriteMap = new Map();
                 const seedNorms = artistList.map((a) => (0, curatorService_1.normalizeArtistId)(a));
+                const isComplexGeneration = artistList.length > 1 || (inputPayload.filters && Object.keys(inputPayload.filters).length > 0);
                 let rootBreakdownStr = "";
                 try {
                     // 3.1 Pro: Root Breakdown Narrative
@@ -805,72 +806,74 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     // the Root Breakdown to the seed artist's Firestore doc so that future cache hits
                     // serve the full 3.1 Pro narrative without re-generating it.
                     // This step uses an atomic transaction to detect and heal legacy split-brain orphans.
-                    for (const seedName of artistList) {
-                        const seedNorm = (0, curatorService_1.normalizeArtistId)(seedName);
-                        const canonicalSeedId = resolvedSeedNormMap.get(seedNorm) ?? seedNorm;
-                        const canonicalDocRef = db.collection('artists').doc(canonicalSeedId);
-                        const rawSeedDocRef = db.collection('artists').doc(seedNorm);
-                        try {
-                            await db.runTransaction(async (transaction) => {
-                                const canonicalSnap = await transaction.get(canonicalDocRef);
-                                const canonicalData = canonicalSnap.exists ? canonicalSnap.data() : null;
-                                let rawData = null;
-                                if (canonicalSeedId !== seedNorm) {
-                                    const rawSnap = await transaction.get(rawSeedDocRef);
-                                    if (rawSnap.exists) {
-                                        rawData = rawSnap.data();
-                                    }
-                                }
-                                const canonicalUpdate = {
-                                    'detailsCache.synthesisRationale': firestore_2.FieldValue.delete(),
-                                    cachedAt: firestore_2.FieldValue.serverTimestamp()
-                                };
-                                let finalRationale = rootBreakdownStr;
-                                // Topology Hydration Check for Stubs
-                                const hasGraph = canonicalData?.graphData && ((typeof canonicalData.graphData === 'string' && canonicalData.graphData.length > 10) ||
-                                    (typeof canonicalData.graphData === 'object' && canonicalData.graphData.nodes));
-                                if (!hasGraph) {
-                                    const finalExtractId = idRewriteMap.get(canonicalSeedId) ?? idRewriteMap.get(seedNorm) ?? canonicalSeedId;
-                                    const rawExtracted = (0, curatorService_1.extractArtistSubGraph)(finalExtractId, finalGraph, artistList);
-                                    if (rawExtracted) {
-                                        const safeExtractedGraph = JSON.parse(JSON.stringify(rawExtracted));
-                                        if (safeExtractedGraph.nodes && safeExtractedGraph.nodes.length > 0) {
-                                            if (safeExtractedGraph.links) {
-                                                for (const link of safeExtractedGraph.links) {
-                                                    link.source = typeof link.source === 'object' && link.source !== null ? link.source.id : link.source;
-                                                    link.target = typeof link.target === 'object' && link.target !== null ? link.target.id : link.target;
-                                                }
-                                            }
-                                            canonicalUpdate.graphData = JSON.stringify(safeExtractedGraph);
-                                            console.log(`[Self-Heal] Hydrating graphData for empty stub: ${canonicalSeedId}`);
+                    if (!isComplexGeneration) {
+                        for (const seedName of artistList) {
+                            const seedNorm = (0, curatorService_1.normalizeArtistId)(seedName);
+                            const canonicalSeedId = resolvedSeedNormMap.get(seedNorm) ?? seedNorm;
+                            const canonicalDocRef = db.collection('artists').doc(canonicalSeedId);
+                            const rawSeedDocRef = db.collection('artists').doc(seedNorm);
+                            try {
+                                await db.runTransaction(async (transaction) => {
+                                    const canonicalSnap = await transaction.get(canonicalDocRef);
+                                    const canonicalData = canonicalSnap.exists ? canonicalSnap.data() : null;
+                                    let rawData = null;
+                                    if (canonicalSeedId !== seedNorm) {
+                                        const rawSnap = await transaction.get(rawSeedDocRef);
+                                        if (rawSnap.exists) {
+                                            rawData = rawSnap.data();
                                         }
                                     }
-                                }
-                                // Merge Orphan Data & Redirect
-                                if (canonicalSeedId !== seedNorm && rawData) {
-                                    if (!finalRationale && rawData.synthesisRationale) {
-                                        finalRationale = rawData.synthesisRationale;
-                                        console.log(`[Self-Heal] Adopting orphaned synthesisRationale for ${canonicalSeedId} in transaction`);
+                                    const canonicalUpdate = {
+                                        'detailsCache.synthesisRationale': firestore_2.FieldValue.delete(),
+                                        cachedAt: firestore_2.FieldValue.serverTimestamp()
+                                    };
+                                    let finalRationale = rootBreakdownStr;
+                                    // Topology Hydration Check for Stubs
+                                    const hasGraph = canonicalData?.graphData && ((typeof canonicalData.graphData === 'string' && canonicalData.graphData.length > 10) ||
+                                        (typeof canonicalData.graphData === 'object' && canonicalData.graphData.nodes));
+                                    if (!hasGraph) {
+                                        const finalExtractId = idRewriteMap.get(canonicalSeedId) ?? idRewriteMap.get(seedNorm) ?? canonicalSeedId;
+                                        const rawExtracted = (0, curatorService_1.extractArtistSubGraph)(finalExtractId, finalGraph, artistList);
+                                        if (rawExtracted) {
+                                            const safeExtractedGraph = JSON.parse(JSON.stringify(rawExtracted));
+                                            if (safeExtractedGraph.nodes && safeExtractedGraph.nodes.length > 0) {
+                                                if (safeExtractedGraph.links) {
+                                                    for (const link of safeExtractedGraph.links) {
+                                                        link.source = typeof link.source === 'object' && link.source !== null ? link.source.id : link.source;
+                                                        link.target = typeof link.target === 'object' && link.target !== null ? link.target.id : link.target;
+                                                    }
+                                                }
+                                                canonicalUpdate.graphData = JSON.stringify(safeExtractedGraph);
+                                                console.log(`[Self-Heal] Hydrating graphData for empty stub: ${canonicalSeedId}`);
+                                            }
+                                        }
                                     }
-                                    if (!rawData.redirectTo) {
-                                        transaction.set(rawSeedDocRef, { redirectTo: canonicalSeedId }, { merge: true });
-                                        console.log(`[Self-Heal] Queued redirectTo for orphaned stub ${seedNorm} -> ${canonicalSeedId}`);
+                                    // Merge Orphan Data & Redirect
+                                    if (canonicalSeedId !== seedNorm && rawData) {
+                                        if (!finalRationale && rawData.synthesisRationale) {
+                                            finalRationale = rawData.synthesisRationale;
+                                            console.log(`[Self-Heal] Adopting orphaned synthesisRationale for ${canonicalSeedId} in transaction`);
+                                        }
+                                        if (!rawData.redirectTo) {
+                                            transaction.set(rawSeedDocRef, { redirectTo: canonicalSeedId }, { merge: true });
+                                            console.log(`[Self-Heal] Queued redirectTo for orphaned stub ${seedNorm} -> ${canonicalSeedId}`);
+                                        }
                                     }
-                                }
-                                if (finalRationale) {
-                                    canonicalUpdate.synthesisRationale = finalRationale;
-                                    if (canonicalUpdate.graphData) {
-                                        const parsedGraph = JSON.parse(canonicalUpdate.graphData);
-                                        parsedGraph.synthesisRationale = finalRationale;
-                                        canonicalUpdate.graphData = JSON.stringify(parsedGraph);
+                                    if (finalRationale) {
+                                        canonicalUpdate.synthesisRationale = finalRationale;
+                                        if (canonicalUpdate.graphData) {
+                                            const parsedGraph = JSON.parse(canonicalUpdate.graphData);
+                                            parsedGraph.synthesisRationale = finalRationale;
+                                            canonicalUpdate.graphData = JSON.stringify(parsedGraph);
+                                        }
                                     }
-                                }
-                                transaction.set(canonicalDocRef, canonicalUpdate, { merge: true });
-                            });
-                            console.log(`[Curation Backend] ✅ Atomic write-back & self-heal completed for canonical seed doc: ${canonicalSeedId}`);
-                        }
-                        catch (e) {
-                            console.warn(`[Curation Backend] Root Breakdown / Atomic Heal failed for artist doc: ${canonicalSeedId}`, e.message);
+                                    transaction.set(canonicalDocRef, canonicalUpdate, { merge: true });
+                                });
+                                console.log(`[Curation Backend] ✅ Atomic write-back & self-heal completed for canonical seed doc: ${canonicalSeedId}`);
+                            }
+                            catch (e) {
+                                console.warn(`[Curation Backend] Root Breakdown / Atomic Heal failed for artist doc: ${canonicalSeedId}`, e.message);
+                            }
                         }
                     }
                     // 3.1 Pro: Final Node Positioning could be executed here if a service existed.
@@ -930,7 +933,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             recDetailsEntry[1] = finalRecDetails;
                         }
                         let safeExtractedGraph = null;
-                        if (matchingSeedNorm && !isLabel) {
+                        if (matchingSeedNorm && !isLabel && !isComplexGeneration) {
                             // Fix D-1: Pass the canonical slug ID (e.g. "buggin-us") instead of the raw
                             // matchingSeedNorm (e.g. "buggin"). finalGraph nodes carry slugged IDs assigned
                             // by executeCurationPipeline; extractArtistSubGraph uses strict equality, so
@@ -964,16 +967,16 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             cacheKey: compositeCanonicalId,
                             [idFieldKey]: recNorm,
                             seedArtists: recArtist,
-                            graphData: safeExtractedGraph ? JSON.stringify(safeExtractedGraph) : null,
+                            graphData: (safeExtractedGraph && !isComplexGeneration) ? JSON.stringify(safeExtractedGraph) : null,
                             detailsCache: finalRecDetails, // Save as structured object!
-                            filters: matchingSeedNorm && !isLabel ? inputPayload.filters || null : null,
-                            synthesisRationale: matchingSeedNorm && finalGraph.synthesisRationale ? finalGraph.synthesisRationale : null,
+                            filters: (matchingSeedNorm && !isLabel && !isComplexGeneration) ? inputPayload.filters || null : null,
+                            synthesisRationale: (matchingSeedNorm && finalGraph.synthesisRationale && !isComplexGeneration) ? finalGraph.synthesisRationale : null,
                             cacheVersion: 4,
                             cachedAt: firestore_2.FieldValue.serverTimestamp(),
                             updatedAt: firestore_2.FieldValue.serverTimestamp(),
                             isDeep: true, // Marked Deep!
                             isPrimarySeed: !!matchingSeedNorm,
-                            hasUniqueSpiderweb: matchingSeedNorm ? !isLabel : false,
+                            hasUniqueSpiderweb: (matchingSeedNorm && !isLabel && !isComplexGeneration) ? true : false,
                             dataIntegrityStatus: matchingSeedNorm ? (recDetails?._isStub ? 'degraded' : 'verified') : undefined,
                         });
                         console.log(`[Curation Backend] Proactively created DEEP entry for recommendation (${collName}): ${compositeCanonicalId}`);
@@ -994,7 +997,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         };
                         if (matchingSeedNorm) {
                             let safeExtractedGraph = null;
-                            if (!isLabel) {
+                            if (!isLabel && !isComplexGeneration) {
                                 // Fix D-2: Same canonical slug resolution and empty-topology guard as Fix D-1,
                                 // applied to the update (recSnap.exists) path. Both call sites must be
                                 // consistent — one unguarded site is enough to corrupt the cache. (Law §1, §8)
@@ -1022,14 +1025,16 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             }
                             updatePayload.isPrimarySeed = true;
                             updatePayload.dataIntegrityStatus = recDetails?._isStub ? 'degraded' : 'verified';
-                            updatePayload.hasUniqueSpiderweb = !isLabel;
-                            if (!isLabel) {
-                                if (safeExtractedGraph) {
-                                    updatePayload.graphData = JSON.stringify(safeExtractedGraph);
-                                }
-                                updatePayload.filters = inputPayload.filters || null;
-                                if (finalGraph.synthesisRationale) {
-                                    updatePayload.synthesisRationale = finalGraph.synthesisRationale;
+                            if (!isComplexGeneration) {
+                                updatePayload.hasUniqueSpiderweb = !isLabel;
+                                if (!isLabel) {
+                                    if (safeExtractedGraph) {
+                                        updatePayload.graphData = JSON.stringify(safeExtractedGraph);
+                                    }
+                                    updatePayload.filters = inputPayload.filters || null;
+                                    if (finalGraph.synthesisRationale) {
+                                        updatePayload.synthesisRationale = finalGraph.synthesisRationale;
+                                    }
                                 }
                             }
                         }

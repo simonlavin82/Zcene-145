@@ -783,6 +783,7 @@ export const processCurationJob = onDocumentCreated({
 
     const idRewriteMap = new Map<string, string>();
     const seedNorms = artistList.map((a: string) => normalizeArtistId(a));
+    const isComplexGeneration = artistList.length > 1 || (inputPayload.filters && Object.keys(inputPayload.filters).length > 0);
     let rootBreakdownStr = "";
     try {
       // 3.1 Pro: Root Breakdown Narrative
@@ -880,7 +881,8 @@ export const processCurationJob = onDocumentCreated({
       // the Root Breakdown to the seed artist's Firestore doc so that future cache hits
       // serve the full 3.1 Pro narrative without re-generating it.
       // This step uses an atomic transaction to detect and heal legacy split-brain orphans.
-      for (const seedName of artistList) {
+      if (!isComplexGeneration) {
+        for (const seedName of artistList) {
         const seedNorm = normalizeArtistId(seedName);
         const canonicalSeedId = resolvedSeedNormMap.get(seedNorm) ?? seedNorm;
         const canonicalDocRef = db.collection('artists').doc(canonicalSeedId);
@@ -959,6 +961,7 @@ export const processCurationJob = onDocumentCreated({
           console.warn(`[Curation Backend] Root Breakdown / Atomic Heal failed for artist doc: ${canonicalSeedId}`, e.message);
         }
       }
+      }
 
       // 3.1 Pro: Final Node Positioning could be executed here if a service existed.
       // We will skip explicit repositioning mutation of finalGraph to avoid breaking schema,
@@ -1029,7 +1032,7 @@ export const processCurationJob = onDocumentCreated({
               }
 
               let safeExtractedGraph = null;
-              if (matchingSeedNorm && !isLabel) {
+              if (matchingSeedNorm && !isLabel && !isComplexGeneration) {
                  // Fix D-1: Pass the canonical slug ID (e.g. "buggin-us") instead of the raw
                  // matchingSeedNorm (e.g. "buggin"). finalGraph nodes carry slugged IDs assigned
                  // by executeCurationPipeline; extractArtistSubGraph uses strict equality, so
@@ -1063,17 +1066,17 @@ export const processCurationJob = onDocumentCreated({
                 cacheKey: compositeCanonicalId,
                 [idFieldKey]: recNorm,
                 seedArtists: recArtist,
-                graphData: safeExtractedGraph ? JSON.stringify(safeExtractedGraph) : null,
+                graphData: (safeExtractedGraph && !isComplexGeneration) ? JSON.stringify(safeExtractedGraph) : null,
                 detailsCache: finalRecDetails, // Save as structured object!
-                filters: matchingSeedNorm && !isLabel ? inputPayload.filters || null : null,
-                synthesisRationale: matchingSeedNorm && finalGraph.synthesisRationale ? finalGraph.synthesisRationale : null,
+                filters: (matchingSeedNorm && !isLabel && !isComplexGeneration) ? inputPayload.filters || null : null,
+                synthesisRationale: (matchingSeedNorm && finalGraph.synthesisRationale && !isComplexGeneration) ? finalGraph.synthesisRationale : null,
                 cacheVersion: 4,
                 cachedAt: FieldValue.serverTimestamp(),
                 updatedAt: FieldValue.serverTimestamp(),
 
                 isDeep: true, // Marked Deep!
                 isPrimarySeed: !!matchingSeedNorm,
-                hasUniqueSpiderweb: matchingSeedNorm ? !isLabel : false,
+                hasUniqueSpiderweb: (matchingSeedNorm && !isLabel && !isComplexGeneration) ? true : false,
                 dataIntegrityStatus: matchingSeedNorm ? (recDetails?._isStub ? 'degraded' : 'verified') : undefined,
               });
               console.log(`[Curation Backend] Proactively created DEEP entry for recommendation (${collName}): ${compositeCanonicalId}`);
@@ -1096,7 +1099,7 @@ export const processCurationJob = onDocumentCreated({
 
               if (matchingSeedNorm) {
                  let safeExtractedGraph = null;
-                 if (!isLabel) {
+                 if (!isLabel && !isComplexGeneration) {
                     // Fix D-2: Same canonical slug resolution and empty-topology guard as Fix D-1,
                     // applied to the update (recSnap.exists) path. Both call sites must be
                     // consistent — one unguarded site is enough to corrupt the cache. (Law §1, §8)
@@ -1123,14 +1126,16 @@ export const processCurationJob = onDocumentCreated({
                  }
                 updatePayload.isPrimarySeed = true;
                 updatePayload.dataIntegrityStatus = recDetails?._isStub ? 'degraded' : 'verified';
-                updatePayload.hasUniqueSpiderweb = !isLabel;
-                if (!isLabel) {
-                  if (safeExtractedGraph) {
-                    updatePayload.graphData = JSON.stringify(safeExtractedGraph);
-                  }
-                  updatePayload.filters = inputPayload.filters || null;
-                  if (finalGraph.synthesisRationale) {
-                    updatePayload.synthesisRationale = finalGraph.synthesisRationale;
+                if (!isComplexGeneration) {
+                  updatePayload.hasUniqueSpiderweb = !isLabel;
+                  if (!isLabel) {
+                    if (safeExtractedGraph) {
+                      updatePayload.graphData = JSON.stringify(safeExtractedGraph);
+                    }
+                    updatePayload.filters = inputPayload.filters || null;
+                    if (finalGraph.synthesisRationale) {
+                      updatePayload.synthesisRationale = finalGraph.synthesisRationale;
+                    }
                   }
                 }
               }
