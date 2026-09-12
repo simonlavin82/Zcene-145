@@ -1499,13 +1499,14 @@ const scrapeImageUrlBackend = async (artistName, type, genre, summary) => {
                         // 2. Taxonomy fallback match
                         let taxonomyMatch = false;
                         for (const [masterGenre, subgenres] of Object.entries(genreTaxonomy)) {
-                            // If iTunes genre aligns with a master category
-                            if (itunesGenreNorm.includes(masterGenre) || masterGenre.includes(itunesGenreNorm)) {
-                                // Check if Zcene genre matches any known subgenre
-                                if (subgenres.some(sub => zceneGenreNorm.includes(sub))) {
-                                    taxonomyMatch = true;
-                                    break;
-                                }
+                            const genreFamily = [masterGenre, ...subgenres];
+                            // Check if iTunes genre is anywhere in this family
+                            const itunesInFamily = genreFamily.some(g => itunesGenreNorm.includes(g) || g.includes(itunesGenreNorm));
+                            // Check if Zcene genre is anywhere in this family
+                            const zceneInFamily = genreFamily.some(g => zceneGenreNorm.includes(g) || g.includes(zceneGenreNorm));
+                            if (itunesInFamily && zceneInFamily) {
+                                taxonomyMatch = true;
+                                break;
                             }
                         }
                         // 3. Summary fallback match (if genre was empty or esoteric)
