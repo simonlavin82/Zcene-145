@@ -474,7 +474,7 @@ const LibraryDialog: React.FC<{
 
   if (!isOpen) return null;  return (
     <ModalBackdrop className="z-[110]" onClick={onClose}>
-        <ModalContainer className="max-w-2xl h-[90vh] max-h-[700px]">
+        <ModalContainer className="max-w-3xl h-[90vh] max-h-[700px]">
             <ModalHeader>
                 <div className="flex items-center gap-2">
                     <LibraryIcon className="text-primary !text-[18px]" />

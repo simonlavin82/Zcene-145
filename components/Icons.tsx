@@ -164,27 +164,28 @@ interface SortControlsProps {
 }
 
 export const SortControls: React.FC<SortControlsProps> = ({ sortConfig, onSortChange }) => {
-  const sortButtons: { label: string; key: SortKey; icon?: string }[] = [
-    { label: 'Recent', key: 'dateAdded', icon: 'history' },
-    { label: 'Name', key: 'name', icon: 'sort_by_alpha' },
-    { label: 'Selected', key: 'selected', icon: 'task_alt' },
+  const sortButtons: { label: string; key: SortKey; icon: string }[] = [
+    { label: 'Sort by Recent', key: 'dateAdded', icon: 'schedule' },
+    { label: 'Sort Alphabetically', key: 'name', icon: 'sort_by_alpha' },
+    { label: 'Sort by Selected', key: 'selected', icon: 'task_alt' },
   ];
   
   return (
-    <div className="flex flex-nowrap items-center gap-2">
+    <div className="flex items-center bg-zinc-950 border border-zinc-700/80 rounded-xl p-0.5 relative">
         {sortButtons.map(btn => {
             const isActive = sortConfig.key === btn.key;
-            const sortIcon = sortConfig.direction === 'asc' ? 'arrow_upward' : 'arrow_downward';
             
             return (
                 <button
                     key={btn.key}
                     onClick={() => onSortChange(btn.key)}
-                    className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl font-medium transition-colors ${isActive ? 'border border-zinc-400 bg-zinc-200 text-brand-black' : 'border border-zinc-600 text-zinc-300 bg-transparent hover:border-zinc-500 hover:text-white hover:bg-zinc-800'}`}
+                    className={`flex items-center justify-center w-8 h-8 rounded-lg transition-colors relative z-10 active:scale-95 ${
+                        isActive ? 'bg-zinc-800 text-white shadow-inner ring-1 ring-zinc-600/50' : 'text-zinc-500 hover:text-zinc-300'
+                    }`}
+                    title={btn.label}
+                    aria-label={btn.label}
                 >
-                    {btn.icon && <span className="material-symbols-outlined !text-[14px] leading-none">{btn.icon}</span>}
-                    <span className="hidden sm:inline">{btn.label}</span>
-                    {isActive && <span className="material-symbols-outlined !text-[14px] leading-none">{sortIcon}</span>}
+                    <span className="material-symbols-outlined !text-[18px]">{btn.icon}</span>
                 </button>
             );
         })}
