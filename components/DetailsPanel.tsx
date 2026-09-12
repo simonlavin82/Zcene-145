@@ -2041,7 +2041,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
           } : {}}
         >
             {isSmallScreen ? (
-                <div className={`flex-shrink-0 bg-zinc-900 z-[60] transition-all duration-300 ${isMagazineViewOpen ? `${LayoutSizes.headerBar} border-b border-zinc-600/50` : 'h-0 overflow-hidden border-transparent'}`}>
+                <div className={`flex-shrink-0 bg-zinc-900 z-[60] transition-all duration-300 ${isMagazineViewOpen ? `${LayoutSizes.topHeader} border-b border-zinc-600/50` : 'h-0 overflow-hidden border-transparent'}`}>
                     <div className="px-4 flex items-center justify-between gap-4 h-full">
                         <div className="flex items-center gap-2 flex-grow animate-in fade-in slide-in-from-top-2 duration-500">
                             <div className="relative flex-grow max-w-[180px]">
@@ -2087,7 +2087,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                 </div>
             ) : (
                 isMagazineViewOpen ? (
-                    <div className={`${LayoutSizes.headerBar} flex-shrink-0 border-b border-zinc-600/50 bg-zinc-900 z-[60] relative px-4 md:px-6 lg:px-8`}>
+                    <div className={`${LayoutSizes.topHeader} flex-shrink-0 border-b border-zinc-600/50 bg-zinc-900 z-[60] relative px-4 md:px-6 lg:px-8`}>
                         <div className="max-w-[1400px] mx-auto w-full h-full flex items-center justify-between relative">
                             <div className="flex items-center gap-4 overflow-hidden w-full h-full">
                                 <div className="flex items-center gap-4 flex-grow animate-in fade-in slide-in-from-left-4 duration-500">
