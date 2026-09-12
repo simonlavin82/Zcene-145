@@ -521,7 +521,7 @@ const LibraryDialog: React.FC<{
                     <div className="static sm:relative shrink-0" ref={genrePopoverRef}>
                         <button
                             onClick={() => setIsGenreOpen(v => !v)}
-                            className={`flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-medium transition-colors ${
+                            className={`flex items-center gap-2 rounded-xl border px-3 ${LayoutSizes.controlBar} text-xs font-medium transition-colors ${
                                 selectedGenres.length > 0
                                     ? 'border-primary/60 bg-primary/10 text-primary'
                                     : 'border-zinc-700 bg-zinc-800 text-zinc-200 hover:bg-zinc-700'

@@ -23,6 +23,7 @@ import { extractInitials, generateDeterministicGradient } from '../utils/formatt
 export const LayoutSizes = {
   topHeader: 'h-16', // Restored roomier height for the main project header
   headerBar: 'h-12', // Universal strict standard for all structural panel/control bars
+  controlBar: 'h-[38px]', // Exact token alignment for toolbar toggles and dropdown buttons
 };
 
 // --- Input Primitives & Sizings ---
@@ -2374,6 +2375,20 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
 
                                     <InteractiveFilterableSelectDemo />
+                                </div>
+                                <div className="mt-8 border border-zinc-800 bg-zinc-900/30 p-8">
+                                    <div className="space-y-4 max-w-sm">
+                                        <p className="text-xs text-zinc-500 uppercase tracking-widest font-semibold">Toolbar Dropdown Trigger</p>
+                                        <button className={`flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-200 hover:bg-zinc-700 px-3 ${LayoutSizes.controlBar} text-xs font-medium transition-colors`}>
+                                            <span className="material-symbols-outlined !text-[14px]">filter_list</span>
+                                            Filter List
+                                            <span className="material-symbols-outlined !text-[14px]">expand_more</span>
+                                        </button>
+                                        <p className="text-xs text-zinc-500 leading-relaxed">
+                                            Custom popover triggers used in toolbars (like the "All Genres" filter). 
+                                            Must explicitly use <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">{LayoutSizes.controlBar}</code> for the height to guarantee perfect vertical alignment alongside segmented toggles.
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
 
