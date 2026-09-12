@@ -1639,7 +1639,9 @@ const App: React.FC = () => {
 
   const handleLogin = useCallback(async (onSuccess?: () => void) => {
     try {
-      await signInWithGoogle();
+      const signedInUser = await signInWithGoogle();
+      if (!signedInUser) return;
+      
       showToast('Logged in successfully');
       if (onSuccess) {
         onSuccess();
