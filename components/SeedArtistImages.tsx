@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { normalizeArtistId, getEntityDocWithRedirect } from '../services/artistCacheService';
 import { motion } from 'framer-motion';
+import { extractInitials, generateDeterministicGradient } from '../utils/formatters';
 
 interface SeedArtistImagesProps {
   seedArtists: string; // "Spaced::End It::Buggin"
@@ -9,6 +10,7 @@ interface SeedArtistImagesProps {
   fallbackGraphData?: any;
   projectDetailsCache?: string; // Add internal project details cache
   seedImageUrl?: string; // Appended for Root Gen cloned projects
+  projectName?: string; // Appended for fallback text monogram
 }
 
 export const SeedArtistImages: React.FC<SeedArtistImagesProps> = ({ 
@@ -17,7 +19,8 @@ export const SeedArtistImages: React.FC<SeedArtistImagesProps> = ({
   variant = 'stack',
   fallbackGraphData,
   projectDetailsCache,
-  seedImageUrl
+  seedImageUrl,
+  projectName
 }) => {
   const [images, setImages] = useState<{ id: string, url: string, name: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -189,8 +192,13 @@ export const SeedArtistImages: React.FC<SeedArtistImagesProps> = ({
     return (
       <div className="w-16 h-16 bg-zinc-800 rounded-lg overflow-hidden shadow-md flex-shrink-0 border border-zinc-700/50 aspect-square">
         {count === 0 ? (
-          <div className="w-full h-full flex items-center justify-center text-zinc-600">
-            <span className="material-symbols-outlined !text-2xl">album</span>
+          <div 
+            className="w-full h-full flex items-center justify-center border border-white/5"
+            style={{ background: generateDeterministicGradient(projectName || seedArtists.split('::')[0] || '?') }}
+          >
+            <span className="text-zinc-300 font-bold text-xs uppercase tracking-widest opacity-80">
+              {extractInitials(projectName || seedArtists.split('::')[0])}
+            </span>
           </div>
         ) : count === 1 ? (
           <img src={validImages[0].url} alt={validImages[0].name} className="w-full h-full object-cover" />

@@ -403,6 +403,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                   projectDetailsCache={project.detailsCache}
                                   fallbackGraphData={project.graphData ? (typeof project.graphData === 'string' ? JSON.parse(project.graphData) : project.graphData) : undefined}
                                   seedImageUrl={project.seedImageUrl}
+                                  projectName={project.name}
                                 />
                                 <div className="flex flex-col gap-1.5 min-w-0 flex-1">
                                   <h3 className="text-base font-medium text-white group-hover:text-primary transition-colors line-clamp-2 pr-2">

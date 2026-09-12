@@ -16,6 +16,7 @@ import { InfoTooltip } from './ui/InfoTooltip';
 import { Waypoints } from 'lucide-react';
 import { TelemetryOverviewCards, DiscoveryLedgerTable, UserTelemetry } from './UsageAnalyticsPage';
 import { CountryFilterDropdown } from './SharedModals';
+import { extractInitials, generateDeterministicGradient } from '../utils/formatters';
 
 // --- Layout Primitives & Sizings ---
 
@@ -1762,6 +1763,27 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                     {/* 9. BADGES & TAGS */}
                     <section id="badges-tags">
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Badges & Tags</h2>
+                        
+                        <div className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-xl space-y-4 mb-12">
+                            <h4 className="text-xs font-semibold text-primary uppercase tracking-widest">Dynamic Monogram Fallback</h4>
+                            <p className="text-sm text-zinc-400">Used when a project or artist lacks a valid image. Extracts 1-3 initials and maps the string to a deterministic, dark-themed gradient.</p>
+                            
+                            <div className="flex gap-4 mt-4">
+                                <div 
+                                className="w-16 h-16 rounded-lg flex items-center justify-center shadow-md border border-white/5"
+                                style={{ background: generateDeterministicGradient("Words of Concrete") }}
+                                >
+                                <span className="text-zinc-300 font-bold text-xs uppercase tracking-widest opacity-80">WOC</span>
+                                </div>
+                                <div 
+                                className="w-16 h-16 rounded-lg flex items-center justify-center shadow-md border border-white/5"
+                                style={{ background: generateDeterministicGradient("Spare Snare") }}
+                                >
+                                <span className="text-zinc-300 font-bold text-xs uppercase tracking-widest opacity-80">SS</span>
+                                </div>
+                            </div>
+                        </div>
+
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                             <BadgeDisplay 
                                 badge={
