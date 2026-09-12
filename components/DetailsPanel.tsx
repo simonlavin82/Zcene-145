@@ -408,6 +408,10 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
   onUpdateTasteProfile, onShowToast, onOpenTasteModal
 }) => {
     const handleAddToTaste = async (node: Node, details: NodeDetails) => {
+        if (!user) {
+            onAuthRequest?.();
+            return;
+        }
         if (!onUpdateTasteProfile) return;
         const currentTaste = userTaste || [];
 
@@ -898,7 +902,13 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             )}
                             {(isArtistNode || isLabelNode) && (
                                 <button
-                                    onClick={() => onToggleStack(node, links.purchase?.[0]?.url)}
+                                    onClick={() => {
+                                        if (!user) {
+                                            onAuthRequest?.();
+                                            return;
+                                        }
+                                        onToggleStack(node, links.purchase?.[0]?.url);
+                                    }}
                                     className={`w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 active:scale-95 leading-none ${isInStack ? 'text-primary bg-primary/5 border-primary/30' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'}`}
                                     title={isInStack ? "Remove from My Stack" : "Save to My Stack"}
                                 >

@@ -203,7 +203,13 @@ const Header: React.FC<HeaderProps> = ({
             
             <div className="flex-shrink-0 flex items-center pointer-events-auto transition-all duration-300 justify-end gap-2 lg:gap-3 pr-0">
             <button 
-                onClick={() => setIsTasteDialogOpen(true)}
+                onClick={() => {
+                  if (!user) {
+                    onLogin?.();
+                    return;
+                  }
+                  setIsTasteDialogOpen(true);
+                }}
                 className={`h-8 flex flex-shrink-0 items-center justify-center rounded-xl bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 transition-colors leading-none shadow-lg border border-zinc-700/50 relative ${isSmallScreen ? 'w-8' : 'pl-2 pr-3 gap-2'}`} 
                 title="Style"
             >
@@ -212,7 +218,13 @@ const Header: React.FC<HeaderProps> = ({
             </button>
 
             <button 
-                onClick={onOpenStack}
+                onClick={() => {
+                  if (!user) {
+                    onLogin?.();
+                    return;
+                  }
+                  onOpenStack();
+                }}
                 className={`h-8 flex flex-shrink-0 items-center justify-center rounded-xl bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 transition-colors leading-none shadow-lg border border-zinc-700/50 relative ${isSmallScreen ? 'w-8' : 'pl-2 pr-3 gap-2'}`} 
                 title="My Stack"
             >
