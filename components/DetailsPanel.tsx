@@ -13,6 +13,7 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { formatSystemTimestamp } from '../utils/formatters';
 import { Select, InputSizes, LayoutSizes } from './DesignSystem';
 import { Flame } from 'lucide-react';
+import { useDominantColor } from '../hooks/useDominantColor';
 const SENTINEL_INSIGHT = 'No insight provided.';
 
 export const getArtistDisplayName = (details: any, node: any): string => {
@@ -1993,6 +1994,10 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         return filteredAndSortedNodes[viewedIndex] || null;
     }, [filteredAndSortedNodes, viewedIndex]);
 
+    const viewedNodeDetails = viewedNode ? detailsCache.get(viewedNode.id) : null;
+    const viewedNodeImageUrl = viewedNodeDetails?.imageUrl || (viewedNodeDetails?.details as any)?.imageUrl || undefined;
+    const dominantColor = useDominantColor(viewedNodeImageUrl, viewedNode?.label || viewedNode?.id || '');
+
     const backgroundLoadingCount = useMemo(() => {
         let count = loadingNodeIds.size;
         if (viewedNode && loadingNodeIds.has(viewedNode.id)) {
@@ -2033,12 +2038,15 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
 
     return (
         <div 
-          className="w-full h-full flex flex-col bg-zinc-900 overflow-hidden relative min-h-0 outline-none"
-          style={isMagazineViewOpen ? {
-            backgroundImage: 'linear-gradient(rgba(17, 17, 19, 0.8), rgba(17, 17, 19, 0.8)), url("https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg")',
-            backgroundSize: 'cover',
-            backgroundPosition: 'center'
-          } : {}}
+          className="w-full h-full flex flex-col bg-zinc-900 overflow-hidden relative min-h-0 outline-none transition-colors duration-700"
+          style={{
+            '--scene-accent': dominantColor,
+            ...(isMagazineViewOpen ? {
+              backgroundImage: 'linear-gradient(rgba(17, 17, 19, 0.8), rgba(17, 17, 19, 0.8)), url("https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg")',
+              backgroundSize: 'cover',
+              backgroundPosition: 'center'
+            } : {})
+          } as React.CSSProperties}
         >
             {isSmallScreen ? (
                 <div className={`flex-shrink-0 bg-zinc-900 z-[60] transition-all duration-300 ${isMagazineViewOpen ? `${LayoutSizes.topHeader} border-b border-zinc-600/50` : 'h-0 overflow-hidden border-transparent'}`}>

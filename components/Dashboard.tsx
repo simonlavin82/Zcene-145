@@ -10,6 +10,7 @@ import { normalizeArtistId, cleanArtistDisplayName, isNodeInSeedList } from '../
 import { formatSystemTimestamp } from '../utils/formatters';
 import { SeedArtistImages } from './SeedArtistImages';
 import { ModalBackdrop, ModalContainer, ModalHeader, ModalBody, ModalFooter } from './ui/Dialog';
+import { DashboardProjectCard } from './DashboardProjectCard';
 
 
 interface DashboardProps {
@@ -340,167 +341,18 @@ const Dashboard: React.FC<DashboardProps> = ({
 
                     {/* Cards inside this parent record crate compartment */}
                     <div className={`grid ${gridColsClass} gap-5 w-full md:w-fit max-w-full`}>
-                      {projectsInBucket.map((project, idx) => {
-                      const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
-                      const displayTitle = cleanArtistDisplayName(project.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene"));
-                      const hasGraphNodes = !!project.graphData && !project.graphData.includes('"nodes":[]');
-                      
-                      // Derive deep cuts count: prefer the persisted activeNodes queue.
-                      // For stale documents where activeNodes was never written by the backend
-                      // (legacy projects always have activeNodes: []), fall back to counting
-                      // how many seed artists are present in the graphData — which is always
-                      // at least 1 for a mapped project.
-                      // ARCHITECTURE: Dynamic Dashboard Integrity
-                      // Derive deep cuts count dynamically from actual rendered nodes, prohibiting static placeholders.
-                      let deepCutsCount = 0;
-                      const rawActiveNodes = project.activeNodes || [];
-                      if (project.graphData) {
-                        try {
-                          const pg = typeof project.graphData === 'string' ? JSON.parse(project.graphData) : project.graphData;
-                          if (pg && Array.isArray(pg.nodes)) {
-                            deepCutsCount = pg.nodes.filter((n: any) => 
-                              rawActiveNodes.includes(n.id) && (n.type === 'artist' || n.type === 'label' || !n.type)
-                            ).length;
-                          } else {
-                            deepCutsCount = rawActiveNodes.length;
-                          }
-                        } catch (e) { deepCutsCount = rawActiveNodes.length; }
-                      } else {
-                        deepCutsCount = rawActiveNodes.length;
-                      }
-
-                      let recommendedCount = 0;
-                      let labelCount = 0;
-                      if (project.graphData) {
-                        try {
-                          const parsedGraph = typeof project.graphData === 'string' ? JSON.parse(project.graphData) : project.graphData;
-                          if (parsedGraph && Array.isArray(parsedGraph.nodes)) {
-                            const artistNodes = parsedGraph.nodes.filter((n: any) => n.type === 'artist' || !n.type);
-                            recommendedCount = artistNodes.filter((n: any) => !isNodeInSeedList(n.id || n.label || '', seedList)).length;
-                            labelCount = parsedGraph.nodes.filter((n: any) => n.type === 'label').length;
-                          }
-                        } catch (e) { /* ignore */ }
-                      }
-                      
-                      return (
-                        <motion.div
+                      {projectsInBucket.map((project, idx) => (
+                        <DashboardProjectCard
                           key={project.id}
-                          onClick={() => onSelectProject(project.id)}
-                          className="group relative bg-zinc-900 border border-zinc-700/50 rounded-none p-5 hover:border-primary/50 transition-all cursor-pointer flex flex-col justify-between w-full md:w-[380px] h-[180px] shadow-xl"
-                        >
-                          <div className="flex flex-col gap-4">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex flex-row items-center gap-4 flex-1 min-w-0">
-                                <SeedArtistImages 
-                                  seedArtists={project.seedArtists} 
-                                  userId={user?.uid} 
-                                  variant="grid" 
-                                  projectDetailsCache={project.detailsCache}
-                                  fallbackGraphData={project.graphData ? (typeof project.graphData === 'string' ? JSON.parse(project.graphData) : project.graphData) : undefined}
-                                  seedImageUrl={project.seedImageUrl}
-                                  projectName={project.name}
-                                />
-                                <div className="flex flex-col gap-1.5 min-w-0 flex-1">
-                                  <h3 className="text-base font-medium text-white group-hover:text-primary transition-colors line-clamp-2 pr-2">
-                                    {displayTitle}
-                                  </h3>
-                                  <p className="font-mono text-[10px] text-zinc-400 font-normal truncate uppercase tracking-widest">
-                                    {project.updatedAt ? `Edited ${formatSystemTimestamp(project.updatedAt)}` : 'New Project'}
-                                  </p>
-                                </div>
-                              </div>
-                              <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                                <button
-                                  onClick={() => setActiveMenuId(activeMenuId === project.id ? null : project.id)}
-                                  className="w-7 h-7 -mr-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800/80 transition-all cursor-pointer flex items-center justify-center"
-                                >
-                                  <span className="material-symbols-outlined !text-xl">more_vert</span>
-                                </button>
-                                
-                                {activeMenuId === project.id && (
-                                  <>
-                                    <div className="fixed inset-0 z-10" onClick={() => setActiveMenuId(null)} />
-                                    <div className="absolute right-0 mt-2 w-48 z-50 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1 shadow-2xl shadow-black pointer-events-auto text-left animate-fade-in-down antialiased">
-                                      <button
-                                        onClick={() => {
-                                          setActiveMenuId(null);
-                                          handleRenameClick(project);
-                                        }}
-                                        className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
-                                      >
-                                        <span className="material-symbols-outlined !text-[16px] text-zinc-500">edit</span>
-                                        Rename
-                                      </button>
-                                      {onShareProject && (
-                                        <button
-                                          onClick={() => {
-                                            setActiveMenuId(null);
-                                            onShareProject(project);
-                                          }}
-                                          className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
-                                        >
-                                          <span className="material-symbols-outlined !text-[16px] text-zinc-500">share</span>
-                                          Share
-                                        </button>
-                                      )}
-                                      <div className="border-t border-zinc-800/80 my-1" />
-                                      <button
-                                        onClick={() => {
-                                          setActiveMenuId(null);
-                                          setProjectToDelete(project.id);
-                                        }}
-                                        className="w-full text-left px-3 py-2 text-xs font-medium text-[#ef4444] hover:bg-[#ef4444]/10 transition-all rounded-lg flex items-center gap-2 group"
-                                      >
-                                        <span className="material-symbols-outlined !text-[16px] text-[#ef4444]">delete</span>
-                                        Delete
-                                      </button>
-                                    </div>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                          
-                          <div className="mt-4 pt-4 border-t border-white/5 flex items-center">
-                            <div className="flex items-center flex-wrap gap-x-1 gap-y-1.5">
-                              <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
-                                SEED: {seedList.length}
-                              </span>
-                              {project.status === 'curating' || project.status === 'pending' || (project.status !== 'failed' && project.status !== 'completed' && project.seedArtists) ? (
-                                <span className="text-[9px] uppercase tracking-wider text-amber-500/80 font-bold px-1.5 py-0.5 bg-amber-500/10 rounded-md border border-amber-500/10 whitespace-nowrap animate-pulse">
-                                  Mapping...
-                                </span>
-                              ) : project.status === 'failed' ? (
-                                <span className="text-[9px] uppercase tracking-wider text-red-500/80 font-bold px-1.5 py-0.5 bg-red-500/10 rounded-md border border-red-500/10 whitespace-nowrap">
-                                  Failed
-                                </span>
-                              ) : project.status === 'completed' ? (
-                                <>
-                                  <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
-                                    AI ARTISTS: {recommendedCount}
-                                  </span>
-                                  {labelCount > 0 && (
-                                    <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
-                                      LABELS: {labelCount}
-                                    </span>
-                                  )}
-                                  <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
-                                    DEEP CUTS: {deepCutsCount}
-                                  </span>
-                                  <span className="text-[9px] uppercase tracking-wide text-primary/60 font-bold px-1.5 py-0.5 bg-primary/10 rounded-md border border-primary/10 whitespace-nowrap">
-                                    Mapped
-                                  </span>
-                                </>
-                              ) : (
-                                <span className="text-[9px] uppercase tracking-wide text-zinc-500 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-zinc-800 font-mono whitespace-nowrap">
-                                  Unmapped
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </motion.div>
-                      );
-                    })}
+                          project={project}
+                          onSelectProject={onSelectProject}
+                          activeMenuId={activeMenuId}
+                          setActiveMenuId={setActiveMenuId}
+                          handleRenameClick={handleRenameClick}
+                          setProjectToDelete={setProjectToDelete}
+                          onShareProject={onShareProject}
+                        />
+                      ))}
                   </div>
                 </div>
               );
