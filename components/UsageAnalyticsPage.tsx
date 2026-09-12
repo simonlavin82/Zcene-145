@@ -431,7 +431,7 @@ const calculateTelemetryForUser = (
         let isEstimate = false;
 
         if (generationType) {
-            if (generationType === "Direct Hit") {
+            if (generationType === "Direct Hit" || generationType === "Clone") {
                 cost = 0;
             } else if (projectHasExactCost) {
                 cost = projectExactCost;

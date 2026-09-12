@@ -1779,6 +1779,7 @@ const App: React.FC = () => {
       const shareImageDetails = primaryShareSeedNorm
         ? (detailsCache.get(primaryShareSeedNorm) || detailsCache.get((seedList[0] || '').toLowerCase()))
         : null;
+      const actualDisplayName = (shareImageDetails as any)?.name || (shareImageDetails as any)?.details?.name;
       const resolvedSeedImageUrl: string = (shareImageDetails as any)?.imageUrl || '';
 
       // ARCHITECTURE: Universal Coordinate Amnesia
@@ -1798,7 +1799,9 @@ const App: React.FC = () => {
       const shareCleanGraphData = { ...graphData!, nodes: shareCleanNodes, links: shareCleanLinks };
 
       const sharePayload: Record<string, any> = {
-        name: projectName || (seedArtists ? seedArtists.split('::')[0] : 'Shared Zcene'),
+        name: (projectName && projectName !== seedArtists.split('::')[0]) 
+          ? projectName 
+          : (actualDisplayName || (seedArtists ? seedArtists.split('::')[0] : 'Shared Zcene')),
         seedArtists,
         activeNodes: hoistedShareActiveNodes,  // Phase 2A: seed-first ordering
         artistIds: artistEntityIds.length > 0 ? artistEntityIds : normalizedIds,
@@ -2768,8 +2771,32 @@ const App: React.FC = () => {
       activeNodeIds.forEach(id => { if (isNodeInSeedList(id, saveSeedNorms)) hoistedSaveActiveNodes.push(id); });
       activeNodeIds.forEach(id => { if (!isNodeInSeedList(id, saveSeedNorms)) hoistedSaveActiveNodes.push(id); });
 
+      // Phase 3: Extract and append seedImageUrl from active detailsCache to the newly cloned project
+      const primarySaveSeedNorm = saveSeedNorms[0] || '';
+      
+      let saveImageDetails = null;
+      if (primarySaveSeedNorm) {
+        saveImageDetails = detailsCache.get(primarySaveSeedNorm) || detailsCache.get((seedArtists.split('::')[0] || '').trim().toLowerCase());
+        
+        // AI canonical slugs (e.g., spaced-us-usa) won't match 'spaced'. Find prefix matches.
+        if (!saveImageDetails) {
+          const fallbackKey = Array.from(detailsCache.keys()).find(k => (k as string).startsWith(primarySaveSeedNorm + '-'));
+          if (fallbackKey) {
+            saveImageDetails = detailsCache.get(fallbackKey);
+          }
+        }
+      }
+      
+      const actualDisplayName = (saveImageDetails as any)?.name || (saveImageDetails as any)?.details?.name;
+      let resolvedSeedImageUrl: string = (saveImageDetails as any)?.imageUrl || (saveImageDetails as any)?.details?.imageUrl || '';
+      if (!resolvedSeedImageUrl && sharedSeedImageUrlRef.current) {
+        resolvedSeedImageUrl = sharedSeedImageUrlRef.current;
+      }
+
       const docPayload: Record<string, any> = {
-        name: projectName || (seedArtists ? seedArtists.split('::')[0] : 'Saved Zcene'),
+        name: (projectName && projectName !== seedArtists.split('::')[0]) 
+          ? projectName 
+          : (actualDisplayName || (seedArtists ? seedArtists.split('::')[0] : 'Saved Zcene')),
         seedArtists,
         activeNodes: hoistedSaveActiveNodes,  // Phase 2A: seed-first ordering
         chatHistories: JSON.stringify(Array.from(chatHistories.entries())),
@@ -2778,6 +2805,7 @@ const App: React.FC = () => {
         isMagazineViewOpen: false,
         authorId: user.uid,
         status: 'completed',
+        generationType: 'Clone', // Ensures clones don't trigger false ledger events
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
@@ -2803,27 +2831,6 @@ const App: React.FC = () => {
         docPayload.labelIds = labelEntityIds;
         docPayload.canvasLayout = JSON.stringify(canvasLayout);
         docPayload.graphData = JSON.stringify(graphData);
-      }
-
-      // Phase 3: Extract and append seedImageUrl from active detailsCache to the newly cloned project
-      const primarySaveSeedNorm = saveSeedNorms[0] || '';
-      
-      let saveImageDetails = null;
-      if (primarySaveSeedNorm) {
-        saveImageDetails = detailsCache.get(primarySaveSeedNorm) || detailsCache.get((seedArtists.split('::')[0] || '').trim().toLowerCase());
-        
-        // AI canonical slugs (e.g., spaced-us-usa) won't match 'spaced'. Find prefix matches.
-        if (!saveImageDetails) {
-          const fallbackKey = Array.from(detailsCache.keys()).find(k => (k as string).startsWith(primarySaveSeedNorm + '-'));
-          if (fallbackKey) {
-            saveImageDetails = detailsCache.get(fallbackKey);
-          }
-        }
-      }
-      
-      let resolvedSeedImageUrl: string = (saveImageDetails as any)?.imageUrl || (saveImageDetails as any)?.details?.imageUrl || '';
-      if (!resolvedSeedImageUrl && sharedSeedImageUrlRef.current) {
-        resolvedSeedImageUrl = sharedSeedImageUrlRef.current;
       }
       
       if (resolvedSeedImageUrl) {
