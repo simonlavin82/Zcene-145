@@ -7,6 +7,7 @@ import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { motion } from 'motion/react';
 import { InfoTooltip } from './ui/InfoTooltip';
 import { AdminViewToggle } from './ui/AdminViewToggle';
+import { cleanArtistDisplayName } from '../services/artistCacheService';
 
 export interface UserTelemetry {
     email: string;
@@ -364,9 +365,17 @@ const calculateTelemetryForUser = (
     projectDocs.forEach((pDoc) => {
         const pData = pDoc.data();
         
-        // 1. Calculate seedArtists
+        // 1. Calculate project name / seed fallback
+        const projectName = pData.name;
         const seedStr = pData.seedArtists || '';
         const seeds = seedStr.split('::').map((s: string) => s.trim()).filter(Boolean);
+        
+        let displayTitle = "Unknown";
+        if (projectName && projectName !== seeds[0]) {
+             displayTitle = projectName;
+        } else if (seeds.length > 0) {
+             displayTitle = cleanArtistDisplayName(seeds[0]);
+        }
         
         seeds.forEach((seed: string) => {
             artistFrequencyMap[seed] = (artistFrequencyMap[seed] || 0) + 1;
@@ -465,7 +474,7 @@ const calculateTelemetryForUser = (
 
         projects.push({
             id: pDoc.id,
-            seedArtist: seedStr || "Unknown",
+            seedArtist: displayTitle,
             generationType,
             cost,
             isEstimate,
