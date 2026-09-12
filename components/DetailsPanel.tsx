@@ -554,7 +554,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
             return str.split(/[-\s]+/).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
         };
         
-        const connectionPeers = Array.from(new Set(peers)).map(formatTitle).sort();
+        const connectionPeers = Array.from(new Set(peers)).map(peer => cleanArtistDisplayName(peer, graphData.nodes)).sort();
         
         return { queryChips: chips, connectionPeers };
     }, [node.id, graphData.links, graphData.nodes]);

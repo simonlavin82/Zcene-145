@@ -1,9 +1,8 @@
-
 import { GoogleGenAI, Type, GenerateContentResponse, ThinkingLevel } from "@google/genai";
 import { GraphData, Node, NodeDetails, Link, ChatMessage, DiscoveryFilters } from "../types";
 import { db } from './firebase';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { normalizeArtistId, extractArtistSubGraph, readArtistCacheMany, normalizeGraphData, stripUndefinedProperties } from './artistCacheService';
+import { normalizeArtistId, extractArtistSubGraph, readArtistCacheMany, normalizeGraphData, stripUndefinedProperties, cleanArtistDisplayName } from './artistCacheService';
 
 // --- EXPORTED CONSTANTS FOR SOURCE PAGE VISIBILITY ---
 
@@ -1918,7 +1917,7 @@ export const streamLocalHeuristicChat = async (
     const formatTitle = (str: string) => {
         return str.split(/[-\s]+/).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
     };
-    const nodeName = formatTitle(currentNode.id);
+    const nodeName = cleanArtistDisplayName(currentNode.id, graphData.nodes);
     
     // Extracted Data
     const year = details?.details?.founded || "their early years";
@@ -1944,7 +1943,7 @@ export const streamLocalHeuristicChat = async (
     const labels = labelNames.length ? labelNames.join(" and ") : "various independent labels";
     
     // Graph Traversal for generic peers
-    const peers = getConnectedNodes(currentNode.id, 'artist').slice(0, 3).map(formatTitle);
+    const peers = getConnectedNodes(currentNode.id, 'artist').slice(0, 3).map(id => cleanArtistDisplayName(id, graphData.nodes));
     
     let fullText = "";
 
@@ -1959,7 +1958,7 @@ export const streamLocalHeuristicChat = async (
         const peerRaw = msg.replace("what is the connection to ", "").replace("?", "").trim();
         const peer = formatTitle(peerRaw);
         
-        const peerNode = graphData.nodes.find(n => formatTitle(n.id).toLowerCase() === peerRaw);
+        const peerNode = graphData.nodes.find(n => cleanArtistDisplayName(n.id, graphData.nodes).toLowerCase() === peerRaw);
         const actualPeerId = peerNode ? peerNode.id : peerRaw.replace(/\s+/g, '-');
         
         const activeLabels = getConnectedNodes(currentNode.id, 'label');
