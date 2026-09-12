@@ -128,7 +128,7 @@ const sanitizeImageUrl = (rawUrl, sanitizeStrFn) => {
 exports.sanitizeImageUrl = sanitizeImageUrl;
 const COUNTRY_ISO_MAP = {
     'united states': 'us', 'usa': 'us', 'us': 'us',
-    'united kingdom': 'gb', 'uk': 'gb', 'england': 'gb', 'great britain': 'gb',
+    'united kingdom': 'gb', 'uk': 'gb', 'england': 'gb', 'great britain': 'gb', 'scotland': 'gb', 'wales': 'gb', 'northern ireland': 'gb',
     'australia': 'au', 'canada': 'ca', 'germany': 'de',
     'france': 'fr', 'japan': 'jp', 'sweden': 'se',
     'italy': 'it', 'spain': 'es', 'brazil': 'br',

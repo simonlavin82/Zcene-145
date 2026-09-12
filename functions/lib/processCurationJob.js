@@ -138,7 +138,8 @@ const KNOWN_COUNTRY_SLUGS = [
     '-japan', '-sweden', '-italy', '-spain', '-brazil', '-mexico', '-netherlands', '-belgium',
     '-norway', '-finland', '-denmark', '-ireland', '-new-zealand', '-poland', '-austria',
     '-switzerland', '-uk', '-usa', '-us', '-gb', '-au', '-ca', '-de', '-fr', '-jp', '-se', '-it', '-es',
-    '-br', '-mx', '-nl', '-be', '-no', '-fi', '-dk', '-ie', '-nz', '-pl', '-at', '-ch'
+    '-br', '-mx', '-nl', '-be', '-no', '-fi', '-dk', '-ie', '-nz', '-pl', '-at', '-ch',
+    '-scotland', '-wales', '-northern-ireland', '-england'
 ];
 function stripCountrySlug(name) {
     let cleanName = name.trim();
@@ -424,6 +425,10 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                         // of the real detailsCache in artists/buggin-us. (Law §6)
                                         if (snapData.redirectTo)
                                             continue;
+                                        // Explicitly reject existing documents that end with known hallucinated regional slugs
+                                        if (snap.id.endsWith('-scotland') || snap.id.endsWith('-wales') || snap.id.endsWith('-northern-ireland') || snap.id.endsWith('-england')) {
+                                            continue;
+                                        }
                                         if (snap.id !== artistNormId && snapData.artistId && snapData.artistId.startsWith(baseNormId)) {
                                             // Prefer docs that already have graphData (fully curated)
                                             if (snapData.graphData || snap.id === artistNormId) {
@@ -631,7 +636,8 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         }
                         if (!details)
                             return null;
-                        return [artistNormId, details];
+                        // Sync strictly to the topology node ID, ignoring any internal deduplication mutation.
+                        return [entityObj.id, details];
                     }));
                     console.log(`[Curation Backend] [Step 3: Firestore Caching] Hydration complete. Writing ${chunkResults.length} entities to Firestore cache...`);
                     for (const res of chunkResults) {

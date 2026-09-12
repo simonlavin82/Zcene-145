@@ -2004,7 +2004,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     const seedCount = seedArtists.length || 1;
     const aiArtistsCount = useMemo(() => {
         if (!graphData?.nodes) return 0;
-        return graphData.nodes.filter(n => !n.isSeed && n.type !== 'label').length;
+        return graphData.nodes.filter(n => !n.isSeed && (n.type === 'artist' || !n.type)).length;
     }, [graphData]);
     const deepCutsCount = useMemo(() => {
         return activeNodes.filter(n => n.type === 'artist' || n.type === 'label' || !n.type).length;
