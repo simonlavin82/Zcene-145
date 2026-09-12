@@ -768,8 +768,17 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         const uniqueNodesMap = new Map();
                         finalGraph.nodes.forEach((node) => {
                             const normId = (0, curatorService_1.normalizeArtistId)(node.id);
+                            const baseNormId = stripCountrySlug(normId);
                             if (idRewriteMap.has(normId)) {
                                 node.id = idRewriteMap.get(normId);
+                            }
+                            else if (idRewriteMap.has(baseNormId)) {
+                                node.id = idRewriteMap.get(baseNormId);
+                            }
+                            // Force overwrite the node's origin to match the canonical database truth
+                            const detailsEntry = detailsCacheEntries.find((entry) => entry[0] === node.id);
+                            if (detailsEntry && detailsEntry[1]?.details?.origin) {
+                                node.origin = detailsEntry[1].details.origin;
                             }
                             if (!uniqueNodesMap.has(node.id)) {
                                 uniqueNodesMap.set(node.id, node);
@@ -784,12 +793,18 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             const tId = typeof link.target === 'string' ? link.target : link.target.id;
                             const normS = (0, curatorService_1.normalizeArtistId)(sId);
                             const normT = (0, curatorService_1.normalizeArtistId)(tId);
+                            const baseNormS = stripCountrySlug(normS);
+                            const baseNormT = stripCountrySlug(normT);
                             let finalS = sId;
                             let finalT = tId;
                             if (idRewriteMap.has(normS))
                                 finalS = idRewriteMap.get(normS);
+                            else if (idRewriteMap.has(baseNormS))
+                                finalS = idRewriteMap.get(baseNormS);
                             if (idRewriteMap.has(normT))
                                 finalT = idRewriteMap.get(normT);
+                            else if (idRewriteMap.has(baseNormT))
+                                finalT = idRewriteMap.get(baseNormT);
                             if (typeof link.source === 'string')
                                 link.source = finalS;
                             else
