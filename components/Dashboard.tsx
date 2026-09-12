@@ -4,7 +4,7 @@ import ViewToggle from './ViewToggle';
 import { Project, StackItem, UserTaste } from '../types';
 import { User } from 'firebase/auth';
 import { motion } from 'framer-motion';
-import { normalizeArtistId, cleanArtistDisplayName } from '../services/artistCacheService';
+import { normalizeArtistId, cleanArtistDisplayName, isNodeInSeedList } from '../services/artistCacheService';
 
 
 import { formatSystemTimestamp } from '../utils/formatters';
@@ -12,13 +12,6 @@ import { SeedArtistImages } from './SeedArtistImages';
 import { ModalBackdrop, ModalContainer, ModalHeader, ModalBody, ModalFooter } from './ui/Dialog';
 
 
-const isSeedMatch = (nId: string, seeds: string[]) => {
-  const normNId = normalizeArtistId(nId);
-  return seeds.some(s => {
-    const normS = normalizeArtistId(s);
-    return normS === normNId || normNId.startsWith(`${normS}-`) || normS.startsWith(`${normNId}-`);
-  });
-};
 interface DashboardProps {
   user: User | null;
   projects: Project[];
@@ -377,12 +370,14 @@ const Dashboard: React.FC<DashboardProps> = ({
                       }
 
                       let recommendedCount = 0;
+                      let labelCount = 0;
                       if (project.graphData) {
                         try {
                           const parsedGraph = typeof project.graphData === 'string' ? JSON.parse(project.graphData) : project.graphData;
                           if (parsedGraph && Array.isArray(parsedGraph.nodes)) {
                             const artistNodes = parsedGraph.nodes.filter((n: any) => n.type === 'artist' || !n.type);
-                            recommendedCount = artistNodes.filter((n: any) => !isSeedMatch(n.id, seedList)).length;
+                            recommendedCount = artistNodes.filter((n: any) => !isNodeInSeedList(n.id || n.label || '', seedList)).length;
+                            labelCount = parsedGraph.nodes.filter((n: any) => n.type === 'label').length;
                           }
                         } catch (e) { /* ignore */ }
                       }
@@ -391,7 +386,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <motion.div
                           key={project.id}
                           onClick={() => onSelectProject(project.id)}
-                          className="group relative bg-zinc-900 border border-zinc-700/50 rounded-none p-5 hover:border-primary/50 transition-all cursor-pointer flex flex-col justify-between w-full md:w-[360px] h-[180px] shadow-xl"
+                          className="group relative bg-zinc-900 border border-zinc-700/50 rounded-none p-5 hover:border-primary/50 transition-all cursor-pointer flex flex-col justify-between w-full md:w-[380px] h-[180px] shadow-xl"
                         >
                           <div className="flex flex-col gap-4">
                             <div className="flex items-start justify-between gap-3">
@@ -467,7 +462,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                           </div>
                           
                           <div className="mt-4 pt-4 border-t border-white/5 flex items-center">
-                            <div className="flex items-center flex-wrap gap-x-1.5 gap-y-1.5">
+                            <div className="flex items-center flex-wrap gap-x-1 gap-y-1.5">
                               <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
                                 SEED: {seedList.length}
                               </span>
@@ -484,6 +479,11 @@ const Dashboard: React.FC<DashboardProps> = ({
                                   <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
                                     AI ARTISTS: {recommendedCount}
                                   </span>
+                                  {labelCount > 0 && (
+                                    <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                                      LABELS: {labelCount}
+                                    </span>
+                                  )}
                                   <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
                                     DEEP CUTS: {deepCutsCount}
                                   </span>
@@ -548,6 +548,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     <th className="py-4 px-6 font-semibold">Modified Date</th>
                     <th className="py-4 px-6 font-semibold">Seeds</th>
                     <th className="py-4 px-6 font-semibold">AI Artists</th>
+                    <th className="py-4 px-6 font-semibold">Labels</th>
                     <th className="py-4 px-6 font-semibold">Deep Cuts</th>
                     <th className="py-4 px-6 font-semibold">Status</th>
                     <th className="py-4 px-6 font-semibold text-right">Actions</th>
@@ -595,12 +596,14 @@ const Dashboard: React.FC<DashboardProps> = ({
                         }
                         
                         let recommendedCount = 0;
+                        let labelCount = 0;
                         if (project.graphData) {
                           try {
                             const parsedGraph = typeof project.graphData === 'string' ? JSON.parse(project.graphData) : project.graphData;
                             if (parsedGraph && Array.isArray(parsedGraph.nodes)) {
                               const artistNodes = parsedGraph.nodes.filter((n: any) => n.type === 'artist' || !n.type);
-                              recommendedCount = artistNodes.filter((n: any) => !isSeedMatch(n.id, seedList)).length;
+                              recommendedCount = artistNodes.filter((n: any) => !isNodeInSeedList(n.id || n.label || '', seedList)).length;
+                              labelCount = parsedGraph.nodes.filter((n: any) => n.type === 'label').length;
                             }
                           } catch (e) {
                             console.warn(`Failed to parse graphData for project ${project.id}:`, e);
@@ -638,6 +641,18 @@ const Dashboard: React.FC<DashboardProps> = ({
                               <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
                                 AI ARTISTS: {recommendedCount}
                               </span>
+                            </td>
+                            <td className={`py-4 px-6 font-normal ${tdClass}`}>
+                              {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
+                              {labelCount > 0 ? (
+                                <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                                  LABELS: {labelCount}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] uppercase tracking-widest text-zinc-600 font-bold px-2.5 py-0.5 bg-zinc-900 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                                  -
+                                </span>
+                              )}
                             </td>
                             <td className={`py-4 px-6 font-normal ${tdClass}`}>
                               {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}

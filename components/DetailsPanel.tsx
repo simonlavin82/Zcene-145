@@ -2004,7 +2004,11 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     const seedCount = seedArtists.length || 1;
     const aiArtistsCount = useMemo(() => {
         if (!graphData?.nodes) return 0;
-        return graphData.nodes.filter(n => !n.isSeed && (n.type === 'artist' || !n.type)).length;
+        return graphData.nodes.filter(n => !isNodeInSeedList(n.id || n.label || '', seedArtists) && (n.type === 'artist' || !n.type)).length;
+    }, [graphData, seedArtists]);
+    const labelsCount = useMemo(() => {
+        if (!graphData?.nodes) return 0;
+        return graphData.nodes.filter(n => n.type === 'label').length;
     }, [graphData]);
     const deepCutsCount = useMemo(() => {
         return activeNodes.filter(n => n.type === 'artist' || n.type === 'label' || !n.type).length;
@@ -2255,13 +2259,18 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     >
                         {isMagazineViewOpen && graphData?.synthesisRationale && (
                             <div className="max-w-[1400px] mx-auto pt-12 md:pt-16 pb-12 mb-8 border-b border-zinc-800/50 transition-opacity duration-500 ease-in-out opacity-100 px-0">
-                                <div className="flex items-center gap-2 mb-6 animate-in fade-in slide-in-from-bottom-2 duration-700">
+                                <div className="flex items-center flex-wrap gap-2 gap-y-2 mb-6 animate-in fade-in slide-in-from-bottom-2 duration-700">
                                     <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
                                         SEED: {seedCount}
                                     </span>
                                     <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
                                         AI ARTISTS: {aiArtistsCount}
                                     </span>
+                                    {labelsCount > 0 && (
+                                        <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                                            LABELS: {labelsCount}
+                                        </span>
+                                    )}
                                     <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
                                         DEEP CUTS: {deepCutsCount}
                                     </span>

@@ -2121,6 +2121,10 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                     <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
                                                         AI ARTISTS: 24
                                                     </span>
+                                                    {/* 3. LABELS */}
+                                                    <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                                                        LABELS: 8
+                                                    </span>
                                                     {/* 3. DEEP CUTS */}
                                                     <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
                                                         DEEP CUTS: 7
@@ -2133,7 +2137,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             </div>
                                         </div>
                                         <p className="text-[10px] text-zinc-500 font-mono mt-2">
-                                            Sequence: SEED → AI ARTISTS → DEEP CUTS → MAPPED
+                                            Sequence: SEED → AI ARTISTS → LABELS → DEEP CUTS → MAPPED
                                         </p>
                                     </div>
                                 </div>
