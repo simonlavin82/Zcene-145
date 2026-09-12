@@ -96,10 +96,16 @@
     @apply text-zinc-400;
   }
   .markdown-bio hr {
-    @apply border-t border-zinc-800 my-8;
+    display: none;
   }
   .markdown-bio h2, .markdown-bio h3, .markdown-bio h4 {
     @apply text-white font-medium mt-8 mb-4 last:mb-0;
+    break-after: avoid-column;
+    break-inside: avoid-column;
+  }
+  /* Fix margin offset when heading falls at the top of a multi-column layout */
+  .markdown-bio > *:first-child {
+    margin-top: 0 !important;
   }
 
   .drop-cap > p:first-of-type::first-letter {
