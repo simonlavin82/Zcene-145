@@ -1092,7 +1092,13 @@ export const getEntityDocWithRedirect = async (
       // redirect chain can resolve correctly. This eliminates the 404 waterfall on page
       // load for graph nodes whose IDs include an origin suffix.
       if (response.status === 404 && depth < 3) {
-        const suffixMatch = entityId.match(/^(.+)-(?:usa|uk|united-states|united-kingdom|canada|australia|germany|france|sweden|norway|italy|spain|brazil|mexico|japan|south-korea)$/i);
+        // Match both full country name suffixes (e.g. -japan, -germany) AND
+        // ISO 3166-1 alpha-2 two-letter country codes (e.g. -jp, -at, -de, -gb, -us).
+        // This covers regional graph node IDs like 'slam-coke-at' or 'acranius-de'
+        // that were disambiguated by a 2-letter country slug at generation time.
+        const suffixMatch = entityId.match(
+          /^(.+)-(?:usa|uk|united-states|united-kingdom|canada|australia|germany|france|sweden|norway|italy|spain|brazil|mexico|japan|south-korea|[a-z]{2})$/i
+        );
         if (suffixMatch) {
           const bareId = suffixMatch[1];
           console.log(`[Proxy Fetch] 404 for ${entityId} — retrying with bare ID: ${bareId}`);

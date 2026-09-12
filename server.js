@@ -716,9 +716,37 @@ async function handleEntityGet(req, res, collectionName = 'artists') {
     const docSnap = await docRef.get();
     
     if (!docSnap.exists) {
+      // Fuzzy Fallback: If the exact ID doesn't exist (e.g. 'slam-coke-at'),
+      // strip any country suffix (full name or ISO 2-letter code) and query for
+      // any document whose artistId matches the bare slug. This resolves country
+      // mismatch cases where the graph assigned one country suffix but the cache
+      // was stored under a different country (e.g. node is 'slam-coke-at' but
+      // the artist profile was saved as 'slam-coke-jp').
+      const suffixStripMatch = entityId.match(
+        /^(.+)-(?:usa|uk|united-states|united-kingdom|canada|australia|germany|france|sweden|norway|italy|spain|brazil|mexico|japan|south-korea|[a-z]{2})$/i
+      );
+      if (suffixStripMatch) {
+        const bareId = suffixStripMatch[1];
+        try {
+          const querySnap = await db.collection(collectionName)
+            .where('artistId', '==', bareId)
+            .limit(1)
+            .get();
+          if (!querySnap.empty) {
+            const altData = querySnap.docs[0].data();
+            if (altData && altData.detailsCache) {
+              console.log(`[Proxy Fuzzy Fallback] ${entityId} not found — served via artistId query: ${querySnap.docs[0].id}`);
+              return res.json(altData);
+            }
+          }
+        } catch (queryErr) {
+          console.warn(`[Proxy Fuzzy Fallback] Query for artistId=${bareId} failed:`, queryErr.message);
+        }
+      }
       res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
       return res.status(404).json({ error: `${collectionName === 'labels' ? 'Label' : 'Artist'} not found` });
     }
+
     
     const data = docSnap.data();
     
