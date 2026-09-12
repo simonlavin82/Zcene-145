@@ -14,6 +14,16 @@ export interface UsageCollector {
 
 // --- UTILITIES PORTED FROM artistCacheService.ts ---
 
+export const CANONICAL_ALIASES: Record<string, string> = {
+  'lungleg': 'Lung Leg',
+};
+
+export const applyCanonicalAlias = (rawName: string): string => {
+  if (!rawName) return rawName;
+  const lookupKey = rawName.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return CANONICAL_ALIASES[lookupKey] || rawName;
+};
+
 export const normalizeArtistId = (name: string): string =>
   name
     .normalize("NFD")
@@ -188,7 +198,7 @@ export const normalizeGraphData = (graph: GraphData): GraphData => {
   const idMap = new Map<string, string>();
 
   const normalizedNodes = graph.nodes.map(node => {
-    const originalId = node.id;
+    const originalId = applyCanonicalAlias(node.id);
     let normalizedId = originalId.trim();
     
     if (node.type === 'artist' || node.type === 'label') {
@@ -197,11 +207,12 @@ export const normalizeGraphData = (graph: GraphData): GraphData => {
       normalizedId = normalizedId.toLowerCase();
     }
     
+    idMap.set(node.id, normalizedId);
     idMap.set(originalId, normalizedId);
     idMap.set(originalId.toLowerCase(), normalizedId);
     idMap.set(normalizeArtistId(originalId), normalizedId);
 
-    let label = node.label || originalId.trim();
+    let label = node.label ? applyCanonicalAlias(node.label) : originalId.trim();
     if (node.type === 'artist' || node.type === 'label') {
       label = titleCaseArtistId(label);
     }
@@ -214,8 +225,11 @@ export const normalizeGraphData = (graph: GraphData): GraphData => {
   });
 
   const normalizedLinks = (graph.links || []).map(link => {
-    const sourceId = typeof link.source === 'string' ? link.source : (link.source as Node).id;
-    const targetId = typeof link.target === 'string' ? link.target : (link.target as Node).id;
+    const rawSourceId = typeof link.source === 'string' ? link.source : (link.source as Node).id;
+    const rawTargetId = typeof link.target === 'string' ? link.target : (link.target as Node).id;
+    
+    const sourceId = applyCanonicalAlias(rawSourceId);
+    const targetId = applyCanonicalAlias(rawTargetId);
 
     const sourceLower = sourceId.trim().toLowerCase();
     const targetLower = targetId.trim().toLowerCase();

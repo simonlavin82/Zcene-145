@@ -1,9 +1,19 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.scrapeImageUrlBackend = exports.checkVideoPlayability = exports.scrapeVideoIdBackend = exports.fetchNodeDetailsBackend = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = exports.NODE_DETAILS_SCHEMA = exports.generateGraphDataBackend = exports.generateRootsBreakdownBackend = exports.validateSeedOriginBackend = exports.SEED_VALIDATION_SCHEMA = exports.GENERATE_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = exports.GRAPH_RESPONSE_SCHEMA = exports.extractCleanJsonString = exports.extractArtistSubGraph = exports.normalizeGraphData = exports.buildCompositeCacheKey = exports.extractCountrySlug = exports.sanitizeImageUrl = exports.extractValidYoutubeId = exports.titleCaseArtistId = exports.normalizeArtistId = void 0;
+exports.scrapeImageUrlBackend = exports.checkVideoPlayability = exports.scrapeVideoIdBackend = exports.fetchNodeDetailsBackend = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = exports.NODE_DETAILS_SCHEMA = exports.generateGraphDataBackend = exports.generateRootsBreakdownBackend = exports.validateSeedOriginBackend = exports.SEED_VALIDATION_SCHEMA = exports.GENERATE_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = exports.GRAPH_RESPONSE_SCHEMA = exports.extractCleanJsonString = exports.extractArtistSubGraph = exports.normalizeGraphData = exports.buildCompositeCacheKey = exports.extractCountrySlug = exports.sanitizeImageUrl = exports.extractValidYoutubeId = exports.titleCaseArtistId = exports.normalizeArtistId = exports.applyCanonicalAlias = exports.CANONICAL_ALIASES = void 0;
 const genai_1 = require("@google/genai");
 const executeCurationPipeline_1 = require("../executeCurationPipeline");
 // --- UTILITIES PORTED FROM artistCacheService.ts ---
+exports.CANONICAL_ALIASES = {
+    'lungleg': 'Lung Leg',
+};
+const applyCanonicalAlias = (rawName) => {
+    if (!rawName)
+        return rawName;
+    const lookupKey = rawName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    return exports.CANONICAL_ALIASES[lookupKey] || rawName;
+};
+exports.applyCanonicalAlias = applyCanonicalAlias;
 const normalizeArtistId = (name) => name
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -173,7 +183,7 @@ const normalizeGraphData = (graph) => {
         return graph;
     const idMap = new Map();
     const normalizedNodes = graph.nodes.map(node => {
-        const originalId = node.id;
+        const originalId = (0, exports.applyCanonicalAlias)(node.id);
         let normalizedId = originalId.trim();
         if (node.type === 'artist' || node.type === 'label') {
             normalizedId = (0, exports.normalizeArtistId)(originalId);
@@ -181,10 +191,11 @@ const normalizeGraphData = (graph) => {
         else {
             normalizedId = normalizedId.toLowerCase();
         }
+        idMap.set(node.id, normalizedId);
         idMap.set(originalId, normalizedId);
         idMap.set(originalId.toLowerCase(), normalizedId);
         idMap.set((0, exports.normalizeArtistId)(originalId), normalizedId);
-        let label = node.label || originalId.trim();
+        let label = node.label ? (0, exports.applyCanonicalAlias)(node.label) : originalId.trim();
         if (node.type === 'artist' || node.type === 'label') {
             label = (0, exports.titleCaseArtistId)(label);
         }
@@ -195,8 +206,10 @@ const normalizeGraphData = (graph) => {
         };
     });
     const normalizedLinks = (graph.links || []).map(link => {
-        const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
-        const targetId = typeof link.target === 'string' ? link.target : link.target.id;
+        const rawSourceId = typeof link.source === 'string' ? link.source : link.source.id;
+        const rawTargetId = typeof link.target === 'string' ? link.target : link.target.id;
+        const sourceId = (0, exports.applyCanonicalAlias)(rawSourceId);
+        const targetId = (0, exports.applyCanonicalAlias)(rawTargetId);
         const sourceLower = sourceId.trim().toLowerCase();
         const targetLower = targetId.trim().toLowerCase();
         const sourceNorm = (0, exports.normalizeArtistId)(sourceId);
