@@ -35,7 +35,8 @@ export function stripCountrySlug(name: string): string {
     '-japan', '-sweden', '-italy', '-spain', '-brazil', '-mexico', '-netherlands', '-belgium',
     '-norway', '-finland', '-denmark', '-ireland', '-new-zealand', '-poland', '-austria',
     '-switzerland', '-uk', '-usa', '-us', '-gb', '-au', '-ca', '-de', '-fr', '-jp', '-se', '-it', '-es',
-    '-br', '-mx', '-nl', '-be', '-no', '-fi', '-dk', '-ie', '-nz', '-pl', '-at', '-ch'
+    '-br', '-mx', '-nl', '-be', '-no', '-fi', '-dk', '-ie', '-nz', '-pl', '-at', '-ch',
+    '-scotland', '-wales', '-northern-ireland', '-england'
   ];
   let cleanName = name.trim();
   for (const suffix of KNOWN_COUNTRY_SLUGS) {

@@ -130,7 +130,7 @@ export const isCacheDocumentVerified = (data: Record<string, any>): boolean => {
 
 const COUNTRY_ISO_MAP: Record<string, string> = {
   'united states': 'us', 'usa': 'us', 'us': 'us',
-  'united kingdom': 'gb', 'uk': 'gb', 'england': 'gb', 'great britain': 'gb',
+  'united kingdom': 'gb', 'uk': 'gb', 'england': 'gb', 'great britain': 'gb', 'scotland': 'gb', 'wales': 'gb', 'northern ireland': 'gb',
   'australia': 'au', 'canada': 'ca', 'germany': 'de',
   'france': 'fr', 'japan': 'jp', 'sweden': 'se',
   'italy': 'it', 'spain': 'es', 'brazil': 'br',
