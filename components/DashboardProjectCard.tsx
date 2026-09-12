@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Project } from '../types';
 import { cleanArtistDisplayName, isNodeInSeedList } from '../services/artistCacheService';
 import { formatSystemTimestamp, generateDeterministicGradient, extractInitials } from '../utils/formatters';
-import { useSeedImage } from '../hooks/useSeedImage';
+import { useSeedImages } from '../hooks/useSeedImages';
 import { useDominantColor } from '../hooks/useDominantColor';
 
 interface DashboardProjectCardProps {
@@ -28,8 +28,8 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
   const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
   const displayTitle = cleanArtistDisplayName(project.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene"));
   
-  const imageUrl = useSeedImage(project.seedArtists, project.detailsCache, project.graphData, project.seedImageUrl);
-  const dominantColor = useDominantColor(imageUrl || undefined, displayTitle);
+  const imageUrls = useSeedImages(project.seedArtists, project.detailsCache, project.graphData, project.seedImageUrl);
+  const dominantColor = useDominantColor(imageUrls[0] && imageUrls[0] !== 'not-found' ? imageUrls[0] : undefined, displayTitle);
 
   // Derive deep cuts count dynamically
   let deepCutsCount = 0;
@@ -79,15 +79,40 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
       <div className={`absolute inset-0 project-card-${project.id}`} style={{ zIndex: 0, pointerEvents: 'none', border: '1px solid transparent' }} />
       
       {/* Background Layer: Full-bleed image or deterministic gradient */}
-      <div className="absolute inset-0 z-0">
-        {imageUrl && imageUrl !== 'not-found' ? (
-          <img src={imageUrl} alt={displayTitle} className="w-full h-full object-cover" crossOrigin="anonymous" />
+      <div className="absolute inset-0 z-0 flex">
+        {imageUrls.length > 1 ? (
+          <>
+            <div className="w-1/2 h-full relative">
+              {imageUrls[0] && imageUrls[0] !== 'not-found' ? (
+                <img src={imageUrls[0]} alt={displayTitle} className="w-full h-full object-cover" crossOrigin="anonymous" />
+              ) : (
+                <div className="w-full h-full" style={{ background: generateDeterministicGradient(seedList[0] || displayTitle) }} />
+              )}
+              {/* Fade out right edge to meet the other image cleanly */}
+              <div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-zinc-950/80 to-transparent z-10" />
+            </div>
+            <div className="w-1/2 h-full relative bg-zinc-950">
+              {imageUrls[1] && imageUrls[1] !== 'not-found' ? (
+                <img src={imageUrls[1]} alt={displayTitle} className="w-full h-full object-cover" crossOrigin="anonymous" />
+              ) : (
+                <div className="w-full h-full" style={{ background: generateDeterministicGradient(seedList[1] || displayTitle) }} />
+              )}
+              {/* Fade out left edge */}
+              <div className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-zinc-950/80 to-transparent z-10" />
+            </div>
+          </>
         ) : (
-          <div className="w-full h-full" style={{ background: generateDeterministicGradient(displayTitle) }}>
-             {/* Monogram for missing images */}
-             <div className="absolute top-4 right-4 text-white/20 font-display text-6xl font-bold tracking-tighter uppercase select-none">
-               {extractInitials(displayTitle)}
-             </div>
+          <div className="w-full h-full">
+            {imageUrls[0] && imageUrls[0] !== 'not-found' ? (
+              <img src={imageUrls[0]} alt={displayTitle} className="w-full h-full object-cover" crossOrigin="anonymous" />
+            ) : (
+              <div className="w-full h-full" style={{ background: generateDeterministicGradient(displayTitle) }}>
+                 {/* Monogram for missing images */}
+                 <div className="absolute top-4 right-4 text-white/20 font-display text-6xl font-bold tracking-tighter uppercase select-none">
+                   {extractInitials(displayTitle)}
+                 </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -162,7 +187,7 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
           </div>
         </div>
         
-        <div className="mt-4 pt-4 border-t border-white/10 flex items-center">
+        <div className="mt-3 flex items-center">
           <div className="flex items-center flex-wrap gap-x-1 gap-y-1.5">
             <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
               SEED: {seedList.length}

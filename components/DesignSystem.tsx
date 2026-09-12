@@ -882,7 +882,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <h3 className="text-xl font-medium text-zinc-200 mb-6">Primary & Brand</h3>
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                                     <ColorSwatch name="Primary" hex="#F6E468" className="bg-primary" />
-                                    <ColorSwatch name="Scene Accent" hex="var(--scene-accent)" style={{ backgroundColor: 'var(--scene-accent, #F6E468)' }} description="Dynamic context-aware brand color driven by image extraction." />
+                                    <ColorSwatch name="Scene Accent" hex="var(--scene-accent)" style={{ backgroundColor: 'var(--scene-accent, #F6E468)' }} description="Dynamic context-aware brand color driven by image extraction. Uses CSS color-mix() for opacities." />
                                     <ColorSwatch name="White" hex="#FFFFFF" className="bg-white" />
                                     <ColorSwatch name="Brand Black" hex="#111113" className="bg-brand-black" />
                                 </div>
@@ -2096,7 +2096,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <h4 className="text-base font-medium text-zinc-200">Project Card — Grid View Preview</h4>
                                     </div>
                                     <p className="text-sm text-zinc-400 leading-relaxed max-w-2xl">
-                                        Badges sit in the card footer, separated from the title/timestamp block by a <code className="text-xs text-primary bg-zinc-800 px-1 rounded">border-t border-white/5</code> rule. The <code className="text-xs text-primary bg-zinc-800 px-1 rounded">AI ARTISTS</code> and <code className="text-xs text-primary bg-zinc-800 px-1 rounded">DEEP CUTS</code> badges are conditionally rendered only when <code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.graphData</code> is present.
+                                        Badges sit flush in the card footer, without top borders, creating a cleaner negative space. Card backgrounds support a 50/50 split grid when multiple seed artists are present. The <code className="text-xs text-primary bg-zinc-800 px-1 rounded">AI ARTISTS</code> and <code className="text-xs text-primary bg-zinc-800 px-1 rounded">DEEP CUTS</code> badges are conditionally rendered only when <code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.graphData</code> is present.
                                     </p>
 
                                     {/* Mock Card */}
@@ -2113,7 +2113,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                 <p className="font-mono text-xs text-zinc-300 font-normal">Edited 27/06/2026 • 8:09 am</p>
                                             </div>
                                             {/* Card Footer — production badge sequence */}
-                                            <div className="mt-4 pt-4 border-t border-white/5 flex items-center">
+                                            <div className="mt-3 flex items-center">
                                                 <div className="flex items-center flex-wrap gap-x-1.5 gap-y-1.5">
                                                     {/* 1. SEED */}
                                                     <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
