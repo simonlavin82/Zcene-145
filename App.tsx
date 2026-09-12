@@ -2221,8 +2221,8 @@ const App: React.FC = () => {
         .map((no: any) => no.label || no.id);
         
       if (connectedCountries.length > 0) {
-        const countryNorm = normalizeArtistId(connectedCountries[0]);
-        if (countryNorm) disambiguatedCacheId = simpleId.endsWith(`-${countryNorm}`) ? simpleId : `${simpleId}-${countryNorm}`;
+        const countryNorm = extractCountrySlug(connectedCountries[0]);
+        if (countryNorm && countryNorm !== 'global') disambiguatedCacheId = simpleId.endsWith(`-${countryNorm}`) ? simpleId : `${simpleId}-${countryNorm}`;
       }
     }
 
@@ -2341,7 +2341,11 @@ const App: React.FC = () => {
     if (!isEvicted) {
         try {
             const standardizedId = normalizeArtistId(node.id);
-            globalDoc = await getEntityDocWithRedirect(standardizedId, node.type === 'label' ? 'label' : 'artist');
+            globalDoc = await getEntityDocWithRedirect(disambiguatedCacheId, node.type === 'label' ? 'label' : 'artist');
+            
+            if (globalDoc.data()?._isStub && disambiguatedCacheId !== standardizedId) {
+                globalDoc = await getEntityDocWithRedirect(standardizedId, node.type === 'label' ? 'label' : 'artist');
+            }
         
         if (globalDoc.exists()) {
             const data = globalDoc.data();
