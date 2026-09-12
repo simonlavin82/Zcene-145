@@ -191,7 +191,7 @@ const SafeYoutubePlayer: React.FC<SafeYoutubePlayerProps> = ({ videoId, artistDi
             href={`https://www.youtube.com/watch?v=${videoId}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[10px] font-bold uppercase tracking-wider text-brand-black bg-[color:var(--scene-accent,#F6E468)] px-3 py-2 hover:bg-white transition-all text-center rounded-none shadow-[2px_2px_0px_#000]"
+            className="text-[10px] font-bold uppercase tracking-wider text-brand-black bg-primary px-3 py-2 hover:bg-white transition-all text-center rounded-none shadow-[2px_2px_0px_#000]"
           >
             Watch on YouTube ↗
           </a>
@@ -910,7 +910,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                         }
                                         onToggleStack(node, links.purchase?.[0]?.url);
                                     }}
-                                    className={`w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 active:scale-95 leading-none ${isInStack ? 'text-[color:var(--scene-accent,#F6E468)] bg-[color:color-mix(in_srgb,var(--scene-accent,#F6E468)_5%,transparent)] border-[color:color-mix(in_srgb,var(--scene-accent,#F6E468)_30%,transparent)]' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'}`}
+                                    className={`w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 active:scale-95 leading-none ${isInStack ? 'text-primary bg-primary/5 border-primary/30' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'}`}
                                     title={isInStack ? "Remove from My Stack" : "Save to My Stack"}
                                 >
                                     <StackIcon className="!text-[18px]" />
@@ -919,7 +919,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             {isArtistNode && !isGuest && onExtendNode && (
                                 <button
                                     onClick={() => onExtendNode(node)}
-                                    className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 active:scale-95 leading-none text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-[color:var(--scene-accent,#F6E468)]"
+                                    className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 active:scale-95 leading-none text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-primary"
                                     title="Explore & expand graph outward from this artist"
                                 >
                                     <span className="material-symbols-outlined !text-[18px]">explore</span>
@@ -928,7 +928,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             {isArtistNode && !isGuest && (
                                 <button
                                     onClick={() => onAddArtist(normalizeArtistId(node.id))}
-                                    className={`w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 active:scale-95 leading-none ${isSeedArtist ? 'text-[color:var(--scene-accent,#F6E468)] bg-[color:color-mix(in_srgb,var(--scene-accent,#F6E468)_5%,transparent)] border-[color:color-mix(in_srgb,var(--scene-accent,#F6E468)_30%,transparent)]' : 'text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-[color:var(--scene-accent,#F6E468)]'}`}
+                                    className={`w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 active:scale-95 leading-none ${isSeedArtist ? 'text-primary bg-primary/5 border-primary/30' : 'text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-primary'}`}
                                     title={isSeedArtist ? "Remove from Seeds" : "Add to Seeds"}
                                 >
                                     <span className="material-symbols-outlined !text-[18px]">
@@ -979,7 +979,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     <h3 className={`${isHeaderStuck ? 'text-base font-medium' : headerSizeClass} text-white leading-[0.9] py-1 break-normal transition-all duration-300`}>
                                         {getArtistDisplayName(details, node)}
                                     </h3>
-                                    <span className={`material-symbols-outlined !text-[16px] flex-shrink-0 transition-all duration-300 ${isIdCopied ? 'text-[color:var(--scene-accent,#F6E468)] opacity-100 scale-110' : 'text-zinc-500 opacity-0 group-hover:opacity-100'}`}>
+                                    <span className={`material-symbols-outlined !text-[16px] flex-shrink-0 transition-all duration-300 ${isIdCopied ? 'text-primary opacity-100 scale-110' : 'text-zinc-500 opacity-0 group-hover:opacity-100'}`}>
                                         {isIdCopied ? 'check' : 'content_copy'}
                                     </span>
                                 </div>
@@ -1055,7 +1055,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 </p>
                                 <button
                                     onClick={() => onGenerateDeepCut ? onGenerateDeepCut(node) : onNodeClick(node)}
-                                    className="flex items-center justify-center gap-2 px-6 py-2.5 bg-[color:var(--scene-accent,#F6E468)] hover:bg-white active:scale-95 text-brand-black font-semibold text-xs rounded-xl shadow-lg transition-all duration-200"
+                                    className="flex items-center justify-center gap-2 px-6 py-2.5 bg-primary hover:bg-white active:scale-95 text-brand-black font-semibold text-xs rounded-xl shadow-lg transition-all duration-200"
                                 >
                                     <span className="material-symbols-outlined !text-[16px]">bolt</span>
                                     Generate Deep Cut
@@ -1110,7 +1110,10 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             )}
 
                             {imageTier !== 'placeholder' && currentImageUrl && (
-                                <div className="w-40 h-40 sm:w-44 sm:h-44 flex-shrink-0 mx-auto bg-zinc-900 overflow-hidden relative border border-zinc-800/50 shadow-2xl rounded-lg group">
+                                <div className="relative mx-auto w-fit">
+                                    {/* Ambient Glow */}
+                                    <div className="absolute inset-[-20%] rounded-full opacity-40 blur-3xl transition-colors duration-1000 z-0 pointer-events-none" style={{ backgroundColor: 'var(--scene-accent, transparent)' }} />
+                                    <div className="w-40 h-40 sm:w-44 sm:h-44 flex-shrink-0 mx-auto bg-zinc-900 overflow-hidden relative border border-zinc-800/50 shadow-2xl rounded-lg group z-10">
                                     {/* Temporary Loading Skeleton while image loads */}
                                     {!imgLoaded && (
                                         <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center p-6 text-center bg-zinc-900 overflow-hidden z-10">
@@ -1142,6 +1145,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                         onLoad={() => setImgLoaded(true)}
                                         onError={handleImageError}
                                     />
+                                    </div>
                                 </div>
                             )}
 
@@ -1223,7 +1227,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                                 setTourError(null);
                                                                 setTourStatus('cost_warning');
                                                             }}
-                                                            className="text-zinc-400 hover:text-[color:var(--scene-accent,#F6E468)] transition-colors text-sm font-normal underline underline-offset-4 decoration-zinc-700 text-left w-fit"
+                                                            className="text-zinc-400 hover:text-primary transition-colors text-sm font-normal underline underline-offset-4 decoration-zinc-700 text-left w-fit"
                                                         >
                                                             Check tours
                                                         </button>
@@ -1248,7 +1252,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                                 </p>
                                                                 <button 
                                                                     onClick={() => setTourStatus('full_itinerary_modal')}
-                                                                    className="text-[color:var(--scene-accent,#F6E468)] hover:underline text-xs font-semibold mt-1 text-left block"
+                                                                    className="text-primary hover:underline text-xs font-semibold mt-1 text-left block"
                                                                 >
                                                                     view tour
                                                                 </button>
@@ -1305,7 +1309,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                     disabled={isAlreadySeed}
                                                     className={`border py-1.5 px-4 transition-all text-sm flex items-center gap-1.5 rounded-xl ${
                                                         isAlreadySeed 
-                                                            ? 'text-[color:var(--scene-accent,#F6E468)] border-[color:color-mix(in_srgb,var(--scene-accent,#F6E468)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--scene-accent,#F6E468)_5%,transparent)] cursor-default' 
+                                                            ? 'text-primary border-primary/30 bg-primary/5 cursor-default' 
                                                             : 'border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:text-white hover:bg-zinc-800 hover:border-zinc-700 active:scale-95'
                                                     }`}
                                                 >
@@ -1335,8 +1339,8 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             )}
 
                             {links.purchase.length > 0 && (
-                                <div className="p-5 bg-[color:color-mix(in_srgb,var(--scene-accent,#F6E468)_5%,transparent)] border-2 border-[color:color-mix(in_srgb,var(--scene-accent,#F6E468)_20%,transparent)] relative">
-                                    <div className="absolute -top-3 left-4 bg-zinc-900 px-2 text-[10px] font-semibold uppercase tracking-widest text-[color:var(--scene-accent,#F6E468)] rounded-none">
+                                <div className="p-5 bg-primary/5 border-2 border-primary/20 relative">
+                                    <div className="absolute -top-3 left-4 bg-zinc-900 px-2 text-[10px] font-semibold uppercase tracking-widest text-primary rounded-none">
                                         {isLabelNode ? 'Label Catalog' : 'Artist Catalog'}
                                     </div>
                                     <div className="flex flex-col gap-3">
@@ -1350,7 +1354,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                     rel="noopener noreferrer" 
                                                     className={`flex items-center justify-center px-4 py-2 rounded-xl font-medium transition-all active:scale-[0.98] ${
                                                         isBandcamp 
-                                                            ? 'bg-[color:var(--scene-accent,#F6E468)] text-brand-black hover:opacity-90' 
+                                                            ? 'bg-primary text-brand-black hover:opacity-90' 
                                                             : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white border border-zinc-700'
                                                     }`}
                                                 >
@@ -1406,7 +1410,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                 href={link.url} 
                                                 target="_blank" 
                                                 rel="noopener noreferrer" 
-                                                className="text-zinc-400 active:text-[color:var(--scene-accent,#F6E468)] transition-all text-sm underline underline-offset-4 decoration-zinc-700 font-medium"
+                                                className="text-zinc-400 active:text-primary transition-all text-sm underline underline-offset-4 decoration-zinc-700 font-medium"
                                             >
                                                 {link.site}
                                             </a>
@@ -1422,7 +1426,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 
                                 {isGuest ? (
                                     <div className="flex flex-col items-center justify-center text-center p-6 bg-zinc-900/50 rounded-none border border-zinc-800/80">
-                                        <span className="material-symbols-outlined !text-4xl text-[color:color-mix(in_srgb,var(--scene-accent,#F6E468)_50%,transparent)] mb-3">lock</span>
+                                        <span className="material-symbols-outlined !text-4xl text-primary/50 mb-3">lock</span>
                                         <h5 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-200 mb-2">DEEPER CONNECTION</h5>
                                         <p className="text-xs text-zinc-400 leading-relaxed mb-4">
                                             Unlock our advanced AI assistant features to map deeper relationships across your music canvas.
@@ -1430,7 +1434,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                         {user ? (
                                             <button 
                                                 onClick={() => onAuthRequest?.()}
-                                                className={`w-full flex items-center justify-center gap-2 bg-[color:var(--scene-accent,#F6E468)] ${isSmallScreen ? 'px-8 py-4 text-lg rounded-2xl' : 'px-6 py-2 text-sm rounded-xl'} font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 shadow-lg`}
+                                                className={`w-full flex items-center justify-center gap-2 bg-primary ${isSmallScreen ? 'px-8 py-4 text-lg rounded-2xl' : 'px-6 py-2 text-sm rounded-xl'} font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 shadow-lg`}
                                             >
                                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
                                                     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
@@ -1442,7 +1446,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                         ) : (
                                             <button 
                                                 onClick={() => onAuthRequest?.()}
-                                                className={`w-full flex items-center justify-center gap-2 bg-[color:var(--scene-accent,#F6E468)] ${isSmallScreen ? 'px-8 py-4 text-lg rounded-2xl' : 'px-6 py-2 text-sm rounded-xl'} font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 shadow-lg`}
+                                                className={`w-full flex items-center justify-center gap-2 bg-primary ${isSmallScreen ? 'px-8 py-4 text-lg rounded-2xl' : 'px-6 py-2 text-sm rounded-xl'} font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 shadow-lg`}
                                             >
                                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
                                                     <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
@@ -1463,7 +1467,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                         ) : (
                                             chatHistory.map((msg, i) => (
                                                 <div key={i} className={`flex flex-col group relative ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                                                    <div className={`max-w-[90%] px-4 py-2 text-sm ${msg.role === 'user' ? 'bg-zinc-800 text-zinc-200 border-r-4 border-[color:var(--scene-accent,#F6E468)]' : 'bg-zinc-900/50 text-zinc-300 border-l-4 border-zinc-600 shadow-sm'} rounded-none`}>
+                                                    <div className={`max-w-[90%] px-4 py-2 text-sm ${msg.role === 'user' ? 'bg-zinc-800 text-zinc-200 border-r-4 border-primary' : 'bg-zinc-900/50 text-zinc-300 border-l-4 border-zinc-600 shadow-sm'} rounded-none`}>
                                                         {msg.text}
                                                     </div>
                                                     {msg.timestamp && (
@@ -1485,11 +1489,11 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                         )}
                                         {isChatLoading && (
                                             <div className="flex items-start">
-                                                <div className="bg-zinc-900 border-l-4 border-[color:var(--scene-accent,#F6E468)] px-4 py-2 flex items-center gap-2 rounded-none">
+                                                <div className="bg-zinc-900 border-l-4 border-primary px-4 py-2 flex items-center gap-2 rounded-none">
                                                     <div className="flex gap-1">
-                                                        <div className="w-1 h-1 bg-[color:var(--scene-accent,#F6E468)] rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
-                                                        <div className="w-1 h-1 bg-[color:var(--scene-accent,#F6E468)] rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
-                                                        <div className="w-1 h-1 bg-[color:var(--scene-accent,#F6E468)] rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
+                                                        <div className="w-1 h-1 bg-primary rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
+                                                        <div className="w-1 h-1 bg-primary rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
+                                                        <div className="w-1 h-1 bg-primary rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1517,7 +1521,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                             )}
                                             {chatMode === 'live' && (
                                                 <div className="text-[10px] text-zinc-500 font-mono tracking-widest flex items-center gap-1">
-                                                    <span className={`w-1.5 h-1.5 rounded-full ${3 - liveMessageCount > 0 ? 'bg-[color:var(--scene-accent,#F6E468)]' : 'bg-red-500 animate-pulse'}`}></span>
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${3 - liveMessageCount > 0 ? 'bg-primary' : 'bg-red-500 animate-pulse'}`}></span>
                                                     {Math.max(0, 3 - liveMessageCount)} / 3 Messages
                                                 </div>
                                             )}
@@ -1533,13 +1537,13 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                     onChange={(e) => setChatInput(e.target.value)}
                                                     onKeyDown={handleKeyDown}
                                                     placeholder="Consult Zcene AI..."
-                                                    className="w-full bg-zinc-950 border border-zinc-700 py-2 pl-4 pr-16 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-[color:var(--scene-accent,#F6E468)] transition-all rounded-xl resize-none min-h-[80px] scrollbar-thin scrollbar-thumb-zinc-700"
+                                                    className="w-full bg-zinc-950 border border-zinc-700 py-2 pl-4 pr-16 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary transition-all rounded-xl resize-none min-h-[80px] scrollbar-thin scrollbar-thumb-zinc-700"
                                                 />
                                                 <div className="absolute right-2 bottom-3 flex flex-col items-center gap-2">
                                                     {!chatInput.trim() ? (
                                                         <button 
                                                             onClick={handleSpeechToText}
-                                                            className={`w-8 h-8 flex flex-shrink-0 items-center justify-center transition-colors rounded-xl ${isListening ? 'text-[color:var(--scene-accent,#F6E468)] animate-pulse' : 'text-zinc-500 active:text-zinc-300'}`}
+                                                            className={`w-8 h-8 flex flex-shrink-0 items-center justify-center transition-colors rounded-xl ${isListening ? 'text-primary animate-pulse' : 'text-zinc-500 active:text-zinc-300'}`}
                                                             title="Speak"
                                                         >
                                                             <MicIcon className="!text-[22px]" />
@@ -1559,7 +1563,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                         className={`w-8 h-8 flex flex-shrink-0 items-center justify-center transition-all duration-300 rounded-xl ${
                                                             !chatInput.trim() || isChatLoading
                                                                 ? 'bg-zinc-800 text-zinc-600'
-                                                                : 'bg-[color:var(--scene-accent,#F6E468)] text-brand-black shadow-[0_0_12px_rgba(246,228,104,0.3)] active:scale-95'
+                                                                : 'bg-primary text-brand-black shadow-[0_0_12px_rgba(246,228,104,0.3)] active:scale-95'
                                                         }`}
                                                         title="Send"
                                                     >
@@ -1582,7 +1586,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                         className={`px-3 py-1.5 border transition-colors text-xs rounded-full disabled:opacity-50 text-left flex items-center gap-1 ${
                                                             isClicked 
                                                                 ? 'bg-zinc-950 border-zinc-800 text-zinc-500 hover:text-zinc-400' 
-                                                                : 'bg-zinc-900 border-zinc-700 hover:border-[color:var(--scene-accent,#F6E468)] hover:bg-zinc-800 text-zinc-300'
+                                                                : 'bg-zinc-900 border-zinc-700 hover:border-primary hover:bg-zinc-800 text-zinc-300'
                                                         }`}
                                                     >
                                                         {chip}
@@ -1592,7 +1596,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                 {connectionPeers.length > 0 && (
                                                     <div className="relative">
                                                         <select
-                                                            className="appearance-none px-3 py-1.5 bg-zinc-900 border border-zinc-700 hover:border-[color:var(--scene-accent,#F6E468)] hover:bg-zinc-800 transition-colors text-xs text-zinc-300 rounded-full cursor-pointer focus:outline-none pr-8"
+                                                            className="appearance-none px-3 py-1.5 bg-zinc-900 border border-zinc-700 hover:border-primary hover:bg-zinc-800 transition-colors text-xs text-zinc-300 rounded-full cursor-pointer focus:outline-none pr-8"
                                                             onChange={(e) => {
                                                                 if (e.target.value) {
                                                                     const query = `What is the connection to ${e.target.value}?`;
@@ -1754,7 +1758,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     const magazineBtnState: 'disabled' | 'attention' | 'neutral' = hasSeenMagazineView ? 'neutral' : 'attention';
     const magazineBtnClasses = {
         disabled: "flex items-center gap-1.5 px-3 py-1.5 border border-zinc-800 bg-zinc-900/20 rounded-xl text-zinc-600 cursor-not-allowed transition-all duration-200 text-xs font-medium shrink-0 leading-none backdrop-blur-sm",
-        attention: "flex items-center gap-1.5 px-3 py-1.5 border border-[color:var(--scene-accent,#F6E468)] bg-[color:color-mix(in_srgb,var(--scene-accent,#F6E468)_10%,transparent)] rounded-xl text-[color:var(--scene-accent,#F6E468)] animate-pulse hover:bg-primary/20 active:scale-95 transition-all duration-200 text-xs font-medium shrink-0 leading-none backdrop-blur-sm",
+        attention: "flex items-center gap-1.5 px-3 py-1.5 border border-primary bg-primary/10 rounded-xl text-primary animate-pulse hover:bg-primary/20 active:scale-95 transition-all duration-200 text-xs font-medium shrink-0 leading-none backdrop-blur-sm",
         neutral: "flex items-center gap-1.5 px-3 py-1.5 border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 transition-all duration-200 text-xs font-medium shrink-0 leading-none backdrop-blur-sm"
     }[magazineBtnState];
     
@@ -2059,11 +2063,11 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                     placeholder="Search..."
                                     value={magazineSearchQuery}
                                     onChange={(e) => setMagazineSearchQuery(e.target.value)}
-                                    className={`w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-[color:var(--scene-accent,#F6E468)] focus:outline-none transition-all ${InputSizes.sm.magazineSearch}`}
+                                    className={`w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all ${InputSizes.sm.magazineSearch}`}
                                 />
                                 <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
                                     {!magazineSearchQuery && (
-                                        <button onClick={handleMagazineSpeechToText} className={`flex items-center justify-center transition-colors leading-none ${InputSizes.sm.iconBtn} ${isListeningMagazineSearch ? 'text-[color:var(--scene-accent,#F6E468)] animate-pulse' : 'text-zinc-500 hover:text-white'}`} title="Search by voice"><MicIcon className={InputSizes.sm.icon} /></button>
+                                        <button onClick={handleMagazineSpeechToText} className={`flex items-center justify-center transition-colors leading-none ${InputSizes.sm.iconBtn} ${isListeningMagazineSearch ? 'text-primary animate-pulse' : 'text-zinc-500 hover:text-white'}`} title="Search by voice"><MicIcon className={InputSizes.sm.icon} /></button>
                                     )}
                                     {magazineSearchQuery && (
                                         <button onClick={() => setMagazineSearchQuery('')} className={`flex items-center justify-center text-zinc-400 hover:text-white transition-colors leading-none ${InputSizes.sm.iconBtn}`} aria-label="Clear search"><span className={`material-symbols-outlined ${InputSizes.sm.icon}`}>close</span></button>
@@ -2107,11 +2111,11 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 placeholder="Search..."
                                                 value={magazineSearchQuery}
                                                 onChange={(e) => setMagazineSearchQuery(e.target.value)}
-                                                className={`w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-[color:var(--scene-accent,#F6E468)] focus:outline-none transition-all ${InputSizes.sm.magazineSearch}`}
+                                                className={`w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all ${InputSizes.sm.magazineSearch}`}
                                             />
                                             <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
                                                 {!magazineSearchQuery && (
-                                                    <button onClick={handleMagazineSpeechToText} className={`flex items-center justify-center transition-colors leading-none ${InputSizes.sm.iconBtn} ${isListeningMagazineSearch ? 'text-[color:var(--scene-accent,#F6E468)] animate-pulse' : 'text-zinc-500 hover:text-white'}`} title="Search by voice"><MicIcon className={InputSizes.sm.icon} /></button>
+                                                    <button onClick={handleMagazineSpeechToText} className={`flex items-center justify-center transition-colors leading-none ${InputSizes.sm.iconBtn} ${isListeningMagazineSearch ? 'text-primary animate-pulse' : 'text-zinc-500 hover:text-white'}`} title="Search by voice"><MicIcon className={InputSizes.sm.icon} /></button>
                                                 )}
                                                 {magazineSearchQuery && (
                                                     <button onClick={() => setMagazineSearchQuery('')} className={`flex items-center justify-center text-zinc-400 hover:text-white transition-colors leading-none ${InputSizes.sm.iconBtn}`} aria-label="Clear search"><span className={`material-symbols-outlined ${InputSizes.sm.icon}`}>close</span></button>
@@ -2151,7 +2155,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                             <div className="flex items-center gap-4 overflow-hidden">
                                 <div className="flex items-center gap-2">
                                     <h2 className="text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Deep Cut</h2>
-                                    <span className={`h-5 w-5 flex flex-shrink-0 items-center justify-center text-[9px] font-bold border rounded-md transition-all duration-500 ${unreadCount > 0 ? 'bg-brand-black text-[color:var(--scene-accent,#F6E468)] border-[color:color-mix(in_srgb,var(--scene-accent,#F6E468)_50%,transparent)]' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>
+                                    <span className={`h-5 w-5 flex flex-shrink-0 items-center justify-center text-[9px] font-bold border rounded-md transition-all duration-500 ${unreadCount > 0 ? 'bg-brand-black text-primary border-primary/50' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>
                                         {activeNodes.length}
                                     </span>
                                 </div>
@@ -2177,7 +2181,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     </div>
                     <div className="absolute bottom-6 left-0 right-0 flex justify-center px-2">
                         <button onClick={onToggleCollapse} className="group relative" title="View Deep Cut">
-                             <span className={`h-8 w-8 flex items-center justify-center text-sm font-bold border-2 rounded-md transition-all duration-500 ${unreadCount > 0 && !systemError ? 'bg-brand-black text-[color:var(--scene-accent,#F6E468)] border-[color:color-mix(in_srgb,var(--scene-accent,#F6E468)_50%,transparent)]' : 'bg-zinc-800 text-zinc-500 border-zinc-700'} group-active:scale-95`}>
+                             <span className={`h-8 w-8 flex items-center justify-center text-sm font-bold border-2 rounded-md transition-all duration-500 ${unreadCount > 0 && !systemError ? 'bg-brand-black text-primary border-primary/50' : 'bg-zinc-800 text-zinc-500 border-zinc-700'} group-active:scale-95`}>
                                 {systemError ? 0 : activeNodes.length}
                             </span>
                         </button>
@@ -2224,9 +2228,9 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                             <div 
                                                                 className={`transition-all flex-shrink-0 rounded-full ${
                                                                     isActive 
-                                                                        ? 'w-4 h-1 bg-[color:var(--scene-accent,#F6E468)]' 
+                                                                        ? 'w-4 h-1 bg-primary' 
                                                                         : isLoading 
-                                                                            ? 'w-1.5 h-1.5 bg-[color:color-mix(in_srgb,var(--scene-accent,#F6E468)_80%,transparent)] animate-pulse' 
+                                                                            ? 'w-1.5 h-1.5 bg-primary/80 animate-pulse' 
                                                                             : 'w-1 h-1 bg-zinc-600 group-hover:bg-zinc-400'
                                                                 }`}
                                                             />
@@ -2292,7 +2296,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                             p: ({node, ...props}) => <p className="mb-6 break-inside-avoid" {...props} />,
                                             strong: ({node, ...props}) => <strong className="font-semibold text-white" {...props} />,
                                             ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-6 break-inside-avoid space-y-2" {...props} />,
-                                            li: ({node, ...props}) => <li className="marker:text-[color:var(--scene-accent,#F6E468)]" {...props} />
+                                            li: ({node, ...props}) => <li className="marker:text-primary" {...props} />
                                         }}
                                     >
                                         {sanitizedRationaleText}

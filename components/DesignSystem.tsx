@@ -882,7 +882,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <h3 className="text-xl font-medium text-zinc-200 mb-6">Primary & Brand</h3>
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                                     <ColorSwatch name="Primary" hex="#F6E468" className="bg-primary" />
-                                    <ColorSwatch name="Scene Accent" hex="var(--scene-accent)" style={{ backgroundColor: 'var(--scene-accent, #F6E468)' }} description="Dynamic context-aware brand color driven by image extraction. Uses CSS color-mix() for opacities." />
+                                    <ColorSwatch name="Scene Accent" hex="var(--scene-accent)" style={{ backgroundColor: 'var(--scene-accent, #F6E468)' }} description="Dynamic context-aware color driven by image extraction. Strictly restricted to ambient atmospheric glows behind artwork. Functional UI controls remain yellow." />
                                     <ColorSwatch name="White" hex="#FFFFFF" className="bg-white" />
                                     <ColorSwatch name="Brand Black" hex="#111113" className="bg-brand-black" />
                                 </div>
