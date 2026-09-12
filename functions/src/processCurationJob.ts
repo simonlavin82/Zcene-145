@@ -844,9 +844,20 @@ export const processCurationJob = onDocumentCreated({
         const uniqueNodesMap = new Map<string, any>();
         finalGraph.nodes.forEach((node: any) => {
           const normId = normalizeArtistId(node.id);
+          const baseNormId = stripCountrySlug(normId);
+
           if (idRewriteMap.has(normId)) {
             node.id = idRewriteMap.get(normId);
+          } else if (idRewriteMap.has(baseNormId)) {
+            node.id = idRewriteMap.get(baseNormId);
           }
+
+          // Force overwrite the node's origin to match the canonical database truth
+          const detailsEntry = detailsCacheEntries.find((entry: any) => entry[0] === node.id);
+          if (detailsEntry && detailsEntry[1]?.details?.origin) {
+            node.origin = detailsEntry[1].details.origin;
+          }
+
           if (!uniqueNodesMap.has(node.id)) {
             uniqueNodesMap.set(node.id, node);
           }
@@ -861,12 +872,17 @@ export const processCurationJob = onDocumentCreated({
           const tId = typeof link.target === 'string' ? link.target : (link.target as any).id;
           const normS = normalizeArtistId(sId);
           const normT = normalizeArtistId(tId);
+          const baseNormS = stripCountrySlug(normS);
+          const baseNormT = stripCountrySlug(normT);
           
           let finalS = sId;
           let finalT = tId;
           
           if (idRewriteMap.has(normS)) finalS = idRewriteMap.get(normS);
+          else if (idRewriteMap.has(baseNormS)) finalS = idRewriteMap.get(baseNormS);
+
           if (idRewriteMap.has(normT)) finalT = idRewriteMap.get(normT);
+          else if (idRewriteMap.has(baseNormT)) finalT = idRewriteMap.get(baseNormT);
           
           if (typeof link.source === 'string') link.source = finalS;
           else (link.source as any).id = finalS;
