@@ -289,14 +289,14 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
                                                                  </thead>
                                                                  <tbody>
                                                                      {user.projects.map((proj, idx) => {
-                                                                         const isDirectHit = proj.generationType === "Direct Hit";
+                                                                         const isZeroCost = proj.generationType === "Direct Hit" || proj.generationType === "Clone";
                                                                          const dateStr = proj.createdAt ? new Date(proj.createdAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).replace(',', ',') : '';
                                                                          return (
                                                                              <tr key={idx} className="border-b border-zinc-800/50 last:border-0 hover:bg-zinc-900/20">
                                                                                  <td className="p-3 text-xs text-zinc-300 font-medium">{proj.seedArtist}</td>
                                                                                  <td className="p-3 text-xs text-zinc-400 whitespace-nowrap">{dateStr}</td>
                                                                                  <td className="p-3 text-xs text-zinc-400">{proj.generationType}</td>
-                                                                                 <td className={`p-3 text-xs text-right font-mono ${isDirectHit ? 'text-primary/80' : 'text-red-400/80'}`}>
+                                                                                 <td className={`p-3 text-xs text-right font-mono ${isZeroCost ? 'text-primary/80' : 'text-red-400/80'}`}>
                                                                                      {proj.isEstimate ? '~' : ''}${proj.cost.toFixed(4)}
                                                                                  </td>
                                                                              </tr>

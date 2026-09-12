@@ -197,7 +197,8 @@ export const cleanArtistDisplayName = (rawIdOrName?: string | null, graphNodes?:
     'united states', 'united kingdom', 'global', 'australia', 'canada', 'germany', 'france',
     'japan', 'sweden', 'italy', 'spain', 'brazil', 'mexico', 'netherlands', 'belgium',
     'norway', 'finland', 'denmark', 'ireland', 'new zealand', 'poland', 'austria',
-    'switzerland', 'uk', 'usa', 'us'
+    'switzerland', 'uk', 'usa', 'us', 'de', 'fr', 'jp', 'se', 'it', 'es', 'br', 'mx',
+    'nl', 'be', 'no', 'fi', 'dk', 'ie', 'nz', 'pl', 'at', 'ch', 'pt', 'ar', 'co', 'au', 'ca', 'gb'
   ];
 
   let cleaned = trimmed;
@@ -243,7 +244,7 @@ export const isNodeInSeedList = (nodeIdOrLabel?: string | null, seedList?: strin
   
   const targetNorm = normalizeArtistId(nodeIdOrLabel);
   // Explicitly strip country routing suffixes to ensure base string matches
-  const countrySuffixRegex = /-(united-states|united-kingdom|global|australia|canada|germany|france|japan|sweden|italy|spain|brazil|mexico|netherlands|belgium|norway|finland|denmark|ireland|new-zealand|poland|austria|switzerland|uk|usa|us|portugal|argentina|colombia)$/;
+  const countrySuffixRegex = /-(united-states|united-kingdom|global|australia|canada|germany|france|japan|sweden|italy|spain|brazil|mexico|netherlands|belgium|norway|finland|denmark|ireland|new-zealand|poland|austria|switzerland|uk|usa|us|portugal|argentina|colombia|de|fr|jp|se|it|es|br|mx|nl|be|no|fi|dk|ie|nz|pl|at|ch|pt|ar|co|au|ca|gb)$/;
   const strippedTargetNorm = targetNorm.replace(countrySuffixRegex, '');
   
   const targetClean = cleanArtistDisplayName(nodeIdOrLabel).toLowerCase();
