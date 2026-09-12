@@ -1923,6 +1923,13 @@ const App: React.FC = () => {
         sharePayload.seedImageUrl = dashboardSeedImageUrl;
       }
 
+      // Strip undefined values to prevent Firebase invalid-argument errors
+      Object.keys(sharePayload).forEach(key => {
+        if (sharePayload[key] === undefined) {
+          delete sharePayload[key];
+        }
+      });
+
       const sharedRef = await addDoc(collection(db, 'sharedZcenes'), sharePayload);
       const shareUrl = `${window.location.origin}/z/${sharedRef.id}`;
 
