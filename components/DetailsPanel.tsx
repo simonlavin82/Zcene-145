@@ -2208,20 +2208,20 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     >
                         {isMagazineViewOpen && graphData?.synthesisRationale && (
                             <div className="max-w-[1400px] mx-auto pt-12 md:pt-16 pb-12 mb-8 border-b border-zinc-800/50 transition-opacity duration-500 ease-in-out opacity-100 px-0">
-                                <div className="flex items-center flex-wrap gap-x-1.5 gap-y-1.5 mb-6 animate-in fade-in slide-in-from-bottom-2 duration-700">
+                                <div className="flex items-center flex-wrap gap-2 gap-y-2 mb-6 animate-in fade-in slide-in-from-bottom-2 duration-700">
                                     <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
-                                        Seed Artist: {seedCount}
+                                        SEED: {seedCount}
                                     </span>
                                     <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
-                                        AI Artist: {aiArtistsCount}
+                                        AI ARTISTS: {aiArtistsCount}
                                     </span>
                                     {labelsCount > 0 && (
                                         <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
-                                            Label: {labelsCount}
+                                            LABELS: {labelsCount}
                                         </span>
                                     )}
                                     <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
-                                        Deep Cut: {deepCutsCount}
+                                        DEEP CUTS: {deepCutsCount}
                                     </span>
                                 </div>
                                 <h1 className="text-7xl font-bold tracking-tighter text-white mb-10 leading-tight" style={{ wordBreak: 'break-word' }}>
