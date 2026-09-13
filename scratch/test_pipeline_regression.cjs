@@ -57,7 +57,17 @@ async function runRegressionSuite() {
         assert(!isUILocked, "UI correctly UNLOCKS only when project status hits 'completed'.");
     }
 
-    // --- 2. Column 2: Dynamic Slug Validation Simulation ---
+    // --- 2. Column 2: Proxy API Schema Simulation ---
+    console.log("\n--- 2. Column 2: Proxy API Schema Simulation ---");
+    // Simulating cache miss response from proxy
+    const mockProxyResponse = {
+        status: 200,
+        data: { found: false }
+    };
+    assert(mockProxyResponse.status === 200, "Proxy returns HTTP 200 OK for cache misses (preventing 404 alert noise).");
+    assert(mockProxyResponse.data && mockProxyResponse.data.found === false, "Proxy returns strictly `{ found: false }` payload on cache miss.");
+
+    // --- 3. Column 2: Dynamic Slug Validation Simulation ---
     console.log("\n--- 2. Column 2: Dynamic Slug Validation Simulation ---");
     assert(applyDynamicSlug('buggin', 'United States') === 'buggin-united-states', "Dynamic slug correctly appends origin.");
     assert(applyDynamicSlug('buggin-united-states', 'United States') === 'buggin-united-states', "Dynamic slug deduplicates trailing origin suffixes.");

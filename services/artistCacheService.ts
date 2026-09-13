@@ -1086,26 +1086,7 @@ export const getEntityDocWithRedirect = async (
     const url = `${apiPath}${entityId}`;
     const response = await fetch(url);
     if (!response.ok) {
-      // Fix 3 — 404 Suffix Fallback: If the country-disambiguated ID (e.g. 'korn-usa')
-      // returns 404, the doc may only exist as a bare ID alias with a redirectTo pointer
-      // (e.g. 'korn'). Strip the last country-suffix segment and retry once so the
-      // redirect chain can resolve correctly. This eliminates the 404 waterfall on page
-      // load for graph nodes whose IDs include an origin suffix.
-      if (response.status === 404 && depth < 3) {
-        // Match both full country name suffixes (e.g. -japan, -germany) AND
-        // ISO 3166-1 alpha-2 two-letter country codes (e.g. -jp, -at, -de, -gb, -us).
-        // This covers regional graph node IDs like 'slam-coke-at' or 'acranius-de'
-        // that were disambiguated by a 2-letter country slug at generation time.
-        const suffixMatch = entityId.match(
-          /^(.+)-(?:usa|uk|united-states|united-kingdom|canada|australia|germany|france|sweden|norway|italy|spain|brazil|mexico|japan|south-korea|[a-z]{2})$/i
-        );
-        if (suffixMatch) {
-          const bareId = suffixMatch[1];
-          console.log(`[Proxy Fetch] 404 for ${entityId} — retrying with bare ID: ${bareId}`);
-          return getEntityDocWithRedirect(bareId, entityType, depth + 1);
-        }
-      }
-      console.warn(`[Proxy Fetch] Non-200 status (${response.status}) for ${entityId}, returning safe fallback to prevent UI crash.`);
+      console.warn(`[Proxy Fetch] HTTP error (${response.status}) for ${entityId}, returning safe fallback to prevent UI crash.`);
       return {
         exists: () => true,
         data: () => ({ imageUrl: "", bio: "", cacheKey: entityId, _isStub: true }),
@@ -1117,6 +1098,37 @@ export const getEntityDocWithRedirect = async (
     }
     
     const data = await response.json();
+    
+    if (data && data.found === false) {
+      // Fix 3 — Suffix Fallback: If the country-disambiguated ID (e.g. 'korn-usa')
+      // returns a cache miss, the doc may only exist as a bare ID alias with a redirectTo pointer
+      // (e.g. 'korn'). Strip the last country-suffix segment and retry once so the
+      // redirect chain can resolve correctly. This eliminates the miss waterfall on page
+      // load for graph nodes whose IDs include an origin suffix.
+      if (depth < 3) {
+        // Match both full country name suffixes (e.g. -japan, -germany) AND
+        // ISO 3166-1 alpha-2 two-letter country codes (e.g. -jp, -at, -de, -gb, -us).
+        const suffixMatch = entityId.match(
+          /^(.+)-(?:usa|uk|united-states|united-kingdom|canada|australia|germany|france|sweden|norway|italy|spain|brazil|mexico|japan|south-korea|[a-z]{2})$/i
+        );
+        if (suffixMatch) {
+          const bareId = suffixMatch[1];
+          console.log(`[Proxy Fetch] Cache miss for ${entityId} — retrying with bare ID: ${bareId}`);
+          return getEntityDocWithRedirect(bareId, entityType, depth + 1);
+        }
+      }
+      
+      console.warn(`[Proxy Fetch] Expected cache miss for ${entityId}, returning safe fallback.`);
+      return {
+        exists: () => true,
+        data: () => ({ imageUrl: "", bio: "", cacheKey: entityId, _isStub: true }),
+        id: entityId,
+        metadata: {} as any,
+        ref: {} as any,
+        get: (fieldPath: string) => null,
+      } as unknown as DocumentSnapshot;
+    }
+
     if (data && data.redirectTo && depth < 3) {
       let targetId = data.redirectTo.trim();
       const match = targetId.match(/^([a-z0-9\-]+-(?:united-states|united-kingdom|canada|australia|germany|france|sweden|norway|italy|spain|brazil|mexico|japan|south-korea))-.+$/i);
