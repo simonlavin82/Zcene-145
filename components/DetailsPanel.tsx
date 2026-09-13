@@ -464,11 +464,13 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     const panelScrollRef = useRef<HTMLDivElement>(null);
     const lastScrolledNodeId = useRef<string | null>(null);
 
+    const activeStyleBarCount = (userTaste || []).filter(p => p.isActive).length;
+
     useEffect(() => {
         if (!isFullScreenMode && panelScrollRef.current && details && !isLoading) {
-            // Guard against re-triggering loops on the same node to prevent flicker
-            if (lastScrolledNodeId.current === node.id) return;
-            const currentNodeId = node.id;
+            const scrollStateKey = `${node.id}-${activeStyleBarCount}`;
+            // Guard against re-triggering loops on the same layout state to prevent flicker
+            if (lastScrolledNodeId.current === scrollStateKey) return;
             
             // Wait for DOM layout to fully stabilize before measuring to prevent jitter
             requestAnimationFrame(() => {
@@ -498,12 +500,12 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                         }
                     }
                     
-                    // Mark this node as fully scrolled
-                    lastScrolledNodeId.current = currentNodeId;
+                    // Mark this layout state as fully scrolled
+                    lastScrolledNodeId.current = scrollStateKey;
                 });
             });
         }
-    }, [node.id, details, isLoading, isFullScreenMode]);
+    }, [node.id, details, isLoading, isFullScreenMode, activeStyleBarCount]);
 
     useEffect(() => {
         if (!isFullScreenMode || !sentinelRef.current) return;
