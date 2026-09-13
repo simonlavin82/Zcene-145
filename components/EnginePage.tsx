@@ -112,11 +112,7 @@ the entire dataset, the app evolves existing visual structures.
      local bands were previously conflated with identically-named legacy acts from different eras and genres.
    - Orphaned Link Mitigation (geminiService.ts): Filters the AI response to 
      ensure every link's 'source' and 'target' corresponds to a validated node ID.
-   - Client detailsCache callback: The client subscribes to job updates, immediately 
-     piping compiled backend metadata into React memory upon completion. The callback
-     routes through expandDetailsCacheMap() to automatically register every incoming
-     entry under its raw key, lowercased key, normalized artist ID, and display name,
-     guaranteeing instant O(1) in-memory short-ID resolution on all subsequent node clicks.
+   - Client detailsCache callback: The UI remains locked until the Background Worker completes this atomic hydration block. Once the project status hits 'completed', the frontend natively pipes the 100% self-contained details payload into memory, guaranteeing instant offline O(1) resolution for every node on the board.
 
 5. GLOBAL CACHE ALIGNMENT & PROACTIVE 'DEEP CACHE' STRATEGY (artistCacheService.ts / App.tsx):
    Before invoking Gemini for Phase 02 Orchestration, the engine computes a 
@@ -132,10 +128,10 @@ the entire dataset, the app evolves existing visual structures.
      artist canvas positions from the project's canvasLayout are restored, and
      the Deep Cut activeNodes queue is initialised via the Seed-Fallback loader
      (see Section 7) so the panel opens to the correct artist on first render.
-   - Proactive Deep Cache: Upon generating a graph, the Cloud Function proactively 
-     hydrates and caches full profile details (biographies, YouTube IDs, discographies) 
-     for both the seeds and all recommended peer bands (isDeep: true). This ensures 
-     that subsequent user clicks on recommended nodes load details instantly offline.
+   - Proactive Deep Cache: Upon generating a graph, the Background Worker proactively 
+     hydrates and bundles full profile details (biographies, YouTube IDs, discographies) 
+     for both the seeds and all recommended peer bands. The UI remains locked until this atomic 
+     hydration block is complete, ensuring a 100% self-contained payload that loads instantly offline.
    - Case-Insensitive Seed Normalization: Resolves casing discrepancies between 
      user seed inputs and lowercase model graph slugs. This guarantees that seed 
      metadata is correctly identified during proactive recommendation walks and 
@@ -518,10 +514,7 @@ for transient API errors on the client.
    If canceled, the operation aborts cleanly and the screen remains unchanged. 
    If confirmed, the sidebar opens and detail generation proceeds.
 
-7. HEAL CACHE & LOADER STATE OPTIMIZATION (App.tsx):
-   - Heal Cache & Invalidation Fallback: Manual force-refresh evicts the node from local cache, clears bio/metadata properties on selectedNode to allow re-fetching (bypassing hasHydratedBio), and populates evictedNodeIdsRef. If deleteDoc fails due to security restrictions, the system falls back to updateDoc to invalidate the Firestore document cache in-place (detailsCache = '').
-   - Outer Try/Catch/Finally Loader Gate: The entire graph generation pipeline is wrapped in a comprehensive outer try/catch/finally block to guarantee isLoading is cleared.
-   - Mutated Seed ID Cleanups: Mutation from a partial query to a canonical node (e.g. 'Gaye' -> 'Marvin Gaye') clears the old unmutated seed ID from loadingNodeIds, and the JIT details queue finally block removes all variation formats case-insensitively.
+
 
 8. LIVE SYNTHESIS TIMEOUTS & ABORT DELEGATION (App.tsx / geminiService.ts):
    - 180s Execution Timeout Ceiling: The main graph generation timeout ceiling is extended to 180 seconds (3 minutes) to accommodate heavy multi-seed co-equal synthesis passes.

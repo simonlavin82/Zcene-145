@@ -6,8 +6,8 @@ This document defines the absolute, immutable architectural baseline of Zcene. A
 
 ### 1. Three-Column Flow (The Pipeline)
 The curation pipeline is strictly divided into three distinct execution columns. 
-- **Column 1: React UI (App.tsx / Dashboard.tsx):** Purely presentation. Completely decoupled from heavy LLM orchestration. Handles caching logic (Front Gate Cache Guard), fast-track local hydration based on synchronous responses, and enforcing UI-level strict state hydration rules (like Guest Hydration Fallbacks).
-- **Column 2: HTTP Fast-Track (executeCurationPipeline.ts):** Synchronous execution layer. Responsible for pre-flight origin slugging (returning conflicts to the user), fast-track cache fallback, generative topology (ensuring Deep Cuts connect back to the seed), and saving the baseline topology to Firestore with an unalterable `updatedAt` anchor.
+- **Column 1: React UI (App.tsx / Dashboard.tsx):** Purely presentation. Completely decoupled from heavy LLM orchestration. Locks the UI via the Active Loader Gate and strictly ignores the HTTP 200 OK from Column 2. Only drops the loader when Column 3 sets project status to 'completed'.
+- **Column 2: HTTP Fast-Track (executeCurationPipeline.ts):** Synchronous execution layer. Responsible for pre-flight origin slugging (returning conflicts to the user), fast-track cache fallback, generative topology (ensuring Deep Cuts connect back to the seed), and saving the baseline topology to Firestore. Returns immediately while creating the curationJobs doc, handing full responsibility to the async worker.
 - **Column 3: Background Worker (processCurationJob.ts):** Asynchronous hydration layer. Follows a strict progression: Hydrate Node Batch -> Final Node Positioning -> Root Breakdown -> Persist Assets. Never writes missing hydration data as 'null', but explicitly flags for retry. Writes fully hydrated nodes back to cache.
 
 ### 2. Strict Seed Hoisting & Pinning
@@ -23,8 +23,8 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 - A deterministic top-level artist image URL (`seedImageUrl`) MUST be appended directly to the root of the project and shared Zcene payloads at creation.
 - This eliminates secondary proxy lookups during Open Graph generation (`server.js`), guaranteeing reliable album art rendering across external platforms (e.g., WhatsApp).
 
-### 5. Guest Hydration Fallback
-- During The Guest Consumption phase, if a cloned `detailsCache` is empty (e.g., due to previous cache trap anomalies), the Guest view MUST proactively batch-hydrate missing profiles immediately upon mount to prevent UI degradation.
+### 5. (Deprecated - Lazy/Guest Hydration Fallbacks are Obsolete)
+- Project payloads are now 100% self-contained and atomic. On-demand or lazy hydration is strictly forbidden.
 
 ### 6. Defensive Alias Matching via `isNodeInSeedList`
 - **Canonical Alias Resolution:** Bypasses and naive strict string matching are dead. Alias matching must be purely canonical.
