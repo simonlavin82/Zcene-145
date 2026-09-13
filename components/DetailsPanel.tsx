@@ -491,8 +491,8 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                         
                         // Calculate the dynamic scroll target: tuck the whitespace padding so the first 
                         // content element (Style bars or Artwork) sits flush under the sticky header
-                        // Added +12px safety buffer to ensure action icons are 100% cleared
-                        const targetScrollOffset = absoluteContentTop - stickyHeader.offsetHeight + 12;
+                        // Added +24px safety buffer to ensure action icons are 100% tucked out of sight
+                        const targetScrollOffset = absoluteContentTop - stickyHeader.offsetHeight + 24;
                         
                         // Trigger the scroll if we're not already there
                         if (Math.abs(panelScrollRef.current.scrollTop - targetScrollOffset) > 2) {
