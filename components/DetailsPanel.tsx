@@ -463,46 +463,31 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     const sentinelRef = useRef<HTMLDivElement>(null);
     const panelScrollRef = useRef<HTMLDivElement>(null);
     const lastScrolledNodeId = useRef<string | null>(null);
+    // Universal content anchor — used by the content body for scroll-mt CSS.
+    const contentAnchorRef = useRef<HTMLDivElement>(null);
+    // Wraps the non-sticky action icons block. Its offsetHeight is the exact integer scroll
+    // distance needed to push the controls out of view behind the sticky header.
+    const collapsibleHeaderRef = useRef<HTMLDivElement>(null);
 
     const activeStyleBarCount = (userTaste || []).filter(p => p.isActive).length;
 
     useEffect(() => {
         if (!isFullScreenMode && panelScrollRef.current && details && !isLoading) {
             const scrollStateKey = `${node.id}-${activeStyleBarCount}`;
-            // Guard against re-triggering loops on the same layout state to prevent flicker
+            // Guard: only fire when the layout state has genuinely changed
             if (lastScrolledNodeId.current === scrollStateKey) return;
-            
-            // Wait for DOM layout to fully stabilize before measuring to prevent jitter
+
+            // One rAF to let React flush the DOM before reading layout properties
             requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    if (!panelScrollRef.current) return;
-                    
-                    const stickyHeader = panelScrollRef.current.querySelector('.sticky.top-0') as HTMLElement;
-                    const contentBody = panelScrollRef.current.querySelector('.space-y-10.text-zinc-300') as HTMLElement;
-                    const firstContentElement = contentBody?.firstElementChild as HTMLElement;
-                    
-                    if (stickyHeader && firstContentElement) {
-                        const containerRect = panelScrollRef.current.getBoundingClientRect();
-                        // Measure the exact top of the actual content (bypassing the parent's py-8 padding)
-                        const contentRect = firstContentElement.getBoundingClientRect();
-                        
-                        // Calculate absolute Y position of the inner content relative to the scroll container's top
-                        const absoluteContentTop = contentRect.top - containerRect.top + panelScrollRef.current.scrollTop;
-                        
-                        // Calculate the dynamic scroll target: tuck the whitespace padding so the first 
-                        // content element (Style bars or Artwork) sits flush under the sticky header
-                        // Added +20px buffer to hit the absolute pixel-perfect goldilocks zone
-                        const targetScrollOffset = absoluteContentTop - stickyHeader.offsetHeight + 20;
-                        
-                        // Trigger the scroll if we're not already there
-                        if (Math.abs(panelScrollRef.current.scrollTop - targetScrollOffset) > 2) {
-                            panelScrollRef.current.scrollTo({ top: targetScrollOffset, behavior: 'instant' });
-                        }
-                    }
-                    
-                    // Mark this layout state as fully scrolled
-                    lastScrolledNodeId.current = scrollStateKey;
-                });
+                if (!panelScrollRef.current || !collapsibleHeaderRef.current) return;
+
+                // Top-down approach: scroll exactly by the height of the non-sticky controls block.
+                // offsetHeight is a stable integer — no getBoundingClientRect(), no offsetParent ambiguity.
+                // Scales automatically if style bars wrap to a new line without triggering re-render jitter.
+                const targetOffset = collapsibleHeaderRef.current.offsetHeight;
+
+                panelScrollRef.current.scrollTo({ top: targetOffset, behavior: 'instant' });
+                lastScrolledNodeId.current = scrollStateKey;
             });
         }
     }, [node.id, details, isLoading, isFullScreenMode, activeStyleBarCount]);
@@ -917,8 +902,10 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
           }}
         >
             <div className="flex flex-col min-h-full">
-                {/* 1. Action Icons (Not Sticky) */}
-                <div className={`px-4 pt-3 bg-zinc-900 z-20 flex-shrink-0 ${isFullScreenMode ? 'md:px-6' : ''}`}>
+                {/* 1. Action Icons (Not Sticky) — wrapped in collapsibleHeaderRef so its
+                     offsetHeight gives us the exact integer scroll distance to tuck
+                     these controls behind the sticky header. */}
+                <div ref={collapsibleHeaderRef} className={`px-4 pt-3 bg-zinc-900 z-20 flex-shrink-0 ${isFullScreenMode ? 'md:px-6' : ''}`}>
                     <div className="flex items-center justify-end gap-1 flex-shrink-0">
                             {isArtistNode && details && (
                                 <button
@@ -1066,7 +1053,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                     )}
 
                     {details && (
-                        <div className={`space-y-10 text-zinc-300 ${isFullScreenMode ? 'pb-6' : 'pb-16'}`}>
+                        <div ref={contentAnchorRef} className={`space-y-10 text-zinc-300 scroll-mt-16 ${isFullScreenMode ? 'pb-6' : 'pb-16'}`}>
                             {/* Compatibility Meter (Hidden for Labels) */}
                             {!isLabelNode && (
                                 <div className="flex flex-col gap-2 w-full">
