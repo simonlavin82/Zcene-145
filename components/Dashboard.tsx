@@ -320,12 +320,7 @@ const Dashboard: React.FC<DashboardProps> = ({
               {sortedBucketKeys.map((bucketKey) => {
                 const projectsInBucket = groupedProjects[bucketKey] || [];
                 const count = projectsInBucket.length;
-                let gridColsClass = "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4";
-                if (count === 1) {
-                  gridColsClass = "grid-cols-1";
-                } else if (count === 2) {
-                  gridColsClass = "grid-cols-1 md:grid-cols-2";
-                }
+                let gridColsClass = "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
 
                 return (
                   <div 
