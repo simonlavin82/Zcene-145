@@ -1001,7 +1001,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                         </div>
                 </div>
 
-                <div className={`px-4 space-y-10 flex-grow min-h-0 relative ${isFullScreenMode ? 'py-4 md:px-8' : 'py-8'}`}>
+                <div className={`px-4 space-y-10 flex-grow min-h-0 relative ${isFullScreenMode ? 'pt-2 pb-4 md:px-8' : 'pt-2 pb-8'}`}>
                     {isLoading && !isLocked && details && (
                         <div className="absolute inset-0 bg-zinc-900/90 backdrop-blur-sm z-30 flex flex-col items-center justify-center text-center space-y-8 h-full bg-zinc-900">
                             <LoadingSpinner 
