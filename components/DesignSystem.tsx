@@ -3619,6 +3619,21 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 </div>
 
                                 <div className="space-y-6">
+                                    <h3 className="text-xl font-medium text-zinc-200">Artwork Containers</h3>
+                                    <p className="text-sm text-zinc-400 leading-relaxed">
+                                        Artwork containers rendered against dynamic background glows must use an ultra-dark drop shadow and an inset subtle white highlight to separate cleanly without looking "boxed-in". We avoid outer black strokes.
+                                    </p>
+                                    <div className="space-y-4 pt-2">
+                                        <div>
+                                            <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Floating Artwork Classes</p>
+                                            <code className="text-xs font-mono text-primary bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 block overflow-x-auto whitespace-nowrap">
+                                                shadow-[0_8px_30px_rgba(0,0,0,0.8)] ring-1 ring-white/10 ring-inset
+                                            </code>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-6">
                                     <h3 className="text-xl font-medium text-zinc-200">Spiderweb Feature Visual</h3>
                                     <p className="text-sm text-zinc-400 leading-relaxed">
                                         The core interactive experience. This visual uses a live, simplified D3 simulation to show real-time physics, node categorization symbols, and the floating legend UI.
