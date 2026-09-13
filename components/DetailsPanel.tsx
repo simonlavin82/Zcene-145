@@ -475,17 +475,27 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                 requestAnimationFrame(() => {
                     if (!panelScrollRef.current) return;
                     
-                    // The offsetTop of the sticky header exactly marks where the action bar ends
                     const stickyHeader = panelScrollRef.current.querySelector('.sticky.top-0') as HTMLElement;
-                    const baseOffset = stickyHeader ? stickyHeader.offsetTop : 56;
+                    const contentBody = panelScrollRef.current.querySelector('.space-y-10.text-zinc-300') as HTMLElement;
+                    const firstContentElement = contentBody?.firstElementChild as HTMLElement;
                     
-                    // Scroll past the sticky threshold (baseOffset) + 54px deep to perfectly 
-                    // tuck the main body's padding (py-8) and hit the manual "sweet spot"
-                    const targetScrollOffset = baseOffset + 54;
-                    
-                    // Trigger the scroll
-                    if (panelScrollRef.current.scrollTop < targetScrollOffset + 50) {
-                        panelScrollRef.current.scrollTo({ top: targetScrollOffset, behavior: 'instant' });
+                    if (stickyHeader && firstContentElement) {
+                        const containerRect = panelScrollRef.current.getBoundingClientRect();
+                        // Measure the exact top of the actual content (bypassing the parent's py-8 padding)
+                        const contentRect = firstContentElement.getBoundingClientRect();
+                        
+                        // Calculate absolute Y position of the inner content relative to the scroll container's top
+                        const absoluteContentTop = contentRect.top - containerRect.top + panelScrollRef.current.scrollTop;
+                        
+                        // Calculate the dynamic scroll target: tuck the whitespace padding so the first 
+                        // content element (Style bars or Artwork) sits flush under the sticky header
+                        // Added +12px safety buffer to ensure action icons are 100% cleared
+                        const targetScrollOffset = absoluteContentTop - stickyHeader.offsetHeight + 12;
+                        
+                        // Trigger the scroll if we're not already there
+                        if (Math.abs(panelScrollRef.current.scrollTop - targetScrollOffset) > 2) {
+                            panelScrollRef.current.scrollTo({ top: targetScrollOffset, behavior: 'instant' });
+                        }
                     }
                     
                     // Mark this node as fully scrolled
