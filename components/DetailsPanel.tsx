@@ -578,6 +578,8 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         return null;
     }, [imageTier, details?.imageUrl]);
 
+    const localDominantColor = useDominantColor(currentImageUrl, node.label || node.id || '');
+
     const availableImageTiers = useMemo(() => {
         const tiers: ('source' | 'placeholder')[] = [];
         if (details?.imageUrl) tiers.push('source');
@@ -882,7 +884,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     return (
         <div 
           className={`w-full min-w-[320px] bg-zinc-900 relative break-words transition-all duration-500 ${isFullScreenMode ? 'h-fit border border-zinc-800/80 shadow-2xl overflow-visible mb-4 md:mb-6 break-inside-avoid' : 'h-full border border-zinc-900 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800'}`}
-          style={{ overscrollBehaviorY: 'auto' }}
+          style={{ overscrollBehaviorY: 'auto', '--scene-accent': localDominantColor } as React.CSSProperties}
           onScroll={(e) => {
               if (isFullScreenMode) return;
               setIsHeaderStuck(e.currentTarget.scrollTop > 40);
@@ -1113,7 +1115,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 <div className="relative mx-auto w-fit">
                                     {/* Ambient Glow */}
                                     <div className="absolute inset-[-20%] rounded-full opacity-40 blur-3xl transition-colors duration-1000 z-0 pointer-events-none" style={{ backgroundColor: 'var(--scene-accent, transparent)' }} />
-                                    <div className="w-40 h-40 sm:w-44 sm:h-44 flex-shrink-0 mx-auto bg-zinc-900 overflow-hidden relative border border-zinc-800/50 shadow-2xl rounded-lg group z-10">
+                                    <div className="w-40 h-40 sm:w-44 sm:h-44 flex-shrink-0 mx-auto bg-zinc-900 overflow-hidden relative border border-zinc-800/50 shadow-[0_8px_30px_rgba(0,0,0,0.8)] ring-1 ring-black/50 rounded-lg group z-10">
                                     {/* Temporary Loading Skeleton while image loads */}
                                     {!imgLoaded && (
                                         <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center p-6 text-center bg-zinc-900 overflow-hidden z-10">
