@@ -132,6 +132,23 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
                 <p className="font-mono text-[10px] text-zinc-300 font-normal truncate uppercase tracking-widest drop-shadow-md">
                   {project.updatedAt ? `Edited ${formatSystemTimestamp(project.updatedAt)}` : 'New Project'}
                 </p>
+                {project.status === 'curating' || project.status === 'pending' || (project.status !== 'failed' && project.status !== 'completed' && project.seedArtists) ? (
+                  <span className="text-[9px] uppercase tracking-wider text-amber-500/80 font-bold px-1.5 py-0.5 bg-amber-500/10 rounded-md border border-amber-500/10 whitespace-nowrap animate-pulse backdrop-blur-sm w-fit mt-0.5">
+                    Mapping...
+                  </span>
+                ) : project.status === 'failed' ? (
+                  <span className="text-[9px] uppercase tracking-wider text-red-500/80 font-bold px-1.5 py-0.5 bg-red-500/10 rounded-md border border-red-500/10 whitespace-nowrap backdrop-blur-sm w-fit mt-0.5">
+                    Failed
+                  </span>
+                ) : project.status === 'completed' ? (
+                  <span className="text-[9px] uppercase tracking-wide text-zinc-950 font-bold px-1.5 py-0.5 rounded-md whitespace-nowrap transition-colors w-fit mt-0.5" style={{ backgroundColor: 'var(--scene-accent, #aaff00)' }}>
+                    Mapped
+                  </span>
+                ) : (
+                  <span className="text-[9px] uppercase tracking-wide text-zinc-500 font-bold px-1.5 py-0.5 bg-zinc-800/80 rounded-md border border-zinc-800 font-mono whitespace-nowrap backdrop-blur-sm w-fit mt-0.5">
+                    Unmapped
+                  </span>
+                )}
               </div>
             </div>
             
@@ -192,15 +209,7 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
             <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
               SEED: {seedList.length}
             </span>
-            {project.status === 'curating' || project.status === 'pending' || (project.status !== 'failed' && project.status !== 'completed' && project.seedArtists) ? (
-              <span className="text-[9px] uppercase tracking-wider text-amber-500/80 font-bold px-1.5 py-0.5 bg-amber-500/10 rounded-md border border-amber-500/10 whitespace-nowrap animate-pulse backdrop-blur-sm">
-                Mapping...
-              </span>
-            ) : project.status === 'failed' ? (
-              <span className="text-[9px] uppercase tracking-wider text-red-500/80 font-bold px-1.5 py-0.5 bg-red-500/10 rounded-md border border-red-500/10 whitespace-nowrap backdrop-blur-sm">
-                Failed
-              </span>
-            ) : project.status === 'completed' ? (
+            {project.status === 'completed' && (
               <>
                 <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
                   AI ARTISTS: {recommendedCount}
@@ -213,14 +222,7 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
                 <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
                   DEEP CUTS: {deepCutsCount}
                 </span>
-                <span className="text-[9px] uppercase tracking-wide text-zinc-950 font-bold px-1.5 py-0.5 rounded-md whitespace-nowrap transition-colors" style={{ backgroundColor: 'var(--scene-accent, #aaff00)' }}>
-                  Mapped
-                </span>
               </>
-            ) : (
-              <span className="text-[9px] uppercase tracking-wide text-zinc-500 font-bold px-1.5 py-0.5 bg-zinc-800/80 rounded-md border border-zinc-800 font-mono whitespace-nowrap backdrop-blur-sm">
-                Unmapped
-              </span>
             )}
           </div>
         </div>

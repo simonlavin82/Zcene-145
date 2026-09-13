@@ -1882,7 +1882,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </span>
                                     </div>
                                     <h4 className="font-medium text-white mb-1">MAPPED / STATUS</h4>
-                                    <p className="text-sm text-zinc-400 leading-relaxed mb-4 flex-grow">Binary mapping state. <strong>Mapped</strong> (accent colour) renders when <code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.graphData</code> is truthy. <strong>Unmapped</strong> (muted) renders otherwise. Table list exposes both states; card footer only shows Mapped.</p>
+                                    <p className="text-sm text-zinc-400 leading-relaxed mb-4 flex-grow">Binary mapping state. <strong>Mapped</strong> (accent colour) renders when <code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.graphData</code> is truthy. <strong>Unmapped</strong> (muted) renders otherwise. Table list exposes both states in a column; card header shows mapping status.</p>
                                     <div className="space-y-1 mt-auto">
                                         <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block">Mapped: text-primary/60 bg-primary/10</p>
                                         <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block mt-1">Unmapped: text-zinc-500 bg-zinc-800</p>
@@ -1928,7 +1928,6 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">SEED: 3</span>
                                             <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">AI ARTISTS: 24</span>
                                             <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">DEEP CUTS: 7</span>
-                                            <span className="text-[9px] uppercase tracking-wide text-primary/60 font-bold px-1.5 py-0.5 bg-primary/10 rounded-md border border-primary/10 font-mono whitespace-nowrap">Mapped</span>
                                         </div>
                                     </div>
                                     <div className="space-y-2">
