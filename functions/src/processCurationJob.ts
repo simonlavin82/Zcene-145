@@ -135,8 +135,8 @@ function sanitizeLabelProfile(details: any): any {
  */
 function isEntitySeedMatch(seedNorm: string, candidateNorm: string): boolean {
   if (!seedNorm || !candidateNorm) return false;
-  const s = normalizeArtistId(seedNorm);
-  const c = normalizeArtistId(candidateNorm);
+  const s = stripCountrySlug(normalizeArtistId(seedNorm));
+  const c = stripCountrySlug(normalizeArtistId(candidateNorm));
   if (s === c) return true;
   if (s.startsWith(`${c}-`) || c.startsWith(`${s}-`)) return true;
   if (s.includes(`-${c}-`) || s.endsWith(`-${c}`) || c.includes(`-${s}-`) || c.endsWith(`-${s}`)) return true;
@@ -449,7 +449,7 @@ export const processCurationJob = onDocumentCreated({
               // to create sick-of-it-all). If a canonical doc is found, adopt its ID.
               if (!isLabel) {
                 try {
-                  const baseNormId = normalizeArtistId(rawName); // without country suffix
+                  const baseNormId = stripCountrySlug(normalizeArtistId(rawName)); // without country suffix
                   const existingQuery = await db.collection("artists")
                     .where("artistId", ">=", baseNormId)
                     .where("artistId", "<=", `${baseNormId}\uf8ff`)
