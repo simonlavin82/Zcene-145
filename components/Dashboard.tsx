@@ -287,7 +287,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           </div>
 
           {projects.length === 0 ? (
-            <div className="w-full md:w-fit max-w-full bg-zinc-950/40 rounded-tr-xl rounded-b-xl rounded-tl-none border border-dashed border-zinc-800/80 p-4 relative flex-shrink-0 min-w-0">
+            <div className="w-full max-w-full bg-zinc-950/40 rounded-tr-xl rounded-b-xl rounded-tl-none border border-dashed border-zinc-800/80 p-4 relative flex-shrink-0 min-w-0">
               {/* Folder Tab Header */}
               <div className="w-[160px] bg-zinc-950/60 border-t border-l border-r border-dashed border-zinc-800/80 rounded-t-lg text-[9px] font-mono absolute -top-[22px] left-[-1px] px-3 py-1 flex items-center h-[22.5px] z-10 select-none">
                 <div className="truncate text-ellipsis whitespace-nowrap uppercase tracking-widest text-zinc-400 font-medium flex items-center gap-1.5">
@@ -296,7 +296,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-5 w-full md:w-fit max-w-full">
+              <div className="grid grid-cols-1 gap-5 w-full max-w-full">
                 <button 
                   onClick={onCreateProject}
                   disabled={isCreatingProject}
@@ -320,7 +320,7 @@ const Dashboard: React.FC<DashboardProps> = ({
               {sortedBucketKeys.map((bucketKey) => {
                 const projectsInBucket = groupedProjects[bucketKey] || [];
                 const count = projectsInBucket.length;
-                let gridColsClass = "grid-cols-1 md:grid-cols-2 xl:grid-cols-3";
+                let gridColsClass = "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4";
                 if (count === 1) {
                   gridColsClass = "grid-cols-1";
                 } else if (count === 2) {
@@ -330,7 +330,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 return (
                   <div 
                     key={bucketKey} 
-                    className="w-full md:w-fit max-w-full bg-zinc-950 rounded-tr-xl rounded-b-xl rounded-tl-none border border-zinc-800 p-4 relative flex-shrink-0 min-w-0"
+                    className="w-full max-w-full bg-zinc-950 rounded-tr-xl rounded-b-xl rounded-tl-none border border-zinc-800 p-4 relative flex-shrink-0 min-w-0"
                   >
                     {/* Unified Folder Index Tab */}
                     <div className="w-[160px] bg-zinc-950 border-t border-l border-r border-zinc-800 rounded-t-lg text-[9px] font-mono absolute -top-[22px] left-[-1px] px-3 py-1 flex items-center h-[22.5px] z-10 select-none">
@@ -340,7 +340,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     </div>
 
                     {/* Cards inside this parent record crate compartment */}
-                    <div className={`grid ${gridColsClass} gap-5 w-full md:w-fit max-w-full`}>
+                    <div className={`grid ${gridColsClass} gap-5 w-full max-w-full`}>
                       {projectsInBucket.map((project, idx) => (
                         <DashboardProjectCard
                           key={project.id}
@@ -360,7 +360,7 @@ const Dashboard: React.FC<DashboardProps> = ({
               
               {/* Standalone Add New Crate Folder */}
               <div 
-                className="w-full md:w-fit max-w-full bg-zinc-950/40 rounded-tr-xl rounded-b-xl rounded-tl-none border border-dashed border-zinc-800/80 p-4 relative flex-shrink-0 min-w-0"
+                className="w-full max-w-full bg-zinc-950/40 rounded-tr-xl rounded-b-xl rounded-tl-none border border-dashed border-zinc-800/80 p-4 relative flex-shrink-0 min-w-0"
               >
                 {/* Folder Tab Header */}
                 <div className="w-[160px] bg-zinc-950/60 border-t border-l border-r border-dashed border-zinc-800/80 rounded-t-lg text-[9px] font-mono absolute -top-[22px] left-[-1px] px-3 py-1 flex items-center h-[22.5px] z-10 select-none">
@@ -370,7 +370,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-5 w-full md:w-fit max-w-full">
+                <div className="grid grid-cols-1 gap-5 w-full max-w-full">
                   <button 
                     onClick={onCreateProject}
                     disabled={isCreatingProject}
@@ -398,10 +398,10 @@ const Dashboard: React.FC<DashboardProps> = ({
                   <tr className="border-b border-zinc-800 text-[10px] text-zinc-400 uppercase tracking-widest font-bold bg-zinc-950">
                     <th className="py-4 px-6 font-semibold">Title</th>
                     <th className="py-4 px-6 font-semibold">Modified Date</th>
-                    <th className="py-4 px-6 font-semibold">Seeds</th>
-                    <th className="py-4 px-6 font-semibold">AI Artists</th>
-                    <th className="py-4 px-6 font-semibold">Labels</th>
-                    <th className="py-4 px-6 font-semibold">Deep Cuts</th>
+                    <th className="py-4 px-6 font-semibold">Seed Artist</th>
+                    <th className="py-4 px-6 font-semibold">AI Artist</th>
+                    <th className="py-4 px-6 font-semibold">Label</th>
+                    <th className="py-4 px-6 font-semibold">Deep Cut</th>
                     <th className="py-4 px-6 font-semibold">Status</th>
                     <th className="py-4 px-6 font-semibold text-right">Actions</th>
                   </tr>

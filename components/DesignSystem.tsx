@@ -2113,32 +2113,28 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             </div>
                                             {/* Card Footer — production badge sequence */}
                                             <div className="mt-3 flex items-center">
-                                                <div className="flex items-center flex-wrap gap-x-1.5 gap-y-1.5">
+                                                <div className="grid grid-cols-2 gap-1.5 w-full">
                                                     {/* 1. SEED */}
                                                     <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
-                                                        SEED: 3
+                                                        Seed Artist: 3
                                                     </span>
                                                     {/* 2. AI ARTISTS */}
                                                     <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
-                                                        AI ARTISTS: 24
+                                                        AI Artist: 24
                                                     </span>
                                                     {/* 3. LABELS */}
                                                     <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
-                                                        LABELS: 8
+                                                        Label: 8
                                                     </span>
-                                                    {/* 3. DEEP CUTS */}
+                                                    {/* 4. DEEP CUTS */}
                                                     <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
-                                                        DEEP CUTS: 7
-                                                    </span>
-                                                    {/* 4. MAPPED */}
-                                                    <span className="text-[9px] uppercase tracking-wide text-primary/60 font-bold px-1.5 py-0.5 bg-primary/10 rounded-md border border-primary/10 font-mono whitespace-nowrap">
-                                                        Mapped
+                                                        Deep Cut: 7
                                                     </span>
                                                 </div>
                                             </div>
                                         </div>
                                         <p className="text-[10px] text-zinc-500 font-mono mt-2">
-                                            Sequence: SEED → AI ARTISTS → LABELS → DEEP CUTS → MAPPED
+                                            Sequence: SEED → AI ARTIST → LABEL → DEEP CUT
                                         </p>
                                     </div>
                                 </div>
