@@ -1584,7 +1584,6 @@ const App: React.FC = () => {
   const lastSyncedDocRef = useRef<string>('');
   const evictedNodeIdsRef = useRef<Set<string>>(new Set());
   const approvedSeedsRef = useRef<Set<string>>(new Set());
-  const handleGenerateDeepCutRef = useRef<((node: Node) => Promise<void>) | null>(null);
 
   useEffect(() => { currentProjectOwnerIdRef.current = currentProjectOwnerId; }, [currentProjectOwnerId]);
   useEffect(() => { projectNameRef.current = projectName; }, [projectName]);
@@ -2502,177 +2501,7 @@ const App: React.FC = () => {
       setActiveNodeIds(prev => prev.some(id => id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node.id]);
     }
 
-    if (node.type === 'label' && !supportsLabelDeepCuts) {
-      showToast("⚠️ Legacy project structure detected: Label deep cuts require a newly created Zcene project.");
-      return;
-    }
-
-    const isApprovedSeed = approvedSeedsRef.current.has(normalizeArtistId(node.id)) || 
-                           approvedSeedsRef.current.has(node.id.toLowerCase());
-
-    // Reserve the loading slot BEFORE the modal so the spinner is ready to show
-    setLoadingNodeIds(prev => new Set(prev).add(node.id));
-
-    const confirmed = isApprovedSeed ? true : await confirmTokenUsage('deep_cut_creation', [], [node.label || titleCaseArtistId(node.id)]);
-    if (!confirmed) {
-      // User cancelled — release the loading slot but KEEP it selected (in Action state)
-      setLoadingNodeIds(prev => { const next = new Set(prev); next.delete(node.id); return next; });
-      return;
-    }
-
-    if (handleGenerateDeepCutRef.current) {
-      approvedSeedsRef.current.add(normalizeArtistId(node.id));
-      approvedSeedsRef.current.add(node.id.toLowerCase());
-      await handleGenerateDeepCutRef.current(node);
-    }
-  }, [confirmTokenUsage, selectedNode, peekedNode, loadingNodeIds, isSmallScreen, supportsLabelDeepCuts, showToast, isGuest]);
-
-  const handleGenerateDeepCut = useCallback(async (node: Node) => {
-    if (node.type === 'label' && !supportsLabelDeepCuts) {
-      showToast("⚠️ Legacy project structure detected: Label deep cuts require a newly created Zcene project.");
-      return;
-    }
-
-    const isApprovedSeed = approvedSeedsRef.current.has(normalizeArtistId(node.id)) || 
-                           approvedSeedsRef.current.has(node.id.toLowerCase());
-
-    const confirmed = isApprovedSeed ? true : await confirmTokenUsage('deep_cut_creation', [], [node.label || titleCaseArtistId(node.id)]);
-    if (!confirmed) {
-      return;
-    }
-
-    // 1. Show Loading UI immediately
-    setLoadingNodeIds(prev => new Set(prev).add(node.id));
-
-    try {
-      const simpleArtistId = normalizeArtistId(node.id);
-      let disambiguatedCacheId = simpleArtistId;
-
-      // 2. Perform Multi-Origin Slug Suffix Calculation
-      if (graphData && node.type !== 'label') {
-        const connectedCountries = graphData.links
-          .filter((l: any) => (typeof l.source === 'object' ? l.source.id : l.source) === node.id || 
-                       (typeof l.target === 'object' ? l.target.id : l.target) === node.id)
-          .map((l: any) => {
-            const connectedId = (typeof l.source === 'object' ? l.source.id : l.source) === node.id 
-              ? (typeof l.target === 'object' ? l.target : null) 
-              : (typeof l.source === 'object' ? l.source : null);
-            return graphData.nodes.find((n: any) => n.id === (connectedId?.id || connectedId));
-          })
-          .filter((no: any) => no && no.type === 'country')
-          .map((no: any) => no.label || no.id);
-          
-        if (connectedCountries.length > 0) {
-          const countryNorm = normalizeArtistId(connectedCountries[0]);
-          if (countryNorm) disambiguatedCacheId = simpleArtistId.endsWith(`-${countryNorm}`) ? simpleArtistId : `${simpleArtistId}-${countryNorm}`;
-        }
-      }
-
-      // 3. Direct API Dispatch
-      const params = new URLSearchParams(window.location.search);
-      const urlOriginHint = params.get('origin');
-      
-      const details = await fetchNodeDetails(node, graphData, seedArtists, urlOriginHint);
-      
-      // 4. Update UI Cache
-      healedDetailsCacheRef.current.set(node.id, details);
-      healedDetailsCacheRef.current.set(simpleArtistId, details);
-      healedDetailsCacheRef.current.set(disambiguatedCacheId, details);
-      
-      setDetailsCache(prev => {
-        const next = new Map(prev);
-        next.set(node.id, details);
-        next.set(node.id.toLowerCase(), details);
-        next.set(simpleArtistId, details);
-        if (disambiguatedCacheId !== simpleArtistId) {
-          next.set(disambiguatedCacheId, details);
-        }
-        return next;
-      });
-
-      setSelectedNode(prev => {
-        if (prev && (normalizeArtistId(prev.id) === simpleArtistId || prev.id.toLowerCase() === node.id.toLowerCase())) {
-          return {
-            ...prev,
-            bio: details.summary,
-            summary: details.summary,
-            genre: details.details?.genre || "",
-            origin: details.details?.origin || "",
-            founded: details.details?.founded || "",
-          };
-        }
-        return prev;
-      });
-
-      // 5. Safe Split-Document Write-Back
-      const collName = node.type === 'label' ? 'labels' : 'artists';
-      if (disambiguatedCacheId !== simpleArtistId) {
-        const simpleDocRef = doc(db, collName, simpleArtistId);
-        const simpleSnap = await getDoc(simpleDocRef);
-        
-        if (simpleSnap.exists()) {
-          const simpleData = simpleSnap.data();
-          if (simpleData && !simpleData.redirectTo) {
-            // Use updateDoc (or setDoc with merge) to preserve existing graphData/filters on the stub
-            await setDoc(simpleDocRef, stripUndefinedProperties({
-              artistId: simpleArtistId,
-              cacheKey: simpleArtistId,
-              redirectTo: disambiguatedCacheId,
-              cacheVersion: 4,
-              cachedAt: serverTimestamp()
-            }), { merge: true });
-          }
-        }
-      }
-
-      // 6. Write the canonical Deep Cache payload
-      const normalizedGraph = normalizeGraphData(graphData);
-      const canonicalNode = normalizedGraph.nodes.find(
-        (n: any) => (n.type === 'artist' || n.type === 'label') && (n.id.trim().toLowerCase() === node.id.trim().toLowerCase() || normalizeArtistId(n.id) === disambiguatedCacheId)
-      );
-      
-      const isLabel = node.type === 'label' || canonicalNode?.type === 'label';
-      const setPayload = isLabel ? {
-        cacheKey: disambiguatedCacheId,
-        labelId: simpleArtistId,
-        cacheVersion: 4,
-        cachedAt: serverTimestamp(),
-        hitCount: 0,
-        isDeep: true,
-        detailsCache: details,
-      } : {
-        cacheKey: disambiguatedCacheId,
-        artistId: simpleArtistId,
-        cacheVersion: 4,
-        cachedAt: serverTimestamp(),
-        hitCount: 0,
-        isDeep: true,
-        detailsCache: details
-      };
-      
-      if (!isLabel) enforceArtistCacheSchema(setPayload);
-      const targetDocRef = doc(db, collName, disambiguatedCacheId);
-      const targetSnap = await getDoc(targetDocRef);
-      if (!targetSnap.exists()) {
-        if (!isLabel) {
-          (setPayload as any).graphData = null;
-          (setPayload as any).isPrimarySeed = false;
-          (setPayload as any).hasUniqueSpiderweb = false;
-        }
-        await setDoc(targetDocRef, stripUndefinedProperties(setPayload));
-      } else {
-        await updateDoc(targetDocRef, stripUndefinedProperties(setPayload));
-      }
-
-    } catch (err) {
-      console.error("[Manual Generation] Failed to fetch and write split document:", err);
-      showToast("Generation failed. Please try again.");
-    } finally {
-      setLoadingNodeIds(prev => { const next = new Set(prev); next.delete(node.id); return next; });
-    }
-  }, [confirmTokenUsage, graphData, seedArtists, showToast]);
-
-  useEffect(() => { handleGenerateDeepCutRef.current = handleGenerateDeepCut; }, [handleGenerateDeepCut]);
+  }, [selectedNode, peekedNode, isSmallScreen, supportsLabelDeepCuts, showToast, isGuest]);
 
   const handleToggleStack = useCallback(async (node: Node, link?: string) => {
     if (!user) {
@@ -7755,7 +7584,7 @@ const App: React.FC = () => {
                   } catch (err: any) { setError(err.message); }
                 }; r.readAsText(f);
               }}
-              onNodeClick={handleNodeClick} onGenerateDeepCut={handleGenerateDeepCut} selectedNode={formattedSelectedNode} peekedNode={formattedPeekedNode} activeNodes={formattedActiveNodes}
+              onNodeClick={handleNodeClick} selectedNode={formattedSelectedNode} peekedNode={formattedPeekedNode} activeNodes={formattedActiveNodes}
               detailsCache={detailsCache} loadingNodeIds={loadingNodeIds} onCloseNode={handleCloseNode}
               onRefreshNode={handleRefreshNode} detailsError={detailsError} systemError={error}
               onLogoClick={() => {

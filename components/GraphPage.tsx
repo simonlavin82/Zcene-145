@@ -57,7 +57,6 @@ interface GraphPageProps {
   onCancelGeneration: () => void;
   onFileUpload: (file: File) => void;
   onNodeClick: (node: Node | null, forceActionState?: boolean) => void;
-  onGenerateDeepCut?: (node: Node) => void;
   selectedNode: Node | null;
   peekedNode: Node | null;
   activeNodes: Node[];
@@ -604,7 +603,7 @@ const LibraryDialog: React.FC<{
 
 const GraphPage: React.FC<GraphPageProps> = ({
   data, baseGraph, libraryArtists, seedArtists, onRegenerate, isLoading,
-  onCancelGeneration, onFileUpload, onNodeClick, onGenerateDeepCut, selectedNode, peekedNode,
+  onCancelGeneration, onFileUpload, onNodeClick, selectedNode, peekedNode,
   activeNodes, detailsCache, loadingNodeIds, onCloseNode, onRefreshNode, detailsError, systemError, onLogoClick, onNavigate, onClearLibrary, onClearZcene, isActive,
   chatHistories, onUpdateChatHistories, onShowToast, onRefreshUI, stack, onToggleStack,
   lastViewedStackCount, onUpdateLastViewedStackCount,
@@ -1615,7 +1614,6 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                         onToggleCollapse={() => {}} 
                                         isSmallScreen={isSmallScreen} 
                                         onNodeClick={handleNodeClickInternal} 
-                                        onGenerateDeepCut={onGenerateDeepCut}
                                         onNavigate={onNavigate} 
                                         isGlobalLoading={isLoading} 
                                         onCancelGlobalLoading={onCancelGeneration} 
@@ -1730,7 +1728,6 @@ const GraphPage: React.FC<GraphPageProps> = ({
                          }} 
                          isCollapsed={isDetailsPanelCollapsed} 
                          onToggleCollapse={toggleDetailsPanel}
-                         onGenerateDeepCut={onGenerateDeepCut}
                          isSmallScreen={isSmallScreen} 
                          onNodeClick={handleNodeClickInternal} 
                          onNavigate={onNavigate} 

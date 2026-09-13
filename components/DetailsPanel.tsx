@@ -22,24 +22,6 @@ export const getArtistDisplayName = (details: any, node: any): string => {
   return cleanArtistDisplayName(rawArtist);
 };
 
-const checkIsProfileIncomplete = (node: Node, details: NodeDetails | null | undefined): boolean => {
-  const isArtist = node.type === 'artist' || !node.type || details?.details?.artist !== undefined;
-  if (!details || !isArtist) return false;
-
-  // A profile is incomplete if summary is missing or is the fallback description
-  if (!details.summary || details.summary.trim() === "" || details.summary.includes("currently unavailable")) {
-    return true;
-  }
-
-  // Genre/origin missing or unknown is incomplete for UI curation (shows Heal Cache button)
-  const genre = details.details?.genre?.trim().toLowerCase();
-  const origin = details.details?.origin?.trim().toLowerCase();
-  if (!genre || genre === 'unknown' || !origin || origin === 'unknown') {
-    return true;
-  }
-
-  return false;
-};
 
 declare global {
   interface Window {
@@ -224,10 +206,8 @@ interface NodeDetailsCardProps {
   seedArtists: string[];
   onAddArtist: (artistName: string) => void;
   isSmallScreen: boolean;
-  onRefresh: () => void;
   onClose: () => void;
   onNodeClick: (node: Node | null, forceActionState?: boolean) => void;
-  onGenerateDeepCut?: (node: Node) => void;
   onExtendNode?: (node: Node) => void;
   onNavigate: (view: View) => void;
   chatHistory: ChatMessage[];
@@ -404,7 +384,7 @@ const ProfileRow: React.FC<ProfileRowProps> = ({ data, colorHex, isSmallScreen, 
 
 export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
   node, details, isLoading, isGlobalLoading, graphData, libraryArtists, seedArtists, onAddArtist, isSmallScreen, 
-  onRefresh, onClose, onNodeClick, onGenerateDeepCut, onExtendNode, onNavigate, 
+  onClose, onNodeClick, onExtendNode, onNavigate, 
   chatHistory, onSendMessage, isChatLoading, chatMode, onChatModeChange, liveMessageCount, onDeleteMessage, onClearChat, isFullScreenMode = false, isHero = false, isInStack, onToggleStack, onToggleMagazineView, isGuest = false, onAuthRequest, user, userTaste, isAdmin = false,
   onUpdateTasteProfile, onShowToast, onOpenTasteModal
 }) => {
@@ -944,27 +924,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     <span className="material-symbols-outlined !text-[18px]">remove</span>
                             </button>
 
-                            {(isArtistNode || isLabelNode) && details && (
-                                checkIsProfileIncomplete(node, details) ? (
-                                    <button
-                                        onClick={onRefresh}
-                                        className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-yellow-500/50 rounded-xl text-yellow-500 bg-yellow-500/10 hover:bg-yellow-500/20 active:scale-95 transition-all duration-200 leading-none animate-pulse"
-                                        title="Profile Missing: Click to Curate"
-                                    >
-                                        <span className="material-symbols-outlined !text-[18px]">healing</span>
-                                    </button>
-                                ) : (
-                                    isAdmin ? (
-                                        <button
-                                            onClick={onRefresh}
-                                            className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-700 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none"
-                                            title="Force Refresh & Re-synthesize (Admin)"
-                                        >
-                                            <span className="material-symbols-outlined !text-[18px]">autorenew</span>
-                                        </button>
-                                    ) : null
-                                )
-                            )}
+
                         </div>
                 </div>
 
@@ -1048,20 +1008,13 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 </div>
                                 <div className="space-y-2">
                                     <h4 className="text-xl font-bold tracking-tight text-white">{node.label || node.id}</h4>
-                                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#a855f7]">
-                                        Deep Cut Synthesis Required
+                                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
+                                        Data Unavailable
                                     </p>
                                 </div>
-                                <p className="text-sm text-zinc-400 max-w-xs leading-relaxed">
-                                    Explore biographical context, personnel details, and critical insights with an AI-generated Deep Cut.
+                                <p className="text-sm text-zinc-500 max-w-xs leading-relaxed">
+                                    Deep Cut details for this node could not be loaded.
                                 </p>
-                                <button
-                                    onClick={() => onGenerateDeepCut ? onGenerateDeepCut(node) : onNodeClick(node)}
-                                    className="flex items-center justify-center gap-2 px-6 py-2.5 bg-primary hover:bg-white active:scale-95 text-brand-black font-semibold text-xs rounded-xl shadow-lg transition-all duration-200"
-                                >
-                                    <span className="material-symbols-outlined !text-[16px]">bolt</span>
-                                    Generate Deep Cut
-                                </button>
                             </div>
                         )
                     )}
@@ -1181,24 +1134,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 ) : null;
                             })()}
 
-                            {checkIsProfileIncomplete(node, details) && (
-                                <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg flex flex-col gap-2 my-2">
-                                    <div className="flex items-center gap-2 text-yellow-500">
-                                        <span className="material-symbols-outlined !text-[18px]">warning</span>
-                                        <span className="text-xs font-bold uppercase tracking-wider">Profile Missing</span>
-                                    </div>
-                                    <p className="text-xs text-zinc-400">
-                                        This artist profile contains corrupt or missing metadata labels (Genre/Origin). You can trigger curation to fetch clean data.
-                                    </p>
-                                    <button 
-                                        onClick={onRefresh}
-                                        className="mt-1 flex items-center justify-center gap-2 w-full py-2 bg-yellow-500 hover:bg-yellow-600 active:scale-95 text-zinc-950 font-semibold text-xs rounded-md transition-all duration-200"
-                                    >
-                                        <span className="material-symbols-outlined !text-[16px]">healing</span>
-                                        Click to Curate
-                                    </button>
-                                </div>
-                            )}
+
 
                             <div className={`grid grid-cols-2 gap-8 py-4 border-b border-zinc-800/50`}>
                                 <div>
@@ -1680,7 +1616,6 @@ interface DetailsPanelProps {
   onToggleCollapse: () => void;
   isSmallScreen: boolean;
   onNodeClick: (node: Node | null, forceActionState?: boolean) => void;
-  onGenerateDeepCut?: (node: Node) => void;
   onExtendNode?: (node: Node) => void;
   onNavigate: (view: View) => void;
   isGlobalLoading: boolean;
@@ -1708,7 +1643,7 @@ interface DetailsPanelProps {
 export const DetailsPanel: React.FC<DetailsPanelProps> = ({
   selectedNode, activeNodes, detailsCache, loadingNodeIds, onCloseNode, onRefreshNode,
   error, systemError, graphData, libraryArtists, seedArtists, onAddArtist, isCollapsed, onToggleCollapse,
-  isSmallScreen, onNodeClick, onGenerateDeepCut, onExtendNode, onNavigate, isGlobalLoading, onCancelGlobalLoading, unreadCount, isActive, collapseBtnRef,
+  isSmallScreen, onNodeClick, onExtendNode, onNavigate, isGlobalLoading, onCancelGlobalLoading, unreadCount, isActive, collapseBtnRef,
   isMagazineViewOpen, onMagazineViewToggle, chatHistories, onUpdateChatHistories, stack, onToggleStack,
   isGuest = false, onAuthRequest, user, userTaste, isAdmin = false,
   onUpdateTasteProfile, onShowToast, onOpenTasteModal, projectName
@@ -2364,10 +2299,8 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 seedArtists={seedArtists}
                                                 onAddArtist={onAddArtist}
                                                 isSmallScreen={isSmallScreen}
-                                                onRefresh={() => onRefreshNode(node.id)}
                                                 onClose={() => onCloseNode(node.id)}
                                                 onNodeClick={onNodeClick}
-                                                onGenerateDeepCut={onGenerateDeepCut}
                                                 onNavigate={onNavigate}
                                                 chatHistory={chatHistories.get(node.id) || []}
                                                 onSendMessage={(msg) => handleSendMessage(node.id, msg)}
