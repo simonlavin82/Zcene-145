@@ -65,7 +65,7 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
   return (
     <motion.div
       onClick={() => onSelectProject(project.id)}
-      className="group relative border border-zinc-700/50 hover:border-primary rounded-none p-5 transition-all cursor-pointer flex flex-col justify-between w-full md:w-[380px] h-[180px] shadow-xl overflow-hidden"
+      className="group relative border border-zinc-700/50 hover:border-primary rounded-none p-5 transition-all cursor-pointer flex flex-col justify-between w-full md:w-[350px] h-[180px] shadow-xl overflow-hidden"
       style={{
         '--scene-accent': dominantColor,
       } as React.CSSProperties}
@@ -200,7 +200,7 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
         <div className="mt-3 flex items-center">
           <div className="flex items-center flex-wrap gap-x-1 gap-y-1.5">
             <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
-              SEED: {seedList.length}
+              Seed Artist: {seedList.length}
             </span>
             {project.status === 'completed' && (
               <>
