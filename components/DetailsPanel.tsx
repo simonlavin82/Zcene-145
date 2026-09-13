@@ -462,9 +462,14 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
     const sentinelRef = useRef<HTMLDivElement>(null);
     const panelScrollRef = useRef<HTMLDivElement>(null);
+    const lastScrolledNodeId = useRef<string | null>(null);
 
     useEffect(() => {
         if (!isFullScreenMode && panelScrollRef.current && details && !isLoading) {
+            // Guard against re-triggering loops on the same node to prevent flicker
+            if (lastScrolledNodeId.current === node.id) return;
+            const currentNodeId = node.id;
+            
             // Tiny delay to ensure DOM layout is complete before measuring
             const timeout = setTimeout(() => {
                 if (!panelScrollRef.current) return;
@@ -472,10 +477,16 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                 const actionBar = panelScrollRef.current.children[0]?.children[0] as HTMLElement;
                 const actionBarHeight = actionBar?.offsetHeight || 56;
                 
-                // If we're at or near the top, programmatically scroll down to hide the action bar
-                if (panelScrollRef.current.scrollTop < actionBarHeight) {
-                    panelScrollRef.current.scrollTo({ top: actionBarHeight, behavior: 'instant' });
+                // Add 32px offset to tuck the py-8 whitespace gap under the sticky title
+                const targetScrollOffset = actionBarHeight + 32;
+                
+                // If we're at or near the top, programmatically scroll down to the targeted offset
+                if (panelScrollRef.current.scrollTop < targetScrollOffset) {
+                    panelScrollRef.current.scrollTo({ top: targetScrollOffset, behavior: 'instant' });
                 }
+                
+                // Mark this node as having been scrolled
+                lastScrolledNodeId.current = currentNodeId;
             }, 50);
             return () => clearTimeout(timeout);
         }
