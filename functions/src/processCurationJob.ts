@@ -840,6 +840,15 @@ export const processCurationJob = onDocumentCreated({
       }
 
       // ── Apply Canonical ID Rewrite and Strict Deduplication to Graph Topology BEFORE Extraction ──
+      const ISO_TO_COUNTRY_MAP: Record<string, string> = {
+        'us': 'United States', 'gb': 'United Kingdom', 'au': 'Australia',
+        'ca': 'Canada', 'de': 'Germany', 'fr': 'France', 'jp': 'Japan',
+        'se': 'Sweden', 'it': 'Italy', 'es': 'Spain', 'br': 'Brazil',
+        'mx': 'Mexico', 'nl': 'Netherlands', 'be': 'Belgium', 'no': 'Norway',
+        'fi': 'Finland', 'dk': 'Denmark', 'ie': 'Ireland', 'nz': 'New Zealand',
+        'pl': 'Poland', 'at': 'Austria', 'ch': 'Switzerland'
+      };
+
       if (finalGraph.nodes) {
         const uniqueNodesMap = new Map<string, any>();
         finalGraph.nodes.forEach((node: any) => {
@@ -863,6 +872,60 @@ export const processCurationJob = onDocumentCreated({
           }
         });
         finalGraph.nodes = Array.from(uniqueNodesMap.values());
+      }
+
+      // --- Topological Reconciliation Loop: Fix geographic hallucinated links ---
+      if (finalGraph.nodes && finalGraph.links) {
+        // Map to quickly check if a node is a country node
+        const countryNodeMap = new Map<string, any>();
+        finalGraph.nodes.forEach((n: any) => {
+          if (n.type === 'country') {
+            countryNodeMap.set(n.id, n);
+          }
+        });
+
+        finalGraph.nodes.forEach((node: any) => {
+          if (node.type === 'artist' || node.type === 'label') {
+            if (node.origin) {
+              const canonSlug = extractCountrySlug(node.origin);
+              if (canonSlug !== 'global') {
+                const canonCountryName = ISO_TO_COUNTRY_MAP[canonSlug] || canonSlug;
+                const canonCountryId = normalizeArtistId(canonCountryName);
+
+                // Reroute links targeting ANY country node from this artist to point to canonCountryId
+                let reroutedAny = false;
+                finalGraph.links.forEach((link: any) => {
+                  const sId = typeof link.source === 'string' ? link.source : (link.source as any).id;
+                  const tId = typeof link.target === 'string' ? link.target : (link.target as any).id;
+                  
+                  if (sId === node.id && countryNodeMap.has(tId) && tId !== canonCountryId) {
+                    // Update link target
+                    if (typeof link.target === 'string') {
+                      link.target = canonCountryId;
+                    } else {
+                      (link.target as any).id = canonCountryId;
+                    }
+                    reroutedAny = true;
+                    console.log(`[Curation Backend] Topological Reconciliation: Rerouted link from "${sId}" to target "${canonCountryId}" (was "${tId}")`);
+                  }
+                });
+
+                // Instantiate the missing canonical country node if needed
+                if (reroutedAny && !countryNodeMap.has(canonCountryId)) {
+                  const newCountryNode = {
+                    id: canonCountryId,
+                    type: "country",
+                    label: canonCountryName,
+                    group: node.group || 1
+                  };
+                  finalGraph.nodes.push(newCountryNode);
+                  countryNodeMap.set(canonCountryId, newCountryNode); // mark as added
+                  console.log(`[Curation Backend] Topological Reconciliation: Injected missing canonical country node "${canonCountryId}" for artist "${node.id}"`);
+                }
+              }
+            }
+          }
+        });
       }
       
       if (finalGraph.links) {
