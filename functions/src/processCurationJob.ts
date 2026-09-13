@@ -965,12 +965,17 @@ export const processCurationJob = onDocumentCreated({
 
       // --- Degree-0 Cleanup Phase ---
       if (finalGraph.nodes && finalGraph.links) {
+        // Build a set of ALL valid node IDs currently in the graph
+        const validNodeIds = new Set<string>(finalGraph.nodes.map((n: any) => n.id));
+
         const connectedNodeIds = new Set<string>();
         finalGraph.links.forEach((link: any) => {
           const sId = typeof link.source === 'string' ? link.source : (link.source as any).id;
           const tId = typeof link.target === 'string' ? link.target : (link.target as any).id;
-          connectedNodeIds.add(sId);
-          connectedNodeIds.add(tId);
+          if (validNodeIds.has(sId) && validNodeIds.has(tId)) {
+            connectedNodeIds.add(sId);
+            connectedNodeIds.add(tId);
+          }
         });
 
         // Ensure all resolved seed IDs are protected from pruning
@@ -982,15 +987,51 @@ export const processCurationJob = onDocumentCreated({
           }
         }
 
-        // Filter out nodes that have 0 degrees and are not protected seeds
+        // Filter out nodes that have 0 degrees, are not protected seeds, or are orphaned country nodes
         const originalNodeCount = finalGraph.nodes.length;
         finalGraph.nodes = finalGraph.nodes.filter((node: any) => {
+          // Force prune any country node that isn't a canonical target for an active artist
+          if (node.type === 'country') {
+            let isRequired = false;
+            for (const n of finalGraph.nodes) {
+              if (n.type === 'artist' || n.type === 'label') {
+                if (n.origin) {
+                  const canonSlug = extractCountrySlug(n.origin);
+                  if (canonSlug !== 'global') {
+                    const canonCountryName = ISO_TO_COUNTRY_MAP[canonSlug] || canonSlug;
+                    if (normalizeArtistId(canonCountryName) === node.id) {
+                      isRequired = true;
+                      break;
+                    }
+                  }
+                }
+              }
+            }
+            if (!isRequired) {
+              return false; // Drop non-canonical or unverified country node
+            }
+          }
+
           return connectedNodeIds.has(node.id) || protectedSeedIds.has(node.id);
         });
 
         const prunedCount = originalNodeCount - finalGraph.nodes.length;
         if (prunedCount > 0) {
           console.log(`[Curation Backend] Degree-0 Cleanup Phase: Pruned ${prunedCount} orphaned ghost node(s).`);
+        }
+
+        // Clean up any phantom links that referenced pruned nodes
+        const finalValidNodes = new Set<string>(finalGraph.nodes.map((n: any) => n.id));
+        const originalLinkCount = finalGraph.links.length;
+        finalGraph.links = finalGraph.links.filter((link: any) => {
+          const sId = typeof link.source === 'string' ? link.source : (link.source as any).id;
+          const tId = typeof link.target === 'string' ? link.target : (link.target as any).id;
+          return finalValidNodes.has(sId) && finalValidNodes.has(tId);
+        });
+        
+        const prunedLinkCount = originalLinkCount - finalGraph.links.length;
+        if (prunedLinkCount > 0) {
+          console.log(`[Curation Backend] Degree-0 Cleanup Phase: Pruned ${prunedLinkCount} phantom edge(s).`);
         }
       }
 
