@@ -963,6 +963,37 @@ export const processCurationJob = onDocumentCreated({
         });
       }
 
+      // --- Degree-0 Cleanup Phase ---
+      if (finalGraph.nodes && finalGraph.links) {
+        const connectedNodeIds = new Set<string>();
+        finalGraph.links.forEach((link: any) => {
+          const sId = typeof link.source === 'string' ? link.source : (link.source as any).id;
+          const tId = typeof link.target === 'string' ? link.target : (link.target as any).id;
+          connectedNodeIds.add(sId);
+          connectedNodeIds.add(tId);
+        });
+
+        // Ensure all resolved seed IDs are protected from pruning
+        const protectedSeedIds = new Set<string>();
+        for (const seedNorm of seedNorms) {
+          protectedSeedIds.add(seedNorm);
+          if (resolvedSeedNormMap.has(seedNorm)) {
+            protectedSeedIds.add(resolvedSeedNormMap.get(seedNorm)!);
+          }
+        }
+
+        // Filter out nodes that have 0 degrees and are not protected seeds
+        const originalNodeCount = finalGraph.nodes.length;
+        finalGraph.nodes = finalGraph.nodes.filter((node: any) => {
+          return connectedNodeIds.has(node.id) || protectedSeedIds.has(node.id);
+        });
+
+        const prunedCount = originalNodeCount - finalGraph.nodes.length;
+        if (prunedCount > 0) {
+          console.log(`[Curation Backend] Degree-0 Cleanup Phase: Pruned ${prunedCount} orphaned ghost node(s).`);
+        }
+      }
+
       // ── Step 5: Root Breakdown Write-Back to Seed Artist Docs (Atomic Self-Heal) ────────────────
       // Per the Unified Canvas Architecture (Column 3, Step 5), Single-Seed jobs persist
       // the Root Breakdown to the seed artist's Firestore doc so that future cache hits
