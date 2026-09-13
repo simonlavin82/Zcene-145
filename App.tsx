@@ -2948,6 +2948,9 @@ const App: React.FC = () => {
       sessionTokenApprovedRef.current = false;
     }
 
+    // Prevent Untitled Zcene string from leaking into backend generation
+    rawArtists = rawArtists.split('::').map(s => s.trim()).filter(s => Boolean(s) && s !== 'Untitled Zcene').join('::');
+
     // Normalize empty graph to null to eliminate ghost-enhancement API path
     if (graphToEnhance && (!graphToEnhance.nodes || graphToEnhance.nodes.length === 0)) {
       graphToEnhance = null;
@@ -5217,7 +5220,7 @@ const App: React.FC = () => {
         const data = docSnap.data();
         projs.push({
           id: docSnap.id,
-          name: data.name || 'Untitled Zcene',
+          name: data.name || '',
           seedArtists: data.seedArtists || '',
           cacheKey: data.cacheKey || '',
           createdAt: data.createdAt,
@@ -6329,7 +6332,7 @@ const App: React.FC = () => {
                 const localProj = projects.find(p => p.id === projectId);
                 if (localProj) {
                   console.log(`[Router] Pre-populating context for project ${projectId} from dashboard data:`, localProj.seedArtists);
-                  setSeedArtists(localProj.seedArtists || localProj.name || '');
+                  setSeedArtists(localProj.seedArtists || '');
                   setProjectName(localProj.name || '');
                   setProjectStatus(localProj.status || null);
                   setActiveJobId(localProj.activeJobId || null);
