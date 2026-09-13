@@ -470,25 +470,28 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
             if (lastScrolledNodeId.current === node.id) return;
             const currentNodeId = node.id;
             
-            // Tiny delay to ensure DOM layout is complete before measuring
-            const timeout = setTimeout(() => {
-                if (!panelScrollRef.current) return;
-                // The action bar is the first child of the first child of the scroll container
-                const actionBar = panelScrollRef.current.children[0]?.children[0] as HTMLElement;
-                const actionBarHeight = actionBar?.offsetHeight || 56;
-                
-                // Add 32px offset to tuck the py-8 whitespace gap under the sticky title
-                const targetScrollOffset = actionBarHeight + 32;
-                
-                // If we're at or near the top, programmatically scroll down to the targeted offset
-                if (panelScrollRef.current.scrollTop < targetScrollOffset) {
-                    panelScrollRef.current.scrollTo({ top: targetScrollOffset, behavior: 'instant' });
-                }
-                
-                // Mark this node as having been scrolled
-                lastScrolledNodeId.current = currentNodeId;
-            }, 50);
-            return () => clearTimeout(timeout);
+            // Wait for DOM layout to fully stabilize before measuring to prevent jitter
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    if (!panelScrollRef.current) return;
+                    
+                    // The offsetTop of the sticky header exactly marks where the action bar ends
+                    const stickyHeader = panelScrollRef.current.querySelector('.sticky.top-0') as HTMLElement;
+                    const baseOffset = stickyHeader ? stickyHeader.offsetTop : 56;
+                    
+                    // Scroll past the sticky threshold (baseOffset) + 54px deep to perfectly 
+                    // tuck the main body's padding (py-8) and hit the manual "sweet spot"
+                    const targetScrollOffset = baseOffset + 54;
+                    
+                    // Trigger the scroll
+                    if (panelScrollRef.current.scrollTop < targetScrollOffset + 50) {
+                        panelScrollRef.current.scrollTo({ top: targetScrollOffset, behavior: 'instant' });
+                    }
+                    
+                    // Mark this node as fully scrolled
+                    lastScrolledNodeId.current = currentNodeId;
+                });
+            });
         }
     }, [node.id, details, isLoading, isFullScreenMode]);
 
