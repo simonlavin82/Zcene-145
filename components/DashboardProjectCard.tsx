@@ -65,18 +65,11 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
   return (
     <motion.div
       onClick={() => onSelectProject(project.id)}
-      className="group relative border border-zinc-700/50 rounded-none p-5 transition-all cursor-pointer flex flex-col justify-between w-full md:w-[380px] h-[180px] shadow-xl overflow-hidden"
+      className="group relative border border-zinc-700/50 hover:border-primary rounded-none p-5 transition-all cursor-pointer flex flex-col justify-between w-full md:w-[380px] h-[180px] shadow-xl overflow-hidden"
       style={{
         '--scene-accent': dominantColor,
       } as React.CSSProperties}
     >
-      {/* Dynamic Hover Border Highlight via pseudo-element or inline styles. We'll use a dynamic border style on hover manually or just inject it */}
-      <style dangerouslySetInnerHTML={{__html: `
-        .project-card-${project.id}:hover {
-          border-color: var(--scene-accent, #aaff00) !important;
-        }
-      `}} />
-      <div className={`absolute inset-0 project-card-${project.id}`} style={{ zIndex: 0, pointerEvents: 'none', border: '1px solid transparent' }} />
       
       {/* Background Layer: Full-bleed image or deterministic gradient */}
       <div className="absolute inset-0 z-0 flex">

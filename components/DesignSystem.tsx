@@ -2004,7 +2004,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             {/* Cards inside this parent record crate compartment */}
                                             <div className="grid grid-cols-1 gap-4 w-full md:w-fit">
                                                 {/* Inner Mock Card */}
-                                                <div className="bg-zinc-900 border border-zinc-700/50 p-5 flex flex-col justify-between min-h-[160px] w-full md:w-[360px] shadow-xl">
+                                                <div className="bg-zinc-900 border border-zinc-700/50 p-5 flex flex-col justify-between min-h-[160px] w-full md:w-[360px] shadow-xl hover:border-primary transition-all cursor-pointer">
                                                     <div className="space-y-3">
                                                         <h3 className="text-sm font-medium text-white truncate">Grayscale</h3>
                                                         <p className="font-mono text-[10px] text-zinc-400">Edited 05/07/2026</p>
