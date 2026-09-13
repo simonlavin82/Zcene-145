@@ -360,10 +360,14 @@ the entire dataset, the app evolves existing visual structures.
     - Sanitization: XML genre fields containing multiple comma-separated or slash-separated values are split into individual genre nodes, while discarding pure numeric metadata anomalies.
     - Persistent Storage: Upon successful import, both the raw 'libraryArtists' array and the compiled 'libraryBaseGraph' are stringified and written to the authenticated user's root document in Firestore. This guarantees that multi-genre filtering capabilities inside the Library Modal persist safely across browser reloads.
     
-18. FALLBACK HYDRATION & isLibrary FLAG:
+    18. FALLBACK HYDRATION & isLibrary FLAG:
     - The 'isLibrary: true' flag is hardcoded in the frontend (App.tsx -> handleNodeClick) for *every* node that is loaded or generated locally from the cache during an on-demand fallback.
     - It is NOT exclusively tied to the Apple Music XML import process.
     - If the backend curation job bypasses a seed node, the frontend is forced to generate the data on-demand and stamp it with 'isLibrary: true'. This must be understood when debugging hydration bypasses to avoid misidentifying the source of the flag.
+
+19. TOPOLOGICAL RECONCILIATION & EXECUTION PHASE TIMING:
+    - Topological Reconciliation (resolving LLM geographic hallucinated links in the backend pipeline) MUST strictly occur AFTER all node and link IDs are fully canonicalized by the 'idRewriteMap'.
+    - If geographic routing or link traversal is executed before the graph state is unified (i.e. before the Link ID normalization block), the engine will suffer from Phase-Timing Mismatches (e.g. attempting to match a canonical node ID like 'slam-coke-de' against an un-normalized link source like 'slam-coke'), resulting in silently orphaned geographic edges.
 `;
 
 const ITUNES_SCRAPER_DOCUMENTATION = `

@@ -874,6 +874,41 @@ export const processCurationJob = onDocumentCreated({
         finalGraph.nodes = Array.from(uniqueNodesMap.values());
       }
 
+      if (finalGraph.links) {
+        const uniqueLinksMap = new Map<string, any>();
+        finalGraph.links.forEach((link: any) => {
+          const sId = typeof link.source === 'string' ? link.source : (link.source as any).id;
+          const tId = typeof link.target === 'string' ? link.target : (link.target as any).id;
+          const normS = normalizeArtistId(sId);
+          const normT = normalizeArtistId(tId);
+          const baseNormS = stripCountrySlug(normS);
+          const baseNormT = stripCountrySlug(normT);
+          
+          let finalS = sId;
+          let finalT = tId;
+          
+          if (idRewriteMap.has(normS)) finalS = idRewriteMap.get(normS);
+          else if (idRewriteMap.has(baseNormS)) finalS = idRewriteMap.get(baseNormS);
+
+          if (idRewriteMap.has(normT)) finalT = idRewriteMap.get(normT);
+          else if (idRewriteMap.has(baseNormT)) finalT = idRewriteMap.get(baseNormT);
+          
+          if (typeof link.source === 'string') link.source = finalS;
+          else (link.source as any).id = finalS;
+          
+          if (typeof link.target === 'string') link.target = finalT;
+          else (link.target as any).id = finalT;
+          
+          if (finalS !== finalT) {
+            const linkKey = [finalS, finalT].sort().join('--');
+            if (!uniqueLinksMap.has(linkKey)) {
+              uniqueLinksMap.set(linkKey, link);
+            }
+          }
+        });
+        finalGraph.links = Array.from(uniqueLinksMap.values());
+      }
+
       // --- Topological Reconciliation Loop: Fix geographic hallucinated links ---
       if (finalGraph.nodes && finalGraph.links) {
         // Map to quickly check if a node is a country node
@@ -926,41 +961,6 @@ export const processCurationJob = onDocumentCreated({
             }
           }
         });
-      }
-      
-      if (finalGraph.links) {
-        const uniqueLinksMap = new Map<string, any>();
-        finalGraph.links.forEach((link: any) => {
-          const sId = typeof link.source === 'string' ? link.source : (link.source as any).id;
-          const tId = typeof link.target === 'string' ? link.target : (link.target as any).id;
-          const normS = normalizeArtistId(sId);
-          const normT = normalizeArtistId(tId);
-          const baseNormS = stripCountrySlug(normS);
-          const baseNormT = stripCountrySlug(normT);
-          
-          let finalS = sId;
-          let finalT = tId;
-          
-          if (idRewriteMap.has(normS)) finalS = idRewriteMap.get(normS);
-          else if (idRewriteMap.has(baseNormS)) finalS = idRewriteMap.get(baseNormS);
-
-          if (idRewriteMap.has(normT)) finalT = idRewriteMap.get(normT);
-          else if (idRewriteMap.has(baseNormT)) finalT = idRewriteMap.get(baseNormT);
-          
-          if (typeof link.source === 'string') link.source = finalS;
-          else (link.source as any).id = finalS;
-          
-          if (typeof link.target === 'string') link.target = finalT;
-          else (link.target as any).id = finalT;
-          
-          if (finalS !== finalT) {
-            const linkKey = [finalS, finalT].sort().join('--');
-            if (!uniqueLinksMap.has(linkKey)) {
-              uniqueLinksMap.set(linkKey, link);
-            }
-          }
-        });
-        finalGraph.links = Array.from(uniqueLinksMap.values());
       }
 
       // ── Step 5: Root Breakdown Write-Back to Seed Artist Docs (Atomic Self-Heal) ────────────────
