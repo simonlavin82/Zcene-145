@@ -461,6 +461,25 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     const isLabelNode = node.type === 'label';
 
     const sentinelRef = useRef<HTMLDivElement>(null);
+    const panelScrollRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!isFullScreenMode && panelScrollRef.current && details && !isLoading) {
+            // Tiny delay to ensure DOM layout is complete before measuring
+            const timeout = setTimeout(() => {
+                if (!panelScrollRef.current) return;
+                // The action bar is the first child of the first child of the scroll container
+                const actionBar = panelScrollRef.current.children[0]?.children[0] as HTMLElement;
+                const actionBarHeight = actionBar?.offsetHeight || 56;
+                
+                // If we're at or near the top, programmatically scroll down to hide the action bar
+                if (panelScrollRef.current.scrollTop < actionBarHeight) {
+                    panelScrollRef.current.scrollTo({ top: actionBarHeight, behavior: 'instant' });
+                }
+            }, 50);
+            return () => clearTimeout(timeout);
+        }
+    }, [node.id, details, isLoading, isFullScreenMode]);
 
     useEffect(() => {
         if (!isFullScreenMode || !sentinelRef.current) return;
@@ -863,6 +882,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
     return (
         <div 
+          ref={panelScrollRef}
           className={`w-full min-w-[320px] bg-zinc-900 relative break-words transition-all duration-500 ${isFullScreenMode ? 'h-fit border border-zinc-800/80 shadow-2xl overflow-visible mb-4 md:mb-6 break-inside-avoid' : 'h-full border border-zinc-900 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800'}`}
           style={{ overscrollBehaviorY: 'auto', '--scene-accent': localDominantColor } as React.CSSProperties}
           onScroll={(e) => {
