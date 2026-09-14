@@ -79,9 +79,9 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                       window.location.hash === '#/merch' || 
                       window.location.hash === '#merch';
       if (isActive && containerRef.current && isMerch) {
-        const merchEl = document.getElementById('merch');
-        if (merchEl) {
-          const topPos = merchEl.offsetTop;
+        const supportEl = document.getElementById('support');
+        if (supportEl) {
+          const topPos = supportEl.offsetTop;
           containerRef.current.scrollTo({ top: topPos, behavior: 'smooth' });
         }
       }
@@ -508,11 +508,9 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                         onClickCapture={(e) => {
                             e.preventDefault();
                             onNavigate(View.Home);
-                            const merchEl = document.getElementById('merch');
-                            if (merchEl) {
-                                merchEl.scrollIntoView({ behavior: 'smooth' });
-                            } else {
-                                window.location.hash = 'merch';
+                            const supportEl = document.getElementById('support');
+                            if (supportEl) {
+                                supportEl.scrollIntoView({ behavior: 'smooth' });
                             }
                         }}
                     >
@@ -530,11 +528,9 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                         onClickCapture={(e) => {
                             e.preventDefault();
                             onNavigate(View.Home);
-                            const merchEl = document.getElementById('merch');
-                            if (merchEl) {
-                                merchEl.scrollIntoView({ behavior: 'smooth' });
-                            } else {
-                                window.location.hash = 'merch';
+                            const supportEl = document.getElementById('support');
+                            if (supportEl) {
+                                supportEl.scrollIntoView({ behavior: 'smooth' });
                             }
                         }}
                     >

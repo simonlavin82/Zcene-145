@@ -1647,7 +1647,12 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                 onClickCapture={(e) => {
                                     e.preventDefault();
                                     onNavigate(View.Home);
-                                    window.location.hash = 'merch';
+                                    setTimeout(() => {
+                                        const supportEl = document.getElementById('support');
+                                        if (supportEl) {
+                                            supportEl.scrollIntoView({ behavior: 'smooth' });
+                                        }
+                                    }, 100);
                                 }}
                             >
                                 <AdSenseUnit 
@@ -1684,7 +1689,12 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                     onClickCapture={(e) => {
                                         e.preventDefault();
                                         onNavigate(View.Home);
-                                        window.location.hash = 'merch';
+                                        setTimeout(() => {
+                                            const supportEl = document.getElementById('support');
+                                            if (supportEl) {
+                                                supportEl.scrollIntoView({ behavior: 'smooth' });
+                                            }
+                                        }, 100);
                                     }}
                                 >
                                     <AdSenseUnit 
@@ -1702,7 +1712,12 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                     onClickCapture={(e) => {
                                         e.preventDefault();
                                         onNavigate(View.Home);
-                                        window.location.hash = 'merch';
+                                        setTimeout(() => {
+                                            const supportEl = document.getElementById('support');
+                                            if (supportEl) {
+                                                supportEl.scrollIntoView({ behavior: 'smooth' });
+                                            }
+                                        }, 100);
                                     }}
                                 >
                                     <AdSenseUnit 
