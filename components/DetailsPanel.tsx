@@ -919,16 +919,8 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         ? 'text-5xl font-bold tracking-tight'
         : 'text-xl font-medium';
 
-    return (
-        <div 
-          ref={panelScrollRef}
-          className={`w-full min-w-[320px] bg-zinc-900 relative break-words transition-all duration-500 ${isFullScreenMode ? 'h-fit border border-zinc-800/80 shadow-2xl overflow-visible mb-4 md:mb-6 break-inside-avoid' : 'h-full border border-zinc-900 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800'}`}
-          style={{ overscrollBehaviorY: 'auto', '--scene-accent': localDominantColor } as React.CSSProperties}
-          onScroll={(e) => {
-              if (isFullScreenMode) return;
-              setIsHeaderStuck(e.currentTarget.scrollTop > 10);
-          }}
-        >
+    const panelContent = (
+        <>
             <div className="flex flex-col min-h-full">
                 {/* 1. Action Icons (Not Sticky) — ref measures its rendered height for the dynamic scroll target */}
                 <div ref={actionIconsRef} className={`px-4 pt-3 bg-zinc-900 z-20 flex-shrink-0 ${isFullScreenMode ? 'md:px-6' : ''}`}>
@@ -1653,6 +1645,30 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                 />,
                 document.body
             )}
+        </>
+    );
+
+    if (isFullScreenMode) {
+        return (
+            <div 
+              key="magazine-card"
+              className="w-full min-w-[320px] bg-zinc-900 relative break-words h-fit border border-zinc-800/80 shadow-2xl overflow-visible mb-4 md:mb-6 break-inside-avoid transition-all duration-500"
+              style={{ '--scene-accent': localDominantColor } as React.CSSProperties}
+            >
+                {panelContent}
+            </div>
+        );
+    }
+
+    return (
+        <div 
+          key="side-panel"
+          ref={panelScrollRef}
+          className="w-full min-w-[320px] bg-zinc-900 relative break-words h-full border border-zinc-900 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800 transition-all duration-500"
+          style={{ overscrollBehaviorY: 'auto', '--scene-accent': localDominantColor } as React.CSSProperties}
+          onScroll={(e) => setIsHeaderStuck(e.currentTarget.scrollTop > 10)}
+        >
+            {panelContent}
         </div>
     );
 };
