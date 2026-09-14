@@ -13,7 +13,7 @@ import Header from './Header';
 import { AdminViewToggle } from './ui/AdminViewToggle';
 import { SegmentedTextToggle } from './ui/SegmentedTextToggle';
 import { InfoTooltip } from './ui/InfoTooltip';
-import { Waypoints } from 'lucide-react';
+import { Waypoints, Flame } from 'lucide-react';
 import { TelemetryOverviewCards, DiscoveryLedgerTable, UserTelemetry } from './UsageAnalyticsPage';
 import { CountryFilterDropdown } from './SharedModals';
 import { extractInitials, generateDeterministicGradient } from '../utils/formatters';
@@ -159,6 +159,45 @@ const InteractiveFilterableSelectDemo: React.FC = () => {
     </div>
   );
 };
+
+const PasswordInputDemo: React.FC = () => {
+  const [value, setValue] = useState('');
+  const [show, setShow] = useState(false);
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-zinc-500 uppercase tracking-widest font-semibold">Live Demo</p>
+        <span className="text-[10px] font-mono text-primary bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">Interactive Demo</span>
+      </div>
+      <div className="relative">
+        <input
+          type={show ? 'text' : 'password'}
+          value={value}
+          onChange={e => setValue(e.target.value)}
+          placeholder="Enter a password…"
+          className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-4 pr-11 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none"
+        />
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={() => setShow(v => !v)}
+          aria-label={show ? 'Hide password' : 'Show password'}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
+        >
+          {show
+            ? <VisibilityOffIcon className="w-4 h-4" />
+            : <VisibilityIcon className="w-4 h-4" />
+          }
+        </button>
+      </div>
+      <p className="text-xs text-zinc-500 leading-relaxed">
+        Type something, then click the Eye icon to reveal/hide. Notice text never overlaps the toggle button thanks to <code className="text-primary bg-zinc-900 px-1 rounded">pr-11</code>.
+      </p>
+    </div>
+  );
+};
+
+
 
 interface TypographyScaleRowProps {
     role: string;
@@ -1067,7 +1106,9 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                                     <IconDisplay icon={<span className="material-symbols-outlined">shopping_bag</span>} name="Catalog / Shop" pxSize="18px" description="Represents physical media or store links (e.g. Bandcamp)." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
                                     <IconDisplay icon={<span className="material-symbols-outlined">public</span>} name="Website / Public" pxSize="18px" description="Represents official artist domains." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
-                                    <IconDisplay icon={<span className="lucide lucide-flame w-5 h-5"></span>} name="Taste Profile (Flame)" pxSize="18px" description="Represents user's taste compatibility (high energy/independent culture)." implementation="Lucide Flame" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<Flame size={18} />} name="Taste Profile (Flame)" pxSize="18px" description="Represents user's taste compatibility (high energy/independent culture)." implementation="&lt;Flame size={18} /&gt;" />
+                                    <IconDisplay icon={<VisibilityIcon className="w-[18px] h-[18px]" />} name="Show Password (Eye)" pxSize="18px" description="Toggles password field to visible. Used on all password inputs." implementation="&lt;VisibilityIcon className=&quot;w-[18px] h-[18px]&quot; /&gt;" />
+                                    <IconDisplay icon={<VisibilityOffIcon className="w-[18px] h-[18px]" />} name="Hide Password (Eye-Off)" pxSize="18px" description="Paired with Eye; shown when the password is currently revealed." implementation="&lt;VisibilityOffIcon className=&quot;w-[18px] h-[18px]&quot; /&gt;" />
                                 </div>
                             </div>
                         </div>
@@ -2432,6 +2473,51 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Password Input Variant */}
+                            <div>
+                                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
+                                    <h3 className="text-xl font-medium text-zinc-200">Password Input</h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">type=&quot;password&quot; / &quot;text&quot;</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Icons: VisibilityIcon / VisibilityOffIcon</span>
+                                    </div>
+                                </div>
+                                <p className="text-sm text-zinc-400 mb-6 leading-relaxed max-w-2xl">
+                                    All password inputs must include a show/hide toggle using the <strong>VisibilityIcon</strong> and <strong>VisibilityOffIcon</strong> from <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">components/Icons.tsx</code>.
+                                    The input is wrapped in a <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">relative</code> container. <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">pr-11</code> is added to the input to prevent text from sliding under the button.
+                                    The toggle button uses <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">tabIndex={-1}</code> to keep tab order on the submit action.
+                                </p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-zinc-900/30 p-8 rounded-none border border-zinc-800">
+                                    <PasswordInputDemo />
+                                    <div className="space-y-4">
+                                        <p className="text-xs text-zinc-500 uppercase tracking-widest font-semibold">Implementation</p>
+                                        <pre className="text-xs text-zinc-300 bg-zinc-950 border border-zinc-800 rounded-xl p-4 overflow-x-auto leading-relaxed font-mono">{
+`const [show, setShow] = useState(false);
+
+<div className="relative">
+  <input
+    type={show ? 'text' : 'password'}
+    className="... pr-11"
+  />
+  <button
+    type="button"
+    tabIndex={-1}
+    onClick={() => setShow(v => !v)}
+    className="absolute right-3 top-1/2
+               -translate-y-1/2 ..."
+  >
+    {show
+      ? <VisibilityOffIcon className="w-4 h-4" />
+      : <VisibilityIcon className="w-4 h-4" />
+    }
+  </button>
+</div>`
+                                        }</pre>
+                                    </div>
+                                </div>
+                            </div>
+
                         </div>
                     </section>
 

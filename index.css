@@ -69,6 +69,19 @@
     white-space: nowrap;
   }
 
+  /* Override Chrome's forced white autofill background in our dark theme.
+     Standard background-color is ignored on autofilled inputs; the only
+     reliable fix is a large inset box-shadow that visually paints over it. */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 9999px #18181b inset !important; /* bg-zinc-900 */
+    -webkit-text-fill-color: #ffffff !important;
+    caret-color: #ffffff;
+    transition: background-color 9999s ease-in-out 0s;
+  }
+
   .animate-fade-in-down {
     animation: fadeInDown 0.5s ease-out forwards;
   }

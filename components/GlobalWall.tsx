@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../services/firebase';
-import { ZceneLogo, Spinner } from './Icons';
+import { ZceneLogo, Spinner, VisibilityIcon, VisibilityOffIcon } from './Icons';
 
 // sessionStorage key — intentionally non-descriptive to avoid easy guessing.
 const SESSION_KEY = 'zcene_beta_unlocked';
@@ -50,6 +50,7 @@ const GlobalWallGate: React.FC<GlobalWallProps> = ({ children }) => {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -110,28 +111,42 @@ const GlobalWallGate: React.FC<GlobalWallProps> = ({ children }) => {
         </p>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-          <input
-            ref={inputRef}
-            id="global-wall-password"
-            type="password"
-            value={password}
-            onChange={(e) => {
-              setPassword(e.target.value);
-              if (error) setError(null);
-            }}
-            placeholder="Access code"
-            autoComplete="current-password"
-            disabled={isLoading}
-            className="
-              w-full px-4 py-3 rounded-xl
-              bg-zinc-900 border border-zinc-800
-              text-white placeholder-zinc-600
-              text-sm
-              focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-zinc-700
-              disabled:opacity-50 disabled:cursor-not-allowed
-              transition-colors
-            "
-          />
+          <div className="relative">
+            <input
+              ref={inputRef}
+              id="global-wall-password"
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                if (error) setError(null);
+              }}
+              placeholder="Access code"
+              autoComplete="current-password"
+              disabled={isLoading}
+              className="
+                w-full px-4 py-3 pr-11 rounded-xl
+                bg-zinc-900 border border-zinc-800
+                text-white placeholder-zinc-600
+                text-sm
+                focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-zinc-700
+                disabled:opacity-50 disabled:cursor-not-allowed
+                transition-colors
+              "
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(v => !v)}
+              tabIndex={-1}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
+            >
+              {showPassword
+                ? <VisibilityOffIcon className="w-4 h-4" />
+                : <VisibilityIcon className="w-4 h-4" />
+              }
+            </button>
+          </div>
 
           {error && (
             <p className="text-red-400 text-xs px-1">
