@@ -473,7 +473,10 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     // lastScrolledNodeId to null here, the scroll effect below is guaranteed to see
     // a cleared guard when isFullScreenMode transitions back to false (Magazine exit).
     useEffect(() => {
-        if (!isFullScreenMode) {
+        if (isFullScreenMode) {
+            // Explicitly reset the header state on Magazine entry so the titles don't render small.
+            setIsHeaderStuck(false);
+        } else {
             lastScrolledNodeId.current = null;
         }
     }, [isFullScreenMode]);
@@ -493,17 +496,23 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         // When onScroll reads scrollTop it will call setIsHeaderStuck(true) — same value, no re-render loop.
         setIsHeaderStuck(true);
 
-        // Double rAF: The first frame queues before the next paint (when layout changes happen).
-        // The second frame guarantees execution AFTER the browser has fully painted the new scroll container,
-        // ensuring actionIconsRef.current.offsetHeight is accurate and not a phantom 0.
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                if (!panelScrollRef.current || !actionIconsRef.current) return;
+        // Polling rAF: The browser's physical layout engine often lags behind React's state commit.
+        // We poll until the browser confirms the container is scrollable (scrollHeight > clientHeight),
+        // guaranteeing the scrollTop assignment hits a real, painted DOM scroll box.
+        let frames = 0;
+        const attemptScroll = () => {
+            frames++;
+            if (!panelScrollRef.current || !actionIconsRef.current) return;
+            
+            // Check if the container is physically scrollable, OR bailout after 15 frames
+            if (panelScrollRef.current.scrollHeight > panelScrollRef.current.clientHeight || frames > 15) {
                 // Dynamic target: actual rendered height of the action icons block.
-                // Adapts automatically whether 0, 1, or 3 style bars are present.
                 panelScrollRef.current.scrollTop = actionIconsRef.current.offsetHeight;
-            });
-        });
+            } else {
+                requestAnimationFrame(attemptScroll);
+            }
+        };
+        requestAnimationFrame(attemptScroll);
     }, [node.id, details, isLocked, isFullScreenMode]);
 
     useEffect(() => {
@@ -593,8 +602,6 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     const [imgLoaded, setImgLoaded] = useState(false);
     const [isIdCopied, setIsIdCopied] = useState(false);
     const [isHeaderStuck, setIsHeaderStuck] = useState(true);
-    // Decouples visual state from internal scroll state when in Magazine view
-    const isEffectivelyStuck = isHeaderStuck && !isFullScreenMode;
     const imgRef = useRef<HTMLImageElement>(null);
 
     const currentImageUrl = useMemo(() => {
@@ -977,15 +984,15 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
                 <div ref={sentinelRef} className="w-full h-[1px] -mt-[1px] pointer-events-none" />
                 {/* 2. Artist Name & Pills */}
-                <div className={`px-4 ${isEffectivelyStuck ? 'py-2' : 'pt-2 pb-3'} transition-all duration-300 border-b border-zinc-800/50 bg-zinc-900 flex-shrink-0 sticky top-0 z-40 ${isFullScreenMode ? 'md:px-6' : ''}`}>
-                    <div className={`flex flex-col ${isEffectivelyStuck ? 'gap-0' : 'gap-3'} min-w-0 flex-grow transition-all duration-300`}>
+                <div className={`px-4 ${isHeaderStuck ? 'py-2' : 'pt-2 pb-3'} transition-all duration-300 border-b border-zinc-800/50 bg-zinc-900 flex-shrink-0 sticky top-0 z-40 ${isFullScreenMode ? 'md:px-6' : ''}`}>
+                    <div className={`flex flex-col ${isHeaderStuck ? 'gap-0' : 'gap-3'} min-w-0 flex-grow transition-all duration-300`}>
                             <div className="flex items-center gap-2">
                                 <div 
                                     onClick={handleCopyId}
                                     className="group flex items-center gap-2 cursor-copy w-fit transition-all active:scale-[0.98] min-w-0"
                                     title="Click to copy name"
                                 >
-                                    <h3 className={`${isEffectivelyStuck ? 'text-base font-medium' : headerSizeClass} text-white leading-[0.9] py-1 break-normal transition-all duration-300`}>
+                                    <h3 className={`${isHeaderStuck ? 'text-base font-medium' : headerSizeClass} text-white leading-[0.9] py-1 break-normal transition-all duration-300`}>
                                         {getArtistDisplayName(details, node)}
                                     </h3>
                                     <span className={`material-symbols-outlined !text-[16px] flex-shrink-0 transition-all duration-300 ${isIdCopied ? 'text-primary opacity-100 scale-110' : 'text-zinc-500 opacity-0 group-hover:opacity-100'}`}>
@@ -993,7 +1000,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     </span>
                                 </div>
                             </div>
-                            <div className={`flex flex-wrap items-center gap-2 transition-all duration-300 overflow-hidden ${isEffectivelyStuck ? 'max-h-0 opacity-0 mt-0' : 'max-h-10 opacity-100 mt-1'}`}>
+                            <div className={`flex flex-wrap items-center gap-2 transition-all duration-300 overflow-hidden ${isHeaderStuck ? 'max-h-0 opacity-0 mt-0' : 'max-h-10 opacity-100 mt-1'}`}>
                                 <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-400 bg-zinc-800/80 px-2 py-0.5 border border-zinc-700/50 rounded-md">{node.type}</span>
                                 {isManualAdd && <span className="text-[10px] font-semibold uppercase tracking-[0.2em] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 border border-emerald-500/30 rounded-md">Manual</span>}
                                 {isAiSuggestion && <span className="text-[10px] font-semibold uppercase tracking-[0.2em] bg-purple-500/20 text-purple-400 px-2 py-0.5 border border-purple-500/30 flex items-center gap-1 rounded-md"><span className="material-symbols-outlined !text-[12px]">star</span>AI</span>}
