@@ -502,7 +502,20 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
 
             <div className="mt-20 border-t border-zinc-700/50 pt-12">
                 <div className="text-zinc-500 text-xs text-center">
-                    <div className="mx-auto flex justify-center items-center lg:hidden" style={{ minHeight: '66px' }}>
+                    <div 
+                        className="mx-auto flex justify-center items-center lg:hidden cursor-pointer" 
+                        style={{ minHeight: '66px' }}
+                        onClickCapture={(e) => {
+                            e.preventDefault();
+                            onNavigate(View.Home);
+                            const merchEl = document.getElementById('merch');
+                            if (merchEl) {
+                                merchEl.scrollIntoView({ behavior: 'smooth' });
+                            } else {
+                                window.location.hash = 'merch';
+                            }
+                        }}
+                    >
                         <AdSenseUnit
                             adClient="ca-pub-9665950244000141"
                             adSlot="3666473373"
@@ -511,7 +524,20 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                             linkUrl="#merch"
                         />
                     </div>
-                    <div className="hidden mx-auto lg:flex justify-center items-center" style={{ minHeight: '90px' }}>
+                    <div 
+                        className="hidden mx-auto lg:flex justify-center items-center cursor-pointer" 
+                        style={{ minHeight: '90px' }}
+                        onClickCapture={(e) => {
+                            e.preventDefault();
+                            onNavigate(View.Home);
+                            const merchEl = document.getElementById('merch');
+                            if (merchEl) {
+                                merchEl.scrollIntoView({ behavior: 'smooth' });
+                            } else {
+                                window.location.hash = 'merch';
+                            }
+                        }}
+                    >
                         <AdSenseUnit
                             adClient="ca-pub-9665950244000141"
                             adSlot="3666473373"

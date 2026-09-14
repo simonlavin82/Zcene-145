@@ -1641,7 +1641,15 @@ const GraphPage: React.FC<GraphPageProps> = ({
                 {!isMagazineViewOpen && (
                     <div className="flex-shrink-0 border-t border-zinc-700/50 bg-zinc-900 py-0 px-2 text-center relative z-50">
                         <div className="text-zinc-500 text-[10px] sm:text-xs">
-                            <div className="mx-auto flex justify-center items-center" style={{ minHeight: '50px' }}>
+                            <div 
+                                className="mx-auto flex justify-center items-center cursor-pointer" 
+                                style={{ minHeight: '50px' }}
+                                onClickCapture={(e) => {
+                                    e.preventDefault();
+                                    onNavigate(View.Home);
+                                    window.location.hash = 'merch';
+                                }}
+                            >
                                 <AdSenseUnit 
                                     adClient="ca-pub-9665950244000141" 
                                     adSlot="3666473373" 
@@ -1670,7 +1678,15 @@ const GraphPage: React.FC<GraphPageProps> = ({
                     <div key={`ad-container-${adSize}`} className="flex-shrink-0 bg-zinc-900 border border-zinc-600/50 px-2 py-0 flex justify-center items-center overflow-hidden">
                         <div className="text-zinc-500 text-[10px] text-center max-w-full">
                             {adSize === 'small' ? (
-                                <div className="mx-auto flex justify-center items-center" style={{ minHeight: '50px', width: '320px' }}>
+                                <div 
+                                    className="mx-auto flex justify-center items-center cursor-pointer" 
+                                    style={{ minHeight: '50px', width: '320px' }}
+                                    onClickCapture={(e) => {
+                                        e.preventDefault();
+                                        onNavigate(View.Home);
+                                        window.location.hash = 'merch';
+                                    }}
+                                >
                                     <AdSenseUnit 
                                         adClient="ca-pub-9665950244000141" 
                                         adSlot="3666473373" 
@@ -1680,7 +1696,15 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                     />
                                 </div>
                             ) : (
-                                <div className="mx-auto flex justify-center items-center" style={{ minHeight: '90px', width: '728px', maxWidth: '100%' }}>
+                                <div 
+                                    className="mx-auto flex justify-center items-center cursor-pointer" 
+                                    style={{ minHeight: '90px', width: '728px', maxWidth: '100%' }}
+                                    onClickCapture={(e) => {
+                                        e.preventDefault();
+                                        onNavigate(View.Home);
+                                        window.location.hash = 'merch';
+                                    }}
+                                >
                                     <AdSenseUnit 
                                         adClient="ca-pub-9665950244000141" 
                                         adSlot="3666473373" 
