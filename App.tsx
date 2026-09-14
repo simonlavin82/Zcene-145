@@ -24,6 +24,7 @@ import { ShareModal } from './components/ShareModal';
 import { analyticsService } from './services/analyticsService';
 import { ZceneLogo, Spinner } from './components/Icons';
 import CookieConsent from './components/CookieConsent';
+import GlobalWall from './components/GlobalWall';
 
 const checkVideoPlayabilityOnServer = async (videoId: string): Promise<boolean> => {
   if (!videoId || videoId.length !== 11) return false;
@@ -7496,6 +7497,7 @@ const App: React.FC = () => {
   }, [discoveryFilters, lastAppliedFilters]);
 
   return (
+    <GlobalWall>
     <div className="h-[100dvh] flex flex-col overflow-hidden" key={refreshKey}>
       <AnimatePresence>
         {error && (
@@ -7921,6 +7923,7 @@ const App: React.FC = () => {
       </AnimatePresence>
       <CookieConsent />
     </div>
+  </GlobalWall>
   );
 };
 

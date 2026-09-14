@@ -123,8 +123,8 @@ function sanitizeLabelProfile(details) {
 function isEntitySeedMatch(seedNorm, candidateNorm) {
     if (!seedNorm || !candidateNorm)
         return false;
-    const s = (0, curatorService_1.normalizeArtistId)(seedNorm);
-    const c = (0, curatorService_1.normalizeArtistId)(candidateNorm);
+    const s = stripCountrySlug((0, curatorService_1.normalizeArtistId)(seedNorm));
+    const c = stripCountrySlug((0, curatorService_1.normalizeArtistId)(candidateNorm));
     if (s === c)
         return true;
     if (s.startsWith(`${c}-`) || c.startsWith(`${s}-`))
@@ -407,7 +407,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         // to create sick-of-it-all). If a canonical doc is found, adopt its ID.
                         if (!isLabel) {
                             try {
-                                const baseNormId = (0, curatorService_1.normalizeArtistId)(rawName); // without country suffix
+                                const baseNormId = stripCountrySlug((0, curatorService_1.normalizeArtistId)(rawName)); // without country suffix
                                 const existingQuery = await db.collection("artists")
                                     .where("artistId", ">=", baseNormId)
                                     .where("artistId", "<=", `${baseNormId}\uf8ff`)
@@ -879,6 +879,70 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                 }
                             }
                         });
+                    }
+                    // --- Degree-0 Cleanup Phase ---
+                    if (finalGraph.nodes && finalGraph.links) {
+                        // Build a set of ALL valid node IDs currently in the graph
+                        const validNodeIds = new Set(finalGraph.nodes.map((n) => n.id));
+                        const connectedNodeIds = new Set();
+                        finalGraph.links.forEach((link) => {
+                            const sId = typeof link.source === 'string' ? link.source : link.source.id;
+                            const tId = typeof link.target === 'string' ? link.target : link.target.id;
+                            if (validNodeIds.has(sId) && validNodeIds.has(tId)) {
+                                connectedNodeIds.add(sId);
+                                connectedNodeIds.add(tId);
+                            }
+                        });
+                        // Ensure all resolved seed IDs are protected from pruning
+                        const protectedSeedIds = new Set();
+                        for (const seedNorm of seedNorms) {
+                            protectedSeedIds.add(seedNorm);
+                            if (resolvedSeedNormMap.has(seedNorm)) {
+                                protectedSeedIds.add(resolvedSeedNormMap.get(seedNorm));
+                            }
+                        }
+                        // Filter out nodes that have 0 degrees, are not protected seeds, or are orphaned country nodes
+                        const originalNodeCount = finalGraph.nodes.length;
+                        finalGraph.nodes = finalGraph.nodes.filter((node) => {
+                            // Force prune any country node that isn't a canonical target for an active artist
+                            if (node.type === 'country') {
+                                let isRequired = false;
+                                for (const n of finalGraph.nodes) {
+                                    if (n.type === 'artist' || n.type === 'label') {
+                                        if (n.origin) {
+                                            const canonSlug = (0, curatorService_1.extractCountrySlug)(n.origin);
+                                            if (canonSlug !== 'global') {
+                                                const canonCountryName = ISO_TO_COUNTRY_MAP[canonSlug] || canonSlug;
+                                                if ((0, curatorService_1.normalizeArtistId)(canonCountryName) === node.id) {
+                                                    isRequired = true;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                if (!isRequired) {
+                                    return false; // Drop non-canonical or unverified country node
+                                }
+                            }
+                            return connectedNodeIds.has(node.id) || protectedSeedIds.has(node.id);
+                        });
+                        const prunedCount = originalNodeCount - finalGraph.nodes.length;
+                        if (prunedCount > 0) {
+                            console.log(`[Curation Backend] Degree-0 Cleanup Phase: Pruned ${prunedCount} orphaned ghost node(s).`);
+                        }
+                        // Clean up any phantom links that referenced pruned nodes
+                        const finalValidNodes = new Set(finalGraph.nodes.map((n) => n.id));
+                        const originalLinkCount = finalGraph.links.length;
+                        finalGraph.links = finalGraph.links.filter((link) => {
+                            const sId = typeof link.source === 'string' ? link.source : link.source.id;
+                            const tId = typeof link.target === 'string' ? link.target : link.target.id;
+                            return finalValidNodes.has(sId) && finalValidNodes.has(tId);
+                        });
+                        const prunedLinkCount = originalLinkCount - finalGraph.links.length;
+                        if (prunedLinkCount > 0) {
+                            console.log(`[Curation Backend] Degree-0 Cleanup Phase: Pruned ${prunedLinkCount} phantom edge(s).`);
+                        }
                     }
                     // ── Step 5: Root Breakdown Write-Back to Seed Artist Docs (Atomic Self-Heal) ────────────────
                     // Per the Unified Canvas Architecture (Column 3, Step 5), Single-Seed jobs persist
