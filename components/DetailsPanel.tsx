@@ -467,13 +467,23 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     const actionIconsRef = useRef<HTMLDivElement>(null);
     // Guards against re-running the scroll effect when the same node re-renders.
     const lastScrolledNodeId = useRef<string | null>(null);
+    // Shadows the previous isFullScreenMode value so the guard can detect Magazine view exits.
+    const lastIsFullScreenModeRef = useRef<boolean>(isFullScreenMode);
 
     // Fire AFTER content is stable (details resolved + isLocked), not during the loading skeleton.
     // This fixes the lifecycle collision: scrolling into a still-loading layout was causing
     // the scroll position to be invalidated when real content mounted and reflowed the DOM.
     useEffect(() => {
         if (isFullScreenMode || !panelScrollRef.current || !details || !isLocked) return;
-        if (lastScrolledNodeId.current === node.id) return;
+
+        // Detect whether we just exited Magazine view (isFullScreenMode: true → false).
+        // When true, we must bypass the node.id guard — the scroll position was reset
+        // during Magazine view and needs to be restored even for the same node.
+        const exitedMagazine = lastIsFullScreenModeRef.current === true && isFullScreenMode === false;
+        lastIsFullScreenModeRef.current = isFullScreenMode;
+
+        // Guard: skip if same node AND we didn't just exit Magazine view.
+        if (!exitedMagazine && lastScrolledNodeId.current === node.id) return;
         lastScrolledNodeId.current = node.id;
 
         // Pre-set compact state so the header is already at its final height before rAF fires.
