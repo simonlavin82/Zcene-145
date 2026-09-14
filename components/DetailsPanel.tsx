@@ -462,16 +462,32 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
     const sentinelRef = useRef<HTMLDivElement>(null);
     const panelScrollRef = useRef<HTMLDivElement>(null);
+    // Measures the rendered height of the non-sticky action icons block dynamically.
+    // Used as the scroll target so the value adapts automatically (e.g. when style bars change).
+    const actionIconsRef = useRef<HTMLDivElement>(null);
+    // Guards against re-running the scroll effect when the same node re-renders.
+    const lastScrolledNodeId = useRef<string | null>(null);
 
-    // On node change: pre-set compact state BEFORE applying the scroll offset.
-    // This ensures the header is already at its final compact height when scrollTop fires,
-    // so the onScroll handler sees setIsHeaderStuck(true) → same value → no re-render → no jitter loop.
+    // Fire AFTER content is stable (details resolved + isLocked), not during the loading skeleton.
+    // This fixes the lifecycle collision: scrolling into a still-loading layout was causing
+    // the scroll position to be invalidated when real content mounted and reflowed the DOM.
     useEffect(() => {
-        if (!isFullScreenMode && panelScrollRef.current) {
-            setIsHeaderStuck(true);
-            panelScrollRef.current.scrollTop = 56;
-        }
-    }, [node.id, isFullScreenMode]);
+        if (isFullScreenMode || !panelScrollRef.current || !details || !isLocked) return;
+        if (lastScrolledNodeId.current === node.id) return;
+        lastScrolledNodeId.current = node.id;
+
+        // Pre-set compact state so the header is already at its final height before rAF fires.
+        // When onScroll reads scrollTop it will call setIsHeaderStuck(true) — same value, no re-render loop.
+        setIsHeaderStuck(true);
+
+        // One rAF: let the browser paint the stable layout, then read the true pixel height.
+        requestAnimationFrame(() => {
+            if (!panelScrollRef.current || !actionIconsRef.current) return;
+            // Dynamic target: actual rendered height of the action icons block.
+            // Adapts automatically whether 0, 1, or 3 style bars are present.
+            panelScrollRef.current.scrollTop = actionIconsRef.current.offsetHeight;
+        });
+    }, [node.id, details, isLocked, isFullScreenMode]);
 
     useEffect(() => {
         if (!isFullScreenMode || !sentinelRef.current) return;
@@ -883,8 +899,8 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
           }}
         >
             <div className="flex flex-col min-h-full">
-                {/* 1. Action Icons (Not Sticky) */}
-                <div className={`px-4 pt-3 bg-zinc-900 z-20 flex-shrink-0 ${isFullScreenMode ? 'md:px-6' : ''}`}>
+                {/* 1. Action Icons (Not Sticky) — ref measures its rendered height for the dynamic scroll target */}
+                <div ref={actionIconsRef} className={`px-4 pt-3 bg-zinc-900 z-20 flex-shrink-0 ${isFullScreenMode ? 'md:px-6' : ''}`}>
                     <div className="flex items-center justify-end gap-1 flex-shrink-0">
                             {isArtistNode && details && (
                                 <button
@@ -1035,7 +1051,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                         <div className={`space-y-10 text-zinc-300 ${isFullScreenMode ? 'pb-6' : 'pb-16'}`}>
                             {/* Compatibility Meter (Hidden for Labels) */}
                             {!isLabelNode && (
-                                <div className="flex flex-col gap-2 w-full">
+                                <div className="flex flex-col gap-2 w-full pt-4">
 
                                     {activeTasteProfilesData.length > 0 && (
                                         <div className="flex flex-col gap-2">
