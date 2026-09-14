@@ -467,23 +467,26 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     const actionIconsRef = useRef<HTMLDivElement>(null);
     // Guards against re-running the scroll effect when the same node re-renders.
     const lastScrolledNodeId = useRef<string | null>(null);
-    // Shadows the previous isFullScreenMode value so the guard can detect Magazine view exits.
-    const lastIsFullScreenModeRef = useRef<boolean>(isFullScreenMode);
 
+    // Effect 1 — Guard Invalidator (must be declared BEFORE the scroll effect).
+    // React runs effects in declaration order within the same commit. By resetting
+    // lastScrolledNodeId to null here, the scroll effect below is guaranteed to see
+    // a cleared guard when isFullScreenMode transitions back to false (Magazine exit).
+    useEffect(() => {
+        if (!isFullScreenMode) {
+            lastScrolledNodeId.current = null;
+        }
+    }, [isFullScreenMode]);
+
+    // Effect 2 — Scroll Executor.
     // Fire AFTER content is stable (details resolved + isLocked), not during the loading skeleton.
-    // This fixes the lifecycle collision: scrolling into a still-loading layout was causing
-    // the scroll position to be invalidated when real content mounted and reflowed the DOM.
+    // On Magazine exit, Effect 1 above has already reset the guard to null in this same commit,
+    // so the node.id check correctly passes and the scroll fires for the current node.
     useEffect(() => {
         if (isFullScreenMode || !panelScrollRef.current || !details || !isLocked) return;
 
-        // Detect whether we just exited Magazine view (isFullScreenMode: true → false).
-        // When true, we must bypass the node.id guard — the scroll position was reset
-        // during Magazine view and needs to be restored even for the same node.
-        const exitedMagazine = lastIsFullScreenModeRef.current === true && isFullScreenMode === false;
-        lastIsFullScreenModeRef.current = isFullScreenMode;
-
-        // Guard: skip if same node AND we didn't just exit Magazine view.
-        if (!exitedMagazine && lastScrolledNodeId.current === node.id) return;
+        // Simple guard: null (cleared by invalidator on Magazine exit) or a different node → scroll.
+        if (lastScrolledNodeId.current === node.id) return;
         lastScrolledNodeId.current = node.id;
 
         // Pre-set compact state so the header is already at its final height before rAF fires.
