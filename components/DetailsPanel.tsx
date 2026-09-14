@@ -497,17 +497,22 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         setIsHeaderStuck(true);
 
         // Polling rAF: The browser's physical layout engine often lags behind React's state commit.
-        // We poll until the browser confirms the container is scrollable (scrollHeight > clientHeight),
-        // guaranteeing the scrollTop assignment hits a real, painted DOM scroll box.
+        // We poll until the browser confirms the container has enough scrollable space (maxScroll)
+        // to accept the full target offset. This prevents the browser from clamping the scroll assignment
+        // during the 500ms CSS layout transition.
         let frames = 0;
         const attemptScroll = () => {
             frames++;
             if (!panelScrollRef.current || !actionIconsRef.current) return;
             
-            // Check if the container is physically scrollable, OR bailout after 15 frames
-            if (panelScrollRef.current.scrollHeight > panelScrollRef.current.clientHeight || frames > 15) {
-                // Dynamic target: actual rendered height of the action icons block.
-                panelScrollRef.current.scrollTop = actionIconsRef.current.offsetHeight;
+            const panel = panelScrollRef.current;
+            const targetOffset = actionIconsRef.current.offsetHeight;
+            const maxScroll = panel.scrollHeight - panel.clientHeight;
+
+            // Wait until the animating layout opens up enough space to not truncate the assignment,
+            // OR bailout after 35 frames (~600ms) to safely cover the 500ms CSS transition.
+            if (maxScroll >= targetOffset || frames > 35) {
+                panel.scrollTop = targetOffset;
             } else {
                 requestAnimationFrame(attemptScroll);
             }
@@ -921,7 +926,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
           style={{ overscrollBehaviorY: 'auto', '--scene-accent': localDominantColor } as React.CSSProperties}
           onScroll={(e) => {
               if (isFullScreenMode) return;
-              setIsHeaderStuck(e.currentTarget.scrollTop > 40);
+              setIsHeaderStuck(e.currentTarget.scrollTop > 10);
           }}
         >
             <div className="flex flex-col min-h-full">
