@@ -463,11 +463,13 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     const sentinelRef = useRef<HTMLDivElement>(null);
     const panelScrollRef = useRef<HTMLDivElement>(null);
 
-    // Reset scroll to top whenever the active node changes so each card starts fresh.
-    // Native scroll listener (onScroll → isHeaderStuck) handles the compact header state naturally.
+    // On node change: pre-set compact state BEFORE applying the scroll offset.
+    // This ensures the header is already at its final compact height when scrollTop fires,
+    // so the onScroll handler sees setIsHeaderStuck(true) → same value → no re-render → no jitter loop.
     useEffect(() => {
         if (!isFullScreenMode && panelScrollRef.current) {
-            panelScrollRef.current.scrollTop = 0;
+            setIsHeaderStuck(true);
+            panelScrollRef.current.scrollTop = 56;
         }
     }, [node.id, isFullScreenMode]);
 
@@ -557,7 +559,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     const [imageTier, setImageTier] = useState<'source' | 'placeholder'>('source');
     const [imgLoaded, setImgLoaded] = useState(false);
     const [isIdCopied, setIsIdCopied] = useState(false);
-    const [isHeaderStuck, setIsHeaderStuck] = useState(false);
+    const [isHeaderStuck, setIsHeaderStuck] = useState(true);
     const imgRef = useRef<HTMLImageElement>(null);
 
     const currentImageUrl = useMemo(() => {
