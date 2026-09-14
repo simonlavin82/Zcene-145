@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../services/firebase';
 import { ZceneLogo, Spinner, VisibilityIcon, VisibilityOffIcon } from './Icons';
+import { Input, Button } from './DesignSystem';
 
 // sessionStorage key — intentionally non-descriptive to avoid easy guessing.
 const SESSION_KEY = 'zcene_beta_unlocked';
@@ -24,6 +25,11 @@ interface GlobalWallProps {
  *   Cloud Function, which compares it against a Cloud Secret Manager secret.
  * - On success, a flag is written to sessionStorage (NOT localStorage) so
  *   access is automatically revoked when the browser tab is closed.
+ *
+ * Design System compliance:
+ * - Input: uses the official <Input> component from DesignSystem.tsx.
+ * - Button: uses the official <Button variant="primary"> from DesignSystem.tsx.
+ * - Logo: rendered in brand yellow via text-primary.
  */
 const GlobalWall: React.FC<GlobalWallProps> = ({ children }) => {
   const isWallEnabled = import.meta.env.VITE_ENABLE_GLOBAL_WALL === 'true';
@@ -98,8 +104,8 @@ const GlobalWallGate: React.FC<GlobalWallProps> = ({ children }) => {
 
   return (
     <div className="min-h-screen w-full bg-background-dark flex flex-col items-center justify-center px-4">
-      {/* Logo */}
-      <ZceneLogo className="text-white w-28 mb-10 opacity-90" />
+      {/* Logo — brand yellow, no opacity dimming */}
+      <ZceneLogo className="text-primary w-28 mb-10" />
 
       {/* Lock screen card */}
       <div className="w-full max-w-sm">
@@ -111,8 +117,9 @@ const GlobalWallGate: React.FC<GlobalWallProps> = ({ children }) => {
         </p>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          {/* Official Input component — yellow focus ring, bg-zinc-950, border-zinc-700 */}
           <div className="relative">
-            <input
+            <Input
               ref={inputRef}
               id="global-wall-password"
               type={showPassword ? 'text' : 'password'}
@@ -124,15 +131,7 @@ const GlobalWallGate: React.FC<GlobalWallProps> = ({ children }) => {
               placeholder="Access code"
               autoComplete="current-password"
               disabled={isLoading}
-              className="
-                w-full px-4 py-3 pr-11 rounded-xl
-                bg-zinc-900 border border-zinc-800
-                text-white placeholder-zinc-600
-                text-sm
-                focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-zinc-700
-                disabled:opacity-50 disabled:cursor-not-allowed
-                transition-colors
-              "
+              className="pr-11 disabled:opacity-50 disabled:cursor-not-allowed"
             />
             <button
               type="button"
@@ -154,18 +153,13 @@ const GlobalWallGate: React.FC<GlobalWallProps> = ({ children }) => {
             </p>
           )}
 
-          <button
+          {/* Official Button component — canonical primary CTA token */}
+          <Button
             id="global-wall-submit"
             type="submit"
+            variant="primary"
+            fullWidth
             disabled={isLoading || !password.trim()}
-            className="
-              w-full py-3 rounded-xl
-              bg-primary text-black
-              text-sm font-semibold
-              hover:opacity-90 active:scale-[0.98]
-              disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100
-              transition-all flex items-center justify-center gap-2
-            "
           >
             {isLoading ? (
               <>
@@ -175,7 +169,7 @@ const GlobalWallGate: React.FC<GlobalWallProps> = ({ children }) => {
             ) : (
               'Continue'
             )}
-          </button>
+          </Button>
         </form>
       </div>
     </div>

@@ -55,13 +55,44 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
   variant?: 'sm' | 'md';
 }
 
-export const Input: React.FC<InputProps> = ({ variant = 'md', className = '', ...props }) => {
-  const size = InputSizes[variant];
+export const Input = React.forwardRef<HTMLInputElement, InputProps>(
+  ({ variant = 'md', className = '', ...props }, ref) => {
+    const size = InputSizes[variant];
+    return (
+      <input
+        ref={ref}
+        className={`w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none ${size.base} px-4 ${className}`}
+        {...props}
+      />
+    );
+  }
+);
+Input.displayName = 'Input';
+
+export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: 'primary' | 'secondary';
+  fullWidth?: boolean;
+}
+
+export const Button: React.FC<ButtonProps> = ({
+  variant = 'primary',
+  fullWidth = false,
+  className = '',
+  children,
+  ...props
+}) => {
+  const base = 'px-6 py-2 rounded-xl font-medium text-sm active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100';
+  const variants: Record<NonNullable<ButtonProps['variant']>, string> = {
+    primary: 'bg-primary text-brand-black hover:opacity-90',
+    secondary: 'border border-zinc-700 text-zinc-200 bg-zinc-800 hover:bg-zinc-700',
+  };
   return (
-    <input 
-      className={`w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none ${size.base} px-4 ${className}`}
+    <button
+      className={`${base} ${variants[variant]}${fullWidth ? ' w-full' : ''}${className ? ` ${className}` : ''}`}
       {...props}
-    />
+    >
+      {children}
+    </button>
   );
 };
 
