@@ -288,7 +288,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             <div>
-              <h1 className="text-lg font-medium uppercase tracking-widest text-zinc-200">YOUR ZCENES</h1>
+              <h1 className="text-base font-medium uppercase tracking-widest text-zinc-200">YOUR ZCENES</h1>
             </div>
           </div>
 
