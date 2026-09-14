@@ -163,7 +163,7 @@ const GlobalWallGate: React.FC<GlobalWallProps> = ({ children }) => {
           >
             {isLoading ? (
               <>
-                <Spinner className="w-4 h-4 text-black" />
+                <Spinner size="sm" />
                 Verifying…
               </>
             ) : (
