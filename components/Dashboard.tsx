@@ -239,50 +239,56 @@ const Dashboard: React.FC<DashboardProps> = ({
       <div className="flex-grow w-full overflow-y-auto relative">
         <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="w-full space-y-8">
-          <div className="flex flex-col-reverse items-start text-left md:flex-row md:justify-between md:items-center gap-4">
-            <h1 className="text-lg font-medium uppercase tracking-widest text-zinc-200">YOUR ZCENES</h1>
-            
-            <div className="flex items-center gap-2 h-[36px] w-full justify-start md:w-auto md:justify-end">
-              {/* Sort Selector Toggle */}
-              <ViewToggle 
-                value={sortBy}
-                onChange={(s) => setSortBy(s as 'recent' | 'alphabetical')}
-                options={[
-                  { id: 'recent', icon: 'schedule', label: 'Sort by Recent' },
-                  { id: 'alphabetical', icon: 'sort_by_alpha', label: 'Sort Alphabetically' }
-                ]}
-                className="h-full"
-              />
+          <div className="flex flex-col gap-6 w-full">
+            <div className="flex flex-row items-start sm:items-center justify-between w-full gap-4">
+              <div className="flex flex-row items-center gap-2 h-[36px] flex-wrap sm:flex-nowrap">
+                {/* Sort Selector Toggle */}
+                <ViewToggle 
+                  value={sortBy}
+                  onChange={(s) => setSortBy(s as 'recent' | 'alphabetical')}
+                  options={[
+                    { id: 'recent', icon: 'schedule', label: 'Sort by Recent' },
+                    { id: 'alphabetical', icon: 'sort_by_alpha', label: 'Sort Alphabetically' }
+                  ]}
+                  className="h-full"
+                />
 
-              {/* Grid/List View Toggle */}
-              <ViewToggle 
-                value={view}
-                onChange={(v) => setView(v as 'grid' | 'list')}
-                options={[
-                  { id: 'grid', icon: 'grid_view', label: 'Grid View' },
-                  { id: 'list', icon: 'list', label: 'List View' }
-                ]}
-                className="h-full"
-              />
+                {/* Grid/List View Toggle */}
+                <ViewToggle 
+                  value={view}
+                  onChange={(v) => setView(v as 'grid' | 'list')}
+                  options={[
+                    { id: 'grid', icon: 'grid_view', label: 'Grid View' },
+                    { id: 'list', icon: 'list', label: 'List View' }
+                  ]}
+                  className="h-full"
+                />
+              </div>
 
               {/* New Zcene Button */}
-              <button 
-                onClick={onCreateProject}
-                disabled={isCreatingProject}
-                className="h-full rounded-xl bg-[#F2E572] text-black text-sm px-4 font-medium flex items-center gap-2 whitespace-nowrap"
-              >
-                {isCreatingProject ? (
-                  <>
-                    <span className="material-symbols-outlined animate-spin !text-lg">progress_activity</span>
-                    Creating...
-                  </>
-                ) : (
-                  <>
-                    <span className="material-symbols-outlined !text-lg font-bold">add</span>
-                    Create
-                  </>
-                )}
-              </button>
+              <div className="flex items-center h-[36px] flex-shrink-0">
+                <button 
+                  onClick={onCreateProject}
+                  disabled={isCreatingProject}
+                  className="h-full rounded-xl bg-[#F2E572] text-black text-sm px-4 font-medium flex items-center gap-2 whitespace-nowrap"
+                >
+                  {isCreatingProject ? (
+                    <>
+                      <span className="material-symbols-outlined animate-spin !text-lg">progress_activity</span>
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined !text-lg font-bold">add</span>
+                      Create
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <h1 className="text-lg font-medium uppercase tracking-widest text-zinc-200">YOUR ZCENES</h1>
             </div>
           </div>
 
