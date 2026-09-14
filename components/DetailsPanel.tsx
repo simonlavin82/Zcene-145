@@ -499,29 +499,35 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         // When onScroll reads scrollTop it will call setIsHeaderStuck(true) — same value, no re-render loop.
         setIsHeaderStuck(true);
 
-        // Polling rAF: The browser's physical layout engine often lags behind React's state commit.
-        // We poll until the browser confirms the container has enough scrollable space (maxScroll)
-        // to accept the full target offset. This prevents the browser from clamping the scroll assignment
-        // during the 500ms CSS layout transition.
-        let frames = 0;
-        const attemptScroll = () => {
-            frames++;
+        // Force-Scroll Polling: During the 300ms horizontal pagination transition, the browser's layout engine
+        // can forcefully clamp or ignore single vertical scrollTop assignments on the moving flex item.
+        // We continuously enforce the target offset for 350ms to guarantee it sticks as it settles into the viewport.
+        let rafId: number;
+        const startTime = Date.now();
+
+        const forceScroll = () => {
             if (!panelScrollRef.current || !actionIconsRef.current) return;
             
             const panel = panelScrollRef.current;
             const targetOffset = actionIconsRef.current.offsetHeight;
             const maxScroll = panel.scrollHeight - panel.clientHeight;
 
-            // Wait until the animating layout opens up enough space to not truncate the assignment,
-            // OR bailout after 35 frames (~600ms) to safely cover the 500ms CSS transition.
-            if (maxScroll >= targetOffset || frames > 35) {
+            // Only apply if the layout has enough space, preventing it from clamping to 0 and triggering onScroll(false)
+            if (maxScroll >= targetOffset) {
                 panel.scrollTop = targetOffset;
-            } else {
-                requestAnimationFrame(attemptScroll);
+            }
+
+            if (Date.now() - startTime < 350) {
+                rafId = requestAnimationFrame(forceScroll);
             }
         };
-        requestAnimationFrame(attemptScroll);
-    }, [node.id, details, isLocked, isFullScreenMode]);
+        
+        rafId = requestAnimationFrame(forceScroll);
+
+        return () => {
+            if (rafId) cancelAnimationFrame(rafId);
+        };
+    }, [node.id, details, isLocked, isFullScreenMode, isActive]);
 
     useEffect(() => {
         if (!isFullScreenMode || !sentinelRef.current) return;
@@ -1009,7 +1015,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                         </div>
                 </div>
 
-                <div className={`px-4 space-y-10 flex-grow min-h-0 relative ${isFullScreenMode ? 'pt-2 pb-4 md:px-8' : 'pt-2 pb-8'}`}>
+                <div className={`px-4 flex-grow min-h-0 relative ${isFullScreenMode ? 'pt-6 pb-4 md:px-8' : 'pt-6 pb-8'}`}>
                     {isLoading && !isLocked && details && (
                         <div className="absolute inset-0 bg-zinc-900/90 backdrop-blur-sm z-30 flex flex-col items-center justify-center text-center space-y-8 h-full bg-zinc-900">
                             <LoadingSpinner 
@@ -1074,7 +1080,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                     )}
 
                     {details && (
-                        <div className={`space-y-10 text-zinc-300 ${isFullScreenMode ? 'pb-6' : 'pb-16'}`}>
+                        <div className={`space-y-6 text-zinc-300 ${isFullScreenMode ? 'pb-6' : 'pb-16'}`}>
                             {/* Compatibility Meter (Hidden for Labels) */}
                             {!isLabelNode && activeTasteProfilesData.length > 0 && (
                                 <div className="flex flex-col gap-2 w-full pt-4">
