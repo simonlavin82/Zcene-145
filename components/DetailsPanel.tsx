@@ -231,6 +231,7 @@ interface NodeDetailsCardProps {
   onUpdateTasteProfile?: (taste: UserTaste) => Promise<void>;
   onShowToast?: (message: string) => void;
   onOpenTasteModal?: () => void;
+  isActive?: boolean;
 }
 
 const parseTourDates = (text: string): { isTouring: boolean; dates: string[] } => {
@@ -386,7 +387,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
   node, details, isLoading, isGlobalLoading, graphData, libraryArtists, seedArtists, onAddArtist, isSmallScreen, 
   onClose, onNodeClick, onExtendNode, onNavigate, 
   chatHistory, onSendMessage, isChatLoading, chatMode, onChatModeChange, liveMessageCount, onDeleteMessage, onClearChat, isFullScreenMode = false, isHero = false, isInStack, onToggleStack, onToggleMagazineView, isGuest = false, onAuthRequest, user, userTaste, isAdmin = false,
-  onUpdateTasteProfile, onShowToast, onOpenTasteModal
+  onUpdateTasteProfile, onShowToast, onOpenTasteModal, isActive = true
 }) => {
     const handleAddToTaste = async (node: Node, details: NodeDetails) => {
         if (!user) {
@@ -471,22 +472,24 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     // Effect 1 — Guard Invalidator (must be declared BEFORE the scroll effect).
     // React runs effects in declaration order within the same commit. By resetting
     // lastScrolledNodeId to null here, the scroll effect below is guaranteed to see
-    // a cleared guard when isFullScreenMode transitions back to false (Magazine exit).
+    // a cleared guard when isFullScreenMode transitions back to false (Magazine exit) or on pagination.
     useEffect(() => {
         if (isFullScreenMode) {
             // Explicitly reset the header state on Magazine entry so the titles don't render small.
             setIsHeaderStuck(false);
         } else {
+            // Clear the guard on Magazine exit OR on pagination change
+            // so the scroll executor runs on the fresh view.
             lastScrolledNodeId.current = null;
         }
-    }, [isFullScreenMode]);
+    }, [isFullScreenMode, isActive]);
 
     // Effect 2 — Scroll Executor.
     // Fire AFTER content is stable (details resolved + isLocked), not during the loading skeleton.
     // On Magazine exit, Effect 1 above has already reset the guard to null in this same commit,
     // so the node.id check correctly passes and the scroll fires for the current node.
     useEffect(() => {
-        if (isFullScreenMode || !panelScrollRef.current || !details || !isLocked) return;
+        if (isFullScreenMode || !isActive || !panelScrollRef.current || !details || !isLocked) return;
 
         // Simple guard: null (cleared by invalidator on Magazine exit) or a different node → scroll.
         if (lastScrolledNodeId.current === node.id) return;
@@ -1073,10 +1076,9 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                     {details && (
                         <div className={`space-y-10 text-zinc-300 ${isFullScreenMode ? 'pb-6' : 'pb-16'}`}>
                             {/* Compatibility Meter (Hidden for Labels) */}
-                            {!isLabelNode && (
+                            {!isLabelNode && activeTasteProfilesData.length > 0 && (
                                 <div className="flex flex-col gap-2 w-full pt-4">
 
-                                    {activeTasteProfilesData.length > 0 && (
                                         <div className="flex flex-col gap-2">
 
                                             {activeTasteProfilesData.map((data) => {
@@ -1111,7 +1113,6 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                 <span>ERA</span>
                                             </div>
                                         </div>
-                                    )}
                                 </div>
                             )}
 
@@ -2399,6 +2400,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 onUpdateTasteProfile={onUpdateTasteProfile}
                                                 onShowToast={onShowToast}
                                                 onOpenTasteModal={onOpenTasteModal}
+                                                isActive={node.id === viewedNode?.id}
                                             />
                                         </div>
                                     );
