@@ -88,7 +88,12 @@ const GlobalWallGate: React.FC<GlobalWallProps> = ({ children }) => {
 
       setIsUnlocked(true);
     } catch (err: any) {
-      if (err.code === 'unauthenticated' || err.code === 'invalid-argument') {
+      if (
+        err.code === 'unauthenticated' || 
+        err.code === 'functions/unauthenticated' || 
+        err.code === 'invalid-argument' || 
+        err.code === 'functions/invalid-argument'
+      ) {
         setError('Incorrect password. Please try again.');
         setPassword('');
       } else {
