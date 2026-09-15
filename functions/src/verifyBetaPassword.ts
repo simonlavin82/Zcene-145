@@ -20,7 +20,7 @@ export const verifyBetaPassword = onCall(
   {
     secrets: ["BETA_WALL_PASSWORD"],
     timeoutSeconds: 30,
-    memory: "256MiB",
+    memory: "512MiB",
   },
   async (request) => {
     const { password } = request.data as { password?: string };

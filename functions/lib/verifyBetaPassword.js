@@ -20,8 +20,8 @@ const https_1 = require("firebase-functions/v2/https");
  */
 exports.verifyBetaPassword = (0, https_1.onCall)({
     secrets: ["BETA_WALL_PASSWORD"],
-    timeoutSeconds: 10,
-    memory: "128MiB",
+    timeoutSeconds: 30,
+    memory: "512MiB",
 }, async (request) => {
     const { password } = request.data;
     if (!password || typeof password !== "string") {
