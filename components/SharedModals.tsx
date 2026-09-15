@@ -4,7 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { StackItem, Node, UserTaste } from '../types';
 import { StackIcon, VisibilityIcon, VisibilityOffIcon } from './Icons';
 import Markdown from 'react-markdown';
-import { isNodeInSeedList } from '../services/artistCacheService';
+import { isNodeInSeedList, cleanArtistDisplayName } from '../services/artistCacheService';
 import { Flame, Waypoints } from 'lucide-react';
 import { formatSystemTimestamp } from '../utils/formatters';
 
@@ -53,7 +53,7 @@ export const MyStackDialog: React.FC<{
                     </div>
                 ) : (
                     [...stack].reverse().map(item => {
-                        const nameToCopy = item.id.replace(/[-_]+/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                        const nameToCopy = cleanArtistDisplayName(item.id);
                         const isCopied = copiedId === item.id;
                         
                         return (
