@@ -24,6 +24,21 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('Uncaught error:', error, errorInfo);
+
+    // Auto-heal chunk load errors (React lazy loading mismatch)
+    const isChunkLoadError = 
+      error.name === 'ChunkLoadError' || 
+      error.message.includes('Failed to fetch dynamically imported module') ||
+      error.message.includes('Importing a module script failed');
+
+    if (isChunkLoadError) {
+      const lastReload = sessionStorage.getItem('chunk_error_reload');
+      const now = Date.now();
+      if (!lastReload || now - parseInt(lastReload) > 10000) {
+        sessionStorage.setItem('chunk_error_reload', now.toString());
+        window.location.reload();
+      }
+    }
   }
 
   private handleReset = () => {
