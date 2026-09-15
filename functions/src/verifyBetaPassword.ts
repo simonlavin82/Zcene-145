@@ -19,8 +19,8 @@ import { onCall, HttpsError } from "firebase-functions/v2/https";
 export const verifyBetaPassword = onCall(
   {
     secrets: ["BETA_WALL_PASSWORD"],
-    timeoutSeconds: 10,
-    memory: "128MiB",
+    timeoutSeconds: 30,
+    memory: "256MiB",
   },
   async (request) => {
     const { password } = request.data as { password?: string };

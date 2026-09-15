@@ -88,10 +88,12 @@ const GlobalWallGate: React.FC<GlobalWallProps> = ({ children }) => {
 
       setIsUnlocked(true);
     } catch (err: any) {
-      // Firebase HttpsError surfaces as err.code + err.message.
-      // We deliberately show a generic message to avoid leaking information.
-      setError('Incorrect password. Please try again.');
-      setPassword('');
+      if (err.code === 'unauthenticated' || err.code === 'invalid-argument') {
+        setError('Incorrect password. Please try again.');
+        setPassword('');
+      } else {
+        setError('Server is waking up from sleep. Please try again in a few seconds.');
+      }
       inputRef.current?.focus();
     } finally {
       setIsLoading(false);
