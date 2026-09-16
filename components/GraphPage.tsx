@@ -12,7 +12,7 @@ import { analyticsService } from '../services/analyticsService';
 import AdSenseUnit from './AdSenseUnit';
 import OnboardingTooltip from './OnboardingTooltip';
 import * as d3 from 'd3';
-import { RootsBreakdownButton, Select, InputSizes, LayoutSizes } from './DesignSystem';
+import { RootsBreakdownButton, Select, InputSizes, LayoutSizes, Checkbox } from './DesignSystem';
 import { ModalBackdrop, ModalContainer, ModalHeader, ModalBody, ModalFooter } from './ui/Dialog';
 
 // Inform TypeScript about the SpeechRecognition and WakeLock APIs
@@ -53,6 +53,7 @@ interface GraphPageProps {
   libraryArtists: ParsedArtist[];
   seedArtists: string;
   onRegenerate: (newArtists: string) => void;
+  onFork?: (newArtists: string) => void;
   isLoading: boolean;
   onCancelGeneration: () => void;
   onFileUpload: (file: File) => void;
@@ -325,6 +326,59 @@ const ZceneEmptyState: React.FC<{ onNavigate: (view: View) => void }> = ({ onNav
     </div>
   </div>
 );
+
+const UpdateInterceptModal: React.FC<{ 
+    isOpen: boolean; 
+    onClose: () => void; 
+    onOverwrite: () => void;
+    onSaveAsNew: () => void;
+    confirmOverwrite: boolean;
+    setConfirmOverwrite: (val: boolean) => void;
+}> = ({ isOpen, onClose, onOverwrite, onSaveAsNew, confirmOverwrite, setConfirmOverwrite }) => {
+    if (!isOpen) return null;
+    return (
+        <ModalBackdrop className="z-[110]" onClick={onClose}>
+            <ModalContainer className="sm:max-w-md">
+                <ModalHeader>
+                    <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-primary !text-[18px]">account_tree</span>
+                        <h3 className="font-medium text-white text-base">Update Zcene</h3>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">
+                        <span className="material-symbols-outlined !text-[18px]">close</span>
+                    </button>
+                </ModalHeader>
+                <ModalBody>
+                    <p className="text-zinc-300 text-sm mb-4">
+                        You are about to generate a new spiderweb. Would you like to fork a new Zcene, or overwrite the existing one?
+                    </p>
+                    <div className="p-3 bg-zinc-900/50 border border-zinc-700/50 rounded-xl hover:bg-zinc-800/50 transition-colors">
+                        <Checkbox 
+                            checked={confirmOverwrite}
+                            onChange={(e) => setConfirmOverwrite(e.target.checked)}
+                            label="I understand that overwriting will replace my current spiderweb."
+                        />
+                    </div>
+                </ModalBody>
+                <ModalFooter className="flex flex-col sm:flex-row gap-3 justify-end items-center">
+                    <button 
+                        onClick={onOverwrite} 
+                        disabled={!confirmOverwrite}
+                        className={`w-full sm:w-auto px-4 py-2 rounded-xl font-medium text-sm transition-all text-center ${confirmOverwrite ? 'bg-zinc-800 text-red-400 border border-red-500/30 hover:bg-red-500/10' : 'bg-zinc-800/50 text-zinc-600 border border-zinc-800 cursor-not-allowed'}`}
+                    >
+                        Overwrite Existing
+                    </button>
+                    <button 
+                        onClick={onSaveAsNew} 
+                        className="w-full sm:w-auto px-4 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm transition-colors hover:bg-primary/90 text-center"
+                    >
+                        Save as New Zcene
+                    </button>
+                </ModalFooter>
+            </ModalContainer>
+        </ModalBackdrop>
+    );
+};
 
 const LimitReachedDialog: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpen, onClose }) => {
     if (!isOpen) return null;
@@ -603,7 +657,7 @@ const LibraryDialog: React.FC<{
 };
 
 const GraphPage: React.FC<GraphPageProps> = ({
-  data, baseGraph, libraryArtists, seedArtists, onRegenerate, isLoading,
+  data, baseGraph, libraryArtists, seedArtists, onRegenerate, onFork, isLoading,
   onCancelGeneration, onFileUpload, onNodeClick, selectedNode, peekedNode,
   activeNodes, detailsCache, loadingNodeIds, onCloseNode, onRefreshNode, detailsError, systemError, onLogoClick, onNavigate, onClearLibrary, onClearZcene, isActive,
   chatHistories, onUpdateChatHistories, onShowToast, onRefreshUI, stack, onToggleStack,
@@ -693,6 +747,9 @@ const GraphPage: React.FC<GraphPageProps> = ({
   });
 
   const [isLibraryDialogOpen, setIsLibraryDialogOpen] = useState(false);
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+  const [pendingUpdateSeed, setPendingUpdateSeed] = useState('');
+  const [confirmOverwrite, setConfirmOverwrite] = useState(false);
   const [isExpectingUpload, setIsExpectingUpload] = useState(false);
   const [leftPanelWidth, setLeftPanelWidth] = useState(DEFAULT_LEFT_PANEL_WIDTH);
   const [rightPanelWidth, setRightPanelWidth] = useState(DEFAULT_RIGHT_PANEL_WIDTH);
@@ -1111,6 +1168,14 @@ const GraphPage: React.FC<GraphPageProps> = ({
     if (enabledArtists.length === 0 || isOverLimit) return;
     
     const newSeed = enabledArtists.join('::');
+    
+    if (!isFirstGeneration) {
+      setPendingUpdateSeed(newSeed);
+      setConfirmOverwrite(false);
+      setIsUpdateModalOpen(true);
+      return;
+    }
+
     onRegenerate(newSeed);
     
     if (isSmallScreen) { setActiveTab('spiderweb'); setIsLeftPanelCollapsed(true); } else setIsLeftPanelCollapsed(true);
@@ -1504,6 +1569,24 @@ const GraphPage: React.FC<GraphPageProps> = ({
         <input type="file" accept=".csv,.txt,.xml" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
         <LibraryDialog isOpen={isLibraryDialogOpen} onClose={() => setIsLibraryDialogOpen(false)} libraryArtists={libraryArtists} selectedArtists={selectedSeedArtists} onArtistToggle={handleLibraryArtistToggle} uniqueGenres={uniqueGenres} artistGenreMap={artistGenreMap} fileInputRef={fileInputRef} onTriggerClear={() => setShowConfirmDelete(true)} />
         <LimitReachedDialog isOpen={showLimitDialog} onClose={() => setShowLimitDialog(false)} />
+        <UpdateInterceptModal 
+            isOpen={isUpdateModalOpen}
+            onClose={() => setIsUpdateModalOpen(false)}
+            confirmOverwrite={confirmOverwrite}
+            setConfirmOverwrite={setConfirmOverwrite}
+            onOverwrite={() => {
+                setIsUpdateModalOpen(false);
+                onRegenerate(pendingUpdateSeed);
+                if (isSmallScreen) { setActiveTab('spiderweb'); setIsLeftPanelCollapsed(true); } else setIsLeftPanelCollapsed(true);
+                if (!onboardingProgress.step2) updateOnboarding('step2');
+            }}
+            onSaveAsNew={() => {
+                setIsUpdateModalOpen(false);
+                if (onFork) onFork(pendingUpdateSeed);
+                if (isSmallScreen) { setActiveTab('spiderweb'); setIsLeftPanelCollapsed(true); } else setIsLeftPanelCollapsed(true);
+                if (!onboardingProgress.step2) updateOnboarding('step2');
+            }}
+        />
         {showConfirmDelete && <ConfirmDeleteModal />}
         
         <Header

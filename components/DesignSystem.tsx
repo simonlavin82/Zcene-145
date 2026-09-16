@@ -13,7 +13,7 @@ import Header from './Header';
 import { AdminViewToggle } from './ui/AdminViewToggle';
 import { SegmentedTextToggle } from './ui/SegmentedTextToggle';
 import { InfoTooltip } from './ui/InfoTooltip';
-import { Waypoints, Flame } from 'lucide-react';
+import { Waypoints, Flame, Check } from 'lucide-react';
 import { TelemetryOverviewCards, DiscoveryLedgerTable, UserTelemetry } from './UsageAnalyticsPage';
 import { CountryFilterDropdown } from './SharedModals';
 import { extractInitials, generateDeterministicGradient } from '../utils/formatters';
@@ -68,6 +68,32 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
   }
 );
 Input.displayName = 'Input';
+
+export interface CheckboxProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  label?: React.ReactNode;
+}
+
+export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
+  ({ className = '', label, ...props }, ref) => {
+    return (
+      <label className={`flex items-start gap-3 cursor-pointer group ${className}`}>
+        <div className="relative flex items-center justify-center mt-0.5">
+          <input
+            type="checkbox"
+            ref={ref}
+            className="peer sr-only"
+            {...props}
+          />
+          <div className="w-4 h-4 rounded border border-zinc-600 bg-zinc-800 flex items-center justify-center transition-all peer-checked:bg-primary peer-checked:border-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-zinc-900 group-hover:border-zinc-500 peer-checked:group-hover:border-primary/90">
+            <Check className="w-3 h-3 text-brand-black opacity-0 peer-checked:opacity-100 transition-opacity" strokeWidth={3} />
+          </div>
+        </div>
+        {label && <span className="text-sm text-zinc-400 leading-snug">{label}</span>}
+      </label>
+    );
+  }
+);
+Checkbox.displayName = 'Checkbox';
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary';
@@ -2544,6 +2570,35 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
     }
   </button>
 </div>`
+                                        }</pre>
+                                    </div>
+                                </div>
+                            </div>
+                            {/* Checkbox Variant */}
+                            <div>
+                                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
+                                    <h3 className="text-xl font-medium text-zinc-200">Checkbox</h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Component: Checkbox</span>
+                                    </div>
+                                </div>
+                                <p className="text-sm text-zinc-400 mb-6 leading-relaxed max-w-2xl">
+                                    Zcene uses a fully custom Checkbox built with Tailwind <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">peer</code> utilities over a visually hidden native input to maintain accessibility while enforcing brand styling.
+                                </p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-zinc-900/30 p-8 rounded-none border border-zinc-800">
+                                    <div className="space-y-4 p-4 bg-zinc-900/60 rounded-xl border border-zinc-700/50 h-fit">
+                                        <Checkbox label="Default unchecked state" />
+                                        <Checkbox checked readOnly label="Checked state" />
+                                        <Checkbox disabled label="Disabled state" className="opacity-50 pointer-events-none" />
+                                    </div>
+                                    <div className="space-y-4">
+                                        <p className="text-xs text-zinc-500 uppercase tracking-widest font-semibold">Implementation</p>
+                                        <pre className="text-xs text-zinc-300 bg-zinc-950 border border-zinc-800 rounded-xl p-4 overflow-x-auto leading-relaxed font-mono">{
+`<Checkbox 
+  label="I agree to the terms"
+  checked={isChecked}
+  onChange={(e) => setIsChecked(e.target.checked)}
+/>`
                                         }</pre>
                                     </div>
                                 </div>
