@@ -1644,6 +1644,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                             }
                                             setIsStackDialogOpen(true);
                                         }}
+                                        onOpenStackDrawer={() => setIsStackDialogOpen(true)}
                                     />
                                 </div>
                             </div>
@@ -1810,6 +1811,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                               }
                               setIsStackDialogOpen(true);
                          }}
+                         onOpenStackDrawer={() => setIsStackDialogOpen(true)}
                        />
                 </aside>
             </main>

@@ -2550,7 +2550,7 @@ const App: React.FC = () => {
         console.log(`[Database Reporter] SUCCESS: Item added to Stack.`);
 
         // SYNC VERIFICATION: Only show toast AFTER we know for sure it's in the DB
-        showToast(`Added to My Stack`);
+        // showToast(`Added to My Stack`); - Removed because the drawer handles feedback
       }
     } catch (err: any) {
       console.error(`[Database Reporter] STACK OPERATION FAILED at: ${itemPath}`);

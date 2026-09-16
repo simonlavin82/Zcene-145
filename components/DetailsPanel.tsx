@@ -233,6 +233,7 @@ interface NodeDetailsCardProps {
   onOpenTasteModal?: () => void;
   isActive?: boolean;
   onStashArtist?: (artistName: string) => void;
+  onOpenStackDrawer?: () => void;
 }
 
 const parseTourDates = (text: string): { isTouring: boolean; dates: string[] } => {
@@ -388,7 +389,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
   node, details, isLoading, isGlobalLoading, graphData, libraryArtists, seedArtists, onAddArtist, isSmallScreen, 
   onClose, onNodeClick, onExtendNode, onNavigate, 
   chatHistory, onSendMessage, isChatLoading, chatMode, onChatModeChange, liveMessageCount, onDeleteMessage, onClearChat, isFullScreenMode = false, isHero = false, isInStack, onToggleStack, onToggleMagazineView, isGuest = false, onAuthRequest, user, userTaste, isAdmin = false,
-  onUpdateTasteProfile, onShowToast, onOpenTasteModal, isActive = true, onStashArtist
+  onUpdateTasteProfile, onShowToast, onOpenTasteModal, isActive = true, onStashArtist, onOpenStackDrawer
 }) => {
     const handleAddToTaste = async (node: Node, details: NodeDetails) => {
         if (!user) {
@@ -952,6 +953,9 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                             return;
                                         }
                                         onToggleStack(node, links.purchase?.[0]?.url);
+                                        if (!isInStack) {
+                                            onOpenStackDrawer?.();
+                                        }
                                     }}
                                     className={`w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 active:scale-95 leading-none ${isInStack ? 'text-primary bg-primary/5 border-primary/30' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'}`}
                                     title={isInStack ? "Remove from My Stack" : "Save to My Stack"}
@@ -1331,7 +1335,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                     {isExistingInGraph ? (
                                                         <span className="material-symbols-outlined !text-[14px] text-primary">check_circle</span>
                                                     ) : (
-                                                        <span className="material-symbols-outlined !text-[14px]">add_circle</span>
+                                                        <StackIcon className="!text-[14px] opacity-70" />
                                                     )}
                                                 </button>
                                             );
@@ -1743,6 +1747,7 @@ interface DetailsPanelProps {
   onOpenTasteModal?: () => void;
   projectName?: string;
   onStashArtist?: (artistName: string) => void;
+  onOpenStackDrawer?: () => void;
 }
 
 export const DetailsPanel: React.FC<DetailsPanelProps> = ({
@@ -1751,7 +1756,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
   isSmallScreen, onNodeClick, onExtendNode, onNavigate, isGlobalLoading, onCancelGlobalLoading, unreadCount, isActive, collapseBtnRef,
   isMagazineViewOpen, onMagazineViewToggle, chatHistories, onUpdateChatHistories, stack, onToggleStack,
   isGuest = false, onAuthRequest, user, userTaste, isAdmin = false,
-  onUpdateTasteProfile, onShowToast, onOpenTasteModal, projectName, onStashArtist
+  onUpdateTasteProfile, onShowToast, onOpenTasteModal, projectName, onStashArtist, onOpenStackDrawer
 }) => {
     const [viewedIndex, setViewedIndex] = useState(0);
     const [chatLoadingMap, setChatLoadingMap] = useState<Map<string, boolean>>(new Map());
@@ -2431,6 +2436,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 onOpenTasteModal={onOpenTasteModal}
                                                 isActive={node.id === viewedNode?.id}
                                                 onStashArtist={onStashArtist}
+                                                onOpenStackDrawer={onOpenStackDrawer}
                                             />
                                         </div>
                                     );
