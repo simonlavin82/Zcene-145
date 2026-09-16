@@ -7568,7 +7568,11 @@ const App: React.FC = () => {
               areFiltersChanged={areFiltersChanged}
               data={formattedGraphData || { nodes: [], links: [] }} baseGraph={baseGraph} libraryArtists={libraryArtists} seedArtists={seedArtists}
               onRegenerate={(n) => handleGenerateGraph(n, true, graphData)} 
-              onFork={(n) => handleGenerateGraph(n, false, null)}
+              onFork={(n) => {
+                setCurrentProjectId(null);
+                currentProjectIdRef.current = null;
+                handleGenerateGraph(n, false, null);
+              }}
               isLoading={isLoading} isHydrating={isProjectLoadingRef.current}
               onCancelGeneration={handleCancel} onFileUpload={(f) => {
                 const r = new FileReader(); r.onload = (e) => {
