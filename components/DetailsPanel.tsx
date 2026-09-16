@@ -1287,7 +1287,13 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     </h4>
                                     <div className="flex flex-wrap gap-2">
                                         {details.details.notableArtists.map(artistName => {
-                                            const isAlreadySeed = isNodeInSeedList(artistName, seedArtists);
+                                            const normalizedArtist = normalizeArtistId(artistName);
+                                            const existingNode = graphData?.nodes.find(n => 
+                                                n.type === 'artist' && 
+                                                (normalizeArtistId(n.id) === normalizedArtist || n.id.toLowerCase() === artistName.toLowerCase())
+                                            );
+                                            const isExistingInGraph = !!existingNode;
+
                                             if (isGuest) {
                                               return (
                                                 <div 
@@ -1301,16 +1307,32 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                             return (
                                                 <button 
                                                     key={artistName} 
-                                                    onClick={() => onAddArtist(normalizeArtistId(artistName))}
-                                                    disabled={isAlreadySeed}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (isExistingInGraph) {
+                                                            if (onNodeClick && existingNode) {
+                                                                onNodeClick(existingNode);
+                                                            }
+                                                        } else {
+                                                            if (onPreviewArtist) {
+                                                                onPreviewArtist(artistName);
+                                                            } else {
+                                                                onAddArtist(normalizedArtist);
+                                                            }
+                                                        }
+                                                    }}
                                                     className={`border py-1.5 px-4 transition-all text-sm flex items-center gap-1.5 rounded-xl ${
-                                                        isAlreadySeed 
-                                                            ? 'text-primary border-primary/30 bg-primary/5 cursor-default' 
+                                                        isExistingInGraph 
+                                                            ? 'border-zinc-700 bg-zinc-800 text-white cursor-pointer hover:bg-zinc-700' 
                                                             : 'border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:text-white hover:bg-zinc-800 hover:border-zinc-700 active:scale-95'
                                                     }`}
                                                 >
                                                     <span className="truncate tracking-normal">{artistName}</span>
-                                                    {!isAlreadySeed && <span className="material-symbols-outlined !text-[14px]">add_circle</span>}
+                                                    {isExistingInGraph ? (
+                                                        <span className="material-symbols-outlined !text-[14px] text-primary">check_circle</span>
+                                                    ) : (
+                                                        <span className="material-symbols-outlined !text-[14px]">add_circle</span>
+                                                    )}
                                                 </button>
                                             );
                                         })}
@@ -1720,6 +1742,7 @@ interface DetailsPanelProps {
   onShowToast?: (message: string) => void;
   onOpenTasteModal?: () => void;
   projectName?: string;
+  onPreviewArtist?: (artistName: string) => void;
 }
 
 export const DetailsPanel: React.FC<DetailsPanelProps> = ({
@@ -1728,7 +1751,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
   isSmallScreen, onNodeClick, onExtendNode, onNavigate, isGlobalLoading, onCancelGlobalLoading, unreadCount, isActive, collapseBtnRef,
   isMagazineViewOpen, onMagazineViewToggle, chatHistories, onUpdateChatHistories, stack, onToggleStack,
   isGuest = false, onAuthRequest, user, userTaste, isAdmin = false,
-  onUpdateTasteProfile, onShowToast, onOpenTasteModal, projectName
+  onUpdateTasteProfile, onShowToast, onOpenTasteModal, projectName, onPreviewArtist
 }) => {
     const [viewedIndex, setViewedIndex] = useState(0);
     const [chatLoadingMap, setChatLoadingMap] = useState<Map<string, boolean>>(new Map());
