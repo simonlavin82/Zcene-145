@@ -43,6 +43,10 @@
   strong, b {
     font-weight: 600;
   }
+
+  button {
+    @apply cursor-pointer;
+  }
 }
 
 @layer components {

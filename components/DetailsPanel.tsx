@@ -960,7 +960,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                             onOpenStackDrawer?.();
                                         }
                                     }}
-                                    className={`w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 active:scale-95 leading-none ${isInStack ? 'text-primary bg-primary/5 border-primary/30' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'}`}
+                                    className={`w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 active:scale-95 leading-none cursor-pointer ${isInStack ? 'text-primary bg-primary/5 border-primary/30' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'}`}
                                     title={isInStack ? "Remove from My Stack" : "Save to My Stack"}
                                 >
                                     <StackIcon className="!text-[18px]" />
@@ -969,7 +969,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             {isArtistNode && !isGuest && onExtendNode && (
                                 <button
                                     onClick={() => onExtendNode(node)}
-                                    className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 active:scale-95 leading-none text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-primary"
+                                    className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 active:scale-95 leading-none text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-primary cursor-pointer"
                                     title="Explore & expand graph outward from this artist"
                                 >
                                     <span className="material-symbols-outlined !text-[18px]">explore</span>
@@ -1329,11 +1329,11 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                             }
                                                         }
                                                     }}
-                                                    className={`border py-1.5 px-4 transition-all text-sm flex items-center gap-1.5 rounded-xl ${
+                                                    className={`border py-1.5 px-4 transition-all text-sm flex items-center gap-1.5 rounded-xl cursor-pointer ${
                                                         isExistingInGraph 
-                                                            ? 'border-zinc-700 bg-zinc-800 text-white cursor-pointer hover:bg-zinc-700' 
+                                                            ? 'border-zinc-700 bg-zinc-800 text-white hover:bg-zinc-700' 
                                                             : isAlreadyInStack
-                                                                ? 'border-primary/30 bg-primary/5 text-primary cursor-pointer hover:bg-primary/10'
+                                                                ? 'border-primary/30 bg-primary/5 text-primary hover:bg-primary/10'
                                                                 : 'border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:text-white hover:bg-zinc-800 hover:border-zinc-700 active:scale-95'
                                                     }`}
                                                 >
