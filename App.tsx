@@ -7602,10 +7602,33 @@ const App: React.FC = () => {
                   
                   setCurrentProjectId(newId);
                   currentProjectIdRef.current = newId;
+
+                  setGraphData({ nodes: [], links: [] });
+                  setActiveNodeIds([]);
+                  setSeedArtists(n);
+                  setProjectName(defaultName);
+                  setProjectStatus('curating');
+                  setSelectedNode(null);
+                  setPeekedNode(null);
+                  setDetailsCache(new Map());
+                  setChatHistories(new Map());
+                  setDiscoveryFilters({});
+
                   navigate(`/p/${newId}`);
                 } else {
                   setCurrentProjectId(null);
                   currentProjectIdRef.current = null;
+                  
+                  setGraphData({ nodes: [], links: [] });
+                  setActiveNodeIds([]);
+                  setSeedArtists(n);
+                  setProjectName("Untitled Zcene");
+                  setProjectStatus('curating');
+                  setSelectedNode(null);
+                  setPeekedNode(null);
+                  setDetailsCache(new Map());
+                  setChatHistories(new Map());
+                  setDiscoveryFilters({});
                 }
                 
                 handleGenerateGraph(n, false, null);
