@@ -4427,8 +4427,9 @@ const App: React.FC = () => {
         const jobId = `job-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 
         // Stateful Project UX: Update project document immediately before running job
-        if (currentProjectId && !isGuest) {
-          const projectPath = `users/${user.uid}/projects/${currentProjectId}`;
+        const activeProjectId = currentProjectIdRef.current || currentProjectId;
+        if (activeProjectId && !isGuest) {
+          const projectPath = `users/${user.uid}/projects/${activeProjectId}`;
           
           let defaultName = projectName || "Untitled Zcene";
           if (!projectName || projectName === "Untitled Zcene") {
@@ -7568,9 +7569,45 @@ const App: React.FC = () => {
               areFiltersChanged={areFiltersChanged}
               data={formattedGraphData || { nodes: [], links: [] }} baseGraph={baseGraph} libraryArtists={libraryArtists} seedArtists={seedArtists}
               onRegenerate={(n) => handleGenerateGraph(n, true, graphData)} 
-              onFork={(n) => {
-                setCurrentProjectId(null);
-                currentProjectIdRef.current = null;
+              onFork={async (n) => {
+                if (user && !isGuest) {
+                  const newDocRef = doc(collection(db, 'users', user.uid, 'projects'));
+                  const newId = newDocRef.id;
+                  
+                  const seeds = n.split('::').map(s => s.trim()).filter(Boolean);
+                  let defaultName = "Untitled Zcene";
+                  if (seeds.length > 1) {
+                    defaultName = seeds.join(' + ');
+                  } else if (seeds.length === 1) {
+                    defaultName = seeds[0];
+                  }
+
+                  await setDoc(newDocRef, {
+                    name: defaultName,
+                    seedArtists: n,
+                    graphData: JSON.stringify({ nodes: [], links: [] }),
+                    activeNodes: [],
+                    detailsCache: '[]',
+                    chatHistories: '[]',
+                    discoveryFilters: '{}',
+                    lastViewedStackCount: 0,
+                    isMagazineViewOpen: false,
+                    authorId: user.uid,
+                    supportsLabelDeepCuts: true,
+                    schemaVersion: 2,
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp(),
+                    status: 'curating'
+                  });
+                  
+                  setCurrentProjectId(newId);
+                  currentProjectIdRef.current = newId;
+                  navigate(`/p/${newId}`);
+                } else {
+                  setCurrentProjectId(null);
+                  currentProjectIdRef.current = null;
+                }
+                
                 handleGenerateGraph(n, false, null);
               }}
               isLoading={isLoading} isHydrating={isProjectLoadingRef.current}
