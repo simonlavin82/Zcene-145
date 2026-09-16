@@ -84,8 +84,8 @@ export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
             className="peer sr-only"
             {...props}
           />
-          <div className="w-4 h-4 rounded border border-zinc-600 bg-transparent flex items-center justify-center transition-all peer-checked:bg-primary/10 peer-checked:border-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-zinc-900 group-hover:border-zinc-500 peer-checked:group-hover:border-primary/90">
-            <Check className="w-3 h-3 text-primary opacity-0 peer-checked:opacity-100 transition-opacity" strokeWidth={3} />
+          <div className="w-4 h-4 rounded border border-zinc-600 bg-transparent flex items-center justify-center transition-all peer-checked:bg-primary/10 peer-checked:border-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-zinc-900 group-hover:border-zinc-500 peer-checked:group-hover:border-primary/90 [&>svg]:opacity-0 peer-checked:[&>svg]:opacity-100">
+            <Check className="w-3 h-3 text-primary transition-opacity" strokeWidth={3} />
           </div>
         </div>
         {label && <span className="text-sm text-zinc-400 leading-snug">{label}</span>}
