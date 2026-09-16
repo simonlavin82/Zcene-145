@@ -117,7 +117,7 @@ interface GraphPageProps {
     showBack?: boolean;
   } | null;
   onSelectDisambiguation: (choice: string | 'synthesis' | 'cancel' | 'back') => void;
-  onPreviewArtist?: (artistName: string) => void;
+  onStashArtist?: (artistName: string) => void;
 }
 
 const DEFAULT_LEFT_PANEL_WIDTH = 320;
@@ -624,7 +624,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
   isStackDialogOpen, setIsStackDialogOpen,
   isMenuOpen, setIsMenuOpen,
   disambiguationDialog, onSelectDisambiguation,
-  onPreviewArtist,
+  onStashArtist,
   isHydrating
 }) => {
   const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
@@ -635,7 +635,6 @@ const GraphPage: React.FC<GraphPageProps> = ({
   const [selectedSeedArtists, setSelectedSeedArtists] = useState<SelectedArtist[]>(() =>
     seedArtists.split('::').map(a => a.trim()).filter(Boolean).map(name => ({ name, enabled: true }))
   );
-  const [previewArtistDialog, setPreviewArtistDialog] = useState<{ query: string, candidates: DisambiguationCandidate[] } | null>(null);
   const [prevSeedArtists, setPrevSeedArtists] = useState(seedArtists);
 
   if (seedArtists !== prevSeedArtists) {
@@ -1635,11 +1634,15 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                         onUpdateTasteProfile={async (taste) => { await onUpdateProfile({ taste }); }}
                                         onShowToast={onShowToast}
                                         onOpenTasteModal={() => window.dispatchEvent(new CustomEvent('open-taste-modal'))}
-                                        onPreviewArtist={(artistName) => {
-                                            setPreviewArtistDialog({
-                                                query: artistName,
-                                                candidates: [{ id: normalizeArtistId(artistName), label: cleanArtistDisplayName(artistName) }]
-                                            });
+                                        onStashArtist={(artistName) => {
+                                            const normalizedId = normalizeArtistId(artistName);
+                                            const isAlreadyInStack = stack.some(item => item.id === normalizedId);
+                                            if (!isAlreadyInStack) {
+                                                const nodeToAdd = { id: normalizedId, type: 'artist' as const, label: titleCaseArtistId(artistName), group: 0 };
+                                                onToggleStack(nodeToAdd);
+                                                onShowToast(`Added ${titleCaseArtistId(artistName)} to your stack for discovery.`);
+                                            }
+                                            setIsStackDialogOpen(true);
                                         }}
                                     />
                                 </div>
@@ -1797,11 +1800,15 @@ const GraphPage: React.FC<GraphPageProps> = ({
                          onUpdateTasteProfile={async (taste) => { await onUpdateProfile({ taste }); }}
                          onShowToast={onShowToast}
                          onOpenTasteModal={() => window.dispatchEvent(new CustomEvent('open-taste-modal'))}
-                         onPreviewArtist={(artistName) => {
-                              setPreviewArtistDialog({
-                                  query: artistName,
-                                  candidates: [{ id: normalizeArtistId(artistName), label: cleanArtistDisplayName(artistName) }]
-                              });
+                         onStashArtist={(artistName) => {
+                              const normalizedId = normalizeArtistId(artistName);
+                              const isAlreadyInStack = stack.some(item => item.id === normalizedId);
+                              if (!isAlreadyInStack) {
+                                  const nodeToAdd = { id: normalizedId, type: 'artist' as const, label: titleCaseArtistId(artistName), group: 0 };
+                                  onToggleStack(nodeToAdd);
+                                  onShowToast(`Added ${titleCaseArtistId(artistName)} to your stack for discovery.`);
+                              }
+                              setIsStackDialogOpen(true);
                          }}
                        />
                 </aside>
@@ -1814,19 +1821,6 @@ const GraphPage: React.FC<GraphPageProps> = ({
           isLiveAISuggestions={disambiguationDialog?.isLiveAISuggestions}
           showBack={disambiguationDialog?.showBack}
           onSelect={onSelectDisambiguation}
-        />
-        <DisambiguationModal
-          isOpen={!!previewArtistDialog}
-          query={previewArtistDialog?.query || ''}
-          candidates={previewArtistDialog?.candidates || []}
-          onSelect={(choice) => {
-            setPreviewArtistDialog(null);
-            if (choice !== 'cancel' && choice !== 'back' && choice !== 'synthesis' && !choice.startsWith('override::')) {
-                const nodeToAdd = { id: choice, type: 'artist' as const, label: titleCaseArtistId(choice), group: 0 };
-                onToggleStack(nodeToAdd);
-                onShowToast(`Added ${titleCaseArtistId(choice)} to your stack for discovery.`);
-            }
-          }}
         />
     </div>
   );

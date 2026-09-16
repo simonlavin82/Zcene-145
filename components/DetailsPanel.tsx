@@ -232,7 +232,7 @@ interface NodeDetailsCardProps {
   onShowToast?: (message: string) => void;
   onOpenTasteModal?: () => void;
   isActive?: boolean;
-  onPreviewArtist?: (artistName: string) => void;
+  onStashArtist?: (artistName: string) => void;
 }
 
 const parseTourDates = (text: string): { isTouring: boolean; dates: string[] } => {
@@ -388,7 +388,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
   node, details, isLoading, isGlobalLoading, graphData, libraryArtists, seedArtists, onAddArtist, isSmallScreen, 
   onClose, onNodeClick, onExtendNode, onNavigate, 
   chatHistory, onSendMessage, isChatLoading, chatMode, onChatModeChange, liveMessageCount, onDeleteMessage, onClearChat, isFullScreenMode = false, isHero = false, isInStack, onToggleStack, onToggleMagazineView, isGuest = false, onAuthRequest, user, userTaste, isAdmin = false,
-  onUpdateTasteProfile, onShowToast, onOpenTasteModal, isActive = true, onPreviewArtist
+  onUpdateTasteProfile, onShowToast, onOpenTasteModal, isActive = true, onStashArtist
 }) => {
     const handleAddToTaste = async (node: Node, details: NodeDetails) => {
         if (!user) {
@@ -1314,8 +1314,8 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                                 onNodeClick(existingNode);
                                                             }
                                                         } else {
-                                                            if (onPreviewArtist) {
-                                                                onPreviewArtist(artistName);
+                                                            if (onStashArtist) {
+                                                                onStashArtist(artistName);
                                                             } else {
                                                                 onAddArtist(normalizedArtist);
                                                             }
@@ -1742,7 +1742,7 @@ interface DetailsPanelProps {
   onShowToast?: (message: string) => void;
   onOpenTasteModal?: () => void;
   projectName?: string;
-  onPreviewArtist?: (artistName: string) => void;
+  onStashArtist?: (artistName: string) => void;
 }
 
 export const DetailsPanel: React.FC<DetailsPanelProps> = ({
@@ -1751,7 +1751,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
   isSmallScreen, onNodeClick, onExtendNode, onNavigate, isGlobalLoading, onCancelGlobalLoading, unreadCount, isActive, collapseBtnRef,
   isMagazineViewOpen, onMagazineViewToggle, chatHistories, onUpdateChatHistories, stack, onToggleStack,
   isGuest = false, onAuthRequest, user, userTaste, isAdmin = false,
-  onUpdateTasteProfile, onShowToast, onOpenTasteModal, projectName, onPreviewArtist
+  onUpdateTasteProfile, onShowToast, onOpenTasteModal, projectName, onStashArtist
 }) => {
     const [viewedIndex, setViewedIndex] = useState(0);
     const [chatLoadingMap, setChatLoadingMap] = useState<Map<string, boolean>>(new Map());
@@ -2430,7 +2430,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 onShowToast={onShowToast}
                                                 onOpenTasteModal={onOpenTasteModal}
                                                 isActive={node.id === viewedNode?.id}
-                                                onPreviewArtist={onPreviewArtist}
+                                                onStashArtist={onStashArtist}
                                             />
                                         </div>
                                     );
