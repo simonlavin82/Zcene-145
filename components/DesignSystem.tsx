@@ -84,8 +84,8 @@ export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
             className="peer sr-only"
             {...props}
           />
-          <div className="w-4 h-4 rounded border border-zinc-600 bg-zinc-800 flex items-center justify-center transition-all peer-checked:bg-primary peer-checked:border-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-zinc-900 group-hover:border-zinc-500 peer-checked:group-hover:border-primary/90">
-            <Check className="w-3 h-3 text-brand-black opacity-0 peer-checked:opacity-100 transition-opacity" strokeWidth={3} />
+          <div className="w-4 h-4 rounded border border-zinc-600 bg-transparent flex items-center justify-center transition-all peer-checked:bg-primary/10 peer-checked:border-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-zinc-900 group-hover:border-zinc-500 peer-checked:group-hover:border-primary/90">
+            <Check className="w-3 h-3 text-primary opacity-0 peer-checked:opacity-100 transition-opacity" strokeWidth={3} />
           </div>
         </div>
         {label && <span className="text-sm text-zinc-400 leading-snug">{label}</span>}
@@ -417,6 +417,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
         { id: 'badges-tags', title: 'Badges & Tags' },
         { id: 'lists', title: 'Lists' },
         { id: 'inputs', title: 'Inputs' },
+        { id: 'form-controls', title: 'Form Controls' },
         { id: 'sliders', title: 'Sliders' },
         { id: 'deep-connections', title: 'Deep Connections' },
         { id: 'toasts', title: 'Toasts' },
@@ -2574,6 +2575,12 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                    </section>
+                    {/* 11.5 FORM CONTROLS */}
+                    <section id="form-controls">
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Form Controls</h2>
+                        <div className="space-y-12">
                             {/* Checkbox Variant */}
                             <div>
                                 <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
@@ -2603,9 +2610,11 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                 </div>
                             </div>
-
+                            
+                            {/* Radio buttons will go here */}
                         </div>
                     </section>
+
 
                     {/* 12. SLIDERS */}
                     <section id="sliders">
