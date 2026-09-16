@@ -2884,8 +2884,21 @@ const App: React.FC = () => {
     let hasDisambiguated = false;
 
     if (!bypassTokenConfirmation && !bypassDisambiguation) {
-      for (let i = 0; i < artistList.length; i++) {
-        const rawInput = artists.split('::').map(s => s.trim()).filter(Boolean)[i] || artistList[i];
+      if (isLiveSynthesisTemp) {
+        // [Rule 15] Complex Cache Bypass
+        if (!sessionTokenApprovedRef.current) {
+          const confirmed = await confirmTokenUsage('live_synthesis', [], artistList, undefined, false);
+          if (!confirmed || confirmed === 'back') {
+            setIsLoading(false);
+            isHydratingSessionRef.current = false;
+            isProjectLoadingRef.current = false;
+            return;
+          }
+          sessionTokenApprovedRef.current = true;
+        }
+      } else {
+        for (let i = 0; i < artistList.length; i++) {
+          const rawInput = artists.split('::').map(s => s.trim()).filter(Boolean)[i] || artistList[i];
         const searchId = artistList[i];
 
         // Step 1: Interrogate the Firestore cache first.
@@ -3025,6 +3038,7 @@ const App: React.FC = () => {
           const nonSelected = cacheCandidates.filter(c => c.id !== choice);
           nonSelected.forEach(ns => mergeAndCleanupArtists(choice, ns.id));
         }
+      }
       }
     }
 
@@ -7576,10 +7590,19 @@ const App: React.FC = () => {
                   
                   const seeds = n.split('::').map(s => s.trim()).filter(Boolean);
                   let defaultName = "Untitled Zcene";
+                  
+                  const formatSeed = (str: string) => {
+                    return str
+                      .replace(/-(us|gb)$/i, '')
+                      .split('-')
+                      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                      .join(' ');
+                  };
+
                   if (seeds.length > 1) {
-                    defaultName = seeds.join(' + ');
+                    defaultName = seeds.map(formatSeed).join(' + ');
                   } else if (seeds.length === 1) {
-                    defaultName = seeds[0];
+                    defaultName = formatSeed(seeds[0]);
                   }
 
                   await setDoc(newDocRef, {
