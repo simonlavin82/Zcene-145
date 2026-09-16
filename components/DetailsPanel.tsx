@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import Markdown from 'react-markdown';
 import { Node, NodeDetails, GraphData, View, ChatMessage, StackItem, UserTaste, TasteProfile, COST_PER_AI_CALL } from '../types';
 import { streamNodeChat, fetchLiveTourData, streamLocalHeuristicChat } from '../services/geminiService';
-import { normalizeArtistId, titleCaseArtistId, cleanArtistDisplayName, isNodeInSeedList, getArtistDocWithRedirect, enforceArtistCacheSchema } from '../services/artistCacheService';
+import { normalizeArtistId, titleCaseArtistId, cleanArtistDisplayName, isNodeInSeedList, getArtistDocWithRedirect, enforceArtistCacheSchema, isArtistIdMatch } from '../services/artistCacheService';
 import { analyticsService } from '../services/analyticsService';
 import { Spinner, HelpIcon, MicIcon, LoadingSpinner, DETAIL_THINKING_STEPS, StackIcon } from './Icons';
 import { TokenConfirmationDialog, FullItineraryDialog, PROFILE_COLORS } from './SharedModals';
@@ -232,6 +232,7 @@ interface NodeDetailsCardProps {
   onShowToast?: (message: string) => void;
   onOpenTasteModal?: () => void;
   isActive?: boolean;
+  onPreviewArtist?: (artistName: string) => void;
 }
 
 const parseTourDates = (text: string): { isTouring: boolean; dates: string[] } => {
@@ -387,7 +388,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
   node, details, isLoading, isGlobalLoading, graphData, libraryArtists, seedArtists, onAddArtist, isSmallScreen, 
   onClose, onNodeClick, onExtendNode, onNavigate, 
   chatHistory, onSendMessage, isChatLoading, chatMode, onChatModeChange, liveMessageCount, onDeleteMessage, onClearChat, isFullScreenMode = false, isHero = false, isInStack, onToggleStack, onToggleMagazineView, isGuest = false, onAuthRequest, user, userTaste, isAdmin = false,
-  onUpdateTasteProfile, onShowToast, onOpenTasteModal, isActive = true
+  onUpdateTasteProfile, onShowToast, onOpenTasteModal, isActive = true, onPreviewArtist
 }) => {
     const handleAddToTaste = async (node: Node, details: NodeDetails) => {
         if (!user) {
@@ -1289,8 +1290,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                         {details.details.notableArtists.map(artistName => {
                                             const normalizedArtist = normalizeArtistId(artistName);
                                             const existingNode = graphData?.nodes.find(n => 
-                                                n.type === 'artist' && 
-                                                (normalizeArtistId(n.id) === normalizedArtist || n.id.toLowerCase() === artistName.toLowerCase())
+                                                n.type === 'artist' && isArtistIdMatch(n.id, artistName)
                                             );
                                             const isExistingInGraph = !!existingNode;
 
@@ -2430,6 +2430,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 onShowToast={onShowToast}
                                                 onOpenTasteModal={onOpenTasteModal}
                                                 isActive={node.id === viewedNode?.id}
+                                                onPreviewArtist={onPreviewArtist}
                                             />
                                         </div>
                                     );

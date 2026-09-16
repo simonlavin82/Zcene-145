@@ -27,6 +27,16 @@ export const normalizeArtistId = (name: string): string =>
     .replace(/^-+|-+$/g, '')
     .substring(0, 256);
 
+export const isArtistIdMatch = (a: string, b: string): boolean => {
+  if (!a || !b) return false;
+  const na = normalizeArtistId(a);
+  const nb = normalizeArtistId(b);
+  if (na === nb) return true;
+  if (na.startsWith(nb + '-')) return true;
+  if (nb.startsWith(na + '-')) return true;
+  return false;
+};
+
 /**
  * Recursively removes any property whose value is strictly `undefined` from an object or array.
  * Required before passing objects to Firestore SDK (`setDoc`, `updateDoc`, `addDoc`) which
@@ -367,12 +377,6 @@ export const extractArtistSubGraph = (
   // Make sure the target artist itself is not in the other seeds set we want to exclude
   seedsNorm.delete(artistNameNorm);
 
-  const isArtistIdMatch = (a: string, b: string) => {
-    const na = normalizeArtistId(a);
-    const nb = normalizeArtistId(b);
-    return na === nb || na.startsWith(nb + '-') || nb.startsWith(na + '-');
-  };
-
   // Find the canonical artist node from the full graph
   const artistNode = fullGraph.nodes.find(
     n => (n.type === 'artist' || n.type === 'label') && (normalizeArtistId(n.id) === artistNameNorm || isArtistIdMatch(n.id, artistName))
@@ -537,7 +541,7 @@ export const eagerNormalizeCacheEntry = (entry: ArtistCacheEntry): ArtistCacheEn
   return entry;
 };
 
-// ─── READ ─────────────────────────────────────────────────────────────────────
+// ─── READ ────────────────────────────────────────────────────────────────     
 
 /**
  * Concurrently reads individual Firestore documents for each requested artist.
@@ -621,7 +625,7 @@ export const readArtistCacheMany = async (
   return { cached, missing };
 };
 
-// ─── WRITE ────────────────────────────────────────────────────────────────────
+// ─── WRITE ────────────────────────────────────────────────────────────────    
 
 /**
  * Writes each artist's isolated sub-graph as an individual Firestore document.
