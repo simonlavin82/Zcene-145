@@ -1640,7 +1640,6 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                             if (!isAlreadyInStack) {
                                                 const nodeToAdd = { id: normalizedId, type: 'artist' as const, label: titleCaseArtistId(artistName), group: 0 };
                                                 onToggleStack(nodeToAdd);
-                                                onShowToast(`Added ${titleCaseArtistId(artistName)} to your stack for discovery.`);
                                             }
                                             setIsStackDialogOpen(true);
                                         }}
@@ -1807,7 +1806,6 @@ const GraphPage: React.FC<GraphPageProps> = ({
                               if (!isAlreadyInStack) {
                                   const nodeToAdd = { id: normalizedId, type: 'artist' as const, label: titleCaseArtistId(artistName), group: 0 };
                                   onToggleStack(nodeToAdd);
-                                  onShowToast(`Added ${titleCaseArtistId(artistName)} to your stack for discovery.`);
                               }
                               setIsStackDialogOpen(true);
                          }}

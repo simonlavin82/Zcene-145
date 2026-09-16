@@ -234,6 +234,7 @@ interface NodeDetailsCardProps {
   isActive?: boolean;
   onStashArtist?: (artistName: string) => void;
   onOpenStackDrawer?: () => void;
+  stack: StackItem[];
 }
 
 const parseTourDates = (text: string): { isTouring: boolean; dates: string[] } => {
@@ -389,7 +390,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
   node, details, isLoading, isGlobalLoading, graphData, libraryArtists, seedArtists, onAddArtist, isSmallScreen, 
   onClose, onNodeClick, onExtendNode, onNavigate, 
   chatHistory, onSendMessage, isChatLoading, chatMode, onChatModeChange, liveMessageCount, onDeleteMessage, onClearChat, isFullScreenMode = false, isHero = false, isInStack, onToggleStack, onToggleMagazineView, isGuest = false, onAuthRequest, user, userTaste, isAdmin = false,
-  onUpdateTasteProfile, onShowToast, onOpenTasteModal, isActive = true, onStashArtist, onOpenStackDrawer
+  onUpdateTasteProfile, onShowToast, onOpenTasteModal, isActive = true, onStashArtist, onOpenStackDrawer, stack
 }) => {
     const handleAddToTaste = async (node: Node, details: NodeDetails) => {
         if (!user) {
@@ -952,8 +953,10 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                             onAuthRequest?.();
                                             return;
                                         }
-                                        onToggleStack(node, links.purchase?.[0]?.url);
-                                        if (!isInStack) {
+                                        if (isInStack) {
+                                            onOpenStackDrawer?.();
+                                        } else {
+                                            onToggleStack(node, links.purchase?.[0]?.url);
                                             onOpenStackDrawer?.();
                                         }
                                     }}
@@ -1297,6 +1300,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                 n.type === 'artist' && isArtistIdMatch(n.id, artistName)
                                             );
                                             const isExistingInGraph = !!existingNode;
+                                            const isAlreadyInStack = stack.some(item => item.id === normalizedArtist);
 
                                             if (isGuest) {
                                               return (
@@ -1328,12 +1332,16 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                     className={`border py-1.5 px-4 transition-all text-sm flex items-center gap-1.5 rounded-xl ${
                                                         isExistingInGraph 
                                                             ? 'border-zinc-700 bg-zinc-800 text-white cursor-pointer hover:bg-zinc-700' 
-                                                            : 'border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:text-white hover:bg-zinc-800 hover:border-zinc-700 active:scale-95'
+                                                            : isAlreadyInStack
+                                                                ? 'border-primary/30 bg-primary/5 text-primary cursor-pointer hover:bg-primary/10'
+                                                                : 'border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:text-white hover:bg-zinc-800 hover:border-zinc-700 active:scale-95'
                                                     }`}
                                                 >
                                                     <span className="truncate tracking-normal">{artistName}</span>
                                                     {isExistingInGraph ? (
                                                         <span className="material-symbols-outlined !text-[14px] text-primary">check_circle</span>
+                                                    ) : isAlreadyInStack ? (
+                                                        <StackIcon className="!text-[14px] text-primary" />
                                                     ) : (
                                                         <StackIcon className="!text-[14px] opacity-70" />
                                                     )}
@@ -2437,6 +2445,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 isActive={node.id === viewedNode?.id}
                                                 onStashArtist={onStashArtist}
                                                 onOpenStackDrawer={onOpenStackDrawer}
+                                                stack={stack}
                                             />
                                         </div>
                                     );
