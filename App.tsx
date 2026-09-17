@@ -3804,7 +3804,7 @@ const App: React.FC = () => {
                     console.warn("Failed to parse detailsCache from silent cloud job:", e);
                   }
                 },
-                currentProjectId || undefined,
+                currentProjectIdRef.current || currentProjectId || undefined,
                 `job-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
                 activeDisambiguationHints,
                 parsedGraphData, // Pass the cache's parsed graph as baseGraph
@@ -4511,7 +4511,7 @@ const App: React.FC = () => {
               console.warn("Failed to parse detailsCache from cloud job:", e);
             }
           },
-          currentProjectId || undefined,
+          currentProjectIdRef.current || currentProjectId || undefined,
           jobId,
           activeDisambiguationHints,
           pruned || undefined,          // Base graph context
