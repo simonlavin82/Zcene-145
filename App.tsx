@@ -67,6 +67,14 @@ const isArtistIdMatch = (nodeId: string, activeId: string): boolean => {
   return false;
 };
 
+const formatSeed = (str: string) => {
+  return str
+    .replace(/-(us|gb)$/i, '')
+    .split('-')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
+
 import { httpsCallable } from 'firebase/functions';
 
 const generateGraphDataViaCloudJob = async (
@@ -2840,12 +2848,12 @@ const App: React.FC = () => {
       navigate(`/p/${newId}`);
 
       let defaultName = projectName || "Untitled Zcene";
-      if (!projectName || projectName === "Untitled Zcene") {
+      if (!projectName || projectName === "Untitled Zcene" || isLiveSynthesisTemp) {
         const seeds = artists.split('::').map(s => s.trim()).filter(Boolean);
         if (seeds.length > 1) {
-          defaultName = seeds.join(' + ');
+          defaultName = seeds.map(formatSeed).join(' + ');
         } else if (seeds.length === 1) {
-          defaultName = seeds[0];
+          defaultName = formatSeed(seeds[0]);
         }
       }
 
@@ -4446,12 +4454,14 @@ const App: React.FC = () => {
           const projectPath = `users/${user.uid}/projects/${activeProjectId}`;
           
           let defaultName = projectName || "Untitled Zcene";
-          if (!projectName || projectName === "Untitled Zcene") {
+          // If this is a transition/fork (isLiveSynthesisTemp) we must ignore the stale projectName 
+          // and forcefully derive the name from the fresh artists string.
+          if (!projectName || projectName === "Untitled Zcene" || isLiveSynthesisTemp) {
             const seeds = artists.split('::').map(s => s.trim()).filter(Boolean);
             if (seeds.length > 1) {
-              defaultName = seeds.join(' + ');
+              defaultName = seeds.map(formatSeed).join(' + ');
             } else if (seeds.length === 1) {
-              defaultName = seeds[0];
+              defaultName = formatSeed(seeds[0]);
             }
           }
 
@@ -7590,14 +7600,6 @@ const App: React.FC = () => {
                   
                   const seeds = n.split('::').map(s => s.trim()).filter(Boolean);
                   let defaultName = "Untitled Zcene";
-                  
-                  const formatSeed = (str: string) => {
-                    return str
-                      .replace(/-(us|gb)$/i, '')
-                      .split('-')
-                      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                      .join(' ');
-                  };
 
                   if (seeds.length > 1) {
                     defaultName = seeds.map(formatSeed).join(' + ');
