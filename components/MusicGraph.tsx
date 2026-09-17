@@ -1305,8 +1305,8 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
         simulation.alpha(restartAlpha).alphaTarget(0).restart();
     }
-  // Removed `dimensions` to isolate physics from container resizes
-  }, [visibleNodes, visibleLinks, seedArtists, activeFilters]);
+  // Used dimensions.width > 0 to trigger initial mount safely while preserving physics isolation during resizes
+  }, [visibleNodes, visibleLinks, seedArtists, activeFilters, dimensions.width > 0]);
 
   // Set tracking target when selectedNode or peekedNode changes
   useEffect(() => {
