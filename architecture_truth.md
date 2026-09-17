@@ -67,3 +67,16 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 ### 12. Resilient iTunes Artwork Pipeline
 - **Punctuation-Agnostic Normalization:** The iTunes scraper MUST use the punctuation-agnostic normalization rule (`toLowerCase().replace(/[^a-z0-9]/g, '')`) to resolve strict equality naming edge cases (e.g., "Jay Z" vs "JAY-Z").
 - **Summary Match Fallback:** If the LLM produces an empty genre string or a highly esoteric subgenre that fails the iTunes master taxonomy, the validator MUST fall back to scanning the artist biography (summary) for core iTunes taxonomy keywords (e.g., "hip", "hop", "rap"). This guarantees 100% hydration while preserving strict homonym protection.
+
+### 13. Auth Handoff Preserver
+- If a guest clicks 'Save' on a shared project, the app stashes the ID in session storage to guarantee the clone resumes post-auth.
+
+### 14. Atomic Self-Healing
+- Graph breakdowns handle atomic self-healing. Fuzzy fallbacks mitigate strict-coupling vulnerabilities.
+
+### 15. Complex Cache Bypass
+- Multi-seed and filtered queries must strictly bypass the Global Topology Cache (Front Gate). The engine must default to Live Synthesis to guarantee bespoke graph generation.
+
+### 16. Curation Intercept Guardrails
+- **ProjectLoader Guardrails:** The ProjectLoader must strictly bypass Phase 1 interception when a document's status is `curating`. The UI must remain locked and patiently await the backend background worker rather than firing duplicate generative calls.
+- **Identity Lock (`isRegeneration`):** During 'Overwrite Existing' (`isRegeneration = true`), the original project name is strictly write-locked. New deep links or explicit forks derive fresh names natively from the seed strings.

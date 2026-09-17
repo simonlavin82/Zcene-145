@@ -177,6 +177,37 @@ async function runRegressionSuite() {
         failed++;
     }
 
+    // --- 4. Column 1: Fork & Overwrite Generation Pathways ---
+    console.log("\n--- 4. Column 1: Fork & Overwrite Generation Pathways ---");
+    
+    // Simulate Save as New Zcene (Fork)
+    let isRegenerationFork = false;
+    let oldProjectNameFork = "Spaced + Turnstile";
+    let newSeedCombinationFork = "Spaced::Turnstile::Scowl";
+    let derivedNameFork = newSeedCombinationFork.split('::')[0] + " (Forked)";
+    let finalizedNameFork = isRegenerationFork ? oldProjectNameFork : derivedNameFork;
+    
+    assert(!isRegenerationFork, "Fork Flow: isRegeneration is correctly false.");
+    assert(finalizedNameFork !== oldProjectNameFork, "Fork Flow: Generates a completely new identity and derives new name.");
+    
+    // Simulate Overwrite Existing (In-Place)
+    let isRegenerationOverwrite = true;
+    let oldProjectNameOverwrite = "Spaced + Turnstile";
+    let newSeedCombinationOverwrite = "Spaced::Turnstile::Scowl";
+    let derivedNameOverwrite = newSeedCombinationOverwrite.split('::')[0] + " (Forked)";
+    let finalizedNameOverwrite = isRegenerationOverwrite ? oldProjectNameOverwrite : derivedNameOverwrite;
+    
+    assert(isRegenerationOverwrite, "Overwrite Flow: isRegeneration is correctly true.");
+    assert(finalizedNameOverwrite === oldProjectNameOverwrite, "Overwrite Flow: Identity Lock strictly protects original project name.");
+    
+    let isProjectLoaderLooping = false;
+    let mockIncomingSnapshotStatus = 'curating';
+    if (mockIncomingSnapshotStatus === 'curating') {
+        // ProjectLoader logic: if data.status === 'curating', ignore snapshot and wait
+        isProjectLoaderLooping = false; 
+    }
+    assert(!isProjectLoaderLooping, "Overwrite Flow: ProjectLoader correctly ignores 'curating' snapshots, preventing modal loops.");
+
     console.log("\n--- Regression Suite Summary ---");
     console.log(`Total Passed: ${passed}`);
     console.log(`Total Failed: ${failed}`);

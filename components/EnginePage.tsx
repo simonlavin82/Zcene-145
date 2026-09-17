@@ -541,6 +541,21 @@ for transient API errors on the client.
     - 5-Profile Limit Guard: Upon hitting the 5-profile ceiling, the system suppresses silent data overwrites, throws a Toast notification, and immediately auto-opens the Taste Manager modal to prompt the user to curate their existing profiles.
 `;
 
+const GENERATION_MODIFICATION_DOCUMENTATION = `
+The "Generation Modification Container" handles how Live Synthesis (generating a new graph) impacts the user's project structure. It strictly branches into two distinct paths:
+
+1. "OVERWRITE EXISTING" (In-Place Modification):
+   - Definition: Updates the current project container in-place with a freshly synthesized spiderweb graph.
+   - Mechanism: Sets \`isRegeneration = true\`.
+   - Identity Lock: This acts as a strict write-lock on the project's identity. The existing Project ID (URL) and Project Name are strictly preserved.
+   - Curation Intercept Guardrail: To prevent infinite modal loops, the UI's ProjectLoader entirely ignores incoming Firebase snapshots while the project status is \`curating\`, patiently waiting for the \`completed\` status from the background worker.
+
+2. "SAVE AS NEW ZCENE" (Fork):
+   - Definition: Forks the current context into a brand new container, preserving the original project untouched.
+   - Mechanism: Sets \`isRegeneration = false\`.
+   - Identity Generation: Automatically derives a fresh project name based on the selected artists, and mints a bespoke Project ID (URL) for independent sharing and exploration.
+`;
+
 const SHARING_FLOW_DOCUMENTATION = `
 Zcene enables collaborative discovery via project sharing. The flow is 
 designed to minimize friction for new users while rewarding existing authors.

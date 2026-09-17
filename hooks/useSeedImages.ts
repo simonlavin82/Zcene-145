@@ -67,24 +67,29 @@ export const useSeedImages = (
         return;
       }
 
-      // 3. Fallback to project internal graph data
-      if (fallbackGraphData && fallbackGraphData.nodes) {
+      // 3. Fallback to project internal graph data & canonical ID extraction
+      let lookupId = normId;
+      if (fallbackGraphData) {
         const parsedGraph = typeof fallbackGraphData === 'string' ? JSON.parse(fallbackGraphData) : fallbackGraphData;
-        if (parsedGraph.nodes) {
+        if (parsedGraph && parsedGraph.nodes) {
            const fallbackNode = parsedGraph.nodes.find((fn: any) => 
              normalizeArtistId(fn.id) === normId || normalizeArtistId(fn.label) === normId || (fn.label && fn.label.toLowerCase() === seed.toLowerCase())
            );
-           if (fallbackNode && fallbackNode.imageUrl && fallbackNode.imageUrl !== 'not-found') {
-             resolvedUrls[index] = fallbackNode.imageUrl;
-             pendingCount--;
-             checkComplete();
-             return;
+           if (fallbackNode) {
+             if (fallbackNode.imageUrl && fallbackNode.imageUrl !== 'not-found') {
+               resolvedUrls[index] = fallbackNode.imageUrl;
+               pendingCount--;
+               checkComplete();
+               return;
+             }
+             // Extract the true canonical ID for a more accurate global cache lookup
+             lookupId = fallbackNode.id;
            }
         }
       }
 
-      // 4. Fetch from database
-      getEntityDocWithRedirect(normId, 'artist').then(snap => {
+      // 4. Fetch from database using the resolved canonical lookupId
+      getEntityDocWithRedirect(lookupId, 'artist').then(snap => {
         if (!isMounted) return;
         if (snap && snap.exists()) {
           const entry = snap.data();

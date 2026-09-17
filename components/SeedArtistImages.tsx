@@ -73,7 +73,18 @@ export const SeedArtistImages: React.FC<SeedArtistImagesProps> = ({
         return Promise.resolve({ exists: () => true, data: () => ({ detailsCache: { imageUrl: seedImageUrl } }) } as any);
       }
 
-      return getEntityDocWithRedirect(id, 'artist');
+      // Extract canonical ID from graphData if available
+      let lookupId = id;
+      if (fallbackGraphData && fallbackGraphData.nodes) {
+         const fallbackNode = fallbackGraphData.nodes.find((fn: any) => 
+           normalizeArtistId(fn.id) === id || normalizeArtistId(fn.label) === id || (fn.label && fn.label.toLowerCase() === list[idx].toLowerCase())
+         );
+         if (fallbackNode) {
+           lookupId = fallbackNode.id;
+         }
+      }
+
+      return getEntityDocWithRedirect(lookupId, 'artist');
     });
 
     Promise.all(promises).then(snapshots => {
