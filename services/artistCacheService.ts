@@ -215,9 +215,18 @@ export const cleanArtistDisplayName = (rawIdOrName?: string | null, graphNodes?:
   // If kebab/snake case, convert to spaced words first for suffix checking
   const spaced = trimmed.replace(/[-_]+/g, ' ').trim();
   const lowerSpaced = spaced.toLowerCase();
+  const lowerTrimmed = trimmed.toLowerCase();
 
   for (const suffix of countrySuffixes) {
     if (lowerSpaced.endsWith(` ${suffix}`)) {
+      // BOUNDARY CHECK: Prevent erroneously stripping short words like "It" from normal titles like "End It"
+      const isShortCode = suffix.length <= 3;
+      const originalEndsWithHyphenSuffix = lowerTrimmed.endsWith(`-${suffix}`) || lowerTrimmed.endsWith(`_${suffix}`) || lowerTrimmed.endsWith(` - ${suffix}`);
+      
+      if (isShortCode && !originalEndsWithHyphenSuffix) {
+          continue;
+      }
+
       // Strip the suffix and any preceding hyphen/space
       const suffixLen = suffix.length;
       const baseSpaced = spaced.slice(0, spaced.length - suffixLen).trim().replace(/[-_]$/, '').trim();
