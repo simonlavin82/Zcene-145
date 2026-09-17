@@ -1690,6 +1690,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">Collaboration & Sharing Flow</h2>
                         <SharingFlowDiagram />
                         <CodeBlock title="Guest Preview & Project Cloning" content={SHARING_FLOW_DOCUMENTATION} />
+                        <CodeBlock title="Generation Modifications (Fork vs Overwrite)" content={GENERATION_MODIFICATION_DOCUMENTATION} />
                     </section>
 
                     {/* ── SYSTEM RESILIENCE ── */}
