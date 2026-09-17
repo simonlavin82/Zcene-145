@@ -4456,7 +4456,8 @@ const App: React.FC = () => {
           let defaultName = projectName || "Untitled Zcene";
           // If this is a transition/fork (isLiveSynthesisTemp) we must ignore the stale projectName 
           // and forcefully derive the name from the fresh artists string.
-          if (!projectName || projectName === "Untitled Zcene" || isLiveSynthesisTemp) {
+          const isNewOrUntitled = !projectName || projectName === "Untitled Zcene";
+          if (isNewOrUntitled || (isLiveSynthesisTemp && !isRegeneration)) {
             const seeds = artists.split('::').map(s => s.trim()).filter(Boolean);
             if (seeds.length > 1) {
               defaultName = seeds.map(formatSeed).join(' + ');
@@ -5561,10 +5562,10 @@ const App: React.FC = () => {
                 setActiveNodeIds(resolvedActiveNodes);
               }
 
-              if (!isHydratingSessionRef.current) {
+              if (!isHydratingSessionRef.current && data.status !== 'curating') {
                 handleGenerateGraph(data.seedArtists || (data.artistIds || []).join('::'), false, null, false, false, parsedFilters);
               } else {
-                console.log(`[ProjectLoader] Bypassing handleGenerateGraph call because the session is already hydrating (API job is active).`);
+                console.log(`[ProjectLoader] Bypassing handleGenerateGraph call because the session is already hydrating (API job is active or status is curating).`);
               }
               return true;
             }
