@@ -3064,7 +3064,22 @@ const App: React.FC = () => {
           }
           
           if (data && isQualified) {
-            if (parsedGraph && parsedGraph.nodes && parsedGraph.nodes.length > 0) {
+            let proceedWithCache = true;
+            if (!bypassDisambiguation && !bypassTokenConfirmation) {
+                const choice = await confirmCacheChoice([searchId]);
+                if (choice === 'cancel') {
+                   setIsLoading(false);
+                   isFetchingDetailsRef.current = false;
+                   isHydratingSessionRef.current = false;
+                   return;
+                }
+                if (choice === 'synthesis') {
+                   console.log("[Front Gate Cache] User requested synthesis. Bypassing cache hit.");
+                   proceedWithCache = false;
+                }
+            }
+
+            if (proceedWithCache && parsedGraph && parsedGraph.nodes && parsedGraph.nodes.length > 0) {
               const rationaleVal = data.synthesisRationale || parsedGraph.synthesisRationale;
               if (rationaleVal) {
                 parsedGraph.synthesisRationale = rationaleVal;
