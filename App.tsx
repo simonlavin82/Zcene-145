@@ -17,7 +17,7 @@ import HelpPage from './components/HelpPage';
 import GraphPage from './components/GraphPage';
 import HomePage from './components/HomePage';
 import Dashboard from './components/Dashboard';
-import { MyStackDialog, TokenConfirmationDialog, CacheChoiceDialog, DisambiguationCandidate, ExploreActionDialog, FilterGuidanceModal, ConsolidatedValidationModal, PreFlightSeed } from './components/SharedModals';
+import { MyStackDialog, TokenConfirmationDialog, DisambiguationCandidate, ExploreActionDialog, FilterGuidanceModal, ConsolidatedValidationModal, PreFlightSeed } from './components/SharedModals';
 import { ModalBackdrop, ModalContainer, ModalHeader, ModalFooter, ModalBody } from './components/ui/Dialog';
 
 import { ShareModal } from './components/ShareModal';
@@ -1177,12 +1177,7 @@ const App: React.FC = () => {
     onBack?: () => void;
     error?: string | null;
   } | null>(null);
-  const [cacheChoiceDialog, setCacheChoiceDialog] = useState<{
-    isOpen: boolean;
-    artists: string[];
-    cost: number;
-    onSelect: (choice: 'cache' | 'synthesis' | 'cancel') => void;
-  } | null>(null);
+
   const [consolidatedValidationDialog, setConsolidatedValidationDialog] = useState<{
     isOpen: boolean;
     seeds: PreFlightSeed[];
@@ -1272,14 +1267,15 @@ const App: React.FC = () => {
     setTokenConfirmation(prev => prev ? { ...prev, error: errorMsg } : null);
   }, []);
 
-  const confirmCacheChoice = useCallback((artists: string[]) => {
-    return new Promise<'cache' | 'synthesis' | 'cancel'>((resolve) => {
-      setCacheChoiceDialog({
+  const confirmDisambiguationChoice = useCallback((query: string, candidates: DisambiguationCandidate[]) => {
+    return new Promise<string | 'synthesis' | 'cancel' | 'back'>((resolve) => {
+      setDisambiguationDialog({
         isOpen: true,
-        artists,
-        cost: COST_PER_AI_CALL,
+        query,
+        candidates,
+        isLiveAISuggestions: false,
         onSelect: (choice) => {
-          setCacheChoiceDialog(null);
+          setDisambiguationDialog(null);
           resolve(choice);
         }
       });
@@ -3066,15 +3062,42 @@ const App: React.FC = () => {
           if (data && isQualified) {
             let proceedWithCache = true;
             if (!bypassDisambiguation && !bypassTokenConfirmation) {
-                const choice = await confirmCacheChoice([searchId]);
-                if (choice === 'cancel') {
+                let parsedDetails: any = null;
+                if (data.detailsCache) {
+                    try { parsedDetails = parseDetailsCacheSafely(data.detailsCache); } catch(e) {}
+                }
+                
+                let unwrappedDetails = parsedDetails;
+                if (Array.isArray(unwrappedDetails) && unwrappedDetails.length > 0) {
+                    unwrappedDetails = Array.isArray(unwrappedDetails[0]) ? unwrappedDetails[0][1] : unwrappedDetails[0];
+                }
+                
+                const normalizedGraphTemp = parsedGraph && parsedGraph.nodes ? applyHumanCasedLabels(normalizeGraphData(parsedGraph), artists) : {nodes:[]};
+                const primaryNodeTemp = normalizedGraphTemp.nodes.find((n: any) => 
+                    n.id.toLowerCase() === searchIdLower || 
+                    normalizeArtistId(n.id) === normalizeArtistId(searchId) || 
+                    isArtistIdMatch(n.id, searchId)
+                ) as any;
+
+                const candidateLabel = unwrappedDetails?.details?.artist || unwrappedDetails?.artist || unwrappedDetails?.name || primaryNodeTemp?.label || searchId;
+                const candidateOrigin = unwrappedDetails?.details?.origin || unwrappedDetails?.origin || unwrappedDetails?.location || unwrappedDetails?.country || primaryNodeTemp?.origin || "";
+                const candidateGenre = unwrappedDetails?.details?.genre || unwrappedDetails?.genre || unwrappedDetails?.genres || primaryNodeTemp?.genre || "";
+
+                const choice = await confirmDisambiguationChoice(searchId, [{
+                    id: primaryNodeTemp?.id || searchId,
+                    label: candidateLabel,
+                    origin: candidateOrigin,
+                    genre: candidateGenre
+                }]);
+                
+                if (choice === 'cancel' || choice === 'back') {
                    setIsLoading(false);
                    isFetchingDetailsRef.current = false;
                    isHydratingSessionRef.current = false;
                    return;
                 }
                 if (choice === 'synthesis') {
-                   console.log("[Front Gate Cache] User requested synthesis. Bypassing cache hit.");
+                   console.log("[Front Gate Cache] User requested synthesis via Disambiguation. Bypassing cache hit.");
                    proceedWithCache = false;
                 }
             }
@@ -3527,18 +3550,11 @@ const App: React.FC = () => {
           // For single-artist queries: skip confirmCacheChoice entirely — load directly from cache.
           // This prevents the cache-choice modal appearing for known artists.
           const skipChoiceModal = artistList.length === 1 || allCompositeCached;
-          const choice = skipChoiceModal ? 'cache' : await confirmCacheChoice(artistList);
-          if (choice === 'cancel' || controller.signal.aborted) {
+          if (controller.signal.aborted) {
             isHydratingSessionRef.current = false;
             setIsLoading(false);
             setActiveNodeIds(prevActiveNodeIds);
             setSeedArtists(prevSeedArtists);
-            return;
-          }
-
-          if (choice === 'synthesis') {
-            console.log("[Phase 02 Cache] Option B chosen: forcing net-new AI generation.");
-            handleGenerateGraph(artists, true, null, true, true);
             return;
           }
 
@@ -3864,18 +3880,11 @@ const App: React.FC = () => {
         // Single-artist queries without filters are already handled by the Front Gate cache check.
         // Thus, any full hit reaching Phase 2 is by definition multi-artist or filtered.
         const allDeep = Array.from(cached.values()).every(entry => entry.isDeep === true);
-        const choice = (allDeep || bypassChoiceConfirmation) ? 'cache' : await confirmCacheChoice(artistList);
-        if (choice === 'cancel' || controller.signal.aborted) {
+        if (controller.signal.aborted) {
           isHydratingSessionRef.current = false;
           setIsLoading(false);
           setActiveNodeIds(prevActiveNodeIds);
           setSeedArtists(prevSeedArtists);
-          return;
-        }
-
-        if (choice === 'synthesis') {
-          console.log("[Phase 02 Cache] Option B chosen: forcing net-new AI generation.");
-          handleGenerateGraph(artists, true, null, true, true);
           return;
         }
 
@@ -4826,7 +4835,7 @@ const App: React.FC = () => {
     graphData,
     activeNodes,
     seedArtists,
-    confirmCacheChoice,
+
     confirmTokenUsage,
     detailsCache,
     currentProjectId,
@@ -7908,13 +7917,7 @@ const App: React.FC = () => {
         error={tokenConfirmation?.error}
       />
 
-      <CacheChoiceDialog
-        isOpen={!!cacheChoiceDialog}
-        onClose={() => cacheChoiceDialog?.onSelect('cancel')}
-        onSelect={(choice) => cacheChoiceDialog?.onSelect(choice)}
-        artists={cacheChoiceDialog?.artists || []}
-        cost={cacheChoiceDialog?.cost || 0}
-      />
+
       <ConsolidatedValidationModal
         isOpen={!!consolidatedValidationDialog?.isOpen}
         seeds={consolidatedValidationDialog?.seeds || []}
