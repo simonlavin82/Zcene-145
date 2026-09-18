@@ -1472,3 +1472,86 @@ export const FilterGuidanceModal: React.FC<{
     </ModalBackdrop>
   );
 };
+
+export interface PreFlightSeed {
+  id: string;
+  query: string;
+  predictedOrigin: string;
+  isKnownCacheHit: boolean;
+}
+
+export interface ConsolidatedValidationModalProps {
+  isOpen: boolean;
+  seeds: PreFlightSeed[];
+  onConfirm: (finalOrigins: Record<string, string>) => void;
+  onCancel: () => void;
+}
+
+export function ConsolidatedValidationModal({ isOpen, seeds, onConfirm, onCancel }: ConsolidatedValidationModalProps) {
+  const [origins, setOrigins] = useState<Record<string, string>>(() => {
+    const initial: Record<string, string> = {};
+    seeds.forEach(s => initial[s.id] = s.predictedOrigin);
+    return initial;
+  });
+
+  React.useEffect(() => {
+    setOrigins(prev => {
+      const next: Record<string, string> = {};
+      let changed = false;
+      seeds.forEach(s => {
+        next[s.id] = prev[s.id] !== undefined ? prev[s.id] : s.predictedOrigin;
+        if (prev[s.id] === undefined) changed = true;
+      });
+      return changed ? next : prev;
+    });
+  }, [seeds]);
+
+  if (!isOpen) return null;
+
+  return (
+    <ModalBackdrop onClick={onCancel} className="z-[1100]">
+      <ModalContainer className="overflow-visible relative z-[1150]">
+        <form onSubmit={e => { e.preventDefault(); onConfirm(origins); }} className="flex flex-col w-full" onClick={e => e.stopPropagation()}>
+          <ModalHeader>
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary !text-[18px]">checklist</span>
+              <h3 className="text-lg font-medium text-white">Confirm Your Seeds</h3>
+            </div>
+            <button type="button" onClick={onCancel} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none">
+              <span className="material-symbols-outlined !text-[18px]">close</span>
+            </button>
+          </ModalHeader>
+          <ModalBody className="p-5 flex flex-col gap-4 overflow-visible">
+            <p className="text-sm font-light text-zinc-400 leading-relaxed">
+              Please verify the regional origins for your selected artists.
+            </p>
+            <div className="flex flex-col gap-4">
+              {seeds.map(seed => (
+                <div key={seed.id} className="flex flex-col gap-2 p-3 bg-zinc-900/50 border border-zinc-700/50 rounded-xl">
+                  <div className="flex items-center justify-between">
+                    <span className="text-white font-medium text-base truncate">{seed.query}</span>
+                    {seed.isKnownCacheHit && (
+                      <span className="text-[10px] uppercase tracking-wider text-primary/80 bg-primary/10 px-2 py-0.5 rounded-full font-semibold">Cache Hit</span>
+                    )}
+                  </div>
+                  <CountryFilterDropdown 
+                    value={origins[seed.id] || ''} 
+                    onChange={v => setOrigins(prev => ({ ...prev, [seed.id]: v }))} 
+                  />
+                </div>
+              ))}
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <button type="button" onClick={onCancel} className="px-4 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent">
+              Cancel
+            </button>
+            <button type="submit" className="px-6 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all shadow-md cursor-pointer whitespace-nowrap">
+              Confirm & Generate
+            </button>
+          </ModalFooter>
+        </form>
+      </ModalContainer>
+    </ModalBackdrop>
+  );
+}
