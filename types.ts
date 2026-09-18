@@ -44,6 +44,7 @@ export interface ChatMessage {
 }
 
 export interface NodeDetails {
+  _isStub?: boolean;
   summary: string;
   imageUrl?: string;
   details: {

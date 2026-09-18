@@ -1141,7 +1141,7 @@ export const processCurationJob = onDocumentCreated({
           }
           
           const recDetailsEntry = detailsCacheEntries.find((entry: any) => isEntitySeedMatch(recNorm, entry[0]));
-          const recDetails = recDetailsEntry ? (recDetailsEntry as any)[1] : null;
+          let recDetails = recDetailsEntry ? (recDetailsEntry as any)[1] : null;
 
           if (isLabel && !recDetails) {
             console.warn(`[Curation Backend] Label cache write skipped for "${recNorm}" — missing detailsCache.`);
