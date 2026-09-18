@@ -1092,14 +1092,27 @@ export const processCurationJob = onDocumentCreated({
             }
 
             // Merge Orphan Data & Redirect
-            if (canonicalSeedId !== seedNorm && rawData) {
-              if (!finalRationale && rawData.synthesisRationale) {
-                finalRationale = rawData.synthesisRationale;
-                console.log(`[Self-Heal] Adopting orphaned synthesisRationale for ${canonicalSeedId} in transaction`);
-              }
-              if (!rawData.redirectTo) {
-                transaction.set(rawSeedDocRef, { redirectTo: canonicalSeedId }, { merge: true });
-                console.log(`[Self-Heal] Queued redirectTo for orphaned stub ${seedNorm} -> ${canonicalSeedId}`);
+            if (canonicalSeedId !== seedNorm) {
+              if (rawData) {
+                if (!finalRationale && rawData.synthesisRationale) {
+                  finalRationale = rawData.synthesisRationale;
+                  console.log(`[Self-Heal] Adopting orphaned synthesisRationale for ${canonicalSeedId} in transaction`);
+                }
+                if (!rawData.redirectTo) {
+                  transaction.set(rawSeedDocRef, { redirectTo: canonicalSeedId }, { merge: true });
+                  console.log(`[Self-Heal] Queued redirectTo for orphaned stub ${seedNorm} -> ${canonicalSeedId}`);
+                }
+              } else {
+                // BUG FIX: Restore the dropped bare stub creation
+                // If the bare document never existed, mint it now with _isStub and a strict redirect
+                const fallbackStub = (inputPayload?.seedStubs && inputPayload.seedStubs[canonicalSeedId]) || {};
+                transaction.set(rawSeedDocRef, { 
+                  ...fallbackStub,
+                  _isStub: true, 
+                  redirectTo: canonicalSeedId,
+                  cachedAt: FieldValue.serverTimestamp()
+                }, { merge: true });
+                console.log(`[Self-Heal] Minted new bare stub forwarder ${seedNorm} -> ${canonicalSeedId}`);
               }
             }
 

@@ -94,6 +94,7 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
         }
     };
     const resolvedSeedArray = [];
+    const seedStubs = {};
     let needsProGeneration = false;
     let hasStubHit = false;
     let hasCacheMiss = false;
@@ -214,6 +215,19 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
                     genre: validationResult.genre,
                     isCacheHit: false
                 });
+                seedStubs[normId] = {
+                    _isStub: true,
+                    summary: "Awaiting Deep Cut analysis...",
+                    imageUrl: null,
+                    details: {
+                        genre: validationResult.genre || "Unknown",
+                        origin: validationResult.origin || "Unknown",
+                        founded: "Unknown",
+                        notableArtists: []
+                    },
+                    discography: [],
+                    links: []
+                };
                 console.log(`[Pipeline Diamond] -> Seed Slugging: ${validationResult.id} -> ${normId}`);
             }
             else {
@@ -370,7 +384,8 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
                     ...payload,
                     baseGraph: finalGraph,
                     generationType: determinedGenerationType,
-                    foregroundApiUsage: collectedTokens
+                    foregroundApiUsage: collectedTokens,
+                    seedStubs: seedStubs
                 }
             });
             console.log(`[Pipeline Diamond] -> Created curation job ${curationJobId} for background hydration`);

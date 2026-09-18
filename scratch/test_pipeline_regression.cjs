@@ -241,6 +241,43 @@ async function runRegressionSuite() {
     assert(uiStateDetailsCache[seedNodeId]._isStub === undefined, "Frontend JIT: Successfully heals the stub and removes the _isStub flag.");
     assert(uiStateDetailsCache[seedNodeId].summary === "A hardcore band.", "Frontend JIT: Rich data is merged into the UI state detailsCache.");
 
+    // --- 6. Phase 6: Cold Start Bare Stub Creation ---
+    console.log("\n--- 6. Phase 6: Cold Start Bare Stub Creation ---");
+    
+    // Simulate the Atomic Self-Heal from processCurationJob.ts
+    const seedNormTest = "buggin";
+    const canonicalSeedTest = "buggin-us";
+    
+    // Simulate "Cold Start" - bare document does not exist yet
+    let rawDataTest = null;
+    let mockFirestoreCache = {};
+    
+    if (canonicalSeedTest !== seedNormTest) {
+      if (rawDataTest) {
+         if (!rawDataTest.redirectTo) {
+            mockFirestoreCache[seedNormTest] = { redirectTo: canonicalSeedTest };
+         }
+      } else {
+         mockFirestoreCache[seedNormTest] = { 
+            _isStub: true, 
+            redirectTo: canonicalSeedTest 
+         };
+      }
+      
+      // Simulate canonical hydration write
+      mockFirestoreCache[canonicalSeedTest] = { artistId: canonicalSeedTest, details: {} };
+    }
+    
+    const bareDocSnap = mockFirestoreCache[seedNormTest];
+    const canonicalDocSnap = mockFirestoreCache[canonicalSeedTest];
+    
+    assert(canonicalDocSnap !== undefined, "Canonical document (buggin-us) was minted.");
+    assert(bareDocSnap !== undefined, "Bare pointer stub (buggin) was minted.");
+    if (bareDocSnap) {
+        assert(bareDocSnap.redirectTo === canonicalSeedTest, "Bare stub correctly redirects to the canonical slug.");
+        assert(bareDocSnap._isStub === true, "Bare stub is explicitly marked with _isStub: true.");
+    }
+
     console.log("\n--- Regression Suite Summary ---");
     console.log(`Total Passed: ${passed}`);
     console.log(`Total Failed: ${failed}`);

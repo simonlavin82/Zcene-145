@@ -992,14 +992,28 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                         }
                                     }
                                     // Merge Orphan Data & Redirect
-                                    if (canonicalSeedId !== seedNorm && rawData) {
-                                        if (!finalRationale && rawData.synthesisRationale) {
-                                            finalRationale = rawData.synthesisRationale;
-                                            console.log(`[Self-Heal] Adopting orphaned synthesisRationale for ${canonicalSeedId} in transaction`);
+                                    if (canonicalSeedId !== seedNorm) {
+                                        if (rawData) {
+                                            if (!finalRationale && rawData.synthesisRationale) {
+                                                finalRationale = rawData.synthesisRationale;
+                                                console.log(`[Self-Heal] Adopting orphaned synthesisRationale for ${canonicalSeedId} in transaction`);
+                                            }
+                                            if (!rawData.redirectTo) {
+                                                transaction.set(rawSeedDocRef, { redirectTo: canonicalSeedId }, { merge: true });
+                                                console.log(`[Self-Heal] Queued redirectTo for orphaned stub ${seedNorm} -> ${canonicalSeedId}`);
+                                            }
                                         }
-                                        if (!rawData.redirectTo) {
-                                            transaction.set(rawSeedDocRef, { redirectTo: canonicalSeedId }, { merge: true });
-                                            console.log(`[Self-Heal] Queued redirectTo for orphaned stub ${seedNorm} -> ${canonicalSeedId}`);
+                                        else {
+                                            // BUG FIX: Restore the dropped bare stub creation
+                                            // If the bare document never existed, mint it now with _isStub and a strict redirect
+                                            const fallbackStub = (inputPayload?.seedStubs && inputPayload.seedStubs[canonicalSeedId]) || {};
+                                            transaction.set(rawSeedDocRef, {
+                                                ...fallbackStub,
+                                                _isStub: true,
+                                                redirectTo: canonicalSeedId,
+                                                cachedAt: firestore_2.FieldValue.serverTimestamp()
+                                            }, { merge: true });
+                                            console.log(`[Self-Heal] Minted new bare stub forwarder ${seedNorm} -> ${canonicalSeedId}`);
                                         }
                                     }
                                     if (finalRationale) {
@@ -1036,18 +1050,24 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         // Do NOT continue here. Let the seed fall through so it can be evaluated for partial hydration or missing assets during a cache upgrade.
                     }
                     const recDetailsEntry = detailsCacheEntries.find((entry) => isEntitySeedMatch(recNorm, entry[0]));
-                    const recDetails = recDetailsEntry ? recDetailsEntry[1] : null;
+                    let recDetails = recDetailsEntry ? recDetailsEntry[1] : null;
                     if (isLabel && !recDetails) {
                         console.warn(`[Curation Backend] Label cache write skipped for "${recNorm}" — missing detailsCache.`);
                         continue;
                     }
-                    // Change 1 — Symmetric artist null-guard.
+                    // Change 1 — Symmetric artist null-guard + JIT Stub Fallback (Rule 17)
                     // Prevents writing a null detailsCache to Firestore when hydration failed for this artist.
-                    // Without this guard, a null details entry silently writes a null Firestore document,
-                    // causing the frontend to display "DEEP CUT SYNTHESIS REQUIRED" instead of pre-hydrated content.
+                    // If the failed artist is a primary seed, we inject a pre-hydrated stub from inputPayload
+                    // to prevent the frontend from falling into a "DATA UNAVAILABLE" state.
                     if (!isLabel && !recDetails) {
-                        console.warn(`[Curation Backend] Artist cache write skipped for "${recNorm}" — missing detailsCache (hydration failed or was skipped during batch).`);
-                        continue;
+                        if (matchingSeedNorm && inputPayload?.seedStubs && inputPayload.seedStubs[recNorm]) {
+                            recDetails = inputPayload.seedStubs[recNorm];
+                            console.log(`[Curation Backend] Injecting pre-hydrated JIT stub for failed seed artist: ${recNorm}`);
+                        }
+                        else {
+                            console.warn(`[Curation Backend] Artist cache write skipped for "${recNorm}" — missing detailsCache (hydration failed or was skipped during batch).`);
+                            continue;
+                        }
                     }
                     const collName = isLabel ? "labels" : "artists";
                     const idFieldKey = isLabel ? "labelId" : "artistId";
