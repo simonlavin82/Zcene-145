@@ -2892,113 +2892,6 @@ const App: React.FC = () => {
       return;
     }
 
-    // ─── STAGE 0: UNIFIED DISAMBIGUATION GATE & TOKEN GUARD ────────────────────
-    let resolvedArtistSeeds = [...artistList];
-    let activeDisambiguationHints: Record<string, string> = disambiguationHints || {};
-    let hasDisambiguated = false;
-
-    if (!bypassTokenConfirmation && !bypassDisambiguation) {
-      if (!sessionTokenApprovedRef.current) {
-        const confirmed = await confirmTokenUsage(isLiveSynthesisTemp ? 'live_synthesis' : 'generation', [], artistList, undefined, false);
-        if (!confirmed || confirmed === 'back') {
-          setIsLoading(false);
-          isHydratingSessionRef.current = false;
-          isProjectLoadingRef.current = false;
-          return;
-        }
-        sessionTokenApprovedRef.current = true;
-      }
-
-      const cacheCandidatesPerSeed = await Promise.all(artistList.map(async (searchId, i) => {
-        const rawInput = artists.split('::').map(s => s.trim()).filter(Boolean)[i] || searchId;
-        const cacheCandidates = await searchDisambiguationCandidates(searchId);
-        
-        let predictedOrigin = '';
-        let isKnownCacheHit = false;
-        let candidateId = undefined;
-
-        if (cacheCandidates.length > 0) {
-          predictedOrigin = cacheCandidates[0].origin || '';
-          isKnownCacheHit = true;
-          candidateId = cacheCandidates[0].id;
-        } else {
-          try {
-            let currentPassword = sessionStorage.getItem('zcene_api_password') || undefined;
-            const validate = httpsCallable(functions, 'validateSeedOriginCallable');
-            const result = await validate({ seed: rawInput, ...(currentPassword && { password: currentPassword }) });
-            const data = result.data as any;
-            if (data && data.isValid) {
-              predictedOrigin = data.origin || '';
-            }
-          } catch (e: any) {
-             console.warn("Origin validation failed:", e);
-          }
-        }
-        
-        return {
-          id: searchId,
-          query: rawInput,
-          predictedOrigin,
-          isKnownCacheHit,
-          candidateId
-        };
-      }));
-
-      setIsLoading(false);
-      isHydratingSessionRef.current = false;
-      isProjectLoadingRef.current = false;
-
-      const finalOrigins = await new Promise<Record<string, string> | null>((resolve) => {
-        setConsolidatedValidationDialog({
-          isOpen: true,
-          seeds: cacheCandidatesPerSeed,
-          onConfirm: (origins) => { setConsolidatedValidationDialog(null); resolve(origins); },
-          onCancel: () => { setConsolidatedValidationDialog(null); resolve(null); }
-        });
-      });
-
-      if (!finalOrigins) {
-        setActiveNodeIds(prevActiveNodeIds);
-        setSeedArtists(prevSeedArtists);
-        return;
-      }
-
-      for (let i = 0; i < artistList.length; i++) {
-        const searchId = artistList[i];
-        const rawCountryName = finalOrigins[searchId];
-        const preFlightSeed = cacheCandidatesPerSeed[i];
-
-        if (rawCountryName) {
-          const countryNorm = extractCountrySlug(rawCountryName);
-
-          if (preFlightSeed.isKnownCacheHit && preFlightSeed.predictedOrigin === rawCountryName && preFlightSeed.candidateId) {
-            resolvedArtistSeeds[i] = normalizeArtistId(preFlightSeed.candidateId);
-          } else {
-            const newSeed = normalizeArtistId(`${searchId}-${countryNorm}`);
-            resolvedArtistSeeds[i] = newSeed;
-            activeDisambiguationHints[newSeed] = rawCountryName;
-          }
-          hasDisambiguated = true;
-        }
-      }
-
-      if (hasDisambiguated) {
-        const newArtistsStr = resolvedArtistSeeds.join('::');
-        const hasActiveFiltersNext = !!(
-          activeDiscoveryFilters.foundedAfter ||
-          activeDiscoveryFilters.foundedBefore ||
-          (activeDiscoveryFilters.includeOrigins && activeDiscoveryFilters.includeOrigins.length > 0) ||
-          (activeDiscoveryFilters.excludeOrigins && activeDiscoveryFilters.excludeOrigins.length > 0) ||
-          (activeDiscoveryFilters.includeGenres && activeDiscoveryFilters.includeGenres.length > 0) ||
-          (activeDiscoveryFilters.additionalInstructions && activeDiscoveryFilters.additionalInstructions.trim().length > 0)
-        );
-        const isCustomNext = resolvedArtistSeeds.length > 1 || hasActiveFiltersNext;
-        
-        handleGenerateGraph(newArtistsStr, isRegeneration, graphToEnhance, false, !isCustomNext, overrideFilters, activeDisambiguationHints, true);
-        return;
-      }
-    }
-
     try {
       const hasActiveFilters = !!(
         activeDiscoveryFilters.foundedAfter ||
@@ -3378,6 +3271,113 @@ const App: React.FC = () => {
         }
       } catch (err) {
         console.warn("[Front Gate Cache] Read failed, falling through:", err);
+      }
+    }
+
+    // ─── STAGE 0: UNIFIED DISAMBIGUATION GATE & TOKEN GUARD ────────────────────
+    let resolvedArtistSeeds = [...artistList];
+    let activeDisambiguationHints: Record<string, string> = disambiguationHints || {};
+    let hasDisambiguated = false;
+
+    if (!bypassTokenConfirmation && !bypassDisambiguation) {
+      if (!sessionTokenApprovedRef.current) {
+        const confirmed = await confirmTokenUsage(isLiveSynthesisTemp ? 'live_synthesis' : 'generation', [], artistList, undefined, false);
+        if (!confirmed || confirmed === 'back') {
+          setIsLoading(false);
+          isHydratingSessionRef.current = false;
+          isProjectLoadingRef.current = false;
+          return;
+        }
+        sessionTokenApprovedRef.current = true;
+      }
+
+      const cacheCandidatesPerSeed = await Promise.all(artistList.map(async (searchId, i) => {
+        const rawInput = artists.split('::').map(s => s.trim()).filter(Boolean)[i] || searchId;
+        const cacheCandidates = await searchDisambiguationCandidates(searchId);
+        
+        let predictedOrigin = '';
+        let isKnownCacheHit = false;
+        let candidateId = undefined;
+
+        if (cacheCandidates.length > 0) {
+          predictedOrigin = cacheCandidates[0].origin || '';
+          isKnownCacheHit = true;
+          candidateId = cacheCandidates[0].id;
+        } else {
+          try {
+            let currentPassword = sessionStorage.getItem('zcene_api_password') || undefined;
+            const validate = httpsCallable(functions, 'validateSeedOriginCallable');
+            const result = await validate({ seed: rawInput, ...(currentPassword && { password: currentPassword }) });
+            const data = result.data as any;
+            if (data && data.isValid) {
+              predictedOrigin = data.origin || '';
+            }
+          } catch (e: any) {
+             console.warn("Origin validation failed:", e);
+          }
+        }
+        
+        return {
+          id: searchId,
+          query: rawInput,
+          predictedOrigin,
+          isKnownCacheHit,
+          candidateId
+        };
+      }));
+
+      setIsLoading(false);
+      isHydratingSessionRef.current = false;
+      isProjectLoadingRef.current = false;
+
+      const finalOrigins = await new Promise<Record<string, string> | null>((resolve) => {
+        setConsolidatedValidationDialog({
+          isOpen: true,
+          seeds: cacheCandidatesPerSeed,
+          onConfirm: (origins) => { setConsolidatedValidationDialog(null); resolve(origins); },
+          onCancel: () => { setConsolidatedValidationDialog(null); resolve(null); }
+        });
+      });
+
+      if (!finalOrigins) {
+        setActiveNodeIds(prevActiveNodeIds);
+        setSeedArtists(prevSeedArtists);
+        return;
+      }
+
+      for (let i = 0; i < artistList.length; i++) {
+        const searchId = artistList[i];
+        const rawCountryName = finalOrigins[searchId];
+        const preFlightSeed = cacheCandidatesPerSeed[i];
+
+        if (rawCountryName) {
+          const countryNorm = extractCountrySlug(rawCountryName);
+
+          if (preFlightSeed.isKnownCacheHit && preFlightSeed.predictedOrigin === rawCountryName && preFlightSeed.candidateId) {
+            resolvedArtistSeeds[i] = normalizeArtistId(preFlightSeed.candidateId);
+          } else {
+            const newSeed = normalizeArtistId(`${searchId}-${countryNorm}`);
+            resolvedArtistSeeds[i] = newSeed;
+            activeDisambiguationHints[newSeed] = rawCountryName;
+          }
+          hasDisambiguated = true;
+        }
+      }
+
+      if (hasDisambiguated) {
+        const newArtistsStr = resolvedArtistSeeds.join('::');
+        const hasActiveFiltersNext = !!(
+          activeDiscoveryFilters.foundedAfter ||
+          activeDiscoveryFilters.foundedBefore ||
+          (activeDiscoveryFilters.includeOrigins && activeDiscoveryFilters.includeOrigins.length > 0) ||
+          (activeDiscoveryFilters.excludeOrigins && activeDiscoveryFilters.excludeOrigins.length > 0) ||
+          (activeDiscoveryFilters.includeGenres && activeDiscoveryFilters.includeGenres.length > 0) ||
+          (activeDiscoveryFilters.additionalInstructions && activeDiscoveryFilters.additionalInstructions.trim().length > 0)
+        );
+        const isCustomNext = resolvedArtistSeeds.length > 1 || hasActiveFiltersNext;
+        
+        handleGenerateGraph(newArtistsStr, isRegeneration, graphToEnhance, false, !isCustomNext, overrideFilters, activeDisambiguationHints, true);
+        return;
       }
     }
     // AbortController is now initialized at the start of the function.
