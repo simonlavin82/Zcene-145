@@ -191,7 +191,8 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
             hasCacheMiss = true;
             let validationResult = null;
             if (payload.disambiguationHints && payload.disambiguationHints[(0, curatorService_1.normalizeArtistId)(seed)]) {
-                validationResult = { isValid: true, id: seed, origin: payload.disambiguationHints[(0, curatorService_1.normalizeArtistId)(seed)], genre: "Unknown" };
+                const hintGenre = payload.disambiguationGenres && payload.disambiguationGenres[(0, curatorService_1.normalizeArtistId)(seed)] ? payload.disambiguationGenres[(0, curatorService_1.normalizeArtistId)(seed)] : "Unknown";
+                validationResult = { isValid: true, id: seed, origin: payload.disambiguationHints[(0, curatorService_1.normalizeArtistId)(seed)], genre: hintGenre };
             }
             else {
                 const valResult = await (0, curatorService_1.validateSeedOriginBackend)(seed);
@@ -201,12 +202,21 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
                 }
             }
             if (validationResult.isValid) {
-                let normId = (0, curatorService_1.normalizeArtistId)(validationResult.id);
+                const bareNormId = (0, curatorService_1.normalizeArtistId)(validationResult.id);
+                let normId = bareNormId;
                 if (validationResult.origin) {
                     const originSlug = (0, curatorService_1.extractCountrySlug)(validationResult.origin);
                     if (originSlug && originSlug !== 'global' && !normId.endsWith(`-${originSlug}`)) {
                         normId = `${normId}-${originSlug}`;
                     }
+                }
+                if (normId !== bareNormId) {
+                    await db.collection("artists").doc(bareNormId).set({
+                        _isStub: true,
+                        redirectTo: normId,
+                        cachedAt: firestore_1.FieldValue.serverTimestamp()
+                    }, { merge: true });
+                    console.log(`[Pipeline Diamond] -> Synchronously minted bare stub forwarder: ${bareNormId} -> ${normId}`);
                 }
                 resolvedSeedArray.push({
                     id: normId,

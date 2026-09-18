@@ -86,6 +86,7 @@ const generateGraphDataViaCloudJob = async (
   projectId?: string,
   jobId?: string,
   disambiguationHints?: Record<string, string>,
+  disambiguationGenres?: Record<string, string>,
   baseGraph?: GraphData,
   cachedSubgraphsContext?: string,
   isSmartBypass?: boolean,
@@ -107,6 +108,7 @@ const generateGraphDataViaCloudJob = async (
       ...(projectId && { projectId }),
       ...(jobId && { jobId }),
       ...(disambiguationHints && { disambiguationHints }),
+      ...(disambiguationGenres && { disambiguationGenres }),
       ...(baseGraph && { baseGraph }),
       ...(cachedSubgraphsContext && { cachedSubgraphsContext }),
       ...(isSmartBypass !== undefined && { isSmartBypass }),
@@ -2782,7 +2784,8 @@ const App: React.FC = () => {
     bypassTokenConfirmation: boolean = false,
     overrideFilters?: DiscoveryFilters,
     disambiguationHints?: Record<string, string>,
-    bypassDisambiguation: boolean = false
+    bypassDisambiguation: boolean = false,
+    disambiguationGenres?: Record<string, string>
   ) => {
     if (!isRegeneration && !bypassDisambiguation && !bypassTokenConfirmation && !skipCacheLookup) {
       sessionTokenApprovedRef.current = false;
@@ -3393,14 +3396,14 @@ const App: React.FC = () => {
         const preFlightSeed = cacheCandidatesPerSeed[i];
 
         if (rawCountryName) {
-          const countryNorm = extractCountrySlug(rawCountryName);
-
           if (preFlightSeed.isKnownCacheHit && preFlightSeed.predictedOrigin === rawCountryName && preFlightSeed.candidateId) {
             resolvedArtistSeeds[i] = normalizeArtistId(preFlightSeed.candidateId);
           } else {
-            const newSeed = normalizeArtistId(`${searchId}-${countryNorm}`);
-            resolvedArtistSeeds[i] = newSeed;
-            activeDisambiguationHints[newSeed] = rawCountryName;
+            resolvedArtistSeeds[i] = searchId;
+            activeDisambiguationHints[searchId] = rawCountryName;
+            if (preFlightSeed.genre) {
+              activeDisambiguationGenres[searchId] = preFlightSeed.genre;
+            }
           }
           hasDisambiguated = true;
         }
@@ -3418,7 +3421,7 @@ const App: React.FC = () => {
         );
         const isCustomNext = resolvedArtistSeeds.length > 1 || hasActiveFiltersNext;
         
-        handleGenerateGraph(newArtistsStr, isRegeneration, graphToEnhance, false, !isCustomNext, overrideFilters, activeDisambiguationHints, true);
+        handleGenerateGraph(newArtistsStr, isRegeneration, graphToEnhance, true, !isCustomNext, overrideFilters, activeDisambiguationHints, true);
         return;
       }
     }
@@ -3783,6 +3786,7 @@ const App: React.FC = () => {
                 currentProjectIdRef.current || currentProjectId || undefined,
                 `job-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
                 activeDisambiguationHints,
+                activeDisambiguationGenres,
                 parsedGraphData, // Pass the cache's parsed graph as baseGraph
                 undefined, // cachedSubgraphsContext
                 true, // isSmartBypass flag
@@ -4127,13 +4131,13 @@ const App: React.FC = () => {
             },
             undefined,
             undefined,
-            undefined,
-            undefined,
+            activeDisambiguationHints,
+            activeDisambiguationGenres,
             undefined,
             toFetch.length > 1 || hasActiveFilters
           );
         } else {
-          partialGraphPromise = generateGraphData(toFetch.join('::'), pruned, activeDiscoveryFilters, user?.uid, controller?.signal, activeDisambiguationHints);
+          partialGraphPromise = generateGraphData(toFetch.join('::'), pruned, activeDiscoveryFilters, user?.uid, controller?.signal, activeDisambiguationHints, activeDisambiguationGenres);
         }
         const timeoutPromise = new Promise((_, reject) =>
           setTimeout(() => reject(new Error("The AI is taking too long to respond. The request has timed out.")), 600000)
@@ -4486,6 +4490,7 @@ const App: React.FC = () => {
           currentProjectIdRef.current || currentProjectId || undefined,
           jobId,
           activeDisambiguationHints,
+          activeDisambiguationGenres,
           pruned || undefined,          // Base graph context
           computedContext,              // Stringified cached subgraphs context for multi-seed
           undefined,                    // isSmartBypass
@@ -4494,7 +4499,7 @@ const App: React.FC = () => {
         );
       } else {
         const payloadArtists = artistList.map(a => normalizeArtistId(a)).join('::');
-        graphPromise = generateGraphData(payloadArtists, pruned, activeDiscoveryFilters, user?.uid, controller?.signal, activeDisambiguationHints);
+        graphPromise = generateGraphData(payloadArtists, pruned, activeDiscoveryFilters, user?.uid, controller?.signal, activeDisambiguationHints, activeDisambiguationGenres);
       }
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error("The AI is taking too long to respond. The request has timed out.")), 600000)

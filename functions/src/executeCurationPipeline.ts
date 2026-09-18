@@ -202,7 +202,8 @@ export const executeCurationPipeline = onCall({
         
         let validationResult: any = null;
         if (payload.disambiguationHints && payload.disambiguationHints[normalizeArtistId(seed)]) {
-           validationResult = { isValid: true, id: seed, origin: payload.disambiguationHints[normalizeArtistId(seed)], genre: "Unknown" };
+           const hintGenre = payload.disambiguationGenres && payload.disambiguationGenres[normalizeArtistId(seed)] ? payload.disambiguationGenres[normalizeArtistId(seed)] : "Unknown";
+           validationResult = { isValid: true, id: seed, origin: payload.disambiguationHints[normalizeArtistId(seed)], genre: hintGenre };
         } else {
            const valResult = await validateSeedOriginBackend(seed);
            validationResult = valResult;
