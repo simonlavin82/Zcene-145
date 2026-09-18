@@ -1137,6 +1137,26 @@ const SitemapNode: React.FC<{ title: string; description: string; children?: Rea
     </li>
 );
 
+const ARCHITECTURE_RULES = [
+    { id: 1, title: "Three-Column Flow", desc: "Pipeline is strictly divided into React UI, HTTP Fast-Track, and Background Worker." },
+    { id: 2, title: "Strict Seed Hoisting & Pinning", desc: "Seed nodes must ALWAYS be elevated to the highest priority in the topology." },
+    { id: 3, title: "Universal Coordinate Amnesia", desc: "Absolute D3 runtime coordinates MUST be explicitly stripped during generation." },
+    { id: 4, title: "Deterministic Open Graph Routing", desc: "A deterministic top-level artist image URL MUST be appended to the root." },
+    { id: 5, title: "Schema Role", desc: "synthesisRationale MUST be written to root level of the Firestore artist document." },
+    { id: 6, title: "Defensive Alias Matching", desc: "isNodeInSeedList strictly enforces canonical mapping without naive substrings." },
+    { id: 7, title: "Fail-Fast Media Gatekeeper", desc: "Re-hydrates any node missing crucial iTunes/Spotify imagery or biography." },
+    { id: 8, title: "Strict Topology Verification", desc: "Stubs MUST be strictly routed to Generative Topology before async hydration." },
+    { id: 9, title: "Canonical Seed Slug Resolution", desc: "All downstream writes MUST target the canonical ID to prevent split-brain." },
+    { id: 10, title: "Redirect Pointer Immunity", desc: "Hydration loop slug dedup MUST explicitly skip any document with a redirectTo field." },
+    { id: 11, title: "Cost-Optimized Parametric Hydration", desc: "Native googleSearch grounding tools MUST remain fully stripped." },
+    { id: 12, title: "Resilient iTunes Artwork Pipeline", desc: "Punctuation-Agnostic Normalization and Summary Match Fallback." },
+    { id: 13, title: "Auth Handoff Preserver", desc: "Stashes ID in session storage to guarantee clone resumes post-auth." },
+    { id: 14, title: "Atomic Self-Healing", desc: "Graph breakdowns handle atomic self-healing." },
+    { id: 15, title: "Complex Cache Bypass", desc: "Multi-seed and filtered queries must strictly bypass the Global Topology Cache." },
+    { id: 16, title: "Curation Intercept Guardrails", desc: "ProjectLoader must strictly bypass Phase 1 interception when curating." },
+    { id: 17, title: "JIT Stub Fallback", desc: "Backend injects a JIT stub, React UI intercepts and fetches details live." },
+    { id: 18, title: "Mandatory Disambiguation on Direct Hits", desc: "Green Line MUST NEVER bypass the user confirmation phase." },
+];
 
 const DiscoveryFlowDiagram: React.FC = () => (
     <div className="w-full py-12 px-4 bg-zinc-950/50 rounded-xl border border-zinc-800 mb-8 overflow-x-auto">
@@ -1187,6 +1207,24 @@ const DiscoveryFlowDiagram: React.FC = () => (
                         <li><span className="text-primary font-medium">Fail-Fast Media Gatekeeper:</span> Re-hydrates any node missing crucial iTunes/Spotify imagery or biography.</li>
                         <li><span className="text-primary font-medium">Metadata Hydration:</span> Fetches rich data via Gemini Flash & Google Search, then writes back to cache.</li>
                     </ul>
+                </div>
+            </div>
+
+            {/* Divider */}
+            <div className="w-px bg-zinc-800/50 mx-2 hidden lg:block" />
+
+            {/* Rules Ledger */}
+            <div className="flex-1 flex flex-col min-w-[280px]">
+                <div className="px-5 py-5 rounded-xl border border-zinc-700 bg-zinc-900 h-[600px] overflow-y-auto">
+                    <div className="text-white font-medium mb-4 sticky -top-5 bg-zinc-900 py-2 border-b border-zinc-800 z-10">Rules Ledger</div>
+                    <div className="space-y-3 pt-2">
+                        {ARCHITECTURE_RULES.map(rule => (
+                            <div key={rule.id} className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                                <div className="text-[10px] font-bold text-yellow-500 uppercase tracking-tighter mb-1">[Rule {rule.id}] {rule.title}</div>
+                                <div className="text-[10px] text-zinc-400 leading-relaxed">{rule.desc}</div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </div>
         </div>
