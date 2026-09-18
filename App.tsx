@@ -3334,11 +3334,13 @@ const App: React.FC = () => {
         const cacheCandidates = await searchDisambiguationCandidates(searchId);
         
         let predictedOrigin = '';
+        let genre = '';
         let isKnownCacheHit = false;
         let candidateId = undefined;
 
         if (cacheCandidates.length > 0) {
           predictedOrigin = cacheCandidates[0].origin || '';
+          genre = cacheCandidates[0].genre || '';
           isKnownCacheHit = true;
           candidateId = cacheCandidates[0].id;
         } else {
@@ -3349,6 +3351,7 @@ const App: React.FC = () => {
             const data = result.data as any;
             if (data && data.isValid) {
               predictedOrigin = data.origin || '';
+              genre = data.genre || '';
             }
           } catch (e: any) {
              console.warn("Origin validation failed:", e);
@@ -3359,6 +3362,7 @@ const App: React.FC = () => {
           id: searchId,
           query: rawInput,
           predictedOrigin,
+          genre,
           isKnownCacheHit,
           candidateId
         };

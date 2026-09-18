@@ -211,13 +211,24 @@ export const executeCurationPipeline = onCall({
            }
         }
         if (validationResult.isValid) {
-           let normId = normalizeArtistId(validationResult.id);
+           const bareNormId = normalizeArtistId(validationResult.id);
+           let normId = bareNormId;
            if (validationResult.origin) {
               const originSlug = extractCountrySlug(validationResult.origin);
               if (originSlug && originSlug !== 'global' && !normId.endsWith(`-${originSlug}`)) {
                  normId = `${normId}-${originSlug}`;
               }
            }
+           
+           if (normId !== bareNormId) {
+              await db.collection("artists").doc(bareNormId).set({
+                 _isStub: true,
+                 redirectTo: normId,
+                 cachedAt: FieldValue.serverTimestamp()
+              }, { merge: true });
+              console.log(`[Pipeline Diamond] -> Synchronously minted bare stub forwarder: ${bareNormId} -> ${normId}`);
+           }
+
            resolvedSeedArray.push({
               id: normId,
               name: validationResult.id,

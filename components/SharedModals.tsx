@@ -1366,6 +1366,7 @@ export interface PreFlightSeed {
   id: string;
   query: string;
   predictedOrigin: string;
+  genre?: string;
   isKnownCacheHit: boolean;
 }
 
@@ -1418,7 +1419,12 @@ export function ConsolidatedValidationModal({ isOpen, seeds, onConfirm, onCancel
               {seeds.map(seed => (
                 <div key={seed.id} className="flex flex-col gap-2 p-3 bg-zinc-900/50 border border-zinc-700/50 rounded-xl">
                   <div className="flex items-center justify-between">
-                    <span className="text-white font-medium text-base truncate">{seed.query}</span>
+                    <div className="flex flex-col">
+                      <span className="text-white font-medium text-base truncate">{seed.query}</span>
+                      {seed.genre && (
+                        <span className="text-xs text-zinc-400 font-light truncate">{seed.genre}</span>
+                      )}
+                    </div>
                     {seed.isKnownCacheHit && (
                       <span className="text-[10px] uppercase tracking-wider text-primary/80 bg-primary/10 px-2 py-0.5 rounded-full font-semibold">Cache Hit</span>
                     )}
