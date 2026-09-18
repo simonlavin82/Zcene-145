@@ -7679,7 +7679,7 @@ const App: React.FC = () => {
                 }; r.readAsText(f);
               }}
               onNodeClick={handleNodeClick} selectedNode={formattedSelectedNode} peekedNode={formattedPeekedNode} activeNodes={formattedActiveNodes}
-              detailsCache={detailsCache} loadingNodeIds={loadingNodeIds} onCloseNode={handleCloseNode}
+              detailsCache={detailsCache} onUpdateDetailsCache={setDetailsCache} loadingNodeIds={loadingNodeIds} onCloseNode={handleCloseNode}
               onRefreshNode={handleRefreshNode} detailsError={detailsError} systemError={error}
               onLogoClick={() => {
                 if (isGuest) {

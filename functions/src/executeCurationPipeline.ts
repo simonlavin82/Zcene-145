@@ -104,6 +104,7 @@ export const executeCurationPipeline = onCall({
   };
   
   const resolvedSeedArray: any[] = [];
+  const seedStubs: Record<string, any> = {};
   let needsProGeneration = false;
   
   let hasStubHit = false;
@@ -224,6 +225,21 @@ export const executeCurationPipeline = onCall({
               genre: validationResult.genre,
               isCacheHit: false
            });
+
+           seedStubs[normId] = {
+               _isStub: true,
+               summary: "Awaiting Deep Cut analysis...",
+               imageUrl: null,
+               details: {
+                   genre: validationResult.genre || "Unknown",
+                   origin: validationResult.origin || "Unknown",
+                   founded: "Unknown",
+                   notableArtists: []
+               },
+               discography: [],
+               links: []
+           };
+
            console.log(`[Pipeline Diamond] -> Seed Slugging: ${validationResult.id} -> ${normId}`);
         } else {
            throw new HttpsError("failed-precondition", `Validation failed for seed: ${seed}.`);
@@ -398,7 +414,8 @@ export const executeCurationPipeline = onCall({
            ...payload,
            baseGraph: finalGraph,
            generationType: determinedGenerationType,
-           foregroundApiUsage: collectedTokens
+           foregroundApiUsage: collectedTokens,
+           seedStubs: seedStubs
         }
       });
       console.log(`[Pipeline Diamond] -> Created curation job ${curationJobId} for background hydration`);

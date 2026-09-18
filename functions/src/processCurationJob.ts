@@ -1148,13 +1148,18 @@ export const processCurationJob = onDocumentCreated({
             continue;
           }
 
-          // Change 1 — Symmetric artist null-guard.
+          // Change 1 — Symmetric artist null-guard + JIT Stub Fallback (Rule 17)
           // Prevents writing a null detailsCache to Firestore when hydration failed for this artist.
-          // Without this guard, a null details entry silently writes a null Firestore document,
-          // causing the frontend to display "DEEP CUT SYNTHESIS REQUIRED" instead of pre-hydrated content.
+          // If the failed artist is a primary seed, we inject a pre-hydrated stub from inputPayload
+          // to prevent the frontend from falling into a "DATA UNAVAILABLE" state.
           if (!isLabel && !recDetails) {
-            console.warn(`[Curation Backend] Artist cache write skipped for "${recNorm}" — missing detailsCache (hydration failed or was skipped during batch).`);
-            continue;
+            if (matchingSeedNorm && inputPayload?.seedStubs && inputPayload.seedStubs[recNorm]) {
+              recDetails = inputPayload.seedStubs[recNorm];
+              console.log(`[Curation Backend] Injecting pre-hydrated JIT stub for failed seed artist: ${recNorm}`);
+            } else {
+              console.warn(`[Curation Backend] Artist cache write skipped for "${recNorm}" — missing detailsCache (hydration failed or was skipped during batch).`);
+              continue;
+            }
           }
 
           const collName = isLabel ? "labels" : "artists";

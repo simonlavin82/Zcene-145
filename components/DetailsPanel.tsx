@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom';
 import Markdown from 'react-markdown';
 import { Node, NodeDetails, GraphData, View, ChatMessage, StackItem, UserTaste, TasteProfile, COST_PER_AI_CALL } from '../types';
-import { streamNodeChat, fetchLiveTourData, streamLocalHeuristicChat } from '../services/geminiService';
+import { streamNodeChat, fetchLiveTourData, streamLocalHeuristicChat, fetchNodeDetails } from '../services/geminiService';
 import { normalizeArtistId, titleCaseArtistId, cleanArtistDisplayName, isNodeInSeedList, getArtistDocWithRedirect, enforceArtistCacheSchema, isArtistIdMatch } from '../services/artistCacheService';
 import { analyticsService } from '../services/analyticsService';
 import { Spinner, HelpIcon, MicIcon, LoadingSpinner, DETAIL_THINKING_STEPS, StackIcon } from './Icons';
@@ -1719,6 +1719,7 @@ interface DetailsPanelProps {
   selectedNode: Node | null;
   activeNodes: Node[];
   detailsCache: Map<string, NodeDetails>;
+  onUpdateDetailsCache?: (cache: Map<string, NodeDetails>) => void;
   loadingNodeIds: Set<string>;
   onCloseNode: (nodeId: string) => void;
   onRefreshNode: (nodeId: string) => void;
@@ -1759,7 +1760,7 @@ interface DetailsPanelProps {
 }
 
 export const DetailsPanel: React.FC<DetailsPanelProps> = ({
-  selectedNode, activeNodes, detailsCache, loadingNodeIds, onCloseNode, onRefreshNode,
+  selectedNode, activeNodes, detailsCache, onUpdateDetailsCache, loadingNodeIds, onCloseNode, onRefreshNode,
   error, systemError, graphData, libraryArtists, seedArtists, onAddArtist, isCollapsed, onToggleCollapse,
   isSmallScreen, onNodeClick, onExtendNode, onNavigate, isGlobalLoading, onCancelGlobalLoading, unreadCount, isActive, collapseBtnRef,
   isMagazineViewOpen, onMagazineViewToggle, chatHistories, onUpdateChatHistories, stack, onToggleStack,
@@ -1772,6 +1773,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     const [magazineSearchQuery, setMagazineSearchQuery] = useState('');
     const [isListeningMagazineSearch, setIsListeningMagazineSearch] = useState(false);
     const [hasSeenMagazineView, setHasSeenMagazineView] = useState(false);
+    const [jitLoadingIds, setJitLoadingIds] = useState<Set<string>>(new Set());
 
     const [renderMode, setRenderMode] = useState<'magazine' | 'panel'>(isMagazineViewOpen ? 'magazine' : 'panel');
     const [isTransitioning, setIsTransitioning] = useState(false);
@@ -1789,6 +1791,37 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
             }, 300);
         }
     }, [isMagazineViewOpen]);
+
+    // JIT Stub Fallback (Rule 17)
+    useEffect(() => {
+        if (!selectedNode || isGlobalLoading) return;
+        
+        const normId = normalizeArtistId(selectedNode.id);
+        const details = detailsCache.get(normId);
+        
+        if (details?._isStub && !jitLoadingIds.has(normId) && !loadingNodeIds.has(normId)) {
+            console.log(`[JIT Hydration] Intercepted stub for node ${normId}. Triggering live hydration.`);
+            setJitLoadingIds(prev => new Set(prev).add(normId));
+            
+            fetchNodeDetails(selectedNode, graphData, seedArtists.join('::'))
+                .then(newDetails => {
+                    if (newDetails && onUpdateDetailsCache) {
+                        onUpdateDetailsCache(new Map(detailsCache).set(normId, newDetails));
+                        console.log(`[JIT Hydration] Success for ${normId}`);
+                    }
+                })
+                .catch(err => {
+                    console.error(`[JIT Hydration] Failed for ${normId}`, err);
+                })
+                .finally(() => {
+                    setJitLoadingIds(prev => {
+                        const next = new Set(prev);
+                        next.delete(normId);
+                        return next;
+                    });
+                });
+        }
+    }, [selectedNode, detailsCache, isGlobalLoading, loadingNodeIds, jitLoadingIds, graphData, seedArtists, onUpdateDetailsCache]);
 
     const handleMagazineSpeechToText = () => {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -2270,7 +2303,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 className="flex items-center flex-nowrap overflow-x-auto scrollbar-hide [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full h-full px-1"
                                             >
                                                 {activeNodes.map((node, i) => {
-                                                    const isLoading = loadingNodeIds.has(node.id);
+                                                    const isLoading = loadingNodeIds.has(node.id) || jitLoadingIds.has(normalizeArtistId(node.id));
                                                     const isActive = i === viewedIndex;
                                                     return (
                                                         <div 
@@ -2410,7 +2443,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                             <NodeDetailsCard
                                                 node={node}
                                                 details={details}
-                                                isLoading={loadingNodeIds.has(node.id)}
+                                                isLoading={loadingNodeIds.has(node.id) || jitLoadingIds.has(normalizeArtistId(node.id))}
                                                 isGlobalLoading={isGlobalLoading}
                                                 graphData={graphData}
                                                 libraryArtists={libraryArtists}

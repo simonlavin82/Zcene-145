@@ -62,6 +62,7 @@ interface GraphPageProps {
   peekedNode: Node | null;
   activeNodes: Node[];
   detailsCache: Map<string, NodeDetails>;
+  onUpdateDetailsCache: (cache: Map<string, NodeDetails>) => void;
   loadingNodeIds: Set<string>;
   isHydrating?: boolean;
   onCloseNode: (nodeId: string) => void;
@@ -659,7 +660,7 @@ const LibraryDialog: React.FC<{
 const GraphPage: React.FC<GraphPageProps> = ({
   data, baseGraph, libraryArtists, seedArtists, onRegenerate, onFork, isLoading,
   onCancelGeneration, onFileUpload, onNodeClick, selectedNode, peekedNode,
-  activeNodes, detailsCache, loadingNodeIds, onCloseNode, onRefreshNode, detailsError, systemError, onLogoClick, onNavigate, onClearLibrary, onClearZcene, isActive,
+  activeNodes, detailsCache, onUpdateDetailsCache, loadingNodeIds, onCloseNode, onRefreshNode, detailsError, systemError, onLogoClick, onNavigate, onClearLibrary, onClearZcene, isActive,
   chatHistories, onUpdateChatHistories, onShowToast, onRefreshUI, stack, onToggleStack,
   lastViewedStackCount, onUpdateLastViewedStackCount,
   discoveryFilters, onUpdateDiscoveryFilters, areFiltersChanged = false,
@@ -1674,7 +1675,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                         selectedNode={selectedNode} 
                                         activeNodes={activeNodes} 
                                         isAdmin={isAdmin}
-                                        detailsCache={detailsCache} 
+                                        detailsCache={detailsCache} onUpdateDetailsCache={onUpdateDetailsCache}
                                         loadingNodeIds={loadingNodeIds} 
                                         onCloseNode={onCloseNode} 
                                         onRefreshNode={onRefreshNode} 
@@ -1839,7 +1840,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                          selectedNode={selectedNode} 
                          activeNodes={activeNodes} 
                          isAdmin={isAdmin}
-                         detailsCache={detailsCache} 
+                         detailsCache={detailsCache} onUpdateDetailsCache={onUpdateDetailsCache}
                          loadingNodeIds={loadingNodeIds} 
                          onCloseNode={nodeId => onCloseNode(nodeId)} 
                          onRefreshNode={nodeId => onRefreshNode(nodeId)} 
