@@ -2965,16 +2965,18 @@ const App: React.FC = () => {
 
       for (let i = 0; i < artistList.length; i++) {
         const searchId = artistList[i];
-        const countrySlug = finalOrigins[searchId];
+        const rawCountryName = finalOrigins[searchId];
         const preFlightSeed = cacheCandidatesPerSeed[i];
 
-        if (countrySlug) {
-          if (preFlightSeed.isKnownCacheHit && preFlightSeed.predictedOrigin === countrySlug && preFlightSeed.candidateId) {
+        if (rawCountryName) {
+          const countryNorm = extractCountrySlug(rawCountryName);
+
+          if (preFlightSeed.isKnownCacheHit && preFlightSeed.predictedOrigin === rawCountryName && preFlightSeed.candidateId) {
             resolvedArtistSeeds[i] = normalizeArtistId(preFlightSeed.candidateId);
           } else {
-            const newSeed = normalizeArtistId(`${searchId}-${countrySlug}`);
+            const newSeed = normalizeArtistId(`${searchId}-${countryNorm}`);
             resolvedArtistSeeds[i] = newSeed;
-            activeDisambiguationHints[newSeed] = countrySlug;
+            activeDisambiguationHints[newSeed] = rawCountryName;
           }
           hasDisambiguated = true;
         }
