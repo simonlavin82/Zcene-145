@@ -6,7 +6,10 @@ This document defines the absolute, immutable architectural baseline of Zcene. A
 
 ### 1. Three-Column Flow (The Pipeline)
 The curation pipeline is strictly divided into three distinct execution columns. 
-- **Column 1: React UI (App.tsx / Dashboard.tsx):** Purely presentation. Completely decoupled from heavy LLM orchestration. Locks the UI via the Active Loader Gate and strictly ignores the HTTP 200 OK from Column 2. Only drops the loader when Column 3 sets project status to 'completed'.
+- **Column 1: React UI (App.tsx / Dashboard.tsx):** Purely presentation. Completely decoupled from heavy LLM orchestration. Locks the UI via the Active Loader Gate and strictly ignores the HTTP 200 OK from Column 2. Only drops the loader when Column 3 sets project status to 'completed'. The frontend flow explicitly enforces these architectural steps to React components:
+  - **Step 2 (Topology Hit):** Explicitly mapped to `<DisambiguationModal>` ("Look What I Found").
+  - **Step 3 (API Confirmation):** Explicitly mapped to `<TokenConfirmationModal>`.
+  - **Step 4 (Validate Origin):** Explicitly mapped to `<ConsolidatedValidationModal>`.
 - **Column 2: HTTP Fast-Track (executeCurationPipeline.ts):** Synchronous execution layer. Responsible for pre-flight origin slugging (returning conflicts to the user), fast-track cache fallback, generative topology (ensuring Deep Cuts connect back to the seed), generating baseline `seedStubs` on cache misses, and saving the baseline topology to Firestore. Returns immediately while creating the curationJobs doc (with injected `seedStubs`), handing full responsibility to the async worker.
 - **Column 3: Background Worker (processCurationJob.ts):** Asynchronous hydration layer. Follows a strict progression: Hydrate Node Batch -> Final Node Positioning -> Root Breakdown -> Persist Assets. Never writes missing hydration data as 'null'; explicitly falls back to pre-hydrated `seedStubs` for failed primary seeds (JIT Fallback) to prevent database corruption. Writes fully hydrated nodes back to cache.
 
@@ -84,3 +87,7 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 ### 17. JIT Stub Fallback
 - **The Frontend/Backend Handshake:** When background hydration times out or fails for a primary seed artist, the backend intercepts this failure and injects a pre-generated JIT stub (`_isStub: true`) from the initial payload rather than writing `null`.
 - **The UI Interception:** The React UI intercepts the selection of any node flagged as `_isStub: true`, executing a Just-In-Time (JIT) API fetch to hydrate the missing details live, and silently merges them into the global cache to self-heal the missing Deep Cut details permanently.
+
+### 18. Mandatory Disambiguation on Direct Hits
+- **Rule:** A single-seed Topology Hit (Green Line) MUST NEVER bypass the user confirmation phase. The frontend MUST explicitly trigger the `<DisambiguationModal>` ("Look What I Found") to allow the user to verify the cached entity's origin. 
+- **Enforcement:** The system is strictly forbidden from instantly hydrating the state and bypassing this modal. The Green Line hydration route can only execute after explicit confirmation from the `<DisambiguationModal>`. Legacy components (e.g., `CacheChoiceDialog`) are strictly prohibited.

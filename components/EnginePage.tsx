@@ -1147,7 +1147,9 @@ const DiscoveryFlowDiagram: React.FC = () => (
                     <div className="text-primary text-[10px] font-mono mb-1 uppercase tracking-tighter">Column 1</div>
                     <div className="text-white font-medium mb-4">React UI</div>
                     <ul className="text-[12px] text-zinc-400 space-y-4">
-                        <li><span className="text-primary font-medium">Front Gate Cache Guard:</span> Bypasses network entirely if a valid, complete cache document exists.</li>
+                        <li><span className="text-primary font-medium">Front Gate Cache Guard:</span> Bypasses network entirely if a valid, complete cache document exists. Topology Hits MUST explicitly route through the <code>&lt;DisambiguationModal&gt;</code> to verify origin.</li>
+                        <li><span className="text-primary font-medium">API Confirmation:</span> <code>&lt;TokenConfirmationModal&gt;</code> intercepts generation to authorize API token spend.</li>
+                        <li><span className="text-primary font-medium">Validate Origin:</span> <code>&lt;ConsolidatedValidationModal&gt;</code> confirms the exact canonical seed origin before hitting the pipeline.</li>
                         <li><span className="text-primary font-medium">Fast Track Local Hydration:</span> Instantly paints the unhydrated graph topology received synchronously.</li>
                     </ul>
                 </div>

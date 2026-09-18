@@ -21,3 +21,9 @@ We found the exact reason the cloned projects weren't rendering their images! It
 
 These changes have been deployed to production. 
 **Next Step:** Please refresh the dashboard in your browser. "Spaced (root generation) Copy" (and any other cloned projects) should now correctly display their images instantly without requiring page navigation.
+
+## Architectural Gates
+To prevent routing regressions, the exact UI components responsible for each validation step in Column 1 are strictly mapped as follows:
+- **Topology Hit:** `<DisambiguationModal>` ("Look What I Found") MUST verify origin.
+- **API Confirmation:** `<TokenConfirmationModal>` intercepts generation to authorize API token spend.
+- **Validate Origin:** `<ConsolidatedValidationModal>` confirms the exact canonical seed origin before hitting the pipeline.
