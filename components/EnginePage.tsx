@@ -1159,11 +1159,11 @@ const ARCHITECTURE_RULES = [
 ];
 
 const DiscoveryFlowDiagram: React.FC = () => (
-    <div className="w-full py-12 px-4 bg-zinc-950/50 rounded-xl border border-zinc-800 mb-8 overflow-x-auto">
-        <div className="min-w-[800px] flex flex-row items-stretch justify-center gap-6 px-4">
+    <div className="w-full py-12 bg-zinc-950/50 rounded-xl border border-zinc-800 mb-8">
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_auto_1fr_auto_1fr_auto_minmax(220px,280px)] items-stretch justify-center gap-3 lg:gap-4 px-2 xl:px-4">
             {/* Column 1: React UI */}
-            <div className="flex-1 flex flex-col">
-                <div className="px-6 py-6 rounded-xl border border-zinc-700 bg-zinc-900 h-full">
+            <div className="flex flex-col">
+                <div className="px-4 py-5 rounded-xl border border-zinc-700 bg-zinc-900 h-full">
                     <div className="text-primary text-[10px] font-mono mb-1 uppercase tracking-tighter">Column 1</div>
                     <div className="text-white font-medium mb-4">React UI</div>
                     <ul className="text-[12px] text-zinc-400 space-y-4">
@@ -1181,8 +1181,8 @@ const DiscoveryFlowDiagram: React.FC = () => (
             </div>
             
             {/* Column 2: HTTP Fast-Track */}
-            <div className="flex-1 flex flex-col">
-                <div className="px-6 py-6 rounded-xl border-2 border-primary bg-zinc-900/50 h-full shadow-[0_0_15px_rgba(255,255,255,0.03)] relative">
+            <div className="flex flex-col">
+                <div className="px-4 py-5 rounded-xl border-2 border-primary bg-zinc-900/50 h-full shadow-[0_0_15px_rgba(255,255,255,0.03)] relative">
                     <div className="text-primary text-[10px] font-mono mb-1 uppercase tracking-tighter">Column 2 (Synchronous)</div>
                     <div className="text-white font-medium mb-4">HTTP Fast-Track</div>
                     <ul className="text-[12px] text-zinc-400 space-y-4">
@@ -1199,8 +1199,8 @@ const DiscoveryFlowDiagram: React.FC = () => (
             </div>
 
             {/* Column 3: Background Worker */}
-            <div className="flex-1 flex flex-col">
-                <div className="px-6 py-6 rounded-xl border border-zinc-700 bg-zinc-900 h-full">
+            <div className="flex flex-col">
+                <div className="px-4 py-5 rounded-xl border border-zinc-700 bg-zinc-900 h-full">
                     <div className="text-primary text-[10px] font-mono mb-1 uppercase tracking-tighter">Column 3 (Asynchronous)</div>
                     <div className="text-white font-medium mb-4">Background Worker</div>
                     <ul className="text-[12px] text-zinc-400 space-y-4">
@@ -1211,11 +1211,11 @@ const DiscoveryFlowDiagram: React.FC = () => (
             </div>
 
             {/* Divider */}
-            <div className="w-px bg-zinc-800/50 mx-2 hidden lg:block" />
+            <div className="w-px bg-zinc-800/50 justify-self-center hidden xl:block" />
 
             {/* Rules Ledger */}
-            <div className="flex-1 flex flex-col min-w-[280px]">
-                <div className="px-5 py-5 rounded-xl border border-zinc-700 bg-zinc-900 h-[600px] overflow-y-auto">
+            <div className="flex flex-col">
+                <div className="px-4 py-5 rounded-xl border border-zinc-700 bg-zinc-900 h-[600px] overflow-y-auto">
                     <div className="text-white font-medium mb-4 sticky -top-5 bg-zinc-900 py-2 border-b border-zinc-800 z-10">Rules Ledger</div>
                     <div className="space-y-3 pt-2">
                         {ARCHITECTURE_RULES.map(rule => (
