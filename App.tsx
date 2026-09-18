@@ -3318,6 +3318,7 @@ const App: React.FC = () => {
     // ─── STAGE 0: UNIFIED DISAMBIGUATION GATE & TOKEN GUARD ────────────────────
     let resolvedArtistSeeds = [...artistList];
     let activeDisambiguationHints: Record<string, string> = disambiguationHints || {};
+    let activeDisambiguationGenres: Record<string, string> = disambiguationGenres || {};
     let hasDisambiguated = false;
 
     if (!bypassTokenConfirmation && !bypassDisambiguation) {
@@ -4133,8 +4134,9 @@ const App: React.FC = () => {
             undefined,
             activeDisambiguationHints,
             activeDisambiguationGenres,
-            undefined,
-            toFetch.length > 1 || hasActiveFilters
+            undefined, // baseGraph
+            undefined, // cachedSubgraphsContext
+            toFetch.length > 1 || hasActiveFilters // isSmartBypass
           );
         } else {
           partialGraphPromise = generateGraphData(toFetch.join('::'), pruned, activeDiscoveryFilters, user?.uid, controller?.signal, activeDisambiguationHints, activeDisambiguationGenres);

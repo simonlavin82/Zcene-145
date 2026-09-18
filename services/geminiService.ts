@@ -998,7 +998,8 @@ export const generateGraphData = async (
   filters?: DiscoveryFilters,
   activeUserId?: string | null,
   signal?: AbortSignal,
-  disambiguationHints?: Record<string, string>
+  disambiguationHints?: Record<string, string>,
+  disambiguationGenres?: Record<string, string>
 ): Promise<GraphData> => {
   if (isLocal) {
     // Add artificial delay to simulate network latency and show loading states during local testing
