@@ -7,8 +7,8 @@ This document defines the absolute, immutable architectural baseline of Zcene. A
 ### 1. Three-Column Flow (The Pipeline)
 The curation pipeline is strictly divided into three distinct execution columns. 
 - **Column 1: React UI (App.tsx / Dashboard.tsx):** Purely presentation. Completely decoupled from heavy LLM orchestration. Locks the UI via the Active Loader Gate and strictly ignores the HTTP 200 OK from Column 2. Only drops the loader when Column 3 sets project status to 'completed'.
-- **Column 2: HTTP Fast-Track (executeCurationPipeline.ts):** Synchronous execution layer. Responsible for pre-flight origin slugging (returning conflicts to the user), fast-track cache fallback, generative topology (ensuring Deep Cuts connect back to the seed), and saving the baseline topology to Firestore. Returns immediately while creating the curationJobs doc, handing full responsibility to the async worker.
-- **Column 3: Background Worker (processCurationJob.ts):** Asynchronous hydration layer. Follows a strict progression: Hydrate Node Batch -> Final Node Positioning -> Root Breakdown -> Persist Assets. Never writes missing hydration data as 'null', but explicitly flags for retry. Writes fully hydrated nodes back to cache.
+- **Column 2: HTTP Fast-Track (executeCurationPipeline.ts):** Synchronous execution layer. Responsible for pre-flight origin slugging (returning conflicts to the user), fast-track cache fallback, generative topology (ensuring Deep Cuts connect back to the seed), generating baseline `seedStubs` on cache misses, and saving the baseline topology to Firestore. Returns immediately while creating the curationJobs doc (with injected `seedStubs`), handing full responsibility to the async worker.
+- **Column 3: Background Worker (processCurationJob.ts):** Asynchronous hydration layer. Follows a strict progression: Hydrate Node Batch -> Final Node Positioning -> Root Breakdown -> Persist Assets. Never writes missing hydration data as 'null'; explicitly falls back to pre-hydrated `seedStubs` for failed primary seeds (JIT Fallback) to prevent database corruption. Writes fully hydrated nodes back to cache.
 
 ### 2. Strict Seed Hoisting & Pinning
 Seed nodes must ALWAYS be elevated to the highest priority in the topology.
@@ -80,3 +80,7 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 ### 16. Curation Intercept Guardrails
 - **ProjectLoader Guardrails:** The ProjectLoader must strictly bypass Phase 1 interception when a document's status is `curating`. The UI must remain locked and patiently await the backend background worker rather than firing duplicate generative calls.
 - **Identity Lock (`isRegeneration`):** During 'Overwrite Existing' (`isRegeneration = true`), the original project name is strictly write-locked. New deep links or explicit forks derive fresh names natively from the seed strings.
+
+### 17. JIT Stub Fallback
+- **The Frontend/Backend Handshake:** When background hydration times out or fails for a primary seed artist, the backend intercepts this failure and injects a pre-generated JIT stub (`_isStub: true`) from the initial payload rather than writing `null`.
+- **The UI Interception:** The React UI intercepts the selection of any node flagged as `_isStub: true`, executing a Just-In-Time (JIT) API fetch to hydrate the missing details live, and silently merges them into the global cache to self-heal the missing Deep Cut details permanently.
