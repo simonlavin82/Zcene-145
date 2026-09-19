@@ -2214,26 +2214,26 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             </div>
 
                             {/* Token Spec Grid */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                                 {/* SEED */}
                                 <div className="flex flex-col p-5 border border-zinc-700/50 rounded-none hover:border-zinc-500 transition-colors bg-zinc-900/20">
                                     <div className="mb-4">
-                                        <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
-                                            SEED: 3
+                                        <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
+                                            Seed Artist: 3
                                         </span>
                                     </div>
                                     <h4 className="font-medium text-white mb-1">SEED</h4>
                                     <p className="text-sm text-zinc-400 leading-relaxed mb-4 flex-grow">Count of seed artists the user manually anchored the Zcene around. Always visible — present even before the graph is mapped.</p>
                                     <div className="space-y-1 mt-auto">
-                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block">Copy: SEED: {'{'}seedList.length{'}'}</p>
-                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block mt-1">Style: text-zinc-400 bg-zinc-800</p>
+                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block">Copy: Seed Artist: {'{'}seedList.length{'}'}</p>
+                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block mt-1">Style: text-zinc-300 bg-zinc-900/50 border-white/10</p>
                                     </div>
                                 </div>
 
                                 {/* AI ARTISTS */}
                                 <div className="flex flex-col p-5 border border-zinc-700/50 rounded-none hover:border-zinc-500 transition-colors bg-zinc-900/20">
                                     <div className="mb-4">
-                                        <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                                        <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
                                             AI ARTISTS: 24
                                         </span>
                                     </div>
@@ -2241,14 +2241,29 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <p className="text-sm text-zinc-400 leading-relaxed mb-4 flex-grow">Count of non-seed artist nodes in the graph — i.e. all artists recommended by the AI engine. Only rendered when <code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.graphData</code> is present.</p>
                                     <div className="space-y-1 mt-auto">
                                         <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block">Copy: AI ARTISTS: {'{'}recommendedCount{'}'}</p>
-                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block mt-1">Style: text-zinc-400 bg-zinc-800</p>
+                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block mt-1">Style: text-zinc-300 bg-zinc-900/50 border-white/10</p>
+                                    </div>
+                                </div>
+
+                                {/* LABELS */}
+                                <div className="flex flex-col p-5 border border-zinc-700/50 rounded-none hover:border-zinc-500 transition-colors bg-zinc-900/20">
+                                    <div className="mb-4">
+                                        <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
+                                            LABELS: 8
+                                        </span>
+                                    </div>
+                                    <h4 className="font-medium text-white mb-1">LABELS</h4>
+                                    <p className="text-sm text-zinc-400 leading-relaxed mb-4 flex-grow">Count of label nodes mapped in the graph. Only rendered when label nodes exist.</p>
+                                    <div className="space-y-1 mt-auto">
+                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block">Copy: LABELS: {'{'}labelCount{'}'}</p>
+                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block mt-1">Style: text-zinc-300 bg-zinc-900/50 border-white/10</p>
                                     </div>
                                 </div>
 
                                 {/* DEEP CUTS */}
                                 <div className="flex flex-col p-5 border border-zinc-700/50 rounded-none hover:border-zinc-500 transition-colors bg-zinc-900/20">
                                     <div className="mb-4">
-                                        <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                                        <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
                                             DEEP CUTS: 7
                                         </span>
                                     </div>
@@ -2256,25 +2271,25 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <p className="text-sm text-zinc-400 leading-relaxed mb-4 flex-grow">Count of artists the user has promoted to their active Deep Cut stack (<code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.activeNodes</code>). Only rendered when <code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.graphData</code> is present.</p>
                                     <div className="space-y-1 mt-auto">
                                         <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block">Copy: DEEP CUTS: {'{'}deepCutsCount{'}'}</p>
-                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block mt-1">Style: text-zinc-400 bg-zinc-800</p>
+                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block mt-1">Style: text-zinc-300 bg-zinc-900/50 border-white/10</p>
                                     </div>
                                 </div>
 
                                 {/* MAPPED / STATUS */}
                                 <div className="flex flex-col p-5 border border-zinc-700/50 rounded-none hover:border-zinc-500 transition-colors bg-zinc-900/20">
-                                    <div className="mb-4 flex gap-2">
-                                        <span className="text-[9px] uppercase tracking-wide text-primary/60 font-bold px-1.5 py-0.5 bg-primary/10 rounded-md border border-primary/10 font-mono whitespace-nowrap">
+                                    <div className="mb-4 flex flex-col items-start gap-2">
+                                        <span className="text-[9px] uppercase tracking-wide text-zinc-950 font-bold px-1.5 py-0.5 rounded-md whitespace-nowrap w-fit" style={{ backgroundColor: '#aaff00' }}>
                                             Mapped
                                         </span>
-                                        <span className="text-[9px] uppercase tracking-wide text-zinc-500 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-zinc-800 font-mono whitespace-nowrap">
+                                        <span className="text-[9px] uppercase tracking-wide text-zinc-500 font-bold px-1.5 py-0.5 bg-zinc-800/80 rounded-md border border-zinc-800 font-mono whitespace-nowrap backdrop-blur-sm w-fit">
                                             Unmapped
                                         </span>
                                     </div>
                                     <h4 className="font-medium text-white mb-1">MAPPED / STATUS</h4>
-                                    <p className="text-sm text-zinc-400 leading-relaxed mb-4 flex-grow">Binary mapping state. <strong>Mapped</strong> (accent colour) renders when <code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.graphData</code> is truthy. <strong>Unmapped</strong> (muted) renders otherwise. Table list exposes both states in a column; card header shows mapping status.</p>
+                                    <p className="text-sm text-zinc-400 leading-relaxed mb-4 flex-grow">Binary mapping state. <strong>Mapped</strong> (accent colour) renders when <code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.graphData</code> is truthy. <strong>Unmapped</strong> (muted) renders otherwise. Table list exposes both states in a column; card header shows mapping status beneath the date.</p>
                                     <div className="space-y-1 mt-auto">
-                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block">Mapped: text-primary/60 bg-primary/10</p>
-                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block mt-1">Unmapped: text-zinc-500 bg-zinc-800</p>
+                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block">Mapped: text-zinc-950 bg-accent</p>
+                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block mt-1">Unmapped: text-zinc-500 bg-zinc-800/80</p>
                                     </div>
                                 </div>
                             </div>
@@ -2288,9 +2303,10 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <p className="text-sm text-zinc-400 leading-relaxed max-w-3xl">
                                     All discovery metric badges use a <strong>label-first</strong> syntax — the descriptive label appears before the numeric value, separated by a colon and space. This mirrors the language used in the spiderweb filter legends and creates instant visual alignment across the product.
                                 </p>
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-                                    <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 font-mono text-sm text-primary">"SEED: X"</div>
+                                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-2">
+                                    <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 font-mono text-sm text-primary">"Seed Artist: X"</div>
                                     <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 font-mono text-sm text-primary">"AI ARTISTS: X"</div>
+                                    <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 font-mono text-sm text-primary">"LABELS: X"</div>
                                     <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 font-mono text-sm text-primary">"DEEP CUTS: X"</div>
                                 </div>
                                 <p className="text-sm text-zinc-50 leading-relaxed max-w-3xl pt-1">
@@ -2396,12 +2412,18 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                 <div className="bg-zinc-900 border border-zinc-700/50 p-5 flex flex-col justify-between min-h-[160px] w-full md:w-[360px] hover:border-primary transition-all cursor-pointer">
                                                     <div className="space-y-3">
                                                         <h3 className="text-sm font-medium text-white truncate">Grayscale</h3>
-                                                        <p className="font-mono text-[10px] text-zinc-400">Edited 05/07/2026</p>
+                                                        <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+                                                            <p className="font-mono text-[10px] text-zinc-400">Edited 05/07/2026</p>
+                                                            <span className="text-[9px] uppercase tracking-wide text-zinc-950 font-bold px-1.5 py-0.5 rounded-md whitespace-nowrap transition-colors w-fit mt-0.5" style={{ backgroundColor: '#aaff00' }}>
+                                                                Mapped
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                     <div className="mt-4 pt-3 border-t border-white/5 flex items-center gap-1.5 flex-wrap">
-                                                        <span className="text-[8px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded border border-white/5 font-mono whitespace-nowrap">SEED: 1</span>
-                                                        <span className="text-[8px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded border border-white/5 font-mono whitespace-nowrap">AI ARTISTS: 22</span>
-                                                        <span className="text-[8px] uppercase tracking-wide text-primary/60 font-bold px-1.5 py-0.5 bg-primary/10 rounded border border-primary/10 font-mono whitespace-nowrap">Mapped</span>
+                                                        <span className="text-[8px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">Seed Artist: 1</span>
+                                                        <span className="text-[8px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">AI ARTISTS: 22</span>
+                                                        <span className="text-[8px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">LABELS: 3</span>
+                                                        <span className="text-[8px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">DEEP CUTS: 5</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -2463,16 +2485,16 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <p className="text-[10px] font-semibold text-emerald-400 uppercase tracking-widest">✓ New — Production</p>
                                             <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4 space-y-2">
                                                 <code className="text-xs font-mono text-zinc-400 block">
-                                                    flex-wrap <span className="text-emerald-400">gap-x-1.5 gap-y-1.5</span>
+                                                    flex-wrap <span className="text-emerald-400">gap-x-1 gap-y-1.5</span>
                                                 </code>
-                                                <p className="text-xs text-zinc-500 leading-relaxed">Badges wrap naturally when space is tight, with consistent 6px horizontal and vertical gutters. Each badge still remains a solid unit via <code className="text-[10px] text-primary bg-zinc-900 px-1 rounded">whitespace-nowrap</code> on the label itself.</p>
+                                                <p className="text-xs text-zinc-500 leading-relaxed">Badges wrap naturally when space is tight, with consistent 4px horizontal and 6px vertical gutters. Each badge still remains a solid unit via <code className="text-[10px] text-primary bg-zinc-900 px-1 rounded">whitespace-nowrap</code> on the label itself.</p>
                                             </div>
                                         </div>
                                     </div>
                                     <div className="pt-2 border-t border-zinc-800 space-y-1">
                                         <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Full wrapper class string</p>
                                         <code className="text-xs font-mono text-primary bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-3 block">
-                                            flex items-center flex-wrap gap-x-1.5 gap-y-1.5
+                                            flex items-center flex-wrap gap-x-1 gap-y-1.5
                                         </code>
                                     </div>
                                 </div>
@@ -2484,7 +2506,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <h4 className="text-base font-medium text-zinc-200">Project Card — Grid View Preview</h4>
                                     </div>
                                     <p className="text-sm text-zinc-400 leading-relaxed max-w-2xl">
-                                        Badges sit flush in the card footer, without top borders, creating a cleaner negative space. Card backgrounds support a 50/50 split grid when multiple seed artists are present. The <code className="text-xs text-primary bg-zinc-800 px-1 rounded">AI ARTISTS</code> and <code className="text-xs text-primary bg-zinc-800 px-1 rounded">DEEP CUTS</code> badges are conditionally rendered only when <code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.graphData</code> is present.
+                                        Badges sit flush in the card footer, without top borders, creating a cleaner negative space. Card backgrounds support a 50/50 split grid when multiple seed artists are present. The <code className="text-xs text-primary bg-zinc-800 px-1 rounded">AI ARTISTS</code>, <code className="text-xs text-primary bg-zinc-800 px-1 rounded">LABELS</code>, and <code className="text-xs text-primary bg-zinc-800 px-1 rounded">DEEP CUTS</code> badges are conditionally rendered only when <code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.graphData</code> is present. The <code className="text-xs text-primary bg-zinc-800 px-1 rounded">MAPPED</code> status pill now lives in the card header directly beneath the modified date.
                                     </p>
 
                                     {/* Mock Card */}
@@ -2492,42 +2514,43 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <div className="bg-zinc-900 border border-zinc-700/50 rounded-none p-5 flex flex-col justify-between min-h-[160px]">
                                             {/* Card Header */}
                                             <div className="space-y-4">
-                                                <div className="flex items-center justify-between gap-3">
-                                                    <h3 className="text-base font-medium text-white truncate">Midwest Emo Roots</h3>
-                                                    <div className="w-7 h-7 -mr-1.5 rounded-lg text-zinc-600 flex items-center justify-center">
-                                                        <span className="material-symbols-outlined !text-xl">more_vert</span>
+                                                <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+                                                    <div className="flex items-center justify-between gap-3">
+                                                        <h3 className="text-base font-medium text-white truncate">Midwest Emo Roots</h3>
+                                                        <div className="w-7 h-7 -mr-1.5 rounded-lg text-zinc-600 flex items-center justify-center">
+                                                            <span className="material-symbols-outlined !text-xl">more_vert</span>
+                                                        </div>
                                                     </div>
+                                                    <p className="font-mono text-[10px] text-zinc-300 font-normal uppercase tracking-widest">Edited 27/06/2026</p>
+                                                    <span className="text-[9px] uppercase tracking-wide text-zinc-950 font-bold px-1.5 py-0.5 rounded-md whitespace-nowrap transition-colors w-fit mt-0.5" style={{ backgroundColor: '#aaff00' }}>
+                                                        Mapped
+                                                    </span>
                                                 </div>
-                                                <p className="font-mono text-xs text-zinc-300 font-normal">Edited 27/06/2026 • 8:09 am</p>
                                             </div>
                                             {/* Card Footer — production badge sequence */}
                                             <div className="mt-3 flex items-center">
-                                                <div className="flex items-center flex-wrap gap-x-1.5 gap-y-1.5">
+                                                <div className="flex items-center flex-wrap gap-x-1 gap-y-1.5">
                                                     {/* 1. SEED */}
-                                                    <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
-                                                        SEED: 3
+                                                    <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
+                                                        Seed Artist: 3
                                                     </span>
                                                     {/* 2. AI ARTISTS */}
-                                                    <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                                                    <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
                                                         AI ARTISTS: 24
                                                     </span>
                                                     {/* 3. LABELS */}
-                                                    <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                                                    <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
                                                         LABELS: 8
                                                     </span>
-                                                    {/* 3. DEEP CUTS */}
-                                                    <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                                                    {/* 4. DEEP CUTS */}
+                                                    <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
                                                         DEEP CUTS: 7
-                                                    </span>
-                                                    {/* 4. MAPPED */}
-                                                    <span className="text-[9px] uppercase tracking-wide text-primary/60 font-bold px-1.5 py-0.5 bg-primary/10 rounded-md border border-primary/10 font-mono whitespace-nowrap">
-                                                        Mapped
                                                     </span>
                                                 </div>
                                             </div>
                                         </div>
                                         <p className="text-[10px] text-zinc-500 font-mono mt-2">
-                                            Sequence: SEED → AI ARTISTS → LABELS → DEEP CUTS → MAPPED
+                                            Sequence: Seed Artist → AI ARTISTS → LABELS → DEEP CUTS
                                         </p>
                                     </div>
                                 </div>
