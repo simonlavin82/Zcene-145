@@ -27,6 +27,7 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
 }) => {
   const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
   const displayTitle = cleanArtistDisplayName(project.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene"));
+  const isUnmapped = project.status !== 'completed' && project.status !== 'curating' && project.status !== 'pending' && project.status !== 'failed' && !project.seedArtists;
   
   const imageUrls = useSeedImages(project.seedArtists, project.detailsCache, project.graphData, project.seedImageUrl);
   const dominantColor = useDominantColor(imageUrls[0] && imageUrls[0] !== 'not-found' ? imageUrls[0] : undefined, displayTitle);
@@ -196,29 +197,30 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
             </div>
           </div>
         </div>
-        
-        <div className="mt-3 flex items-center">
-          <div className="flex items-center flex-wrap gap-x-1 gap-y-1.5">
-            <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
-              Seed Artist: {seedList.length}
-            </span>
-            {project.status === 'completed' && (
-              <>
-                <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
-                  AI ARTISTS: {recommendedCount}
-                </span>
-                {labelCount > 0 && (
+        {!isUnmapped && (
+          <div className="mt-3 flex items-center">
+            <div className="flex items-center flex-wrap gap-x-1 gap-y-1.5">
+              <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
+                Seed Artist: {seedList.length}
+              </span>
+              {project.status === 'completed' && (
+                <>
                   <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
-                    LABELS: {labelCount}
+                    AI ARTISTS: {recommendedCount}
                   </span>
-                )}
-                <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
-                  DEEP CUTS: {deepCutsCount}
-                </span>
-              </>
-            )}
+                  {labelCount > 0 && (
+                    <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
+                      LABELS: {labelCount}
+                    </span>
+                  )}
+                  <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
+                    DEEP CUTS: {deepCutsCount}
+                  </span>
+                </>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </motion.div>
   );
