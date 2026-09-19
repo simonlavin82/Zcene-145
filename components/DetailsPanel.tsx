@@ -1908,10 +1908,12 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     }, [selectedNode, activeNodes]);
 
     const hasOpenedMagazineRef = useRef(false);
+    const lastScrolledNodeIdRef = useRef<string | null>(null);
 
     useEffect(() => {
         if (!isMagazineViewOpen) {
             hasOpenedMagazineRef.current = false;
+            lastScrolledNodeIdRef.current = null;
             return;
         }
 
@@ -1921,15 +1923,19 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
             if (container) {
                 container.scrollTop = 0;
             }
+            if (selectedNode) {
+                lastScrolledNodeIdRef.current = selectedNode.id;
+            }
             return;
         }
 
-        if (selectedNode) {
+        if (selectedNode && selectedNode.id !== lastScrolledNodeIdRef.current) {
             const timeoutId = setTimeout(() => {
                 const targetEl = document.getElementById(`magazine-card-${selectedNode.id}`);
                 if (targetEl) {
                     targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
+                lastScrolledNodeIdRef.current = selectedNode.id;
             }, 50);
             return () => clearTimeout(timeoutId);
         }
