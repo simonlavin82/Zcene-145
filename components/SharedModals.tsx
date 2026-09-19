@@ -52,37 +52,40 @@ export const MyStackDialog: React.FC<{
                         </div>
                     </div>
                 ) : (
-                    [...stack].reverse().map(item => {
+                    [...stack].sort((a, b) => b.dateSaved - a.dateSaved).map(item => {
                         const nameToCopy = cleanArtistDisplayName(item.id);
                         const isCopied = copiedId === item.id;
                         
                         return (
-                            <div key={item.id} className="group bg-zinc-900/60 border border-zinc-700/50 p-4 rounded-xl flex items-center justify-between gap-4 hover:border-zinc-500 transition-colors">
+                            <div key={item.id} className="group flex items-center justify-between py-2.5 border-b border-zinc-800/50 last:border-0 hover:bg-zinc-900/30 px-3 -mx-3 rounded-lg transition-colors">
                                 <div 
-                                    className="flex-grow min-w-0 cursor-pointer flex flex-col"
+                                    className="flex-grow min-w-0 cursor-pointer flex flex-col justify-center"
                                     onClick={() => handleCopy(item.id, nameToCopy)}
                                     title="Click to copy name"
                                 >
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded-md">{item.type}</span>
-                                        <span className="font-mono text-xs text-zinc-300 font-normal">{formatSystemTimestamp(item.dateSaved)}</span>
-                                    </div>
                                     <div className="flex items-center gap-2">
-                                        <h4 className="text-lg font-medium text-white truncate">{nameToCopy}</h4>
+                                        <h4 className="text-[15px] font-medium text-white truncate leading-tight">{nameToCopy}</h4>
                                         {isCopied ? (
-                                            <span className="material-symbols-outlined text-primary !text-[16px]">check_circle</span>
+                                            <span className="material-symbols-outlined text-primary !text-[14px]">check_circle</span>
                                         ) : (
-                                            <span className="material-symbols-outlined text-zinc-500 opacity-0 group-hover:opacity-100 transition-opacity !text-[16px]">content_copy</span>
+                                            <span className="material-symbols-outlined text-zinc-500 opacity-0 group-hover:opacity-100 transition-opacity !text-[14px]">content_copy</span>
                                         )}
                                     </div>
+                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                        <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-400 bg-zinc-800/50 px-1 py-[2px] rounded-sm leading-none">{item.type}</span>
+                                        <span className="text-[11px] text-zinc-500 font-mono truncate">
+                                            {formatSystemTimestamp(item.dateSaved)}
+                                            {item.discoveredVia && ` • Discovered via ${item.discoveredVia}`}
+                                        </span>
+                                    </div>
                                 </div>
-                                <div className="flex items-center gap-2 flex-shrink-0">
+                                <div className="flex items-center flex-shrink-0 pl-4">
                                     <button 
                                         onClick={() => onRemove({ id: item.id, type: item.type as any, group: 0 })}
-                                        className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                                        className="w-7 h-7 flex items-center justify-center rounded-md text-zinc-500 hover:text-red-400 hover:bg-red-400/10 transition-colors"
                                         title="Remove from stack"
                                     >
-                                        <span className="material-symbols-outlined !text-[18px]">delete</span>
+                                        <span className="material-symbols-outlined !text-[16px]">delete</span>
                                     </button>
                                 </div>
                             </div>

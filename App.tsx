@@ -2542,7 +2542,8 @@ const App: React.FC = () => {
           id: node.id,
           type: node.type || "artist",
           dateSaved: Date.now(),
-          link: link || ""
+          link: link || "",
+          ...(projectName && { discoveredVia: projectName })
         };
 
         // PRE-FLIGHT DIAGNOSTIC LOGGING

@@ -80,7 +80,9 @@ service cloud.firestore {
       return data.keys().hasAll(['id', 'type', 'dateSaved']) &&
              data.id is string &&
              data.type is string &&
-             (data.dateSaved is int || data.dateSaved is timestamp);
+             (data.dateSaved is int || data.dateSaved is timestamp) &&
+             (!('link' in data) || data.link is string) &&
+             (!('discoveredVia' in data) || data.discoveredVia is string);
     }
 
     function isValidSession(data) {
