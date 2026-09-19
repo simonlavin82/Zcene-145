@@ -1118,7 +1118,7 @@ export const getEntityDocWithRedirect = async (
       // (e.g. 'korn'). Strip the last country-suffix segment and retry once so the
       // redirect chain can resolve correctly. This eliminates the miss waterfall on page
       // load for graph nodes whose IDs include an origin suffix.
-      if (depth < 3) {
+      if (depth === 0) {
         // Match both full country name suffixes (e.g. -japan, -germany) AND
         // ISO 3166-1 alpha-2 two-letter country codes (e.g. -jp, -at, -de, -gb, -us).
         const suffixMatch = entityId.match(
@@ -1131,10 +1131,10 @@ export const getEntityDocWithRedirect = async (
         }
       }
       
-      console.warn(`[Proxy Fetch] Expected cache miss for ${entityId}, returning safe fallback.`);
+      console.warn(`[Proxy Fetch] Expected cache miss for ${entityId}, returning proper miss fallback.`);
       return {
-        exists: () => true,
-        data: () => ({ imageUrl: "", bio: "", cacheKey: entityId, _isStub: true }),
+        exists: () => false,
+        data: () => undefined,
         id: entityId,
         metadata: {} as any,
         ref: {} as any,
