@@ -57,9 +57,9 @@ export const MyStackDialog: React.FC<{
                         const isCopied = copiedId === item.id;
                         
                         return (
-                            <div key={item.id} className="group flex items-center justify-between pt-2 pb-3 border-b border-zinc-800/50 last:border-0 hover:bg-zinc-900/30 px-3 -mx-3 rounded-lg transition-colors">
+                            <div key={item.id} className="group flex items-center justify-between py-2.5 border-b border-zinc-800/50 last:border-0 hover:bg-zinc-900/30 px-3 -mx-3 rounded-lg transition-colors">
                                 <div 
-                                    className="flex-grow min-w-0 cursor-pointer flex flex-col justify-center"
+                                    className="flex-grow min-w-0 cursor-pointer flex flex-col justify-center pb-1"
                                     onClick={() => handleCopy(item.id, nameToCopy)}
                                     title="Click to copy name"
                                 >
