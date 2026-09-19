@@ -216,7 +216,7 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                       initial={{ opacity: 0, y: 10, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                      className="absolute right-0 mt-2 w-56 z-20 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1 shadow-2xl shadow-black text-left font-display antialiased"
+                      className="absolute right-0 mt-2 w-56 z-20 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1 shadow-black text-left font-display antialiased"
                     >
                       {user ? (
                         <div className="px-3 py-2.5 border-b border-white/5">
@@ -364,7 +364,7 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                               onNavigate(hasExistingGraph ? View.Dashboard : View.Graph);
                             }
                           }}
-                          className="cta-button rounded-2xl bg-primary px-8 py-4 text-base sm:text-lg font-medium text-brand-black transition-all hover:scale-105 shadow-xl shadow-primary/20 active:scale-95"
+                          className="cta-button rounded-2xl bg-primary px-8 py-4 text-base sm:text-lg font-medium text-brand-black transition-all hover:scale-105 shadow-primary/20 active:scale-95"
                         >
                           {hasExistingGraph ? 'Resume Your Zcene' : 'Create Your Zcene'}
                         </button>
@@ -402,7 +402,7 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                 </div>
                 <div 
                     onClick={handleVisualInteraction}
-                    className="mt-16 max-w-4xl mx-auto shadow-[0_0_50px_rgba(0,0,0,0.3)] flex flex-col items-center cursor-default pointer-events-auto"
+                    className="mt-16 max-w-4xl mx-auto flex flex-col items-center cursor-default pointer-events-auto"
                 >
                     <ArtistFeatureVisual />
                 </div>
@@ -442,7 +442,7 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                 </div>
                 <div 
                     onClick={handleVisualInteraction}
-                    className="mt-16 max-w-4xl mx-auto shadow-[0_0_50px_rgba(0,0,0,0.3)] flex flex-col items-center cursor-default pointer-events-auto"
+                    className="mt-16 max-w-4xl mx-auto flex flex-col items-center cursor-default pointer-events-auto"
                 >
                     <CollectionIntelligenceVisual />
                 </div>
@@ -458,7 +458,7 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto text-left">
                 {/* Left Card: Buy Me a Coffee */}
-                <div className="bg-zinc-900/50 border border-zinc-800 p-8 space-y-8 flex flex-col rounded-none shadow-xl">
+                <div className="bg-zinc-900/50 border border-zinc-800 p-8 space-y-8 flex flex-col rounded-none">
                     <div className="flex-grow space-y-4">
                         <h4 className="text-2xl font-bold text-white uppercase tracking-tight">Buy Me a Coffee</h4>
                         <p className="text-zinc-400 text-base leading-relaxed">
@@ -471,13 +471,13 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                       rel="noopener noreferrer"
                       className="flex-shrink-0 self-start hover:scale-105 transition-transform"
                     >
-                      <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" className="h-14 w-auto shadow-lg" />
+                      <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" className="h-14 w-auto" />
                     </a>
                 </div>
 
                 {/* Right Card: T-shirt */}
-                <div id="merch" className="relative bg-zinc-900/50 border-2 border-primary p-8 space-y-8 flex flex-col rounded-none shadow-xl shadow-primary/5">
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-brand-black px-4 py-1 rounded-none text-[10px] font-black tracking-[0.2em] uppercase shadow-lg">
+                <div id="merch" className="relative bg-zinc-900/50 border-2 border-primary p-8 space-y-8 flex flex-col rounded-none shadow-primary/5">
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-brand-black px-4 py-1 rounded-none text-[10px] font-black tracking-[0.2em] uppercase">
                         ZCENESTER
                     </div>
                     <div className="flex-grow space-y-4">
@@ -493,7 +493,7 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                       href="https://www.instagram.com/zcene.online/"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="self-start rounded-xl bg-primary px-8 py-3.5 text-sm font-medium text-brand-black hover:bg-primary/90 transition-all active:scale-95 shadow-lg shadow-primary/20"
+                      className="self-start rounded-xl bg-primary px-8 py-3.5 text-sm font-medium text-brand-black hover:bg-primary/90 transition-all active:scale-95 shadow-primary/20"
                     >
                       Order via Instagram
                     </a>
@@ -608,7 +608,7 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                             <span className="material-symbols-outlined !text-[18px]">{isCopied ? 'check' : 'share'}</span>
                         </button>
                         {isCopied && (
-                            <span className="absolute -top-10 left-1/2 -translate-x-1/2 bg-primary text-brand-black text-[10px] font-bold py-1 px-2 rounded-none whitespace-nowrap shadow-xl">
+                            <span className="absolute -top-10 left-1/2 -translate-x-1/2 bg-primary text-brand-black text-[10px] font-bold py-1 px-2 rounded-none whitespace-nowrap">
                                 Link Copied
                             </span>
                         )}

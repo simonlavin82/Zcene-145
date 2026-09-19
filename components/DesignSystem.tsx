@@ -148,7 +148,7 @@ const ColorSwatch: React.FC<{ name: string; hex: string; className?: string; sty
     return (
         <div className="group cursor-pointer">
             <div 
-                className={`w-full h-24 rounded-none shadow-md border border-zinc-700 transition-transform group-hover:scale-[1.02] ${className}`}
+                className={`w-full h-24 rounded-none border border-zinc-700 transition-transform group-hover:scale-[1.02] ${className}`}
                 style={style}
             ></div>
             <div className="text-left mt-2">
@@ -886,7 +886,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </li>
                                         <li>
                                             <span className="text-white font-medium block font-bold">Tooltip Pattern</span>
-                                            Hovering over segments on desktop reveals a minimal tooltip (bg-zinc-800, rounded, shadow-lg) displaying the raw criteria value (e.g., "Hardcore", "2018+").
+                                            Hovering over segments on desktop reveals a minimal tooltip (bg-zinc-800, rounded,) displaying the raw criteria value (e.g., "Hardcore", "2018+").
                                         </li>
                                         <li>
                                             <span className="text-white font-medium block font-bold">Mobile Tap-to-Expand</span>
@@ -934,7 +934,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                     <div className="grid grid-cols-4 gap-1.5 w-full relative group">
                                                         <div className="h-2 bg-[#10b981] border border-[#10b981] transition-all duration-300 relative">
                                                             {/* Tooltip demo */}
-                                                            <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full mb-1 left-1/2 -translate-x-1/2 w-max max-w-[150px] bg-zinc-800 text-white text-[10px] px-2 py-1 rounded shadow-lg pointer-events-none z-50 text-center truncate">
+                                                            <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full mb-1 left-1/2 -translate-x-1/2 w-max max-w-[150px] bg-zinc-800 text-white text-[10px] px-2 py-1 rounded pointer-events-none z-50 text-center truncate">
                                                                 Hardcore
                                                             </div>
                                                         </div>
@@ -1246,7 +1246,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <div className="space-y-6">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Visual Component Preview</h4>
                                             <div className="p-8 bg-zinc-900/30 border border-zinc-800 flex items-center justify-center min-h-[260px]">
-                                                 <div className="w-[320px] bg-zinc-950/95 border border-zinc-700/80 px-3.5 py-2.5 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md rounded-xl flex flex-col gap-2 text-left">
+                                                 <div className="w-[320px] bg-zinc-950/95 border border-zinc-700/80 px-3.5 py-2.5 backdrop-blur-md rounded-xl flex flex-col gap-2 text-left">
                                                      <span className="font-poppins text-sm text-white border-b border-zinc-800 pb-1 mb-1 font-medium">Never Ending Game</span>
                                                      <div className="flex flex-col gap-1">
                                                          <div className="text-xs font-medium text-zinc-300 leading-tight">
@@ -1267,7 +1267,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <div className="space-y-6">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Specifications & Class Tokens</h4>
                                             <ul className="space-y-3 text-sm text-zinc-400">
-                                                <li><strong>Background Architecture:</strong> <code>bg-zinc-950/95 border border-zinc-700/80 px-3.5 py-2.5 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md</code></li>
+                                                <li><strong>Background Architecture:</strong> <code>bg-zinc-950/95 border border-zinc-700/80 px-3.5 py-2.5 backdrop-blur-md</code></li>
                                                 <li><strong>Border Radius:</strong> <code>rounded-xl</code> (12px) for consistent, modern container framing.</li>
                                                 <li><strong>Title Typography:</strong> <code>font-poppins font-medium text-sm text-white</code> for sharp, readable Title Case presentation.</li>
                                                 <li><strong>Relational Contexts:</strong> Uses <code>text-zinc-400 font-normal</code> for structural descriptions and <code>text-primary font-normal</code> for highlighted details.</li>
@@ -1308,7 +1308,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
 
                                     <div className="space-y-4">
                                         <div className="h-16 flex items-center justify-center bg-zinc-950 rounded-none border border-zinc-800">
-                                            <button className="bg-primary text-brand-black px-6 py-2 text-sm rounded-xl font-medium shadow-lg">Standard CTA</button>
+                                            <button className="bg-primary text-brand-black px-6 py-2 text-sm rounded-xl font-medium">Standard CTA</button>
                                         </div>
                                         <div>
                                             <h4 className="text-sm font-semibold text-zinc-200 uppercase tracking-widest">Medium (Standard)</h4>
@@ -1319,7 +1319,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
 
                                     <div className="space-y-4">
                                         <div className="h-16 flex items-center justify-center bg-zinc-950 rounded-none border border-zinc-800">
-                                            <button className="bg-primary text-brand-black px-8 py-4 text-base sm:text-lg rounded-xl font-medium shadow-xl">Hero Action</button>
+                                            <button className="bg-primary text-brand-black px-8 py-4 text-base sm:text-lg rounded-xl font-medium">Hero Action</button>
                                         </div>
                                         <div>
                                             <h4 className="text-sm font-semibold text-zinc-200 uppercase tracking-widest">Large (Hero/Mobile)</h4>
@@ -1357,16 +1357,16 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-none border border-zinc-800">
                                      <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Default Status</p>
-                                        <button className="w-full bg-primary text-brand-black px-6 py-2 rounded-xl font-medium shadow-lg text-sm flex items-center justify-center gap-2">
+                                        <button className="w-full bg-primary text-brand-black px-6 py-2 rounded-xl font-medium text-sm flex items-center justify-center gap-2 transition-opacity hover:opacity-90">
                                             <span>Create Zcene</span>
                                             <span className="h-5 w-5 rounded-[6px] flex items-center justify-center text-[9px] font-semibold border border-primary/50 bg-brand-black text-primary">0</span>
                                         </button>
                                     </div>
                                     <div className="space-y-4">
-                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover / Pulse Status</p>
-                                        <button className="w-full bg-primary/90 text-brand-black px-6 py-2 rounded-xl font-medium shadow-lg text-sm flex items-center justify-center gap-2 ring-4 ring-primary/20">
+                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover Status</p>
+                                        <button className="w-full bg-primary text-brand-black px-6 py-2 rounded-xl font-medium text-sm flex items-center justify-center gap-2 opacity-90 transition-opacity hover:opacity-90">
                                             <span>Create Zcene</span>
-                                            <span className="h-5 w-5 rounded-[6px] flex items-center justify-center text-[9px] font-semibold border border-primary/50 bg-brand-black text-primary animate-pulse">2</span>
+                                            <span className="h-5 w-5 rounded-[6px] flex items-center justify-center text-[9px] font-semibold border border-primary/50 bg-brand-black text-primary">2</span>
                                         </button>
                                     </div>
                                     <div className="space-y-4">
@@ -1871,13 +1871,13 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             
                             <div className="flex gap-4 mt-4">
                                 <div 
-                                className="w-16 h-16 rounded-lg flex items-center justify-center shadow-md border border-white/5"
+                                className="w-16 h-16 rounded-lg flex items-center justify-center border border-white/5"
                                 style={{ background: generateDeterministicGradient("Words of Concrete") }}
                                 >
                                 <span className="text-zinc-300 font-bold text-xs uppercase tracking-widest opacity-80">WOC</span>
                                 </div>
                                 <div 
-                                className="w-16 h-16 rounded-lg flex items-center justify-center shadow-md border border-white/5"
+                                className="w-16 h-16 rounded-lg flex items-center justify-center border border-white/5"
                                 style={{ background: generateDeterministicGradient("Spare Snare") }}
                                 >
                                 <span className="text-zinc-300 font-bold text-xs uppercase tracking-widest opacity-80">SS</span>
@@ -2103,7 +2103,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             {/* Cards inside this parent record crate compartment */}
                                             <div className="grid grid-cols-1 gap-4 w-full md:w-fit">
                                                 {/* Inner Mock Card */}
-                                                <div className="bg-zinc-900 border border-zinc-700/50 p-5 flex flex-col justify-between min-h-[160px] w-full md:w-[360px] shadow-xl hover:border-primary transition-all cursor-pointer">
+                                                <div className="bg-zinc-900 border border-zinc-700/50 p-5 flex flex-col justify-between min-h-[160px] w-full md:w-[360px] hover:border-primary transition-all cursor-pointer">
                                                     <div className="space-y-3">
                                                         <h3 className="text-sm font-medium text-white truncate">Grayscale</h3>
                                                         <p className="font-mono text-[10px] text-zinc-400">Edited 05/07/2026</p>
@@ -2199,7 +2199,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
 
                                     {/* Mock Card */}
                                     <div className="max-w-xs">
-                                        <div className="bg-zinc-900 border border-zinc-700/50 rounded-none p-5 flex flex-col justify-between min-h-[160px] shadow-xl">
+                                        <div className="bg-zinc-900 border border-zinc-700/50 rounded-none p-5 flex flex-col justify-between min-h-[160px]">
                                             {/* Card Header */}
                                             <div className="space-y-4">
                                                 <div className="flex items-center justify-between gap-3">
@@ -2716,7 +2716,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                     <section id="toasts">
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Toasts</h2>
                         <div className="flex justify-center p-12 bg-zinc-950 rounded-xl border border-zinc-800">
-                             <div className="bg-brand-black text-primary px-6 py-3 rounded-xl shadow-2xl flex items-center justify-center gap-3 border border-primary/50">
+                             <div className="bg-brand-black text-primary px-6 py-3 rounded-xl flex items-center justify-center gap-3 border border-primary/50">
                                 <span className="material-symbols-outlined !text-[20px]">check_circle</span>
                                 <span className="text-sm font-semibold tracking-tight">Artist seed registered in the curation queue</span>
                              </div>
@@ -2732,7 +2732,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             </p>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                                  <div className="p-6 bg-zinc-900 border border-zinc-700/50 rounded-xl flex flex-col items-center gap-4">
-                                    <span className="h-8 w-8 rounded-lg flex items-center justify-center text-sm font-semibold border-2 bg-brand-black text-primary border-primary/50 shadow-[0_0_12px_rgba(246,228,104,0.3)]">12</span>
+                                    <span className="h-8 w-8 rounded-lg flex items-center justify-center text-sm font-semibold border-2 bg-brand-black text-primary border-primary/50">12</span>
                                     <div className="text-center">
                                         <p className="text-sm font-medium text-white">Large (32px)</p>
                                         <p className="text-xs text-zinc-500 mt-1">Action State</p>
@@ -2896,7 +2896,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <div>
                                             <h4 className="text-sm font-medium text-zinc-400 mb-3">Desktop (Centered)</h4>
                                             <div className="bg-zinc-900/50 p-4 rounded-lg border border-zinc-800 flex items-center justify-center min-h-[200px]">
-                                                <div className="bg-background-dark border border-zinc-600 rounded-none overflow-hidden shadow-2xl relative w-full max-w-[300px]">
+                                                <div className="bg-background-dark border border-zinc-600 rounded-none overflow-hidden relative w-full max-w-[300px]">
                                                     <div className="p-3 bg-zinc-900 border-b border-zinc-700 flex justify-between items-center">
                                                         <div className="flex items-center gap-2">
                                                             <span className="material-symbols-outlined text-primary !text-[18px]">info</span>
@@ -2922,7 +2922,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <h4 className="text-sm font-medium text-zinc-400 mb-3">Mobile (Bottom Sheet)</h4>
                                             <div className="bg-zinc-900/50 rounded-lg border border-zinc-800 flex flex-col justify-end min-h-[250px] relative overflow-hidden max-w-[350px] mx-auto">
                                                 <div className="absolute inset-0 bg-black/60" />
-                                                <div className="bg-background-dark border border-zinc-600 border-b-0 rounded-t-2xl overflow-hidden shadow-2xl relative w-full">
+                                                <div className="bg-background-dark border border-zinc-600 border-b-0 rounded-t-2xl overflow-hidden relative w-full">
                                                     <div className="p-3 bg-zinc-900 border-b border-zinc-700 flex justify-between items-center">
                                                         <div className="flex items-center gap-2">
                                                             <span className="material-symbols-outlined text-primary !text-[18px]">info</span>
@@ -3051,7 +3051,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="space-y-6">
                                     <h3 className="text-xl font-medium text-zinc-200">Unified Dropdown Anatomy</h3>
                                     <div className="bg-zinc-950 p-8 rounded-xl border border-zinc-800 flex justify-center">
-                                        <div className="w-56 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1 shadow-2xl">
+                                        <div className="w-56 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1">
                                             <div className="px-3 py-2.5 border-b border-white/5">
                                                 <p className="text-[9px] uppercase tracking-[0.2em] text-zinc-500 font-bold mb-1">Authenticated Account</p>
                                                 <p className="text-xs font-medium text-zinc-200 truncate">user@example.com</p>
@@ -3091,7 +3091,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
 
                                     <h3 className="text-xl font-medium text-zinc-200 mt-12 mb-6">Multi-Select Filter Dropdown</h3>
                                     <div className="bg-zinc-950 p-8 rounded-xl border border-zinc-800 flex justify-center">
-                                        <div className="w-56 rounded-xl border border-zinc-700 bg-zinc-950 shadow-2xl flex flex-col relative z-20">
+                                        <div className="w-56 rounded-xl border border-zinc-700 bg-zinc-950 flex flex-col relative z-20">
                                             <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800 rounded-t-xl">
                                                 <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Filter by Genre</span>
                                                 <button className="text-[10px] font-semibold text-zinc-400 hover:text-primary transition-colors uppercase tracking-widest">Clear</button>
@@ -3263,11 +3263,11 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             {/* Visual Mockup Container (7 cols) */}
                                             <div className="lg:col-span-7 bg-zinc-950 rounded-none border border-zinc-800 p-8 min-h-[260px] flex items-center justify-center relative overflow-hidden">
                                                 <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(246,228,104,0.03),transparent_60%)]"></div>
-                                                <div className="relative w-72 bg-primary text-brand-black p-4 rounded-xl shadow-2xl z-10 transition-all duration-300">
+                                                <div className="relative w-72 bg-primary text-brand-black p-4 rounded-xl z-10 transition-all duration-300">
                                                     <div className="text-sm font-medium leading-relaxed">
                                                         {step.content}
                                                     </div>
-                                                    <div className="absolute -top-2 -right-2 w-6 h-6 flex items-center justify-center rounded-xl bg-zinc-800 text-white shadow-lg border border-zinc-700">
+                                                    <div className="absolute -top-2 -right-2 w-6 h-6 flex items-center justify-center rounded-xl bg-zinc-800 text-white border border-zinc-700">
                                                         <span className="material-symbols-outlined !text-[14px]">close</span>
                                                     </div>
                                                     <div className={`absolute w-0 h-0 border-[6px] border-transparent ${arrowClass}`}></div>
@@ -3406,7 +3406,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="space-y-6">
                                     <h3 className="text-xl font-medium text-zinc-200">Global Error Overlay</h3>
                                     <div className="p-6 bg-zinc-950 rounded-xl border border-zinc-800 flex items-center justify-center">
-                                        <div className="w-full bg-red-900 border border-red-600 text-red-200 px-4 py-3 rounded-xl shadow-2xl flex items-start justify-between gap-4">
+                                        <div className="w-full bg-red-900 border border-red-600 text-red-200 px-4 py-3 rounded-xl flex items-start justify-between gap-4">
                                             <div className="flex-grow min-w-0 break-all sm:break-words pt-2.5">
                                                 <strong className="font-medium text-red-100">Error: </strong>
                                                 <span>Operational limits exceeded. The curation engine is temporarily saturated. Retrying in a moment.</span>
@@ -3619,7 +3619,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     <div className="space-y-4">
                                         <div className="flex items-center gap-3">
-                                            <div className="h-2 w-2 rounded-full bg-primary shadow-[0_0_8px_rgba(246,228,104,0.6)]"></div>
+                                            <div className="h-2 w-2 rounded-full bg-primary"></div>
                                             <h4 className="text-base font-medium text-zinc-200">Global Layer</h4>
                                         </div>
                                         <div className="bg-zinc-950 p-5 rounded-xl border border-zinc-800 space-y-4">
@@ -3641,7 +3641,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
 
                                     <div className="space-y-4">
                                         <div className="flex items-center gap-3">
-                                            <div className="h-2 w-2 rounded-full bg-primary shadow-[0_0_8px_rgba(246,228,104,0.6)]"></div>
+                                            <div className="h-2 w-2 rounded-full bg-primary"></div>
                                             <h4 className="text-base font-medium text-zinc-200">Carousel Layer</h4>
                                         </div>
                                         <div className="bg-zinc-950 p-5 rounded-xl border border-zinc-800 space-y-4">
@@ -3808,7 +3808,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <div>
                                             <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Floating Artwork Classes</p>
                                             <code className="text-xs font-mono text-primary bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 block overflow-x-auto whitespace-nowrap">
-                                                shadow-[0_8px_30px_rgba(0,0,0,0.8)] ring-1 ring-white/10 ring-inset
+                                                ring-1 ring-white/10 ring-inset
                                             </code>
                                         </div>
                                     </div>

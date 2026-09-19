@@ -795,7 +795,7 @@ export const CountryFilterDropdown: React.FC<CountryFilterDropdownProps> = ({ va
       {isOpen && (
         <>
           <div className="fixed inset-0 z-[1190]" onClick={() => setIsOpen(false)} />
-          <div className="absolute left-0 right-0 top-full mt-1.5 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl max-h-48 overflow-y-auto z-[1200] scrollbar-thin py-1">
+          <div className="absolute left-0 right-0 top-full mt-1.5 bg-zinc-900 border border-zinc-700 rounded-xl max-h-48 overflow-y-auto z-[1200] scrollbar-thin py-1">
             <button
               type="button"
               onClick={() => {
@@ -917,7 +917,7 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
             {(!isLiveAISuggestions || overrideInput.trim()) && (
               <button
                 type="submit"
-                className="px-6 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all shadow-md cursor-pointer whitespace-nowrap"
+                className="px-6 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all cursor-pointer whitespace-nowrap"
               >
                 {isLiveAISuggestions 
                   ? 'Confirm Origin'
@@ -1024,7 +1024,7 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
                 type="submit"
                 className={
                   overrideInput.trim()
-                    ? "px-6 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 active:scale-95 transition-all shadow-md cursor-pointer whitespace-nowrap"
+                    ? "px-6 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
                     : "px-6 py-2 border border-zinc-700 bg-zinc-800/50 hover:bg-zinc-800 hover:border-zinc-500 text-zinc-300 hover:text-white rounded-xl font-medium text-sm flex items-center gap-2 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
                 }
               >
@@ -1129,7 +1129,7 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
           {overrideInput.trim() && (
             <button
               type="submit"
-              className="px-6 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 active:scale-95 transition-all shadow-md cursor-pointer whitespace-nowrap"
+              className="px-6 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
             >
               {isLiveAISuggestions ? 'Confirm Origin' : 'Confirm'}
             </button>
@@ -1180,7 +1180,7 @@ export const ExploreActionDialog: React.FC<{
           </button>
           <button
             onClick={onConfirm}
-            className="px-4 py-1.5 bg-primary text-brand-black rounded-xl font-semibold text-sm active:scale-95 transition-all shadow-md hover:bg-yellow-400 cursor-pointer"
+            className="px-4 py-1.5 bg-primary text-brand-black rounded-xl font-semibold text-sm active:scale-95 transition-all hover:bg-yellow-400 cursor-pointer"
           >
             Continue
           </button>
@@ -1449,7 +1449,7 @@ export function ConsolidatedValidationModal({ isOpen, seeds, onConfirm, onCancel
             <button type="button" onClick={onCancel} className="px-4 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent">
               Cancel
             </button>
-            <button type="submit" className="px-6 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all shadow-md cursor-pointer whitespace-nowrap">
+            <button type="submit" className="px-6 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all cursor-pointer whitespace-nowrap">
               Confirm & Generate
             </button>
           </ModalFooter>

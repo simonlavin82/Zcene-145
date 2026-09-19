@@ -270,7 +270,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 <button 
                   onClick={onCreateProject}
                   disabled={isCreatingProject}
-                  className="h-full rounded-xl bg-[#F2E572] text-black text-sm px-4 font-medium flex items-center gap-2 whitespace-nowrap"
+                  className="h-full rounded-xl bg-primary text-brand-black text-sm px-4 font-medium flex items-center gap-2 whitespace-nowrap transition-opacity hover:opacity-90 disabled:opacity-50"
                 >
                   {isCreatingProject ? (
                     <>

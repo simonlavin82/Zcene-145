@@ -3,7 +3,7 @@ import { BookOpen, ChevronLast, ChevronLeft, ChevronRight, Star, ShoppingBag, Ar
 
 const CollectionIntelligenceVisual: React.FC<{ className?: string }> = ({ className }) => {
     return (
-        <div className={`w-full aspect-[3/4] md:aspect-video bg-zinc-950 border border-zinc-800/50 shadow-2xl flex items-center justify-center p-4 md:p-8 overflow-hidden relative pointer-events-none ${className}`}>
+        <div className={`w-full aspect-[3/4] md:aspect-video bg-zinc-950 border border-zinc-800/50 flex items-center justify-center p-4 md:p-8 overflow-hidden relative pointer-events-none ${className}`}>
              {/* Background Image Overlay */}
              <img 
                 src="https://storage.googleapis.com/zcene-prod-assets/Deep%20Cut%20background.png" 
@@ -14,7 +14,7 @@ const CollectionIntelligenceVisual: React.FC<{ className?: string }> = ({ classN
              <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/40 to-transparent z-0"></div>
 
              {/* Panel (Deep Cut) */}
-            <div className="w-full h-full md:max-w-xl bg-zinc-900 border border-zinc-600/50 shadow-2xl flex flex-col overflow-hidden text-left relative z-10 rounded-none font-sans">
+            <div className="w-full h-full md:max-w-xl bg-zinc-900 border border-zinc-600/50 flex flex-col overflow-hidden text-left relative z-10 rounded-none font-sans">
                 {/* Header (Matching DetailsPanel Header) */}
                 <div className="h-12 flex-shrink-0 border-b border-zinc-600/50 flex items-center justify-between px-4 bg-zinc-900 relative z-20">
                     <div className="flex items-center gap-2">
@@ -163,7 +163,7 @@ const CollectionIntelligenceVisual: React.FC<{ className?: string }> = ({ classN
                                 Artist Catalog
                             </div>
                             <div className="flex flex-col gap-3">
-                                <button className="flex items-center justify-center px-4 py-2 bg-primary text-brand-black rounded-xl shadow-[4px_4px_0px_#000] transition-all font-bold uppercase tracking-tighter text-sm gap-3">
+                                <button className="flex items-center justify-center px-4 py-2 bg-primary text-brand-black rounded-xl transition-all font-bold uppercase tracking-tighter text-sm gap-3">
                                     <span className="material-symbols-outlined !text-[18px]">shopping_bag</span>
                                     <span>Shop on Bandcamp</span>
                                 </button>
@@ -224,7 +224,7 @@ const CollectionIntelligenceVisual: React.FC<{ className?: string }> = ({ classN
                                         Consult Zcene AI...
                                     </div>
                                     <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                                        <button className="w-8 h-8 flex items-center justify-center rounded-xl bg-primary text-brand-black shadow-[0_0_12px_rgba(246,228,104,0.3)]">
+                                        <button className="w-8 h-8 flex items-center justify-center rounded-xl bg-primary text-brand-black">
                                             <span className="material-symbols-outlined !text-[22px]">arrow_upward</span>
                                         </button>
                                     </div>

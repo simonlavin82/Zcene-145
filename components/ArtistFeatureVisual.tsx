@@ -3,7 +3,7 @@ import { Mic, Music, Plus, ChevronLeft, CheckCircle2, MinusCircle } from 'lucide
 
 const ArtistFeatureVisual: React.FC<{ className?: string }> = ({ className }) => {
     return (
-        <div className={`w-full aspect-[3/4] md:aspect-video bg-zinc-950 border border-zinc-800/50 shadow-2xl flex items-center justify-center p-4 md:p-8 overflow-hidden relative pointer-events-none ${className}`}>
+        <div className={`w-full aspect-[3/4] md:aspect-video bg-zinc-950 border border-zinc-800/50 flex items-center justify-center p-4 md:p-8 overflow-hidden relative pointer-events-none ${className}`}>
              {/* Background Image Overlay */}
              <img 
                 src="https://storage.googleapis.com/zcene-prod-assets/Artist%20background.png" 
@@ -13,7 +13,7 @@ const ArtistFeatureVisual: React.FC<{ className?: string }> = ({ className }) =>
              {/* Gradient for depth */}
              <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/40 to-transparent z-0"></div>
 
-             <div className="w-full h-full md:max-w-xl bg-zinc-900 border border-zinc-600/50 shadow-2xl flex flex-col overflow-hidden text-left relative z-10 rounded-none font-sans">
+             <div className="w-full h-full md:max-w-xl bg-zinc-900 border border-zinc-600/50 flex flex-col overflow-hidden text-left relative z-10 rounded-none font-sans">
                 {/* Header (Matching App's Panel Header) */}
                 <div className="h-12 flex-shrink-0 border-b border-zinc-600/50 flex items-center justify-between px-4 bg-zinc-900 relative z-[60]">
                     <div className="flex items-center gap-2 overflow-hidden">
@@ -49,7 +49,7 @@ const ArtistFeatureVisual: React.FC<{ className?: string }> = ({ className }) =>
                                         <span className="material-symbols-outlined !text-[18px]">mic</span>
                                     </button>
                                     <button
-                                        className="flex items-center justify-center rounded-xl bg-primary text-brand-black w-7 h-7 flex-shrink-0 shadow-[0_0_12px_rgba(246,228,104,0.3)] hover:scale-110 transition-all"
+                                        className="flex items-center justify-center rounded-xl bg-primary text-brand-black w-7 h-7 flex-shrink-0 hover:scale-110 transition-all"
                                     >
                                         <span className="material-symbols-outlined !text-lg">add</span>
                                     </button>
@@ -89,7 +89,7 @@ const ArtistFeatureVisual: React.FC<{ className?: string }> = ({ className }) =>
                         </div>
 
                         <div className="px-4 pt-4 pb-12">
-                            <button className="w-full flex items-center justify-center gap-2 bg-primary px-6 py-2 text-sm rounded-xl font-medium text-brand-black transition-all duration-500 hover:opacity-90 shadow-lg">
+                            <button className="w-full flex items-center justify-center gap-2 bg-primary px-6 py-2 text-sm rounded-xl font-medium text-brand-black transition-all duration-500 hover:opacity-90">
                                 <span>Update Zcene</span>
                                 <span className="h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border transition-all duration-500 bg-brand-black text-primary border-primary/50">
                                     2

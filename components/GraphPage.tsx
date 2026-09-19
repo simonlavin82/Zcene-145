@@ -588,7 +588,7 @@ const LibraryDialog: React.FC<{
                             <span className="material-symbols-outlined !text-[14px] transition-transform duration-200" style={{ transform: isGenreOpen ? 'rotate(180deg)' : '' }}>expand_more</span>
                         </button>
                         {isGenreOpen && uniqueGenres.length > 0 && (
-                            <div className="absolute top-full left-4 right-4 sm:left-auto sm:right-0 mt-2 sm:mt-1.5 w-auto sm:w-56 max-w-none rounded-xl border border-zinc-700 bg-zinc-950 shadow-xl z-20 flex flex-col">
+                            <div className="absolute top-full left-4 right-4 sm:left-auto sm:right-0 mt-2 sm:mt-1.5 w-auto sm:w-56 max-w-none rounded-xl border border-zinc-700 bg-zinc-950 z-20 flex flex-col">
                                 <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800 rounded-t-xl">
                                     <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Filter by Genre</span>
                                     {selectedGenres.length > 0 && (
@@ -1405,7 +1405,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                               <span className="material-symbols-outlined !text-[18px]">close</span>
                           </button>
                       )}
-                      <button type="submit" disabled={!searchTerm.trim()} className={`flex items-center justify-center rounded-xl w-7 h-7 flex-shrink-0 transition-all duration-300 disabled:cursor-not-allowed leading-none ${!searchTerm.trim() ? 'bg-zinc-800 text-zinc-600' : 'bg-primary text-brand-black shadow-[0_0_12px_rgba(246,228,104,0.3)] hover:scale-110 active:scale-95'}`} aria-label="Add artists">
+                      <button type="submit" disabled={!searchTerm.trim()} className={`flex items-center justify-center rounded-xl w-7 h-7 flex-shrink-0 transition-all duration-300 disabled:cursor-not-allowed leading-none ${!searchTerm.trim() ? 'bg-zinc-800 text-zinc-600' : 'bg-primary text-brand-black hover:scale-110 active:scale-95'}`} aria-label="Add artists">
                           <span className="material-symbols-outlined !text-lg">add</span>
                       </button>
                   </div>
@@ -1453,7 +1453,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                   ref={createZceneBtnRef} 
                   onClick={handleApplyChanges} 
                   disabled={(enabledArtistsCount === 0 && !searchTerm.trim()) || isLoading || isOverLimit} 
-                  className={`w-full flex items-center justify-center gap-2 bg-primary px-6 py-2 text-sm rounded-xl font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 shadow-lg ${visibleTooltips.step2 ? 'animate-pulse' : ''}`}
+                  className={`w-full flex items-center justify-center gap-2 bg-primary px-6 py-2 text-sm rounded-xl font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 ${visibleTooltips.step2 ? 'animate-pulse' : ''}`}
               >
                   <span>{createButtonLabel}</span>
                   <span className={`h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border transition-all duration-500 bg-brand-black text-primary border-primary/50`}>
@@ -1481,7 +1481,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                   {user ? (
                     <button 
                       onClick={onSaveToDashboard}
-                      className="w-full flex items-center justify-center gap-2 bg-primary px-6 py-2 text-sm rounded-xl font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 shadow-lg"
+                      className="w-full flex items-center justify-center gap-2 bg-primary px-6 py-2 text-sm rounded-xl font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
                         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
@@ -1494,7 +1494,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                     <>
                       <button 
                         onClick={onSaveToDashboard}
-                        className="w-full flex items-center justify-center gap-2 bg-primary px-6 py-2 text-sm rounded-xl font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 shadow-lg"
+                        className="w-full flex items-center justify-center gap-2 bg-primary px-6 py-2 text-sm rounded-xl font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
                           <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />

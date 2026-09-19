@@ -173,7 +173,7 @@ const SafeYoutubePlayer: React.FC<SafeYoutubePlayerProps> = ({ videoId, artistDi
             href={`https://www.youtube.com/watch?v=${videoId}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[10px] font-bold uppercase tracking-wider text-brand-black bg-primary px-3 py-2 hover:bg-white transition-all text-center rounded-none shadow-[2px_2px_0px_#000]"
+            className="text-[10px] font-bold uppercase tracking-wider text-brand-black bg-primary px-3 py-2 hover:bg-white transition-all text-center rounded-none"
           >
             Watch on YouTube ↗
           </a>
@@ -367,13 +367,13 @@ const ProfileRow: React.FC<ProfileRowProps> = ({ data, colorHex, isSmallScreen, 
                                 isSmallScreen ? (
                                     // Mobile: persistent inline label — visible only when row is expanded
                                     isExpanded ? (
-                                        <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 w-max max-w-[150px] bg-zinc-800 text-white text-[10px] px-2 py-1 rounded shadow-lg pointer-events-none z-50 text-center truncate">
+                                        <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 w-max max-w-[150px] bg-zinc-800 text-white text-[10px] px-2 py-1 rounded pointer-events-none z-50 text-center truncate">
                                             {c.value}
                                         </div>
                                     ) : null
                                 ) : (
                                     // Desktop: hover tooltip (unchanged)
-                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full mb-1 left-1/2 -translate-x-1/2 w-max max-w-[150px] bg-zinc-800 text-white text-[10px] px-2 py-1 rounded shadow-lg pointer-events-none z-50 text-center truncate">
+                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full mb-1 left-1/2 -translate-x-1/2 w-max max-w-[150px] bg-zinc-800 text-white text-[10px] px-2 py-1 rounded pointer-events-none z-50 text-center truncate">
                                         {c.value}
                                     </div>
                                 )
@@ -1135,7 +1135,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 <div className="relative mx-auto w-fit">
                                     {/* Ambient Glow */}
                                     <div className="absolute inset-[-20%] rounded-full opacity-40 blur-3xl transition-colors duration-1000 z-0 pointer-events-none" style={{ backgroundColor: 'var(--scene-accent, transparent)' }} />
-                                    <div className="w-40 h-40 sm:w-44 sm:h-44 flex-shrink-0 mx-auto bg-zinc-900 overflow-hidden relative shadow-[0_8px_30px_rgba(0,0,0,0.8)] ring-1 ring-white/10 ring-inset rounded-lg group z-10">
+                                    <div className="w-40 h-40 sm:w-44 sm:h-44 flex-shrink-0 mx-auto bg-zinc-900 overflow-hidden relative ring-1 ring-white/10 ring-inset rounded-lg group z-10">
                                     {/* Temporary Loading Skeleton while image loads */}
                                     {!imgLoaded && (
                                         <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center p-6 text-center bg-zinc-900 overflow-hidden z-10">
@@ -1149,7 +1149,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                             />
                                             <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-900/60 to-transparent" />
                                             <div className="relative z-10 flex flex-col items-center justify-center space-y-2">
-                                                <div className="w-12 h-12 rounded-full bg-zinc-800/80 border border-zinc-700/50 flex items-center justify-center shadow-lg backdrop-blur-sm group-hover:border-purple-500/50 transition-colors duration-500">
+                                                <div className="w-12 h-12 rounded-full bg-zinc-800/80 border border-zinc-700/50 flex items-center justify-center backdrop-blur-sm group-hover:border-purple-500/50 transition-colors duration-500">
                                                     <span className="material-symbols-outlined text-zinc-400 group-hover:text-purple-400 transition-colors duration-500 text-2xl">
                                                         {isLabelNode ? 'album' : 'music_note'}
                                                     </span>
@@ -1465,7 +1465,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                         {user ? (
                                             <button 
                                                 onClick={() => onAuthRequest?.()}
-                                                className={`w-full flex items-center justify-center gap-2 bg-primary ${isSmallScreen ? 'px-8 py-4 text-lg rounded-2xl' : 'px-6 py-2 text-sm rounded-xl'} font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 shadow-lg`}
+                                                className={`w-full flex items-center justify-center gap-2 bg-primary ${isSmallScreen ? 'px-8 py-4 text-lg rounded-2xl' : 'px-6 py-2 text-sm rounded-xl'} font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50`}
                                             >
                                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
                                                     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
@@ -1477,7 +1477,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                         ) : (
                                             <button 
                                                 onClick={() => onAuthRequest?.()}
-                                                className={`w-full flex items-center justify-center gap-2 bg-primary ${isSmallScreen ? 'px-8 py-4 text-lg rounded-2xl' : 'px-6 py-2 text-sm rounded-xl'} font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 shadow-lg`}
+                                                className={`w-full flex items-center justify-center gap-2 bg-primary ${isSmallScreen ? 'px-8 py-4 text-lg rounded-2xl' : 'px-6 py-2 text-sm rounded-xl'} font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50`}
                                             >
                                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
                                                     <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
@@ -1594,7 +1594,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                         className={`w-8 h-8 flex flex-shrink-0 items-center justify-center transition-all duration-300 rounded-xl ${
                                                             !chatInput.trim() || isChatLoading
                                                                 ? 'bg-zinc-800 text-zinc-600'
-                                                                : 'bg-primary text-brand-black shadow-[0_0_12px_rgba(246,228,104,0.3)] active:scale-95'
+                                                                : 'bg-primary text-brand-black active:scale-95'
                                                         }`}
                                                         title="Send"
                                                     >
@@ -1694,7 +1694,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         return (
             <div 
               key="magazine-card"
-              className="w-full min-w-[320px] bg-zinc-900 relative break-words h-fit border border-zinc-800/80 shadow-2xl overflow-visible mb-4 md:mb-6 break-inside-avoid transition-all duration-500"
+              className="w-full min-w-[320px] bg-zinc-900 relative break-words h-fit border border-zinc-800/80 overflow-visible mb-4 md:mb-6 break-inside-avoid transition-all duration-500"
               style={{ '--scene-accent': localDominantColor } as React.CSSProperties}
             >
                 {panelContent}
