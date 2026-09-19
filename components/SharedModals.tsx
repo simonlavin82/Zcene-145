@@ -64,14 +64,14 @@ export const MyStackDialog: React.FC<{
                                     title="Click to copy name"
                                 >
                                     <div className="flex items-center gap-2">
-                                        <h4 className="text-[15px] font-medium text-white truncate leading-tight -mt-2.5">{nameToCopy}</h4>
+                                        <h4 className="text-[15px] font-medium text-white truncate leading-tight -mt-5">{nameToCopy}</h4>
                                         {isCopied ? (
                                             <span className="material-symbols-outlined text-primary !text-[14px]">check_circle</span>
                                         ) : (
                                             <span className="material-symbols-outlined text-zinc-500 opacity-0 group-hover:opacity-100 transition-opacity !text-[14px]">content_copy</span>
                                         )}
                                     </div>
-                                    <div className="flex items-start gap-1.5 mt-1.5">
+                                    <div className="flex items-start gap-1.5 mt-0">
                                         <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-400 bg-zinc-800/50 px-1 py-[2px] rounded-sm leading-none shrink-0 mt-[2px]">{item.type}</span>
                                         <span className="text-[11px] text-zinc-500 font-mono leading-normal break-words">
                                             {formatSystemTimestamp(item.dateSaved)}
