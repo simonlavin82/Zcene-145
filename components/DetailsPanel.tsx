@@ -1007,7 +1007,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     className="group flex items-center gap-2 cursor-copy w-fit transition-all active:scale-[0.98] min-w-0"
                                     title="Click to copy name"
                                 >
-                                    <h3 className={`${isHeaderStuck ? 'text-base font-medium' : headerSizeClass} text-white leading-[0.9] py-1 break-normal ${isFullScreenMode ? '' : 'transition-all duration-300'}`}>
+                                    <h3 className={`${isHeaderStuck ? 'text-base font-medium' : headerSizeClass} text-white leading-[0.9] py-1 break-words min-w-0 ${isFullScreenMode ? '' : 'transition-all duration-300'}`}>
                                         {getArtistDisplayName(details, node)}
                                     </h3>
                                     <span className={`material-symbols-outlined !text-[16px] flex-shrink-0 transition-all duration-300 ${isIdCopied ? 'text-primary opacity-100 scale-110' : 'text-zinc-500 opacity-0 group-hover:opacity-100'}`}>
