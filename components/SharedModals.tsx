@@ -71,9 +71,9 @@ export const MyStackDialog: React.FC<{
                                             <span className="material-symbols-outlined text-zinc-500 opacity-0 group-hover:opacity-100 transition-opacity !text-[14px]">content_copy</span>
                                         )}
                                     </div>
-                                    <div className="flex items-center gap-1.5 mt-0.5">
-                                        <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-400 bg-zinc-800/50 px-1 py-[2px] rounded-sm leading-none">{item.type}</span>
-                                        <span className="text-[11px] text-zinc-500 font-mono truncate">
+                                    <div className="flex items-start gap-1.5 mt-1.5">
+                                        <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-400 bg-zinc-800/50 px-1 py-[2px] rounded-sm leading-none shrink-0 mt-[2px]">{item.type}</span>
+                                        <span className="text-[11px] text-zinc-500 font-mono leading-normal break-words">
                                             {formatSystemTimestamp(item.dateSaved)}
                                             {item.discoveredVia && ` • via ${item.discoveredVia}`}
                                         </span>
