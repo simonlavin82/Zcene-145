@@ -57,21 +57,21 @@ export const MyStackDialog: React.FC<{
                         const isCopied = copiedId === item.id;
                         
                         return (
-                            <div key={item.id} className="group flex items-center justify-between py-2.5 border-b border-zinc-800/50 last:border-0 hover:bg-zinc-900/30 px-3 -mx-3 rounded-lg transition-colors">
+                            <div key={item.id} className="group flex justify-between border-b border-zinc-800/50 last:border-0 hover:bg-zinc-900/30 px-3 -mx-3 rounded-lg transition-colors">
                                 <div 
-                                    className="flex-grow min-w-0 cursor-pointer flex flex-col justify-center"
+                                    className="flex-grow min-w-0 cursor-pointer flex flex-col justify-center pt-2 pb-3.5"
                                     onClick={() => handleCopy(item.id, nameToCopy)}
                                     title="Click to copy name"
                                 >
                                     <div className="flex items-center gap-2">
-                                        <h4 className="text-[15px] font-medium text-white truncate leading-tight -mt-5">{nameToCopy}</h4>
+                                        <h4 className="text-[15px] font-medium text-white truncate leading-tight">{nameToCopy}</h4>
                                         {isCopied ? (
                                             <span className="material-symbols-outlined text-primary !text-[14px]">check_circle</span>
                                         ) : (
                                             <span className="material-symbols-outlined text-zinc-500 opacity-0 group-hover:opacity-100 transition-opacity !text-[14px]">content_copy</span>
                                         )}
                                     </div>
-                                    <div className="flex items-start gap-1.5 mt-0">
+                                    <div className="flex items-start gap-1.5 mt-1">
                                         <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-400 bg-zinc-800/50 px-1 py-[2px] rounded-sm leading-none shrink-0 mt-[2px]">{item.type}</span>
                                         <span className="text-[11px] text-zinc-500 font-mono leading-normal break-words">
                                             {formatSystemTimestamp(item.dateSaved)}
@@ -79,7 +79,7 @@ export const MyStackDialog: React.FC<{
                                         </span>
                                     </div>
                                 </div>
-                                <div className="flex items-center flex-shrink-0 pl-4">
+                                <div className="flex flex-col justify-center flex-shrink-0 pl-4">
                                     <button 
                                         onClick={() => onRemove({ id: item.id, type: item.type as any, group: 0 })}
                                         className="w-7 h-7 flex items-center justify-center rounded-md text-zinc-500 hover:text-red-400 hover:bg-red-400/10 transition-colors"
