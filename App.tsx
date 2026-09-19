@@ -2576,7 +2576,7 @@ const App: React.FC = () => {
       });
       handleFirestoreError(err, exists ? OperationType.DELETE : OperationType.WRITE, itemPath);
     }
-  }, [user, stack, showToast, handleLogin]);
+  }, [user, stack, showToast, handleLogin, projectName]);
 
   const handleSaveToDashboard = useCallback(async () => {
     if (!user) {

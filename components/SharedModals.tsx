@@ -75,7 +75,7 @@ export const MyStackDialog: React.FC<{
                                         <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-400 bg-zinc-800/50 px-1 py-[2px] rounded-sm leading-none">{item.type}</span>
                                         <span className="text-[11px] text-zinc-500 font-mono truncate">
                                             {formatSystemTimestamp(item.dateSaved)}
-                                            {item.discoveredVia && ` • Discovered via ${item.discoveredVia}`}
+                                            {item.discoveredVia && ` • via ${item.discoveredVia}`}
                                         </span>
                                     </div>
                                 </div>
