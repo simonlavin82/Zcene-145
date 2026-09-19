@@ -1907,8 +1907,24 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         }
     }, [selectedNode, activeNodes]);
 
+    const hasOpenedMagazineRef = useRef(false);
+
     useEffect(() => {
-        if (isMagazineViewOpen && selectedNode) {
+        if (!isMagazineViewOpen) {
+            hasOpenedMagazineRef.current = false;
+            return;
+        }
+
+        if (!hasOpenedMagazineRef.current) {
+            hasOpenedMagazineRef.current = true;
+            const container = document.getElementById('magazine-scroll-container');
+            if (container) {
+                container.scrollTop = 0;
+            }
+            return;
+        }
+
+        if (selectedNode) {
             const timeoutId = setTimeout(() => {
                 const targetEl = document.getElementById(`magazine-card-${selectedNode.id}`);
                 if (targetEl) {
@@ -2364,6 +2380,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     )}
 
                     <div 
+                        id="magazine-scroll-container"
                         className={`flex-grow relative min-h-0 ${isMagazineViewOpen ? 'overflow-y-auto px-4 md:px-6 lg:px-8 scrollbar-thin scrollbar-thumb-zinc-800' : 'overflow-hidden'}`}
                         onTouchStart={handleTouchStart}
                         onTouchMove={handleTouchMove}
