@@ -25,3 +25,10 @@ dist-ssr
 
 # Local service account credentials
 firebase-service-account.json
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/

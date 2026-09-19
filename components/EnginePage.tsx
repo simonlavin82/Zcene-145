@@ -1155,7 +1155,9 @@ const ARCHITECTURE_RULES = [
     { id: 15, title: "Complex Cache Bypass", desc: "Multi-seed and filtered queries must strictly bypass the Global Topology Cache." },
     { id: 16, title: "Curation Intercept Guardrails", desc: "ProjectLoader must strictly bypass Phase 1 interception when curating." },
     { id: 17, title: "JIT Stub Fallback", desc: "Backend injects a JIT stub, React UI intercepts and fetches details live." },
-    { id: 18, title: "Mandatory Disambiguation on Direct Hits", desc: "Green Line MUST NEVER bypass the user confirmation phase." },
+    { id: 18, title: "Authorization Lifecycle", desc: "Token/billing authorization state must be strictly scoped to the active generation event." },
+    { id: 19, title: "External Link Security", desc: "Official Website and Bandcamp links must rely on deterministic client-side search templates." },
+    { id: 20, title: "Mandatory Disambiguation on Direct Hits", desc: "Green Line MUST NEVER bypass the user confirmation phase." },
 ];
 
 const DiscoveryFlowDiagram: React.FC = () => (
@@ -1170,7 +1172,8 @@ const DiscoveryFlowDiagram: React.FC = () => (
                         <li><span className="text-primary font-medium">Front Gate Cache Guard:</span> Bypasses network entirely if a valid, complete cache document exists. Topology Hits MUST explicitly route through the <code>&lt;DisambiguationModal&gt;</code> to verify origin.</li>
                         <li><span className="text-primary font-medium">API Confirmation:</span> <code>&lt;TokenConfirmationModal&gt;</code> intercepts generation to authorize API token spend.</li>
                         <li><span className="text-primary font-medium">Validate Origin:</span> <code>&lt;ConsolidatedValidationModal&gt;</code> confirms the exact canonical seed origin before hitting the pipeline.</li>
-                        <li><span className="text-primary font-medium">Fast Track Local Hydration:</span> Instantly paints the unhydrated graph topology received synchronously.</li>
+                        <li><span className="text-primary font-medium">Active Loader Gate:</span> Locks the UI completely to wait for backend processing.</li>
+                        <li><span className="text-primary font-medium">Drop Loader & Render Zcene:</span> The loader drops only when the background worker sets project status to 'completed'.</li>
                     </ul>
                 </div>
             </div>
