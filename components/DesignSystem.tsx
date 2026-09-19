@@ -1361,6 +1361,16 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <span>Create Zcene</span>
                                             <span className="h-5 w-5 rounded-[6px] flex items-center justify-center text-[9px] font-semibold border border-primary/50 bg-brand-black text-primary">0</span>
                                         </button>
+                                        <div className="flex flex-wrap gap-1.5 pt-2">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-primary border border-primary/20"></span>
+                                                bg-primary
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-brand-black border border-zinc-800"></span>
+                                                text-brand-black
+                                            </span>
+                                        </div>
                                     </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover Status</p>
@@ -1368,6 +1378,14 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <span>Create Zcene</span>
                                             <span className="h-5 w-5 rounded-[6px] flex items-center justify-center text-[9px] font-semibold border border-primary/50 bg-brand-black text-primary">2</span>
                                         </button>
+                                        <div className="flex flex-wrap gap-1.5 pt-2">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500">
+                                                hover:opacity-90
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500">
+                                                transition-opacity
+                                            </span>
+                                        </div>
                                     </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Disabled Status</p>
@@ -1375,6 +1393,11 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <span>Create Zcene</span>
                                             <span className="h-5 w-5 rounded-[6px] flex items-center justify-center text-[9px] font-semibold border border-zinc-700 bg-zinc-800 text-zinc-500">0</span>
                                         </button>
+                                        <div className="flex flex-wrap gap-1.5 pt-2">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500">
+                                                disabled:opacity-50
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1400,6 +1423,16 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <span className="material-symbols-outlined !text-[18px]">public</span>
                                             <span>Official Website</span>
                                         </div>
+                                        <div className="flex flex-wrap gap-1.5 pt-2">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-800 border border-zinc-700"></span>
+                                                bg-zinc-800 border-zinc-700
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-300 border border-zinc-400"></span>
+                                                text-zinc-300
+                                            </span>
+                                        </div>
                                     </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover / Active Status</p>
@@ -1407,12 +1440,35 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <span className="material-symbols-outlined !text-[18px]">play_circle</span>
                                             <span>Watch on YouTube</span>
                                         </div>
+                                        <div className="flex flex-wrap gap-1.5 pt-2">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-700 border border-zinc-500"></span>
+                                                hover:bg-zinc-700 hover:border-zinc-500
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-white border border-zinc-300"></span>
+                                                hover:text-white
+                                            </span>
+                                        </div>
                                     </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Disabled Status</p>
                                         <div className="flex items-center justify-center px-4 py-2 bg-zinc-900/40 text-zinc-600 border border-zinc-800/80 rounded-xl font-medium text-sm gap-2.5 opacity-50 cursor-not-allowed">
                                             <span className="material-symbols-outlined !text-[18px]">public</span>
                                             <span>Official Website</span>
+                                        </div>
+                                        <div className="flex flex-wrap gap-1.5 pt-2">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-900/40 border border-zinc-800/80"></span>
+                                                bg-zinc-900/40 border-zinc-800/80
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-600 border border-zinc-700"></span>
+                                                text-zinc-600
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500">
+                                                opacity-50
+                                            </span>
                                         </div>
                                     </div>
                                 </div>
@@ -1479,18 +1535,43 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <button className="w-full px-4 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent">
                                             Cancel
                                         </button>
+                                        <div className="flex flex-wrap gap-1.5 pt-2">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-400 border border-zinc-500"></span>
+                                                text-zinc-400
+                                            </span>
+                                        </div>
                                     </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover / Active Status</p>
                                         <button className="w-full px-4 py-2 text-white bg-zinc-800 text-sm font-medium rounded-xl transition-colors border border-zinc-700">
                                             Cancel
                                         </button>
+                                        <div className="flex flex-wrap gap-1.5 pt-2">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-800 border border-zinc-700"></span>
+                                                hover:bg-zinc-800 hover:border-zinc-700
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-white border border-zinc-300"></span>
+                                                hover:text-white
+                                            </span>
+                                        </div>
                                     </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Disabled Status</p>
                                         <button disabled className="w-full px-4 py-2 text-zinc-600 text-sm font-medium rounded-xl opacity-50 cursor-not-allowed border border-transparent">
                                             Cancel
                                         </button>
+                                        <div className="flex flex-wrap gap-1.5 pt-2">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-600 border border-zinc-700"></span>
+                                                text-zinc-600
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500">
+                                                opacity-50
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1515,12 +1596,28 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <button className="rounded-xl border border-primary bg-transparent px-4 py-2 font-medium text-primary text-sm">
                                             Support
                                         </button>
+                                        <div className="flex flex-wrap gap-1.5 pt-2">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-transparent border border-primary"></span>
+                                                bg-transparent border-primary
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-primary border border-primary/20"></span>
+                                                text-primary
+                                            </span>
+                                        </div>
                                     </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover Status</p>
                                         <button className="rounded-xl border border-primary bg-primary/20 px-4 py-2 font-medium text-primary text-sm">
                                             Support
                                         </button>
+                                        <div className="flex flex-wrap gap-1.5 pt-2">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-primary/20 border border-primary"></span>
+                                                hover:bg-primary/20
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
