@@ -64,7 +64,7 @@ export const MyStackDialog: React.FC<{
                                     title="Click to copy name"
                                 >
                                     <div className="flex items-center gap-2">
-                                        <h4 className="text-[15px] font-medium text-white truncate leading-tight -mt-1.5">{nameToCopy}</h4>
+                                        <h4 className="text-[15px] font-medium text-white truncate leading-tight -mt-2.5">{nameToCopy}</h4>
                                         {isCopied ? (
                                             <span className="material-symbols-outlined text-primary !text-[14px]">check_circle</span>
                                         ) : (
