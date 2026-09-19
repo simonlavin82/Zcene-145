@@ -1429,6 +1429,14 @@ export function ConsolidatedValidationModal({ isOpen, seeds, onConfirm, onCancel
                       <span className="text-[10px] uppercase tracking-wider text-primary/80 bg-primary/10 px-2 py-0.5 rounded-full font-semibold">Cache Hit</span>
                     )}
                   </div>
+                  {(!seed.predictedOrigin || seed.predictedOrigin.trim() === '') && (
+                    <div className="bg-amber-950/30 border border-amber-900/50 rounded-lg p-2.5 mb-1 flex items-start gap-2">
+                      <span className="material-symbols-outlined text-amber-500 !text-[16px] mt-0.5">warning</span>
+                      <p className="text-xs text-amber-200/90 leading-relaxed">
+                        We couldn't confidently locate this artist. Please assign an origin manually.
+                      </p>
+                    </div>
+                  )}
                   <CountryFilterDropdown 
                     value={origins[seed.id] || ''} 
                     onChange={v => setOrigins(prev => ({ ...prev, [seed.id]: v }))} 

@@ -2787,7 +2787,7 @@ const App: React.FC = () => {
     bypassDisambiguation: boolean = false,
     disambiguationGenres?: Record<string, string>
   ) => {
-    if (!isRegeneration && !bypassDisambiguation && !bypassTokenConfirmation && !skipCacheLookup) {
+    if (!bypassTokenConfirmation) {
       sessionTokenApprovedRef.current = false;
     }
 
@@ -3325,6 +3325,7 @@ const App: React.FC = () => {
       if (!sessionTokenApprovedRef.current) {
         const confirmed = await confirmTokenUsage(isLiveSynthesisTemp ? 'live_synthesis' : 'generation', [], artistList, undefined, false);
         if (!confirmed || confirmed === 'back') {
+          sessionTokenApprovedRef.current = false;
           setIsLoading(false);
           isHydratingSessionRef.current = false;
           isProjectLoadingRef.current = false;
@@ -3386,6 +3387,7 @@ const App: React.FC = () => {
       });
 
       if (!finalOrigins) {
+        sessionTokenApprovedRef.current = false;
         setActiveNodeIds(prevActiveNodeIds);
         setSeedArtists(prevSeedArtists);
         return;
@@ -4093,6 +4095,7 @@ const App: React.FC = () => {
           );
         }
         if (!confirmed || controller.signal.aborted) {
+          sessionTokenApprovedRef.current = false;
           setIsLoading(false);
           const legacyArtists = [...fullHits, ...enrichmentRequired];
           if (legacyArtists.length > 0) {
@@ -4813,6 +4816,7 @@ const App: React.FC = () => {
 
       isHydratingSessionRef.current = false;
     } catch (err: any) {
+      sessionTokenApprovedRef.current = false;
       if (err.name !== 'AbortError' && !(controller && controller.signal.aborted)) {
         if (err.message && err.message.includes("discover any relational bridges")) {
           setFilterGuidanceState({
