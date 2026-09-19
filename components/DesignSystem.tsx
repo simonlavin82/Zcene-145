@@ -1540,7 +1540,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                 focus:ring-primary
                                             </span>
                                         </div>
-                                    </div>               </div>
+                                    </div>
                                 </div>
                             </div>
 
