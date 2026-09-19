@@ -897,8 +897,9 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         // The client fully owns both purchase-tier buttons. AI-provided raw domains are never
         // rendered directly — hijacked official sites return HTTP 200 and bypass the http-sanitiser.
         // Both search destinations are structurally guaranteed never to 404 or redirect to spam.
-        const bandcampSearchUrl = `https://bandcamp.com/search?q=${encodeURIComponent(node.id)}`;
-        const officialSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(node.id)}+official+website`;
+        const artistDisplay = getArtistDisplayName(details, node);
+        const bandcampSearchUrl = `https://bandcamp.com/search?q=${encodeURIComponent(artistDisplay)}`;
+        const officialSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(artistDisplay)}+official+website`;
 
         // Null-filter AI-supplied links (strips empty strings, non-http, legacy cache junk).
         // AI is instructed not to include Official Website or Bandcamp, so aiLinks should
