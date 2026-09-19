@@ -690,12 +690,9 @@ const GraphPage: React.FC<GraphPageProps> = ({
   const [selectedSeedArtists, setSelectedSeedArtists] = useState<SelectedArtist[]>(() =>
     seedArtists.split('::').map(a => a.trim()).filter(Boolean).map(name => ({ name, enabled: true }))
   );
-  const [prevSeedArtists, setPrevSeedArtists] = useState(seedArtists);
-
-  if (seedArtists !== prevSeedArtists) {
-    setPrevSeedArtists(seedArtists);
+  useEffect(() => {
     setSelectedSeedArtists(seedArtists.split('::').map(a => a.trim()).filter(Boolean).map(name => ({ name, enabled: true })));
-  }
+  }, [seedArtists]);
   
   const handleToggleArtist = (artistName: string) => {
     setSelectedSeedArtists(prev => prev.map(a => 

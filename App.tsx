@@ -7563,6 +7563,7 @@ const App: React.FC = () => {
         <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Graph ? 'z-10' : 'z-0 opacity-0 pointer-events-none'}`}>
           {graphData && (
             <GraphPage
+              key={currentProjectId || (isViewingShare ? 'share' : 'new-project')}
               areFiltersChanged={areFiltersChanged}
               data={formattedGraphData || { nodes: [], links: [] }} baseGraph={baseGraph} libraryArtists={libraryArtists} seedArtists={seedArtists}
               onRegenerate={(n) => handleGenerateGraph(n, true, graphData)} 
