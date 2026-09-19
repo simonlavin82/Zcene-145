@@ -2356,7 +2356,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                         onTouchStart={handleTouchStart}
                         onTouchMove={handleTouchMove}
                         onTouchEnd={handleTouchEnd}
-                        style={isMagazineViewOpen ? { touchAction: 'pan-y', overscrollBehaviorY: 'auto' } : {}}
+                        style={isMagazineViewOpen ? { touchAction: 'pan-y', overscrollBehaviorY: 'auto', overflowAnchor: 'none' } : {}}
                     >
                         {isMagazineViewOpen && graphData?.synthesisRationale && (
                             <div className="max-w-[1400px] mx-auto pt-12 md:pt-16 pb-12 mb-8 border-b border-zinc-800/50 transition-opacity duration-500 ease-in-out opacity-100 px-0">
