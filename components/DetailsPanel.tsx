@@ -2218,7 +2218,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                 isMagazineViewOpen ? (
                     <div className={`${LayoutSizes.topHeader} flex-shrink-0 border-b border-zinc-600/50 bg-zinc-900 z-[60] relative px-4 md:px-6 lg:px-8`}>
                         <div className="max-w-[1400px] mx-auto w-full h-full flex items-center justify-between relative">
-                            <div className="flex items-center gap-4 overflow-hidden w-full h-full">
+                            <div className="flex items-center gap-4 overflow-hidden w-full h-full -mx-1 px-1">
                                 <div className="flex items-center gap-4 flex-grow animate-in fade-in slide-in-from-left-4 duration-500">
                                     <div className="flex items-center gap-3 flex-grow max-w-md">
                                         <div className="relative flex-grow">
