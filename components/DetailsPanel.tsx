@@ -1907,6 +1907,18 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         }
     }, [selectedNode, activeNodes]);
 
+    useEffect(() => {
+        if (isMagazineViewOpen && selectedNode) {
+            const timeoutId = setTimeout(() => {
+                const targetEl = document.getElementById(`magazine-card-${selectedNode.id}`);
+                if (targetEl) {
+                    targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }, 50);
+            return () => clearTimeout(timeoutId);
+        }
+    }, [selectedNode, isMagazineViewOpen]);
+
     const handleSendMessage = async (nodeId: string, message: string, forceLive = false) => {
         const currentMode = getChatMode(nodeId);
         if (currentMode === 'live' && liveMessageCount >= 3 && !forceLive) {
@@ -2437,6 +2449,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                     return (
                                         <div 
                                             key={node.id} 
+                                            id={`magazine-card-${node.id}`}
                                             className={`${renderMode === 'magazine' 
                                                 ? 'inline-block w-full max-w-2xl text-left' 
                                                 : 'w-full h-full flex-shrink-0 overflow-hidden'}`}
