@@ -204,7 +204,7 @@ export const HighlightedText: React.FC<{ text: string; query?: string }> = ({ te
         <>
             {parts.map((part, index) =>
                 part.toLowerCase() === query.toLowerCase() ? (
-                    <span key={index} className="bg-[#eaff00] text-brand-black font-bold px-0.5 rounded-sm">
+                    <span key={index} className="bg-primary text-brand-black font-bold px-0.5 rounded-sm">
                         {part}
                     </span>
                 ) : (
