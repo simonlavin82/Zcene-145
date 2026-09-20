@@ -1082,7 +1082,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                     </div>
                 </div>
 
-                <div className={`flex-grow min-h-0 relative ${isFullScreenMode ? 'p-0' : 'px-4 pt-6 pb-8'}`}>
+                <div className={`flex-grow min-h-0 relative ${isFullScreenMode ? 'p-0 overflow-x-clip' : 'px-4 pt-6 pb-8'}`}>
                     {isLoading && !isLocked && details && (
                         <div className={`absolute inset-0 z-30 flex flex-col items-center justify-center text-center space-y-8 h-full ${isFullScreenMode ? 'bg-zinc-900/50 backdrop-blur-sm' : 'bg-zinc-900/90 backdrop-blur-sm bg-zinc-900'}`}>
                             <LoadingSpinner 
@@ -1751,7 +1751,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         return (
             <div 
               key="magazine-card"
-              className="w-full min-w-[320px] bg-transparent relative break-words h-fit overflow-x-clip overflow-y-visible mb-4 md:mb-6 break-inside-avoid transition-all duration-500"
+              className="w-full min-w-[320px] bg-transparent relative break-words h-fit overflow-y-visible mb-4 md:mb-6 break-inside-avoid transition-all duration-500"
               style={{ '--scene-accent': localDominantColor } as React.CSSProperties}
             >
                 {panelContent}
