@@ -980,7 +980,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         <>
             <div className="flex flex-col min-h-full">
                 {/* 1. Action Icons (Not Sticky) — ref measures its rendered height for the dynamic scroll target */}
-                <div ref={actionIconsRef} className={`px-4 pt-3 ${isFullScreenMode ? 'bg-transparent' : 'bg-zinc-900'} z-20 flex-shrink-0 ${isFullScreenMode ? 'md:px-6' : ''}`}>
+                <div ref={actionIconsRef} className={`pt-3 ${isFullScreenMode ? 'px-0 bg-transparent' : 'px-4 bg-zinc-900'} z-20 flex-shrink-0`}>
                     <div className={`flex items-center justify-end gap-1 flex-shrink-0 ${isFullScreenMode ? 'w-fit ml-auto' : ''}`}>
                             {isArtistNode && details && (
                                 <button
@@ -1047,8 +1047,8 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                     className={`transition-all duration-300 flex-shrink-0 sticky z-40 ${
                         isFullScreenMode 
                             ? isHeaderStuck 
-                                ? 'top-2 w-fit bg-zinc-900/80 backdrop-blur-md border border-zinc-700 rounded-xl px-5 py-2 shadow-lg ml-4 md:ml-6' 
-                                : 'top-0 w-full bg-transparent border-transparent px-4 md:px-6 pt-2 pb-3'
+                                ? 'top-2 w-fit bg-zinc-900/80 backdrop-blur-md border border-zinc-700 rounded-xl px-5 py-2 shadow-lg ml-0' 
+                                : 'top-0 w-full bg-transparent border-transparent px-0 pt-2 pb-3'
                             : `top-0 w-full px-4 ${isHeaderStuck ? 'py-2' : 'pt-2 pb-3'} border-b border-zinc-800/50 bg-zinc-900`
                     }`}
                 >
@@ -1186,7 +1186,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             {imageTier !== 'placeholder' && currentImageUrl && (
                                 <div className="relative mx-auto w-fit">
                                     {/* Ambient Glow */}
-                                    <div className={`absolute ${isFullScreenMode ? 'inset-[-40%] rounded-xl opacity-20 blur-3xl' : 'inset-[-20%] rounded-full opacity-40 blur-3xl'} transition-colors duration-1000 z-0 pointer-events-none`} style={{ backgroundColor: 'var(--scene-accent, transparent)' }} />
+                                    <div className={`absolute ${isFullScreenMode ? 'inset-[-20%] rounded-full opacity-30 blur-2xl' : 'inset-[-20%] rounded-full opacity-40 blur-3xl'} transition-colors duration-1000 z-0 pointer-events-none`} style={{ backgroundColor: 'var(--scene-accent, transparent)' }} />
                                     <div className={`w-40 h-40 sm:w-44 sm:h-44 flex-shrink-0 mx-auto bg-zinc-900 overflow-hidden relative ring-1 ring-white/10 ring-inset rounded-lg group z-10 ${isFullScreenMode ? 'shadow-[0_40px_100px_0px_rgba(0,0,0,1),0_10px_30px_0px_rgba(0,0,0,0.8)]' : ''}`}>
                                     {/* Temporary Loading Skeleton while image loads */}
                                     {!imgLoaded && (
