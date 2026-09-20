@@ -1053,7 +1053,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                     <div className={`transition-all duration-300 ${
                         isFullScreenMode
                             ? isHeaderStuck
-                                ? 'w-fit bg-zinc-900/80 backdrop-blur-md border border-zinc-700 rounded-xl px-5 py-2 shadow-lg -ml-5'
+                                ? 'w-fit bg-zinc-900/80 backdrop-blur-md border border-zinc-700 rounded-xl px-4 md:px-5 py-2 shadow-lg -ml-4 md:-ml-5'
                                 : 'w-full bg-transparent border border-transparent px-0 pt-2 pb-3'
                             : `w-full px-4 ${isHeaderStuck ? 'py-2' : 'pt-2 pb-3'}`
                     }`}>
@@ -2611,7 +2611,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     {isMagazineViewOpen && (
                         <div 
                             onClick={scrollToTop} 
-                            className={`fixed bottom-8 right-8 z-50 flex flex-col items-center gap-1 text-zinc-500 hover:text-zinc-300 transition-all duration-300 cursor-pointer ${showScrollTop ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}
+                            className={`fixed bottom-24 md:bottom-8 right-4 md:right-8 z-50 flex flex-col items-center gap-1 text-zinc-500 hover:text-zinc-300 transition-all duration-300 cursor-pointer ${showScrollTop ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}
                             aria-label="Scroll to top"
                         >
                             <span className="material-symbols-outlined !text-[20px]">expand_less</span>
