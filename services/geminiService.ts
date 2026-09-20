@@ -1992,7 +1992,26 @@ export const streamLocalHeuristicChat = async (
         }
     }
     else if (msg === "what sound do they have?") {
-        fullText = `They are primarily known for pushing the boundaries of ${genres}, blending raw aggression with technical precision.`;
+        const summary = details?.summary || "";
+        const sentences = summary.split(/(?<=[.!?])\s+/);
+        
+        const musicKeywords = ['riffs', 'vocals', 'vocal', 'melodic', 'breakdowns', 'rhythms', 'sound', 'samples', 'lyrical', 'lyrics'];
+        const soundSentence = sentences.find(s => {
+            const lower = s.toLowerCase();
+            return musicKeywords.some(kw => lower.includes(kw));
+        });
+
+        if (soundSentence) {
+            fullText = `Operating within ${genres}, ${soundSentence.charAt(0).toLowerCase() + soundSentence.slice(1)}`;
+        } else {
+            const hash = currentNode.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+            const templates = [
+                `They are primarily known for pushing the boundaries of ${genres}, blending raw aggression with technical precision.`,
+                `Rooted deeply in ${genres}, their sonic signature relies on high-energy output and dynamic musicianship.`,
+                `They have carved out a unique space within ${genres} by delivering a sound that is both abrasive and compelling.`
+            ];
+            fullText = templates[hash % templates.length];
+        }
     }
     else if (msg === "recent history?") {
         fullText = `Formed around ${year} in ${origin}, ${nodeName} carved a unique space within ${genres}. ${peers.length > 0 ? `They often shared the stage and scene with peers like ${peers.join(" and ")}.` : ""}`;
