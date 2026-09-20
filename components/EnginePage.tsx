@@ -335,13 +335,10 @@ the entire dataset, the app evolves existing visual structures.
       that hasn't fully bound to its port yet, eliminating terminal ECONNREFUSED spam on mount.
 
 14. DETERMINISTIC INSTANT AI & DEEP CONNECTIONS:
-    - Architecture Clarification: The "Instant AI" feature relies entirely on local, deterministic heuristics parsing local graph state. It is strictly separate from the token-based, paid "Deep Web" LLM API feature.
-    - Entity Prompt Branching: Query chips are dynamically rendered based on the node's entity type. Artists and Record Labels possess completely distinct, context-aware prompt sets instead of sharing generic fallback questions.
-    - Graph Proximity Synthesis: Connection query chips evaluate peer relationships by traversing exact graph edges in a prioritized strict hierarchy (Mutual Labels > Shared Genres > Explicit Topological Links > Broad Geographic Origins). This synthesizes intelligent relational context locally.
-    - Artist Sound Synthesis (Bio Extraction): For the "What sound do they have?" prompt, the engine scans the raw Wikipedia/editorial summary for musical keywords (e.g., "riffs", "vocals"). It extracts that precise sentence to craft a deeply tailored response. If extraction fails, it falls back to a deterministic template rotation to prevent visual repetition.
-    - Label Legacy Synthesis: For a label's "legacy" prompt, the engine organically extracts the first two sentences of the node's summary via dynamic punctuation splitting. This ensures a punchy, conversational takeaway without robotic wrap-up strings.
-    - Universal Plain-Text Formatting: Before streaming any localized Instant AI response to the UI, the engine executes a regex cascade to strip all Markdown artifacts (bolding, italics, links). This guarantees a pristine, uninterrupted plain-text chat bubble experience.
-    - Component-Bound State Isolation: Critical chat states (like \`chatLoadingMap\`) and spent \`clickedChips\` are firmly isolated per \`NodeDetailsCard\`. This ensures perfectly decoupled, simultaneous multi-node investigations without cross-panel layout bleeding.
+    - Instead of open-ended regex routing, the free Instant AI mode operates on a strictly structured query chip architecture.
+    - Graph Proximity Synthesis: Connection query chips evaluate peer relationships by traversing exact graph edges in a prioritized strict hierarchy (Mutual Labels > Shared Genres > Explicit Topological Links > Broad Geographic Origins). This synthesizes intelligent relational context locally without incurring external LLM inference costs.
+    - Component-Bound State Isolation: Critical chat states such as \`chatLoadingMap\`, spent \`clickedChips\`, and dynamic node dropdown lists are firmly isolated per \`NodeDetailsCard\`. This ensures perfectly decoupled, simultaneous multi-node investigations without cross-panel layout bleeding or "phantom reflows".
+    - Interactive Select UI: Dynamic queries utilize a styled native \`<select>\` dropdown masked as a standard query chip, allowing users to intuitively cross-examine any graph peer directly from their active context window.
 
 15. NETWORK STREAMING & DECOMPRESSION FIX:
     - The browser fetch for Live AI generation was aborting precisely due to 'ERR_CONTENT_DECODING_FAILED'.
@@ -858,27 +855,28 @@ The Zcene AI curation and client proxy pipelines implement a 4-tier defense-in-d
 `;
 
 const CONVERSATIONAL_INTELLIGENCE_DOCUMENTATION = `
-The "Consult Zcene AI" chat feature implements a zero-friction persona 
-designed for expert-friend utility.
+Zcene provides two distinct layers of conversational intelligence: the free, heuristically-driven "Instant AI" and the token-based "Deep Web" live query engine.
 
-1. ATMOSPHERIC CONCISION:
-   Responses are capped at 50 words and a single paragraph. This prevents 
-   "Chatbot Fatigue" and keeps the user focused on the discovery graph.
+--- INSTANT AI (LOCAL HEURISTICS) ---
+The Instant AI relies entirely on local graph traversal and deterministic heuristics, requiring zero external API calls:
 
-2. UK ENGLISH STANDARDIZATION:
-   To maintain a consistent cultural tone, the model is locked to UK 
-   English spelling and idiom (e.g., 'Analysing', 'Colour').
+1. ENTITY PROMPT BRANCHING:
+   Query chips dynamically adapt based on entity type. Artists and Record Labels receive completely distinct, context-aware prompt sets.
 
-3. PURE TEXT GATING:
-   Zcene strictly forbids markdown (bolding, headers, lists) and symbolic 
-   clutter in chat. This ensures the conversational layer maintains 
-   a raw, editorial feel that contrasts with the structured metadata 
-   of the Deep Cut.
+2. BIO-EXTRACTED SOUND SYNTHESIS (ARTISTS):
+   For the artist "sound" prompt, the engine scans the raw biography for musical keywords (e.g., "riffs", "vocals"). It surgically extracts that precise sentence to craft a deeply tailored response. If extraction fails, it falls back to a deterministic template rotation.
 
-4. NO REPLIES / PURE INSIGHT:
-   The model is forbidden from using conversational fillers (e.g., "Hi," 
-   "Sure thing"). It starts immediately with the musical insight to 
-   maximize information density.
+3. TWO-SENTENCE LEGACY SYNTHESIS (LABELS):
+   For a record label's "legacy" prompt, the engine dynamically splits the biography based on punctuation and extracts the first two sentences, ensuring a punchy, conversational takeaway.
+
+4. UNIVERSAL PLAIN-TEXT FORMATTING:
+   Before streaming any Instant AI response, the engine executes a regex cascade to strip all Markdown artifacts (bolding, italics, links) for a pristine UI experience.
+
+--- DEEP WEB AI (LIVE LLM) ---
+When users switch to Deep Web queries, the engine enforces strict persona constraints:
+- Atmospheric Concision: Responses are capped at 50 words.
+- UK English Standardization: Enforces regional spelling.
+- Pure Text Gating: Strips all markdown and conversational fillers for maximum information density.
 `;
 
 const ADMIN_OVERRIDE_DOCUMENTATION = `
