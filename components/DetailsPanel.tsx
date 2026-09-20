@@ -1421,7 +1421,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 <div className="pt-6">
                                     <button 
                                         onClick={() => setIsCatalogOpen(!isCatalogOpen)}
-                                        className="flex w-full items-center justify-between font-semibold text-primary text-[10px] uppercase tracking-widest mb-4 hover:text-primary-light transition-colors"
+                                        className="flex w-full items-center justify-between font-semibold text-zinc-500 text-[10px] uppercase tracking-widest mb-4 hover:text-zinc-300 transition-colors"
                                     >
                                         <span>{isLabelNode ? 'Label Catalog' : 'Artist Catalog'}</span>
                                         <span className="material-symbols-outlined !text-[16px]">
@@ -1535,7 +1535,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     <div className="space-y-4 bg-zinc-950/20 border border-zinc-800/50 p-4">
                                             <div ref={chatContainerRef} className="max-h-60 overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-zinc-800 pr-1">
                                         {chatHistory.length === 0 ? (
-                                            <p className="text-sm text-zinc-500 text-center py-4 italic">
+                                            <p className="text-xs text-zinc-500 pb-2">
                                                 Inquire about history or relative scene positioning.
                                             </p>
                                         ) : (
