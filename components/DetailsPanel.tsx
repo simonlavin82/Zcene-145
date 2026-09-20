@@ -1429,7 +1429,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                         </span>
                                     </button>
                                     {isCatalogOpen && (
-                                        <div className="p-5 bg-primary/5 border border-primary">
+                                        <div className="p-5 bg-primary/5 border-[0.5px] border-primary">
                                             <div className="flex flex-col gap-3">
                                                 {/* Watch on YouTube button (Hidden for labels) */}
                                             {!isLabelNode && (() => {
@@ -1533,9 +1533,6 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     </div>
                                 ) : (
                                     <div className="flex flex-col">
-                                        <p className="text-sm text-zinc-400 mb-4">
-                                            Inquire about history or relative scene positioning.
-                                        </p>
                                         <div className="flex flex-col bg-zinc-950/20 border border-zinc-800/50 p-4">
                                             <div ref={chatContainerRef} className={`max-h-60 overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-zinc-800 pr-1 ${chatHistory.length === 0 ? 'hidden' : 'mb-4'}`}>
                                             {chatHistory.length === 0 ? null : (
