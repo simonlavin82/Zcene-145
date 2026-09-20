@@ -10,7 +10,12 @@ test.describe('Zcene UI and State Tests', () => {
     const createBtn = page.getByRole('button', { name: /Create/i }).first();
     await expect(createBtn).toBeVisible({ timeout: 15000 });
 
-    // 3. Ensure the page title is correct to confirm the app loaded
-    await expect(page).toHaveTitle(/Zcene/);
+    // 3. Click Create (unauthenticated users will trigger Google Auth popup)
+    const popupPromise = page.waitForEvent('popup', { timeout: 15000 });
+    await createBtn.click();
+    const popup = await popupPromise;
+    
+    // 4. Ensure the popup is the Google Auth flow
+    await expect(popup).toHaveTitle(/Sign in/i);
   });
 });
