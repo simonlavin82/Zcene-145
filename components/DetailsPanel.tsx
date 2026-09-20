@@ -1418,66 +1418,68 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             )}
 
                             {links.purchase.length > 0 && (
-                                <div className={`bg-primary/5 border-2 border-primary/20 relative transition-all ${isCatalogOpen ? 'p-5' : 'p-4'}`}>
+                                <div className="pt-6">
                                     <button 
                                         onClick={() => setIsCatalogOpen(!isCatalogOpen)}
-                                        className="absolute -top-3 left-4 bg-zinc-900 px-2 text-[10px] font-semibold uppercase tracking-widest text-primary rounded-none flex items-center gap-1 cursor-pointer hover:text-primary-light transition-colors"
+                                        className="flex w-full items-center justify-between font-semibold text-primary text-[10px] uppercase tracking-widest mb-4 hover:text-primary-light transition-colors"
                                     >
-                                        {isLabelNode ? 'Label Catalog' : 'Artist Catalog'}
-                                        <span className="material-symbols-outlined !text-[14px]">
+                                        <span>{isLabelNode ? 'Label Catalog' : 'Artist Catalog'}</span>
+                                        <span className="material-symbols-outlined !text-[16px]">
                                             {isCatalogOpen ? 'expand_less' : 'expand_more'}
                                         </span>
                                     </button>
                                     {isCatalogOpen && (
-                                        <div className="flex flex-col gap-3">
-                                            {/* Watch on YouTube button (Hidden for labels) */}
-                                        {!isLabelNode && (() => {
-                                            const artistDisplay = getArtistDisplayName(details, node);
-                                            const youtubeVideoId = details.youtubeVideoId;
-                                            const youtubeUrl = youtubeVideoId && youtubeVideoId.length === 11
-                                                ? `https://www.youtube.com/watch?v=${youtubeVideoId}`
-                                                : `https://www.youtube.com/results?search_query=${encodeURIComponent(artistDisplay)}+official+music+video`;
+                                        <div className="p-5 bg-primary/5 border-2 border-primary/20">
+                                            <div className="flex flex-col gap-3">
+                                                {/* Watch on YouTube button (Hidden for labels) */}
+                                            {!isLabelNode && (() => {
+                                                const artistDisplay = getArtistDisplayName(details, node);
+                                                const youtubeVideoId = details.youtubeVideoId;
+                                                const youtubeUrl = youtubeVideoId && youtubeVideoId.length === 11
+                                                    ? `https://www.youtube.com/watch?v=${youtubeVideoId}`
+                                                    : `https://www.youtube.com/results?search_query=${encodeURIComponent(artistDisplay)}+official+music+video`;
 
-                                            return (
-                                                <a 
-                                                    href={youtubeUrl} 
-                                                    target="_blank" 
-                                                    rel="noopener noreferrer" 
-                                                    className="flex items-center justify-start px-4 py-2 rounded-xl font-medium transition-all active:scale-[0.98] bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white border border-zinc-700"
-                                                >
-                                                    <div className="flex items-center gap-3">
-                                                        <span className="material-symbols-outlined !text-[18px]">
-                                                            play_circle
-                                                        </span>
-                                                        <span className="px-0.5 tracking-normal text-sm">
-                                                            YouTube
-                                                        </span>
-                                                    </div>
-                                                </a>
-                                            );
-                                        })()}
+                                                return (
+                                                    <a 
+                                                        href={youtubeUrl} 
+                                                        target="_blank" 
+                                                        rel="noopener noreferrer" 
+                                                        className="flex items-center justify-start px-4 py-2 rounded-xl font-medium transition-all active:scale-[0.98] bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white border border-zinc-700"
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            <span className="material-symbols-outlined !text-[18px]">
+                                                                play_circle
+                                                            </span>
+                                                            <span className="px-0.5 tracking-normal text-sm">
+                                                                YouTube
+                                                            </span>
+                                                        </div>
+                                                    </a>
+                                                );
+                                            })()}
 
-                                        {links.purchase.map((link, i) => {
-                                            const isBandcamp = /bandcamp/i.test(link.site);
-                                            return (
-                                                <a 
-                                                    key={i} 
-                                                    href={link.url} 
-                                                    target="_blank" 
-                                                    rel="noopener noreferrer" 
-                                                    className="flex items-center justify-start px-4 py-2 rounded-xl font-medium transition-all active:scale-[0.98] bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white border border-zinc-700"
-                                                >
-                                                    <div className="flex items-center gap-3">
-                                                        <span className="material-symbols-outlined !text-[18px]">
-                                                            {isBandcamp ? 'album' : 'public'}
-                                                        </span>
-                                                        <span className="px-0.5 tracking-normal text-sm">
-                                                            {isBandcamp ? 'Bandcamp' : link.site}
-                                                        </span>
-                                                    </div>
-                                                </a>
-                                            );
-                                        })}
+                                            {links.purchase.map((link, i) => {
+                                                const isBandcamp = /bandcamp/i.test(link.site);
+                                                return (
+                                                    <a 
+                                                        key={i} 
+                                                        href={link.url} 
+                                                        target="_blank" 
+                                                        rel="noopener noreferrer" 
+                                                        className="flex items-center justify-start px-4 py-2 rounded-xl font-medium transition-all active:scale-[0.98] bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white border border-zinc-700"
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            <span className="material-symbols-outlined !text-[18px]">
+                                                                {isBandcamp ? 'album' : 'public'}
+                                                            </span>
+                                                            <span className="px-0.5 tracking-normal text-sm">
+                                                                {isBandcamp ? 'Bandcamp' : link.site}
+                                                            </span>
+                                                        </div>
+                                                    </a>
+                                                );
+                                            })}
+                                            </div>
                                         </div>
                                     )}
                                 </div>
