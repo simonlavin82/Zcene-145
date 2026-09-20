@@ -1043,7 +1043,10 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
                 <div ref={sentinelRef} className="w-full h-[1px] -mt-[1px] pointer-events-none" />
                 {/* 2. Artist Name & Pills */}
-                <div className={`px-4 ${isHeaderStuck ? 'py-2' : 'pt-2 pb-3'} transition-all duration-300 border-b ${isFullScreenMode ? 'bg-zinc-950/95 border-zinc-700/80 backdrop-blur-md' : 'border-zinc-800/50 bg-zinc-900'} flex-shrink-0 sticky top-0 z-40 ${isFullScreenMode ? 'md:px-6' : ''}`}>
+                <div 
+                    className={`px-4 ${isHeaderStuck ? 'py-2' : 'pt-2 pb-3'} transition-all duration-300 border-b ${isFullScreenMode ? 'bg-gradient-to-b from-zinc-950/95 via-zinc-950/60 to-transparent backdrop-blur-md border-none' : 'border-zinc-800/50 bg-zinc-900'} flex-shrink-0 sticky top-0 z-40 ${isFullScreenMode ? 'md:px-6' : ''}`}
+                    style={isFullScreenMode ? { maskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to bottom, black 60%, transparent 100%)' } : undefined}
+                >
                     <div className={`flex flex-col ${isHeaderStuck ? 'gap-0' : 'gap-3'} min-w-0 flex-grow transition-all duration-300`}>
                             <div className="flex items-center gap-2">
                                 <div 
@@ -1178,8 +1181,8 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             {imageTier !== 'placeholder' && currentImageUrl && (
                                 <div className="relative mx-auto w-fit">
                                     {/* Ambient Glow */}
-                                    <div className={`absolute ${isFullScreenMode ? 'inset-[-10%] rounded-xl opacity-80 blur-xl drop-shadow-2xl' : 'inset-[-20%] rounded-full opacity-40 blur-3xl'} transition-colors duration-1000 z-0 pointer-events-none`} style={{ backgroundColor: 'var(--scene-accent, transparent)' }} />
-                                    <div className="w-40 h-40 sm:w-44 sm:h-44 flex-shrink-0 mx-auto bg-zinc-900 overflow-hidden relative ring-1 ring-white/10 ring-inset rounded-lg group z-10">
+                                    <div className={`absolute ${isFullScreenMode ? 'inset-[-10%] rounded-xl opacity-50 blur-xl' : 'inset-[-20%] rounded-full opacity-40 blur-3xl'} transition-colors duration-1000 z-0 pointer-events-none`} style={{ backgroundColor: 'var(--scene-accent, transparent)' }} />
+                                    <div className={`w-40 h-40 sm:w-44 sm:h-44 flex-shrink-0 mx-auto bg-zinc-900 overflow-hidden relative ring-1 ring-white/10 ring-inset rounded-lg group z-10 ${isFullScreenMode ? 'shadow-[0_20px_50px_-10px_rgba(0,0,0,0.8)]' : ''}`}>
                                     {/* Temporary Loading Skeleton while image loads */}
                                     {!imgLoaded && (
                                         <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center p-6 text-center bg-zinc-900 overflow-hidden z-10">
@@ -1418,7 +1421,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             )}
 
                             {links.purchase.length > 0 && (
-                                <div className={`${isFullScreenMode ? 'bg-zinc-900/30 border border-zinc-800 rounded-xl p-4 mt-6' : 'pt-6'}`}>
+                                <div className="pt-6">
                                     <button 
                                         onClick={() => setIsCatalogOpen(!isCatalogOpen)}
                                         className="flex w-full items-center justify-between font-semibold text-zinc-500 text-[10px] uppercase tracking-widest mb-4 hover:text-zinc-300 transition-colors"
@@ -1486,7 +1489,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             )}
 
 
-                            <div className={`${isFullScreenMode ? 'bg-zinc-900/30 border border-zinc-800 rounded-xl p-4 mt-6' : 'pt-6 border-t border-zinc-800'}`}>
+                            <div className="pt-6 border-t border-zinc-800">
                                 <button 
                                     onClick={() => setIsConnectionsOpen(!isConnectionsOpen)}
                                     className="flex w-full items-center justify-between font-semibold text-zinc-500 text-[10px] uppercase tracking-widest mb-4 hover:text-zinc-300 transition-colors"
