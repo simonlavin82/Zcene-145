@@ -1487,10 +1487,11 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 </div>
                             )}
 
-                            <div className="pt-6 border-t border-zinc-800">
-                                <h4 className="font-semibold text-zinc-500 text-[10px] uppercase tracking-widest mb-4">
-                                    Deep Connections
-                                </h4>
+                            {!isFullScreenMode && (
+                                <div className="pt-6 border-t border-zinc-800">
+                                    <h4 className="font-semibold text-zinc-500 text-[10px] uppercase tracking-widest mb-4">
+                                        Deep Connections
+                                    </h4>
                                 
                                 {isGuest ? (
                                     <div className="flex flex-col items-center justify-center text-center p-6 bg-zinc-900/50 rounded-none border border-zinc-800/80">
@@ -1696,6 +1697,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     </div>
                                 )}
                             </div>
+                            )}
                         </div>
                     )}
                 </div>
