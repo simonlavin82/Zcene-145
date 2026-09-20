@@ -616,7 +616,12 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     useEffect(() => { setExpandedProfileId(null); }, [node.id]);
     
     const { queryChips, connectionPeers } = useMemo(() => {
-        const chips = [
+        const chips = isLabelNode ? [
+            "What is their legacy in the scene?",
+            "What genres do they specialize in?",
+            "Who are their most notable artists?",
+            "When were they founded and where?"
+        ] : [
             "Where are they from?",
             "What sound do they have?",
             "What labels are they on?",
@@ -644,7 +649,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         const connectionPeers = Array.from(new Set(peers)).map(peer => cleanArtistDisplayName(peer, graphData.nodes)).sort();
         
         return { queryChips: chips, connectionPeers };
-    }, [node.id, graphData.links, graphData.nodes]);
+    }, [node.id, isLabelNode, graphData.links, graphData.nodes]);
 
     const [isListening, setIsListening] = useState(false);
     const [imageTier, setImageTier] = useState<'source' | 'placeholder'>('source');
