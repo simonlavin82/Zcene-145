@@ -1411,32 +1411,6 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                         {isLabelNode ? 'Label Catalog' : 'Artist Catalog'}
                                     </div>
                                     <div className="flex flex-col gap-3">
-                                        {links.purchase.map((link, i) => {
-                                            const isBandcamp = /bandcamp/i.test(link.site);
-                                            return (
-                                                <a 
-                                                    key={i} 
-                                                    href={link.url} 
-                                                    target="_blank" 
-                                                    rel="noopener noreferrer" 
-                                                    className={`flex items-center justify-center px-4 py-2 rounded-xl font-medium transition-all active:scale-[0.98] ${
-                                                        isBandcamp 
-                                                            ? 'bg-primary text-brand-black hover:opacity-90' 
-                                                            : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white border border-zinc-700'
-                                                    }`}
-                                                >
-                                                    <div className="flex items-center gap-3">
-                                                        <span className="material-symbols-outlined !text-[18px]">
-                                                            {isBandcamp ? 'shopping_bag' : 'public'}
-                                                        </span>
-                                                        <span className="px-0.5 tracking-normal text-sm">
-                                                            {isBandcamp ? `Shop on ${link.site}` : link.site}
-                                                        </span>
-                                                    </div>
-                                                </a>
-                                            );
-                                        })}
-
                                         {/* Watch on YouTube button (Hidden for labels) */}
                                         {!isLabelNode && (() => {
                                             const artistDisplay = getArtistDisplayName(details, node);
@@ -1450,19 +1424,41 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                     href={youtubeUrl} 
                                                     target="_blank" 
                                                     rel="noopener noreferrer" 
-                                                    className="flex items-center justify-center px-4 py-2 rounded-xl font-medium transition-all active:scale-[0.98] bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white border border-zinc-700"
+                                                    className="flex items-center justify-start px-4 py-2 rounded-xl font-medium transition-all active:scale-[0.98] bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white border border-zinc-700"
                                                 >
                                                     <div className="flex items-center gap-3">
                                                         <span className="material-symbols-outlined !text-[18px]">
                                                             play_circle
                                                         </span>
                                                         <span className="px-0.5 tracking-normal text-sm">
-                                                            Watch on YouTube
+                                                            YouTube
                                                         </span>
                                                     </div>
                                                 </a>
                                             );
                                         })()}
+
+                                        {links.purchase.map((link, i) => {
+                                            const isBandcamp = /bandcamp/i.test(link.site);
+                                            return (
+                                                <a 
+                                                    key={i} 
+                                                    href={link.url} 
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer" 
+                                                    className="flex items-center justify-start px-4 py-2 rounded-xl font-medium transition-all active:scale-[0.98] bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white border border-zinc-700"
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="material-symbols-outlined !text-[18px]">
+                                                            {isBandcamp ? 'album' : 'public'}
+                                                        </span>
+                                                        <span className="px-0.5 tracking-normal text-sm">
+                                                            {isBandcamp ? 'Bandcamp' : link.site}
+                                                        </span>
+                                                    </div>
+                                                </a>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             )}
