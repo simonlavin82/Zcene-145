@@ -1044,7 +1044,13 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                 <div ref={sentinelRef} className="w-full h-[1px] -mt-[1px] pointer-events-none" />
                 {/* 2. Artist Name & Pills */}
                 <div 
-                    className={`px-4 ${isHeaderStuck ? 'py-2' : 'pt-2 pb-3'} transition-all duration-300 border-b ${isFullScreenMode ? 'bg-transparent border-transparent md:px-6' : 'border-zinc-800/50 bg-zinc-900 sticky top-0 z-40'} flex-shrink-0`}
+                    className={`transition-all duration-300 flex-shrink-0 sticky z-40 ${
+                        isFullScreenMode 
+                            ? isHeaderStuck 
+                                ? 'top-2 w-fit bg-zinc-900/95 backdrop-blur-md border border-zinc-700/50 rounded-full px-5 py-2 shadow-xl ml-4 md:ml-6' 
+                                : 'top-0 w-full bg-transparent border-transparent px-4 md:px-6 pt-2 pb-3'
+                            : `top-0 w-full px-4 ${isHeaderStuck ? 'py-2' : 'pt-2 pb-3'} border-b border-zinc-800/50 bg-zinc-900`
+                    }`}
                 >
                     <div className={`flex flex-col ${isHeaderStuck ? 'gap-0' : 'gap-3'} min-w-0 flex-grow transition-all duration-300`}>
                             <div className="flex items-center gap-2">
