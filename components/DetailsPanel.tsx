@@ -980,8 +980,8 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         <>
             <div className="flex flex-col min-h-full">
                 {/* 1. Action Icons (Not Sticky) — ref measures its rendered height for the dynamic scroll target */}
-                <div ref={actionIconsRef} className={`px-4 pt-3 bg-zinc-900 z-20 flex-shrink-0 ${isFullScreenMode ? 'md:px-6' : ''}`}>
-                    <div className="flex items-center justify-end gap-1 flex-shrink-0">
+                <div ref={actionIconsRef} className={`px-4 pt-3 ${isFullScreenMode ? 'bg-transparent' : 'bg-zinc-900'} z-20 flex-shrink-0 ${isFullScreenMode ? 'md:px-6' : ''}`}>
+                    <div className={`flex items-center justify-end gap-1 flex-shrink-0 ${isFullScreenMode ? 'bg-zinc-900/60 border border-zinc-700 rounded-xl backdrop-blur-sm p-1.5 w-fit ml-auto' : ''}`}>
                             {isArtistNode && details && (
                                 <button
                                     onClick={() => handleAddToTaste(node, details)}
@@ -1043,7 +1043,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
                 <div ref={sentinelRef} className="w-full h-[1px] -mt-[1px] pointer-events-none" />
                 {/* 2. Artist Name & Pills */}
-                <div className={`px-4 ${isHeaderStuck ? 'py-2' : 'pt-2 pb-3'} transition-all duration-300 border-b border-zinc-800/50 bg-zinc-900 flex-shrink-0 sticky top-0 z-40 ${isFullScreenMode ? 'md:px-6' : ''}`}>
+                <div className={`px-4 ${isHeaderStuck ? 'py-2' : 'pt-2 pb-3'} transition-all duration-300 border-b ${isFullScreenMode ? 'bg-zinc-950/95 border-zinc-700/80 backdrop-blur-md' : 'border-zinc-800/50 bg-zinc-900'} flex-shrink-0 sticky top-0 z-40 ${isFullScreenMode ? 'md:px-6' : ''}`}>
                     <div className={`flex flex-col ${isHeaderStuck ? 'gap-0' : 'gap-3'} min-w-0 flex-grow transition-all duration-300`}>
                             <div className="flex items-center gap-2">
                                 <div 
@@ -1070,7 +1070,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
                 <div className={`px-4 flex-grow min-h-0 relative ${isFullScreenMode ? 'pt-6 pb-4 md:px-8' : 'pt-6 pb-8'}`}>
                     {isLoading && !isLocked && details && (
-                        <div className="absolute inset-0 bg-zinc-900/90 backdrop-blur-sm z-30 flex flex-col items-center justify-center text-center space-y-8 h-full bg-zinc-900">
+                        <div className={`absolute inset-0 z-30 flex flex-col items-center justify-center text-center space-y-8 h-full ${isFullScreenMode ? 'bg-zinc-900/50 backdrop-blur-sm' : 'bg-zinc-900/90 backdrop-blur-sm bg-zinc-900'}`}>
                             <LoadingSpinner 
                                 steps={DETAIL_THINKING_STEPS}
                                 subtext="Typically takes 20–30 seconds to dig for details."
@@ -1178,7 +1178,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             {imageTier !== 'placeholder' && currentImageUrl && (
                                 <div className="relative mx-auto w-fit">
                                     {/* Ambient Glow */}
-                                    <div className="absolute inset-[-20%] rounded-full opacity-40 blur-3xl transition-colors duration-1000 z-0 pointer-events-none" style={{ backgroundColor: 'var(--scene-accent, transparent)' }} />
+                                    <div className={`absolute ${isFullScreenMode ? 'inset-[-10%] rounded-xl opacity-80 blur-xl drop-shadow-2xl' : 'inset-[-20%] rounded-full opacity-40 blur-3xl'} transition-colors duration-1000 z-0 pointer-events-none`} style={{ backgroundColor: 'var(--scene-accent, transparent)' }} />
                                     <div className="w-40 h-40 sm:w-44 sm:h-44 flex-shrink-0 mx-auto bg-zinc-900 overflow-hidden relative ring-1 ring-white/10 ring-inset rounded-lg group z-10">
                                     {/* Temporary Loading Skeleton while image loads */}
                                     {!imgLoaded && (
@@ -1418,7 +1418,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             )}
 
                             {links.purchase.length > 0 && (
-                                <div className="pt-6">
+                                <div className={`${isFullScreenMode ? 'bg-zinc-900/30 border border-zinc-800 rounded-xl p-4 mt-6' : 'pt-6'}`}>
                                     <button 
                                         onClick={() => setIsCatalogOpen(!isCatalogOpen)}
                                         className="flex w-full items-center justify-between font-semibold text-zinc-500 text-[10px] uppercase tracking-widest mb-4 hover:text-zinc-300 transition-colors"
@@ -1486,7 +1486,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             )}
 
 
-                            <div className="pt-6 border-t border-zinc-800">
+                            <div className={`${isFullScreenMode ? 'bg-zinc-900/30 border border-zinc-800 rounded-xl p-4 mt-6' : 'pt-6 border-t border-zinc-800'}`}>
                                 <button 
                                     onClick={() => setIsConnectionsOpen(!isConnectionsOpen)}
                                     className="flex w-full items-center justify-between font-semibold text-zinc-500 text-[10px] uppercase tracking-widest mb-4 hover:text-zinc-300 transition-colors"
@@ -1737,7 +1737,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         return (
             <div 
               key="magazine-card"
-              className="w-full min-w-[320px] bg-zinc-900 relative break-words h-fit border border-zinc-800/80 overflow-visible mb-4 md:mb-6 break-inside-avoid transition-all duration-500"
+              className="w-full min-w-[320px] bg-transparent relative break-words h-fit overflow-visible mb-4 md:mb-6 break-inside-avoid transition-all duration-500"
               style={{ '--scene-accent': localDominantColor } as React.CSSProperties}
             >
                 {panelContent}
