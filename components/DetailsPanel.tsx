@@ -610,6 +610,13 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     const [chatInput, setChatInput] = useState('');
     const [showAllChips, setShowAllChips] = useState(false);
     const [clickedChips, setClickedChips] = useState<Set<string>>(new Set());
+    const [isCatalogOpen, setIsCatalogOpen] = useState(!isFullScreenMode);
+    const [isConnectionsOpen, setIsConnectionsOpen] = useState(!isFullScreenMode);
+
+    useEffect(() => {
+        setIsCatalogOpen(!isFullScreenMode);
+        setIsConnectionsOpen(!isFullScreenMode);
+    }, [isFullScreenMode]);
     // Tracks which profile row is expanded on mobile — only one at a time.
     const [expandedProfileId, setExpandedProfileId] = useState<string | null>(null);
     // Reset expanded row when navigating to a different artist card.
@@ -1411,12 +1418,19 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             )}
 
                             {links.purchase.length > 0 && (
-                                <div className="p-5 bg-primary/5 border-2 border-primary/20 relative">
-                                    <div className="absolute -top-3 left-4 bg-zinc-900 px-2 text-[10px] font-semibold uppercase tracking-widest text-primary rounded-none">
+                                <div className={`bg-primary/5 border-2 border-primary/20 relative transition-all ${isCatalogOpen ? 'p-5' : 'p-4'}`}>
+                                    <button 
+                                        onClick={() => setIsCatalogOpen(!isCatalogOpen)}
+                                        className="absolute -top-3 left-4 bg-zinc-900 px-2 text-[10px] font-semibold uppercase tracking-widest text-primary rounded-none flex items-center gap-1 cursor-pointer hover:text-primary-light transition-colors"
+                                    >
                                         {isLabelNode ? 'Label Catalog' : 'Artist Catalog'}
-                                    </div>
-                                    <div className="flex flex-col gap-3">
-                                        {/* Watch on YouTube button (Hidden for labels) */}
+                                        <span className="material-symbols-outlined !text-[14px]">
+                                            {isCatalogOpen ? 'expand_less' : 'expand_more'}
+                                        </span>
+                                    </button>
+                                    {isCatalogOpen && (
+                                        <div className="flex flex-col gap-3">
+                                            {/* Watch on YouTube button (Hidden for labels) */}
                                         {!isLabelNode && (() => {
                                             const artistDisplay = getArtistDisplayName(details, node);
                                             const youtubeVideoId = details.youtubeVideoId;
@@ -1464,18 +1478,25 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                 </a>
                                             );
                                         })}
-                                    </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
 
-                            {!isFullScreenMode && (
-                                <div className="pt-6 border-t border-zinc-800">
-                                    <h4 className="font-semibold text-zinc-500 text-[10px] uppercase tracking-widest mb-4">
-                                        Deep Connections
-                                    </h4>
-                                
-                                {isGuest ? (
+                            <div className="pt-6 border-t border-zinc-800">
+                                <button 
+                                    onClick={() => setIsConnectionsOpen(!isConnectionsOpen)}
+                                    className="flex w-full items-center justify-between font-semibold text-zinc-500 text-[10px] uppercase tracking-widest mb-4 hover:text-zinc-300 transition-colors"
+                                >
+                                    <span>Deep Connections</span>
+                                    <span className="material-symbols-outlined !text-[16px]">
+                                        {isConnectionsOpen ? 'expand_less' : 'expand_more'}
+                                    </span>
+                                </button>
+                                {isConnectionsOpen && (
+                                    <>
+                                        {isGuest ? (
                                     <div className="flex flex-col items-center justify-center text-center p-6 bg-zinc-900/50 rounded-none border border-zinc-800/80">
                                         <span className="material-symbols-outlined !text-4xl text-primary/50 mb-3">lock</span>
                                         <h5 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-200 mb-2">DEEPER CONNECTION</h5>
@@ -1678,8 +1699,9 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     </div>
                                     </div>
                                 )}
+                                    </>
+                                )}
                             </div>
-                            )}
                         </div>
                     )}
                 </div>
