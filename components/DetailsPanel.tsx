@@ -195,6 +195,37 @@ const SafeYoutubePlayer: React.FC<SafeYoutubePlayerProps> = ({ videoId, artistDi
   );
 };
 
+// --- Helper: Highlighted Text ---
+export const HighlightedText: React.FC<{ text: string; query?: string }> = ({ text, query }) => {
+    if (!query || !query.trim()) return <>{text}</>;
+    
+    const parts = text.split(new RegExp(`(${query})`, 'gi'));
+    return (
+        <>
+            {parts.map((part, index) =>
+                part.toLowerCase() === query.toLowerCase() ? (
+                    <span key={index} className="bg-[#eaff00] text-brand-black font-bold px-0.5 rounded-sm">
+                        {part}
+                    </span>
+                ) : (
+                    <span key={index}>{part}</span>
+                )
+            )}
+        </>
+    );
+};
+
+export const renderWithHighlights = (children: React.ReactNode, query?: string): React.ReactNode => {
+    if (!query || !query.trim()) return children;
+    
+    return React.Children.map(children, child => {
+        if (typeof child === 'string') {
+            return <HighlightedText text={child} query={query} />;
+        }
+        return child;
+    });
+};
+
 // --- Sub-component: Single Detail Card ---
 interface NodeDetailsCardProps {
   node: Node;
@@ -223,6 +254,7 @@ interface NodeDetailsCardProps {
   isInStack: boolean;
   onToggleStack: (node: Node, link?: string) => void;
   onToggleMagazineView?: () => void;
+  searchQuery?: string;
   isGuest?: boolean;
   user?: any;
   onAuthRequest?: () => void;
@@ -389,7 +421,7 @@ const ProfileRow: React.FC<ProfileRowProps> = ({ data, colorHex, isSmallScreen, 
 export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
   node, details, isLoading, isGlobalLoading, graphData, libraryArtists, seedArtists, onAddArtist, isSmallScreen, 
   onClose, onNodeClick, onExtendNode, onNavigate, 
-  chatHistory, onSendMessage, isChatLoading, chatMode, onChatModeChange, liveMessageCount, onDeleteMessage, onClearChat, isFullScreenMode = false, isHero = false, isInStack, onToggleStack, onToggleMagazineView, isGuest = false, onAuthRequest, user, userTaste, isAdmin = false,
+  chatHistory, onSendMessage, isChatLoading, chatMode, onChatModeChange, liveMessageCount, onDeleteMessage, onClearChat, isFullScreenMode = false, isHero = false, isInStack, onToggleStack, onToggleMagazineView, searchQuery, isGuest = false, onAuthRequest, user, userTaste, isAdmin = false,
   onUpdateTasteProfile, onShowToast, onOpenTasteModal, isActive = true, onStashArtist, onOpenStackDrawer, stack
 }) => {
     const handleAddToTaste = async (node: Node, details: NodeDetails) => {
@@ -1008,7 +1040,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     title="Click to copy name"
                                 >
                                     <h3 className={`${isHeaderStuck ? 'text-base font-medium' : headerSizeClass} text-white leading-[0.9] py-1 break-words min-w-0 ${isFullScreenMode ? '' : 'transition-all duration-300'}`}>
-                                        {getArtistDisplayName(details, node)}
+                                        <HighlightedText text={getArtistDisplayName(details, node) || ''} query={searchQuery} />
                                     </h3>
                                     <span className={`material-symbols-outlined !text-[16px] flex-shrink-0 transition-all duration-300 ${isIdCopied ? 'text-primary opacity-100 scale-110' : 'text-zinc-500 opacity-0 group-hover:opacity-100'}`}>
                                         {isIdCopied ? 'check' : 'content_copy'}
@@ -1195,7 +1227,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 return quoteText ? (
                                     <div className="pt-2">
                                         <p className="italic text-zinc-100 leading-tight font-serif tracking-tight text-xl">
-                                            "{quoteText}"
+                                            "<HighlightedText text={quoteText} query={searchQuery} />"
                                         </p>
                                     </div>
                                 ) : null;
@@ -1278,7 +1310,11 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             <div className="space-y-4">
                                 <h4 className="font-bold text-zinc-500 text-[10px] uppercase tracking-[0.2em]">Bio</h4>
                                 <div className={`leading-relaxed text-zinc-300 markdown-bio ${isHero ? 'text-[clamp(0.875rem,1vw,1rem)] font-normal column-count-1 md:column-count-2 md:gap-12' : 'text-sm'}`}>
-                                    <Markdown>{details.summary}</Markdown>
+                                    <Markdown components={{
+                                        p: ({node, children, ...props}) => <p className="mb-4" {...props}>{renderWithHighlights(children, searchQuery)}</p>,
+                                        strong: ({node, children, ...props}) => <strong className="font-semibold text-white" {...props}>{renderWithHighlights(children, searchQuery)}</strong>,
+                                        li: ({node, children, ...props}) => <li className="marker:text-primary" {...props}>{renderWithHighlights(children, searchQuery)}</li>
+                                    }}>{details.summary}</Markdown>
                                 </div>
                             </div>
 
@@ -2417,10 +2453,10 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                 <div className="markdown-bio text-base leading-relaxed text-zinc-300 columns-1 md:columns-2 lg:columns-3 gap-12 font-sans">
                                     <Markdown
                                         components={{
-                                            p: ({node, ...props}) => <p className="mb-6 break-inside-avoid" {...props} />,
-                                            strong: ({node, ...props}) => <strong className="font-semibold text-white" {...props} />,
+                                            p: ({node, children, ...props}) => <p className="mb-6 break-inside-avoid" {...props}>{renderWithHighlights(children, magazineSearchQuery)}</p>,
+                                            strong: ({node, children, ...props}) => <strong className="font-semibold text-white" {...props}>{renderWithHighlights(children, magazineSearchQuery)}</strong>,
                                             ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-6 break-inside-avoid space-y-2" {...props} />,
-                                            li: ({node, ...props}) => <li className="marker:text-primary" {...props} />
+                                            li: ({node, children, ...props}) => <li className="marker:text-primary" {...props}>{renderWithHighlights(children, magazineSearchQuery)}</li>
                                         }}
                                     >
                                         {sanitizedRationaleText}
@@ -2503,6 +2539,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 isInStack={isInStack}
                                                 onToggleStack={onToggleStack}
                                                 onToggleMagazineView={() => onMagazineViewToggle(!isMagazineViewOpen)}
+                                                searchQuery={isMagazineViewOpen ? magazineSearchQuery : undefined}
                                                 isGuest={isGuest}
                                                 user={user}
                                                 onAuthRequest={onAuthRequest}
