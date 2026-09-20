@@ -1076,7 +1076,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                         </div>
                 </div>
 
-                <div className={`px-4 flex-grow min-h-0 relative ${isFullScreenMode ? 'pt-6 pb-4 md:px-8' : 'pt-6 pb-8'}`}>
+                <div className={`flex-grow min-h-0 relative ${isFullScreenMode ? 'p-0' : 'px-4 pt-6 pb-8'}`}>
                     {isLoading && !isLocked && details && (
                         <div className={`absolute inset-0 z-30 flex flex-col items-center justify-center text-center space-y-8 h-full ${isFullScreenMode ? 'bg-zinc-900/50 backdrop-blur-sm' : 'bg-zinc-900/90 backdrop-blur-sm bg-zinc-900'}`}>
                             <LoadingSpinner 
@@ -2482,7 +2482,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                 <h1 className="text-7xl font-bold tracking-tighter text-white mb-10 leading-tight" style={{ wordBreak: 'break-word' }}>
                                     {projectName || (seedArtists && seedArtists.length > 0 ? seedArtists.join(' / ') : 'Magazine')}
                                 </h1>
-                                <div className="markdown-bio text-base leading-relaxed text-zinc-300 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 font-sans">
+                                <div className="markdown-bio text-base leading-relaxed text-zinc-300 columns-1 md:columns-2 lg:columns-3 gap-12 font-sans">
                                     <Markdown
                                         components={{
                                             p: ({node, children, ...props}) => <p className="mb-6 break-inside-avoid" {...props}>{renderWithHighlights(children, magazineSearchQuery)}</p>,
@@ -2499,7 +2499,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                         {/* 4) DEEP CUT CARDS GRID (Z-INDEX 10) */}
                         <div 
                             className={`${renderMode === 'magazine' 
-                                ? `grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 items-start max-w-[1400px] mx-auto pt-4 md:pt-6 lg:pt-8 pb-12 transition-opacity duration-300 ease-in-out ${!isMagazineViewOpen || isTransitioning ? 'opacity-0 min-w-[100vw]' : 'opacity-100 w-full'}` 
+                                ? `grid grid-cols-[repeat(auto-fit,minmax(min(100%,400px),1fr))] gap-6 items-start max-w-[1400px] mx-auto pt-4 md:pt-6 lg:pt-8 pb-12 transition-opacity duration-300 ease-in-out ${!isMagazineViewOpen || isTransitioning ? 'opacity-0 min-w-[100vw]' : 'opacity-100 w-full'}` 
                                 : `flex h-full w-full transition-all duration-300 ease-in-out will-change-transform touch-pan-y ${isTransitioning ? 'opacity-0' : 'opacity-100'}`
                             } relative z-10`}
                             style={renderMode === 'panel' ? { 
@@ -2603,13 +2603,14 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
 
                     </div>
                     {isMagazineViewOpen && (
-                        <button 
+                        <div 
                             onClick={scrollToTop} 
-                            className={`fixed bottom-8 right-8 z-50 p-3 rounded-full bg-zinc-900/80 border border-zinc-700 text-zinc-400 hover:text-white backdrop-blur-md shadow-2xl transition-all duration-300 ${showScrollTop ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}
+                            className={`fixed bottom-8 right-8 z-50 flex flex-col items-center gap-1 text-zinc-500 hover:text-zinc-300 transition-all duration-300 cursor-pointer ${showScrollTop ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}
                             aria-label="Scroll to top"
                         >
-                            <span className="material-symbols-outlined text-[20px]">arrow_upward</span>
-                        </button>
+                            <span className="material-symbols-outlined !text-[20px]">expand_less</span>
+                            <span className="text-[9px] font-bold uppercase tracking-[0.3em] ml-[0.3em]">Top</span>
+                        </div>
                     )}
                 </div>
             )}
