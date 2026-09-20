@@ -1997,6 +1997,22 @@ export const streamLocalHeuristicChat = async (
     else if (msg === "recent history?") {
         fullText = `Formed around ${year} in ${origin}, ${nodeName} carved a unique space within ${genres}. ${peers.length > 0 ? `They often shared the stage and scene with peers like ${peers.join(" and ")}.` : ""}`;
     }
+    else if (msg === "when were they founded and where?") {
+        fullText = `${nodeName} was founded in ${year} in ${origin}, quickly becoming a cornerstone of the regional and global scene.`;
+    }
+    else if (msg === "what is their legacy in the scene?") {
+        fullText = details?.summary 
+            ? details.summary 
+            : `As a foundational cornerstone of ${genres}, ${nodeName} brought raw energy and visionary curation to the scene.`;
+    }
+    else if (msg === "what genres do they specialize in?") {
+        fullText = `${nodeName} specializes in pushing the boundaries of ${genres}, cultivating a distinct and influential catalog.`;
+    }
+    else if (msg === "who are their most notable artists?") {
+        fullText = peers.length > 0 
+            ? `They have been instrumental in launching and sustaining the careers of pioneering acts like ${peers.join(", ")}.`
+            : `They have been instrumental in launching and sustaining the careers of pioneering acts within the ${genres} community.`;
+    }
     else {
         // Fallback for anything else
         fullText = `As a foundational cornerstone of ${genres}, ${nodeName} brought raw energy to the scene.`;
