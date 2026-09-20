@@ -1047,7 +1047,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                     className={`transition-all duration-300 flex-shrink-0 sticky z-40 ${
                         isFullScreenMode 
                             ? isHeaderStuck 
-                                ? 'top-2 w-fit bg-zinc-900/95 backdrop-blur-md border border-zinc-700/50 rounded-full px-5 py-2 shadow-xl ml-4 md:ml-6' 
+                                ? 'top-2 w-fit bg-zinc-900/80 backdrop-blur-md border border-zinc-700 rounded-xl px-5 py-2 shadow-lg ml-4 md:ml-6' 
                                 : 'top-0 w-full bg-transparent border-transparent px-4 md:px-6 pt-2 pb-3'
                             : `top-0 w-full px-4 ${isHeaderStuck ? 'py-2' : 'pt-2 pb-3'} border-b border-zinc-800/50 bg-zinc-900`
                     }`}
@@ -1245,7 +1245,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     : null;
                                 const quoteText = hasInsight ? details.recommendationReason : summaryFallback;
                                 return quoteText ? (
-                                    <div className="pt-2">
+                                    <div className="pt-2 relative z-10">
                                         <p className="italic text-zinc-100 leading-tight font-serif tracking-tight text-xl">
                                             "<HighlightedText text={quoteText} query={searchQuery} />"
                                         </p>
@@ -1745,7 +1745,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         return (
             <div 
               key="magazine-card"
-              className="w-full min-w-[320px] bg-transparent relative break-words h-fit overflow-visible mb-4 md:mb-6 break-inside-avoid transition-all duration-500"
+              className="w-full min-w-[320px] bg-transparent relative break-words h-fit overflow-x-clip overflow-y-visible mb-4 md:mb-6 break-inside-avoid transition-all duration-500"
               style={{ '--scene-accent': localDominantColor } as React.CSSProperties}
             >
                 {panelContent}
@@ -1829,6 +1829,22 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
 
     const [renderMode, setRenderMode] = useState<'magazine' | 'panel'>(isMagazineViewOpen ? 'magazine' : 'panel');
     const [isTransitioning, setIsTransitioning] = useState(false);
+    const [showScrollTop, setShowScrollTop] = useState(false);
+
+    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        if (e.currentTarget.scrollTop > 500) {
+            setShowScrollTop(true);
+        } else {
+            setShowScrollTop(false);
+        }
+    };
+
+    const scrollToTop = () => {
+        const container = document.getElementById('magazine-scroll-container');
+        if (container) {
+            container.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    };
 
     useEffect(() => {
         if (isMagazineViewOpen) {
@@ -2438,7 +2454,8 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
 
                     <div 
                         id="magazine-scroll-container"
-                        className={`flex-grow relative min-h-0 ${isMagazineViewOpen ? 'overflow-y-auto px-4 md:px-6 lg:px-8 scrollbar-thin scrollbar-thumb-zinc-800' : 'overflow-hidden'}`}
+                        className={`flex-grow relative min-h-0 ${isMagazineViewOpen ? 'overflow-y-auto px-4 md:px-6 lg:px-8 scrollbar-thin scrollbar-thumb-zinc-800 overflow-x-clip' : 'overflow-hidden'}`}
+                        onScroll={isMagazineViewOpen ? handleScroll : undefined}
                         onTouchStart={handleTouchStart}
                         onTouchMove={handleTouchMove}
                         onTouchEnd={handleTouchEnd}
@@ -2465,7 +2482,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                 <h1 className="text-7xl font-bold tracking-tighter text-white mb-10 leading-tight" style={{ wordBreak: 'break-word' }}>
                                     {projectName || (seedArtists && seedArtists.length > 0 ? seedArtists.join(' / ') : 'Magazine')}
                                 </h1>
-                                <div className="markdown-bio text-base leading-relaxed text-zinc-300 columns-1 md:columns-2 lg:columns-3 gap-12 font-sans">
+                                <div className="markdown-bio text-base leading-relaxed text-zinc-300 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 font-sans">
                                     <Markdown
                                         components={{
                                             p: ({node, children, ...props}) => <p className="mb-6 break-inside-avoid" {...props}>{renderWithHighlights(children, magazineSearchQuery)}</p>,
@@ -2479,10 +2496,12 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                 </div>
                             </div>
                         )}
+                        {/* 4) DEEP CUT CARDS GRID (Z-INDEX 10) */}
                         <div 
                             className={`${renderMode === 'magazine' 
-                                ? `grid grid-cols-[repeat(auto-fit,minmax(min(100%,400px),1fr))] gap-6 items-start max-w-[1400px] mx-auto pt-4 md:pt-6 lg:pt-8 pb-12 transition-opacity duration-300 ease-in-out ${!isMagazineViewOpen || isTransitioning ? 'opacity-0 min-w-[100vw]' : 'opacity-100 w-full'}` 
-                                : `flex h-full w-full transition-all duration-300 ease-in-out will-change-transform touch-pan-y ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}`}
+                                ? `grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 items-start max-w-[1400px] mx-auto pt-4 md:pt-6 lg:pt-8 pb-12 transition-opacity duration-300 ease-in-out ${!isMagazineViewOpen || isTransitioning ? 'opacity-0 min-w-[100vw]' : 'opacity-100 w-full'}` 
+                                : `flex h-full w-full transition-all duration-300 ease-in-out will-change-transform touch-pan-y ${isTransitioning ? 'opacity-0' : 'opacity-100'}`
+                            } relative z-10`}
                             style={renderMode === 'panel' ? { 
                                 transform: `translateX(-${viewedIndex * 100}%)`,
                                 overscrollBehaviorX: 'none'
@@ -2583,6 +2602,15 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
 
 
                     </div>
+                    {isMagazineViewOpen && (
+                        <button 
+                            onClick={scrollToTop} 
+                            className={`fixed bottom-8 right-8 z-50 p-3 rounded-full bg-zinc-900/80 border border-zinc-700 text-zinc-400 hover:text-white backdrop-blur-md shadow-2xl transition-all duration-300 ${showScrollTop ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}
+                            aria-label="Scroll to top"
+                        >
+                            <span className="material-symbols-outlined text-[20px]">arrow_upward</span>
+                        </button>
+                    )}
                 </div>
             )}
             
