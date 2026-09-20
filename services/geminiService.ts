@@ -2001,8 +2001,9 @@ export const streamLocalHeuristicChat = async (
         fullText = `${nodeName} was founded in ${year} in ${origin}, quickly becoming a cornerstone of the regional and global scene.`;
     }
     else if (msg === "what is their legacy in the scene?") {
-        fullText = details?.summary 
-            ? details.summary 
+        const sentences = details?.summary ? details.summary.split(/(?<=[.!?])\s+/) : [];
+        fullText = sentences.length > 0 
+            ? sentences.slice(0, 2).join(' ')
             : `As a foundational cornerstone of ${genres}, ${nodeName} brought raw energy and visionary curation to the scene.`;
     }
     else if (msg === "what genres do they specialize in?") {
@@ -2018,6 +2019,12 @@ export const streamLocalHeuristicChat = async (
         fullText = `As a foundational cornerstone of ${genres}, ${nodeName} brought raw energy to the scene.`;
     }
     
+    // Universal Markdown Stripper for Instant AI
+    fullText = fullText
+        .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold
+        .replace(/\*(.*?)\*/g, '$1')     // Remove italics
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1'); // Flatten links
+
     let current = "";
     const words = fullText.split(" ");
     for (let i = 0; i < words.length; i++) {
