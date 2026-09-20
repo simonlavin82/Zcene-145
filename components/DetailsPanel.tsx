@@ -1044,14 +1044,19 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                 <div ref={sentinelRef} className="w-full h-[1px] -mt-[1px] pointer-events-none" />
                 {/* 2. Artist Name & Pills */}
                 <div 
-                    className={`transition-all duration-300 flex-shrink-0 sticky z-40 ${
+                    className={`transition-all duration-300 flex-shrink-0 sticky z-40 w-full ${
                         isFullScreenMode 
-                            ? isHeaderStuck 
-                                ? 'top-2 w-fit bg-zinc-900/80 backdrop-blur-md border border-zinc-700 rounded-xl px-5 py-2 shadow-lg ml-0' 
-                                : 'top-0 w-full bg-transparent border-transparent px-0 pt-2 pb-3'
-                            : `top-0 w-full px-4 ${isHeaderStuck ? 'py-2' : 'pt-2 pb-3'} border-b border-zinc-800/50 bg-zinc-900`
+                            ? isHeaderStuck ? 'top-2' : 'top-0'
+                            : `top-0 border-b ${isHeaderStuck ? 'border-zinc-800/50 bg-zinc-900' : 'border-transparent bg-transparent'}`
                     }`}
                 >
+                    <div className={`transition-all duration-300 ${
+                        isFullScreenMode
+                            ? isHeaderStuck
+                                ? 'w-fit bg-zinc-900/80 backdrop-blur-md border border-zinc-700 rounded-xl px-5 py-2 shadow-lg -ml-5'
+                                : 'w-full bg-transparent border border-transparent px-0 pt-2 pb-3'
+                            : `w-full px-4 ${isHeaderStuck ? 'py-2' : 'pt-2 pb-3'}`
+                    }`}>
                     <div className={`flex flex-col ${isHeaderStuck ? 'gap-0' : 'gap-3'} min-w-0 flex-grow transition-all duration-300`}>
                             <div className="flex items-center gap-2">
                                 <div 
@@ -1074,6 +1079,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 {isLibraryArtist && <span className="text-[10px] font-semibold uppercase tracking-[0.2em] bg-sky-500/20 text-sky-400 px-2 py-0.5 border border-sky-500/30 rounded-md">Library</span>}
                             </div>
                         </div>
+                    </div>
                 </div>
 
                 <div className={`flex-grow min-h-0 relative ${isFullScreenMode ? 'p-0' : 'px-4 pt-6 pb-8'}`}>
