@@ -272,22 +272,7 @@ export const NODE_DETAILS_SCHEMA = {
       },
       required: ["genre", "origin", "founded", "notableArtists"]
     },
-    links: {
-      type: Type.ARRAY,
-      description: "Wikipedia link MUST be index 0 if found. Do NOT include Official Website or Bandcamp entries — those are handled by the client. Only include grounded reference links.",
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          site: { type: Type.STRING },
-          url: {
-            type: Type.STRING,
-            nullable: true,
-            description: "The verified, active URL. MUST be null if the URL cannot be confirmed. Do NOT guess or fabricate."
-          }
-        },
-        required: ["site"]
-      }
-    },
+
     discography: {
       type: Type.ARRAY,
       items: {
@@ -483,9 +468,7 @@ export const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed infor
         "founded": "YYYY",
         "notableArtists": ["Artist Name", ...]
       },
-      "links": [
-        {"site": "Wikipedia", "url": "https://en.wikipedia.org/wiki/..."}
-      ],
+
       "discography": [{"albumName": "Name", "releaseYear": "YYYY"}],
       "recommendationReason": "Curator insight about their role in this scene.",
       "youtubeVideoId": "dQw4w9WgXcQ",
@@ -505,17 +488,6 @@ export const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed infor
     - ZERO HALLUCINATION (MANDATORY): You must only return a youtubeVideoId if you can extract the exact 11-character ID from a YouTube watch URL (e.g., youtube.com/watch?v=...) present in your Google Search results. If you do not see the exact URL or video ID in the search results, set youtubeVideoId to null. NEVER guess or hallucinate a video ID under any circumstances.
     - AMBIGUITY RESOLUTION (CRITICAL): For entities with common or ambiguous names (such as "Missing Link"), you MUST combine the entity name with its Connected Network (e.g., its genre, label, or the Seed Artist) in your search query to prevent entity collisions. For example, search "Missing Link hardcore punk band" or "Missing Link Triple B Records" instead of just "Missing Link band".
 
-    WIKIPEDIA ORDERING RULE (MANDATORY):
-    If a Wikipedia link is found, it MUST be the very first item (index 0) in the links array.
-
-    OFFICIAL WEBSITE RULE:
-    Do NOT include an "Official Website" entry in your links array. The client application handles Official Website routing independently and safely.
-
-    BANDCAMP RULE:
-    Do NOT include a "Bandcamp" entry in your links array. The client application handles Bandcamp routing independently.
-
-    WIKIPEDIA / OTHER INFO LINKS:
-    Include grounded Wikipedia or other reference links if confirmed by Google Search results. Wikipedia MUST be index 0.
 
     CURATOR TONE & VARIETY (CRITICAL):
     - BREVITY: Max 25 words. Use exactly ONE snappy, high-impact sentence.

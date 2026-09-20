@@ -1468,24 +1468,6 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 </div>
                             )}
 
-                            {links.info.length > 0 && (
-                                <div>
-                                    <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-widest">Metadata</h4>
-                                    <div className="flex flex-wrap gap-4 pt-1">
-                                        {links.info.map((link, i) => (
-                                            <a 
-                                                key={i} 
-                                                href={link.url} 
-                                                target="_blank" 
-                                                rel="noopener noreferrer" 
-                                                className="text-zinc-400 active:text-primary transition-all text-sm underline underline-offset-4 decoration-zinc-700 font-medium"
-                                            >
-                                                {link.site}
-                                            </a>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
 
                             {!isFullScreenMode && (
                                 <div className="pt-6 border-t border-zinc-800">
