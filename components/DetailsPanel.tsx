@@ -1429,7 +1429,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                         </span>
                                     </button>
                                     {isCatalogOpen && (
-                                        <div className="p-5 bg-primary/5 border-2 border-primary/20">
+                                        <div className="p-5 bg-primary/5 border-2 border-primary">
                                             <div className="flex flex-col gap-3">
                                                 {/* Watch on YouTube button (Hidden for labels) */}
                                             {!isLabelNode && (() => {
@@ -1532,13 +1532,13 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                         )}
                                     </div>
                                 ) : (
-                                    <div className="space-y-4 bg-zinc-950/20 border border-zinc-800/50 p-4">
+                                    <div className="flex flex-col">
+                                        <p className="text-sm text-zinc-400 mb-4">
+                                            Inquire about history or relative scene positioning.
+                                        </p>
+                                        <div className="space-y-4 bg-zinc-950/20 border border-zinc-800/50 p-4">
                                             <div ref={chatContainerRef} className="max-h-60 overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-zinc-800 pr-1">
-                                        {chatHistory.length === 0 ? (
-                                            <p className="text-xs text-zinc-500 pb-2">
-                                                Inquire about history or relative scene positioning.
-                                            </p>
-                                        ) : (
+                                        {chatHistory.length === 0 ? null : (
                                             chatHistory.map((msg, i) => (
                                                 <div key={i} className={`flex flex-col group relative ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                                                     <div className={`max-w-[90%] px-4 py-2 text-sm ${msg.role === 'user' ? 'bg-zinc-800 text-zinc-200 border-r-4 border-primary' : 'bg-zinc-900/50 text-zinc-300 border-l-4 border-zinc-600 shadow-sm'} rounded-none`}>
@@ -1698,6 +1698,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                 )}
                                             </div>
                                         )}
+                                    </div>
                                     </div>
                                     </div>
                                 )}
