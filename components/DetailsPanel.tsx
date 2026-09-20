@@ -2611,7 +2611,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     {isMagazineViewOpen && (
                         <div 
                             onClick={scrollToTop} 
-                            className={`absolute bottom-24 md:bottom-12 right-6 md:right-8 z-50 flex flex-col items-center gap-1 text-zinc-500 hover:text-zinc-300 transition-all duration-300 cursor-pointer ${showScrollTop ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}
+                            className={`fixed bottom-24 md:bottom-12 right-6 md:right-8 z-50 flex flex-col items-center gap-1 text-zinc-500 hover:text-zinc-300 transition-all duration-300 cursor-pointer ${showScrollTop ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}
                             aria-label="Scroll to top"
                         >
                             <span className="material-symbols-outlined !text-[20px]">expand_less</span>
