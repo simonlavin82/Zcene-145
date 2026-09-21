@@ -135,10 +135,10 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
           <div className="flex items-start justify-between gap-3">
             <div className="flex flex-row items-center gap-4 flex-1 min-w-0">
               <div className="flex flex-col gap-1.5 min-w-0 flex-1">
-                <h3 className="text-base font-medium line-clamp-2 pr-2 transition-colors" style={{ color: 'var(--scene-accent-title, white)' }}>
+                <h3 className="text-base font-medium line-clamp-2 pr-2 transition-colors" style={{ color: 'var(--scene-accent-title, white)', textShadow: '0 1px 3px rgba(0,0,0,0.95)' }}>
                   {displayTitle}
                 </h3>
-                <p className="font-mono text-[10px] text-zinc-400 font-normal truncate uppercase tracking-widest">
+                <p className="font-mono text-[10px] text-zinc-400 font-normal truncate uppercase tracking-widest" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.95)' }}>
                   {project.updatedAt ? `Edited ${formatSystemTimestamp(project.updatedAt)}` : 'New Project'}
                 </p>
                 {project.status === 'curating' || project.status === 'pending' || (project.status !== 'failed' && project.status !== 'completed' && project.seedArtists) ? (
