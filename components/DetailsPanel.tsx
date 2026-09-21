@@ -1192,8 +1192,8 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             {imageTier !== 'placeholder' && currentImageUrl && (
                                 <div className="relative mx-auto w-fit">
                                     {/* Ambient Glow */}
-                                    <div className={`absolute ${isFullScreenMode ? 'inset-[-20%] rounded-full opacity-30 blur-2xl' : 'inset-[-20%] rounded-full opacity-40 blur-3xl'} transition-colors duration-1000 z-0 pointer-events-none`} style={{ backgroundColor: 'var(--scene-accent, transparent)' }} />
-                                    <div className={`w-40 h-40 sm:w-44 sm:h-44 flex-shrink-0 mx-auto bg-zinc-900 overflow-hidden relative ring-1 ring-white/10 ring-inset rounded-lg group z-10 ${isFullScreenMode ? 'shadow-[0_40px_100px_0px_rgba(0,0,0,1),0_10px_30px_0px_rgba(0,0,0,0.8)]' : ''}`}>
+                                    <div className={`absolute ${isFullScreenMode ? 'inset-[-25%] rounded-full opacity-45 blur-3xl' : 'inset-[-15%] rounded-full opacity-35 blur-2xl'} transition-colors duration-1000 z-0 pointer-events-none`} style={{ backgroundColor: 'var(--scene-accent, transparent)' }} />
+                                    <div className={`w-40 h-40 sm:w-44 sm:h-44 flex-shrink-0 mx-auto bg-zinc-900 overflow-hidden relative ring-1 ring-white/10 ring-inset rounded-lg group z-10 ${isFullScreenMode ? 'shadow-[0_48px_120px_0px_rgba(0,0,0,1),0_12px_40px_0px_rgba(0,0,0,0.9)]' : 'shadow-[0_12px_36px_0px_rgba(0,0,0,0.85),0_3px_8px_0px_rgba(0,0,0,0.65)]'}`}>
                                     {/* Temporary Loading Skeleton while image loads */}
                                     {!imgLoaded && (
                                         <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center p-6 text-center bg-zinc-900 overflow-hidden z-10">
