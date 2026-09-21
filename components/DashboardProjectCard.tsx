@@ -111,8 +111,10 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
         )}
       </div>
 
-      {/* Multi-stop gradient overlay for legibility */}
-      <div className="absolute inset-0 z-10 bg-gradient-to-t from-zinc-950 via-zinc-950/90 to-zinc-950/20" />
+      {/* Bottom gradient: anchors metadata row and title legibility without smothering artwork */}
+      <div className="absolute inset-x-0 bottom-0 h-[60%] z-10 bg-gradient-to-t from-zinc-950/95 to-transparent" />
+      {/* Top vignette: subtle framing for title area and overflow menu button */}
+      <div className="absolute inset-x-0 top-0 h-[35%] z-10 bg-gradient-to-b from-zinc-950/55 to-transparent" />
 
       {/* Content Container (z-20) */}
       <div className="relative z-20 flex flex-col h-full justify-between">
