@@ -608,7 +608,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         };
     }, [isFullScreenMode]);
     const [chatInput, setChatInput] = useState('');
-    const [showAllChips, setShowAllChips] = useState(false);
+
     const [clickedChips, setClickedChips] = useState<Set<string>>(new Set());
     const [isCatalogOpen, setIsCatalogOpen] = useState(!isFullScreenMode);
     const [isConnectionsOpen, setIsConnectionsOpen] = useState(!isFullScreenMode);
@@ -1658,7 +1658,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                             </>
                                         ) : (
                                             <div className="flex flex-wrap gap-2">
-                                                {(showAllChips ? queryChips : queryChips.slice(0, 3)).map((chip, idx) => {
+                                                {queryChips.map((chip, idx) => {
                                                     const isClicked = clickedChips.has(chip);
                                                     return (
                                                     <button 
@@ -1699,14 +1699,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                         <span className="material-symbols-outlined !text-[14px] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400">expand_more</span>
                                                     </div>
                                                 )}
-                                                {queryChips.length > 3 && (
-                                                    <button 
-                                                        onClick={() => setShowAllChips(!showAllChips)}
-                                                        className="px-3 py-1.5 bg-zinc-950 border border-zinc-800 hover:text-white transition-colors text-xs text-zinc-500 rounded-full"
-                                                    >
-                                                        {showAllChips ? "Show less" : "More..."}
-                                                    </button>
-                                                )}
+
                                             </div>
                                         )}
                                     </div>
