@@ -69,6 +69,11 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
       className="group relative border border-zinc-700/50 hover:border-primary rounded-none p-5 transition-all cursor-pointer flex flex-col justify-between w-full md:w-[350px] h-[180px] shadow-xl overflow-hidden"
       style={{
         '--scene-accent': dominantColor,
+        // Blend scene accent toward white so the title colour is always bright enough
+        // to read on the uniform 45% dark scrim, while preserving hue fidelity.
+        '--scene-accent-title': dominantColor
+          ? `color-mix(in oklch, ${dominantColor} 60%, white)`
+          : 'white',
       } as React.CSSProperties}
     >
       
@@ -121,10 +126,8 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
         )}
       </div>
 
-      {/* Bottom gradient: anchors metadata row and title legibility without smothering artwork */}
-      <div className="absolute inset-x-0 bottom-0 h-[60%] z-10 bg-gradient-to-t from-zinc-950/95 to-transparent" />
-      {/* Top vignette: subtle framing for title area and overflow menu button */}
-      <div className="absolute inset-x-0 top-0 h-[40%] z-10 bg-gradient-to-b from-zinc-950/70 to-transparent" />
+      {/* Uniform scrim: even 45% dark backdrop — artwork shows through evenly with no directional patches */}
+      <div className="absolute inset-0 z-10 bg-zinc-950/45" />
 
       {/* Content Container (z-20) */}
       <div className="relative z-20 flex flex-col h-full justify-between">
@@ -132,10 +135,10 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
           <div className="flex items-start justify-between gap-3">
             <div className="flex flex-row items-center gap-4 flex-1 min-w-0">
               <div className="flex flex-col gap-1.5 min-w-0 flex-1">
-                <h3 className="text-base font-medium text-white transition-colors line-clamp-2 pr-2" style={{ textShadow: '0 1px 2px rgba(0,0,0,1), 0 2px 8px rgba(0,0,0,0.9), 0 4px 16px rgba(0,0,0,0.7)' }}>
+                <h3 className="text-base font-medium line-clamp-2 pr-2 transition-colors" style={{ color: 'var(--scene-accent-title, white)' }}>
                   {displayTitle}
                 </h3>
-                <p className="font-mono text-[10px] text-zinc-300 font-normal truncate uppercase tracking-widest w-fit px-1.5 py-0.5 rounded bg-zinc-950/50 backdrop-blur-sm">
+                <p className="font-mono text-[10px] text-zinc-400 font-normal truncate uppercase tracking-widest">
                   {project.updatedAt ? `Edited ${formatSystemTimestamp(project.updatedAt)}` : 'New Project'}
                 </p>
                 {project.status === 'curating' || project.status === 'pending' || (project.status !== 'failed' && project.status !== 'completed' && project.seedArtists) ? (
