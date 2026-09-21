@@ -1996,11 +1996,6 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         }
 
         if (selectedNode && selectedNode.id !== lastScrolledNodeIdRef.current) {
-            // Eagerly mark this node as scrolled-to before the async timeout.
-            // Prevents double-tap from re-queuing a scroll to the same target
-            // if the user taps the same pill again within the delay window.
-            lastScrolledNodeIdRef.current = selectedNode.id;
-
             // On mobile a 300ms tab-switch animation (duration-300) runs concurrently
             // with this scroll. Wait for it to fully settle before measuring bounding
             // rects. On desktop there is no tab animation, 50ms is sufficient.
@@ -2023,6 +2018,10 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     // the DOM, so containerRect.top already accounts for it — no
                     // additional header offset subtraction is needed here.
                     container.scrollTo({ top: relativeTop - SCROLL_PADDING, behavior: 'smooth' });
+                    // Only commit the guard AFTER a scroll actually fires.
+                    // If the card doesn't exist (e.g. API failure), the guard stays
+                    // null/stale so the next state change can retry the scroll.
+                    lastScrolledNodeIdRef.current = selectedNode.id;
                 }
             }, SCROLL_DELAY);
             return () => clearTimeout(timeoutId);
