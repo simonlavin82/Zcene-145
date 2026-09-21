@@ -127,8 +127,8 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
         )}
       </div>
 
-      {/* Uniform scrim: even 45% dark backdrop — artwork shows through evenly with no directional patches */}
-      <div className="absolute inset-0 z-10 bg-zinc-950/45" />
+      {/* Uniform scrim: even 55% dark backdrop — artwork shows through evenly with no directional patches */}
+      <div className="absolute inset-0 z-10 bg-zinc-950/55" />
 
       {/* Content Container (z-20) */}
       <div className="relative z-20 flex flex-col h-full justify-between">

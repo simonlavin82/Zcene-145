@@ -1,5 +1,5 @@
 export const getFallbackAccentColor = (seed: string): string => {
-  if (!seed) return '#aaff00'; // Default primary brand color
+  if (!seed) return 'transparent'; // No seed → no glow; avoids green flash on unresolved nodes
   let hash = 0;
   for (let i = 0; i < seed.length; i++) {
     hash = seed.charCodeAt(i) + ((hash << 5) - hash);
