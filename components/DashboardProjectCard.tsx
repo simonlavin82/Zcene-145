@@ -69,11 +69,12 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
       className="group relative border border-zinc-700/50 hover:border-primary rounded-none p-5 transition-all cursor-pointer flex flex-col justify-between w-full md:w-[350px] h-[180px] shadow-xl overflow-hidden"
       style={{
         '--scene-accent': dominantColor,
-        // Blend scene accent toward white so the title colour is always bright enough
-        // to read on the uniform 45% dark scrim, while preserving hue fidelity.
+        // Blend scene accent toward white for bright legible title colour
         '--scene-accent-title': dominantColor
           ? `color-mix(in oklch, ${dominantColor} 25%, white)`
           : 'white',
+
+
       } as React.CSSProperties}
     >
       
@@ -138,7 +139,7 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
                 <h3 className="text-base font-medium line-clamp-2 pr-2 transition-colors" style={{ color: 'var(--scene-accent-title, white)' }}>
                   {displayTitle}
                 </h3>
-                <p className="font-mono text-[10px] text-white font-normal truncate uppercase tracking-widest">
+                <p className="font-mono text-[10px] font-normal truncate uppercase tracking-widest" style={{ color: 'var(--scene-accent-title, white)' }}>
                   {project.updatedAt ? `Edited ${formatSystemTimestamp(project.updatedAt)}` : 'New Project'}
                 </p>
                 {project.status === 'curating' || project.status === 'pending' || (project.status !== 'failed' && project.status !== 'completed' && project.seedArtists) ? (
@@ -150,9 +151,7 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
                     Failed
                   </span>
                 ) : project.status === 'completed' ? (
-                  <span className="text-[9px] uppercase tracking-wide text-zinc-950 font-bold px-1.5 py-0.5 rounded-md whitespace-nowrap transition-colors w-fit mt-0.5" style={{ backgroundColor: 'var(--scene-accent, #aaff00)' }}>
-                    Mapped
-                  </span>
+                  null
                 ) : (
                   <span className="text-[9px] uppercase tracking-wide text-zinc-500 font-bold px-1.5 py-0.5 bg-zinc-800/80 rounded-md border border-zinc-800 font-mono whitespace-nowrap backdrop-blur-sm w-fit mt-0.5">
                     Unmapped
@@ -161,7 +160,10 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
               </div>
             </div>
             
-            <div className="relative flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+            <div
+              className={`relative flex-shrink-0 transition-opacity duration-150 ${activeMenuId === project.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+              onClick={(e) => e.stopPropagation()}
+            >
               <button
                 onClick={() => setActiveMenuId(activeMenuId === project.id ? null : project.id)}
                 className="w-7 h-7 -mr-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800/80 transition-all cursor-pointer flex items-center justify-center drop-shadow-md"
