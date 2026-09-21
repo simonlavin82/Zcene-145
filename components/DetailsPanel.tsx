@@ -2001,10 +2001,10 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
             // rects. On desktop there is no tab animation, 50ms is sufficient.
             const SCROLL_DELAY = isSmallScreen ? 350 : 50;
             // Small breathing room so the card top doesn't sit flush against the
-            // container edge. Must be less than actionIconsRef.offsetHeight (~44px)
-            // so the sentinel stays below the container boundary and isHeaderStuck
-            // remains false (big title renders, not slimline).
-            const SCROLL_PADDING = 8;
+            // container edge. Increased to 40px to absorb the browser's momentum
+            // bounce on downward scrolls. Must be less than actionIconsRef.offsetHeight
+            // (~44px) so the sentinel stays below the boundary (big title renders).
+            const SCROLL_PADDING = 40;
 
             const timeoutId = setTimeout(() => {
                 const container = document.getElementById('magazine-scroll-container');
