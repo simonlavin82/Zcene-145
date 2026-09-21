@@ -1996,12 +1996,20 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         }
 
         if (selectedNode && selectedNode.id !== lastScrolledNodeIdRef.current) {
-            // On mobile a 300ms tab-switch animation (duration-300) runs concurrently with
-            // this scroll. We wait 350ms (300ms animation + ~50ms layout settle) before
-            // measuring bounding rects so the DOM is fully stable when we fire.
-            // On desktop there is no tab animation, so 50ms remains sufficient.
-            const MOBILE_HEADER_OFFSET = isSmallScreen ? 64 : 0; // matches LayoutSizes.topHeader (h-16 = 64px)
+            // Eagerly mark this node as scrolled-to before the async timeout.
+            // Prevents double-tap from re-queuing a scroll to the same target
+            // if the user taps the same pill again within the delay window.
+            lastScrolledNodeIdRef.current = selectedNode.id;
+
+            // On mobile a 300ms tab-switch animation (duration-300) runs concurrently
+            // with this scroll. Wait for it to fully settle before measuring bounding
+            // rects. On desktop there is no tab animation, 50ms is sufficient.
             const SCROLL_DELAY = isSmallScreen ? 350 : 50;
+            // Small breathing room so the card top doesn't sit flush against the
+            // container edge. Must be less than actionIconsRef.offsetHeight (~44px)
+            // so the sentinel stays below the container boundary and isHeaderStuck
+            // remains false (big title renders, not slimline).
+            const SCROLL_PADDING = 8;
 
             const timeoutId = setTimeout(() => {
                 const container = document.getElementById('magazine-scroll-container');
@@ -2009,11 +2017,13 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                 if (container && targetEl) {
                     const containerRect = container.getBoundingClientRect();
                     const targetRect = targetEl.getBoundingClientRect();
-                    // relativeTop = position of the target's top edge within the scroll container
                     const relativeTop = targetRect.top - containerRect.top + container.scrollTop;
-                    container.scrollTo({ top: relativeTop - MOBILE_HEADER_OFFSET, behavior: 'smooth' });
+                    // Scroll the card top to the container top, minus a small padding.
+                    // The floating mobile header (h-16) sits *above* the container in
+                    // the DOM, so containerRect.top already accounts for it — no
+                    // additional header offset subtraction is needed here.
+                    container.scrollTo({ top: relativeTop - SCROLL_PADDING, behavior: 'smooth' });
                 }
-                lastScrolledNodeIdRef.current = selectedNode.id;
             }, SCROLL_DELAY);
             return () => clearTimeout(timeoutId);
         }
