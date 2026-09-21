@@ -76,23 +76,33 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
       <div className="absolute inset-0 z-0 flex">
         {imageUrls.length > 1 ? (
           <>
-            <div className="w-1/2 h-full relative">
+            {/* Left artist: anchored left, cross-fades out across the right half */}
+            <div
+              className="absolute inset-0"
+              style={{
+                WebkitMaskImage: 'linear-gradient(to right, black 30%, transparent 75%)',
+                maskImage: 'linear-gradient(to right, black 30%, transparent 75%)',
+              }}
+            >
               {imageUrls[0] && imageUrls[0] !== 'not-found' ? (
-                <img src={imageUrls[0]} alt={displayTitle} className="w-full h-full object-cover" crossOrigin="anonymous" />
+                <img src={imageUrls[0]} alt={displayTitle} className="w-full h-full object-cover object-left" crossOrigin="anonymous" />
               ) : (
                 <div className="w-full h-full" style={{ background: generateDeterministicGradient(seedList[0] || displayTitle) }} />
               )}
-              {/* Fade out right edge to meet the other image cleanly */}
-              <div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-zinc-950/80 to-transparent z-10" />
             </div>
-            <div className="w-1/2 h-full relative bg-zinc-950">
+            {/* Right artist: anchored right, cross-fades out across the left half */}
+            <div
+              className="absolute inset-0"
+              style={{
+                WebkitMaskImage: 'linear-gradient(to left, black 30%, transparent 75%)',
+                maskImage: 'linear-gradient(to left, black 30%, transparent 75%)',
+              }}
+            >
               {imageUrls[1] && imageUrls[1] !== 'not-found' ? (
-                <img src={imageUrls[1]} alt={displayTitle} className="w-full h-full object-cover" crossOrigin="anonymous" />
+                <img src={imageUrls[1]} alt={displayTitle} className="w-full h-full object-cover object-right" crossOrigin="anonymous" />
               ) : (
                 <div className="w-full h-full" style={{ background: generateDeterministicGradient(seedList[1] || displayTitle) }} />
               )}
-              {/* Fade out left edge */}
-              <div className="absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-zinc-950/80 to-transparent z-10" />
             </div>
           </>
         ) : (
@@ -114,7 +124,7 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
       {/* Bottom gradient: anchors metadata row and title legibility without smothering artwork */}
       <div className="absolute inset-x-0 bottom-0 h-[60%] z-10 bg-gradient-to-t from-zinc-950/95 to-transparent" />
       {/* Top vignette: subtle framing for title area and overflow menu button */}
-      <div className="absolute inset-x-0 top-0 h-[35%] z-10 bg-gradient-to-b from-zinc-950/55 to-transparent" />
+      <div className="absolute inset-x-0 top-0 h-[40%] z-10 bg-gradient-to-b from-zinc-950/70 to-transparent" />
 
       {/* Content Container (z-20) */}
       <div className="relative z-20 flex flex-col h-full justify-between">
@@ -122,10 +132,10 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
           <div className="flex items-start justify-between gap-3">
             <div className="flex flex-row items-center gap-4 flex-1 min-w-0">
               <div className="flex flex-col gap-1.5 min-w-0 flex-1">
-                <h3 className="text-base font-medium text-white transition-colors line-clamp-2 pr-2" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>
+                <h3 className="text-base font-medium text-white transition-colors line-clamp-2 pr-2" style={{ textShadow: '0 1px 2px rgba(0,0,0,1), 0 2px 8px rgba(0,0,0,0.9), 0 4px 16px rgba(0,0,0,0.7)' }}>
                   {displayTitle}
                 </h3>
-                <p className="font-mono text-[10px] text-zinc-300 font-normal truncate uppercase tracking-widest drop-shadow-md">
+                <p className="font-mono text-[10px] text-zinc-300 font-normal truncate uppercase tracking-widest w-fit px-1.5 py-0.5 rounded bg-zinc-950/50 backdrop-blur-sm">
                   {project.updatedAt ? `Edited ${formatSystemTimestamp(project.updatedAt)}` : 'New Project'}
                 </p>
                 {project.status === 'curating' || project.status === 'pending' || (project.status !== 'failed' && project.status !== 'completed' && project.seedArtists) ? (
