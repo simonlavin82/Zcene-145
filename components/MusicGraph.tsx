@@ -100,7 +100,7 @@ const computeNodeDepths = (nodes: Node[], links: Link[], seedArtistsOrSet: Set<s
 
 const MusicGraph: React.FC<MusicGraphProps> = ({
   data, libraryArtists, seedArtists, onNodeClick, selectedNode, peekedNode, isSmallScreen,
-  activeFilters, searchQuery, toggleFilter,
+  activeFilters, searchQuery, setSearchQuery, toggleFilter,
   legendConfig, legendOrder,
   legendRef, onInteraction, onLegendInteraction, isGuest,
   detailsCache, isActive = false
