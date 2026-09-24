@@ -1458,7 +1458,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                         href={youtubeUrl} 
                                                         target="_blank" 
                                                         rel="noopener noreferrer" 
-                                                        className="flex items-center justify-start px-4 py-2 rounded-xl font-medium transition-all active:scale-[0.98] bg-zinc-900/50 text-zinc-400 hover:bg-zinc-800/80 hover:text-white border border-zinc-700 hover:border-zinc-600"
+                                                        className="flex items-center justify-start px-4 py-2 rounded-xl font-medium transition-all active:scale-[0.98] bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-white border border-zinc-700 hover:border-zinc-600"
                                                     >
                                                         <div className="flex items-center gap-3">
                                                             <span className="material-symbols-outlined !text-[18px]">
@@ -1480,7 +1480,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                         href={link.url} 
                                                         target="_blank" 
                                                         rel="noopener noreferrer" 
-                                                        className="flex items-center justify-start px-4 py-2 rounded-xl font-medium transition-all active:scale-[0.98] bg-zinc-900/50 text-zinc-400 hover:bg-zinc-800/80 hover:text-white border border-zinc-700 hover:border-zinc-600"
+                                                        className="flex items-center justify-start px-4 py-2 rounded-xl font-medium transition-all active:scale-[0.98] bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-white border border-zinc-700 hover:border-zinc-600"
                                                     >
                                                         <div className="flex items-center gap-3">
                                                             <span className="material-symbols-outlined !text-[18px]">
@@ -1670,7 +1670,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                         disabled={isChatLoading}
                                                         className={`px-4 py-1.5 border transition-colors text-xs rounded-full disabled:opacity-50 text-left flex items-center gap-1 ${
                                                             isClicked 
-                                                                ? 'bg-zinc-950/30 border-zinc-800/50 text-zinc-600 cursor-default' 
+                                                                ? 'bg-zinc-950 border-zinc-800 text-zinc-600 cursor-default' 
                                                                 : 'bg-transparent border-zinc-700 text-zinc-400 hover:bg-zinc-800 hover:text-white'
                                                         }`}
                                                     >

@@ -121,7 +121,7 @@ export const Button: React.FC<ButtonProps> = ({
   };
   const variants: Record<NonNullable<ButtonProps['variant']>, string> = {
     primary: 'bg-primary text-brand-black hover:opacity-90',
-    secondary: 'border border-zinc-700 text-zinc-400 bg-zinc-900/50 hover:text-white hover:border-zinc-600 hover:bg-zinc-800/80',
+    secondary: 'border border-zinc-700 text-zinc-400 bg-zinc-900 hover:text-white hover:border-zinc-600 hover:bg-zinc-800',
     outline: 'border border-primary bg-transparent text-primary hover:bg-primary/20',
     ghost: 'bg-transparent hover:bg-zinc-800/50 text-zinc-400 hover:text-white',
   };
@@ -1489,20 +1489,20 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </Button>
                                         <div className="flex flex-wrap gap-1.5 pt-2">
                                             <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-sm bg-zinc-900/50 border border-zinc-800"></span>
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-900 border border-zinc-700"></span>
                                                 Button variant="secondary"
                                             </span>
                                         </div>
                                     </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover / Active Status</p>
-                                        <Button variant="secondary" className="w-full justify-start border-zinc-700 bg-zinc-800/80 text-white scale-95">
+                                        <Button variant="secondary" className="w-full justify-start border-zinc-600 bg-zinc-800 text-white scale-95">
                                             <span className="material-symbols-outlined !text-[18px]">play_circle</span>
                                             <span>Watch on YouTube</span>
                                         </Button>
                                         <div className="flex flex-wrap gap-1.5 pt-2">
                                             <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-sm bg-zinc-800/80 border border-zinc-700"></span>
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-800 border border-zinc-600"></span>
                                                 hover styles via Button component
                                             </span>
                                         </div>
@@ -1515,7 +1515,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </Button>
                                         <div className="flex flex-wrap gap-1.5 pt-2">
                                             <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-sm bg-zinc-900/50 border border-zinc-800"></span>
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-900 border border-zinc-700"></span>
                                                 Button variant="secondary" disabled
                                             </span>
                                         </div>
@@ -1555,14 +1555,14 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Spent / Clicked Status</p>
-                                        <button className="px-4 py-1.5 text-xs text-zinc-600 border border-zinc-800/50 rounded-full bg-zinc-950/30 flex items-center gap-1.5 cursor-default">
+                                        <button className="px-4 py-1.5 text-xs text-zinc-600 border border-zinc-800 rounded-full bg-zinc-950 flex items-center gap-1.5 cursor-default">
                                             Where are they from?
                                             <span className="material-symbols-outlined !text-[12px]">check</span>
                                         </button>
                                         <div className="flex flex-wrap gap-1.5 pt-2">
                                             <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-sm bg-zinc-950/30 border border-zinc-800/50"></span>
-                                                bg-zinc-950/30 border-zinc-800/50
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-950 border border-zinc-800"></span>
+                                                bg-zinc-950 border-zinc-800
                                             </span>
                                             <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
                                                 <span className="w-2 h-2 rounded-sm bg-zinc-600 border border-zinc-700"></span>
