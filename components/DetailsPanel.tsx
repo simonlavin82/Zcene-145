@@ -1668,10 +1668,10 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                             onSendMessage(chip);
                                                         }}
                                                         disabled={isChatLoading}
-                                                        className={`px-3 py-1.5 border transition-colors text-xs rounded-full disabled:opacity-50 text-left flex items-center gap-1 ${
+                                                        className={`px-4 py-1.5 border transition-colors text-xs rounded-full disabled:opacity-50 text-left flex items-center gap-1 ${
                                                             isClicked 
-                                                                ? 'bg-zinc-950 border-zinc-800 text-zinc-500 hover:text-zinc-400' 
-                                                                : 'bg-zinc-900 border-zinc-700 hover:border-primary hover:bg-zinc-800 text-zinc-300'
+                                                                ? 'bg-zinc-950/30 border-zinc-800/50 text-zinc-600 cursor-default' 
+                                                                : 'bg-transparent border-zinc-700 text-zinc-400 hover:bg-zinc-800 hover:text-white'
                                                         }`}
                                                     >
                                                         {chip}
@@ -1681,7 +1681,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                 {connectionPeers.length > 0 && (
                                                     <div className="relative">
                                                         <select
-                                                            className="appearance-none px-3 py-1.5 bg-zinc-900 border border-zinc-700 hover:border-primary hover:bg-zinc-800 transition-colors text-xs text-zinc-300 rounded-full cursor-pointer focus:outline-none pr-8"
+                                                            className="appearance-none px-4 py-1.5 bg-transparent border border-zinc-700 hover:bg-zinc-800 hover:text-white transition-colors text-xs text-zinc-400 rounded-full cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary pr-8"
                                                             onChange={(e) => {
                                                                 if (e.target.value) {
                                                                     const query = `What is the connection to ${e.target.value}?`;
