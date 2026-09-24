@@ -1,29 +1,29 @@
-# UI Polish: Remove Button Transparency for Solid Contrast & Sync Documentation
+# UI Polish: Enforce Premium Black & Remove Base Transparency
 
 ## Audit Findings
-- **Secondary Buttons:** The core token in `<Button>` uses `bg-zinc-900/50` (base) and `hover:bg-zinc-800/80` (hover). These cascade down to the Artist Catalog in `DetailsPanel.tsx` and the Design System documentation.
-- **Instant AI Query Chips (Spent State):** The spent state chips utilize `bg-zinc-950/30` along with `border-zinc-800/50`. 
-- **Issue:** These opacity modifiers cause the Magazine view's patterned texture to bleed through, disrupting the deep, premium dark mode aesthetic by visually washing out the buttons.
+- **Secondary Buttons:** Currently set to `bg-zinc-900`, which in the context of the Zcene dark mode palette, reads too light (grey) rather than a true premium dark tone.
+- **Available AI Query Chips:** Currently set to `bg-transparent`. While this looks clean in isolation, it completely fails to mask the Magazine view's background texture, causing severe visual bleed.
+- **Interactive Connection Dropdown:** Also set to `bg-transparent`, suffering from the same background bleed.
 
 ## Implementation Plan
 
-### 1. Solidify Secondary Buttons
+### 1. Upgrade to Premium Black (Secondary Buttons)
 - **Core Component (`DesignSystem.tsx`):**
-  - Update `bg-zinc-900/50` ➔ `bg-zinc-900` (solid deep grey).
-  - Update `hover:bg-zinc-800/80` ➔ `hover:bg-zinc-800` (solid hover state).
+  - Update base background: `bg-zinc-900` ➔ `bg-black` (or `bg-zinc-950` for a softer dark). I recommend `bg-zinc-950` as it integrates seamlessly with the zinc borders, but we can go full `bg-black` for maximum contrast.
+  - Update hover background: `hover:bg-zinc-800` ➔ `hover:bg-zinc-900` to maintain a subtle, premium interaction.
 - **Artist Catalog (`DetailsPanel.tsx`):**
-  - Update the manual `<a>` tags for YouTube, Bandcamp, and Official Website.
-  - *Swap:* `bg-zinc-900/50 ... hover:bg-zinc-800/80` ➔ `bg-zinc-900 ... hover:bg-zinc-800`.
+  - Sync the manual `<a>` tags to match the core component (`bg-zinc-950` / `hover:bg-zinc-900`).
 
-### 2. Solidify Instant AI Query Chips
-- **Spent / Clicked State (`DetailsPanel.tsx`):**
-  - Update `bg-zinc-950/30` ➔ `bg-zinc-950` (the darkest solid grey available without being black).
-  - Update `border-zinc-800/50` ➔ `border-zinc-800` to maintain a crisp, solid boundary.
+### 2. Block Texture Bleed (Instant AI Query Chips & Dropdown)
+- **Available Action Chips (`DetailsPanel.tsx` & `DesignSystem.tsx`):**
+  - Update `bg-transparent` ➔ `bg-zinc-950`. This provides a solid, ultra-dark base that completely blocks the background texture while remaining visually distinct from the borders.
+  - Update hover state to `hover:bg-zinc-900`.
+- **Interactive Connection Dropdown (`DetailsPanel.tsx` & `DesignSystem.tsx`):**
+  - Update `bg-transparent` ➔ `bg-zinc-950` and hover to `hover:bg-zinc-900` to match the available action chips perfectly.
 
 ### 3. Sync Design System Documentation (`DesignSystem.tsx`)
-- Ensure the official Style Guide remains the source of truth by updating the documentation blocks and color swatch visualizers:
-  - **Secondary Buttons Docs:** Update swatch tooltip strings and colored `span` blocks from `bg-zinc-900/50` to `bg-zinc-900` and `hover:bg-zinc-800/80` to `hover:bg-zinc-800`.
-  - **Query Chips Docs:** Update the "Spent / Clicked Status" section to strictly use `bg-zinc-950` and `border-zinc-800` across its component block and swatch labels.
+- Scrub the visual swatches and documentation tooltips for both "Secondary Buttons" and "Instant AI Query Chips" to reflect the new ultra-dark tokens (`bg-zinc-950`, `bg-black`). 
+- Specifically, the `<span>` color blocks will be updated to render the exact hex values so the documentation remains the absolute source of truth.
 
 ## Execution
-Once approved, I will use `multi_replace_file_content` to execute these precise token swaps across `DesignSystem.tsx` and `DetailsPanel.tsx` simultaneously.
+Once you approve the choice between `bg-zinc-950` and `bg-black` for the secondary buttons, I will execute the replacements across both files to lock in the premium aesthetic.
