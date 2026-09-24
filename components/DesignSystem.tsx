@@ -1797,7 +1797,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                 Button variant="secondary" size="sm"
                                             </span>
                                         </div>
-                                                           <div className="space-y-4">
+                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover / Active</p>
                                         <Button variant="secondary" size="sm" className="justify-start border-zinc-700 bg-zinc-800 text-white scale-95">
                                             <span className="truncate uppercase font-semibold tracking-tighter">Sunny Day Real Estate</span>
@@ -1809,7 +1809,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                 hover styles via Button component
                                             </span>
                                         </div>
-                                    </div>               </div>
+                                    </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Added (Disabled)</p>
                                         <button disabled className="border py-1.5 px-3 transition-all text-sm flex items-center gap-1.5 rounded-xl text-primary border-primary/30 bg-primary/5 cursor-default">
@@ -2044,13 +2044,6 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
                                                 <span className="w-2 h-2 rounded-sm bg-zinc-800 border border-zinc-700"></span>
                                                 Button variant="secondary"
-                                            </span>
-                                                <span className="w-2 h-2 rounded-sm bg-zinc-900 border border-zinc-800"></span>
-                                                bg-zinc-900 border-zinc-800
-                                            </span>
-                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-sm bg-zinc-400 border border-zinc-500"></span>
-                                                text-zinc-400
                                             </span>
                                         </div>
                                     </div>
