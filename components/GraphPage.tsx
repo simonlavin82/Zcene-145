@@ -1547,7 +1547,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                     <button 
                         onClick={() => { setIsSearchExpanded(true); setTimeout(() => graphSearchInputRef.current?.focus(), 50); }} 
                         className={CanvasControlStyles}
-                        aria-label="Find in graph..."
+                        aria-label="Find in spiderweb..."
                     >
                         <span className="material-symbols-outlined !text-[20px]">search</span>
                     </button>
@@ -1557,7 +1557,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                         <input 
                             ref={graphSearchInputRef}
                             type="search" 
-                            placeholder="Find in graph..." 
+                            placeholder="Find in spiderweb..." 
                             value={searchQuery} 
                             onChange={(e) => { setSearchQuery(e.target.value); if (selectedNode) onNodeClick(null); }} 
                             onFocus={() => { if (selectedNode) onNodeClick(null); }} 

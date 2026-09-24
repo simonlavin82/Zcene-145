@@ -28,7 +28,7 @@ export const LayoutSizes = {
 
 // --- Floating Canvas Controls ---
 
-export const CanvasControlStyles = 'w-12 h-12 rounded-full bg-zinc-900/80 backdrop-blur-md border border-zinc-700 text-zinc-400 hover:text-white shadow-xl transition-all flex flex-shrink-0 items-center justify-center cursor-pointer active:scale-90';
+export const CanvasControlStyles = 'w-12 h-12 rounded-xl bg-zinc-900/80 backdrop-blur-md border border-zinc-700 text-zinc-400 hover:text-white shadow-xl transition-all flex flex-shrink-0 items-center justify-center cursor-pointer active:scale-90';
 
 // --- Input Primitives & Sizings ---
 
@@ -415,6 +415,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
         { id: 'layout-spacing', title: 'Layout & Spacing' },
         { id: 'iconography', title: 'Iconography' },
         { id: 'spiderweb-legends', title: 'Spiderweb Legends' },
+        { id: 'spiderweb-controls', title: 'Spiderweb Controls' },
         { id: 'buttons', title: 'Buttons' },
         { id: 'toggles', title: 'Toggles' },
         { id: 'links', title: 'Links' },
@@ -1281,6 +1282,56 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             </ul>
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* SPIDERWEB CONTROLS */}
+                    <section id="spiderweb-controls">
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Spiderweb Controls</h2>
+                        <p className="text-base text-zinc-300 leading-relaxed max-w-3xl mb-12">
+                            The Spiderweb canvas employs a dedicated set of floating controls utilizing the <code>CanvasControlStyles</code> primitive. These controls ensure consistent interaction models for zoom, centering, filtering, and search logic overlaying the D3 canvas.
+                        </p>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-24">
+                            {/* Standard Controls */}
+                            <div className="space-y-6">
+                                <h3 className="text-xl font-medium text-zinc-200">Standard Canvas Controls</h3>
+                                <div className="p-8 bg-zinc-950 border border-zinc-800 rounded-2xl flex flex-col items-center justify-center gap-6 min-h-[240px] relative overflow-hidden bg-[url('https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg')] bg-cover bg-center">
+                                    <div className="absolute inset-0 bg-zinc-900/80 backdrop-blur-sm"></div>
+                                    <div className="relative z-10 flex gap-4">
+                                        <button className={CanvasControlStyles}>
+                                            <span className="material-symbols-outlined !text-[20px]">center_focus_strong</span>
+                                        </button>
+                                        <button className={CanvasControlStyles}>
+                                            <span className="material-symbols-outlined !text-[20px]">add</span>
+                                        </button>
+                                        <button className={CanvasControlStyles}>
+                                            <span className="material-symbols-outlined !text-[20px]">remove</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <p className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Base Primitive</p>
+                                    <p className="text-sm text-zinc-400">All canvas controls utilize a standardized <code>w-12 h-12 rounded-xl bg-zinc-900/80 backdrop-blur-md border border-zinc-700</code> visual baseline, establishing a unified boxy aesthetic.</p>
+                                </div>
+                            </div>
+
+                            {/* Active State (Filter) */}
+                            <div className="space-y-6">
+                                <h3 className="text-xl font-medium text-zinc-200">Active State Toggle</h3>
+                                <div className="p-8 bg-zinc-950 border border-zinc-800 rounded-2xl flex flex-col items-center justify-center gap-6 min-h-[240px] relative overflow-hidden bg-[url('https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg')] bg-cover bg-center">
+                                    <div className="absolute inset-0 bg-zinc-900/80 backdrop-blur-sm"></div>
+                                    <div className="relative z-10 flex gap-4">
+                                        <button className={`${CanvasControlStyles} bg-zinc-800 border-primary/50 text-primary`}>
+                                            <span className="material-symbols-outlined !text-[20px]">close</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <p className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Selected Variant</p>
+                                    <p className="text-sm text-zinc-400">When toggled (e.g. expanding the filter drawer), controls shift to <code>bg-zinc-800 border-primary/50 text-primary</code> to communicate active UI focus.</p>
                                 </div>
                             </div>
                         </div>
@@ -2795,7 +2846,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="mt-8 border border-zinc-800 bg-zinc-900/30 p-8">
                                     <div className="space-y-4 max-w-sm">
                                         <p className="text-xs text-zinc-500 uppercase tracking-widest font-semibold">Toolbar Dropdown Trigger</p>
-                                        <button className={`flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-200 hover:bg-zinc-700 px-3 ${LayoutSizes.controlBar} text-xs font-medium transition-colors`}>
+                                        <button className={`flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-950 text-zinc-200 hover:bg-zinc-900 px-3 ${LayoutSizes.controlBar} text-xs font-medium transition-colors`}>
                                             <span className="material-symbols-outlined !text-[14px]">filter_list</span>
                                             Filter List
                                             <span className="material-symbols-outlined !text-[14px]">expand_more</span>
@@ -3132,7 +3183,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             </div>
 
                                             {/* Right-Aligned Magazine Trigger Mock */}
-                                            <div className="flex gap-2">
+                                            <div className="flex gap-2 flex-wrap justify-end">
                                                 <button className="flex items-center gap-1.5 px-3 py-1.5 border border-primary bg-primary/10 rounded-xl text-primary animate-pulse transition-all text-xs font-medium shrink-0 leading-none">
                                                     <span className="material-symbols-outlined !text-[16px]">auto_stories</span>
                                                     <span>Magazine View (Attention)</span>
