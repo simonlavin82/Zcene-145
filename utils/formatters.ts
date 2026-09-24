@@ -64,20 +64,18 @@ export const zceneCategoricalPalette = [
   '#a855f7', // Purple
   '#2dd4bf', // Teal
   '#ef4444', // Red
-  '#eab308', // Yellow
   '#3b82f6', // Blue
   '#10b981', // Green
-  '#f59e0b', // Orange
   '#ec4899', // Pink
 ];
 
 export const zceneFallbackColor = '#71717a'; // Zinc
 
 export const nodeTypeColorMap: Record<string, string> = {
-  genre: zceneCategoricalPalette[4], // Blue
-  label: zceneCategoricalPalette[5], // Green
-  country: zceneCategoricalPalette[6], // Orange
-  founded: zceneCategoricalPalette[7], // Pink
+  genre: zceneCategoricalPalette[3], // Blue
+  label: zceneCategoricalPalette[4], // Green
+  country: zceneCategoricalPalette[1], // Teal (Origin)
+  founded: zceneCategoricalPalette[5], // Pink
   seed: '#F6E468', // Primary Brand Yellow
   ai: zceneCategoricalPalette[0], // Purple
 };

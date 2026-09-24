@@ -111,10 +111,11 @@ import { AnimatePresence, motion } from 'framer-motion';
 
 export const PROFILE_COLORS = [
   { name: 'purple', class: 'bg-[#a855f7]' },
-  { name: 'emerald', class: 'bg-[#10b981]' },
-  { name: 'amber', class: 'bg-[#f59e0b]' },
-  { name: 'rose', class: 'bg-[#f43f5e]' },
-  { name: 'cyan', class: 'bg-[#06b6d4]' }
+  { name: 'teal', class: 'bg-[#2dd4bf]' },
+  { name: 'red', class: 'bg-[#ef4444]' },
+  { name: 'blue', class: 'bg-[#3b82f6]' },
+  { name: 'green', class: 'bg-[#10b981]' },
+  { name: 'pink', class: 'bg-[#ec4899]' }
 ];
 
 export const MyTasteDialog: React.FC<{
