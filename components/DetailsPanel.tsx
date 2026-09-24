@@ -11,7 +11,7 @@ import { SegmentedTextToggle } from './ui/SegmentedTextToggle';
 import { db } from '../services/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import { formatSystemTimestamp } from '../utils/formatters';
-import { Select, InputSizes, LayoutSizes } from './DesignSystem';
+import { Select, InputSizes, LayoutSizes, Button } from './DesignSystem';
 import { Flame } from 'lucide-react';
 import { useDominantColor } from '../hooks/useDominantColor';
 const SENTINEL_INSIGHT = 'No insight provided.';
@@ -1911,11 +1911,6 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     const [pendingChatMessage, setPendingChatMessage] = useState<{ nodeId: string; message: string } | null>(null);
 
     const magazineBtnState: 'disabled' | 'attention' | 'neutral' = hasSeenMagazineView ? 'neutral' : 'attention';
-    const magazineBtnClasses = {
-        disabled: "flex items-center gap-1.5 px-3 py-1.5 border border-zinc-800 bg-zinc-900/20 rounded-xl text-zinc-600 cursor-not-allowed transition-all duration-200 text-xs font-medium shrink-0 leading-none backdrop-blur-sm",
-        attention: "flex items-center gap-1.5 px-3 py-1.5 border border-primary bg-primary/10 rounded-xl text-primary animate-pulse hover:bg-primary/20 active:scale-95 transition-all duration-200 text-xs font-medium shrink-0 leading-none backdrop-blur-sm",
-        neutral: "flex items-center gap-1.5 px-3 py-1.5 border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 transition-all duration-200 text-xs font-medium shrink-0 leading-none backdrop-blur-sm"
-    }[magazineBtnState];
     
     const touchStartX = useRef<number | null>(null);
     const touchEndX = useRef<number | null>(null);
@@ -2456,18 +2451,20 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                 )}
                             </div>
 
-                            <button
+                            <Button
+                                variant={hasSeenMagazineView ? 'secondary' : 'outline'}
+                                size="sm"
                                 onClick={() => {
                                     setHasSeenMagazineView(true);
                                     onMagazineViewToggle(!isMagazineViewOpen);
                                 }}
                                 disabled={(magazineBtnState as string) === 'disabled'}
-                                className={magazineBtnClasses}
+                                className="backdrop-blur-sm"
                                 title="Enter Magazine View"
                             >
                                 <span className="material-symbols-outlined !text-[16px]">auto_stories</span>
                                 <span>Magazine</span>
-                            </button>
+                            </Button>
                         </div>
                     )}
 

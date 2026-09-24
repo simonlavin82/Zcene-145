@@ -100,25 +100,34 @@ export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
 Checkbox.displayName = 'Checkbox';
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary';
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
+  size?: 'sm' | 'md' | 'pill';
   fullWidth?: boolean;
 }
 
 export const Button: React.FC<ButtonProps> = ({
   variant = 'primary',
+  size = 'md',
   fullWidth = false,
   className = '',
   children,
   ...props
 }) => {
-  const base = 'px-6 py-2 rounded-xl font-medium text-sm active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100';
+  const base = 'font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 active:scale-95 shrink-0 leading-none';
+  const sizes: Record<NonNullable<ButtonProps['size']>, string> = {
+    sm: 'px-3 py-1.5 text-xs rounded-xl',
+    md: 'px-6 py-2 text-sm rounded-xl',
+    pill: 'px-4 py-1.5 text-xs rounded-full',
+  };
   const variants: Record<NonNullable<ButtonProps['variant']>, string> = {
     primary: 'bg-primary text-brand-black hover:opacity-90',
-    secondary: 'border border-zinc-700 text-zinc-200 bg-zinc-800 hover:bg-zinc-700',
+    secondary: 'border border-zinc-700 text-zinc-400 bg-zinc-900/60 hover:text-white hover:border-zinc-600 hover:bg-zinc-800',
+    outline: 'border border-primary bg-transparent text-primary hover:bg-primary/20',
+    ghost: 'bg-transparent hover:bg-zinc-800/50 text-zinc-400 hover:text-white',
   };
   return (
     <button
-      className={`${base} ${variants[variant]}${fullWidth ? ' w-full' : ''}${className ? ` ${className}` : ''}`}
+      className={`${base} ${sizes[size]} ${variants[variant]}${fullWidth ? ' w-full' : ''}${className ? ` ${className}` : ''}`}
       {...props}
     >
       {children}
@@ -340,28 +349,26 @@ export interface RootsBreakdownButtonProps {
 }
 
 export const RootsBreakdownButton: React.FC<RootsBreakdownButtonProps> = ({ state, onClick, isLoading }) => {
-  const btnClasses = {
-    disabled: "flex items-center gap-1.5 px-3 py-1.5 border border-zinc-800 bg-zinc-900/20 rounded-xl text-zinc-600 cursor-not-allowed transition-all duration-200 text-xs font-medium shrink-0 leading-none backdrop-blur-sm",
-    attention: "flex items-center gap-1.5 px-3 py-1.5 border border-primary bg-primary/10 rounded-xl text-primary animate-pulse hover:bg-primary/20 active:scale-95 transition-all duration-200 text-xs font-medium shrink-0 leading-none backdrop-blur-sm",
-    neutral: "flex items-center gap-1.5 px-3 py-1.5 border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 transition-all duration-200 text-xs font-medium shrink-0 leading-none backdrop-blur-sm"
+  const btnTitle = {
+    disabled: isLoading ? "Magazine View in progress..." : "No Magazine View available",
+    attention: "New Magazine View available! Click to view",
+    neutral: "View Magazine"
   }[state];
 
-  const btnTitle = {
-    disabled: isLoading ? "Roots Breakdown in progress..." : "No Roots Breakdown available",
-    attention: "New Roots Breakdown available! Click to view",
-    neutral: "View Roots Breakdown"
-  }[state];
+  const variant = state === 'attention' ? 'outline' : 'secondary';
 
   return (
-    <button 
+    <Button 
+      variant={variant}
+      size="sm"
       onClick={state !== 'disabled' ? onClick : undefined}
       disabled={state === 'disabled'}
-      className={btnClasses}
       title={btnTitle}
+      className="backdrop-blur-sm"
     >
       <Waypoints size={16} className="text-current" />
-      <span>Roots</span>
-    </button>
+      <span>Magazine</span>
+    </Button>
   );
 };
 
@@ -1677,17 +1684,15 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Default Status</p>
-                                        <button className="rounded-xl border border-primary bg-transparent px-4 py-2 font-medium text-primary text-sm">
-                                            Support
-                                        </button>
+                                        <div className="w-fit">
+                                            <Button variant="outline">
+                                                Support
+                                            </Button>
+                                        </div>
                                         <div className="flex flex-wrap gap-1.5 pt-2">
                                             <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
                                                 <span className="w-2 h-2 rounded-sm bg-transparent border border-primary"></span>
-                                                bg-transparent border-primary
-                                            </span>
-                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-sm bg-primary border border-primary/20"></span>
-                                                text-primary
+                                                Button variant="outline"
                                             </span>
                                         </div>
                                     </div>
@@ -1723,15 +1728,11 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
                                      <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Default Status</p>
-                                        <button className="w-full border border-zinc-600 text-zinc-300 px-4 py-1 rounded-full font-medium text-xs">Import Library</button>
+                                        <Button variant="secondary" size="pill" fullWidth>Import Library</Button>
                                         <div className="flex flex-wrap gap-1.5 pt-2">
                                             <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-sm bg-transparent border border-zinc-600"></span>
-                                                border-zinc-600
-                                            </span>
-                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-sm bg-zinc-300 border border-zinc-400"></span>
-                                                text-zinc-300
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-800 border border-zinc-700"></span>
+                                                Button variant="secondary" size="pill"
                                             </span>
                                         </div>
                                      </div>
@@ -1786,41 +1787,29 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
                                      <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Default Status</p>
-                                        <button className="border py-1.5 px-3 transition-all text-sm flex items-center gap-1.5 rounded-xl border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:text-white hover:bg-zinc-800 hover:border-zinc-700">
+                                        <Button variant="secondary" size="sm" className="justify-start border-zinc-800 bg-zinc-900/50">
                                             <span className="truncate uppercase font-semibold tracking-tighter">Sunny Day Real Estate</span>
                                             <span className="material-symbols-outlined !text-[14px]">add_circle</span>
-                                        </button>
+                                        </Button>
                                         <div className="flex flex-wrap gap-1.5 pt-2">
                                             <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-sm bg-zinc-900/50 border border-zinc-800"></span>
-                                                bg-zinc-900/50 border-zinc-800
-                                            </span>
-                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-sm bg-zinc-400 border border-zinc-500"></span>
-                                                text-zinc-400
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-900 border border-zinc-800"></span>
+                                                Button variant="secondary" size="sm"
                                             </span>
                                         </div>
-                                    </div>
-                                    <div className="space-y-4">
+                                                           <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover / Active</p>
-                                        <button className="border py-1.5 px-3 transition-all text-sm flex items-center gap-1.5 rounded-xl border-zinc-700 bg-zinc-800 text-white scale-95">
+                                        <Button variant="secondary" size="sm" className="justify-start border-zinc-700 bg-zinc-800 text-white scale-95">
                                             <span className="truncate uppercase font-semibold tracking-tighter">Sunny Day Real Estate</span>
                                             <span className="material-symbols-outlined !text-[14px]">add_circle</span>
-                                        </button>
+                                        </Button>
                                         <div className="flex flex-wrap gap-1.5 pt-2">
                                             <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
                                                 <span className="w-2 h-2 rounded-sm bg-zinc-800 border border-zinc-700"></span>
-                                                hover:bg-zinc-800 hover:border-zinc-700
-                                            </span>
-                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-sm bg-white border border-zinc-300"></span>
-                                                hover:text-white
-                                            </span>
-                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500">
-                                                scale-95
+                                                hover styles via Button component
                                             </span>
                                         </div>
-                                    </div>
+                                    </div>               </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Added (Disabled)</p>
                                         <button disabled className="border py-1.5 px-3 transition-all text-sm flex items-center gap-1.5 rounded-xl text-primary border-primary/30 bg-primary/5 cursor-default">
@@ -2023,46 +2012,28 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 </div>
                             </div>
 
-                            {/* Roots Breakdown Button */}
+                            {/* Magazine View Button */}
                             <div>
                                 <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
-                                    <h3 className="text-xl font-medium text-zinc-200">Roots Breakdown Button</h3>
+                                    <h3 className="text-xl font-medium text-zinc-200">Magazine View Button</h3>
                                     <div className="flex flex-wrap gap-2">
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Component: RootsBreakdownButton</span>
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Icon: Waypoints (lucide)</span>
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Size: Compact (sm)</span>
-                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">States: disabled, attention, neutral</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">States: attention, neutral</span>
                                     </div>
                                 </div>
                                 <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
-                                    An always-visible, state-driven information button. Guides users to the graph's metadata breakdown using a tri-state visual logic.
+                                    An always-visible, state-driven information button. Guides users to the graph's metadata breakdown using a two-state visual logic.
                                 </p>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-none border border-zinc-800">
-                                     <div className="space-y-4">
-                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Disabled State (No content/loading)</p>
-                                        <RootsBreakdownButton state="disabled" isLoading={false} />
-                                        <div className="flex flex-wrap gap-1.5 pt-2">
-                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-sm bg-zinc-900 border border-zinc-800"></span>
-                                                bg-zinc-900 border-zinc-800
-                                            </span>
-                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-sm bg-zinc-600 border border-zinc-700"></span>
-                                                text-zinc-600
-                                            </span>
-                                        </div>
-                                    </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-zinc-900/30 p-8 rounded-none border border-zinc-800">
                                      <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Attention State (Unread insights)</p>
                                         <RootsBreakdownButton state="attention" />
                                         <div className="flex flex-wrap gap-1.5 pt-2">
                                             <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-sm bg-primary/10 border border-primary/50"></span>
-                                                bg-primary/10 border-primary/50
-                                            </span>
-                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-sm bg-primary border border-primary/20"></span>
-                                                text-primary
+                                                <span className="w-2 h-2 rounded-sm bg-transparent border border-primary"></span>
+                                                Button variant="outline"
                                             </span>
                                         </div>
                                     </div>
@@ -2071,6 +2042,9 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <RootsBreakdownButton state="neutral" />
                                         <div className="flex flex-wrap gap-1.5 pt-2">
                                             <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-800 border border-zinc-700"></span>
+                                                Button variant="secondary"
+                                            </span>
                                                 <span className="w-2 h-2 rounded-sm bg-zinc-900 border border-zinc-800"></span>
                                                 bg-zinc-900 border-zinc-800
                                             </span>

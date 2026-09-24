@@ -1,37 +1,26 @@
-# Implementation Plan: Magazine View Deep Cut Typography (Revised)
+# Strategic UI Audit: Button Consolidation & Pulse Removal
 
-## 1. Context and Problem
-The recent update attempted to increase the deep cut bio text to 16px (`text-base`) in the Magazine view by adding a fallback for `isFullScreenMode`. However, the deep cuts still rendered at 14px. We need to identify why the previous logic failed to apply `text-base` to the deep cuts in the Magazine view and propose a definitive fix.
+## Audit Findings
+- **Current Button Ecosystem**: We currently have multiple bespoke button definitions scattered across `DesignSystem.tsx` and duplicated in consumer components like `DetailsPanel.tsx`.
+- **Identified Redundancies**:
+  - `RootsBreakdownButton` (Magazine/Roots button) has duplicate definitions in `DesignSystem.tsx` and `DetailsPanel.tsx`. It shares base structural styles with secondary interactive elements but uses a hardcoded tri-state string definition.
+  - The `attention` state of the Magazine/Roots button uses `animate-pulse`, which causes visual fatigue.
+  - "Brand Support Action", "Utility Pills", and "Scene Tags" repeat roughly 90% of the same Tailwind utility classes (e.g., `flex items-center justify-center rounded-xl transition-all active:scale-95 text-xs font-medium`) found in our standard `<Button>` component.
+  - There is a functional overlap between "Secondary Buttons", "Roots Breakdown (Neutral)", and "Scene Tags". They all serve as outlined/subtle secondary actions but implement hover backgrounds, borders, and opacities slightly differently, fragmenting the design tokens.
 
-## 2. Root Cause Analysis
-The previous fix updated the bio container class to:
-```tsx
-<div className={`leading-relaxed text-zinc-300 markdown-bio ${isHero ? 'text-[clamp(0.875rem,1vw,1rem)] font-normal column-count-1 md:column-count-2 md:gap-12' : (isFullScreenMode ? 'text-base font-normal' : 'text-sm')}`}>
-```
+## Consolidation Recommendations
+- **Targeted Pulse Removal**: Immediately remove `animate-pulse` from the `attention` state of the Magazine/Roots Breakdown buttons to resolve visual fatigue. Map its attention state to rely on static color contrast (e.g., solid primary border/text with a slight glow or elevated opacity) rather than animation.
+- **Unify Base Button Component**: Extend the core `<Button>` component in `DesignSystem.tsx` to handle a stricter taxonomy of `variant` tokens (e.g., `'primary'`, `'secondary'`, `'outline'`, `'ghost'`) and sizes (`'sm'`, `'md'`).
+- **Merge Magazine / Roots Breakdown Logic**: Map the Magazine button's tri-state directly to the unified button props:
+  - `neutral` state -> maps to `variant="secondary"`
+  - `attention` state -> maps to `variant="outline"` with a brand color emphasis.
+  - `disabled` state -> handled by the standard native `disabled` attribute rather than a bespoke CSS class block.
+- **Deduplicate Components**: Purge the inline `RootsBreakdownButton` declaration from `DetailsPanel.tsx` and strictly import it from `DesignSystem.tsx`. Deprecate bespoke classes for "Brand Support", "Utility Pills", and "Scene Tags", funneling them through the core `<Button>` API.
 
-The failure lies in how `isHero` is calculated for the Magazine view cards. In `DetailsPanel.tsx` (around line 2558), `isHero` is defined as:
-```tsx
-const isHero = isMagazineViewOpen && (node.id === selectedNode?.id || (isRichData && node.type === 'artist'));
-```
-This means that in the Magazine view, **all** artist nodes with rich data (including deep cuts like "Buggin" and "Spaced") evaluate `isHero` to `true`. 
-
-Because `isHero` was `true`, the code hit the first branch of the ternary operator and applied `text-[clamp(0.875rem,1vw,1rem)]`. On standard desktop resolutions (e.g., 1400px width), `1vw` evaluates to `14px`, causing the text to render at exactly 14px instead of the intended 16px (`text-base`). 
-
-My previous logic `(isFullScreenMode ? 'text-base font-normal' : 'text-sm')` was completely bypassed because `isHero` intercepted it.
-
-## 3. Proposed Code Fix
-We must detach the typography size logic from the `isHero` state. `isFullScreenMode` should be the **sole** determinant for the font size, while `isHero` can continue to manage the column layout.
-
-We will update the `markdown-bio` wrapper in `NodeDetailsCard` (around line 1338) to:
-
-```tsx
-<div className={`leading-relaxed text-zinc-300 markdown-bio ${isFullScreenMode ? 'text-base font-normal' : 'text-sm'} ${isHero ? 'column-count-1 md:column-count-2 md:gap-12' : ''}`}>
-```
-
-**Why this works perfectly:**
-1. **Magazine View (`isFullScreenMode = true`)**: Unconditionally applies `text-base` (16px), ensuring deep cuts and hero nodes alike use the 16px reading typography.
-2. **Side Panel (`isFullScreenMode = false`)**: Unconditionally applies `text-sm` (14px), protecting the constrained layout.
-3. **Layout formatting**: Preserves the `column-count` logic for rich nodes without entangling it with font size.
-
-## 4. Next Steps
-Once this revised plan is approved, I will deploy the `replace_file_content` tool to immediately swap this class logic and resolve the bug permanently.
+## Execution Checklist
+1. **[PRIORITY] Targeted Pulse Removal**: Edit `DesignSystem.tsx` (approx line 345) and `DetailsPanel.tsx` (approx line 1916) to remove `animate-pulse` from the `attention` state of the Magazine/Roots Breakdown button.
+2. **Refactor `<Button>` Base**: Update the core `<Button>` interface in `DesignSystem.tsx` to accept sizes (`sm`, `md`, `pill`) and extended design tokens (`outline`, `ghost`).
+3. **Consolidate RootsBreakdown**: Refactor the `RootsBreakdownButton` component in `DesignSystem.tsx` to compose the newly unified `<Button>` component rather than returning a raw HTML `<button>` with concatenated strings.
+4. **Remove Duplication**: Delete the duplicate `RootsBreakdownButton` block from `DetailsPanel.tsx` and update its imports.
+5. **Migrate Remaining Variants**: Sweep `DesignSystem.tsx` and `DetailsPanel.tsx` for manual instances of "Brand Support Action", "Utility Pills", and "Scene Tags", replacing them with the standard `<Button>` implementation.
+6. **Purge Dead Code**: Remove unused disabled states and obsolete bespoke button variables from the style guide documentation.
