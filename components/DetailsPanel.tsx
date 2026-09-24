@@ -1053,7 +1053,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                     <div className={`transition-all duration-300 ${
                         isFullScreenMode
                             ? isHeaderStuck
-                                ? 'w-fit bg-zinc-900/80 backdrop-blur-md border border-zinc-700 rounded-xl px-3 md:px-4 py-1.5 shadow-lg -ml-1 md:-ml-4'
+                                ? 'w-fit bg-zinc-900/80 backdrop-blur-md border border-zinc-700 rounded-none px-3 md:px-4 py-1.5 shadow-lg -ml-1 md:-ml-4'
                                 : 'w-full bg-transparent border border-transparent px-0 pt-2 pb-3'
                             : `w-full px-4 ${isHeaderStuck ? 'py-2' : 'pt-2 pb-3'}`
                     }`}>

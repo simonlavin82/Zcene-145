@@ -1,26 +1,20 @@
-# Strategic UI Audit: Button Consolidation & Pulse Removal
+# UI Polish: Enforce Hard-Edge Rule on Sticky Magazine Header
 
 ## Audit Findings
-- **Current Button Ecosystem**: We currently have multiple bespoke button definitions scattered across `DesignSystem.tsx` and duplicated in consumer components like `DetailsPanel.tsx`.
-- **Identified Redundancies**:
-  - `RootsBreakdownButton` (Magazine/Roots button) has duplicate definitions in `DesignSystem.tsx` and `DetailsPanel.tsx`. It shares base structural styles with secondary interactive elements but uses a hardcoded tri-state string definition.
-  - The `attention` state of the Magazine/Roots button uses `animate-pulse`, which causes visual fatigue.
-  - "Brand Support Action", "Utility Pills", and "Scene Tags" repeat roughly 90% of the same Tailwind utility classes (e.g., `flex items-center justify-center rounded-xl transition-all active:scale-95 text-xs font-medium`) found in our standard `<Button>` component.
-  - There is a functional overlap between "Secondary Buttons", "Roots Breakdown (Neutral)", and "Scene Tags". They all serve as outlined/subtle secondary actions but implement hover backgrounds, borders, and opacities slightly differently, fragmenting the design tokens.
+- **Target Component:** `DetailsPanel.tsx` (specifically within the Magazine/Fullscreen view).
+- **Target Container:** The sticky artist name header that attaches to the top of the scroll container (`<div className="transition-all duration-300 flex-shrink-0 sticky z-40 w-full ...">`).
+- **Identified Violation:** When `isFullScreenMode` and `isHeaderStuck` are true, the nested child container applies the `rounded-xl` utility class. 
+- **Rule Breached:** As per the Zcene Design Philosophy ("Functional Signifiers"), rounded edges (6px+) are exclusively reserved for interactive/clickable components. Since this sticky header is a non-interactive structural label, it must use hard edges (0px radius) to align with our 90s Structural Brutalism aesthetic.
 
-## Consolidation Recommendations
-- **Targeted Pulse Removal**: Immediately remove `animate-pulse` from the `attention` state of the Magazine/Roots Breakdown buttons to resolve visual fatigue. Map its attention state to rely on static color contrast (e.g., solid primary border/text with a slight glow or elevated opacity) rather than animation.
-- **Unify Base Button Component**: Extend the core `<Button>` component in `DesignSystem.tsx` to handle a stricter taxonomy of `variant` tokens (e.g., `'primary'`, `'secondary'`, `'outline'`, `'ghost'`) and sizes (`'sm'`, `'md'`).
-- **Merge Magazine / Roots Breakdown Logic**: Map the Magazine button's tri-state directly to the unified button props:
-  - `neutral` state -> maps to `variant="secondary"`
-  - `attention` state -> maps to `variant="outline"` with a brand color emphasis.
-  - `disabled` state -> handled by the standard native `disabled` attribute rather than a bespoke CSS class block.
-- **Deduplicate Components**: Purge the inline `RootsBreakdownButton` declaration from `DetailsPanel.tsx` and strictly import it from `DesignSystem.tsx`. Deprecate bespoke classes for "Brand Support", "Utility Pills", and "Scene Tags", funneling them through the core `<Button>` API.
+## Implementation Plan
 
-## Execution Checklist
-1. **[PRIORITY] Targeted Pulse Removal**: Edit `DesignSystem.tsx` (approx line 345) and `DetailsPanel.tsx` (approx line 1916) to remove `animate-pulse` from the `attention` state of the Magazine/Roots Breakdown button.
-2. **Refactor `<Button>` Base**: Update the core `<Button>` interface in `DesignSystem.tsx` to accept sizes (`sm`, `md`, `pill`) and extended design tokens (`outline`, `ghost`).
-3. **Consolidate RootsBreakdown**: Refactor the `RootsBreakdownButton` component in `DesignSystem.tsx` to compose the newly unified `<Button>` component rather than returning a raw HTML `<button>` with concatenated strings.
-4. **Remove Duplication**: Delete the duplicate `RootsBreakdownButton` block from `DetailsPanel.tsx` and update its imports.
-5. **Migrate Remaining Variants**: Sweep `DesignSystem.tsx` and `DetailsPanel.tsx` for manual instances of "Brand Support Action", "Utility Pills", and "Scene Tags", replacing them with the standard `<Button>` implementation.
-6. **Purge Dead Code**: Remove unused disabled states and obsolete bespoke button variables from the style guide documentation.
+1. **Modify Sticky Header Container (`DetailsPanel.tsx`)**
+   - Locate the sticky header's inner wrapper (around line 1056).
+   - The current class string for the stuck state is: 
+     `'w-fit bg-zinc-900/80 backdrop-blur-md border border-zinc-700 rounded-xl px-3 md:px-4 py-1.5 shadow-lg -ml-1 md:-ml-4'`
+   - **Action:** Remove the `rounded-xl` class and explicitly replace it with `rounded-none` (to enforce 0px radius).
+   - The updated class string will be: 
+     `'w-fit bg-zinc-900/80 backdrop-blur-md border border-zinc-700 rounded-none px-3 md:px-4 py-1.5 shadow-lg -ml-1 md:-ml-4'`
+
+## Execution
+This change is localized and purely visual. Once this plan is approved, I will deploy the `replace_file_content` tool to immediately swap the classes and enforce the brutalist structural aesthetic.
