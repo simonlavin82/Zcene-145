@@ -1,22 +1,24 @@
-# Strategic UI Audit: Secondary Button Modernization
+# UI Polish: Secondary Button Stroke & Layout Documentation
 
 ## Audit Findings
-- **Current State of `<Button>` Component:** The `secondary` variant within the core `<Button>` component (`DesignSystem.tsx`) was partially updated in the previous refactor to use `bg-zinc-900/60`, but the "Secondary Buttons" documentation block in `DesignSystem.tsx` and the actual usage in the Artist Catalog (`DetailsPanel.tsx`) are still hardcoded with the dated `bg-zinc-800 border-zinc-700 text-zinc-300` utility classes.
-- **Link Components:** The Artist Catalog items (YouTube, Bandcamp, Official Website) are rendered as `<a>` tags. Since our `<Button>` component strictly renders a `<button>` element, these links are currently maintaining their own bespoke duplicated class lists instead of inheriting from a single token.
+- **Stroke Contrast Issue:** The recent modernization of the secondary button introduced `border-zinc-800`, which lacks sufficient contrast against the deep `bg-zinc-900/50` background, causing the stroke to virtually disappear. By examining the "Exit Magazine" button, we observed it utilizes `border-zinc-700` with a `hover:border-zinc-600` state, which provides the desired crisp definition.
+- **Layout Modifier Documentation:** The Zcene design system currently doesn't explicitly document how layout overrides (e.g., `w-full justify-start`) should be handled. We need to formalize this to prevent future developers from creating bespoke tokens for simple layout variants like the Artist Catalog.
 
 ## Implementation Plan
 
-1. **Modernize and Extract Secondary Token (`DesignSystem.tsx`)**
-   - Ensure the `secondary` variant in `<Button>` is perfectly tuned to the deep neutral aesthetic: `border border-zinc-800 text-zinc-400 bg-zinc-900/50 hover:text-white hover:border-zinc-700 hover:bg-zinc-800/80` (or similar).
-   
-2. **Refactor "Secondary Buttons" Documentation (`DesignSystem.tsx`)**
-   - Replace the hardcoded `<div>` wrappers in the "Secondary Buttons" documentation section with actual usages of the `<Button variant="secondary">` component, so the visual style guide accurately reflects the new modernized look.
+1. **Fix the Stroke Contrast (`DesignSystem.tsx`)**
+   - Update the `secondary` variant in the core `<Button>` component to restore the crisp border:
+     *From:* `border-zinc-800 ... hover:border-zinc-700`
+     *To:* `border-zinc-700 ... hover:border-zinc-600`
+   - The deep background (`bg-zinc-900/50`) will remain untouched as requested.
 
-3. **Cascade to Artist Catalog (`DetailsPanel.tsx`)**
-   - Since the Artist Catalog buttons are anchor links (`<a>`), I will update their `className` string to exactly match the new base + secondary variant classes from our unified `<Button>` component. 
-   - *Alternative/Preferred:* I will apply the updated `bg-zinc-900/50 border-zinc-800` classes directly to these anchor tags, keeping `justify-start` to maintain the left-aligned layout of the catalog.
+2. **Document Layout Modifiers (`DesignSystem.tsx`)**
+   - In the "Secondary Buttons" section, append the following to the description text:
+     *"While buttons default to center alignment, they fully support structural overrides (e.g., `w-full justify-start`) for contextual uses like vertical catalog menus. This ensures layout flexibility without creating bespoke tokens."*
 
-## Verification
-- Updating these classes will safely cascade the visual style without breaking the layout because we are only modifying colors, borders, and opacities (backgrounds and borders). We will retain structural layout classes like `w-full`, `px-4 py-2`, `flex items-center justify-start` to ensure layout safety.
+3. **Cascade Fix to Artist Catalog (`DetailsPanel.tsx`)**
+   - Update the manual anchor (`<a>`) tags rendering the YouTube, Bandcamp, and Official Website links in the Artist Catalog.
+   - Swap `border-zinc-800 hover:border-zinc-700` back to `border-zinc-700 hover:border-zinc-600` to match the core token fix.
 
-*Awaiting approval before execution.*
+## Execution
+Once approved, I will deploy the `multi_replace_file_content` tool to patch the utility classes and insert the layout documentation.
