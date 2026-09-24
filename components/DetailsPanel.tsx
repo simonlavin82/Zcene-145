@@ -1157,10 +1157,10 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                             {activeTasteProfilesData.map((data) => {
                                                 const hexMap: Record<string, string> = {
                                                     purple: '#a855f7',
-                                                    emerald: '#10b981',
-                                                    amber: '#f59e0b',
-                                                    rose: '#f43f5e',
-                                                    cyan: '#06b6d4'
+                                                    teal: '#2dd4bf',
+                                                    red: '#ef4444',
+                                                    blue: '#3b82f6',
+                                                    pink: '#ec4899'
                                                 };
                                                 const colorHex = hexMap[data.profile.color] || '#a855f7';
                                                 return (

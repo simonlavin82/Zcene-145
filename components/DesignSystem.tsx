@@ -1045,12 +1045,11 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         These vibrant "Style Profile" colours are the universal source of truth for all sequential UI mappings. They are used to dynamically colour Dashboard Crates (to create physical-record visual rhythm) and to assign visual distinction to nodes in the D3 Spiderweb graph.
                                     </p>
                                 </div>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                                <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
                                     <ColorSwatch name="Purple" hex="#A855F7" className="bg-purple-500" />
                                     <ColorSwatch name="Teal" hex="#2DD4BF" className="bg-teal-400" />
                                     <ColorSwatch name="Red" hex="#EF4444" className="bg-red-500" />
                                     <ColorSwatch name="Blue" hex="#3B82F6" className="bg-blue-500" />
-                                    <ColorSwatch name="Green" hex="#10B981" className="bg-emerald-500" />
                                     <ColorSwatch name="Pink" hex="#EC4899" className="bg-pink-500" />
                                 </div>
                             </div>

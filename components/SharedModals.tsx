@@ -114,7 +114,6 @@ export const PROFILE_COLORS = [
   { name: 'teal', class: 'bg-[#2dd4bf]' },
   { name: 'red', class: 'bg-[#ef4444]' },
   { name: 'blue', class: 'bg-[#3b82f6]' },
-  { name: 'green', class: 'bg-[#10b981]' },
   { name: 'pink', class: 'bg-[#ec4899]' }
 ];
 
