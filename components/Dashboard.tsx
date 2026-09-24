@@ -7,7 +7,7 @@ import { motion } from 'framer-motion';
 import { normalizeArtistId, cleanArtistDisplayName, isNodeInSeedList } from '../services/artistCacheService';
 
 
-import { formatSystemTimestamp } from '../utils/formatters';
+import { formatSystemTimestamp, zceneCategoricalPalette, zceneFallbackColor } from '../utils/formatters';
 import { SeedArtistImages } from './SeedArtistImages';
 import { ModalBackdrop, ModalContainer, ModalHeader, ModalBody, ModalFooter } from './ui/Dialog';
 import { DashboardProjectCard } from './DashboardProjectCard';
@@ -323,7 +323,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             </div>
           ) : view === 'grid' ? (
             <div className="w-full flex flex-wrap gap-x-8 gap-y-10 items-start">
-              {sortedBucketKeys.map((bucketKey) => {
+              {sortedBucketKeys.map((bucketKey, bucketIndex) => {
                 const projectsInBucket = groupedProjects[bucketKey] || [];
                 const count = projectsInBucket.length;
                 let gridColsClass = "grid-cols-1 md:grid-cols-2 xl:grid-cols-3";
@@ -333,14 +333,31 @@ const Dashboard: React.FC<DashboardProps> = ({
                   gridColsClass = "grid-cols-1 md:grid-cols-2";
                 }
 
+                const isUnassigned = bucketKey === 'UNASSIGNED';
+                const crateColor = isUnassigned ? zceneFallbackColor : zceneCategoricalPalette[bucketIndex % zceneCategoricalPalette.length];
+
                 return (
                   <div 
                     key={bucketKey} 
-                    className="w-full md:w-fit max-w-full bg-zinc-950 rounded-tr-xl rounded-b-xl rounded-tl-none border border-zinc-800 p-4 relative flex-shrink-0 min-w-0"
+                    className="w-full md:w-fit max-w-full rounded-tr-xl rounded-b-xl rounded-tl-none border p-4 relative flex-shrink-0 min-w-0"
+                    style={{
+                      borderColor: `${crateColor}33`,
+                      backgroundColor: `${crateColor}0A`
+                    }}
                   >
                     {/* Unified Folder Index Tab */}
-                    <div className="w-[160px] bg-zinc-950 border-t border-l border-r border-zinc-800 rounded-t-lg text-[9px] font-mono absolute -top-[22px] left-[-1px] px-3 py-1 flex items-center h-[22.5px] z-10 select-none">
-                      <div className="truncate text-ellipsis whitespace-nowrap uppercase tracking-widest text-zinc-400 font-medium">
+                    <div 
+                      className="w-[160px] border-t border-l border-r rounded-t-lg text-[9px] font-mono absolute -top-[22px] left-[-1px] px-3 py-1 flex items-center h-[22.5px] z-10 select-none"
+                      style={{
+                        borderColor: `${crateColor}33`,
+                        borderTopColor: crateColor,
+                        backgroundColor: `${crateColor}0A`
+                      }}
+                    >
+                      <div 
+                        className="truncate text-ellipsis whitespace-nowrap uppercase tracking-widest font-medium"
+                        style={{ color: crateColor }}
+                      >
                         {bucketKey}
                       </div>
                     </div>
@@ -413,14 +430,28 @@ const Dashboard: React.FC<DashboardProps> = ({
                   </tr>
                 </thead>
                 <tbody className="bg-zinc-900">
-                  {sortedBucketKeys.map((bucketKey) => (
+                  {sortedBucketKeys.map((bucketKey, bucketIndex) => {
+                    const isUnassigned = bucketKey === 'UNASSIGNED';
+                    const crateColor = isUnassigned ? zceneFallbackColor : zceneCategoricalPalette[bucketIndex % zceneCategoricalPalette.length];
+                    
+                    return (
                     <React.Fragment key={bucketKey}>
                       {/* Unified Folder Tab Divider Row */}
                       <tr className="select-none pointer-events-none bg-zinc-900">
                         <td colSpan={7} className="pt-6 pb-0 px-6 align-bottom bg-zinc-900 border-none">
                           {/* The Folder Tab */}
-                          <div className="w-[140px] sm:w-[160px] bg-zinc-950 border-t border-l border-r border-zinc-800 rounded-t-lg px-3 py-1.5 font-mono tracking-widest text-[9px] sm:text-[10px] text-zinc-400 uppercase font-medium relative -mb-[1px] z-0">
-                            <div className="truncate text-ellipsis whitespace-nowrap">
+                          <div 
+                            className="w-[140px] sm:w-[160px] border-t border-l border-r rounded-t-lg px-3 py-1.5 font-mono tracking-widest text-[9px] sm:text-[10px] uppercase font-medium relative -mb-[1px] z-0"
+                            style={{
+                              borderColor: `${crateColor}33`,
+                              borderTopColor: crateColor,
+                              backgroundColor: `${crateColor}0A`
+                            }}
+                          >
+                            <div 
+                              className="truncate text-ellipsis whitespace-nowrap"
+                              style={{ color: crateColor }}
+                            >
                               {bucketKey}
                             </div>
                           </div>
@@ -594,7 +625,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                         );
                       })}
                     </React.Fragment>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

@@ -1040,22 +1040,20 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
 
                             <div>
                                 <div className="mb-6">
-                                    <h3 className="text-xl font-medium text-zinc-200">Graph Node Colours</h3>
+                                    <h3 className="text-xl font-medium text-zinc-200">Zcene Categorical Palette</h3>
                                     <p className="text-sm text-zinc-400 mt-2 leading-relaxed max-w-2xl">
-                                        These colours are used sequentially to assign a colour to each artist 'group' in the graph, providing visual distinction between different musical clusters. Sourced from D3's schemeTableau10.
+                                        These vibrant "Style Profile" colours are the universal source of truth for all sequential UI mappings. They are used to dynamically colour Dashboard Crates (to create physical-record visual rhythm) and to assign visual distinction to nodes in the D3 Spiderweb graph.
                                     </p>
                                 </div>
-                                <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
-                                    <ColorSwatch name="Graph Blue" hex="#4e79a7" style={{ backgroundColor: '#4e79a7' }} />
-                                    <ColorSwatch name="Graph Orange" hex="#f28e2c" style={{ backgroundColor: '#f28e2c' }} />
-                                    <ColorSwatch name="Graph Red" hex="#e15759" style={{ backgroundColor: '#e15759' }} />
-                                    <ColorSwatch name="Graph Teal" hex="#76b7b2" style={{ backgroundColor: '#76b7b2' }} />
-                                    <ColorSwatch name="Graph Green" hex="#59a14f" style={{ backgroundColor: '#59a14f' }} />
-                                    <ColorSwatch name="Graph Yellow" hex="#edc949" style={{ backgroundColor: '#edc949' }} />
-                                    <ColorSwatch name="Graph Purple" hex="#af7aa1" style={{ backgroundColor: '#af7aa1' }} />
-                                    <ColorSwatch name="Graph Pink" hex="#ff9da7" style={{ backgroundColor: '#ff9da7' }} />
-                                    <ColorSwatch name="Graph Brown" hex="#9c755f" style={{ backgroundColor: '#9c755f' }} />
-                                    <ColorSwatch name="Graph Grey" hex="#bab0ab" style={{ backgroundColor: '#bab0ab' }} />
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                                    <ColorSwatch name="Purple" hex="#A855F7" className="bg-purple-500" />
+                                    <ColorSwatch name="Teal" hex="#2DD4BF" className="bg-teal-400" />
+                                    <ColorSwatch name="Red" hex="#EF4444" className="bg-red-500" />
+                                    <ColorSwatch name="Yellow" hex="#EAB308" className="bg-yellow-500" />
+                                    <ColorSwatch name="Blue" hex="#3B82F6" className="bg-blue-500" />
+                                    <ColorSwatch name="Green" hex="#10B981" className="bg-emerald-500" />
+                                    <ColorSwatch name="Orange" hex="#F59E0B" className="bg-orange-500" />
+                                    <ColorSwatch name="Pink" hex="#EC4899" className="bg-pink-500" />
                                 </div>
                             </div>
                         </div>

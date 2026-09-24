@@ -3,6 +3,7 @@ import * as d3 from 'd3';
 import { motion } from 'motion/react';
 import { GraphData, Node, Link } from '../types';
 import { LegendSymbol } from './Icons';
+import { zceneCategoricalPalette, zceneFallbackColor } from '../utils/formatters';
 
 // A static, predefined graph for the example animation that mirrors real app data structure
 const exampleGraphData: GraphData = {
@@ -227,7 +228,7 @@ const ExampleMusicGraph: React.FC = () => {
         const svg = d3.select(svgRef.current);
         svg.attr("viewBox", `0 0 ${width} ${height}`);
 
-        const colorScale = d3.scaleOrdinal(d3.schemeTableau10);
+        const colorScale = d3.scaleOrdinal(zceneCategoricalPalette);
 
         // Glow filter
         let defs = svg.select("defs");
@@ -393,13 +394,8 @@ const ExampleMusicGraph: React.FC = () => {
                 if (d.type === 'artist') {
                     return isSeed ? '#F6E468' : '#A855F7';
                 }
-                switch (d.type) {
-                    case 'genre': return '#3B82F6';
-                    case 'label': return '#10B981';
-                    case 'country': return '#F59E0B';
-                    case 'founded': return '#EC4899';
-                    default: return '#71717A';
-                }
+                if (!d.type) return zceneFallbackColor;
+                return colorScale(d.type);
             })
             .attr("stroke", (d: any) => {
                 if (d.isLoading) return "#A855F7";

@@ -58,3 +58,18 @@ export const generateDeterministicGradient = (seed: string): string => {
   
   return `linear-gradient(135deg, hsl(${h}, ${s}%, 12%) 0%, hsl(${(h + 40) % 360}, ${s}%, 18%) 100%)`;
 };
+
+// Zcene Categorical Palette
+export const zceneCategoricalPalette = [
+  '#a855f7', // Purple
+  '#2dd4bf', // Teal
+  '#ef4444', // Red
+  '#eab308', // Yellow
+  '#3b82f6', // Blue
+  '#10b981', // Green
+  '#f59e0b', // Orange
+  '#ec4899', // Pink
+];
+
+export const zceneFallbackColor = '#71717a'; // Zinc
+
