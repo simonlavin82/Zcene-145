@@ -1,32 +1,34 @@
-# Strategic UI Refactor: "Crate-Digger" Dashboard & Palette Consolidation
+# Strategic UI Refactor: Crate Tabs & Legend Synchronization
 
 ## Concept & Architecture
-We are upgrading the Zcene dashboard to mimic physical record shop crates, improving peripheral scanning and accessibility by introducing category-specific colors, while strictly maintaining the 90s neo-brutalist dark mode. We are eliminating generic default palettes in favor of a unified, premium Zcene Categorical Palette.
+We are completing the final polish of the Crate-Digger Dashboard and the Zcene Categorical Palette consolidation. This involves two distinct visual refinements:
+1. **Physical Record Shop Tabs:** Enhancing the tactile feel of the Dashboard crates by turning the folder tabs into solid, brightly-coloured plastic dividers with stark black text.
+2. **Legend Synchronization:** Ensuring that the hardcoded interactive graph legends perfectly mirror the dynamic colour assignments executed by the D3 `scaleOrdinal` physics engine.
 
 ## Implementation Plan
 
-### 1. Centralize the Zcene Categorical Palette
-- Define the universal "Style Profile" colors (Purple, Teal, Red, Yellow, Blue, etc.) as an exported constant array (`zceneCategoricalPalette`) in a central location (e.g., `utils/formatters.ts` or a new constants file) so both React components and D3 graphs can access it uniformly.
-- Exact hex codes will be extracted from the active "Style Profile" tokens.
+### 1. Physical Crate Tabs (Dashboard Styling)
+- **Target Component:** `Dashboard.tsx`
+- **Current State:** The folder tab uses a dark background (`bg-zinc-950` with a 4% colour wash) and coloured text.
+- **New Execution:**
+  - We will modify the inline styles of the tab container to use the full 100% opacity categorical colour as its `backgroundColor`.
+  - The text colour will be flipped from the categorical colour to pure brand black (`#111113` or `#000000`).
+  - We will remove the coloured top border on the tab (as the entire tab is now a solid block of colour).
+  - The main crate body will retain its 4% ambient wash and 20% structural stroke.
+  - This change needs to be applied to both the Grid View crates and the List View divider tabs.
 
-### 2. Implement Sequential "Crate" Mapping (Dashboard)
-- **Abandon String Hashing:** To create a proper visual rhythm and prevent adjacent crates of the same color, we will use index-based sequential mapping.
-- **Index Modulo:** In `Dashboard.tsx`, when mapping over the grouped genre buckets (the crates), we will assign colors based on the crate's index: `color = zceneCategoricalPalette[index % zceneCategoricalPalette.length]`.
-- **Empty State Fallback:** Any "New" or unassigned crate will default to a deliberate neutral token (e.g., `#71717A` Zinc) to provide a sleek baseline state.
-
-### 3. Apply the Crate Visual Architecture (CSS Execution)
-We will execute the crate colors using dynamic inline styles that respect the existing Depth Matrix (voids vs. surfaces):
-- **The Edge-Lit Tab (100% Opacity):** The folder tab text and a stark 1px top border will hit at full opacity using the sequential category color.
-- **The Structural Stroke (~20% Opacity):** The outer border of the crate will carry a faint tint of the category color (`${categoryHex}33`).
-- **The Ambient Wash (~4% Opacity):** The inner background of the crate will receive an ultra-low, flat opacity fill (`${categoryHex}0A`), slightly tinting the void without muddying or competing with vibrant album artwork.
-
-### 4. Update the D3 Graph Logic (`MusicGraph.tsx` & `ExampleMusicGraph.tsx`)
-- **Deprecate Legacy Palettes:** Remove all references to `d3.schemeTableau10`.
-- **Sequential Graph Mapping:** Replace the hardcoded switch statements in `getNodeColor` (e.g., Genre = Blue, Label = Green) with `d3.scaleOrdinal(zceneCategoricalPalette)`. D3's scaleOrdinal natively assigns colors sequentially as it discovers new node groups, perfectly aligning with our new aesthetic strategy.
-
-### 5. Consolidate the Design System (`DesignSystem.tsx`)
-- Scrub the visual swatches and documentation tooltips for legacy colors (`Graph Blue`, `Graph Orange`, `schemeTableau10`).
-- Document the new "Zcene Categorical Palette" (the promoted Style Profile colors) and establish them as the universal source of truth for both structural crates and data visualizations.
+### 2. Graph Legend Synchronization
+- **The Challenge:** D3's `scaleOrdinal` assigns colours to new node types as they are discovered in the dataset. However, our UI legends (which act as filters) are currently hardcoded with legacy colours (e.g., `#3B82F6` for Genre).
+- **The Solution:** We must pre-map the standard node types ('genre', 'label', 'country', 'founded') to our new `zceneCategoricalPalette` so both the D3 engine and the React UI draw from the exact same deterministic source.
+- **Execution Strategy:**
+  1. **Define a Deterministic Map (`utils/formatters.ts`):** 
+     - We will create an exported constant `nodeTypeColorMap` that explicitly maps specific node types to specific colours from our `zceneCategoricalPalette`.
+     - *Example:* `genre` -> Palette Index 0 (Purple), `label` -> Palette Index 1 (Teal), etc.
+     - Seed artists (Yellow) and AI artists (Purple) will remain explicitly mapped as they are core functional identities, not generic categories.
+  2. **Update Graph Physics (`MusicGraph.tsx` & `ExampleMusicGraph.tsx`):**
+     - We will update the `getNodeColor` logic. Instead of relying purely on a sequential `d3.scaleOrdinal()`, we will first check our `nodeTypeColorMap`. If the node type exists in the map, we use that exact colour. If it's a completely new/unknown type, we can fallback to `d3.scaleOrdinal()`.
+  3. **Update UI Legends (`MusicGraph.tsx`, `ExampleMusicGraph.tsx` & `DesignSystem.tsx`):**
+     - We will refactor the hardcoded legend HTML/JSX to dynamically pull background and text colours from the `nodeTypeColorMap`.
 
 ## Execution
-Once approved, I will implement the central color palette, apply the sequential CSS mapping to the Dashboard crates, update the D3 graphs, and clean up the Design System.
+Once approved, I will implement the deterministic colour map in `formatters.ts`, wire it into the graphs and legends, and apply the solid background styling to the Dashboard crate tabs.
