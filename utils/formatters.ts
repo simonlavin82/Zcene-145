@@ -63,8 +63,8 @@ export const generateDeterministicGradient = (seed: string): string => {
 export const zceneCategoricalPalette = [
   '#a855f7', // Purple
   '#2dd4bf', // Teal
-  '#ef4444', // Red
-  '#3b82f6', // Blue
+  '#38bdf8', // Electric Sky
+  '#6366f1', // Vivid Indigo
   '#ec4899', // Pink
 ];
 
@@ -72,8 +72,8 @@ export const zceneFallbackColor = '#71717a'; // Zinc
 
 export const nodeTypeColorMap: Record<string, string> = {
   label: zceneCategoricalPalette[1], // Teal
-  country: zceneCategoricalPalette[2], // Red (Origin)
-  genre: zceneCategoricalPalette[3], // Blue
+  genre: zceneCategoricalPalette[2], // Electric Sky
+  country: zceneCategoricalPalette[3], // Vivid Indigo (Origin)
   founded: zceneCategoricalPalette[4], // Pink
   seed: '#F6E468', // Primary Brand Yellow
   ai: zceneCategoricalPalette[0], // Purple

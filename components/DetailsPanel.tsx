@@ -1158,8 +1158,8 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                 const hexMap: Record<string, string> = {
                                                     purple: '#a855f7',
                                                     teal: '#2dd4bf',
-                                                    red: '#ef4444',
-                                                    blue: '#3b82f6',
+                                                    sky: '#38bdf8',
+                                                    indigo: '#6366f1',
                                                     pink: '#ec4899'
                                                 };
                                                 const colorHex = hexMap[data.profile.color] || '#a855f7';

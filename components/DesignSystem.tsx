@@ -1048,8 +1048,8 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
                                     <ColorSwatch name="Purple" hex="#A855F7" className="bg-purple-500" />
                                     <ColorSwatch name="Teal" hex="#2DD4BF" className="bg-teal-400" />
-                                    <ColorSwatch name="Red" hex="#EF4444" className="bg-red-500" />
-                                    <ColorSwatch name="Blue" hex="#3B82F6" className="bg-blue-500" />
+                                    <ColorSwatch name="Electric Sky" hex="#38BDF8" className="bg-sky-400" />
+                                    <ColorSwatch name="Vivid Indigo" hex="#6366F1" className="bg-indigo-500" />
                                     <ColorSwatch name="Pink" hex="#EC4899" className="bg-pink-500" />
                                 </div>
                             </div>

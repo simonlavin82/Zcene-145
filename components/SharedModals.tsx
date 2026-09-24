@@ -112,8 +112,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 export const PROFILE_COLORS = [
   { name: 'purple', class: 'bg-[#a855f7]' },
   { name: 'teal', class: 'bg-[#2dd4bf]' },
-  { name: 'red', class: 'bg-[#ef4444]' },
-  { name: 'blue', class: 'bg-[#3b82f6]' },
+  { name: 'sky', class: 'bg-[#38bdf8]' },
+  { name: 'indigo', class: 'bg-[#6366f1]' },
   { name: 'pink', class: 'bg-[#ec4899]' }
 ];
 
