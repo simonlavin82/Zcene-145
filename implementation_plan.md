@@ -1,35 +1,37 @@
-# Implementation Plan: Magazine View Deep Cut Typography
+# Implementation Plan: Magazine View Deep Cut Typography (Revised)
 
 ## 1. Context and Problem
-The user noticed a typography inconsistency in the Magazine view:
-- The root artist breakdown (Hero node) correctly uses a base size of 16px (text-base equivalent via clamp).
-- The deep cut bios (non-Hero nodes in the Magazine view) drop to 14px (`text-sm`).
+The recent update attempted to increase the deep cut bio text to 16px (`text-base`) in the Magazine view by adding a fallback for `isFullScreenMode`. However, the deep cuts still rendered at 14px. We need to identify why the previous logic failed to apply `text-base` to the deep cuts in the Magazine view and propose a definitive fix.
 
-According to the design system, `14px` is meant for "Data Value" elements within constrained panels to prevent layout fracturing. However, the Magazine view is an editorial reading experience, so all paragraph body content (both Hero and Deep Cuts) must use the 16px "Body (Content)" standard (`text-base`). At the same time, the graph view side panel must remain at `text-sm` (14px).
-
-## 2. Investigation Findings
-The bios for both the side panel and the Magazine view are rendered using a shared `NodeCard` component in `components/DetailsPanel.tsx`. 
-Currently, the markdown bio container on line ~1338 applies the typography size based solely on the `isHero` prop:
-
-```tsx
-<div className={`leading-relaxed text-zinc-300 markdown-bio ${isHero ? 'text-[clamp(0.875rem,1vw,1rem)] font-normal column-count-1 md:column-count-2 md:gap-12' : 'text-sm'}`}>
-```
-
-The `NodeCard` component receives an `isFullScreenMode` prop, which maps to `isMagazineViewOpen`. We can use this to determine if the component is rendering inside the Magazine view or the side panel.
-
-## 3. Proposed Solution
-We will update the logic to check `isFullScreenMode` when rendering non-hero nodes.
-
-### Code Refactoring Details
-Update the `className` logic in `components/DetailsPanel.tsx` for the bio `<div>` (around line 1338) to:
-
+## 2. Root Cause Analysis
+The previous fix updated the bio container class to:
 ```tsx
 <div className={`leading-relaxed text-zinc-300 markdown-bio ${isHero ? 'text-[clamp(0.875rem,1vw,1rem)] font-normal column-count-1 md:column-count-2 md:gap-12' : (isFullScreenMode ? 'text-base font-normal' : 'text-sm')}`}>
 ```
 
-- **`isHero` (Root Artist in Magazine)**: Uses the existing fluid clamp/columns.
-- **`!isHero && isFullScreenMode` (Deep Cuts in Magazine)**: Uses `text-base font-normal` (16px).
-- **`!isHero && !isFullScreenMode` (Side Panel)**: Continues to use `text-sm` (14px) to preserve constrained layouts.
+The failure lies in how `isHero` is calculated for the Magazine view cards. In `DetailsPanel.tsx` (around line 2558), `isHero` is defined as:
+```tsx
+const isHero = isMagazineViewOpen && (node.id === selectedNode?.id || (isRichData && node.type === 'artist'));
+```
+This means that in the Magazine view, **all** artist nodes with rich data (including deep cuts like "Buggin" and "Spaced") evaluate `isHero` to `true`. 
+
+Because `isHero` was `true`, the code hit the first branch of the ternary operator and applied `text-[clamp(0.875rem,1vw,1rem)]`. On standard desktop resolutions (e.g., 1400px width), `1vw` evaluates to `14px`, causing the text to render at exactly 14px instead of the intended 16px (`text-base`). 
+
+My previous logic `(isFullScreenMode ? 'text-base font-normal' : 'text-sm')` was completely bypassed because `isHero` intercepted it.
+
+## 3. Proposed Code Fix
+We must detach the typography size logic from the `isHero` state. `isFullScreenMode` should be the **sole** determinant for the font size, while `isHero` can continue to manage the column layout.
+
+We will update the `markdown-bio` wrapper in `NodeDetailsCard` (around line 1338) to:
+
+```tsx
+<div className={`leading-relaxed text-zinc-300 markdown-bio ${isFullScreenMode ? 'text-base font-normal' : 'text-sm'} ${isHero ? 'column-count-1 md:column-count-2 md:gap-12' : ''}`}>
+```
+
+**Why this works perfectly:**
+1. **Magazine View (`isFullScreenMode = true`)**: Unconditionally applies `text-base` (16px), ensuring deep cuts and hero nodes alike use the 16px reading typography.
+2. **Side Panel (`isFullScreenMode = false`)**: Unconditionally applies `text-sm` (14px), protecting the constrained layout.
+3. **Layout formatting**: Preserves the `column-count` logic for rich nodes without entangling it with font size.
 
 ## 4. Next Steps
-Once this plan is approved, I will use the code editing tools to apply the conditional typography logic in `components/DetailsPanel.tsx`.
+Once this revised plan is approved, I will deploy the `replace_file_content` tool to immediately swap this class logic and resolve the bug permanently.
