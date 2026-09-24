@@ -1524,7 +1524,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
   }, [activeTab]);
 
   const legendConfig: Record<FilterKeys, { label: string; shape: React.ReactNode }> = {
-    seed: { label: 'Seed Artist', shape: <LegendSymbol symbol={d3.symbolCircle} size={260} style={{ color: nodeTypeColorMap.seed }} className="stroke-1 fill-zinc-700"/> },
+    seed: { label: 'Seed Artist', shape: <LegendSymbol symbol={d3.symbolCircle} size={400} style={{ color: nodeTypeColorMap.seed }} className="stroke-1 fill-zinc-700"/> },
     recommended: { label: 'AI Artist', shape: <LegendSymbol symbol={d3.symbolStar} size={400} style={{ color: nodeTypeColorMap.ai }} className="-mt-0.5"/> },
     founded: { label: 'Founded', shape: <LegendSymbol symbol={d3.symbolCross} size={320} style={{ color: nodeTypeColorMap.founded }} /> },
     label: { label: 'Label', shape: <LegendSymbol symbol={d3.symbolDiamond} size={320} style={{ color: nodeTypeColorMap.label }} /> },

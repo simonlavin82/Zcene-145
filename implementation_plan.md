@@ -1,34 +1,26 @@
-# Strategic UI Refactor: Crate Tabs & Legend Synchronization
+# Strategic UI Refactor: Brutalist Crate Borders & Graph Node Normalization
 
 ## Concept & Architecture
-We are completing the final polish of the Crate-Digger Dashboard and the Zcene Categorical Palette consolidation. This involves two distinct visual refinements:
-1. **Physical Record Shop Tabs:** Enhancing the tactile feel of the Dashboard crates by turning the folder tabs into solid, brightly-coloured plastic dividers with stark black text.
-2. **Legend Synchronization:** Ensuring that the hardcoded interactive graph legends perfectly mirror the dynamic colour assignments executed by the D3 `scaleOrdinal` physics engine.
+We are dialing back the "sci-fi" aesthetic by enforcing strict brutalist borders on the Dashboard crates. Simultaneously, we are correcting visual desyncs within the Spiderweb Graph to ensure the Seed Artist node and its corresponding legend icon carry the correct brand weight and color.
 
 ## Implementation Plan
 
-### 1. Physical Crate Tabs (Dashboard Styling)
-- **Target Component:** `Dashboard.tsx`
-- **Current State:** The folder tab uses a dark background (`bg-zinc-950` with a 4% colour wash) and coloured text.
-- **New Execution:**
-  - We will modify the inline styles of the tab container to use the full 100% opacity categorical colour as its `backgroundColor`.
-  - The text colour will be flipped from the categorical colour to pure brand black (`#111113` or `#000000`).
-  - We will remove the coloured top border on the tab (as the entire tab is now a solid block of colour).
-  - The main crate body will retain its 4% ambient wash and 20% structural stroke.
-  - This change needs to be applied to both the Grid View crates and the List View divider tabs.
+### 1. Spiderweb Graph & Legend Fixes
+- **Node Color Correction (`formatters.ts`, `MusicGraph.tsx`, `ExampleMusicGraph.tsx`):** 
+  - The Seed Artist node is currently mapped to a standard palette yellow, which may be rendering with an orange tint, while the stroke is picking up a different value.
+  - We will explicitly force the Seed Artist's fill and stroke to the core brand primary yellow (`#F6E468`) in both the D3 node rendering logic and the `nodeTypeColorMap` to ensure absolute consistency.
+- **Legend Normalization (`GraphPage.tsx`, `ExampleMusicGraph.tsx`, `DesignSystem.tsx`):**
+  - The `d3.symbolCircle` used for the Seed Artist in the UI legends currently has a `size` prop of `260`, making it appear visually smaller than the star (`400`) or diamond (`320`).
+  - We will increase the `size` prop of the circle symbol across all legend configurations (to roughly `400` or `450`) so its visual volume matches the other geometric shapes perfectly. We will also ensure its fill color relies strictly on `#F6E468`.
 
-### 2. Graph Legend Synchronization
-- **The Challenge:** D3's `scaleOrdinal` assigns colours to new node types as they are discovered in the dataset. However, our UI legends (which act as filters) are currently hardcoded with legacy colours (e.g., `#3B82F6` for Genre).
-- **The Solution:** We must pre-map the standard node types ('genre', 'label', 'country', 'founded') to our new `zceneCategoricalPalette` so both the D3 engine and the React UI draw from the exact same deterministic source.
-- **Execution Strategy:**
-  1. **Define a Deterministic Map (`utils/formatters.ts`):** 
-     - We will create an exported constant `nodeTypeColorMap` that explicitly maps specific node types to specific colours from our `zceneCategoricalPalette`.
-     - *Example:* `genre` -> Palette Index 0 (Purple), `label` -> Palette Index 1 (Teal), etc.
-     - Seed artists (Yellow) and AI artists (Purple) will remain explicitly mapped as they are core functional identities, not generic categories.
-  2. **Update Graph Physics (`MusicGraph.tsx` & `ExampleMusicGraph.tsx`):**
-     - We will update the `getNodeColor` logic. Instead of relying purely on a sequential `d3.scaleOrdinal()`, we will first check our `nodeTypeColorMap`. If the node type exists in the map, we use that exact colour. If it's a completely new/unknown type, we can fallback to `d3.scaleOrdinal()`.
-  3. **Update UI Legends (`MusicGraph.tsx`, `ExampleMusicGraph.tsx` & `DesignSystem.tsx`):**
-     - We will refactor the hardcoded legend HTML/JSX to dynamically pull background and text colours from the `nodeTypeColorMap`.
+### 2. Dashboard Crate Borders (Anti-Sci-Fi)
+- **Target Component:** `Dashboard.tsx`
+- **The Issue:** The dynamic colored structural stroke (`${crateColor}33`) wraps the entire crate, giving it a glowing neon/sci-fi appearance that conflicts with our brutalist roots.
+- **New Execution:**
+  - We will strip the dynamic `borderColor` from the inline styles of the main crate containers in both the Grid and List views.
+  - We will revert the outer border to the standard, hard-edged `border-zinc-800` utility class.
+  - The solid, fully opaque folder tabs will remain exactly as they are.
+  - The ultra-low opacity ambient background wash (`${crateColor}0A`) inside the crate body will be retained, providing subtle depth without the glowing edge.
 
 ## Execution
-Once approved, I will implement the deterministic colour map in `formatters.ts`, wire it into the graphs and legends, and apply the solid background styling to the Dashboard crate tabs.
+Once approved, I will implement the border corrections in `Dashboard.tsx`, normalize the legend circle sizes, and enforce the pure primary brand yellow for the Seed Artists across the graph logic.

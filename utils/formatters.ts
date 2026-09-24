@@ -78,6 +78,6 @@ export const nodeTypeColorMap: Record<string, string> = {
   label: zceneCategoricalPalette[5], // Green
   country: zceneCategoricalPalette[6], // Orange
   founded: zceneCategoricalPalette[7], // Pink
-  seed: zceneCategoricalPalette[3], // Yellow
+  seed: '#F6E468', // Primary Brand Yellow
   ai: zceneCategoricalPalette[0], // Purple
 };

@@ -339,9 +339,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                 return (
                   <div 
                     key={bucketKey} 
-                    className="w-full md:w-fit max-w-full rounded-tr-xl rounded-b-xl rounded-tl-none border p-4 relative flex-shrink-0 min-w-0"
+                    className="w-full md:w-fit max-w-full rounded-tr-xl rounded-b-xl rounded-tl-none border border-zinc-800 p-4 relative flex-shrink-0 min-w-0"
                     style={{
-                      borderColor: `${crateColor}33`,
                       backgroundColor: `${crateColor}0A`
                     }}
                   >

@@ -1203,7 +1203,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-none border border-zinc-800">
                                      <div className="flex items-center gap-3 group cursor-pointer">
                                          <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center group-hover:bg-zinc-700 transition-colors" style={{ color: nodeTypeColorMap.seed }}>
-                                             <LegendSymbol symbol={d3.symbolCircle} size={260} />
+                                             <LegendSymbol symbol={d3.symbolCircle} size={400} />
                                          </div>
                                          <span className="text-sm font-medium">Seed Artist</span>
                                      </div>
