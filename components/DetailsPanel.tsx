@@ -1335,7 +1335,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
                             <div className="space-y-4">
                                 <h4 className="font-bold text-zinc-500 text-[10px] uppercase tracking-[0.2em]">Bio</h4>
-                                <div className={`leading-relaxed text-zinc-300 markdown-bio ${isHero ? 'text-[clamp(0.875rem,1vw,1rem)] font-normal column-count-1 md:column-count-2 md:gap-12' : 'text-sm'}`}>
+                                <div className={`leading-relaxed text-zinc-300 markdown-bio ${isHero ? 'text-[clamp(0.875rem,1vw,1rem)] font-normal column-count-1 md:column-count-2 md:gap-12' : (isFullScreenMode ? 'text-base font-normal' : 'text-sm')}`}>
                                     <Markdown components={{
                                         p: ({node, children, ...props}) => <p className="mb-4" {...props}>{renderWithHighlights(children, searchQuery)}</p>,
                                         strong: ({node, children, ...props}) => <strong className="font-semibold text-white" {...props}>{renderWithHighlights(children, searchQuery)}</strong>,
