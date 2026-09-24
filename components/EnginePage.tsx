@@ -1801,9 +1801,9 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                         </div>
 
                         <div className="mb-12">
-                            <h3 className="text-zinc-200 font-medium text-lg mb-6 uppercase tracking-wider">Transient Toast Notifications</h3>
+                            <h3 className="text-zinc-200 font-medium text-lg mb-6 uppercase tracking-wider">Global Toast Notifications</h3>
                             <p className="text-zinc-400 text-sm leading-relaxed mb-4">
-                                Transient toasts inform users of rapid background processes. To prevent user fatigue during fast graph navigation, aggressive notifications (e.g., Cache hits) are throttled via a session-level state lock (<code>hasShownCacheToastRef</code> in App.tsx), ensuring they gracefully display once per session to demonstrate speed before silently completing in the background for subsequent actions.
+                                Global toasts are top-anchored, dismissible notifications used to inform users of critical errors and necessary confirmations. To prevent user fatigue and UI obstruction, redundant background logs have been purged in favor of direct, user-actionable feedback.
                             </p>
                             <Table headers={["Original Message", "Translated Curator Message", "Target Component"]}>
                                 {Object.entries(TOAST_MAPPING_RULES).map(([raw, final], idx) => (
@@ -1812,7 +1812,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                                         <td className="py-4 px-6 text-xs text-zinc-200 italic leading-relaxed">"{final}"</td>
                                         <td className="py-4 px-6 text-xs">
                                             <span className="inline-block px-2.5 py-0.5 rounded-full text-[9px] font-semibold tracking-wide uppercase border text-primary bg-primary/10 border-primary/20">
-                                                Transient Toast
+                                                Global Toast
                                             </span>
                                         </td>
                                     </tr>

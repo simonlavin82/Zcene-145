@@ -3084,9 +3084,14 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                     <section id="toasts">
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Toasts</h2>
                         <div className="flex justify-center p-12 bg-zinc-950 rounded-xl border border-zinc-800">
-                             <div className="bg-brand-black text-primary px-6 py-3 rounded-xl flex items-center justify-center gap-3 border border-primary/50">
-                                <span className="material-symbols-outlined !text-[20px]">check_circle</span>
-                                <span className="text-sm font-semibold tracking-tight">Artist seed registered in the curation queue</span>
+                             <div className="bg-brand-black text-primary px-4 py-3 rounded-none shadow-2xl flex items-center justify-between gap-3 border border-primary/50 w-full max-w-sm">
+                                <div className="flex items-center gap-3">
+                                    <span className="material-symbols-outlined !text-[20px]">check_circle</span>
+                                    <span className="text-sm font-semibold tracking-tight pr-2">Artist seed registered in the curation queue</span>
+                                </div>
+                                <button className="p-1 hover:bg-white/10 rounded-full transition-colors flex-shrink-0">
+                                    <span className="material-symbols-outlined !text-[16px] opacity-70 hover:opacity-100">close</span>
+                                </button>
                              </div>
                         </div>
                     </section>

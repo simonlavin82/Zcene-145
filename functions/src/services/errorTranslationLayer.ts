@@ -51,35 +51,35 @@ export const ERROR_MAPPING_RULES: ErrorMappingRule[] = [
     rawPattern: "RESOURCE_EXHAUSTED",
     finalMessage: "Operational limits exceeded. The curation engine is temporarily saturated. Retrying in a moment.",
     severity: "transient",
-    targetComponent: "Toast / Local Catch"
+    targetComponent: "GLOBAL TOAST"
   },
   {
     scenario: "API Rate Limit (429)",
     rawPattern: "429",
     finalMessage: "Operational limits exceeded. The curation engine is temporarily saturated. Retrying in a moment.",
     severity: "transient",
-    targetComponent: "Toast / Local Catch"
+    targetComponent: "GLOBAL TOAST"
   },
   {
     scenario: "API Rate Limit (429)",
     rawPattern: "busy",
     finalMessage: "Operational limits exceeded. The curation engine is temporarily saturated. Retrying in a moment.",
     severity: "transient",
-    targetComponent: "Toast / Local Catch"
+    targetComponent: "GLOBAL TOAST"
   },
   {
     scenario: "Proxy Route Failure",
     rawPattern: "Proxying failed",
     finalMessage: "Signal degradation. The curation node is unreachable. Re-establishing connection...",
     severity: "transient",
-    targetComponent: "Toast / Local Catch"
+    targetComponent: "GLOBAL TOAST"
   },
   {
     scenario: "Proxy Route Failure",
     rawPattern: "AI unreachable",
     finalMessage: "Signal degradation. The curation node is unreachable. Re-establishing connection...",
     severity: "transient",
-    targetComponent: "Toast / Local Catch"
+    targetComponent: "GLOBAL TOAST"
   },
   {
     scenario: "Network Loss",
@@ -107,7 +107,7 @@ export const ERROR_MAPPING_RULES: ErrorMappingRule[] = [
     rawPattern: "taking too long to respond",
     finalMessage: "Curation latency. The AI engine is taking longer than usual to map connections. Retrying in background...",
     severity: "transient",
-    targetComponent: "Toast / Local Catch"
+    targetComponent: "GLOBAL TOAST"
   },
   {
     scenario: "AI Response Timeout",

@@ -247,22 +247,27 @@ const Toast: React.FC<{ message: string; onClose: () => void }> = ({ message, on
   const cleanMessage = message.replace(/^[⚠️⚡✅]\s?/, '').trim();
 
   return (
-    <div className="fixed bottom-24 sm:bottom-12 left-1/2 -translate-x-1/2 z-[1000] pointer-events-none px-4 w-full max-w-sm">
+    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[1000] pointer-events-none px-4 w-full max-w-sm">
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 20 }}
-        className={`px-6 py-3 rounded-none shadow-2xl flex items-center justify-center gap-3 pointer-events-auto backdrop-blur-md border ${
+        exit={{ opacity: 0, y: -20 }}
+        className={`px-4 py-3 rounded-none shadow-2xl flex items-center justify-between pointer-events-auto backdrop-blur-md border ${
           isWarning
             ? 'bg-yellow-950/90 border-yellow-500/50 text-yellow-400'
             : 'bg-brand-black border-primary/50 text-primary'
         }`}
       >
-        {isWarning
-          ? <AlertTriangle className="w-5 h-5 flex-shrink-0" />
-          : <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
-        }
-        <span className="text-sm font-medium">{cleanMessage}</span>
+        <div className="flex items-center gap-3">
+          {isWarning
+            ? <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+            : <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
+          }
+          <span className="text-sm font-medium pr-2">{cleanMessage}</span>
+        </div>
+        <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-full transition-colors flex-shrink-0">
+          <X className="w-4 h-4 opacity-70 hover:opacity-100" />
+        </button>
       </motion.div>
     </div>
   );
@@ -1640,7 +1645,7 @@ const App: React.FC = () => {
   const hasShownCacheToastRef = useRef(false);
   const showCacheToast = useCallback(() => {
     if (!hasShownCacheToastRef.current) {
-      showToast('⚡ Loaded from cache');
+
       hasShownCacheToastRef.current = true;
     }
   }, [showToast]);
@@ -1654,7 +1659,7 @@ const App: React.FC = () => {
       const signedInUser = await signInWithGoogle();
       if (!signedInUser) return;
       
-      showToast('Logged in successfully');
+
       if (onSuccess) {
         onSuccess();
       }
@@ -1667,7 +1672,7 @@ const App: React.FC = () => {
     try {
       await logout();
       setProfile(null);
-      showToast('Logged out');
+
     } catch (err) {
       setError(humanizeError(err));
     }
@@ -1857,7 +1862,7 @@ const App: React.FC = () => {
         showToast('Link copied to clipboard!');
       } catch (err) {
         console.error("Failed to copy link:", err);
-        showToast(`Share created! ID: ${docRef.id}`);
+
       }
 
       return docRef.id;
@@ -1963,7 +1968,7 @@ const App: React.FC = () => {
     const path = `users/${user.uid}/projects/${projectId}`;
     try {
       await deleteDoc(doc(db, 'users', user.uid, 'projects', projectId));
-      showToast("Zcene deleted");
+
       if (currentProjectId === projectId) {
         navigate('/dashboard');
       }
@@ -1993,7 +1998,7 @@ const App: React.FC = () => {
   const handleRenameProject = useCallback(async (projectId: string, name: string) => {
     localStorage.setItem(`zcene_project_name_${projectId}`, name);
     console.log(`[Offline Sandbox] Saved name to localStorage for project ${projectId}: ${name}`);
-    showToast("Zcene renamed (offline sandbox)");
+
     if (!user) return;
     const path = `users/${user.uid}/projects/${projectId}`;
     try {
@@ -2001,7 +2006,7 @@ const App: React.FC = () => {
         name,
         updatedAt: serverTimestamp()
       }, { merge: true });
-      showToast("Zcene renamed");
+
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, path);
     }
@@ -2536,7 +2541,7 @@ const App: React.FC = () => {
         console.log(`[Database Reporter] Attempting DELETE | Path: ${itemPath}`);
         await deleteDoc(itemRef);
         console.log(`[Database Reporter] SUCCESS: Item removed from Stack.`);
-        showToast(`Removed from My Stack`);
+
       } else {
         const newItem: StackItem = {
           id: node.id,
@@ -2708,7 +2713,7 @@ const App: React.FC = () => {
         console.error(e);
       }
     }
-    showToast("Walkthrough restarted!");
+
   }, [user, handleUpdateProfile, showToast]);
 
   const handleDeleteAccount = async () => {
@@ -4069,7 +4074,7 @@ const App: React.FC = () => {
         // ── PARTIAL CACHE HIT: some artists cached (or needing enrichment), some missing/needing-enrichment ─────────────
         const toFetch = [...missing, ...enrichmentRequired];
         console.log(`[Music Discovery] Partial cache HIT. Full hits: [${fullHits.join(', ')}] | Enrichment required: [${enrichmentRequired.join(', ')}] | Missing: [${missing.join(', ')}]`);
-        showToast(`⚡ ${fullHits.length + enrichmentRequired.length} artist${(fullHits.length + enrichmentRequired.length) > 1 ? 's' : ''} from cache — fetching ${toFetch.join(', ')}...`);
+
 
         // Intercept with token confirmation modal
         const optimisticGraph = assembleGraphFromCache(cached);
@@ -4102,7 +4107,7 @@ const App: React.FC = () => {
           if (legacyArtists.length > 0) {
             setActiveNodeIds(prevActiveNodeIds);
             setSeedArtists(prevSeedArtists);
-            showToast(`Loading cached artists: ${legacyArtists.join(', ')}`);
+
             handleGenerateGraph(legacyArtists.join('::'), isRegeneration, graphToEnhance, true, true);
           } else {
             isHydratingSessionRef.current = false;
@@ -6287,7 +6292,7 @@ const App: React.FC = () => {
                     }
                   }
                 }
-                showToast("Shared Zcene Loaded");
+
               } else {
                 setError("Shared Zcene not found.");
               }
@@ -6540,7 +6545,7 @@ const App: React.FC = () => {
         if (isMultiSeed || hasActiveFilters) {
           console.log(`[Phase 4 Sandbox Guard] Bypassing global cache writes for network extension. Multi-Seed: ${isMultiSeed}, Filters: ${hasActiveFilters}`);
         } else {
-          showToast("Saving new discoveries to global cache...");
+
           try {
             const combinedDetailsMap = new Map([
               ...detailsCacheRef.current,
@@ -6561,7 +6566,7 @@ const App: React.FC = () => {
       // Show toast for the new discovery
       const newArtist = extension.nodes.find(n => n.type === 'artist' || n.type === 'label');
       if (newArtist) {
-        showToast(`Discovered ${newArtist.id}`);
+
       }
 
     } catch (err: any) {
@@ -6606,7 +6611,7 @@ const App: React.FC = () => {
       setSelectedNode(null);
     }
 
-    showToast(`Removed ${node.label || node.id}`);
+
   }, [selectedNode, showToast]);
 
   const incrementDeepCutsOpenedCount = useCallback(async () => {

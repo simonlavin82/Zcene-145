@@ -908,7 +908,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
     setIsLeftPanelCollapsed(false);
     
     // Show a toast to notify user
-    onShowToast("Walkthrough restarted!");
+
   }, [user, onUpdateProfile, onNodeClick, onUpdateIsMagazineViewOpen, onShowToast]);
 
   useEffect(() => {
@@ -1706,10 +1706,10 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                             const isAlreadySeed = selectedSeedArtists.some(s => normalizeArtistId(s.name) === normalizedArtist);
                                             if (isAlreadySeed) {
                                                 setSelectedSeedArtists(prev => prev.filter(s => normalizeArtistId(s.name) !== normalizedArtist));
-                                                onShowToast(`Removed ${cleanArtistDisplayName(artist, data?.nodes)} from seed list`);
+
                                             } else {
                                                 setSelectedSeedArtists(prev => [...prev, { name: artist, enabled: true }]);
-                                                onShowToast(`Added ${cleanArtistDisplayName(artist, data?.nodes)} to seed list`);
+
                                             }
                                         }}
                                         isCollapsed={false} 
@@ -1871,10 +1871,10 @@ const GraphPage: React.FC<GraphPageProps> = ({
                               const isAlreadySeed = selectedSeedArtists.some(s => normalizeArtistId(s.name) === normalizedArtist);
                               if (isAlreadySeed) {
                                   setSelectedSeedArtists(prev => prev.filter(s => normalizeArtistId(s.name) !== normalizedArtist));
-                                  onShowToast(`Removed ${cleanArtistDisplayName(artist, data?.nodes)} from seed list`);
+
                               } else {
                                   setSelectedSeedArtists(prev => [...prev, { name: artist, enabled: true }]);
-                                  onShowToast(`Added ${cleanArtistDisplayName(artist, data?.nodes)} to seed list`);
+
                               }
                          }} 
                          isCollapsed={isDetailsPanelCollapsed} 

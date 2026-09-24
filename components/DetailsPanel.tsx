@@ -485,7 +485,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         const updatedTaste = [...currentTaste, newProfile];
         await onUpdateTasteProfile(updatedTaste);
         if (onShowToast) {
-            onShowToast(`Added ${newProfile.name} to Taste Profiles`);
+
         }
     };
 
