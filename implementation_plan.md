@@ -1,22 +1,30 @@
-# Strategic UI Refactor: Palette Finalization & State Sync Bug
+# Strategic UI Refactor: Palette Refinement
 
-## 1. Palette Reduction (5-Colors)
-- **Investigation:** We need to remove Green (`#10B981`) to avoid clashes with Teal, locking in a hyper-distinct 5-color rotation.
-- **Execution:** 
-  - Remove Green from `zceneCategoricalPalette` in `utils/formatters.ts`.
-  - Remove Green from the `PROFILE_COLORS` array in `SharedModals.tsx`.
-  - Remove the Green `ColorSwatch` in `DesignSystem.tsx`. We will update the layout to `grid-cols-2 md:grid-cols-5` to perfectly balance the 5 colors across a single row on desktop screens.
+## 1. Palette Upgrade (5-Colors)
+- **Execution:** We will update `zceneCategoricalPalette` in `utils/formatters.ts` to swap Red for Vivid Indigo and Blue for Electric Sky.
+- **The New Palette (5 Colors):**
+  - Index 0: Purple (`#A855F7`)
+  - Index 1: Teal (`#2DD4BF`)
+  - Index 2: Electric Sky (`#38BDF8`)
+  - Index 3: Vivid Indigo (`#6366F1`)
+  - Index 4: Pink (`#EC4899`)
 
-## 2. Node Remapping & Contrast Verification
+## 2. Node Remapping
 - **Execution (`utils/formatters.ts`):** 
-  - Remap `label` to Teal (`zceneCategoricalPalette[1]`).
-  - Remap `country` (Origin) to Red (`zceneCategoricalPalette[2]`).
-- **Contrast Verification (Red vs Pink):** Red (`#EF4444`) is a warm, aggressive primary, while Pink (`#EC4899`) acts as a cool magenta. While they sit adjacent on the color wheel, their specific lightness and saturation values provide adequate visual separation for small SVG nodes on our dark `bg-zinc-950` canvas. However, we should monitor this closely—if they blend at a glance, we can easily swap one for a higher-contrast alternative later.
+  - `ai`: `zceneCategoricalPalette[0]` (Purple)
+  - `label`: `zceneCategoricalPalette[1]` (Teal)
+  - `genre`: `zceneCategoricalPalette[2]` (Electric Sky)
+  - `country` (Origin): `zceneCategoricalPalette[3]` (Vivid Indigo)
+  - `founded`: `zceneCategoricalPalette[4]` (Pink)
+  - `seed`: `'#F6E468'` (Brand Yellow)
 
-## 3. Debugging the Style State Sync Bug
-- **Investigation:** I audited the Deep Cut state propagation. The bug originates in `DetailsPanel.tsx` (Lines 1158-1165). The `ProfileRow` component attempts to translate the string color name (e.g., `'teal'`) into a hex code using a hardcoded `hexMap`. 
-- **The Bug:** This `hexMap` was never updated to reflect our new categorical color names. It still contained legacy keys (`emerald`, `amber`, `rose`, `cyan`). Because `'teal'` and `'red'` were not in the map, the lookup returned `undefined` and triggered the fallback `|| '#a855f7'`, forcing everything to render as Purple.
-- **Execution:** I will update the inline `hexMap` in `DetailsPanel.tsx` to properly map the 5 new active style profile names (`purple`, `teal`, `red`, `blue`, `pink`) directly to their exact categorical hex codes.
+## 3. Global Sync
+- **State Sync (`DetailsPanel.tsx`):**
+  - We will update `hexMap` to map the new keys `sky` (or `electricsky`) and `indigo` to their respective hex codes (`#38bdf8`, `#6366f1`) and remove `red` and `blue`.
+- **Modal Sync (`SharedModals.tsx`):**
+  - We will update `PROFILE_COLORS` to include the exact names and background classes for the new colors (`bg-[#38bdf8]` and `bg-[#6366f1]`).
+- **Design System (`DesignSystem.tsx`):**
+  - We will replace the "Red" and "Blue" `ColorSwatch` components with "Electric Sky" (`#38BDF8`) and "Vivid Indigo" (`#6366F1`). The grid will remain `grid-cols-5`.
 
 ## Sign-Off
-I am ready to execute these changes to lock in the 5-color palette and restore the dynamic progress bar coloring. Let me know if you approve this plan!
+This plan guarantees perfect complementary harmony with the Brand Yellow and introduces the requested high-luminance tones. Let me know if this strategy is approved!
