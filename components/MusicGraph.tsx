@@ -669,24 +669,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     let container = svg.select<SVGGElement>("g.main-container");
     if (container.empty()) {
         svg.selectAll("*").remove(); 
-        
-        // Add glow filter definition
-        const defs = svg.append("defs");
-        const filter = defs.append("filter")
-            .attr("id", "node-glow")
-            .attr("x", "-50%")
-            .attr("y", "-50%")
-            .attr("width", "200%")
-            .attr("height", "200%");
-        
-        filter.append("feGaussianBlur")
-            .attr("stdDeviation", "3.5")
-            .attr("result", "blur");
-        
-        const feMerge = filter.append("feMerge");
-        feMerge.append("feMergeNode").attr("in", "blur");
-        feMerge.append("feMergeNode").attr("in", "SourceGraphic");
-
+        // Glow filter removed to maintain true colour fidelity
         container = svg.append("g").attr("class", "main-container");
         container.append("g").attr("class", "link-group").attr("stroke", "#e4e4e7");
         container.append("g").attr("class", "node-group");
@@ -1159,7 +1142,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
     nodeElements.select("path")
         .attr("stroke-width", d => (d.type === 'artist' && isNodeInSeedList(d.id || d.label || '', seedArtists)) ? 3 : 2)
-        .attr("stroke", d => (d.type === 'artist' && isNodeInSeedList(d.id || d.label || '', seedArtists)) ? '#F6E468' : '#1F1F1E')
+        .attr("stroke", d => (d.type === 'artist' && isNodeInSeedList(d.id || d.label || '', seedArtists)) ? '#F6E468' : 'transparent')
         .attr("fill", d => getNodeColor(d))
         .attr("opacity", d => d.isLoading || d.isPending ? 0.35 : 1)
         .attr("d", d => {
@@ -1408,11 +1391,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             const isSelected = activeNode ? isSameNodeId(activeNode.id, d.id) : false;
             const isSeed = d.type === 'artist' && isNodeInSeedList(d.id || d.label || '', seedArtists);
             if (isSelected) return '#F6E468';
-            return isSeed ? '#F6E468' : '#1F1F1E';
-        })
-        .attr("filter", d => {
-            const activeNode = selectedNode || peekedNode;
-            return activeNode && isSameNodeId(activeNode.id, d.id) ? "url(#node-glow)" : null;
+            return isSeed ? '#F6E468' : 'transparent';
         });
     container.select(".link-group").selectAll<SVGLineElement, Link>("line.visual-line")
         .transition().duration(300)

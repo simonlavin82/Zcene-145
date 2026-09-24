@@ -230,25 +230,7 @@ const ExampleMusicGraph: React.FC = () => {
 
         const colorScale = d3.scaleOrdinal(zceneCategoricalPalette);
 
-        // Glow filter
-        let defs = svg.select("defs");
-        if (defs.empty()) {
-            defs = svg.append("defs");
-            const filter = defs.append("filter")
-                .attr("id", "node-glow-example")
-                .attr("x", "-50%")
-                .attr("y", "-50%")
-                .attr("width", "200%")
-                .attr("height", "200%");
-            
-            filter.append("feGaussianBlur")
-                .attr("stdDeviation", "3.5")
-                .attr("result", "blur");
-            
-            const feMerge = filter.append("feMerge");
-            feMerge.append("feMergeNode").attr("in", "blur");
-            feMerge.append("feMergeNode").attr("in", "SourceGraphic");
-        }
+        // Glow filter removed to maintain true colour fidelity
 
         // Manage nodes and links with identity preservation to prevent jumps
         let nodes: Node[];
@@ -401,10 +383,9 @@ const ExampleMusicGraph: React.FC = () => {
                 if (d.isLoading) return "#A855F7";
                 const isSeed = seedIds.includes(d.id) || d.isSeed;
                 if (isSeed) return "#F6E468";
-                return "#1F1F1E";
+                return "transparent";
             })
             .attr("stroke-width", (d: any) => (seedIds.includes(d.id) || d.isSeed || d.isLoading) ? 3 : 2)
-            .attr("filter", (d: any) => d.type === 'artist' || d.isLoading ? "url(#node-glow-example)" : null)
             .attr("opacity", (d: any) => d.isLoading ? 0.6 : 1)
             .attr("class", (d: any) => d.isLoading ? "animate-pulse" : "node-shape");
 
