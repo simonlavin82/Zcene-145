@@ -1,39 +1,39 @@
-# Strategic UI Refactor: Node Color Fidelity & Selection Glow Removal
+# Strategic UI Refactor: Palette Reduction & Brand Protection
 
-## Investigation & Findings
-
-I have completed a hard audit of the D3 graph logic (`MusicGraph.tsx` and `ExampleMusicGraph.tsx`) and identified the exact causes of both the color degradation and the tacky selection glow.
-
-### 1. Color Degradation: The "Dark Stroke" Bleed
-- **The Evidence:** The hex colors mapped via `nodeTypeColorMap` are being passed to D3 correctly without any mathematical opacity degradation (base opacity is strictly `1`). However, in `MusicGraph.tsx` (Lines 1161-1162) and `ExampleMusicGraph.tsx` (Lines 400-406), all unselected nodes are forced to render a dark stroke:
-  ```typescript
-  .attr("stroke-width", 2)
-  .attr("stroke", "#1F1F1E")
-  ```
-- **The Physics:** SVG strokes are drawn centered on the path boundary. For our small node shapes (e.g., area `350`, roughly a 10px radius), a `2px` stroke bleeds `1px` into the interior of the shape. Because the stroke is nearly black (`#1F1F1E`), this dark ring eats up nearly 20% of the interior visual area, aggressively darkening/muddying the perception of the vibrant categorical fill.
-- **The Solution:** We must strip the `#1F1F1E` default stroke. Unselected nodes should receive `stroke="transparent"` so the raw categorical fill extends fully to the geometric boundary with 100% fidelity.
-
-### 2. Selection Glow: The `feGaussianBlur` Filter
-- **The Evidence:** The "tacky" glow is a literal SVG filter being dynamically appended to the canvas defs in `MusicGraph.tsx` (Lines 675-688) and `ExampleMusicGraph.tsx` (Lines 237-248):
-  ```typescript
-  const filter = defs.append("filter").attr("id", "node-glow")
-  filter.append("feGaussianBlur").attr("stdDeviation", "3.5")
-  ```
-- **The Application:** This filter is then conditionally applied to the active node path:
-  ```typescript
-  .attr("filter", d => activeNode && isSameNodeId(activeNode.id, d.id) ? "url(#node-glow)" : null)
-  ```
-- **The Solution:** We must rip out the `#node-glow` and `#node-glow-example` SVG `<filter>` definitions from the canvas initialization, and completely strip the `.attr("filter")` logic from the node update cycles. The active state will rely exclusively on the crisp, high-contrast `#F6E468` stroke.
+## Concept & Architecture
+The presence of Yellow and Orange in our global categorical palette creates visual friction and dilutes the core brand identity. By removing them, we protect the primary brand Yellow (`#F6E468`) to ensure it holds maximum visual weight for Seed Artists and primary actions.
 
 ## Implementation Plan
 
-### `MusicGraph.tsx` & `ExampleMusicGraph.tsx`
-1. **Strip the Glow:**
-   - Delete the SVG `<defs>` block that generates `#node-glow` and `#node-glow-example`.
-   - Remove all `.attr("filter", ...)` lines from the node path updates.
-2. **Restore True Color Fidelity:**
-   - Modify the stroke assignment so unselected nodes receive `"transparent"` instead of `"#1F1F1E"`.
-   - The selected nodes (and Seed Artists) will maintain their pure yellow (`#F6E468`) 3px stroke, ensuring the selection boundary is crisp and sharp without muddying the interior fill.
+### 1. Strict Palette Reduction (`utils/formatters.ts`)
+- **Execution:** Remove Yellow (`#EAB308`) and Orange (`#F59E0B`) from `zceneCategoricalPalette`. 
+- **The New Palette (6 Colors):**
+  - Index 0: Purple (`#A855F7`)
+  - Index 1: Teal (`#2DD4BF`)
+  - Index 2: Red (`#EF4444`)
+  - Index 3: Blue (`#3B82F6`)
+  - Index 4: Green (`#10B981`)
+  - Index 5: Pink (`#EC4899`)
 
-## Execution
-Once approved, I will deploy these surgical D3 corrections to restore the true-hex visual rhythm of the graphs.
+### 2. Node Remapping (`utils/formatters.ts`)
+- **Execution:** We will update `nodeTypeColorMap` to map to the new array indices.
+- **The New Mapping:**
+  - `ai`: `zceneCategoricalPalette[0]` (Purple)
+  - `country` (Origin): `zceneCategoricalPalette[1]` (Teal — beautifully complementary to the Yellow seed)
+  - `genre`: `zceneCategoricalPalette[3]` (Blue)
+  - `label`: `zceneCategoricalPalette[4]` (Green)
+  - `founded`: `zceneCategoricalPalette[5]` (Pink)
+  - `seed`: `'#F6E468'` (Brand Yellow)
+
+### 3. Style Profiles Modal Sync (`SharedModals.tsx`)
+- **Audit Findings:** The `PROFILE_COLORS` array in `SharedModals.tsx` currently contains 5 disconnected/legacy colors (purple, emerald, amber, rose, cyan). The color picker uses a flexbox layout (`flex items-center gap-2`), not a hardcoded grid.
+- **Execution:** We will replace `PROFILE_COLORS` with the exact 6 colors of our new categorical palette. Expanding from 5 to 6 swatches will fit perfectly within the flex layout without breaking the modal architecture.
+
+### 4. Design System Sync (`DesignSystem.tsx`)
+- **Execution:** In the "Zcene Categorical Palette" section, we will remove the `ColorSwatch` components for Yellow and Orange.
+- **Layout Adjustment:** We will adjust the grid from `grid-cols-4` to `grid-cols-3` (`grid grid-cols-2 md:grid-cols-3 gap-6`) so the remaining 6 colors sit perfectly balanced across two rows.
+
+## Engineering Sign-Off
+I have audited the downstream components. There are no layout breaks in the Style Modal, and shifting the Origin node to Teal is structurally sound—it provides much sharper contrast against the Yellow Seed Artist than the old Orange did.
+
+I am ready to execute this plan.
