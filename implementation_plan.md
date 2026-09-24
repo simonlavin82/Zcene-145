@@ -1,26 +1,39 @@
-# Strategic UI Refactor: Optical Alignment & Album Art Contrast
+# Strategic UI Refactor: Node Color Fidelity & Selection Glow Removal
 
-## Concept & Architecture
-We need to correct the optical alignment of the SVG legend shapes so they sit perfectly centered relative to their labels. Additionally, we need to introduce a heavy, brutalist shadow and border system to the Dashboard project tiles so the album art punches through the tinted crate backgrounds.
+## Investigation & Findings
+
+I have completed a hard audit of the D3 graph logic (`MusicGraph.tsx` and `ExampleMusicGraph.tsx`) and identified the exact causes of both the color degradation and the tacky selection glow.
+
+### 1. Color Degradation: The "Dark Stroke" Bleed
+- **The Evidence:** The hex colors mapped via `nodeTypeColorMap` are being passed to D3 correctly without any mathematical opacity degradation (base opacity is strictly `1`). However, in `MusicGraph.tsx` (Lines 1161-1162) and `ExampleMusicGraph.tsx` (Lines 400-406), all unselected nodes are forced to render a dark stroke:
+  ```typescript
+  .attr("stroke-width", 2)
+  .attr("stroke", "#1F1F1E")
+  ```
+- **The Physics:** SVG strokes are drawn centered on the path boundary. For our small node shapes (e.g., area `350`, roughly a 10px radius), a `2px` stroke bleeds `1px` into the interior of the shape. Because the stroke is nearly black (`#1F1F1E`), this dark ring eats up nearly 20% of the interior visual area, aggressively darkening/muddying the perception of the vibrant categorical fill.
+- **The Solution:** We must strip the `#1F1F1E` default stroke. Unselected nodes should receive `stroke="transparent"` so the raw categorical fill extends fully to the geometric boundary with 100% fidelity.
+
+### 2. Selection Glow: The `feGaussianBlur` Filter
+- **The Evidence:** The "tacky" glow is a literal SVG filter being dynamically appended to the canvas defs in `MusicGraph.tsx` (Lines 675-688) and `ExampleMusicGraph.tsx` (Lines 237-248):
+  ```typescript
+  const filter = defs.append("filter").attr("id", "node-glow")
+  filter.append("feGaussianBlur").attr("stdDeviation", "3.5")
+  ```
+- **The Application:** This filter is then conditionally applied to the active node path:
+  ```typescript
+  .attr("filter", d => activeNode && isSameNodeId(activeNode.id, d.id) ? "url(#node-glow)" : null)
+  ```
+- **The Solution:** We must rip out the `#node-glow` and `#node-glow-example` SVG `<filter>` definitions from the canvas initialization, and completely strip the `.attr("filter")` logic from the node update cycles. The active state will rely exclusively on the crisp, high-contrast `#F6E468` stroke.
 
 ## Implementation Plan
 
-### 1. Optical Legend Alignment (`Icons.tsx`)
-- **The Issue:** D3 symbols (like `d3.symbolTriangle` and `d3.symbolStar`) are drawn relative to their mathematical centroids, which often differ from their visual/optical centers. This makes them appear top-heavy or vertically misaligned inside the legend's flex container.
-- **The Solution:** We will introduce a dynamic `transform` offset inside the `LegendSymbol` component.
-- **Execution:**
-  - In `Icons.tsx`, we will check the incoming `symbol` type.
-  - If it is `d3.symbolTriangle`, we will apply a `transform="translate(0, 2)"` to nudge it down.
-  - If it is `d3.symbolStar`, we will apply a `transform="translate(0, 1)"` to ground it.
-  - We will apply this `transform` directly to the `<path>` element inside the SVG. This ensures perfect optical centering within the existing `viewBox` without disrupting the HTML layout.
-
-### 2. Album Art Contrast (`DashboardProjectCard.tsx`)
-- **The Issue:** The project cards (`DashboardProjectCard`) currently use a semi-transparent `border-zinc-700/50` and a standard `shadow-xl`. Against the new 4% color wash of the dashboard crates, these cards are losing their defining edge.
-- **The Solution:** We will implement a deep structural boundary using a pure dark stroke and a heavy, opaque drop shadow.
-- **Execution:**
-  - In `DashboardProjectCard.tsx`, we will replace `border-zinc-700/50` with a solid `border-zinc-950` or `border-black` to create a stark dividing line.
-  - We will replace the default `shadow-xl` with a custom, heavy shadow utility (e.g., `shadow-[0_8px_30px_rgba(0,0,0,0.8)]`) to dramatically lift the tile off the tinted crate background.
-  - The combination of the dark stroke and the deep shadow will effectively quarantine the album artwork from the ambient crate wash, restoring full contrast.
+### `MusicGraph.tsx` & `ExampleMusicGraph.tsx`
+1. **Strip the Glow:**
+   - Delete the SVG `<defs>` block that generates `#node-glow` and `#node-glow-example`.
+   - Remove all `.attr("filter", ...)` lines from the node path updates.
+2. **Restore True Color Fidelity:**
+   - Modify the stroke assignment so unselected nodes receive `"transparent"` instead of `"#1F1F1E"`.
+   - The selected nodes (and Seed Artists) will maintain their pure yellow (`#F6E468`) 3px stroke, ensuring the selection boundary is crisp and sharp without muddying the interior fill.
 
 ## Execution
-Once approved, I will implement the optical offsets in `Icons.tsx` and upgrade the border/shadow utility classes in `DashboardProjectCard.tsx`.
+Once approved, I will deploy these surgical D3 corrections to restore the true-hex visual rhythm of the graphs.
