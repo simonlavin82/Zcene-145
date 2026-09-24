@@ -1606,7 +1606,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             )}
         </div>
         
-        <div className={`absolute right-6 z-40 flex justify-end transition-all duration-300 ${!isCompactMode ? 'top-[72px]' : 'top-6'}`}>
+        <div className={`absolute right-6 z-40 flex justify-end transition-all duration-300 ${!isCompactMode ? 'top-[88px]' : 'top-6'}`}>
             <div className={`transition-all duration-300 ease-in-out origin-right ${isSearchExpanded ? 'w-64 opacity-100' : 'w-[38px] opacity-100'}`}>
                 {!isSearchExpanded ? (
                     <button 
