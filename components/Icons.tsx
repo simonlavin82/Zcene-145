@@ -147,10 +147,10 @@ export const InstagramIcon: React.FC<{ className?: string }> = ({ className }) =
   </svg>
 );
 
-export const LegendSymbol: React.FC<{ symbol: d3.SymbolType; size?: number; className?: string; }> = ({ symbol, size = 64, className }) => {
+export const LegendSymbol: React.FC<{ symbol: d3.SymbolType; size?: number; className?: string; style?: React.CSSProperties; }> = ({ symbol, size = 64, className, style }) => {
     const path = d3.symbol().type(symbol).size(size)();
     return (
-        <svg width="14" height="14" viewBox="-15 -15 30 30" className={className} preserveAspectRatio="xMidYMid meet">
+        <svg width="14" height="14" viewBox="-15 -15 30 30" className={className} style={style} preserveAspectRatio="xMidYMid meet">
             <path d={path || ''} fill="currentColor" />
         </svg>
     );

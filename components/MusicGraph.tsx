@@ -5,7 +5,7 @@ import { Loader2 } from 'lucide-react';
 import { GraphData, Node, Link, GraphSettings, NodeDetails } from '../types';
 import { LegendSymbol } from './Icons';
 import { CanvasControlStyles, InputSizes } from './DesignSystem';
-import { zceneCategoricalPalette, zceneFallbackColor } from '../utils/formatters';
+import { zceneCategoricalPalette, zceneFallbackColor, nodeTypeColorMap } from '../utils/formatters';
 import { normalizeArtistId, isNodeInSeedList } from '../services/artistCacheService';
 
 type FilterKeys = 'genre' | 'label' | 'country' | 'founded' | 'seed' | 'recommended';
@@ -1050,10 +1050,10 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
     const getNodeColor = (node: Node) => {
         if (node.type === 'artist') {
-            return isNodeInSeedList(node.id || node.label || '', seedArtists) ? '#F6E468' : '#A855F7'; // Yellow for seed, Purple for AI
+            return isNodeInSeedList(node.id || node.label || '', seedArtists) ? nodeTypeColorMap.seed : nodeTypeColorMap.ai;
         }
         if (!node.type) return zceneFallbackColor;
-        return colorScale(node.type);
+        return nodeTypeColorMap[node.type] || colorScale(node.type);
     };
 
     const nodeElements = container.select(".node-group").selectAll<SVGGElement, Node>("g.node-element")

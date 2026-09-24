@@ -3,7 +3,7 @@ import * as d3 from 'd3';
 import { motion } from 'motion/react';
 import { GraphData, Node, Link } from '../types';
 import { LegendSymbol } from './Icons';
-import { zceneCategoricalPalette, zceneFallbackColor } from '../utils/formatters';
+import { zceneCategoricalPalette, zceneFallbackColor, nodeTypeColorMap } from '../utils/formatters';
 
 // A static, predefined graph for the example animation that mirrors real app data structure
 const exampleGraphData: GraphData = {
@@ -95,12 +95,12 @@ const ExampleMusicGraph: React.FC = () => {
     }, [isLegendExpanded]);
 
     const legendConfig: Record<string, { label: string; shape: React.ReactNode }> = {
-        seed: { label: 'Seed Artist', shape: <LegendSymbol symbol={d3.symbolCircle} size={260} className="text-zinc-400 stroke-zinc-400 stroke-2 fill-zinc-700"/> },
-        recommended: { label: 'AI Artist', shape: <LegendSymbol symbol={d3.symbolStar} size={400} className="text-primary/70 -mt-0.5"/> },
-        founded: { label: 'Founded', shape: <LegendSymbol symbol={d3.symbolCross} size={320} className="text-primary/70" /> },
-        label: { label: 'Label', shape: <LegendSymbol symbol={d3.symbolDiamond} size={320} className="text-primary/70" /> },
-        genre: { label: 'Genre', shape: <LegendSymbol symbol={d3.symbolSquare} size={260} className="text-primary/70" /> },
-        country: { label: 'Origin', shape: <LegendSymbol symbol={d3.symbolTriangle} size={260} className="text-primary/70" /> },
+        seed: { label: 'Seed Artist', shape: <LegendSymbol symbol={d3.symbolCircle} size={260} style={{ color: nodeTypeColorMap.seed }}/> },
+        recommended: { label: 'AI Artist', shape: <LegendSymbol symbol={d3.symbolStar} size={400} style={{ color: nodeTypeColorMap.ai }} className="-mt-0.5"/> },
+        founded: { label: 'Founded', shape: <LegendSymbol symbol={d3.symbolCross} size={320} style={{ color: nodeTypeColorMap.founded }} /> },
+        label: { label: 'Label', shape: <LegendSymbol symbol={d3.symbolDiamond} size={320} style={{ color: nodeTypeColorMap.label }} /> },
+        genre: { label: 'Genre', shape: <LegendSymbol symbol={d3.symbolSquare} size={260} style={{ color: nodeTypeColorMap.genre }} /> },
+        country: { label: 'Origin', shape: <LegendSymbol symbol={d3.symbolTriangle} size={260} style={{ color: nodeTypeColorMap.country }} /> },
     };
     
     const legendOrder: FilterKeys[] = ['seed', 'recommended', 'label', 'genre', 'country', 'founded'];
@@ -389,13 +389,13 @@ const ExampleMusicGraph: React.FC = () => {
                 return d3.symbol().type(d3.symbolCircle).size(area - 100)();
             })
             .attr("fill", (d: any) => {
-                if (d.isLoading) return '#A855F7';
+                if (d.isLoading) return nodeTypeColorMap.ai;
                 const isSeed = seedIds.includes(d.id) || d.isSeed;
                 if (d.type === 'artist') {
-                    return isSeed ? '#F6E468' : '#A855F7';
+                    return isSeed ? nodeTypeColorMap.seed : nodeTypeColorMap.ai;
                 }
                 if (!d.type) return zceneFallbackColor;
-                return colorScale(d.type);
+                return nodeTypeColorMap[d.type] || colorScale(d.type);
             })
             .attr("stroke", (d: any) => {
                 if (d.isLoading) return "#A855F7";

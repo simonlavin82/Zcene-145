@@ -347,16 +347,15 @@ const Dashboard: React.FC<DashboardProps> = ({
                   >
                     {/* Unified Folder Index Tab */}
                     <div 
-                      className="w-[160px] border-t border-l border-r rounded-t-lg text-[9px] font-mono absolute -top-[22px] left-[-1px] px-3 py-1 flex items-center h-[22.5px] z-10 select-none"
+                      className="w-[160px] border-l border-r rounded-t-lg text-[9px] font-mono absolute -top-[22px] left-[-1px] px-3 py-1 flex items-center h-[22.5px] z-10 select-none"
                       style={{
-                        borderColor: `${crateColor}33`,
-                        borderTopColor: crateColor,
-                        backgroundColor: `${crateColor}0A`
+                        borderColor: crateColor,
+                        backgroundColor: crateColor
                       }}
                     >
                       <div 
-                        className="truncate text-ellipsis whitespace-nowrap uppercase tracking-widest font-medium"
-                        style={{ color: crateColor }}
+                        className="truncate text-ellipsis whitespace-nowrap uppercase tracking-widest font-bold"
+                        style={{ color: '#111113' }}
                       >
                         {bucketKey}
                       </div>
@@ -441,16 +440,15 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <td colSpan={7} className="pt-6 pb-0 px-6 align-bottom bg-zinc-900 border-none">
                           {/* The Folder Tab */}
                           <div 
-                            className="w-[140px] sm:w-[160px] border-t border-l border-r rounded-t-lg px-3 py-1.5 font-mono tracking-widest text-[9px] sm:text-[10px] uppercase font-medium relative -mb-[1px] z-0"
+                            className="w-[140px] sm:w-[160px] border-l border-r rounded-t-lg px-3 py-1.5 font-mono tracking-widest text-[9px] sm:text-[10px] uppercase font-bold relative -mb-[1px] z-0"
                             style={{
-                              borderColor: `${crateColor}33`,
-                              borderTopColor: crateColor,
-                              backgroundColor: `${crateColor}0A`
+                              borderColor: crateColor,
+                              backgroundColor: crateColor
                             }}
                           >
                             <div 
                               className="truncate text-ellipsis whitespace-nowrap"
-                              style={{ color: crateColor }}
+                              style={{ color: '#111113' }}
                             >
                               {bucketKey}
                             </div>

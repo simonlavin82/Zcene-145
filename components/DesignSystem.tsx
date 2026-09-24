@@ -16,7 +16,7 @@ import { InfoTooltip } from './ui/InfoTooltip';
 import { Waypoints, Flame, Check } from 'lucide-react';
 import { TelemetryOverviewCards, DiscoveryLedgerTable, UserTelemetry } from './UsageAnalyticsPage';
 import { CountryFilterDropdown } from './SharedModals';
-import { extractInitials, generateDeterministicGradient } from '../utils/formatters';
+import { extractInitials, generateDeterministicGradient, nodeTypeColorMap } from '../utils/formatters';
 
 // --- Layout Primitives & Sizings ---
 
@@ -1202,37 +1202,37 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 </p>
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-none border border-zinc-800">
                                      <div className="flex items-center gap-3 group cursor-pointer">
-                                         <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center text-[#F6E468] group-hover:bg-zinc-700 transition-colors">
+                                         <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center group-hover:bg-zinc-700 transition-colors" style={{ color: nodeTypeColorMap.seed }}>
                                              <LegendSymbol symbol={d3.symbolCircle} size={260} />
                                          </div>
                                          <span className="text-sm font-medium">Seed Artist</span>
                                      </div>
                                      <div className="flex items-center gap-3 group cursor-pointer">
-                                         <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center text-[#A855F7] group-hover:bg-zinc-700 transition-colors">
+                                         <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center group-hover:bg-zinc-700 transition-colors" style={{ color: nodeTypeColorMap.ai }}>
                                              <LegendSymbol symbol={d3.symbolStar} size={400} />
                                          </div>
                                          <span className="text-sm font-medium">AI Artist</span>
                                      </div>
                                      <div className="flex items-center gap-3 group cursor-pointer">
-                                         <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center text-[#10B981] group-hover:bg-zinc-700 transition-colors">
+                                         <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center group-hover:bg-zinc-700 transition-colors" style={{ color: nodeTypeColorMap.label }}>
                                              <LegendSymbol symbol={d3.symbolDiamond} size={320} />
                                          </div>
                                          <span className="text-sm font-medium">Label</span>
                                      </div>
                                      <div className="flex items-center gap-3 group cursor-pointer">
-                                         <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center text-[#3B82F6] group-hover:bg-zinc-700 transition-colors">
+                                         <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center group-hover:bg-zinc-700 transition-colors" style={{ color: nodeTypeColorMap.genre }}>
                                              <LegendSymbol symbol={d3.symbolSquare} size={260} />
                                          </div>
                                          <span className="text-sm font-medium">Genre</span>
                                      </div>
                                      <div className="flex items-center gap-3 group cursor-pointer">
-                                         <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center text-[#F59E0B] group-hover:bg-zinc-700 transition-colors">
+                                         <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center group-hover:bg-zinc-700 transition-colors" style={{ color: nodeTypeColorMap.country }}>
                                              <LegendSymbol symbol={d3.symbolTriangle} size={260} />
                                          </div>
                                          <span className="text-sm font-medium">Origin</span>
                                      </div>
                                      <div className="flex items-center gap-3 group cursor-pointer">
-                                         <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center text-[#EC4899] group-hover:bg-zinc-700 transition-colors">
+                                         <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center group-hover:bg-zinc-700 transition-colors" style={{ color: nodeTypeColorMap.founded }}>
                                              <LegendSymbol symbol={d3.symbolCross} size={320} />
                                          </div>
                                          <span className="text-sm font-medium">Founded</span>

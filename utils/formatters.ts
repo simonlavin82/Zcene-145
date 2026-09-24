@@ -73,3 +73,11 @@ export const zceneCategoricalPalette = [
 
 export const zceneFallbackColor = '#71717a'; // Zinc
 
+export const nodeTypeColorMap: Record<string, string> = {
+  genre: zceneCategoricalPalette[4], // Blue
+  label: zceneCategoricalPalette[5], // Green
+  country: zceneCategoricalPalette[6], // Orange
+  founded: zceneCategoricalPalette[7], // Pink
+  seed: zceneCategoricalPalette[3], // Yellow
+  ai: zceneCategoricalPalette[0], // Purple
+};

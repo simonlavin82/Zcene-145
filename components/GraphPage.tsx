@@ -14,6 +14,7 @@ import OnboardingTooltip from './OnboardingTooltip';
 import * as d3 from 'd3';
 import { RootsBreakdownButton, Select, InputSizes, LayoutSizes, Checkbox, CanvasControlStyles } from './DesignSystem';
 import { ModalBackdrop, ModalContainer, ModalHeader, ModalBody, ModalFooter } from './ui/Dialog';
+import { nodeTypeColorMap } from '../utils/formatters';
 
 // Inform TypeScript about the SpeechRecognition and WakeLock APIs
 declare global {
@@ -1523,12 +1524,12 @@ const GraphPage: React.FC<GraphPageProps> = ({
   }, [activeTab]);
 
   const legendConfig: Record<FilterKeys, { label: string; shape: React.ReactNode }> = {
-    seed: { label: 'Seed Artist', shape: <LegendSymbol symbol={d3.symbolCircle} size={260} className="text-[#F6E468] stroke-[#F6E468] stroke-1 fill-zinc-700"/> },
-    recommended: { label: 'AI Artist', shape: <LegendSymbol symbol={d3.symbolStar} size={400} className="text-[#A855F7] -mt-0.5"/> },
-    founded: { label: 'Founded', shape: <LegendSymbol symbol={d3.symbolCross} size={320} className="text-[#EC4899]" /> },
-    label: { label: 'Label', shape: <LegendSymbol symbol={d3.symbolDiamond} size={320} className="text-[#10B981]" /> },
-    genre: { label: 'Genre', shape: <LegendSymbol symbol={d3.symbolSquare} size={260} className="text-[#3B82F6]" /> },
-    country: { label: 'Origin', shape: <LegendSymbol symbol={d3.symbolTriangle} size={260} className="text-[#F59E0B]" /> },
+    seed: { label: 'Seed Artist', shape: <LegendSymbol symbol={d3.symbolCircle} size={260} style={{ color: nodeTypeColorMap.seed }} className="stroke-1 fill-zinc-700"/> },
+    recommended: { label: 'AI Artist', shape: <LegendSymbol symbol={d3.symbolStar} size={400} style={{ color: nodeTypeColorMap.ai }} className="-mt-0.5"/> },
+    founded: { label: 'Founded', shape: <LegendSymbol symbol={d3.symbolCross} size={320} style={{ color: nodeTypeColorMap.founded }} /> },
+    label: { label: 'Label', shape: <LegendSymbol symbol={d3.symbolDiamond} size={320} style={{ color: nodeTypeColorMap.label }} /> },
+    genre: { label: 'Genre', shape: <LegendSymbol symbol={d3.symbolSquare} size={260} style={{ color: nodeTypeColorMap.genre }} /> },
+    country: { label: 'Origin', shape: <LegendSymbol symbol={d3.symbolTriangle} size={260} style={{ color: nodeTypeColorMap.country }} /> },
   };
   const legendOrder: FilterKeys[] = ['seed', 'recommended', 'label', 'genre', 'country', 'founded'];
   const toggleFilterInternal = (filter: FilterKeys) => {
