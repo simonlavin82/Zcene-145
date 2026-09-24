@@ -1458,7 +1458,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                         href={youtubeUrl} 
                                                         target="_blank" 
                                                         rel="noopener noreferrer" 
-                                                        className="flex items-center justify-start px-4 py-2 rounded-xl font-medium transition-all active:scale-[0.98] bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white border border-zinc-700"
+                                                        className="flex items-center justify-start px-4 py-2 rounded-xl font-medium transition-all active:scale-[0.98] bg-zinc-900/50 text-zinc-400 hover:bg-zinc-800/80 hover:text-white border border-zinc-800 hover:border-zinc-700"
                                                     >
                                                         <div className="flex items-center gap-3">
                                                             <span className="material-symbols-outlined !text-[18px]">
@@ -1480,7 +1480,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                         href={link.url} 
                                                         target="_blank" 
                                                         rel="noopener noreferrer" 
-                                                        className="flex items-center justify-start px-4 py-2 rounded-xl font-medium transition-all active:scale-[0.98] bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white border border-zinc-700"
+                                                        className="flex items-center justify-start px-4 py-2 rounded-xl font-medium transition-all active:scale-[0.98] bg-zinc-900/50 text-zinc-400 hover:bg-zinc-800/80 hover:text-white border border-zinc-800 hover:border-zinc-700"
                                                     >
                                                         <div className="flex items-center gap-3">
                                                             <span className="material-symbols-outlined !text-[18px]">

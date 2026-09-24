@@ -121,7 +121,7 @@ export const Button: React.FC<ButtonProps> = ({
   };
   const variants: Record<NonNullable<ButtonProps['variant']>, string> = {
     primary: 'bg-primary text-brand-black hover:opacity-90',
-    secondary: 'border border-zinc-700 text-zinc-400 bg-zinc-900/60 hover:text-white hover:border-zinc-600 hover:bg-zinc-800',
+    secondary: 'border border-zinc-800 text-zinc-400 bg-zinc-900/50 hover:text-white hover:border-zinc-700 hover:bg-zinc-800/80',
     outline: 'border border-primary bg-transparent text-primary hover:bg-primary/20',
     ghost: 'bg-transparent hover:bg-zinc-800/50 text-zinc-400 hover:text-white',
   };
@@ -1481,55 +1481,40 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Default Status</p>
-                                        <div className="flex items-center justify-center px-4 py-2 bg-zinc-800 text-zinc-300 border border-zinc-700 rounded-xl font-medium text-sm gap-2.5">
+                                        <Button variant="secondary" className="w-full justify-start">
                                             <span className="material-symbols-outlined !text-[18px]">public</span>
                                             <span>Official Website</span>
-                                        </div>
+                                        </Button>
                                         <div className="flex flex-wrap gap-1.5 pt-2">
                                             <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-sm bg-zinc-800 border border-zinc-700"></span>
-                                                bg-zinc-800 border-zinc-700
-                                            </span>
-                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-sm bg-zinc-300 border border-zinc-400"></span>
-                                                text-zinc-300
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-900/50 border border-zinc-800"></span>
+                                                Button variant="secondary"
                                             </span>
                                         </div>
                                     </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover / Active Status</p>
-                                        <div className="flex items-center justify-center px-4 py-2 bg-zinc-700 text-white border border-zinc-500 rounded-xl font-medium text-sm gap-2.5">
+                                        <Button variant="secondary" className="w-full justify-start border-zinc-700 bg-zinc-800/80 text-white scale-95">
                                             <span className="material-symbols-outlined !text-[18px]">play_circle</span>
                                             <span>Watch on YouTube</span>
-                                        </div>
+                                        </Button>
                                         <div className="flex flex-wrap gap-1.5 pt-2">
                                             <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-sm bg-zinc-700 border border-zinc-500"></span>
-                                                hover:bg-zinc-700 hover:border-zinc-500
-                                            </span>
-                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-sm bg-white border border-zinc-300"></span>
-                                                hover:text-white
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-800/80 border border-zinc-700"></span>
+                                                hover styles via Button component
                                             </span>
                                         </div>
                                     </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Disabled Status</p>
-                                        <div className="flex items-center justify-center px-4 py-2 bg-zinc-900/40 text-zinc-600 border border-zinc-800/80 rounded-xl font-medium text-sm gap-2.5 opacity-50 cursor-not-allowed">
+                                        <Button variant="secondary" disabled className="w-full justify-start">
                                             <span className="material-symbols-outlined !text-[18px]">public</span>
                                             <span>Official Website</span>
-                                        </div>
+                                        </Button>
                                         <div className="flex flex-wrap gap-1.5 pt-2">
                                             <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-sm bg-zinc-900/40 border border-zinc-800/80"></span>
-                                                bg-zinc-900/40 border-zinc-800/80
-                                            </span>
-                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-sm bg-zinc-600 border border-zinc-700"></span>
-                                                text-zinc-600
-                                            </span>
-                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500">
-                                                opacity-50
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-900/50 border border-zinc-800"></span>
+                                                Button variant="secondary" disabled
                                             </span>
                                         </div>
                                     </div>

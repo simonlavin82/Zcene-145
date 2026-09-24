@@ -1,20 +1,22 @@
-# UI Polish: Enforce Hard-Edge Rule on Sticky Magazine Header
+# Strategic UI Audit: Secondary Button Modernization
 
 ## Audit Findings
-- **Target Component:** `DetailsPanel.tsx` (specifically within the Magazine/Fullscreen view).
-- **Target Container:** The sticky artist name header that attaches to the top of the scroll container (`<div className="transition-all duration-300 flex-shrink-0 sticky z-40 w-full ...">`).
-- **Identified Violation:** When `isFullScreenMode` and `isHeaderStuck` are true, the nested child container applies the `rounded-xl` utility class. 
-- **Rule Breached:** As per the Zcene Design Philosophy ("Functional Signifiers"), rounded edges (6px+) are exclusively reserved for interactive/clickable components. Since this sticky header is a non-interactive structural label, it must use hard edges (0px radius) to align with our 90s Structural Brutalism aesthetic.
+- **Current State of `<Button>` Component:** The `secondary` variant within the core `<Button>` component (`DesignSystem.tsx`) was partially updated in the previous refactor to use `bg-zinc-900/60`, but the "Secondary Buttons" documentation block in `DesignSystem.tsx` and the actual usage in the Artist Catalog (`DetailsPanel.tsx`) are still hardcoded with the dated `bg-zinc-800 border-zinc-700 text-zinc-300` utility classes.
+- **Link Components:** The Artist Catalog items (YouTube, Bandcamp, Official Website) are rendered as `<a>` tags. Since our `<Button>` component strictly renders a `<button>` element, these links are currently maintaining their own bespoke duplicated class lists instead of inheriting from a single token.
 
 ## Implementation Plan
 
-1. **Modify Sticky Header Container (`DetailsPanel.tsx`)**
-   - Locate the sticky header's inner wrapper (around line 1056).
-   - The current class string for the stuck state is: 
-     `'w-fit bg-zinc-900/80 backdrop-blur-md border border-zinc-700 rounded-xl px-3 md:px-4 py-1.5 shadow-lg -ml-1 md:-ml-4'`
-   - **Action:** Remove the `rounded-xl` class and explicitly replace it with `rounded-none` (to enforce 0px radius).
-   - The updated class string will be: 
-     `'w-fit bg-zinc-900/80 backdrop-blur-md border border-zinc-700 rounded-none px-3 md:px-4 py-1.5 shadow-lg -ml-1 md:-ml-4'`
+1. **Modernize and Extract Secondary Token (`DesignSystem.tsx`)**
+   - Ensure the `secondary` variant in `<Button>` is perfectly tuned to the deep neutral aesthetic: `border border-zinc-800 text-zinc-400 bg-zinc-900/50 hover:text-white hover:border-zinc-700 hover:bg-zinc-800/80` (or similar).
+   
+2. **Refactor "Secondary Buttons" Documentation (`DesignSystem.tsx`)**
+   - Replace the hardcoded `<div>` wrappers in the "Secondary Buttons" documentation section with actual usages of the `<Button variant="secondary">` component, so the visual style guide accurately reflects the new modernized look.
 
-## Execution
-This change is localized and purely visual. Once this plan is approved, I will deploy the `replace_file_content` tool to immediately swap the classes and enforce the brutalist structural aesthetic.
+3. **Cascade to Artist Catalog (`DetailsPanel.tsx`)**
+   - Since the Artist Catalog buttons are anchor links (`<a>`), I will update their `className` string to exactly match the new base + secondary variant classes from our unified `<Button>` component. 
+   - *Alternative/Preferred:* I will apply the updated `bg-zinc-900/50 border-zinc-800` classes directly to these anchor tags, keeping `justify-start` to maintain the left-aligned layout of the catalog.
+
+## Verification
+- Updating these classes will safely cascade the visual style without breaking the layout because we are only modifying colors, borders, and opacities (backgrounds and borders). We will retain structural layout classes like `w-full`, `px-4 py-2`, `flex items-center justify-start` to ensure layout safety.
+
+*Awaiting approval before execution.*
