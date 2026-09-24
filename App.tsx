@@ -265,7 +265,7 @@ const Toast: React.FC<{ message: string; onClose: () => void }> = ({ message, on
           }
           <span className="text-sm font-medium pr-2">{cleanMessage}</span>
         </div>
-        <button onClick={onClose} className="p-1 hover:bg-white/10 rounded-full transition-colors flex-shrink-0">
+        <button onClick={onClose} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl hover:bg-white/10 transition-colors leading-none">
           <X className="w-4 h-4 opacity-70 hover:opacity-100" />
         </button>
       </motion.div>
