@@ -1,29 +1,32 @@
-# UI Polish: Enforce Premium Black & Remove Base Transparency
+# Strategic UI Refactor: Enforce The Depth Hierarchy Matrix
 
 ## Audit Findings
-- **Secondary Buttons:** Currently set to `bg-zinc-900`, which in the context of the Zcene dark mode palette, reads too light (grey) rather than a true premium dark tone.
-- **Available AI Query Chips:** Currently set to `bg-transparent`. While this looks clean in isolation, it completely fails to mask the Magazine view's background texture, causing severe visual bleed.
-- **Interactive Connection Dropdown:** Also set to `bg-transparent`, suffering from the same background bleed.
+- **The Overcorrection:** By pushing Secondary Buttons and AI Query Chips to `bg-black` and `bg-zinc-950`, we solved the texture bleed but destroyed our elevation hierarchy. 
+- **The Conflict:** Input fields (e.g., "Add artist", "Search") use `bg-black` because they are "Voids"—recessed areas designed to receive input. Buttons and chips are "Surfaces"—elevated interactive elements that should sit *above* the background. By making buttons black, they falsely read as recessed voids.
 
 ## Implementation Plan
 
-### 1. Upgrade to Premium Black (Secondary Buttons)
+### 1. Adopt the Depth Matrix
+We will officially standardize our dark mode elevation logic into two distinct layers:
+- **The Void (`bg-black` / `bg-zinc-950`):** Used strictly for recessed input fields, search bars, and inactive/spent states.
+- **The Surface (`bg-zinc-900`):** Used for elevated interactive elements (Secondary Buttons, Available AI Chips, Dropdowns).
+
+### 2. Refactor Secondary Buttons to Surfaces
 - **Core Component (`DesignSystem.tsx`):**
-  - Update base background: `bg-zinc-900` ➔ `bg-black` (or `bg-zinc-950` for a softer dark). I recommend `bg-zinc-950` as it integrates seamlessly with the zinc borders, but we can go full `bg-black` for maximum contrast.
-  - Update hover background: `hover:bg-zinc-800` ➔ `hover:bg-zinc-900` to maintain a subtle, premium interaction.
+  - Revert base background from `bg-black` ➔ `bg-zinc-900`.
+  - Revert hover background from `hover:bg-zinc-950` ➔ `hover:bg-zinc-800`.
 - **Artist Catalog (`DetailsPanel.tsx`):**
-  - Sync the manual `<a>` tags to match the core component (`bg-zinc-950` / `hover:bg-zinc-900`).
+  - Sync the manual `<a>` tags to match (`bg-zinc-900` / `hover:bg-zinc-800`).
 
-### 2. Block Texture Bleed (Instant AI Query Chips & Dropdown)
-- **Available Action Chips (`DetailsPanel.tsx` & `DesignSystem.tsx`):**
-  - Update `bg-transparent` ➔ `bg-zinc-950`. This provides a solid, ultra-dark base that completely blocks the background texture while remaining visually distinct from the borders.
-  - Update hover state to `hover:bg-zinc-900`.
-- **Interactive Connection Dropdown (`DetailsPanel.tsx` & `DesignSystem.tsx`):**
-  - Update `bg-transparent` ➔ `bg-zinc-950` and hover to `hover:bg-zinc-900` to match the available action chips perfectly.
+### 3. Refactor AI Query Chips & Dropdowns to Surfaces
+- **Available Action Chips & Dropdowns (`DetailsPanel.tsx` & `DesignSystem.tsx`):**
+  - Shift from `bg-zinc-950` ➔ `bg-zinc-900`.
+  - Shift hover states from `hover:bg-zinc-900` ➔ `hover:bg-zinc-800`.
+  - *(Note: Spent AI chips will remain `bg-zinc-950` as they correctly recede back towards the void).*
 
-### 3. Sync Design System Documentation (`DesignSystem.tsx`)
-- Scrub the visual swatches and documentation tooltips for both "Secondary Buttons" and "Instant AI Query Chips" to reflect the new ultra-dark tokens (`bg-zinc-950`, `bg-black`). 
-- Specifically, the `<span>` color blocks will be updated to render the exact hex values so the documentation remains the absolute source of truth.
+### 4. Enforce Documentation Strategy (`DesignSystem.tsx`)
+- Scrub the visual swatches and documentation tooltips for all affected components to reflect the new `bg-zinc-900` tokens.
+- **Add Depth Matrix Documentation:** I will add a new explanatory block in the Design System introduction (or the Buttons section) explicitly outlining the "Void vs. Surface" logic. This ensures future developers understand *why* inputs are black and buttons are zinc-900, preventing this regression from happening again.
 
 ## Execution
-Once you approve the choice between `bg-zinc-950` and `bg-black` for the secondary buttons, I will execute the replacements across both files to lock in the premium aesthetic.
+Once approved, I will execute these utility class swaps and inject the Depth Matrix documentation into the Style Guide.

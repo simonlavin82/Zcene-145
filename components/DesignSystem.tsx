@@ -121,7 +121,7 @@ export const Button: React.FC<ButtonProps> = ({
   };
   const variants: Record<NonNullable<ButtonProps['variant']>, string> = {
     primary: 'bg-primary text-brand-black hover:opacity-90',
-    secondary: 'border border-zinc-700 text-zinc-400 bg-black hover:text-white hover:border-zinc-600 hover:bg-zinc-950',
+    secondary: 'border border-zinc-700 text-zinc-400 bg-zinc-900 hover:text-white hover:border-zinc-600 hover:bg-zinc-800',
     outline: 'border border-primary bg-transparent text-primary hover:bg-primary/20',
     ghost: 'bg-transparent hover:bg-zinc-800/50 text-zinc-400 hover:text-white',
   };
@@ -593,6 +593,15 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <p className="text-sm text-zinc-300 leading-relaxed">
                                     In Zcene, <strong>Border Radius is a functional signifier</strong>. If an element has a hard edge (0px), it is part of the app's structural skeleton. 
                                     If an element has a rounded edge (6px+), it is an interactive component or a contextual indicator designed to catch the eye and invite engagement.
+                                </p>
+                            </div>
+
+                            <div className="p-8 border border-zinc-700 bg-zinc-900/30 rounded-xl mt-8">
+                                <h4 className="text-sm font-semibold text-zinc-300 uppercase tracking-widest mb-4">The Depth Hierarchy Matrix</h4>
+                                <p className="text-sm text-zinc-400 leading-relaxed space-y-4">
+                                    <span className="block mb-2">To preserve tactile depth, Zcene enforces a strict <strong>Void vs. Surface</strong> logic:</span>
+                                    <span className="block mb-2"><strong className="text-white">The Void (bg-black / bg-zinc-950):</strong> Reserved strictly for recessed areas designed to receive input (Search bars, Add Artist fields) or elements that should recede visually (inactive/spent states).</span>
+                                    <span className="block"><strong className="text-white">The Surface (bg-zinc-900):</strong> Reserved for elevated interactive components (Secondary Buttons, Nav Utilities, Available AI Chips, Dropdowns). Surfaces must visibly sit above the void.</span>
                                 </p>
                             </div>
                         </div>
@@ -1489,20 +1498,20 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </Button>
                                         <div className="flex flex-wrap gap-1.5 pt-2">
                                             <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-sm bg-black border border-zinc-700"></span>
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-900 border border-zinc-700"></span>
                                                 Button variant="secondary"
                                             </span>
                                         </div>
                                     </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover / Active Status</p>
-                                        <Button variant="secondary" className="w-full justify-start border-zinc-600 bg-zinc-950 text-white scale-95">
+                                        <Button variant="secondary" className="w-full justify-start border-zinc-600 bg-zinc-800 text-white scale-95">
                                             <span className="material-symbols-outlined !text-[18px]">play_circle</span>
                                             <span>Watch on YouTube</span>
                                         </Button>
                                         <div className="flex flex-wrap gap-1.5 pt-2">
                                             <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-sm bg-zinc-950 border border-zinc-600"></span>
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-800 border border-zinc-600"></span>
                                                 hover styles via Button component
                                             </span>
                                         </div>
@@ -1515,7 +1524,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </Button>
                                         <div className="flex flex-wrap gap-1.5 pt-2">
                                             <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-sm bg-black border border-zinc-700"></span>
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-900 border border-zinc-700"></span>
                                                 Button variant="secondary" disabled
                                             </span>
                                         </div>
@@ -1539,13 +1548,13 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Available Action</p>
-                                        <button className="px-4 py-1.5 text-xs text-zinc-400 border border-zinc-700 bg-zinc-950 rounded-full hover:bg-zinc-900 hover:text-white transition-colors">
+                                        <button className="px-4 py-1.5 text-xs text-zinc-400 border border-zinc-700 bg-zinc-900 rounded-full hover:bg-zinc-800 hover:text-white transition-colors">
                                             What sound do they have?
                                         </button>
                                         <div className="flex flex-wrap gap-1.5 pt-2">
                                             <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-sm bg-zinc-950 border border-zinc-700"></span>
-                                                bg-zinc-950 border-zinc-700
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-900 border border-zinc-700"></span>
+                                                bg-zinc-900 border-zinc-700
                                             </span>
                                             <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
                                                 <span className="w-2 h-2 rounded-sm bg-zinc-400 border border-zinc-500"></span>
@@ -1573,7 +1582,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Interactive Connection Dropdown</p>
                                         <div className="relative inline-block group">
-                                            <select className="px-4 py-1.5 text-xs text-zinc-400 border border-zinc-700 rounded-full appearance-none hover:bg-zinc-900 hover:text-white transition-colors cursor-pointer bg-zinc-950 focus:outline-none focus:ring-1 focus:ring-primary pr-8">
+                                            <select className="px-4 py-1.5 text-xs text-zinc-400 border border-zinc-700 rounded-full appearance-none hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer bg-zinc-900 focus:outline-none focus:ring-1 focus:ring-primary pr-8">
                                                 <option value="">What is the connection to...</option>
                                                 <option value="node-1">Spaced</option>
                                                 <option value="node-2">Buggin</option>
@@ -1582,8 +1591,8 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </div>
                                         <div className="flex flex-wrap gap-1.5 pt-2">
                                             <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-sm bg-zinc-950 border border-zinc-700"></span>
-                                                bg-zinc-950 border-zinc-700
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-900 border border-zinc-700"></span>
+                                                bg-zinc-900 border-zinc-700
                                             </span>
                                             <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500">
                                                 focus:ring-primary

@@ -1458,7 +1458,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                         href={youtubeUrl} 
                                                         target="_blank" 
                                                         rel="noopener noreferrer" 
-                                                        className="flex items-center justify-start px-4 py-2 rounded-xl font-medium transition-all active:scale-[0.98] bg-black text-zinc-400 hover:bg-zinc-950 hover:text-white border border-zinc-700 hover:border-zinc-600"
+                                                        className="flex items-center justify-start px-4 py-2 rounded-xl font-medium transition-all active:scale-[0.98] bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-white border border-zinc-700 hover:border-zinc-600"
                                                     >
                                                         <div className="flex items-center gap-3">
                                                             <span className="material-symbols-outlined !text-[18px]">
@@ -1480,7 +1480,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                         href={link.url} 
                                                         target="_blank" 
                                                         rel="noopener noreferrer" 
-                                                        className="flex items-center justify-start px-4 py-2 rounded-xl font-medium transition-all active:scale-[0.98] bg-black text-zinc-400 hover:bg-zinc-950 hover:text-white border border-zinc-700 hover:border-zinc-600"
+                                                        className="flex items-center justify-start px-4 py-2 rounded-xl font-medium transition-all active:scale-[0.98] bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-white border border-zinc-700 hover:border-zinc-600"
                                                     >
                                                         <div className="flex items-center gap-3">
                                                             <span className="material-symbols-outlined !text-[18px]">
@@ -1671,7 +1671,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                         className={`px-4 py-1.5 border transition-colors text-xs rounded-full disabled:opacity-50 text-left flex items-center gap-1 ${
                                                             isClicked 
                                                                 ? 'bg-zinc-950 border-zinc-800 text-zinc-600 cursor-default' 
-                                                                : 'bg-zinc-950 border-zinc-700 text-zinc-400 hover:bg-zinc-900 hover:text-white'
+                                                                : 'bg-zinc-900 border-zinc-700 text-zinc-400 hover:bg-zinc-800 hover:text-white'
                                                         }`}
                                                     >
                                                         {chip}
@@ -1681,7 +1681,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                 {connectionPeers.length > 0 && (
                                                     <div className="relative">
                                                         <select
-                                                            className="appearance-none px-4 py-1.5 bg-zinc-950 border border-zinc-700 hover:bg-zinc-900 hover:text-white transition-colors text-xs text-zinc-400 rounded-full cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary pr-8"
+                                                            className="appearance-none px-4 py-1.5 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 hover:text-white transition-colors text-xs text-zinc-400 rounded-full cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary pr-8"
                                                             onChange={(e) => {
                                                                 if (e.target.value) {
                                                                     const query = `What is the connection to ${e.target.value}?`;
