@@ -2047,6 +2047,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             </span>
                                         </div>
                                     </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
