@@ -1,39 +1,22 @@
-# Strategic UI Refactor: Palette Reduction & Brand Protection
+# Strategic UI Refactor: Palette Finalization & State Sync Bug
 
-## Concept & Architecture
-The presence of Yellow and Orange in our global categorical palette creates visual friction and dilutes the core brand identity. By removing them, we protect the primary brand Yellow (`#F6E468`) to ensure it holds maximum visual weight for Seed Artists and primary actions.
+## 1. Palette Reduction (5-Colors)
+- **Investigation:** We need to remove Green (`#10B981`) to avoid clashes with Teal, locking in a hyper-distinct 5-color rotation.
+- **Execution:** 
+  - Remove Green from `zceneCategoricalPalette` in `utils/formatters.ts`.
+  - Remove Green from the `PROFILE_COLORS` array in `SharedModals.tsx`.
+  - Remove the Green `ColorSwatch` in `DesignSystem.tsx`. We will update the layout to `grid-cols-2 md:grid-cols-5` to perfectly balance the 5 colors across a single row on desktop screens.
 
-## Implementation Plan
+## 2. Node Remapping & Contrast Verification
+- **Execution (`utils/formatters.ts`):** 
+  - Remap `label` to Teal (`zceneCategoricalPalette[1]`).
+  - Remap `country` (Origin) to Red (`zceneCategoricalPalette[2]`).
+- **Contrast Verification (Red vs Pink):** Red (`#EF4444`) is a warm, aggressive primary, while Pink (`#EC4899`) acts as a cool magenta. While they sit adjacent on the color wheel, their specific lightness and saturation values provide adequate visual separation for small SVG nodes on our dark `bg-zinc-950` canvas. However, we should monitor this closely—if they blend at a glance, we can easily swap one for a higher-contrast alternative later.
 
-### 1. Strict Palette Reduction (`utils/formatters.ts`)
-- **Execution:** Remove Yellow (`#EAB308`) and Orange (`#F59E0B`) from `zceneCategoricalPalette`. 
-- **The New Palette (6 Colors):**
-  - Index 0: Purple (`#A855F7`)
-  - Index 1: Teal (`#2DD4BF`)
-  - Index 2: Red (`#EF4444`)
-  - Index 3: Blue (`#3B82F6`)
-  - Index 4: Green (`#10B981`)
-  - Index 5: Pink (`#EC4899`)
+## 3. Debugging the Style State Sync Bug
+- **Investigation:** I audited the Deep Cut state propagation. The bug originates in `DetailsPanel.tsx` (Lines 1158-1165). The `ProfileRow` component attempts to translate the string color name (e.g., `'teal'`) into a hex code using a hardcoded `hexMap`. 
+- **The Bug:** This `hexMap` was never updated to reflect our new categorical color names. It still contained legacy keys (`emerald`, `amber`, `rose`, `cyan`). Because `'teal'` and `'red'` were not in the map, the lookup returned `undefined` and triggered the fallback `|| '#a855f7'`, forcing everything to render as Purple.
+- **Execution:** I will update the inline `hexMap` in `DetailsPanel.tsx` to properly map the 5 new active style profile names (`purple`, `teal`, `red`, `blue`, `pink`) directly to their exact categorical hex codes.
 
-### 2. Node Remapping (`utils/formatters.ts`)
-- **Execution:** We will update `nodeTypeColorMap` to map to the new array indices.
-- **The New Mapping:**
-  - `ai`: `zceneCategoricalPalette[0]` (Purple)
-  - `country` (Origin): `zceneCategoricalPalette[1]` (Teal — beautifully complementary to the Yellow seed)
-  - `genre`: `zceneCategoricalPalette[3]` (Blue)
-  - `label`: `zceneCategoricalPalette[4]` (Green)
-  - `founded`: `zceneCategoricalPalette[5]` (Pink)
-  - `seed`: `'#F6E468'` (Brand Yellow)
-
-### 3. Style Profiles Modal Sync (`SharedModals.tsx`)
-- **Audit Findings:** The `PROFILE_COLORS` array in `SharedModals.tsx` currently contains 5 disconnected/legacy colors (purple, emerald, amber, rose, cyan). The color picker uses a flexbox layout (`flex items-center gap-2`), not a hardcoded grid.
-- **Execution:** We will replace `PROFILE_COLORS` with the exact 6 colors of our new categorical palette. Expanding from 5 to 6 swatches will fit perfectly within the flex layout without breaking the modal architecture.
-
-### 4. Design System Sync (`DesignSystem.tsx`)
-- **Execution:** In the "Zcene Categorical Palette" section, we will remove the `ColorSwatch` components for Yellow and Orange.
-- **Layout Adjustment:** We will adjust the grid from `grid-cols-4` to `grid-cols-3` (`grid grid-cols-2 md:grid-cols-3 gap-6`) so the remaining 6 colors sit perfectly balanced across two rows.
-
-## Engineering Sign-Off
-I have audited the downstream components. There are no layout breaks in the Style Modal, and shifting the Origin node to Teal is structurally sound—it provides much sharper contrast against the Yellow Seed Artist than the old Orange did.
-
-I am ready to execute this plan.
+## Sign-Off
+I am ready to execute these changes to lock in the 5-color palette and restore the dynamic progress bar coloring. Let me know if you approve this plan!
