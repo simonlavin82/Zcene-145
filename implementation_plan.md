@@ -1,24 +1,32 @@
-# UI Polish: Secondary Button Stroke & Layout Documentation
+# UI Polish: Align Instant AI Query Chips with Design System
 
 ## Audit Findings
-- **Stroke Contrast Issue:** The recent modernization of the secondary button introduced `border-zinc-800`, which lacks sufficient contrast against the deep `bg-zinc-900/50` background, causing the stroke to virtually disappear. By examining the "Exit Magazine" button, we observed it utilizes `border-zinc-700` with a `hover:border-zinc-600` state, which provides the desired crisp definition.
-- **Layout Modifier Documentation:** The Zcene design system currently doesn't explicitly document how layout overrides (e.g., `w-full justify-start`) should be handled. We need to formalize this to prevent future developers from creating bespoke tokens for simple layout variants like the Artist Catalog.
+- **Discrepancy Located:** The "Instant AI Query Chips" inside `DetailsPanel.tsx` (lines ~1670-1685) have diverged from the official design system documentation in `DesignSystem.tsx`.
+- **Rogue Classes Identified:** 
+  - The live available chips utilize `hover:border-primary` which causes the unwanted yellow outline on hover. 
+  - The live components also use heavier backgrounds (`bg-zinc-900` instead of `bg-transparent`) and brighter text (`text-zinc-300` instead of `text-zinc-400`), missing the intended subtle interaction.
+  - The clicked state uses a heavier background and text color than the documented dimmed, spent state.
 
 ## Implementation Plan
 
-1. **Fix the Stroke Contrast (`DesignSystem.tsx`)**
-   - Update the `secondary` variant in the core `<Button>` component to restore the crisp border:
-     *From:* `border-zinc-800 ... hover:border-zinc-700`
-     *To:* `border-zinc-700 ... hover:border-zinc-600`
-   - The deep background (`bg-zinc-900/50`) will remain untouched as requested.
+1. **Update Query Chips (Buttons)**
+   - Modify the `className` ternary inside `queryChips.map` in `DetailsPanel.tsx`:
+   - **Clicked (Spent) State:**
+     - *From:* `bg-zinc-950 border-zinc-800 text-zinc-500 hover:text-zinc-400`
+     - *To:* `bg-zinc-950/30 border-zinc-800/50 text-zinc-600 cursor-default`
+   - **Available Action State:**
+     - *From:* `bg-zinc-900 border-zinc-700 hover:border-primary hover:bg-zinc-800 text-zinc-300`
+     - *To:* `bg-transparent border-zinc-700 text-zinc-400 hover:bg-zinc-800 hover:text-white`
+     *(This directly removes the rogue `hover:border-primary` class.)*
 
-2. **Document Layout Modifiers (`DesignSystem.tsx`)**
-   - In the "Secondary Buttons" section, append the following to the description text:
-     *"While buttons default to center alignment, they fully support structural overrides (e.g., `w-full justify-start`) for contextual uses like vertical catalog menus. This ensures layout flexibility without creating bespoke tokens."*
+2. **Update Connection Dropdown (`<select>`)**
+   - Align the dropdown's utility classes to perfectly mirror the design system interactive connection dropdown.
+   - *From:* `... bg-zinc-900 border-zinc-700 hover:border-primary hover:bg-zinc-800 transition-colors text-xs text-zinc-300 ...`
+   - *To:* `... bg-transparent border-zinc-700 text-zinc-400 hover:bg-zinc-800 hover:text-white focus:ring-1 focus:ring-primary ...` 
+   *(Removes the rogue hover border, standardizes the background and text color, and adds the correct focus ring.)*
 
-3. **Cascade Fix to Artist Catalog (`DetailsPanel.tsx`)**
-   - Update the manual anchor (`<a>`) tags rendering the YouTube, Bandcamp, and Official Website links in the Artist Catalog.
-   - Swap `border-zinc-800 hover:border-zinc-700` back to `border-zinc-700 hover:border-zinc-600` to match the core token fix.
+3. **Padding Standardization**
+   - Update the baseline padding from `px-3` to `px-4` on both the chips and the dropdown to exactly match the `px-4 py-1.5` metrics defined in the Design System.
 
 ## Execution
-Once approved, I will deploy the `multi_replace_file_content` tool to patch the utility classes and insert the layout documentation.
+Once approved, I will deploy the `multi_replace_file_content` tool on `DetailsPanel.tsx` to strip these rogue classes and apply the correct design tokens.
