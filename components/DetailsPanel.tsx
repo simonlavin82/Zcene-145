@@ -2267,27 +2267,27 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     <div className="px-4 flex items-center justify-between gap-4 h-full">
                         <div className="flex items-center gap-2 flex-grow animate-in fade-in slide-in-from-top-2 duration-500">
                             <div className="relative flex-grow max-w-[180px]">
-                                <span className={`material-symbols-outlined absolute top-1/2 -translate-y-1/2 text-zinc-500 ${InputSizes.sm.leftIcon}`}>search</span>
+                                <span className={`material-symbols-outlined absolute top-1/2 -translate-y-1/2 text-zinc-500 ${InputSizes.md.leftIcon}`}>search</span>
                                 <input 
                                     type="search"
                                     placeholder="Search..."
                                     value={magazineSearchQuery}
                                     onChange={(e) => setMagazineSearchQuery(e.target.value)}
-                                    className={`w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all ${InputSizes.sm.magazineSearch}`}
+                                    className={`w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all ${InputSizes.md.magazineSearch}`}
                                 />
                                 <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
                                     {!magazineSearchQuery && (
-                                        <button onClick={handleMagazineSpeechToText} className={`flex items-center justify-center transition-colors leading-none ${InputSizes.sm.iconBtn} ${isListeningMagazineSearch ? 'text-primary animate-pulse' : 'text-zinc-500 hover:text-white'}`} title="Search by voice"><MicIcon className={InputSizes.sm.icon} /></button>
+                                        <button onClick={handleMagazineSpeechToText} className={`flex items-center justify-center transition-colors leading-none ${InputSizes.md.iconBtn} ${isListeningMagazineSearch ? 'text-primary animate-pulse' : 'text-zinc-500 hover:text-white'}`} title="Search by voice"><MicIcon className={InputSizes.md.icon} /></button>
                                     )}
                                     {magazineSearchQuery && (
-                                        <button onClick={() => setMagazineSearchQuery('')} className={`flex items-center justify-center text-zinc-400 hover:text-white transition-colors leading-none ${InputSizes.sm.iconBtn}`} aria-label="Clear search"><span className={`material-symbols-outlined ${InputSizes.sm.icon}`}>close</span></button>
+                                        <button onClick={() => setMagazineSearchQuery('')} className={`flex items-center justify-center text-zinc-400 hover:text-white transition-colors leading-none ${InputSizes.md.iconBtn}`} aria-label="Clear search"><span className={`material-symbols-outlined ${InputSizes.md.icon}`}>close</span></button>
                                     )}
                                 </div>
                             </div>
 
-                            <div className="relative shrink-0 w-[90px]">
+                            <div className="relative shrink-0 w-[110px]">
                                 <Select 
-                                    variant="sm"
+                                    variant="md"
                                     value={magazineSortBy}
                                     onChange={(e) => setMagazineSortBy(e.target.value as any)}
                                 >
@@ -2300,10 +2300,10 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
 
                         <button 
                             onClick={() => onMagazineViewToggle(false)}
-                            className="flex items-center justify-center w-7 h-7 border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 focus:outline-none transition-all duration-200 shrink-0 leading-none backdrop-blur-sm"
+                            className="flex items-center justify-center w-8 h-8 border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 focus:outline-none transition-all duration-200 shrink-0 leading-none backdrop-blur-sm"
                             title="Exit Magazine View"
                         >
-                            <span className="material-symbols-outlined !text-[16px]">close</span>
+                            <span className="material-symbols-outlined !text-[18px]">close</span>
                         </button>
                     </div>
                 </div>
@@ -2315,27 +2315,26 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                 <div className="flex items-center gap-4 flex-grow animate-in fade-in slide-in-from-left-4 duration-500">
                                     <div className="flex items-center gap-3 flex-grow max-w-md">
                                         <div className="relative flex-grow">
-                                            <span className={`material-symbols-outlined absolute top-1/2 -translate-y-1/2 text-zinc-500 ${InputSizes.sm.leftIcon}`}>search</span>
+                                            <span className={`material-symbols-outlined absolute top-1/2 -translate-y-1/2 text-zinc-500 ${InputSizes.md.leftIcon}`}>search</span>
                                             <input 
                                                 type="search"
                                                 placeholder="Search..."
                                                 value={magazineSearchQuery}
                                                 onChange={(e) => setMagazineSearchQuery(e.target.value)}
-                                                className={`w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all ${InputSizes.sm.magazineSearch}`}
+                                                className={`w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all ${InputSizes.md.magazineSearch}`}
                                             />
                                             <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
                                                 {!magazineSearchQuery && (
-                                                    <button onClick={handleMagazineSpeechToText} className={`flex items-center justify-center transition-colors leading-none ${InputSizes.sm.iconBtn} ${isListeningMagazineSearch ? 'text-primary animate-pulse' : 'text-zinc-500 hover:text-white'}`} title="Search by voice"><MicIcon className={InputSizes.sm.icon} /></button>
+                                                    <button onClick={handleMagazineSpeechToText} className={`flex items-center justify-center transition-colors leading-none ${InputSizes.md.iconBtn} ${isListeningMagazineSearch ? 'text-primary animate-pulse' : 'text-zinc-500 hover:text-white'}`} title="Search by voice"><MicIcon className={InputSizes.md.icon} /></button>
                                                 )}
                                                 {magazineSearchQuery && (
-                                                    <button onClick={() => setMagazineSearchQuery('')} className={`flex items-center justify-center text-zinc-400 hover:text-white transition-colors leading-none ${InputSizes.sm.iconBtn}`} aria-label="Clear search"><span className={`material-symbols-outlined ${InputSizes.sm.icon}`}>close</span></button>
+                                                    <button onClick={() => setMagazineSearchQuery('')} className={`flex items-center justify-center text-zinc-400 hover:text-white transition-colors leading-none ${InputSizes.md.iconBtn}`} aria-label="Clear search"><span className={`material-symbols-outlined ${InputSizes.md.icon}`}>close</span></button>
                                                 )}
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2 shrink-0">
-                                            <span className="text-xs text-zinc-500 uppercase tracking-widest hidden sm:block">Sort by</span>
                                             <Select 
-                                                variant="sm"
+                                                variant="md"
                                                 value={magazineSortBy}
                                                 onChange={(e) => setMagazineSortBy(e.target.value as any)}
                                             >
@@ -2350,11 +2349,11 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                             <div className="flex items-center gap-0.5 ml-4 shrink-0">
                                 <button 
                                     onClick={() => onMagazineViewToggle(false)}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 focus:outline-none transition-all duration-200 text-xs font-medium shrink-0 leading-none backdrop-blur-sm"
+                                    className="flex items-center gap-1.5 px-4 py-2 border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 focus:outline-none transition-all duration-200 text-sm font-medium shrink-0 leading-none backdrop-blur-sm"
                                     title="Exit Magazine View"
                                 >
                                     <span>Exit Magazine</span>
-                                    <span className="material-symbols-outlined !text-[16px]">close</span>
+                                    <span className="material-symbols-outlined !text-[18px]">close</span>
                                 </button>
                             </div>
                         </div>

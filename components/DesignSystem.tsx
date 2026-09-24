@@ -26,6 +26,10 @@ export const LayoutSizes = {
   controlBar: 'h-[38px]', // Exact token alignment for toolbar toggles and dropdown buttons
 };
 
+// --- Floating Canvas Controls ---
+
+export const CanvasControlStyles = 'w-12 h-12 rounded-full bg-zinc-900/80 backdrop-blur-md border border-zinc-700 text-zinc-400 hover:text-white shadow-xl transition-all flex flex-shrink-0 items-center justify-center cursor-pointer active:scale-90';
+
 // --- Input Primitives & Sizings ---
 
 export const InputSizes = {

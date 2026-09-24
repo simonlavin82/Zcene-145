@@ -4,6 +4,7 @@ import * as d3 from 'd3';
 import { Loader2 } from 'lucide-react';
 import { GraphData, Node, Link, GraphSettings, NodeDetails } from '../types';
 import { LegendSymbol } from './Icons';
+import { CanvasControlStyles } from './DesignSystem';
 import { normalizeArtistId, isNodeInSeedList } from '../services/artistCacheService';
 
 type FilterKeys = 'genre' | 'label' | 'country' | 'founded' | 'seed' | 'recommended';
@@ -1534,13 +1535,13 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         )}
 
         <div className="absolute bottom-6 right-6 flex flex-col gap-3 z-30">
-            <button onClick={handleCenter} className="w-12 h-12 bg-zinc-900/80 border border-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center backdrop-blur-md shadow-xl transition-all active:scale-90 rounded-xl">
+            <button onClick={handleCenter} className={CanvasControlStyles}>
                 <span className="material-symbols-outlined !text-[20px]">center_focus_strong</span>
             </button>
-            <button onClick={handleZoomIn} className="w-12 h-12 bg-zinc-900/80 border border-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center backdrop-blur-md shadow-xl transition-all active:scale-90 rounded-xl">
+            <button onClick={handleZoomIn} className={CanvasControlStyles}>
                 <span className="material-symbols-outlined !text-[20px]">add</span>
             </button>
-            <button onClick={handleZoomOut} className="w-12 h-12 bg-zinc-900/80 border border-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center backdrop-blur-md shadow-xl transition-all active:scale-90 rounded-xl">
+            <button onClick={handleZoomOut} className={CanvasControlStyles}>
                 <span className="material-symbols-outlined !text-[20px]">remove</span>
             </button>
         </div>
@@ -1576,7 +1577,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 <div className="flex flex-col items-start gap-4 pointer-events-none w-full relative">
                     <button
                         onClick={(e) => { e.stopPropagation(); setIsLegendExpanded(!isLegendExpanded); if (onLegendInteraction) onLegendInteraction(); }}
-                        className={`bg-zinc-900/80 backdrop-blur-md border border-zinc-600 text-zinc-300 w-14 h-14 flex items-center justify-center pointer-events-auto shadow-2xl transition-all active:scale-90 rounded-xl relative z-40 ${isLegendExpanded ? 'bg-zinc-800 border-primary/50 text-primary' : ''}`}
+                        className={`${CanvasControlStyles} pointer-events-auto relative z-40 ${isLegendExpanded ? 'bg-zinc-800 border-primary/50 text-primary' : ''}`}
                     >
                         <span className="material-symbols-outlined !text-[20px]">{isLegendExpanded ? 'close' : 'filter_list'}</span>
                     </button>
