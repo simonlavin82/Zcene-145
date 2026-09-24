@@ -1,26 +1,26 @@
-# Strategic UI Refactor: Brutalist Crate Borders & Graph Node Normalization
+# Strategic UI Refactor: Optical Alignment & Album Art Contrast
 
 ## Concept & Architecture
-We are dialing back the "sci-fi" aesthetic by enforcing strict brutalist borders on the Dashboard crates. Simultaneously, we are correcting visual desyncs within the Spiderweb Graph to ensure the Seed Artist node and its corresponding legend icon carry the correct brand weight and color.
+We need to correct the optical alignment of the SVG legend shapes so they sit perfectly centered relative to their labels. Additionally, we need to introduce a heavy, brutalist shadow and border system to the Dashboard project tiles so the album art punches through the tinted crate backgrounds.
 
 ## Implementation Plan
 
-### 1. Spiderweb Graph & Legend Fixes
-- **Node Color Correction (`formatters.ts`, `MusicGraph.tsx`, `ExampleMusicGraph.tsx`):** 
-  - The Seed Artist node is currently mapped to a standard palette yellow, which may be rendering with an orange tint, while the stroke is picking up a different value.
-  - We will explicitly force the Seed Artist's fill and stroke to the core brand primary yellow (`#F6E468`) in both the D3 node rendering logic and the `nodeTypeColorMap` to ensure absolute consistency.
-- **Legend Normalization (`GraphPage.tsx`, `ExampleMusicGraph.tsx`, `DesignSystem.tsx`):**
-  - The `d3.symbolCircle` used for the Seed Artist in the UI legends currently has a `size` prop of `260`, making it appear visually smaller than the star (`400`) or diamond (`320`).
-  - We will increase the `size` prop of the circle symbol across all legend configurations (to roughly `400` or `450`) so its visual volume matches the other geometric shapes perfectly. We will also ensure its fill color relies strictly on `#F6E468`.
+### 1. Optical Legend Alignment (`Icons.tsx`)
+- **The Issue:** D3 symbols (like `d3.symbolTriangle` and `d3.symbolStar`) are drawn relative to their mathematical centroids, which often differ from their visual/optical centers. This makes them appear top-heavy or vertically misaligned inside the legend's flex container.
+- **The Solution:** We will introduce a dynamic `transform` offset inside the `LegendSymbol` component.
+- **Execution:**
+  - In `Icons.tsx`, we will check the incoming `symbol` type.
+  - If it is `d3.symbolTriangle`, we will apply a `transform="translate(0, 2)"` to nudge it down.
+  - If it is `d3.symbolStar`, we will apply a `transform="translate(0, 1)"` to ground it.
+  - We will apply this `transform` directly to the `<path>` element inside the SVG. This ensures perfect optical centering within the existing `viewBox` without disrupting the HTML layout.
 
-### 2. Dashboard Crate Borders (Anti-Sci-Fi)
-- **Target Component:** `Dashboard.tsx`
-- **The Issue:** The dynamic colored structural stroke (`${crateColor}33`) wraps the entire crate, giving it a glowing neon/sci-fi appearance that conflicts with our brutalist roots.
-- **New Execution:**
-  - We will strip the dynamic `borderColor` from the inline styles of the main crate containers in both the Grid and List views.
-  - We will revert the outer border to the standard, hard-edged `border-zinc-800` utility class.
-  - The solid, fully opaque folder tabs will remain exactly as they are.
-  - The ultra-low opacity ambient background wash (`${crateColor}0A`) inside the crate body will be retained, providing subtle depth without the glowing edge.
+### 2. Album Art Contrast (`DashboardProjectCard.tsx`)
+- **The Issue:** The project cards (`DashboardProjectCard`) currently use a semi-transparent `border-zinc-700/50` and a standard `shadow-xl`. Against the new 4% color wash of the dashboard crates, these cards are losing their defining edge.
+- **The Solution:** We will implement a deep structural boundary using a pure dark stroke and a heavy, opaque drop shadow.
+- **Execution:**
+  - In `DashboardProjectCard.tsx`, we will replace `border-zinc-700/50` with a solid `border-zinc-950` or `border-black` to create a stark dividing line.
+  - We will replace the default `shadow-xl` with a custom, heavy shadow utility (e.g., `shadow-[0_8px_30px_rgba(0,0,0,0.8)]`) to dramatically lift the tile off the tinted crate background.
+  - The combination of the dark stroke and the deep shadow will effectively quarantine the album artwork from the ambient crate wash, restoring full contrast.
 
 ## Execution
-Once approved, I will implement the border corrections in `Dashboard.tsx`, normalize the legend circle sizes, and enforce the pure primary brand yellow for the Seed Artists across the graph logic.
+Once approved, I will implement the optical offsets in `Icons.tsx` and upgrade the border/shadow utility classes in `DashboardProjectCard.tsx`.

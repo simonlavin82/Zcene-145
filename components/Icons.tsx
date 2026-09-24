@@ -149,9 +149,15 @@ export const InstagramIcon: React.FC<{ className?: string }> = ({ className }) =
 
 export const LegendSymbol: React.FC<{ symbol: d3.SymbolType; size?: number; className?: string; style?: React.CSSProperties; }> = ({ symbol, size = 64, className, style }) => {
     const path = d3.symbol().type(symbol).size(size)();
+    
+    let transform = "";
+    if (symbol === d3.symbolTriangle) transform = "translate(0, 2)";
+    else if (symbol === d3.symbolStar) transform = "translate(0, 1)";
+    else if (symbol === d3.symbolSquare) transform = "translate(0, 0)";
+
     return (
         <svg width="14" height="14" viewBox="-15 -15 30 30" className={className} style={style} preserveAspectRatio="xMidYMid meet">
-            <path d={path || ''} fill="currentColor" />
+            <path d={path || ''} fill="currentColor" transform={transform} />
         </svg>
     );
 };
