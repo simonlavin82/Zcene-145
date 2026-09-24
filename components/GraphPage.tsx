@@ -579,7 +579,7 @@ const LibraryDialog: React.FC<{
                             className={`flex items-center gap-2 rounded-xl border px-3 ${LayoutSizes.controlBar} text-xs font-medium transition-colors ${
                                 selectedGenres.length > 0
                                     ? 'border-primary/60 bg-primary/10 text-primary'
-                                    : 'border-zinc-700 bg-zinc-950 text-zinc-200 hover:bg-zinc-900'
+                                    : 'border-zinc-700 bg-zinc-950 text-zinc-200'
                             }`}
                             aria-expanded={isGenreOpen}
                         >
@@ -1542,7 +1542,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
   const ExpandingSearchOverlay = useMemo(() => {
     return (
         <div className="absolute top-6 right-6 z-40 flex justify-end">
-            <div className={`transition-all duration-300 ease-in-out origin-right ${isSearchExpanded ? 'w-64 opacity-100' : 'w-12 opacity-100'}`}>
+            <div className={`transition-all duration-300 ease-in-out origin-right ${isSearchExpanded ? 'w-64 opacity-100' : 'w-[38px] opacity-100'}`}>
                 {!isSearchExpanded ? (
                     <button 
                         onClick={() => { setIsSearchExpanded(true); setTimeout(() => graphSearchInputRef.current?.focus(), 50); }} 
@@ -1552,7 +1552,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                         <span className="material-symbols-outlined !text-[20px]">search</span>
                     </button>
                 ) : (
-                    <div className="relative w-full h-12">
+                    <div className="relative w-full h-[38px]">
                         <span className={`material-symbols-outlined absolute top-1/2 -translate-y-1/2 text-zinc-500 ${InputSizes.md.leftIcon}`}>search</span>
                         <input 
                             ref={graphSearchInputRef}
@@ -1562,7 +1562,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                             onChange={(e) => { setSearchQuery(e.target.value); if (selectedNode) onNodeClick(null); }} 
                             onFocus={() => { if (selectedNode) onNodeClick(null); }} 
                             onBlur={() => { if (!searchQuery.trim()) setIsSearchExpanded(false); }}
-                            className={`w-full h-full appearance-none rounded-full border border-zinc-700 bg-zinc-900/80 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none backdrop-blur-md shadow-xl transition-all pl-10 pr-20 text-sm`} 
+                            className={`w-full h-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900/80 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none backdrop-blur-md shadow-xl transition-all pl-10 pr-20 text-sm`} 
                         />
                         <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1 z-10">
                             {searchQuery && (

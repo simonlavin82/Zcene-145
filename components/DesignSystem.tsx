@@ -28,7 +28,7 @@ export const LayoutSizes = {
 
 // --- Floating Canvas Controls ---
 
-export const CanvasControlStyles = 'w-12 h-12 rounded-xl bg-zinc-900/80 backdrop-blur-md border border-zinc-700 text-zinc-400 hover:text-white shadow-xl transition-all flex flex-shrink-0 items-center justify-center cursor-pointer active:scale-90';
+export const CanvasControlStyles = 'w-[38px] h-[38px] rounded-xl bg-zinc-900/80 backdrop-blur-md border border-zinc-700 text-zinc-400 hover:text-white shadow-xl transition-all flex flex-shrink-0 items-center justify-center cursor-pointer active:scale-90';
 
 // --- Input Primitives & Sizings ---
 
@@ -2846,7 +2846,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="mt-8 border border-zinc-800 bg-zinc-900/30 p-8">
                                     <div className="space-y-4 max-w-sm">
                                         <p className="text-xs text-zinc-500 uppercase tracking-widest font-semibold">Toolbar Dropdown Trigger</p>
-                                        <button className={`flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-950 text-zinc-200 hover:bg-zinc-900 px-3 ${LayoutSizes.controlBar} text-xs font-medium transition-colors`}>
+                                        <button className={`flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-950 text-zinc-200 px-3 ${LayoutSizes.controlBar} text-xs font-medium transition-colors`}>
                                             <span className="material-symbols-outlined !text-[14px]">filter_list</span>
                                             Filter List
                                             <span className="material-symbols-outlined !text-[14px]">expand_more</span>
