@@ -3089,8 +3089,8 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <span className="material-symbols-outlined !text-[20px]">check_circle</span>
                                     <span className="text-sm font-semibold tracking-tight pr-2">Artist seed registered in the curation queue</span>
                                 </div>
-                                <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl hover:bg-white/10 transition-colors leading-none">
-                                    <span className="material-symbols-outlined !text-[16px] opacity-70 hover:opacity-100">close</span>
+                                <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center transition-opacity leading-none opacity-60 hover:opacity-100">
+                                    <span className="material-symbols-outlined !text-[16px]">close</span>
                                 </button>
                              </div>
                         </div>
