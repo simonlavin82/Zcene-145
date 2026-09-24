@@ -121,7 +121,7 @@ export const Button: React.FC<ButtonProps> = ({
   };
   const variants: Record<NonNullable<ButtonProps['variant']>, string> = {
     primary: 'bg-primary text-brand-black hover:opacity-90',
-    secondary: 'border border-zinc-800 text-zinc-400 bg-zinc-900/50 hover:text-white hover:border-zinc-700 hover:bg-zinc-800/80',
+    secondary: 'border border-zinc-700 text-zinc-400 bg-zinc-900/50 hover:text-white hover:border-zinc-600 hover:bg-zinc-800/80',
     outline: 'border border-primary bg-transparent text-primary hover:bg-primary/20',
     ghost: 'bg-transparent hover:bg-zinc-800/50 text-zinc-400 hover:text-white',
   };
@@ -1477,6 +1477,8 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 </div>
                                 <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
                                     Solid dark-background buttons with defined 1px borders used as our standard secondary interactive buttons across the application, including panel utility actions and external catalog links (e.g. <strong>Official Website</strong>, <strong>Watch on YouTube</strong> in the Deep Cut panel). They provide distinct visual substance and structure.
+                                    <br /><br />
+                                    While these buttons default to center alignment, they fully support structural overrides (e.g., <code className="text-zinc-300">w-full justify-start</code>) for contextual uses like vertical catalog menus. This ensures layout flexibility without creating bespoke tokens.
                                 </p>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
                                     <div className="space-y-4">
