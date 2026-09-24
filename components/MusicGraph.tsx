@@ -4,7 +4,7 @@ import * as d3 from 'd3';
 import { Loader2 } from 'lucide-react';
 import { GraphData, Node, Link, GraphSettings, NodeDetails } from '../types';
 import { LegendSymbol } from './Icons';
-import { CanvasControlStyles } from './DesignSystem';
+import { CanvasControlStyles, InputSizes } from './DesignSystem';
 import { normalizeArtistId, isNodeInSeedList } from '../services/artistCacheService';
 
 type FilterKeys = 'genre' | 'label' | 'country' | 'founded' | 'seed' | 'recommended';
@@ -111,6 +111,8 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [highlightedNodes, setHighlightedNodes] = useState<Set<string>>(new Set());
   const [isLegendExpanded, setIsLegendExpanded] = useState(false);
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  const graphSearchInputRef = useRef<HTMLInputElement>(null);
   const [isCompactMode, setIsCompactMode] = useState(false);
   const [hoveredLink, setHoveredLink] = useState<{
     sourceId: string;
@@ -1602,6 +1604,41 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     </div>
                 </div>
             )}
+        </div>
+        
+        <div className={`absolute right-6 z-40 flex justify-end transition-all duration-300 ${!isCompactMode ? 'top-[72px]' : 'top-6'}`}>
+            <div className={`transition-all duration-300 ease-in-out origin-right ${isSearchExpanded ? 'w-64 opacity-100' : 'w-[38px] opacity-100'}`}>
+                {!isSearchExpanded ? (
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); setIsSearchExpanded(true); setTimeout(() => graphSearchInputRef.current?.focus(), 50); }} 
+                        className={CanvasControlStyles}
+                        aria-label="Find in spiderweb..."
+                    >
+                        <span className="material-symbols-outlined !text-[20px]">search</span>
+                    </button>
+                ) : (
+                    <div className="relative w-full h-[38px]">
+                        <span className={`material-symbols-outlined absolute top-1/2 -translate-y-1/2 text-zinc-500 ${InputSizes.md.leftIcon}`}>search</span>
+                        <input 
+                            ref={graphSearchInputRef}
+                            type="search" 
+                            placeholder="Find in spiderweb..." 
+                            value={searchQuery} 
+                            onChange={(e) => { setSearchQuery(e.target.value); if (selectedNode) onNodeClick(null); }} 
+                            onFocus={() => { if (selectedNode) onNodeClick(null); }} 
+                            onBlur={() => { if (!searchQuery.trim()) setIsSearchExpanded(false); }}
+                            className={`w-full h-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900/80 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none backdrop-blur-md shadow-xl transition-all pl-10 pr-20 text-sm`} 
+                        />
+                        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1 z-10">
+                            {searchQuery && (
+                                <button onMouseDown={(e) => { e.preventDefault(); setSearchQuery(''); graphSearchInputRef.current?.focus(); }} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-[10px] text-zinc-400 hover:text-white transition-colors leading-none" aria-label="Clear search">
+                                    <span className="material-symbols-outlined !text-[18px]">close</span>
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     </div>
   );
