@@ -125,9 +125,11 @@ the entire dataset, the app evolves existing visual structures.
      against subsequent generic Google Image Search hits.
    - Cache HIT: Graph structure + Deep Cut metadata are returned instantly. 
      Phases 02 and 03 are bypassed entirely. D3 Phase 04 begins immediately, 
-     artist canvas positions from the project's canvasLayout are restored, and
-     the Deep Cut activeNodes queue is initialised via the Seed-Fallback loader
-     (see Section 7) so the panel opens to the correct artist on first render.
+     and the D3 simulation is explicitly masked by the global loading curtain.
+     The curtain only drops once the network has fully settled and the canvas
+     dynamically calculates its bounding box to snap into a perfectly framed view.
+     Returning to a saved Zcene guarantees a completely unfocused, centered, and 
+     unobstructed view with the workspace controls elegantly tucked away.
    - Proactive Deep Cache: Upon generating a graph, the Background Worker proactively 
      hydrates and bundles full profile details (biographies, YouTube IDs, discographies) 
      for both the seeds and all recommended peer bands. The UI remains locked until this atomic 
@@ -153,6 +155,8 @@ the entire dataset, the app evolves existing visual structures.
 6. IMMERSIVE DISCOVERY FLOW & VIEWPORT OPTIMIZATIONS (MusicGraph.tsx / GraphPage.tsx):
    Zcene features a "Spiderweb" discovery interface that allows users to 
    interactively expand the graph in real-time.
+   - Dynamic Bounding Box Framing: On initialization and when manually centering, the graph calculates the precise physical boundaries (minX, maxX, minY, maxY) of the settled network. It dynamically scales and translates the camera to perfectly frame the graph based on the device viewport, replacing all legacy static zoom scales.
+   - Simulation Masking (The Loading Curtain): The global loading state explicitly masks the D3 physics simulation. It is strictly synchronized with the simulation lifecycle via a React-to-D3 state bridge, only unmounting after the physics engine reaches its '.on("end")' event and the bounding box is framed.
    - Discovery UI: Contextual action buttons (+/-) emerge directly from 
      selected nodes, maintaining spatial anchoring during simulation.
    - Central Anchoring Layout: Seed Artist nodes are visually anchored to the center 
@@ -179,8 +183,9 @@ the entire dataset, the app evolves existing visual structures.
    - Synchronous Pre-population: Project identity (seedArtists, projectName, status, and activeJobId)
      is synchronously pre-populated from the local dashboard 'projects' list during routing,
      preventing the header from briefly clearing or flickering.
-   - Auto-Hydration: The Deep Cut details panel automatically hydrates upon loading a completed project
-     by auto-selecting the first activeNodes entry and triggering the local details loader.
+   - Clean Slate Mounts: Returning to a completed project now guarantees a completely unfocused 
+     and centered state. No default selection is imposed on mount, providing an unobstructed, 
+     unbiased view of the network until the user explicitly interacts with a node.
    - O(1) Cold-Start Database Hydration: Synchronous state mutations (setGraphData) have been removed from the generation and cache-hit pipelines for authenticated users. The pipeline strictly writes the generated graph and active nodes to the minted Project Document in Firestore, relying entirely on the onSnapshot listener to organically hydrate the frontend React state.
    - SEED-FALLBACK LOADER (CRITICAL — App.tsx: handleProjectSnapshot):
      The project loader runs across four code branches (graphData-direct, Phase 1 per-artist cache,
