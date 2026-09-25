@@ -36,6 +36,7 @@ interface MusicGraphProps {
   isGuest?: boolean;
   detailsCache?: Map<string, NodeDetails>;
   isActive?: boolean;
+  onSimulationComplete?: () => void;
 }
 
 const isSameNodeId = (id1: any, id2: any): boolean => {
@@ -104,9 +105,13 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   activeFilters, searchQuery, setSearchQuery, toggleFilter,
   legendConfig, legendOrder,
   legendRef, onInteraction, onLegendInteraction, isGuest,
-  detailsCache, isActive = false
+  detailsCache, isActive = false, onSimulationComplete
 }) => {
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const onSimulationCompleteRef = useRef(onSimulationComplete);
+  useEffect(() => {
+    onSimulationCompleteRef.current = onSimulationComplete;
+  }, [onSimulationComplete]);
   const simulationRef = useRef<d3.Simulation<Node, Link> | null>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
@@ -879,7 +884,10 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
                 if (!hasInitialCentered.current && fitGraphToScreenRef.current) {
                     hasInitialCentered.current = true;
-                    fitGraphToScreenRef.current(1000);
+                    fitGraphToScreenRef.current(0);
+                    setTimeout(() => {
+                        if (onSimulationCompleteRef.current) onSimulationCompleteRef.current();
+                    }, 50);
                 }
             });
         simulationRef.current = simulation;
