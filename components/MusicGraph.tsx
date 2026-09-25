@@ -228,12 +228,8 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   };
 
   const handleCenter = () => {
-    if (svgRef.current && zoomRef.current && dimensions.width > 0) {
-        isTrackingRef.current = false;
-        const k = 0.5;
-        const tx = (dimensions.width / 2) - VIRTUAL_CENTER_X * k;
-        const ty = (dimensions.height / 2) - VIRTUAL_CENTER_Y * k;
-        d3.select(svgRef.current).transition().duration(750).call(zoomRef.current.transform as any, d3.zoomIdentity.translate(tx, ty).scale(k));
+    if (fitGraphToScreenRef.current) {
+        fitGraphToScreenRef.current(750);
     }
   };
 
@@ -406,21 +402,57 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
       dimensionsRef.current = dimensions;
   }, [dimensions]);
 
-  const hasInitialCentered = useRef(false);
+  const isSmallScreenRef = useRef(isSmallScreen);
   useEffect(() => {
-    if (dimensions.width > 50 && dimensions.height > 50 && visibleNodes.length > 0 && !hasInitialCentered.current && zoomRef.current && svgRef.current) {
-        hasInitialCentered.current = true;
-        isTrackingRef.current = false;
-        
-        requestAnimationFrame(() => {
-            if (!svgRef.current || !zoomRef.current) return;
-            const k = isSmallScreen ? 0.35 : 0.5;
-            const tx = (dimensions.width / 2) - VIRTUAL_CENTER_X * k;
-            const ty = (dimensions.height / 2) - VIRTUAL_CENTER_Y * k;
-            d3.select(svgRef.current).call(zoomRef.current.transform as any, d3.zoomIdentity.translate(tx, ty).scale(k));
-        });
-    }
-  }, [dimensions.width, dimensions.height, visibleNodes.length, isSmallScreen]);
+      isSmallScreenRef.current = isSmallScreen;
+  }, [isSmallScreen]);
+
+  const fitGraphToScreenRef = useRef<((duration?: number) => void) | null>(null);
+  
+  const fitGraphToScreen = useCallback((duration: number = 1000) => {
+      if (!svgRef.current || !zoomRef.current || dimensionsRef.current.width === 0 || visibleNodesRef.current.length === 0) return;
+      isTrackingRef.current = false;
+      const width = dimensionsRef.current.width;
+      const height = dimensionsRef.current.height;
+      
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      let validNodesCount = 0;
+      visibleNodesRef.current.forEach(n => {
+          if (n.x !== undefined && n.y !== undefined && !isNaN(n.x) && !isNaN(n.y)) {
+              if (n.x < minX) minX = n.x;
+              if (n.x > maxX) maxX = n.x;
+              if (n.y < minY) minY = n.y;
+              if (n.y > maxY) maxY = n.y;
+              validNodesCount++;
+          }
+      });
+      
+      if (validNodesCount === 0) return;
+
+      const contentWidth = maxX - minX;
+      const contentHeight = maxY - minY;
+      const cx = (minX + maxX) / 2;
+      const cy = (minY + maxY) / 2;
+      
+      const padding = isSmallScreenRef.current ? 40 : 80;
+      const scaleX = (width - padding * 2) / (contentWidth || 1);
+      const scaleY = (height - padding * 2) / (contentHeight || 1);
+      
+      const maxScale = isSmallScreenRef.current ? 0.75 : 1;
+      const minScale = 0.15;
+      const k = Math.max(minScale, Math.min(scaleX, scaleY, maxScale));
+      
+      const tx = width / 2 - cx * k;
+      const ty = height / 2 - cy * k;
+      
+      d3.select(svgRef.current).transition().duration(duration).call(zoomRef.current.transform as any, d3.zoomIdentity.translate(tx, ty).scale(k));
+  }, []);
+
+  useEffect(() => {
+      fitGraphToScreenRef.current = fitGraphToScreen;
+  }, [fitGraphToScreen]);
+
+  const hasInitialCentered = useRef(false);
 
   useEffect(() => {
     if (!svgRef.current || dimensions.width === 0) return;
@@ -844,6 +876,11 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                         n.fy = n.y;
                     }
                 });
+
+                if (!hasInitialCentered.current && fitGraphToScreenRef.current) {
+                    hasInitialCentered.current = true;
+                    fitGraphToScreenRef.current(1000);
+                }
             });
         simulationRef.current = simulation;
     }
