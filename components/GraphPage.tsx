@@ -683,10 +683,15 @@ const GraphPage: React.FC<GraphPageProps> = ({
   onStashArtist,
   isHydrating
 }) => {
-  const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(() => {
-      const isFirst = data.nodes.length === 0 || data.nodes.length === seedArtists.split('::').filter(Boolean).length;
-      return !isFirst; 
-  });
+  const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
+  const hasInitializedPanelRef = useRef(false);
+
+  useEffect(() => {
+      if (hasInitializedPanelRef.current || data.nodes.length === 0) return;
+      hasInitializedPanelRef.current = true;
+      const isFirst = data.nodes.length === seedArtists.split('::').filter(Boolean).length;
+      setIsLeftPanelCollapsed(!isFirst);
+  }, [data.nodes.length, seedArtists]);
   const [isDetailsPanelCollapsed, setIsDetailsPanelCollapsed] = useState(true);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [viewedRationale, setViewedRationale] = useState<string | null>(null);

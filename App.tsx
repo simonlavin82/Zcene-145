@@ -5945,6 +5945,7 @@ const App: React.FC = () => {
         setIsLoading(false);
 
         // Auto-hydrate the Deep Cut panel on load if nothing is selected
+        /*
         if (!selectedNode && hasAutoSelectedRef.current !== currentProjectId) {
           hasAutoSelectedRef.current = currentProjectId;
           const seedList = (seedArtists || '').split('::').map(s => s.trim());
@@ -5957,6 +5958,7 @@ const App: React.FC = () => {
             handleNodeClick(defaultNode);
           }
         }
+        */
       } else {
         console.log(`[Re-hydration Hook] Project status is completed but local graphData state is empty. Falling back to curation loading state.`);
         setIsLoading(true);
