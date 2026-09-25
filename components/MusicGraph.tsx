@@ -406,6 +406,18 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
       dimensionsRef.current = dimensions;
   }, [dimensions]);
 
+  const hasInitialCentered = useRef(false);
+  useEffect(() => {
+    if (dimensions.width > 0 && dimensions.height > 0 && !hasInitialCentered.current && zoomRef.current && svgRef.current) {
+        hasInitialCentered.current = true;
+        isTrackingRef.current = false;
+        const k = 0.5;
+        const tx = (dimensions.width / 2) - VIRTUAL_CENTER_X * k;
+        const ty = (dimensions.height / 2) - VIRTUAL_CENTER_Y * k;
+        d3.select(svgRef.current).call(zoomRef.current.transform as any, d3.zoomIdentity.translate(tx, ty).scale(k));
+    }
+  }, [dimensions.width, dimensions.height]);
+
   useEffect(() => {
     if (!svgRef.current || dimensions.width === 0) return;
     const svg = d3.select(svgRef.current);
@@ -713,7 +725,6 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             });
         svg.call(zoom).on("dblclick.zoom", null);
         zoomRef.current = zoom;
-        svg.call(zoom.transform, d3.zoomIdentity.translate(dimensions.width/2 - VIRTUAL_CENTER_X * 0.5, dimensions.height/2 - VIRTUAL_CENTER_Y * 0.5).scale(0.5));
         
         // Custom conditional double-click zoom to restore background zooming without hijacking mobile node taps
         svg.on("dblclick", (event) => {

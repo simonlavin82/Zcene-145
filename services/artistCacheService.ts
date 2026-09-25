@@ -327,7 +327,9 @@ export const normalizeGraphData = (graph: GraphData): GraphData => {
     return {
       ...node,
       id: normalizedId,
-      label
+      label,
+      isPending: false,
+      isLoading: false
     };
   });
 
