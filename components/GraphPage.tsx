@@ -1126,7 +1126,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
   // My Stack Action State logic: Action if stack size has grown since last visit to dialog
   const isStackNew = useMemo(() => stack.length > lastViewedStackCount, [stack.length, lastViewedStackCount]);
   const unreadDetailsCount = useMemo(() => activeNodes.filter(n => !readNodeIds.has(n.id.trim().toLowerCase())).length, [activeNodes, readNodeIds]);
-  const artistIndicatorStyles = useMemo(() => isArtistPending ? 'bg-brand-black text-primary border-primary/50' : 'bg-zinc-800 text-zinc-500 border-zinc-700', [isArtistPending]);
+  const artistIndicatorStyles = useMemo(() => isArtistPending ? 'bg-zinc-900 text-white border-white/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700', [isArtistPending]);
   
   const isFirstGeneration = useMemo(() => data.nodes.length === 0 && !seedArtists, [data.nodes.length, seedArtists]);
 
@@ -1625,7 +1625,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                             </span>
                                         )}
                                         {tab === 'details' && (
-                                            <span className={`h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border shadow-sm transition-all duration-500 ${unreadDetailsCount > 0 ? 'bg-brand-black text-primary border-primary/50' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>
+                                            <span className={`h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border shadow-sm transition-all duration-500 ${unreadDetailsCount > 0 ? 'bg-zinc-900 text-white border-white/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>
                                                 {totalDetails}
                                             </span>
                                         )}

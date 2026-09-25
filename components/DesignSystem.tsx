@@ -1689,7 +1689,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover Status</p>
-                                        <button className="rounded-xl border border-white bg-white/10 px-4 py-2 font-medium text-white text-sm">
+                                        <button className="font-medium transition-all flex items-center justify-center gap-2 shrink-0 leading-none px-6 py-2 text-sm rounded-xl border border-white bg-white/10 text-white">
                                             Support
                                         </button>
                                         <div className="flex flex-wrap gap-1.5 pt-2">
@@ -3064,14 +3064,14 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             </p>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                                  <div className="p-6 bg-zinc-900 border border-zinc-700/50 rounded-xl flex flex-col items-center gap-4">
-                                    <span className="h-8 w-8 rounded-lg flex items-center justify-center text-sm font-semibold border-2 bg-brand-black text-primary border-primary/50">12</span>
+                                    <span className="h-8 w-8 rounded-lg flex items-center justify-center text-sm font-semibold border-2 bg-zinc-900 text-white border-white/20">12</span>
                                     <div className="text-center">
                                         <p className="text-sm font-medium text-white">Large (32px)</p>
                                         <p className="text-xs text-zinc-500 mt-1">Action State</p>
                                     </div>
                                  </div>
                                  <div className="p-6 bg-zinc-900 border border-zinc-700/50 rounded-xl flex flex-col items-center gap-4">
-                                    <span className="h-5 w-5 rounded-lg flex items-center justify-center text-[9px] font-semibold border bg-brand-black text-primary border-primary/50">8</span>
+                                    <span className="h-5 w-5 rounded-lg flex items-center justify-center text-[9px] font-semibold border bg-zinc-900 text-white border-white/20">8</span>
                                     <div className="text-center">
                                         <p className="text-sm font-medium text-white">Medium (20px)</p>
                                         <p className="text-xs text-zinc-500 mt-1">Action State</p>
@@ -3090,8 +3090,8 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest mb-4">Implementation Logic</h4>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     <div className="space-y-2">
-                                        <p className="text-sm text-primary font-semibold">Action State</p>
-                                        <p className="text-xs text-zinc-400 leading-relaxed">Used when new data is available or the user needs to take a primary action (e.g., Update Zcene, Unread Deep Cut cards). Uses high-contrast yellow.</p>
+                                        <p className="text-sm text-white font-semibold">Action State</p>
+                                        <p className="text-xs text-zinc-400 leading-relaxed">Used when new data is available or the user needs to take a primary action (e.g., Update Zcene, Unread Deep Cut cards). Uses high-contrast monochrome tones.</p>
                                     </div>
                                     <div className="space-y-2">
                                         <p className="text-sm text-zinc-500 font-semibold">Passive State</p>
@@ -3241,7 +3241,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                     </div>
                                                     <div className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2">
                                                         <button className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors">Cancel</button>
-                                                        <button className="px-4 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2">
+                                                        <button className="px-4 py-1.5 bg-white text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 hover:opacity-90 transition-opacity">
                                                             <span className="material-symbols-outlined !text-[16px]">check</span>
                                                             Action
                                                         </button>
@@ -3267,7 +3267,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                     </div>
                                                     <div className="p-3 pb-6 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2">
                                                         <button className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors">Cancel</button>
-                                                        <button className="px-4 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2">
+                                                        <button className="px-4 py-1.5 bg-white text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 hover:opacity-90 transition-opacity">
                                                             <span className="material-symbols-outlined !text-[16px]">check</span>
                                                             Action
                                                         </button>

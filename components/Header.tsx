@@ -231,7 +231,7 @@ const Header: React.FC<HeaderProps> = ({
                 <StackIcon className="!text-[18px]" />
                 {!isSmallScreen && <span className="text-xs font-medium">My Stack</span>}
                 {stackCount > 0 && (
-                    <span className={`absolute -top-1 -right-1 h-4.5 w-4.5 rounded-md flex items-center justify-center text-[9px] font-bold border shadow-sm transition-all duration-500 ${isStackNew ? 'bg-brand-black text-primary border-primary/50' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>
+                    <span className={`absolute -top-1 -right-1 h-4.5 w-4.5 rounded-md flex items-center justify-center text-[9px] font-bold border shadow-sm transition-all duration-500 ${isStackNew ? 'bg-zinc-900 text-white border-white/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>
                         {stackCount}
                     </span>
                 )}

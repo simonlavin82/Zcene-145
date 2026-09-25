@@ -2359,7 +2359,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                             <div className="flex items-center gap-4 overflow-hidden">
                                 <div className="flex items-center gap-2">
                                     <h2 className="text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Deep Cut</h2>
-                                    <span className={`h-5 w-5 flex flex-shrink-0 items-center justify-center text-[9px] font-bold border rounded-md transition-all duration-500 ${unreadCount > 0 ? 'bg-brand-black text-primary border-primary/50' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>
+                                    <span className={`h-5 w-5 flex flex-shrink-0 items-center justify-center text-[9px] font-bold border rounded-md transition-all duration-500 ${unreadCount > 0 ? 'bg-zinc-900 text-white border-white/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>
                                         {activeNodes.length}
                                     </span>
                                 </div>
@@ -2385,7 +2385,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     </div>
                     <div className="absolute bottom-6 left-0 right-0 flex justify-center px-2">
                         <button onClick={onToggleCollapse} className="group relative" title="View Deep Cut">
-                             <span className={`h-8 w-8 flex items-center justify-center text-sm font-bold border-2 rounded-md transition-all duration-500 ${unreadCount > 0 && !systemError ? 'bg-brand-black text-primary border-primary/50' : 'bg-zinc-800 text-zinc-500 border-zinc-700'} group-active:scale-95`}>
+                             <span className={`h-8 w-8 flex items-center justify-center text-sm font-bold border-2 rounded-md transition-all duration-500 ${unreadCount > 0 && !systemError ? 'bg-zinc-900 text-white border-white/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700'} group-active:scale-95`}>
                                 {systemError ? 0 : activeNodes.length}
                             </span>
                         </button>
