@@ -1585,7 +1585,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         
         <div className={`absolute right-6 z-40 flex justify-end transition-all duration-300 ${!isCompactMode ? 'top-[88px]' : 'top-6'}`}>
             <div 
-                className={`relative h-[38px] flex items-center transition-all duration-300 ease-in-out overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900/80 backdrop-blur-md shadow-xl origin-right ${isSearchExpanded ? 'w-64 focus-within:ring-1 focus-within:ring-primary' : 'w-[38px] cursor-pointer hover:bg-zinc-800'}`}
+                className={`relative h-[38px] flex items-center transition-all duration-300 ease-in-out overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900/80 backdrop-blur-md shadow-xl origin-right ${isSearchExpanded ? 'w-64 focus-within:ring-1 focus-within:ring-primary' : 'w-[38px] cursor-pointer'}`}
                 onClick={(e) => { 
                     if (!isSearchExpanded) {
                         e.stopPropagation(); 

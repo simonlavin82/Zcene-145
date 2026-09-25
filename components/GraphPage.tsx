@@ -1457,7 +1457,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                   className={`w-full flex items-center justify-center gap-2 bg-white px-6 py-2 text-sm rounded-xl font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 ${visibleTooltips.step2 ? 'animate-pulse' : ''}`}
               >
                   <span>{createButtonLabel}</span>
-                  <span className={`h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border transition-all duration-500 bg-zinc-900 text-white border-zinc-700`}>
+                  <span className={`h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border transition-all duration-500 bg-transparent border-brand-black text-brand-black`}>
                       {totalPendingCount}
                   </span>
               </button>
