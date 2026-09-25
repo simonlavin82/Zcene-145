@@ -167,6 +167,7 @@ const GlobalWallGate: React.FC<GlobalWallProps> = ({ children }) => {
             variant="primary"
             fullWidth
             disabled={isLoading || !password.trim()}
+            className="h-[38px]"
           >
             {isLoading ? (
               <>
