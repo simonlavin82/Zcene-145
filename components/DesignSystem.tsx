@@ -120,9 +120,9 @@ export const Button: React.FC<ButtonProps> = ({
     pill: 'px-4 py-1.5 text-xs rounded-full',
   };
   const variants: Record<NonNullable<ButtonProps['variant']>, string> = {
-    primary: 'bg-primary text-brand-black hover:opacity-90',
+    primary: 'bg-white text-brand-black hover:opacity-90',
     secondary: 'border border-zinc-700 text-zinc-400 bg-zinc-900 hover:text-white hover:border-zinc-600 hover:bg-zinc-800',
-    outline: 'border border-primary bg-transparent text-primary hover:bg-primary/20',
+    outline: 'border border-white bg-transparent text-white hover:bg-white/10',
     ghost: 'bg-transparent hover:bg-zinc-800/50 text-zinc-400 hover:text-white',
   };
   return (
@@ -1418,19 +1418,19 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                 </div>
                                 <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
-                                    High-impact buttons used for definitive system actions like generating or updating a graph. On Tablet/Mobile, the placement follows a dynamic inline strategy to ensure absolute visibility.
+                                    High-impact buttons used for definitive system actions like generating or updating a graph. To ensure maximum visual hierarchy, primary CTAs use pure White, isolating the Brand Yellow for identity and selection states.
                                 </p>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-none border border-zinc-800">
                                      <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Default Status</p>
-                                        <button className="w-full bg-primary text-brand-black px-6 py-2 rounded-xl font-medium text-sm flex items-center justify-center gap-2 transition-opacity hover:opacity-90">
+                                        <button className="w-full bg-white text-brand-black px-6 py-2 rounded-xl font-medium text-sm flex items-center justify-center gap-2 transition-opacity hover:opacity-90">
                                             <span>Create Zcene</span>
-                                            <span className="h-5 w-5 rounded-[6px] flex items-center justify-center text-[9px] font-semibold border border-primary/50 bg-brand-black text-primary">0</span>
+                                            <span className="h-5 w-5 rounded-[6px] flex items-center justify-center text-[9px] font-semibold border border-zinc-300 bg-zinc-100 text-brand-black">0</span>
                                         </button>
                                         <div className="flex flex-wrap gap-1.5 pt-2">
                                             <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-sm bg-primary border border-primary/20"></span>
-                                                bg-primary
+                                                <span className="w-2 h-2 rounded-sm bg-white border border-zinc-200"></span>
+                                                bg-white
                                             </span>
                                             <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
                                                 <span className="w-2 h-2 rounded-sm bg-brand-black border border-zinc-800"></span>
@@ -1440,9 +1440,9 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover Status</p>
-                                        <button className="w-full bg-primary text-brand-black px-6 py-2 rounded-xl font-medium text-sm flex items-center justify-center gap-2 opacity-90 transition-opacity hover:opacity-90">
+                                        <button className="w-full bg-white text-brand-black px-6 py-2 rounded-xl font-medium text-sm flex items-center justify-center gap-2 opacity-90 transition-opacity hover:opacity-90">
                                             <span>Create Zcene</span>
-                                            <span className="h-5 w-5 rounded-[6px] flex items-center justify-center text-[9px] font-semibold border border-primary/50 bg-brand-black text-primary">2</span>
+                                            <span className="h-5 w-5 rounded-[6px] flex items-center justify-center text-[9px] font-semibold border border-zinc-300 bg-zinc-100 text-brand-black">2</span>
                                         </button>
                                         <div className="flex flex-wrap gap-1.5 pt-2">
                                             <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500">
@@ -1455,7 +1455,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Disabled Status</p>
-                                        <button disabled className="w-full bg-primary text-brand-black px-6 py-2 rounded-xl font-medium opacity-50 cursor-not-allowed text-sm flex items-center justify-center gap-2">
+                                        <button disabled className="w-full bg-white text-brand-black px-6 py-2 rounded-xl font-medium opacity-50 cursor-not-allowed text-sm flex items-center justify-center gap-2">
                                             <span>Create Zcene</span>
                                             <span className="h-5 w-5 rounded-[6px] flex items-center justify-center text-[9px] font-semibold border border-zinc-700 bg-zinc-800 text-zinc-500">0</span>
                                         </button>

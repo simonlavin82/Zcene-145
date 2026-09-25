@@ -246,7 +246,7 @@ const Header: React.FC<HeaderProps> = ({
               >
                   <span className="material-symbols-outlined !text-[18px]">{isCopied ? 'check' : 'share'}</span>
                   {!isSmallScreen && <span className="text-xs font-medium">Share</span>}
-                  {isCopied && <span className="absolute -top-10 left-1/2 -translate-x-1/2 bg-primary text-brand-black text-[10px] font-bold py-1 px-2 rounded-md whitespace-nowrap shadow-xl">Link Copied</span>}
+                  {isCopied && <span className="absolute -top-10 left-1/2 -translate-x-1/2 bg-white text-brand-black text-[10px] font-bold py-1 px-2 rounded-md whitespace-nowrap shadow-xl">Link Copied</span>}
               </button>
             )}
 
@@ -304,7 +304,7 @@ const Header: React.FC<HeaderProps> = ({
                           <div className="p-1 border-b border-white/5">
                             <button
                               onClick={() => { setIsProfileOpen(false); onLogin(); }}
-                              className="w-full bg-primary text-black rounded-xl px-4 py-2 flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-95 text-xs font-semibold cursor-pointer"
+                              className="w-full bg-white text-brand-black rounded-xl px-4 py-2 flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-95 text-xs font-semibold cursor-pointer"
                             >
                               <span className="material-symbols-outlined !text-[14px] text-black font-bold">login</span>
                               Sign In with Google

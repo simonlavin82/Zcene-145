@@ -97,7 +97,7 @@ export const MyStackDialog: React.FC<{
                 <button onClick={onClose} className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors">
                     Cancel
                 </button>
-                <button onClick={onClose} className="px-6 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90">
+                <button onClick={onClose} className="px-6 py-1.5 bg-white text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90">
                     Done
                 </button>
             </ModalFooter>
@@ -357,7 +357,7 @@ export const MyTasteDialog: React.FC<{
               <button onClick={onClose} disabled={isSaving} className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors disabled:opacity-50">
                 Cancel
               </button>
-              <button onClick={handleSaveClick} disabled={isSaving} className="px-6 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90 disabled:opacity-50">
+              <button onClick={handleSaveClick} disabled={isSaving} className="px-6 py-1.5 bg-white text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90 disabled:opacity-50">
                 {isSaving ? 'Saving...' : 'Save'}
               </button>
             </div>
@@ -553,7 +553,7 @@ export const TokenConfirmationDialog: React.FC<{
           <button 
             onClick={() => onConfirm(password)} 
             disabled={!password}
-            className="px-4 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90 disabled:opacity-50"
+            className="px-4 py-1.5 bg-white text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90 disabled:opacity-50"
           >
             Confirm
           </button>
@@ -600,7 +600,7 @@ export const FullItineraryDialog: React.FC<{
         <ModalFooter>
           <button 
             onClick={onClose}
-            className="px-5 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90"
+            className="px-5 py-1.5 bg-white text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90"
           >
             Close
           </button>
@@ -697,7 +697,7 @@ export const GenerativeRationaleModal: React.FC<{
         <ModalFooter>
           <button 
             onClick={onClose}
-            className="px-6 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90 active:scale-95 transition-all duration-200"
+            className="px-6 py-1.5 bg-white text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90 active:scale-95 transition-all duration-200"
           >
             Done
           </button>
@@ -920,7 +920,7 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
             {(!isLiveAISuggestions || overrideInput.trim()) && (
               <button
                 type="submit"
-                className="px-6 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+                className="px-6 py-2 bg-white text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all cursor-pointer whitespace-nowrap"
               >
                 {isLiveAISuggestions 
                   ? 'Confirm Origin'
@@ -1027,7 +1027,7 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
                 type="submit"
                 className={
                   overrideInput.trim()
-                    ? "px-6 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+                    ? "px-6 py-2 bg-white text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
                     : "px-6 py-2 border border-zinc-700 bg-zinc-800/50 hover:bg-zinc-800 hover:border-zinc-500 text-zinc-300 hover:text-white rounded-xl font-medium text-sm flex items-center gap-2 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
                 }
               >
@@ -1132,7 +1132,7 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
           {overrideInput.trim() && (
             <button
               type="submit"
-              className="px-6 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
+              className="px-6 py-2 bg-white text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 active:scale-95 transition-all cursor-pointer whitespace-nowrap"
             >
               {isLiveAISuggestions ? 'Confirm Origin' : 'Confirm'}
             </button>
@@ -1183,7 +1183,7 @@ export const ExploreActionDialog: React.FC<{
           </button>
           <button
             onClick={onConfirm}
-            className="px-4 py-1.5 bg-primary text-brand-black rounded-xl font-semibold text-sm active:scale-95 transition-all hover:bg-yellow-400 cursor-pointer"
+            className="px-4 py-1.5 bg-white text-brand-black rounded-xl font-semibold text-sm active:scale-95 transition-all hover:bg-yellow-400 cursor-pointer"
           >
             Continue
           </button>
@@ -1354,7 +1354,7 @@ export const FilterGuidanceModal: React.FC<{
           </button>
           <button 
             onClick={handleApply} 
-            className="px-5 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90 flex items-center gap-2"
+            className="px-5 py-1.5 bg-white text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90 flex items-center gap-2"
           >
             <span className="material-symbols-outlined !text-[16px]">refresh</span>
             Re-run with adjusted filters
@@ -1452,7 +1452,7 @@ export function ConsolidatedValidationModal({ isOpen, seeds, onConfirm, onCancel
             <button type="button" onClick={onCancel} className="px-4 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent">
               Cancel
             </button>
-            <button type="submit" className="px-6 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all cursor-pointer whitespace-nowrap">
+            <button type="submit" className="px-6 py-2 bg-white text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all cursor-pointer whitespace-nowrap">
               Confirm & Generate
             </button>
           </ModalFooter>

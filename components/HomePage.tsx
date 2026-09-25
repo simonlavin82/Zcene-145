@@ -173,7 +173,7 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
           <div className="flex items-center gap-3">
             <button 
               onClick={scrollToSupport}
-              className="rounded-xl border border-primary bg-transparent px-4 py-1.5 font-medium text-primary transition-colors hover:bg-primary/20 text-sm"
+              className="rounded-xl border border-white bg-transparent px-4 py-1.5 font-medium text-white transition-colors hover:bg-white/10 text-sm"
             >
               Support
             </button>
@@ -239,7 +239,7 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                                 onNavigate(hasExistingGraph ? View.Dashboard : View.Graph);
                               });
                             }}
-                            className="w-full bg-primary text-black rounded-xl px-4 py-2 flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-95 text-xs font-semibold cursor-pointer"
+                            className="w-full bg-white text-brand-black rounded-xl px-4 py-2 flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-95 text-xs font-semibold cursor-pointer"
                           >
                             <span className="material-symbols-outlined !text-[14px] text-black font-bold">login</span>
                             Sign In with Google
@@ -364,7 +364,7 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                               onNavigate(hasExistingGraph ? View.Dashboard : View.Graph);
                             }
                           }}
-                          className="cta-button rounded-2xl bg-primary px-8 py-4 text-base sm:text-lg font-medium text-brand-black transition-all hover:scale-105 shadow-primary/20 active:scale-95"
+                          className="cta-button rounded-2xl bg-white px-8 py-4 text-base sm:text-lg font-medium text-brand-black transition-all hover:scale-105 hover:opacity-90 shadow-white/20 active:scale-95"
                         >
                           {hasExistingGraph ? 'Resume Your Zcene' : 'Create Your Zcene'}
                         </button>
@@ -493,7 +493,7 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                       href="https://www.instagram.com/zcene.online/"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="self-start rounded-xl bg-primary px-8 py-3.5 text-sm font-medium text-brand-black hover:bg-primary/90 transition-all active:scale-95 shadow-primary/20"
+                      className="self-start rounded-xl bg-white px-8 py-3.5 text-sm font-medium text-brand-black hover:opacity-90 transition-all active:scale-95 shadow-white/20"
                     >
                       Order via Instagram
                     </a>

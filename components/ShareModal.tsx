@@ -67,7 +67,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, shareUr
             <ModalFooter>
               <button 
                 onClick={onClose}
-                className="px-6 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm hover:opacity-90 transition-opacity"
+                className="px-6 py-1.5 bg-white text-brand-black rounded-xl font-medium text-sm hover:opacity-90 transition-opacity"
               >
                 Done
               </button>

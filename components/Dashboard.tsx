@@ -270,7 +270,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 <button 
                   onClick={onCreateProject}
                   disabled={isCreatingProject}
-                  className="h-full rounded-xl bg-primary text-brand-black text-sm px-4 font-medium flex items-center gap-2 whitespace-nowrap transition-opacity hover:opacity-90 disabled:opacity-50"
+                  className="h-full rounded-xl bg-white text-brand-black text-sm px-4 font-medium flex items-center gap-2 whitespace-nowrap transition-opacity hover:opacity-90 disabled:opacity-50"
                 >
                   {isCreatingProject ? (
                     <>
@@ -308,7 +308,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                   disabled={isCreatingProject}
                   className="group relative bg-zinc-900 border-2 border-dashed border-zinc-700 rounded-none p-5 flex flex-col items-center justify-center gap-3 transition-all h-[180px] w-full md:w-[350px] hover:border-primary/50 disabled:opacity-50 cursor-pointer overflow-hidden"
                 >
-                  <div className="w-10 h-10 rounded-full bg-zinc-800 group-hover:bg-primary group-hover:text-brand-black flex items-center justify-center text-zinc-550 transition-all relative z-10">
+                  <div className="w-10 h-10 rounded-full bg-zinc-800 group-hover:bg-white group-hover:text-brand-black flex items-center justify-center text-zinc-550 transition-all relative z-10">
                     {isCreatingProject ? (
                       <span className="material-symbols-outlined animate-spin !text-2xl">progress_activity</span>
                     ) : (
@@ -397,7 +397,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     disabled={isCreatingProject}
                     className="group relative bg-zinc-900 border-2 border-dashed border-zinc-700 rounded-none p-5 flex flex-col items-center justify-center gap-3 transition-all h-[180px] w-full md:w-[350px] hover:border-primary/50 disabled:opacity-50 cursor-pointer overflow-hidden"
                   >
-                    <div className="w-10 h-10 rounded-full bg-zinc-800 group-hover:bg-primary group-hover:text-brand-black flex items-center justify-center text-zinc-550 transition-all relative z-10">
+                    <div className="w-10 h-10 rounded-full bg-zinc-800 group-hover:bg-white group-hover:text-brand-black flex items-center justify-center text-zinc-550 transition-all relative z-10">
                       {isCreatingProject ? (
                         <span className="material-symbols-outlined animate-spin !text-2xl">progress_activity</span>
                       ) : (
@@ -497,7 +497,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         }
                         
                         const rowBg = index % 2 === 0 ? 'bg-zinc-900' : 'bg-zinc-950/40';
-                        const tdClass = `transition-colors ${rowBg} group-hover:bg-primary/5 ${index === 0 ? 'relative z-10' : ''}`;
+                        const tdClass = `transition-colors ${rowBg} group-hover:bg-white/5 ${index === 0 ? 'relative z-10' : ''}`;
                         
                         return (
                           <tr 
@@ -684,7 +684,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                   }
                 }} 
                 disabled={!renameValue.trim()}
-                className="px-4 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+                className="px-4 py-1.5 bg-white text-brand-black rounded-xl font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-opacity hover:opacity-90"
               >
                 Save
               </button>

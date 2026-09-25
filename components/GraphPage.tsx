@@ -372,7 +372,7 @@ const UpdateInterceptModal: React.FC<{
                     </button>
                     <button 
                         onClick={onSaveAsNew} 
-                        className="w-full sm:w-auto px-4 py-2 bg-primary text-brand-black rounded-xl font-medium text-sm transition-colors hover:bg-primary/90 text-center"
+                        className="w-full sm:w-auto px-4 py-2 bg-white text-brand-black rounded-xl font-medium text-sm transition-colors hover:opacity-90 text-center"
                     >
                         Save as New Zcene
                     </button>
@@ -400,7 +400,7 @@ const LimitReachedDialog: React.FC<{ isOpen: boolean; onClose: () => void; }> = 
                     To ensure the best performance and graph quality, you can only add up to 5 seed artists.
                 </ModalBody>
                 <ModalFooter>
-                    <button onClick={onClose} className="px-4 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm transition-colors hover:bg-primary/90">
+                    <button onClick={onClose} className="px-4 py-1.5 bg-white text-brand-black rounded-xl font-medium text-sm transition-colors hover:opacity-90">
                         Got it
                     </button>
                 </ModalFooter>
@@ -651,7 +651,7 @@ const LibraryDialog: React.FC<{
                     <span className="material-symbols-outlined !text-[18px]">delete_sweep</span>
                     Clear Library
                 </button>
-                <button onClick={onClose} className="rounded-xl bg-primary px-6 py-2 text-sm font-medium text-brand-black transition-opacity hover:opacity-90">Done</button>
+                <button onClick={onClose} className="rounded-xl bg-white px-6 py-2 text-sm font-medium text-brand-black transition-opacity hover:opacity-90">Done</button>
             </ModalFooter>
         </ModalContainer>
     </ModalBackdrop>
@@ -1406,7 +1406,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                               <span className="material-symbols-outlined !text-[18px]">close</span>
                           </button>
                       )}
-                      <button type="submit" disabled={!searchTerm.trim()} className={`flex items-center justify-center rounded-xl w-7 h-7 flex-shrink-0 transition-all duration-300 disabled:cursor-not-allowed leading-none ${!searchTerm.trim() ? 'bg-zinc-800 text-zinc-600' : 'bg-primary text-brand-black hover:scale-110 active:scale-95'}`} aria-label="Add artists">
+                      <button type="submit" disabled={!searchTerm.trim()} className={`flex items-center justify-center rounded-xl w-7 h-7 flex-shrink-0 transition-all duration-300 disabled:cursor-not-allowed leading-none ${!searchTerm.trim() ? 'bg-zinc-800 text-zinc-600' : 'bg-white text-brand-black hover:scale-110 active:scale-95'}`} aria-label="Add artists">
                           <span className="material-symbols-outlined !text-lg">add</span>
                       </button>
                   </div>
@@ -1454,7 +1454,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                   ref={createZceneBtnRef} 
                   onClick={handleApplyChanges} 
                   disabled={(enabledArtistsCount === 0 && !searchTerm.trim()) || isLoading || isOverLimit} 
-                  className={`w-full flex items-center justify-center gap-2 bg-primary px-6 py-2 text-sm rounded-xl font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 ${visibleTooltips.step2 ? 'animate-pulse' : ''}`}
+                  className={`w-full flex items-center justify-center gap-2 bg-white px-6 py-2 text-sm rounded-xl font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 ${visibleTooltips.step2 ? 'animate-pulse' : ''}`}
               >
                   <span>{createButtonLabel}</span>
                   <span className={`h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border transition-all duration-500 bg-brand-black text-primary border-primary/50`}>
@@ -1482,7 +1482,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                   {user ? (
                     <button 
                       onClick={onSaveToDashboard}
-                      className="w-full flex items-center justify-center gap-2 bg-primary px-6 py-2 text-sm rounded-xl font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="w-full flex items-center justify-center gap-2 bg-white px-6 py-2 text-sm rounded-xl font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
                         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
@@ -1495,7 +1495,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                     <>
                       <button 
                         onClick={onSaveToDashboard}
-                        className="w-full flex items-center justify-center gap-2 bg-primary px-6 py-2 text-sm rounded-xl font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="w-full flex items-center justify-center gap-2 bg-white px-6 py-2 text-sm rounded-xl font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
                           <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />

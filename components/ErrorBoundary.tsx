@@ -94,7 +94,7 @@ export class ErrorBoundary extends Component<Props, State> {
               </button>
               <button
                 onClick={this.handleReset}
-                className="flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-brand-black px-4 py-3 rounded-2xl text-sm font-semibold transition-all active:scale-95"
+                className="flex items-center justify-center gap-2 bg-white hover:opacity-90 text-brand-black px-4 py-3 rounded-2xl text-sm font-semibold transition-all active:scale-95"
               >
                 <RefreshCw className="w-4 h-4" />
                 Re-initialise

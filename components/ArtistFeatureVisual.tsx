@@ -49,7 +49,7 @@ const ArtistFeatureVisual: React.FC<{ className?: string }> = ({ className }) =>
                                         <span className="material-symbols-outlined !text-[18px]">mic</span>
                                     </button>
                                     <button
-                                        className="flex items-center justify-center rounded-xl bg-primary text-brand-black w-7 h-7 flex-shrink-0 hover:scale-110 transition-all"
+                                        className="flex items-center justify-center rounded-xl bg-white text-brand-black w-7 h-7 flex-shrink-0 hover:scale-110 transition-all"
                                     >
                                         <span className="material-symbols-outlined !text-lg">add</span>
                                     </button>
@@ -89,7 +89,7 @@ const ArtistFeatureVisual: React.FC<{ className?: string }> = ({ className }) =>
                         </div>
 
                         <div className="px-4 pt-4 pb-12">
-                            <button className="w-full flex items-center justify-center gap-2 bg-primary px-6 py-2 text-sm rounded-xl font-medium text-brand-black transition-all duration-500 hover:opacity-90">
+                            <button className="w-full flex items-center justify-center gap-2 bg-white px-6 py-2 text-sm rounded-xl font-medium text-brand-black transition-all duration-500 hover:opacity-90">
                                 <span>Update Zcene</span>
                                 <span className="h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border transition-all duration-500 bg-brand-black text-primary border-primary/50">
                                     2

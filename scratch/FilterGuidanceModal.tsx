@@ -162,7 +162,7 @@ export const FilterGuidanceModal: React.FC<{
           </button>
           <button 
             onClick={handleApply} 
-            className="px-5 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90 flex items-center gap-2"
+            className="px-5 py-1.5 bg-white text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90 flex items-center gap-2"
           >
             <span className="material-symbols-outlined !text-[16px]">refresh</span>
             Re-run with adjusted filters

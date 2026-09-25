@@ -163,7 +163,7 @@ const CollectionIntelligenceVisual: React.FC<{ className?: string }> = ({ classN
                                 Artist Catalog
                             </div>
                             <div className="flex flex-col gap-3">
-                                <button className="flex items-center justify-center px-4 py-2 bg-primary text-brand-black rounded-xl transition-all font-bold uppercase tracking-tighter text-sm gap-3">
+                                <button className="flex items-center justify-center px-4 py-2 bg-white text-brand-black rounded-xl transition-all font-bold uppercase tracking-tighter text-sm gap-3">
                                     <span className="material-symbols-outlined !text-[18px]">shopping_bag</span>
                                     <span>Shop on Bandcamp</span>
                                 </button>
@@ -224,7 +224,7 @@ const CollectionIntelligenceVisual: React.FC<{ className?: string }> = ({ classN
                                         Consult Zcene AI...
                                     </div>
                                     <div className="absolute right-2 top-1/2 -translate-y-1/2">
-                                        <button className="w-8 h-8 flex items-center justify-center rounded-xl bg-primary text-brand-black">
+                                        <button className="w-8 h-8 flex items-center justify-center rounded-xl bg-white text-brand-black">
                                             <span className="material-symbols-outlined !text-[22px]">arrow_upward</span>
                                         </button>
                                     </div>
