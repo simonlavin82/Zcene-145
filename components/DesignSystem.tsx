@@ -1374,7 +1374,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
 
                                     <div className="space-y-4">
                                         <div className="h-16 flex items-center justify-center bg-zinc-950 rounded-none border border-zinc-800">
-                                            <button className="bg-primary text-brand-black px-6 py-2 text-sm rounded-xl font-medium">Standard CTA</button>
+                                            <button className="bg-white text-brand-black px-6 py-2 text-sm rounded-xl font-medium">Standard CTA</button>
                                         </div>
                                         <div>
                                             <h4 className="text-sm font-semibold text-zinc-200 uppercase tracking-widest">Medium (Standard)</h4>
@@ -1385,7 +1385,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
 
                                     <div className="space-y-4">
                                         <div className="h-16 flex items-center justify-center bg-zinc-950 rounded-none border border-zinc-800">
-                                            <button className="bg-primary text-brand-black px-8 py-4 text-base sm:text-lg rounded-xl font-medium">Hero Action</button>
+                                            <button className="bg-white text-brand-black px-8 py-4 text-base sm:text-lg rounded-xl font-medium">Hero Action</button>
                                         </div>
                                         <div>
                                             <h4 className="text-sm font-semibold text-zinc-200 uppercase tracking-widest">Large (Hero/Mobile)</h4>
@@ -1682,20 +1682,20 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </div>
                                         <div className="flex flex-wrap gap-1.5 pt-2">
                                             <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-sm bg-transparent border border-primary"></span>
+                                                <span className="w-2 h-2 rounded-sm bg-transparent border border-white"></span>
                                                 Button variant="outline"
                                             </span>
                                         </div>
                                     </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover Status</p>
-                                        <button className="rounded-xl border border-primary bg-primary/20 px-4 py-2 font-medium text-primary text-sm">
+                                        <button className="rounded-xl border border-white bg-white/10 px-4 py-2 font-medium text-white text-sm">
                                             Support
                                         </button>
                                         <div className="flex flex-wrap gap-1.5 pt-2">
                                             <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-sm bg-primary/20 border border-primary"></span>
-                                                hover:bg-primary/20
+                                                <span className="w-2 h-2 rounded-sm bg-white/10 border border-white"></span>
+                                                hover:bg-white/10
                                             </span>
                                         </div>
                                     </div>

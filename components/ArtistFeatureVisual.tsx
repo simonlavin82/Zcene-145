@@ -18,7 +18,7 @@ const ArtistFeatureVisual: React.FC<{ className?: string }> = ({ className }) =>
                 <div className="h-12 flex-shrink-0 border-b border-zinc-600/50 flex items-center justify-between px-4 bg-zinc-900 relative z-[60]">
                     <div className="flex items-center gap-2 overflow-hidden">
                         <h2 className="text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Artists</h2>
-                        <span className="h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border transition-all duration-500 shadow-sm bg-brand-black text-primary border-primary/50">
+                        <span className="h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border transition-all duration-500 shadow-sm bg-zinc-900 text-white border-zinc-700">
                             2
                         </span>
                     </div>
@@ -91,7 +91,7 @@ const ArtistFeatureVisual: React.FC<{ className?: string }> = ({ className }) =>
                         <div className="px-4 pt-4 pb-12">
                             <button className="w-full flex items-center justify-center gap-2 bg-white px-6 py-2 text-sm rounded-xl font-medium text-brand-black transition-all duration-500 hover:opacity-90">
                                 <span>Update Zcene</span>
-                                <span className="h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border transition-all duration-500 bg-brand-black text-primary border-primary/50">
+                                <span className="h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border transition-all duration-500 bg-zinc-900 text-white border-zinc-700">
                                     2
                                 </span>
                             </button>
