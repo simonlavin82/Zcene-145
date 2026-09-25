@@ -408,15 +408,19 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
   const hasInitialCentered = useRef(false);
   useEffect(() => {
-    if (dimensions.width > 0 && dimensions.height > 0 && visibleNodes.length > 0 && !hasInitialCentered.current && zoomRef.current && svgRef.current) {
+    if (dimensions.width > 50 && dimensions.height > 50 && visibleNodes.length > 0 && !hasInitialCentered.current && zoomRef.current && svgRef.current) {
         hasInitialCentered.current = true;
         isTrackingRef.current = false;
-        const k = 0.5;
-        const tx = (dimensions.width / 2) - VIRTUAL_CENTER_X * k;
-        const ty = (dimensions.height / 2) - VIRTUAL_CENTER_Y * k;
-        d3.select(svgRef.current).call(zoomRef.current.transform as any, d3.zoomIdentity.translate(tx, ty).scale(k));
+        
+        requestAnimationFrame(() => {
+            if (!svgRef.current || !zoomRef.current) return;
+            const k = isSmallScreen ? 0.35 : 0.5;
+            const tx = (dimensions.width / 2) - VIRTUAL_CENTER_X * k;
+            const ty = (dimensions.height / 2) - VIRTUAL_CENTER_Y * k;
+            d3.select(svgRef.current).call(zoomRef.current.transform as any, d3.zoomIdentity.translate(tx, ty).scale(k));
+        });
     }
-  }, [dimensions.width, dimensions.height, visibleNodes.length]);
+  }, [dimensions.width, dimensions.height, visibleNodes.length, isSmallScreen]);
 
   useEffect(() => {
     if (!svgRef.current || dimensions.width === 0) return;
