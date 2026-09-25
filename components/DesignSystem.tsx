@@ -1321,6 +1321,9 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <button className={CanvasControlStyles}>
                                             <span className="material-symbols-outlined !text-[20px]">remove</span>
                                         </button>
+                                        <button className={CanvasControlStyles}>
+                                            <span className="material-symbols-outlined !text-[20px]">search</span>
+                                        </button>
                                     </div>
                                 </div>
                                 <div className="space-y-2">
@@ -1425,7 +1428,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Default Status</p>
                                         <button className="w-full bg-white text-brand-black px-6 py-2 rounded-xl font-medium text-sm flex items-center justify-center gap-2 transition-opacity hover:opacity-90">
                                             <span>Create Zcene</span>
-                                            <span className="h-5 w-5 rounded-[6px] flex items-center justify-center text-[9px] font-semibold border border-zinc-300 bg-zinc-100 text-brand-black">0</span>
+                                            <span className="h-5 w-5 rounded-[6px] flex items-center justify-center text-[9px] font-semibold border border-brand-black bg-transparent text-brand-black">0</span>
                                         </button>
                                         <div className="flex flex-wrap gap-1.5 pt-2">
                                             <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
@@ -1442,7 +1445,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover Status</p>
                                         <button className="w-full bg-white text-brand-black px-6 py-2 rounded-xl font-medium text-sm flex items-center justify-center gap-2 opacity-90 transition-opacity hover:opacity-90">
                                             <span>Create Zcene</span>
-                                            <span className="h-5 w-5 rounded-[6px] flex items-center justify-center text-[9px] font-semibold border border-zinc-300 bg-zinc-100 text-brand-black">2</span>
+                                            <span className="h-5 w-5 rounded-[6px] flex items-center justify-center text-[9px] font-semibold border border-brand-black bg-transparent text-brand-black">2</span>
                                         </button>
                                         <div className="flex flex-wrap gap-1.5 pt-2">
                                             <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500">
@@ -1457,7 +1460,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Disabled Status</p>
                                         <button disabled className="w-full bg-white text-brand-black px-6 py-2 rounded-xl font-medium opacity-50 cursor-not-allowed text-sm flex items-center justify-center gap-2">
                                             <span>Create Zcene</span>
-                                            <span className="h-5 w-5 rounded-[6px] flex items-center justify-center text-[9px] font-semibold border border-zinc-700 bg-zinc-800 text-zinc-500">0</span>
+                                            <span className="h-5 w-5 rounded-[6px] flex items-center justify-center text-[9px] font-semibold border border-brand-black bg-transparent text-brand-black">0</span>
                                         </button>
                                         <div className="flex flex-wrap gap-1.5 pt-2">
                                             <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500">
@@ -3148,7 +3151,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
 
                                             {/* Right-Aligned Magazine Trigger Mock */}
                                             <div className="flex gap-2 flex-wrap justify-end">
-                                                <button className="flex items-center gap-1.5 px-3 py-1.5 border border-primary bg-primary/10 rounded-xl text-primary animate-pulse transition-all text-xs font-medium shrink-0 leading-none">
+                                                <button className="flex items-center gap-1.5 px-3 py-1.5 border border-white bg-white/10 rounded-xl text-white animate-pulse transition-all text-xs font-medium shrink-0 leading-none">
                                                     <span className="material-symbols-outlined !text-[16px]">auto_stories</span>
                                                     <span>Magazine</span>
                                                 </button>
