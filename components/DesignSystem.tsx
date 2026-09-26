@@ -1824,7 +1824,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             </div>
 
                             {/* Bordered Variant */}
-                            <div className="mt-4 mb-16">
+                            <div className="mt-16 mb-16">
                                 <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
                                     <h3 className="text-xl font-medium text-zinc-200">Bordered Variant</h3>
                                     <div className="flex flex-wrap gap-2">
@@ -1838,7 +1838,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
                                     <div className="flex flex-col items-center gap-4">
                                         <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-700/50 rounded-xl leading-none text-zinc-400 bg-zinc-900 shadow-lg hover:text-white hover:bg-zinc-800 transition-colors">
-                                            <span className="lucide lucide-flame w-[18px] h-[18px]" />
+                                            <span className="material-symbols-outlined !text-[18px]">settings</span>
                                         </button>
                                         <div className="flex flex-col items-center gap-2">
                                             <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Default Status</p>
@@ -1856,7 +1856,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                     <div className="flex flex-col items-center gap-4">
                                         <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-700/50 rounded-xl leading-none text-white bg-zinc-800 transition-colors shadow-lg">
-                                            <span className="lucide lucide-flame w-[18px] h-[18px]" />
+                                            <span className="material-symbols-outlined !text-[18px]">settings</span>
                                         </button>
                                         <div className="flex flex-col items-center gap-2">
                                             <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover / Active Status</p>
@@ -1874,7 +1874,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                     <div className="flex flex-col items-center gap-4">
                                         <button disabled className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-700/50 rounded-xl leading-none text-zinc-600 bg-zinc-900 shadow-lg opacity-50 cursor-not-allowed">
-                                            <span className="lucide lucide-flame w-[18px] h-[18px]" />
+                                            <span className="material-symbols-outlined !text-[18px]">settings</span>
                                         </button>
                                         <div className="flex flex-col items-center gap-2">
                                             <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Disabled Status</p>
