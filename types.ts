@@ -28,6 +28,7 @@ export interface Link {
   source: string | Node;
   target: string | Node;
   value: number;
+  weight?: number;
   context?: string;
 }
 

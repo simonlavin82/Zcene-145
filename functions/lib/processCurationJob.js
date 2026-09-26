@@ -1021,9 +1021,38 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             }
                         }
                     }
-                    // 3.1 Pro: Final Node Positioning could be executed here if a service existed.
-                    // We will skip explicit repositioning mutation of finalGraph to avoid breaking schema,
-                    // but the narrative synthesis is now locked to 3.1 Pro.
+                    // 3.1 Pro: Final Node Positioning (Semantic Link Weights)
+                    if (finalGraph.links && finalGraph.links.length > 0 && process.env.GEMINI_API_KEY) {
+                        console.log(`[Curation Backend] Executing Final Node Positioning using Flash for ${finalGraph.links.length} links...`);
+                        const weightedLinks = await (0, curatorService_1.generateSemanticLinkWeights)(process.env.GEMINI_API_KEY, detailsCacheEntries, finalGraph.links.map((l) => ({
+                            source: typeof l.source === 'string' ? l.source : l.source.id,
+                            target: typeof l.target === 'string' ? l.target : l.target.id
+                        })), {
+                            push: (model, usage) => {
+                                if (!collectedTokens[model])
+                                    collectedTokens[model] = { prompt: 0, candidates: 0, total: 0 };
+                                collectedTokens[model].prompt += usage.promptTokenCount || 0;
+                                collectedTokens[model].candidates += usage.candidatesTokenCount || 0;
+                                collectedTokens[model].total += usage.totalTokenCount || 0;
+                            }
+                        });
+                        if (weightedLinks && weightedLinks.length > 0) {
+                            const weightMap = new Map();
+                            weightedLinks.forEach((wl) => {
+                                const linkKey = [wl.source, wl.target].sort().join('--');
+                                weightMap.set(linkKey, wl.weight);
+                            });
+                            finalGraph.links.forEach((link) => {
+                                const sId = typeof link.source === 'string' ? link.source : link.source.id;
+                                const tId = typeof link.target === 'string' ? link.target : link.target.id;
+                                const linkKey = [sId, tId].sort().join('--');
+                                if (weightMap.has(linkKey)) {
+                                    link.weight = weightMap.get(linkKey);
+                                }
+                            });
+                            console.log(`[Curation Backend] Applied semantic weights to ${weightMap.size} links.`);
+                        }
+                    }
                 }
                 catch (e) {
                     console.error(`[Curation Backend] 3.1 Pro Post-Processing failed:`, e);

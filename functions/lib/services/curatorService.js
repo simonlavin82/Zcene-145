@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.scrapeImageUrlBackend = exports.checkVideoPlayability = exports.scrapeVideoIdBackend = exports.fetchNodeDetailsBackend = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = exports.NODE_DETAILS_SCHEMA = exports.generateGraphDataBackend = exports.generateRootsBreakdownBackend = exports.validateSeedOriginBackend = exports.SEED_VALIDATION_SCHEMA = exports.GENERATE_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = exports.GRAPH_RESPONSE_SCHEMA = exports.extractCleanJsonString = exports.extractArtistSubGraph = exports.normalizeGraphData = exports.buildCompositeCacheKey = exports.extractCountrySlug = exports.sanitizeImageUrl = exports.extractValidYoutubeId = exports.titleCaseArtistId = exports.normalizeArtistId = exports.applyCanonicalAlias = exports.CANONICAL_ALIASES = void 0;
+exports.generateSemanticLinkWeights = exports.scrapeImageUrlBackend = exports.checkVideoPlayability = exports.scrapeVideoIdBackend = exports.fetchNodeDetailsBackend = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = exports.NODE_DETAILS_SCHEMA = exports.generateGraphDataBackend = exports.generateRootsBreakdownBackend = exports.validateSeedOriginBackend = exports.SEED_VALIDATION_SCHEMA = exports.GENERATE_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = exports.GRAPH_RESPONSE_SCHEMA = exports.extractCleanJsonString = exports.extractArtistSubGraph = exports.normalizeGraphData = exports.buildCompositeCacheKey = exports.extractCountrySlug = exports.sanitizeImageUrl = exports.extractValidYoutubeId = exports.titleCaseArtistId = exports.normalizeArtistId = exports.applyCanonicalAlias = exports.CANONICAL_ALIASES = void 0;
 const genai_1 = require("@google/genai");
 const executeCurationPipeline_1 = require("../executeCurationPipeline");
 // --- UTILITIES PORTED FROM artistCacheService.ts ---
@@ -1568,4 +1568,76 @@ const scrapeImageUrlBackend = async (artistName, type, genre, summary) => {
     return null;
 };
 exports.scrapeImageUrlBackend = scrapeImageUrlBackend;
+const generateSemanticLinkWeights = async (apiKey, detailsCacheEntries, links, usageCollector) => {
+    const currentModel = "gemini-1.5-flash";
+    const ai = new genai_1.GoogleGenAI({ apiKey, httpOptions: { timeout: 300000 } });
+    // Map cache to lightweight context
+    const evaluationContext = detailsCacheEntries.map(entry => {
+        const id = entry[0];
+        const details = entry[1];
+        return {
+            id,
+            genre: details?.details?.genre || "Unknown",
+            bio: details?.summary || details?.bio || ""
+        };
+    });
+    const prompt = `Evaluate the provided artist biographies. For each provided link, output a semantic weight between 0.1 and 1.0 representing the strength of their musical or cultural connection.
+
+Context:
+${JSON.stringify(evaluationContext)}
+
+Links to evaluate:
+${JSON.stringify(links)}
+`;
+    const responseSchema = {
+        type: genai_1.Type.ARRAY,
+        description: "An array of evaluated links with assigned semantic weights.",
+        items: {
+            type: genai_1.Type.OBJECT,
+            properties: {
+                source: {
+                    type: genai_1.Type.STRING,
+                    description: "The exact source artist ID provided in the input."
+                },
+                target: {
+                    type: genai_1.Type.STRING,
+                    description: "The exact target artist ID provided in the input."
+                },
+                weight: {
+                    type: genai_1.Type.NUMBER,
+                    description: "A float between 0.1 (loose relation) and 1.0 (core defining connection)."
+                }
+            },
+            required: ["source", "target", "weight"]
+        }
+    };
+    try {
+        const response = await ai.models.generateContent({
+            model: currentModel,
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: responseSchema,
+                temperature: 0.1,
+            }
+        });
+        if (response.usageMetadata) {
+            usageCollector.push(currentModel, {
+                promptTokenCount: response.usageMetadata.promptTokenCount || 0,
+                candidatesTokenCount: response.usageMetadata.candidatesTokenCount || 0,
+                totalTokenCount: response.usageMetadata.totalTokenCount || 0
+            });
+        }
+        const text = response.text;
+        if (!text)
+            return [];
+        const parsed = JSON.parse(text);
+        return parsed;
+    }
+    catch (error) {
+        console.error("[generateSemanticLinkWeights] Failed to generate link weights:", error);
+        return [];
+    }
+};
+exports.generateSemanticLinkWeights = generateSemanticLinkWeights;
 //# sourceMappingURL=curatorService.js.map

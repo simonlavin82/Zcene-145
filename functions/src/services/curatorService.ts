@@ -1720,3 +1720,84 @@ export const scrapeImageUrlBackend = async (
 
   return null;
 };
+
+export const generateSemanticLinkWeights = async (
+  apiKey: string,
+  detailsCacheEntries: any[],
+  links: any[],
+  usageCollector: UsageCollector
+): Promise<any[]> => {
+  const currentModel = "gemini-1.5-flash";
+  const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: 300000 } });
+
+  // Map cache to lightweight context
+  const evaluationContext = detailsCacheEntries.map(entry => {
+    const id = entry[0];
+    const details = entry[1];
+    return {
+      id,
+      genre: details?.details?.genre || "Unknown",
+      bio: details?.summary || details?.bio || ""
+    };
+  });
+
+  const prompt = `Evaluate the provided artist biographies. For each provided link, output a semantic weight between 0.1 and 1.0 representing the strength of their musical or cultural connection.
+
+Context:
+${JSON.stringify(evaluationContext)}
+
+Links to evaluate:
+${JSON.stringify(links)}
+`;
+
+  const responseSchema = {
+    type: Type.ARRAY,
+    description: "An array of evaluated links with assigned semantic weights.",
+    items: {
+      type: Type.OBJECT,
+      properties: {
+        source: {
+          type: Type.STRING,
+          description: "The exact source artist ID provided in the input."
+        },
+        target: {
+          type: Type.STRING,
+          description: "The exact target artist ID provided in the input."
+        },
+        weight: {
+          type: Type.NUMBER,
+          description: "A float between 0.1 (loose relation) and 1.0 (core defining connection)."
+        }
+      },
+      required: ["source", "target", "weight"]
+    }
+  };
+
+  try {
+    const response = await ai.models.generateContent({
+      model: currentModel,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: responseSchema,
+        temperature: 0.1,
+      }
+    });
+
+    if (response.usageMetadata) {
+      usageCollector.push(currentModel, {
+        promptTokenCount: response.usageMetadata.promptTokenCount || 0,
+        candidatesTokenCount: response.usageMetadata.candidatesTokenCount || 0,
+        totalTokenCount: response.usageMetadata.totalTokenCount || 0
+      });
+    }
+
+    const text = response.text;
+    if (!text) return [];
+    const parsed = JSON.parse(text);
+    return parsed;
+  } catch (error) {
+    console.error("[generateSemanticLinkWeights] Failed to generate link weights:", error);
+    return [];
+  }
+};

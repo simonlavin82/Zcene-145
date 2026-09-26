@@ -146,7 +146,6 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   const localLegendRef = useRef<HTMLDivElement | null>(null);
   const isTrackingRef = useRef(false);
   const targetNodeIdRef = useRef<string | null>(null);
-  const dragEndTimeRef = useRef<number>(0);
   const prevVisibleNodesLengthRef = useRef<number>(0);
 
   const setLegendRef = useCallback((node: HTMLDivElement | null) => {
@@ -777,8 +776,6 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
     svg.on("click", (event) => { 
         if (event.target === svgRef.current) {
-            // Ignore background clicks that happen immediately after a drag event finishes
-            if (Date.now() - dragEndTimeRef.current < 100) return;
             onNodeClickRef.current(null);
             clearNodeHover();
         }
@@ -964,11 +961,16 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
     // Compute connection degrees for all visible nodes
     const nodeDegrees = new Map<string, number>();
+    const nodeTotalWeights = new Map<string, number>();
     visibleLinks.forEach(l => {
         const s = typeof l.source === 'object' ? l.source.id : l.source;
         const t = typeof l.target === 'object' ? l.target.id : l.target;
         nodeDegrees.set(s, (nodeDegrees.get(s) || 0) + 1);
         nodeDegrees.set(t, (nodeDegrees.get(t) || 0) + 1);
+        
+        const weight = l.weight ?? 0.5;
+        nodeTotalWeights.set(s, (nodeTotalWeights.get(s) || 0) + weight);
+        nodeTotalWeights.set(t, (nodeTotalWeights.get(t) || 0) + weight);
     });
 
     const forceX = d3.forceX<Node>();
@@ -1027,7 +1029,9 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         const label = toDisplayLabel(d);
         const textWidth = label.length * 6.0; 
         const minRadius = d.type === 'artist' ? 32 : 20;
-        return Math.max(minRadius, textWidth / 2 + 10);
+        const baseRadius = textWidth / 2 + 10;
+        const centralityBonus = (nodeTotalWeights.get(d.id) || 0) * 5;
+        return Math.max(minRadius, baseRadius + centralityBonus);
     });
 
     simulation.force('x', forceX).force('y', forceY);
@@ -1059,16 +1063,9 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             }
         }
 
-        // Artist-to-Artist links: scale core skeleton
-        const depthS = depths.get(s.id) ?? 1;
-        const depthT = depths.get(t.id) ?? 1;
-
-        if (depthS === 0 || depthT === 0) {
-            return 230 * spacingMultiplier; // Core branches: scaled for density
-        }
-
-        const maxDepth = Math.max(depthS, depthT);
-        return (165 + (maxDepth - 1) * 30) * spacingMultiplier; // Compact recommendation branches
+        // Artist-to-Artist links: scale core skeleton using AI semantic weight
+        const weight = d.weight ?? 0.5;
+        return (300 - (weight * 220)) * spacingMultiplier;
     });
 
     // Re-tensioned dynamic link strengths
@@ -1086,7 +1083,8 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             return 0.85; // Private petals stay locked tight to their artist
         }
         
-        return 0.35; // Firm artist-to-artist connection
+        const weight = d.weight ?? 0.5;
+        return 0.1 + (weight * 0.6); // Firm semantic tie = rigid; weak tie = elastic
     });
 
     const colorScale = d3.scaleOrdinal(zceneCategoricalPalette);
@@ -1105,20 +1103,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             enter => {
                 const g = enter.append("g")
                     .attr("class", "node-element")
-                    .attr("cursor", "pointer")
-                    .call(d3.drag<SVGGElement, Node>()
-                        .on("start", (event, d) => {
-                            if (!event.active) simulation.alphaTarget(0.3).restart();
-                            d.fx = d.x; d.fy = d.y;
-                        })
-                        .on("drag", (event, d) => { d.fx = event.x; d.fy = event.y; })
-                        .on("end", (event, d) => {
-                            if (!event.active) simulation.alphaTarget(0);
-                            d.fx = event.x;
-                            d.fy = event.y;
-                            dragEndTimeRef.current = Date.now();
-                        })
-                    );
+                    .attr("cursor", "pointer");
                 
                 // Expanded invisible hit-box for forgiving touch/hover targets
                 g.append("circle")
