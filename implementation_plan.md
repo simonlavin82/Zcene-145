@@ -43,3 +43,14 @@
   - We will strictly reuse the existing color tokens (`bg-zinc-900`, `border-zinc-700/50`, `text-primary`).
   - The overflow menu will perfectly mirror the existing Profile dropdown's DOM structure (`motion.div` with absolute positioning, `z-50`, shadow, border, and background tokens). 
   - No new components need to be added to `components/DesignSystem.tsx`. The bottom bar will just reuse standard Tailwind CSS layout classes (`fixed`, `backdrop-blur`, etc.) that are already prevalent in the app.
+
+## 6. My Stack Notification & Badge State Ergonomics
+**Target:** `components/Header.tsx`, `components/GraphPage.tsx`
+- **Findings:**
+  - **Persistent Yellow Pip (Header.tsx):** The notification dot on the mobile `MoreVertical` overflow button is currently hardcoded to display whenever `stackCount > 0`. This completely ignores the `isStackNew` lifecycle state which tracks whether the user has actually viewed the latest additions. 
+  - **"Seen" State Management (GraphPage.tsx & Header.tsx):** `isStackNew` is properly managed by comparing `stack.length > lastViewedStackCount`. The `lastViewedStackCount` is updated via `onOpenStack()`. However, because the mobile overflow button ignores `isStackNew`, the pip never clears.
+  - **Screaming Yellow Pill (Header.tsx):** Inside the overflow menu, the `My Stack` badge is styled with `bg-primary/20 text-primary`, defaulting to a highlighted accent instead of a neutral information pill.
+- **Action Plan:**
+  - Update the mobile overflow menu button in `Header.tsx` to conditionally render the notification pip based on `isStackNew` instead of `stackCount > 0`.
+  - Update the `My Stack` numeric badge inside the mobile overflow menu to use neutral tokens: `bg-zinc-800 text-zinc-500 border border-zinc-700`.
+  - Validate that opening "My Stack" from the overflow menu correctly triggers `onOpenStack()` (which invokes `onUpdateLastViewedStackCount` in `GraphPage.tsx`), thus cleanly dismissing the `isStackNew` notification dot.

@@ -264,7 +264,7 @@ const Header: React.FC<HeaderProps> = ({
                         title="Menu"
                     >
                         <MoreVertical size={18} />
-                        {stackCount > 0 && (
+                        {isStackNew && (
                             <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-primary border-2 border-background-dark"></span>
                         )}
                     </button>
@@ -317,7 +317,7 @@ const Header: React.FC<HeaderProps> = ({
                                 My Stack
                               </div>
                               {stackCount > 0 && (
-                                <span className="bg-primary/20 text-primary px-1.5 py-0.5 rounded text-[9px] font-bold">
+                                <span className="bg-zinc-800 text-zinc-500 border border-zinc-700 px-1.5 py-0.5 rounded text-[9px] font-bold">
                                   {stackCount}
                                 </span>
                               )}
