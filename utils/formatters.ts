@@ -66,6 +66,7 @@ export const zceneCategoricalPalette = [
   '#38bdf8', // Electric Sky
   '#6366f1', // Vivid Indigo
   '#ec4899', // Pink
+  '#000000', // Black
 ];
 
 export const zceneFallbackColor = '#71717a'; // Zinc

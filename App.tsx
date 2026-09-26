@@ -7567,6 +7567,10 @@ const App: React.FC = () => {
             onRestartWalkthrough={handleDashboardRestartWalkthrough}
             userTaste={profile?.taste}
             onSaveTaste={(taste) => handleUpdateProfile({ taste })}
+            crateColors={profile?.crateColors || {}}
+            onUpdateCrateColor={(crate, color) => handleUpdateProfile({
+              crateColors: { ...(profile?.crateColors || {}), [crate]: color }
+            })}
           />
         </div>
         <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Graph ? 'z-10' : 'z-0 opacity-0 pointer-events-none'}`}>

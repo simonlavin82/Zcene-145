@@ -11,6 +11,7 @@ import { formatSystemTimestamp, zceneCategoricalPalette, zceneFallbackColor } fr
 import { SeedArtistImages } from './SeedArtistImages';
 import { ModalBackdrop, ModalContainer, ModalHeader, ModalBody, ModalFooter } from './ui/Dialog';
 import { DashboardProjectCard } from './DashboardProjectCard';
+import { PROFILE_COLORS } from './SharedModals';
 
 
 interface DashboardProps {
@@ -40,6 +41,8 @@ interface DashboardProps {
   onShareProject?: (project: Project) => void;
   userTaste?: UserTaste;
   onSaveTaste?: (taste: UserTaste) => Promise<void>;
+  crateColors?: Record<string, string>;
+  onUpdateCrateColor?: (crate: string, color: string) => void;
 }
 
 const Dashboard: React.FC<DashboardProps> = ({
@@ -68,13 +71,33 @@ const Dashboard: React.FC<DashboardProps> = ({
   onRestartWalkthrough,
   onShareProject,
   userTaste,
-  onSaveTaste
+  onSaveTaste,
+  crateColors,
+  onUpdateCrateColor
 }) => {
   const [projectToDelete, setProjectToDelete] = React.useState<string | null>(null);
   const [projectToRename, setProjectToRename] = React.useState<Project | null>(null);
   const [renameValue, setRenameValue] = React.useState('');
   const [view, setView] = React.useState<'grid' | 'list'>('grid');
   const [activeMenuId, setActiveMenuId] = React.useState<string | null>(null);
+  const [openColorPopover, setOpenColorPopover] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    const handleGlobalClick = () => setOpenColorPopover(null);
+    if (openColorPopover) {
+      window.addEventListener('click', handleGlobalClick);
+    }
+    return () => window.removeEventListener('click', handleGlobalClick);
+  }, [openColorPopover]);
+
+  const colorHexMap: Record<string, string> = {
+    purple: '#a855f7',
+    teal: '#2dd4bf',
+    sky: '#38bdf8',
+    indigo: '#6366f1',
+    pink: '#ec4899',
+    black: '#000000',
+  };
   const [sortBy, setSortBy] = React.useState<'recent' | 'alphabetical'>('recent');
 
   const handleRenameClick = (project: Project) => {
@@ -334,7 +357,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                 }
 
                 const isUnassigned = bucketKey === 'UNASSIGNED';
-                const crateColor = isUnassigned ? zceneFallbackColor : zceneCategoricalPalette[bucketIndex % zceneCategoricalPalette.length];
+                const defaultColor = zceneCategoricalPalette[bucketIndex % zceneCategoricalPalette.length];
+                const crateColor = isUnassigned ? zceneFallbackColor : (crateColors?.[bucketKey] || defaultColor);
 
                 return (
                   <div 
@@ -346,7 +370,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                   >
                     {/* Unified Folder Index Tab */}
                     <div 
-                      className="w-[160px] border-l border-r rounded-t-lg text-[9px] font-mono absolute -top-[22px] left-[-1px] px-3 py-1 flex items-center h-[22.5px] z-10 select-none"
+                      className="group w-[160px] border-l border-r rounded-t-lg text-[9px] font-mono absolute -top-[22px] left-[-1px] px-3 py-1 flex items-center justify-between h-[22.5px] z-10 select-none"
                       style={{
                         borderColor: crateColor,
                         backgroundColor: crateColor
@@ -358,6 +382,31 @@ const Dashboard: React.FC<DashboardProps> = ({
                       >
                         {bucketKey}
                       </div>
+
+                      {/* Trigger Icon */}
+                      {!isUnassigned && (
+                        <div className="hidden group-hover:flex items-center">
+                          <button onClick={(e) => { e.stopPropagation(); setOpenColorPopover(openColorPopover === bucketKey ? null : bucketKey); }} className="flex items-center text-[#111113]/70 hover:text-[#111113] transition-colors p-0.5">
+                            <span className="material-symbols-outlined !text-[14px]">more_horiz</span>
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Popover UI */}
+                      {openColorPopover === bucketKey && (
+                        <div className="absolute top-full right-0 mt-1 p-2 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl z-50 flex gap-2" onClick={(e) => e.stopPropagation()}>
+                          {PROFILE_COLORS.map(color => (
+                            <button
+                              key={color.name}
+                              onClick={() => {
+                                 onUpdateCrateColor?.(bucketKey, colorHexMap[color.name]);
+                                 setOpenColorPopover(null);
+                              }}
+                              className={`w-4 h-4 rounded-full transition-transform ${color.class} hover:scale-110`}
+                            />
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     {/* Cards inside this parent record crate compartment */}
@@ -430,7 +479,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                 <tbody className="bg-zinc-900">
                   {sortedBucketKeys.map((bucketKey, bucketIndex) => {
                     const isUnassigned = bucketKey === 'UNASSIGNED';
-                    const crateColor = isUnassigned ? zceneFallbackColor : zceneCategoricalPalette[bucketIndex % zceneCategoricalPalette.length];
+                    const defaultColor = zceneCategoricalPalette[bucketIndex % zceneCategoricalPalette.length];
+                    const crateColor = isUnassigned ? zceneFallbackColor : (crateColors?.[bucketKey] || defaultColor);
                     
                     return (
                     <React.Fragment key={bucketKey}>
@@ -439,7 +489,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <td colSpan={7} className="pt-6 pb-0 px-6 align-bottom bg-zinc-900 border-none">
                           {/* The Folder Tab */}
                           <div 
-                            className="w-[140px] sm:w-[160px] border-l border-r rounded-t-lg px-3 py-1.5 font-mono tracking-widest text-[9px] sm:text-[10px] uppercase font-bold relative -mb-[1px] z-0"
+                            className="group w-[140px] sm:w-[160px] border-l border-r rounded-t-lg px-3 py-1.5 font-mono tracking-widest text-[9px] sm:text-[10px] uppercase font-bold relative -mb-[1px] z-0 flex items-center justify-between"
                             style={{
                               borderColor: crateColor,
                               backgroundColor: crateColor
@@ -451,6 +501,31 @@ const Dashboard: React.FC<DashboardProps> = ({
                             >
                               {bucketKey}
                             </div>
+                            
+                            {/* Trigger Icon */}
+                            {!isUnassigned && (
+                              <div className="hidden group-hover:flex items-center pointer-events-auto">
+                                <button onClick={(e) => { e.stopPropagation(); setOpenColorPopover(openColorPopover === bucketKey ? null : bucketKey); }} className="flex items-center text-[#111113]/70 hover:text-[#111113] transition-colors p-0.5 -my-1">
+                                  <span className="material-symbols-outlined !text-[14px]">more_horiz</span>
+                                </button>
+                              </div>
+                            )}
+
+                            {/* Popover UI */}
+                            {openColorPopover === bucketKey && (
+                              <div className="absolute top-full left-0 sm:left-auto sm:right-0 mt-1 p-2 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl z-50 flex gap-2 pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+                                {PROFILE_COLORS.map(color => (
+                                  <button
+                                    key={color.name}
+                                    onClick={() => {
+                                       onUpdateCrateColor?.(bucketKey, colorHexMap[color.name]);
+                                       setOpenColorPopover(null);
+                                    }}
+                                    className={`w-4 h-4 rounded-full transition-transform ${color.class} hover:scale-110`}
+                                  />
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </td>
                       </tr>
