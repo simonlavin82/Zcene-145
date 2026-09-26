@@ -13,7 +13,8 @@
     "deploy": "npm run build && npm run deploy:hosting && npm run deploy:backend",
     "seed:cache-hit": "node scripts/seed_cache_hit.cjs",
     "seed:cache-miss": "node scripts/seed_cache_miss.cjs",
-    "test:regression": "node scratch/test_pipeline_regression.cjs"
+    "test:regression": "node scratch/test_pipeline_regression.cjs",
+    "test:serve": "concurrently \"node --env-file=.env server.js\" \"vite --mode test\""
   },
   "dependencies": {
     "@google/genai": "^1.22.0",
