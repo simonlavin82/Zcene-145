@@ -71,6 +71,11 @@ export const zceneCategoricalPalette = [
 
 export const zceneFallbackColor = '#71717a'; // Zinc
 
+export const getContrastTextColor = (hexColor: string): string => {
+  const lightBackgrounds = ['#2dd4bf', '#ec4899', '#f6e468']; // Teal, Pink, Yellow (seed)
+  return lightBackgrounds.includes(hexColor.toLowerCase()) ? '#111113' : '#ffffff';
+};
+
 export const nodeTypeColorMap: Record<string, string> = {
   label: zceneCategoricalPalette[1], // Teal
   genre: zceneCategoricalPalette[2], // Electric Sky

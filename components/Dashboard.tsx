@@ -7,7 +7,7 @@ import { motion } from 'framer-motion';
 import { normalizeArtistId, cleanArtistDisplayName, isNodeInSeedList } from '../services/artistCacheService';
 
 
-import { formatSystemTimestamp, zceneCategoricalPalette, zceneFallbackColor } from '../utils/formatters';
+import { formatSystemTimestamp, zceneCategoricalPalette, zceneFallbackColor, getContrastTextColor } from '../utils/formatters';
 import { SeedArtistImages } from './SeedArtistImages';
 import { ModalBackdrop, ModalContainer, ModalHeader, ModalBody, ModalFooter } from './ui/Dialog';
 import { DashboardProjectCard } from './DashboardProjectCard';
@@ -359,6 +359,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 const isUnassigned = bucketKey === 'UNASSIGNED';
                 const defaultColor = zceneCategoricalPalette[bucketIndex % zceneCategoricalPalette.length];
                 const crateColor = isUnassigned ? zceneFallbackColor : (crateColors?.[bucketKey] || defaultColor);
+                const crateTextColor = getContrastTextColor(crateColor);
 
                 return (
                   <div 
@@ -378,7 +379,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     >
                       <div 
                         className="truncate text-ellipsis whitespace-nowrap uppercase tracking-widest font-bold"
-                        style={{ color: '#111113' }}
+                        style={{ color: crateTextColor }}
                       >
                         {bucketKey}
                       </div>
@@ -386,7 +387,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                       {/* Trigger Icon */}
                       {!isUnassigned && (
                         <div className="hidden group-hover:flex items-center">
-                          <button onClick={(e) => { e.stopPropagation(); setOpenColorPopover(openColorPopover === bucketKey ? null : bucketKey); }} className="flex items-center text-[#111113]/70 hover:text-[#111113] transition-colors">
+                          <button onClick={(e) => { e.stopPropagation(); setOpenColorPopover(openColorPopover === bucketKey ? null : bucketKey); }} className="flex items-center opacity-70 hover:opacity-100 transition-opacity" style={{ color: crateTextColor }}>
                             <span className="material-symbols-outlined !text-[15px]">more_horiz</span>
                           </button>
                         </div>
@@ -481,6 +482,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     const isUnassigned = bucketKey === 'UNASSIGNED';
                     const defaultColor = zceneCategoricalPalette[bucketIndex % zceneCategoricalPalette.length];
                     const crateColor = isUnassigned ? zceneFallbackColor : (crateColors?.[bucketKey] || defaultColor);
+                    const crateTextColor = getContrastTextColor(crateColor);
                     
                     return (
                     <React.Fragment key={bucketKey}>
@@ -497,7 +499,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                           >
                             <div 
                               className="truncate text-ellipsis whitespace-nowrap"
-                              style={{ color: '#111113' }}
+                              style={{ color: crateTextColor }}
                             >
                               {bucketKey}
                             </div>
@@ -505,7 +507,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                             {/* Trigger Icon */}
                             {!isUnassigned && (
                               <div className="hidden group-hover:flex items-center pointer-events-auto">
-                                <button onClick={(e) => { e.stopPropagation(); setOpenColorPopover(openColorPopover === bucketKey ? null : bucketKey); }} className="flex items-center text-[#111113]/70 hover:text-[#111113] transition-colors -my-1">
+                                <button onClick={(e) => { e.stopPropagation(); setOpenColorPopover(openColorPopover === bucketKey ? null : bucketKey); }} className="flex items-center opacity-70 hover:opacity-100 transition-opacity -my-1" style={{ color: crateTextColor }}>
                                   <span className="material-symbols-outlined !text-[15px]">more_horiz</span>
                                 </button>
                               </div>
