@@ -159,13 +159,17 @@ const Header: React.FC<HeaderProps> = ({
                 <button 
                   onClick={onLogoClick} 
                   title={isDashboard ? "Back to landing" : "Back to dashboard"} 
-                  className="flex-shrink-0 flex justify-center items-center appearance-none bg-transparent border-none outline-none focus:outline-none active:scale-95 cursor-pointer pointer-events-auto p-0 h-8 w-8 md:h-10 md:w-10" 
+                  className={`flex-shrink-0 flex justify-center items-center outline-none focus:outline-none active:scale-95 cursor-pointer pointer-events-auto transition-colors ${
+                    isDashboard 
+                      ? 'appearance-none bg-transparent border-none p-0 h-8 w-8 md:h-10 md:w-10' 
+                      : 'h-8 w-8 rounded-xl bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 leading-none shadow-lg border border-zinc-700/50'
+                  }`} 
                   aria-label="Logo"
                 >
                     {isDashboard ? (
                         <FaviconLogo className="h-full w-full text-primary pointer-events-none" />
                     ) : (
-                        <ArrowLeft className="h-full w-full text-zinc-400 hover:text-white transition-colors pointer-events-none p-1" />
+                        <ArrowLeft size={18} strokeWidth={2} className="pointer-events-none" />
                     )}
                 </button>
                 
