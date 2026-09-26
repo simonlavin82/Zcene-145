@@ -370,7 +370,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                   >
                     {/* Unified Folder Index Tab */}
                     <div 
-                      className="group w-[160px] border-l border-r rounded-t-lg text-[9px] font-mono absolute -top-[22px] left-[-1px] px-3 py-1 flex items-center justify-between h-[22.5px] z-10 select-none"
+                      className={`group w-[160px] border-l border-r rounded-t-lg text-[9px] font-mono absolute -top-[22px] left-[-1px] pl-3 pr-1.5 py-1 flex items-center justify-between h-[22.5px] select-none ${openColorPopover === bucketKey ? 'z-[60]' : 'z-10'}`}
                       style={{
                         borderColor: crateColor,
                         backgroundColor: crateColor
@@ -386,8 +386,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                       {/* Trigger Icon */}
                       {!isUnassigned && (
                         <div className="hidden group-hover:flex items-center">
-                          <button onClick={(e) => { e.stopPropagation(); setOpenColorPopover(openColorPopover === bucketKey ? null : bucketKey); }} className="flex items-center text-[#111113]/70 hover:text-[#111113] transition-colors p-0.5 -mr-0.5">
-                            <span className="material-symbols-outlined !text-[14px]">more_horiz</span>
+                          <button onClick={(e) => { e.stopPropagation(); setOpenColorPopover(openColorPopover === bucketKey ? null : bucketKey); }} className="flex items-center text-[#111113]/70 hover:text-[#111113] transition-colors">
+                            <span className="material-symbols-outlined !text-[15px]">more_horiz</span>
                           </button>
                         </div>
                       )}
@@ -489,7 +489,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <td colSpan={7} className="pt-6 pb-0 px-6 align-bottom bg-zinc-900 border-none">
                           {/* The Folder Tab */}
                           <div 
-                            className={`group w-[140px] sm:w-[160px] border-l border-r rounded-t-lg px-3 py-1.5 font-mono tracking-widest text-[9px] sm:text-[10px] uppercase font-bold relative -mb-[1px] flex items-center justify-between ${openColorPopover === bucketKey ? 'z-50' : 'z-0'}`}
+                            className={`group w-[140px] sm:w-[160px] border-l border-r rounded-t-lg pl-3 pr-1.5 py-1.5 font-mono tracking-widest text-[9px] sm:text-[10px] uppercase font-bold relative -mb-[1px] flex items-center justify-between ${openColorPopover === bucketKey ? 'z-[60]' : 'z-0'}`}
                             style={{
                               borderColor: crateColor,
                               backgroundColor: crateColor
@@ -505,8 +505,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                             {/* Trigger Icon */}
                             {!isUnassigned && (
                               <div className="hidden group-hover:flex items-center pointer-events-auto">
-                                <button onClick={(e) => { e.stopPropagation(); setOpenColorPopover(openColorPopover === bucketKey ? null : bucketKey); }} className="flex items-center text-[#111113]/70 hover:text-[#111113] transition-colors p-0.5 -mr-0.5 -my-1">
-                                  <span className="material-symbols-outlined !text-[14px]">more_horiz</span>
+                                <button onClick={(e) => { e.stopPropagation(); setOpenColorPopover(openColorPopover === bucketKey ? null : bucketKey); }} className="flex items-center text-[#111113]/70 hover:text-[#111113] transition-colors -my-1">
+                                  <span className="material-symbols-outlined !text-[15px]">more_horiz</span>
                                 </button>
                               </div>
                             )}
