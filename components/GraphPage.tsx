@@ -1023,10 +1023,15 @@ const GraphPage: React.FC<GraphPageProps> = ({
     onNodeClick(node, forceActionState);
     if (node) {
       analyticsService.track('Node Clicked', { node_id: node?.id, node_type: node?.type });
-      if (!isSmallScreen) {
-        setIsLeftPanelCollapsed(true);
-      } else {
-        setActiveTab('details');
+      
+      const isEntityNode = node.type === 'artist' || node.type === 'label';
+      
+      if (isEntityNode) {
+        if (!isSmallScreen) {
+          setIsLeftPanelCollapsed(true);
+        } else {
+          setActiveTab('details');
+        }
       }
     }
   }, [onNodeClick, isSmallScreen]);

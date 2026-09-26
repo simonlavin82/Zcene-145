@@ -122,3 +122,13 @@
   - **Ghost Button Fixes (`DesignSystem.tsx`):** Update both the "Tertiary / Ghost Buttons" and "Icon Buttons (States)" sections by removing all border properties (`border-transparent`, `border-zinc-700`) from their default and hover state examples. Clean up the associated descriptive tokens.
   - **Deep Cut Icons Fix (`DesignSystem.tsx`):** Update "Deep Cut Utility Action Icons" to accurately document the Contained variant (`bg-zinc-900 border border-zinc-700/50 shadow-lg text-zinc-400` default, transitioning to `bg-zinc-800 text-white` on hover).
   - **Iconography (`DesignSystem.tsx`):** Add the `Back` (`ArrowLeft`) icon to the Navigation Icons list inside the Iconography section.
+
+## 13. Restrict Deep Cut Triggers to Artist and Label Nodes
+**Target:** `components/GraphPage.tsx`, `App.tsx`
+- **Findings:**
+  - In `GraphPage.tsx`, `handleNodeClickInternal` calls `setActiveTab('details')` on mobile for ANY clicked node, which inappropriately opens the Deep Cut view for metadata nodes (genre, origin, date).
+  - In `App.tsx`, `handleNodeClick` has an `isBlockedType` check, but it occurs *after* local cache validation and global Firestore document lookups, meaning the app still performs unnecessary API queries for non-entity nodes before ultimately aborting.
+- **Action Plan:**
+  - **GraphPage.tsx:** Introduce an `isEntityNode` check (`node.type === 'artist' || node.type === 'label'`). Only execute `setActiveTab('details')` and `setIsLeftPanelCollapsed(true)` if this condition is met.
+  - **App.tsx:** Replace the delayed `isBlockedType` logic with an early return for non-entity nodes at the very top of `handleNodeClick`. This ensures non-entity nodes are still selected (allowing the graph to highlight them) but completely bypasses all local cache lookups, database queries, and Deep Cut hydration logic.
+

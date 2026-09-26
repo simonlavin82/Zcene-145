@@ -2185,7 +2185,16 @@ const App: React.FC = () => {
       (peekedNode.type === 'artist' && node.type === 'artist' && isArtistIdMatch(peekedNode.id, node.id))
     );
 
-    const isBlockedType = node.type === 'founded' || node.type === 'country' || node.type === 'genre';
+    const isEntityNode = node.type === 'artist' || node.type === 'label';
+
+    if (!isEntityNode) {
+      setPeekedNode(null);
+      setSelectedNode(node);
+      if (node.type !== 'founded') {
+        setActiveNodeIds(prev => prev.some(id => id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node.id]);
+      }
+      return;
+    }
 
     if (isAlreadySelected) {
       return;
@@ -2495,15 +2504,7 @@ const App: React.FC = () => {
       nodeInGraph: !!isNodeInGraph
     });
 
-    // Blocked types must never trigger an API call.
-    if (isBlockedType) {
-      setPeekedNode(null);
-      setSelectedNode(node);
-      if (node.type !== 'founded') {
-        setActiveNodeIds(prev => prev.some(id => id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node.id]);
-      }
-      return;
-    }
+
 
     // Sticky Peek logic: first tap/click on a non-cached, allowed node type enters Peek state
     if (!isAlreadyPeeked) {
