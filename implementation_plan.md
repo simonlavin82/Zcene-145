@@ -122,3 +122,42 @@ To enforce strict JSON output from Flash, use the following `responseSchema`:
   }
 }
 ```
+
+## 5. Curation Pipeline Crash Investigation & Fix
+
+### Findings: The 404 Error
+The production logs indicate a `404 NOT_FOUND` error for `models/gemini-1.5-flash`. Upon auditing `curatorService.ts`, the model string in `generateSemanticLinkWeights` is hardcoded to `gemini-1.5-flash`. However, an audit of the rest of the codebase reveals that the correct, supported string in this SDK environment for Flash is `gemini-3.5-flash` (used in Phase 1 Origin Validation and elsewhere). 
+
+Because the API call failed with a 404, the `generateSemanticLinkWeights` function threw an exception.
+
+### Findings: Error Handling & Silent Bypassing
+Currently, `generateSemanticLinkWeights` wraps the API call in a `try/catch`. When the 404 occurs, it logs the error and returns an empty array `[]`.
+In `processCurationJob.ts`, the pipeline expects `weightedLinks` to populate the `weight` property. Since the array is empty, it skips the weight assignment entirely, leaving `link.weight` undefined. 
+While this successfully prevents the entire pipeline from crashing (the graph still saves), it results in a "silent bypass" of the new physics engine. 
+
+### Proposed Structural Fix
+
+1. **Model String Correction:**
+   Update the model string in `curatorService.ts` for `generateSemanticLinkWeights`:
+   `const currentModel = "gemini-3.5-flash";`
+
+2. **Graceful Fallback Mechanism (Default Weights):**
+   To ensure data integrity and guarantee that the UI physics engine always has valid numerical data (even if AI generation fails or times out), we should enforce a default weight fallback directly in the background worker. 
+
+   In `processCurationJob.ts` (Phase 3.1 Pro):
+   - We should map over the links and assign a `weight` regardless of success. 
+   - If AI generation succeeds, map the AI weights.
+   - If AI generation fails (returns empty) or throws, apply a generic default weight (e.g., `0.5`) to all links so they still adhere to the physics logic without undefined properties.
+
+   *Implementation:*
+   ```typescript
+   if (weightedLinks && weightedLinks.length > 0) {
+     // Apply AI weights
+   } else {
+     // Graceful Fallback: Apply default neutral weight to ensure physics engine continuity
+     finalGraph.links.forEach((link: any) => {
+       link.weight = 0.5;
+     });
+     console.warn(`[Curation Backend] AI weight generation failed or returned empty. Applied default weight (0.5) to all links.`);
+   }
+   ```

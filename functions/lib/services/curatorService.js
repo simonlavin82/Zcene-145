@@ -1569,7 +1569,7 @@ const scrapeImageUrlBackend = async (artistName, type, genre, summary) => {
 };
 exports.scrapeImageUrlBackend = scrapeImageUrlBackend;
 const generateSemanticLinkWeights = async (apiKey, detailsCacheEntries, links, usageCollector) => {
-    const currentModel = "gemini-1.5-flash";
+    const currentModel = "gemini-3.5-flash";
     const ai = new genai_1.GoogleGenAI({ apiKey, httpOptions: { timeout: 300000 } });
     // Map cache to lightweight context
     const evaluationContext = detailsCacheEntries.map(entry => {

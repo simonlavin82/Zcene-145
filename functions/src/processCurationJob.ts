@@ -1157,9 +1157,18 @@ export const processCurationJob = onDocumentCreated({
             const linkKey = [sId, tId].sort().join('--');
             if (weightMap.has(linkKey)) {
               link.weight = weightMap.get(linkKey);
+            } else {
+              // Ensure all links have at least a neutral weight
+              link.weight = 0.5;
             }
           });
           console.log(`[Curation Backend] Applied semantic weights to ${weightMap.size} links.`);
+        } else {
+          // Graceful Fallback: Apply default neutral weight to ensure physics engine continuity
+          finalGraph.links.forEach((link: any) => {
+            link.weight = 0.5;
+          });
+          console.warn(`[Curation Backend] AI weight generation failed or returned empty. Applied default weight (0.5) to all links.`);
         }
       }
     } catch (e) {

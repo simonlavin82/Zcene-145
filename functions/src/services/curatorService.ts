@@ -1727,7 +1727,7 @@ export const generateSemanticLinkWeights = async (
   links: any[],
   usageCollector: UsageCollector
 ): Promise<any[]> => {
-  const currentModel = "gemini-1.5-flash";
+  const currentModel = "gemini-3.5-flash";
   const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: 300000 } });
 
   // Map cache to lightweight context
