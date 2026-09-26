@@ -162,7 +162,7 @@ const Header: React.FC<HeaderProps> = ({
                   className={`flex-shrink-0 flex justify-center items-center outline-none focus:outline-none active:scale-95 cursor-pointer pointer-events-auto transition-colors ${
                     isDashboard 
                       ? 'appearance-none bg-transparent border-none p-0 h-8 w-8 md:h-10 md:w-10' 
-                      : 'h-8 w-8 rounded-xl bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 leading-none shadow-lg border border-zinc-700/50'
+                      : 'h-8 w-8 rounded-xl bg-transparent text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors'
                   }`} 
                   aria-label="Logo"
                 >

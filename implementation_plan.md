@@ -97,3 +97,28 @@
   - When `isDashboard` is false, apply the exact standard utility button classes: `h-8 w-8 rounded-xl bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 shadow-lg border border-zinc-700/50`.
   - Remove the inline `text-zinc-400 hover:text-white` classes from the `ArrowLeft` component itself, allowing it to naturally inherit the text color transitions from the parent container.
   - Set `ArrowLeft` size to `18` to exactly match `MoreVertical` and the other header utility icons.
+## 11. Back Arrow Hover State Realignment
+**Target:** `components/Header.tsx`
+- **Findings:**
+  - My previous implementation used `bg-zinc-900`, `shadow-lg`, and a permanent `border-zinc-700/50`. This resulted in a "heavy", permanent button container rather than the clean, lightweight hover interaction defined in the design system.
+  - The `DesignSystem.tsx` defines standard `Icon Buttons (States)` (Ghost variant) with a clean default state (`border-transparent text-zinc-400 bg-transparent`) that transitions gracefully to a defined active state (`hover:bg-zinc-800 hover:border-zinc-700 hover:text-white`).
+  - The `Deep Cut Utility Action Icons` use a very similar lightweight approach (`border-zinc-800/80` at rest transitioning to `hover:bg-zinc-800 hover:border-zinc-700`).
+- **Action Plan:**
+  - Strip the heavy `bg-zinc-900`, `shadow-lg`, and static `border-zinc-700/50` from the back arrow's `isDashboard === false` branch.
+  - Apply the exact `Icon Buttons (States)` ghost sequence: `h-8 w-8 flex flex-shrink-0 items-center justify-center rounded-xl bg-transparent border border-transparent text-zinc-400 hover:text-white hover:bg-zinc-800 hover:border-zinc-700 transition-colors`.
+  - This guarantees a completely flat, borderless appearance at rest that only illuminates cleanly into a well-defined bounded box upon user interaction.
+## 12. Icon Button Variants & Design System Cleanup
+**Target:** `components/Header.tsx`, `components/DesignSystem.tsx`
+- **Findings:**
+  - The UI utilizes two primary icon button paradigms: 
+    1. **Contained/Bordered** (e.g., structural Header actions like *Share* or *Style*): Solid `bg-zinc-900` with a permanent `border border-zinc-700/50` and `shadow-lg`.
+    2. **Floaty/Ghost** (e.g., Back Arrow, project card overflow menus): Completely flat/borderless at rest, revealing only a tight `bg-zinc-800` container (with no stroke border) on hover.
+  - My previous back arrow refactor incorrectly retained `border-transparent` and `hover:border-zinc-700` from an outdated design system block, violating the true "Floaty" paradigm.
+  - In `DesignSystem.tsx`, the "Tertiary / Ghost Buttons" and "Icon Buttons (States)" inaccurately document hover states with heavy stroke borders (`border-zinc-700`).
+  - In `DesignSystem.tsx`, the "Deep Cut Utility Action Icons" card incorrectly documents an outdated default state (`border-zinc-800/80` with no background) instead of the actual `bg-zinc-900 border-zinc-700/50` Contained variant.
+  - The `ArrowLeft` navigation icon is missing from the Design System's Iconography section.
+- **Action Plan:**
+  - **Header Back Arrow (`Header.tsx`):** Strip out `border border-transparent` and `hover:border-zinc-700`. The true floaty class should strictly be: `h-8 w-8 rounded-xl bg-transparent text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors`.
+  - **Ghost Button Fixes (`DesignSystem.tsx`):** Update both the "Tertiary / Ghost Buttons" and "Icon Buttons (States)" sections by removing all border properties (`border-transparent`, `border-zinc-700`) from their default and hover state examples. Clean up the associated descriptive tokens.
+  - **Deep Cut Icons Fix (`DesignSystem.tsx`):** Update "Deep Cut Utility Action Icons" to accurately document the Contained variant (`bg-zinc-900 border border-zinc-700/50 shadow-lg text-zinc-400` default, transitioning to `bg-zinc-800 text-white` on hover).
+  - **Iconography (`DesignSystem.tsx`):** Add the `Back` (`ArrowLeft`) icon to the Navigation Icons list inside the Iconography section.

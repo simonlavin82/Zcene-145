@@ -13,7 +13,7 @@ import Header from './Header';
 import { AdminViewToggle } from './ui/AdminViewToggle';
 import { SegmentedTextToggle } from './ui/SegmentedTextToggle';
 import { InfoTooltip } from './ui/InfoTooltip';
-import { Waypoints, Flame, Check } from 'lucide-react';
+import { Waypoints, Flame, Check, ArrowLeft } from 'lucide-react';
 import { TelemetryOverviewCards, DiscoveryLedgerTable, UserTelemetry } from './UsageAnalyticsPage';
 import { CountryFilterDropdown } from './SharedModals';
 import { extractInitials, generateDeterministicGradient, nodeTypeColorMap } from '../utils/formatters';
@@ -1151,7 +1151,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <IconDisplay icon={<span className="material-symbols-outlined">close</span>} name="Close Panel / Exit" pxSize="18px" description="Exits magazine full-screen view or closes side panels." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
                                     <IconDisplay icon={<span className="material-symbols-outlined">remove</span>} name="Remove Card" pxSize="18px" description="Dismisses/removes a single artist details card from the workspace stack view." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
                                     <IconDisplay icon={<span className="material-symbols-outlined">refresh</span>} name="Refresh" pxSize="18px" description="Reloads content for a specific node or panel." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
-                                    <IconDisplay icon={<span className="material-symbols-outlined">arrow_back</span>} name="Back" pxSize="18px" description="Navigates to the previous primary view." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<ArrowLeft size={18} strokeWidth={2} />} name="Back (Header)" pxSize="18px" description="Primary structural navigation to return to the dashboard." implementation="<ArrowLeft size={18} strokeWidth={2} />" overrideIconClass="" />
                                     <IconDisplay icon={<HelpIcon />} name="Help Guide" pxSize="18px" description="Triggers help section navigation." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
                                     <IconDisplay icon={<MicIcon />} name="Speech-to-Text" pxSize="18px" description="Triggers the browser's speech recognition API." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
                                     <IconDisplay icon={<span className="material-symbols-outlined">center_focus_strong</span>} name="Center Focus" pxSize="18px" description="Resets graph zoom and centers simulation." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
@@ -1629,13 +1629,13 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover / Active Status</p>
-                                        <button className="w-full px-4 py-2 text-white bg-zinc-800 text-sm font-medium rounded-xl transition-colors border border-zinc-700">
+                                        <button className="w-full px-4 py-2 text-white bg-zinc-800 text-sm font-medium rounded-xl transition-colors border border-transparent">
                                             Cancel
                                         </button>
                                         <div className="flex flex-wrap gap-1.5 pt-2">
                                             <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-sm bg-zinc-800 border border-zinc-700"></span>
-                                                hover:bg-zinc-800 hover:border-zinc-700
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-800 border border-transparent"></span>
+                                                hover:bg-zinc-800
                                             </span>
                                             <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
                                                 <span className="w-2 h-2 rounded-sm bg-white border border-zinc-300"></span>
@@ -1826,27 +1826,27 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             {/* Deep Cut Utility Action Icons */}
                             <div>
                                 <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
-                                    <h3 className="text-xl font-medium text-zinc-200">Deep Cut Utility Action Icons</h3>
+                                    <h3 className="text-xl font-medium text-zinc-200">Contained / Bordered Variant</h3>
                                     <div className="flex flex-wrap gap-2">
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Radius: 12px / rounded-xl</span>
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Size: 32x32px (w-8 h-8)</span>
                                     </div>
                                 </div>
                                 <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
-                                    Square icon buttons used in the Deep Cut header for primary utility actions like Add to Taste, Explore, and Remove. They feature a distinct standard hover state.
+                                    Used for structural actions like Deep Cut utilities (e.g. Add to Taste, Explore, Remove). These feature a solid container with a distinct stroke border (<code className="text-zinc-300">bg-zinc-900 border border-zinc-700/50 shadow-lg</code>), providing a self-contained look.
                                 </p>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Default Status</p>
                                         <div className="flex gap-2">
-                                            <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl leading-none text-zinc-400">
+                                            <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-700/50 rounded-xl leading-none text-zinc-400 bg-zinc-900 shadow-lg">
                                                 <span className="lucide lucide-flame w-[18px] h-[18px]" />
                                             </button>
                                         </div>
                                         <div className="flex flex-wrap gap-1.5 pt-2">
                                             <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-sm bg-transparent border border-zinc-800/80"></span>
-                                                border-zinc-800/80
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-900 border border-zinc-700/50"></span>
+                                                bg-zinc-900 border-zinc-700/50
                                             </span>
                                             <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
                                                 <span className="w-2 h-2 rounded-sm bg-zinc-400 border border-zinc-500"></span>
@@ -1857,14 +1857,14 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover Status</p>
                                         <div className="flex gap-2">
-                                            <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-700 rounded-xl leading-none text-white bg-zinc-800 transition-colors">
+                                            <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-700/50 rounded-xl leading-none text-white bg-zinc-800 transition-colors shadow-lg">
                                                 <span className="lucide lucide-flame w-[18px] h-[18px]" />
                                             </button>
                                         </div>
                                         <div className="flex flex-wrap gap-1.5 pt-2">
                                             <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-sm bg-zinc-800 border border-zinc-700"></span>
-                                                bg-zinc-800 border-zinc-700
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-800 border border-zinc-700/50"></span>
+                                                bg-zinc-800 border-zinc-700/50
                                             </span>
                                             <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
                                                 <span className="w-2 h-2 rounded-sm bg-white border border-zinc-300"></span>
@@ -1878,7 +1878,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             {/* Icon Buttons */}
                             <div className="space-y-8">
                                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-800 pb-4">
-                                    <h3 className="text-xl font-medium text-zinc-200">Icon Buttons (States)</h3>
+                                    <h3 className="text-xl font-medium text-zinc-200">Floaty / Borderless Variant</h3>
                                     <div className="flex flex-wrap gap-2">
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Radius: 12px / rounded-xl</span>
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Height: 32px / h-8</span>
@@ -1886,6 +1886,9 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Font: 18px (icon)</span>
                                     </div>
                                 </div>
+                                <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
+                                    Used for the back arrow, panel expand/collapse toggles, and card menus. These are completely flat at rest, and on hover reveal a tight fill (<code className="text-zinc-300">bg-zinc-800</code>) with zero border or stroke.
+                                </p>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
                                     <div className="flex flex-col items-center gap-4">
                                         <button className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white transition-colors border border-transparent">
@@ -1902,15 +1905,15 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </div>
                                     </div>
                                     <div className="flex flex-col items-center gap-4">
-                                        <button className="w-8 h-8 flex items-center justify-center rounded-xl text-white bg-zinc-800 transition-colors border border-zinc-700">
+                                        <button className="w-8 h-8 flex items-center justify-center rounded-xl text-white bg-zinc-800 transition-colors border border-transparent">
                                             <span className="material-symbols-outlined !text-[18px]">settings</span>
                                         </button>
                                         <div className="flex flex-col items-center gap-2">
                                             <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover / Active</p>
                                             <div className="flex flex-wrap justify-center gap-1.5">
                                                 <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
-                                                    <span className="w-2 h-2 rounded-sm bg-zinc-800 border border-zinc-700"></span>
-                                                    bg-zinc-800 border-zinc-700
+                                                    <span className="w-2 h-2 rounded-sm bg-zinc-800 border border-transparent"></span>
+                                                    bg-zinc-800
                                                 </span>
                                                 <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
                                                     <span className="w-2 h-2 rounded-sm bg-white border border-zinc-300"></span>
