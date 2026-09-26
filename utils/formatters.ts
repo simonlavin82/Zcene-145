@@ -67,12 +67,13 @@ export const zceneCategoricalPalette = [
   '#6366f1', // Vivid Indigo
   '#ec4899', // Pink
   '#000000', // Black
+  '#ffffff', // White
 ];
 
 export const zceneFallbackColor = '#71717a'; // Zinc
 
 export const getContrastTextColor = (hexColor: string): string => {
-  const lightBackgrounds = ['#2dd4bf', '#ec4899', '#f6e468', '#38bdf8']; // Teal, Pink, Yellow (seed), Electric Sky
+  const lightBackgrounds = ['#2dd4bf', '#ec4899', '#f6e468', '#38bdf8', '#ffffff']; // Teal, Pink, Yellow (seed), Electric Sky, White
   return lightBackgrounds.includes(hexColor.toLowerCase()) ? '#111113' : '#ffffff';
 };
 

@@ -115,7 +115,8 @@ export const PROFILE_COLORS = [
   { name: 'sky', class: 'bg-[#38bdf8]' },
   { name: 'indigo', class: 'bg-[#6366f1]' },
   { name: 'pink', class: 'bg-[#ec4899]' },
-  { name: 'black', class: 'bg-[#000000] border border-zinc-700' }
+  { name: 'black', class: 'bg-[#000000] border border-zinc-700' },
+  { name: 'white', class: 'bg-[#ffffff]' }
 ];
 
 export const MyTasteDialog: React.FC<{

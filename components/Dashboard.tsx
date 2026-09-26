@@ -371,7 +371,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                   >
                     {/* Unified Folder Index Tab */}
                     <div 
-                      className={`group w-[160px] border-t border-l border-r border-zinc-800 rounded-t-lg text-[9px] font-mono absolute -top-[22px] left-[-1px] pl-3 pr-1.5 py-1 flex items-center justify-between h-[22.5px] select-none ${openColorPopover === bucketKey ? 'z-[60]' : 'z-10'}`}
+                      className={`group w-[160px] border border-zinc-800 rounded-t-lg text-[9px] font-mono absolute -top-[22px] left-[-1px] pl-3 pr-1.5 py-1 flex items-center justify-between h-[22.5px] select-none ${openColorPopover === bucketKey ? 'z-[60]' : 'z-10'}`}
                       style={{
                         backgroundColor: crateColor
                       }}
@@ -478,7 +478,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <td colSpan={7} className="pt-6 pb-0 px-6 align-bottom bg-zinc-900 border-none">
                           {/* The Folder Tab */}
                           <div 
-                            className={`group w-[140px] sm:w-[160px] border-t border-l border-r border-zinc-800 rounded-t-lg pl-3 pr-1.5 py-1.5 font-mono tracking-widest text-[9px] sm:text-[10px] uppercase font-bold relative -mb-[1px] flex items-center justify-between ${openColorPopover === bucketKey ? 'z-[60]' : 'z-0'}`}
+                            className={`group w-[140px] sm:w-[160px] border border-zinc-800 rounded-t-lg pl-3 pr-1.5 py-1.5 font-mono tracking-widest text-[9px] sm:text-[10px] uppercase font-bold relative -mb-[1px] flex items-center justify-between ${openColorPopover === bucketKey ? 'z-[60]' : 'z-0'}`}
                             style={{
                               backgroundColor: crateColor
                             }}
