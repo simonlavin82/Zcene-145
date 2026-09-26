@@ -366,7 +366,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     key={bucketKey} 
                     className={`w-full md:w-fit max-w-full rounded-tr-xl rounded-b-xl rounded-tl-none border border-zinc-800 p-4 relative flex-shrink-0 min-w-0 ${openColorPopover === bucketKey ? 'z-50' : 'z-0'}`}
                     style={{
-                      backgroundColor: `${crateColor}0A`
+                      backgroundColor: `${crateColor}80`
                     }}
                   >
                     {/* Unified Folder Index Tab */}

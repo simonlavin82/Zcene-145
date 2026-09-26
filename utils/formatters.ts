@@ -72,7 +72,7 @@ export const zceneCategoricalPalette = [
 export const zceneFallbackColor = '#71717a'; // Zinc
 
 export const getContrastTextColor = (hexColor: string): string => {
-  const lightBackgrounds = ['#2dd4bf', '#ec4899', '#f6e468']; // Teal, Pink, Yellow (seed)
+  const lightBackgrounds = ['#2dd4bf', '#ec4899', '#f6e468', '#38bdf8']; // Teal, Pink, Yellow (seed), Electric Sky
   return lightBackgrounds.includes(hexColor.toLowerCase()) ? '#111113' : '#ffffff';
 };
 
