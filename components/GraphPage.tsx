@@ -1620,29 +1620,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
 
         {isSmallScreen ? (
             <>
-                <div className="flex-grow flex-shrink min-h-0 flex flex-col overflow-hidden relative">
-                    <div className={`flex-shrink-0 ${LayoutSizes.headerBar} border-b border-zinc-700/50 bg-zinc-900 relative z-20 ${isMagazineViewOpen ? 'hidden' : ''}`}>
-                        <nav className="flex h-full">
-                            {(['artists', 'spiderweb', 'details'] as MobileTab[]).map(tab => {
-                                const totalDetails = displayBadgeCount;
-                                return (
-                                    <button key={tab} ref={tab === 'details' ? deepCutTabRef : null} onClick={() => { setActiveTab(tab); if (tab === 'details') { if (!onboardingProgress.step5) updateOnboarding('step5'); /* Fix C: only auto-select when nothing is selected; preserve explicit user tap */ if (!selectedNode) selectFirstUnread(); } }} className={`flex-1 flex items-center justify-center gap-2 text-sm font-medium border-b-2 transition-colors ${activeTab === tab ? 'text-primary border-primary' : 'text-zinc-400 border-transparent hover:text-white active:text-white'}`}>
-                                        <span className="uppercase tracking-widest">{tab === 'details' ? 'Deep Cut' : tab}</span>
-                                        {tab === 'artists' && (
-                                            <span className={`h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border shadow-sm transition-all duration-500 ${artistIndicatorStyles}`}>
-                                                {enabledArtistsCount}
-                                            </span>
-                                        )}
-                                        {tab === 'details' && (
-                                            <span className={`h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border shadow-sm transition-all duration-500 ${unreadDetailsCount > 0 ? 'bg-zinc-900 text-white border-white/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>
-                                                {totalDetails}
-                                            </span>
-                                        )}
-                                    </button>
-                                );
-                            })}
-                        </nav>
-                    </div>
+                <div className="flex-grow flex-shrink min-h-0 flex flex-col overflow-hidden relative pb-[calc(env(safe-area-inset-bottom)+4rem)]">
                     <div ref={mobileTabContainerRef} className="flex-grow overflow-hidden relative z-10 min-h-0" style={{ overscrollBehaviorY: 'contain' }}>
                         <div className="flex h-full transition-transform duration-300 ease-in-out" style={{ transform: `translateX(-${tabIndex * 100}%)` }}>
                             <div className="w-full flex-shrink-0 flex flex-col min-h-0 overflow-hidden relative">{ArtistsPanelContent}</div>
@@ -1718,34 +1696,31 @@ const GraphPage: React.FC<GraphPageProps> = ({
                         </div>
                     </div>
                 </div>
-                {!isMagazineViewOpen && (
-                    <div className="flex-shrink-0 border-t border-zinc-700/50 bg-zinc-900 py-0 px-2 text-center relative z-50">
-                        <div className="text-zinc-500 text-[10px] sm:text-xs">
-                            <div 
-                                className="mx-auto flex justify-center items-center cursor-pointer" 
-                                style={{ minHeight: '50px' }}
-                                onClickCapture={(e) => {
-                                    e.preventDefault();
-                                    onNavigate(View.Home);
-                                    setTimeout(() => {
-                                        const supportEl = document.getElementById('support');
-                                        if (supportEl) {
-                                            supportEl.scrollIntoView({ behavior: 'smooth' });
-                                        }
-                                    }, 100);
-                                }}
-                            >
-                                <AdSenseUnit 
-                                    adClient="ca-pub-9665950244000141" 
-                                    adSlot="3666473373" 
-                                    style={{ display: 'inline-block', width: '320px', height: '50px' }} 
-                                    customImageUrl="https://storage.googleapis.com/zcene-prod-assets/Zcene%20App%20Mobile%20(slim).png"
-                                    linkUrl="#/merch"
-                                />
-                            </div>
-                        </div>
-                    </div>
-                )}
+
+
+                {/* Mobile Bottom Navigation Tabs */}
+                <div className={`fixed bottom-0 left-0 right-0 z-[100] h-16 bg-zinc-900/80 backdrop-blur-md border-t border-zinc-700/50 pb-[env(safe-area-inset-bottom)] md:hidden ${isMagazineViewOpen ? 'hidden' : ''}`}>
+                    <nav className="flex h-full px-2">
+                        {(['artists', 'spiderweb', 'details'] as MobileTab[]).map(tab => {
+                            const totalDetails = displayBadgeCount;
+                            return (
+                                <button key={tab} ref={tab === 'details' ? deepCutTabRef : null} onClick={() => { setActiveTab(tab); if (tab === 'details') { if (!onboardingProgress.step5) updateOnboarding('step5'); /* Fix C: only auto-select when nothing is selected; preserve explicit user tap */ if (!selectedNode) selectFirstUnread(); } }} className={`flex-1 flex items-center justify-center gap-2 text-sm font-medium border-t-2 transition-colors -mt-[1px] ${activeTab === tab ? 'text-primary border-primary' : 'text-zinc-400 border-transparent hover:text-white active:text-white'}`}>
+                                    <span className="uppercase tracking-widest">{tab === 'details' ? 'Deep Cut' : tab}</span>
+                                    {tab === 'artists' && (
+                                        <span className={`h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border shadow-sm transition-all duration-500 ${artistIndicatorStyles}`}>
+                                            {enabledArtistsCount}
+                                        </span>
+                                    )}
+                                    {tab === 'details' && (
+                                        <span className={`h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border shadow-sm transition-all duration-500 ${unreadDetailsCount > 0 ? 'bg-zinc-900 text-white border-white/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>
+                                            {totalDetails}
+                                        </span>
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </nav>
+                </div>
             </>
         ) : (
             <main className={`flex-grow flex flex-row relative min-h-0 gap-4 ${isSmallScreen ? 'px-4' : 'px-6 lg:px-8'} pb-6`}>
@@ -1759,57 +1734,6 @@ const GraphPage: React.FC<GraphPageProps> = ({
                     <div className="flex-1 relative min-h-0 flex flex-col bg-zinc-900 border border-zinc-600/50 overflow-hidden">
                         <div className={`${LayoutSizes.headerBar} px-4 flex-shrink-0 border-b border-zinc-600/50 flex items-center justify-between overflow-hidden`}><h2 className="text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Spiderweb</h2></div>
                         <div className="flex-grow relative min-h-0" ref={desktopGraphAreaRef}>{(isLoading || isHydrating || (data.nodes.length > 0 && isSimulationSettling)) && (<div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-md z-[90] flex flex-col items-center justify-center gap-4 pointer-events-auto"><LoadingSpinner subtext={loadingSubtext} /></div>)}{isFirstGeneration && !(isLoading || isHydrating || (data.nodes.length > 0 && isSimulationSettling)) && (<div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none"><ZceneEmptyState onNavigate={onNavigate} /></div>)}{data.nodes.length > 0 && (<MusicGraph data={data} libraryArtists={memoizedLibraryArtists} seedArtists={memoizedSeedArtists} onNodeClick={handleNodeClickInternal} selectedNode={selectedNode} peekedNode={peekedNode} isSmallScreen={isSmallScreen} activeFilters={activeFilters} searchQuery={searchQuery} setSearchQuery={setSearchQuery} toggleFilter={toggleFilterInternal} legendConfig={legendConfig} legendOrder={legendOrder} legendRef={desktopLegendAreaRef} onInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onLegendInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} isGuest={isGuest} detailsCache={detailsCache} isActive={isActive} onSimulationComplete={() => setIsSimulationSettling(false)} />)}</div>
-                    </div>
-                    <div key={`ad-container-${adSize}`} className="flex-shrink-0 bg-zinc-900 border border-zinc-600/50 px-2 py-0 flex justify-center items-center overflow-hidden">
-                        <div className="text-zinc-500 text-[10px] text-center max-w-full">
-                            {adSize === 'small' ? (
-                                <div 
-                                    className="mx-auto flex justify-center items-center cursor-pointer" 
-                                    style={{ minHeight: '50px', width: '320px' }}
-                                    onClickCapture={(e) => {
-                                        e.preventDefault();
-                                        onNavigate(View.Home);
-                                        setTimeout(() => {
-                                            const supportEl = document.getElementById('support');
-                                            if (supportEl) {
-                                                supportEl.scrollIntoView({ behavior: 'smooth' });
-                                            }
-                                        }, 100);
-                                    }}
-                                >
-                                    <AdSenseUnit 
-                                        adClient="ca-pub-9665950244000141" 
-                                        adSlot="3666473373" 
-                                        style={{ display: 'inline-block', width: '320px', height: '50px' }} 
-                                        customImageUrl="https://storage.googleapis.com/zcene-prod-assets/Zcene%20App%20Mobile%20(slim).png"
-                                        linkUrl="#/merch"
-                                    />
-                                </div>
-                            ) : (
-                                <div 
-                                    className="mx-auto flex justify-center items-center cursor-pointer" 
-                                    style={{ minHeight: '90px', width: '728px', maxWidth: '100%' }}
-                                    onClickCapture={(e) => {
-                                        e.preventDefault();
-                                        onNavigate(View.Home);
-                                        setTimeout(() => {
-                                            const supportEl = document.getElementById('support');
-                                            if (supportEl) {
-                                                supportEl.scrollIntoView({ behavior: 'smooth' });
-                                            }
-                                        }, 100);
-                                    }}
-                                >
-                                    <AdSenseUnit 
-                                        adClient="ca-pub-9665950244000141" 
-                                        adSlot="3666473373" 
-                                        style={{ display: 'inline-block', width: '728px', height: '90px' }} 
-                                        customImageUrl="https://storage.googleapis.com/zcene-prod-assets/Zcene%20App%20Desktop.png"
-                                        linkUrl="#/merch"
-                                    />
-                                </div>
-                            )}
-                        </div>
                     </div>
                 </div>
                 

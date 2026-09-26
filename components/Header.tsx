@@ -4,7 +4,7 @@ import { LayoutSizes } from './DesignSystem';
 import { User } from 'firebase/auth';
 import { AnimatePresence, motion } from 'framer-motion';
 import { UserTaste } from '../types';
-import { Flame } from 'lucide-react';
+import { Flame, ArrowLeft, MoreVertical } from 'lucide-react';
 
 import { MyTasteDialog } from './SharedModals';
 
@@ -73,6 +73,7 @@ const Header: React.FC<HeaderProps> = ({
 
   const [isTasteDialogOpen, setIsTasteDialogOpen] = React.useState(false);
   const [localTaste, setLocalTaste] = React.useState<UserTaste>([]);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
   React.useEffect(() => {
     const handleOpenTasteModal = () => setIsTasteDialogOpen(true);
@@ -161,7 +162,11 @@ const Header: React.FC<HeaderProps> = ({
                   className="flex-shrink-0 flex justify-center items-center appearance-none bg-transparent border-none outline-none focus:outline-none active:scale-95 cursor-pointer pointer-events-auto p-0 h-8 w-8 md:h-10 md:w-10" 
                   aria-label="Logo"
                 >
-                    <FaviconLogo className="h-full w-full text-primary pointer-events-none" />
+                    {isDashboard ? (
+                        <FaviconLogo className="h-full w-full text-primary pointer-events-none" />
+                    ) : (
+                        <ArrowLeft className="h-full w-full text-primary pointer-events-none p-1" />
+                    )}
                 </button>
                 
                 <div className="flex items-center pointer-events-auto flex-grow max-w-[280px] sm:max-w-[320px] md:max-w-[480px]">
@@ -210,11 +215,11 @@ const Header: React.FC<HeaderProps> = ({
                   }
                   setIsTasteDialogOpen(true);
                 }}
-                className={`h-8 flex flex-shrink-0 items-center justify-center rounded-xl bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 transition-colors leading-none shadow-lg border border-zinc-700/50 relative ${isSmallScreen ? 'w-8' : 'pl-2 pr-3 gap-2'}`} 
+                className={`h-8 hidden md:flex flex-shrink-0 items-center justify-center rounded-xl bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 transition-colors leading-none shadow-lg border border-zinc-700/50 relative pl-2 pr-3 gap-2`} 
                 title="Style"
             >
                 <Flame size={18} />
-                {!isSmallScreen && <span className="text-xs font-medium">Style</span>}
+                <span className="text-xs font-medium">Style</span>
             </button>
 
             <button 
@@ -225,11 +230,11 @@ const Header: React.FC<HeaderProps> = ({
                   }
                   onOpenStack();
                 }}
-                className={`h-8 flex flex-shrink-0 items-center justify-center rounded-xl bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 transition-colors leading-none shadow-lg border border-zinc-700/50 relative ${isSmallScreen ? 'w-8' : 'pl-2 pr-3 gap-2'}`} 
+                className={`h-8 hidden md:flex flex-shrink-0 items-center justify-center rounded-xl bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 transition-colors leading-none shadow-lg border border-zinc-700/50 relative pl-2 pr-3 gap-2`} 
                 title="My Stack"
             >
                 <StackIcon className="!text-[18px]" />
-                {!isSmallScreen && <span className="text-xs font-medium">My Stack</span>}
+                <span className="text-xs font-medium">My Stack</span>
                 {stackCount > 0 && (
                     <span className={`absolute -top-1 -right-1 h-4.5 w-4.5 rounded-md flex items-center justify-center text-[9px] font-bold border shadow-sm transition-all duration-500 ${isStackNew ? 'bg-zinc-900 text-white border-white/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>
                         {stackCount}
@@ -250,7 +255,85 @@ const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            <div className="flex items-center gap-3 ml-1 relative">
+            {/* Mobile Overflow Menu Button */}
+            {isSmallScreen && (
+                <div className="relative">
+                    <button 
+                        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                        className="h-8 w-8 flex flex-shrink-0 items-center justify-center rounded-xl bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 transition-colors leading-none shadow-lg border border-zinc-700/50"
+                        title="Menu"
+                    >
+                        <MoreVertical size={18} />
+                        {stackCount > 0 && (
+                            <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-primary border-2 border-background-dark"></span>
+                        )}
+                    </button>
+                    
+                    <AnimatePresence>
+                      {isMobileMenuOpen && (
+                        <>
+                          <div className="fixed inset-0 z-10" onClick={() => setIsMobileMenuOpen(false)} />
+                          <motion.div
+                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                            className="absolute right-0 top-full mt-2 w-48 z-20 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1 shadow-2xl shadow-black pointer-events-auto text-left antialiased"
+                          >
+                            <button
+                              onClick={() => {
+                                setIsMobileMenuOpen(false);
+                                if (!user) onLogin?.(); else setIsTasteDialogOpen(true);
+                              }}
+                              className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-3"
+                            >
+                              <Flame size={16} className="text-zinc-500" />
+                              Style
+                            </button>
+                            <button
+                              onClick={() => {
+                                setIsMobileMenuOpen(false);
+                                if (!user) onLogin?.(); else onOpenStack();
+                              }}
+                              className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center justify-between"
+                            >
+                              <div className="flex items-center gap-3">
+                                <StackIcon className="!text-[16px] text-zinc-500" />
+                                My Stack
+                              </div>
+                              {stackCount > 0 && (
+                                <span className="bg-primary/20 text-primary px-1.5 py-0.5 rounded text-[9px] font-bold">
+                                  {stackCount}
+                                </span>
+                              )}
+                            </button>
+                            <div className="border-t border-zinc-800/80 my-1.5 mx-2" />
+                            <button
+                              onClick={() => {
+                                setIsMobileMenuOpen(false);
+                                setIsProfileOpen(true);
+                              }}
+                              className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-3"
+                            >
+                              {user ? (
+                                user.photoURL ? (
+                                  <img src={user.photoURL} alt="" className="w-4 h-4 rounded-full border border-primary/50" />
+                                ) : (
+                                  <span className="material-symbols-outlined !text-[16px] text-zinc-500">account_circle</span>
+                                )
+                              ) : (
+                                <span className="material-symbols-outlined !text-[16px] text-zinc-500">account_circle</span>
+                              )}
+                              Account
+                            </button>
+                          </motion.div>
+                        </>
+                      )}
+                    </AnimatePresence>
+                </div>
+            )}
+
+            {/* Desktop Profile Icon */}
+            <div className="hidden md:flex items-center gap-3 ml-1 relative">
                 <button 
                     onClick={() => setIsProfileOpen(!isProfileOpen)}
                     className="group relative flex items-center justify-center pointer-events-auto"
