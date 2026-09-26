@@ -161,7 +161,7 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
             </div>
             
             <div
-              className={`relative flex-shrink-0 transition-opacity duration-150 ${activeMenuId === project.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+              className={`relative flex-shrink-0 transition-opacity duration-150 opacity-100`}
               onClick={(e) => e.stopPropagation()}
             >
               <button
