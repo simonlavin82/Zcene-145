@@ -165,7 +165,7 @@ const Header: React.FC<HeaderProps> = ({
                     {isDashboard ? (
                         <FaviconLogo className="h-full w-full text-primary pointer-events-none" />
                     ) : (
-                        <ArrowLeft className="h-full w-full text-primary pointer-events-none p-1" />
+                        <ArrowLeft className="h-full w-full text-zinc-400 hover:text-white transition-colors pointer-events-none p-1" />
                     )}
                 </button>
                 
@@ -242,15 +242,15 @@ const Header: React.FC<HeaderProps> = ({
                 )}
             </button>
 
-            {!isDashboard && onShare && (
+            {!isDashboard && onShare && !isSmallScreen && (
               <button 
                   onClick={onShare} 
                   disabled={isSharing}
-                  className={`h-8 flex flex-shrink-0 items-center justify-center rounded-xl bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 transition-colors leading-none shadow-lg border border-zinc-700/50 relative disabled:opacity-50 disabled:cursor-not-allowed ${isSmallScreen ? 'w-8' : 'pl-2 pr-3 gap-2'}`} 
+                  className={`h-8 flex flex-shrink-0 items-center justify-center rounded-xl bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 transition-colors leading-none shadow-lg border border-zinc-700/50 relative disabled:opacity-50 disabled:cursor-not-allowed pl-2 pr-3 gap-2`} 
                   title="Share Zcene"
               >
                   <span className="material-symbols-outlined !text-[18px]">{isCopied ? 'check' : 'share'}</span>
-                  {!isSmallScreen && <span className="text-xs font-medium">Share</span>}
+                  <span className="text-xs font-medium">Share</span>
                   {isCopied && <span className="absolute -top-10 left-1/2 -translate-x-1/2 bg-white text-brand-black text-[10px] font-bold py-1 px-2 rounded-md whitespace-nowrap shadow-xl">Link Copied</span>}
               </button>
             )}
@@ -277,14 +277,30 @@ const Header: React.FC<HeaderProps> = ({
                             initial={{ opacity: 0, y: 10, scale: 0.95 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                            className="absolute right-0 top-full mt-2 w-48 z-20 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1 shadow-2xl shadow-black pointer-events-auto text-left antialiased"
+                            className="absolute right-0 top-full mt-2 w-48 z-50 overflow-hidden rounded-xl border border-white/10 bg-brand-black shadow-2xl shadow-black pointer-events-auto text-left animate-fade-in-down antialiased flex flex-col py-1"
                           >
+                            {onShare && (
+                              <>
+                                <button
+                                  onClick={() => {
+                                    setIsMobileMenuOpen(false);
+                                    onShare();
+                                  }}
+                                  disabled={isSharing}
+                                  className="w-full text-left px-4 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all flex items-center gap-3 disabled:opacity-50"
+                                >
+                                  <span className="material-symbols-outlined !text-[16px] text-zinc-500">share</span>
+                                  Share
+                                </button>
+                                <div className="border-t border-zinc-800 w-full" />
+                              </>
+                            )}
                             <button
                               onClick={() => {
                                 setIsMobileMenuOpen(false);
                                 if (!user) onLogin?.(); else setIsTasteDialogOpen(true);
                               }}
-                              className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-3"
+                              className="w-full text-left px-4 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all flex items-center gap-3"
                             >
                               <Flame size={16} className="text-zinc-500" />
                               Style
@@ -294,7 +310,7 @@ const Header: React.FC<HeaderProps> = ({
                                 setIsMobileMenuOpen(false);
                                 if (!user) onLogin?.(); else onOpenStack();
                               }}
-                              className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center justify-between"
+                              className="w-full text-left px-4 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all flex items-center justify-between"
                             >
                               <div className="flex items-center gap-3">
                                 <StackIcon className="!text-[16px] text-zinc-500" />
@@ -306,25 +322,6 @@ const Header: React.FC<HeaderProps> = ({
                                 </span>
                               )}
                             </button>
-                            <div className="border-t border-zinc-800/80 my-1.5 mx-2" />
-                            <button
-                              onClick={() => {
-                                setIsMobileMenuOpen(false);
-                                setIsProfileOpen(true);
-                              }}
-                              className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-3"
-                            >
-                              {user ? (
-                                user.photoURL ? (
-                                  <img src={user.photoURL} alt="" className="w-4 h-4 rounded-full border border-primary/50" />
-                                ) : (
-                                  <span className="material-symbols-outlined !text-[16px] text-zinc-500">account_circle</span>
-                                )
-                              ) : (
-                                <span className="material-symbols-outlined !text-[16px] text-zinc-500">account_circle</span>
-                              )}
-                              Account
-                            </button>
                           </motion.div>
                         </>
                       )}
@@ -332,8 +329,8 @@ const Header: React.FC<HeaderProps> = ({
                 </div>
             )}
 
-            {/* Desktop Profile Icon */}
-            <div className="hidden md:flex items-center gap-3 ml-1 relative">
+            {/* Profile Icon (Desktop and Mobile) */}
+            <div className="flex items-center gap-3 ml-1 relative">
                 <button 
                     onClick={() => setIsProfileOpen(!isProfileOpen)}
                     className="group relative flex items-center justify-center pointer-events-auto"
