@@ -544,7 +544,10 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
             if (!panelScrollRef.current || !actionIconsRef.current) return;
             
             const panel = panelScrollRef.current;
-            const targetOffset = actionIconsRef.current.offsetHeight;
+            
+            // Base height of icons + 24px to consume the `pt-6` padding on the content wrapper.
+            // This pushes the icons fully out of view and brings the content flush to the header.
+            const targetOffset = actionIconsRef.current.offsetHeight + 24;
             const maxScroll = panel.scrollHeight - panel.clientHeight;
 
             // Only apply if the layout has enough space, preventing it from clamping to 0 and triggering onScroll(false)
