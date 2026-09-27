@@ -2262,7 +2262,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                 <div className={`flex-shrink-0 z-[60] transition-all duration-300 ${isMagazineViewOpen ? `bg-transparent ${LayoutSizes.topHeader} border-b border-zinc-700/50` : 'bg-zinc-900 h-0 overflow-hidden border-transparent'}`}>
                     <div className="px-4 flex items-center justify-between gap-4 h-full">
                         <div className="flex items-center gap-2 flex-grow animate-in fade-in slide-in-from-top-2 duration-500">
-                            <div className="relative flex-grow max-w-[180px]">
+                            <div className="relative flex-grow max-w-none">
                                 <span className={`material-symbols-outlined absolute top-1/2 -translate-y-1/2 text-zinc-500 ${InputSizes.md.leftIcon}`}>search</span>
                                 <input 
                                     type="search"
@@ -2293,14 +2293,6 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                 </Select>
                             </div>
                         </div>
-
-                        <button 
-                            onClick={() => onMagazineViewToggle(false)}
-                            className="flex items-center justify-center w-8 h-8 border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 focus:outline-none transition-all duration-200 shrink-0 leading-none backdrop-blur-sm"
-                            title="Exit Magazine View"
-                        >
-                            <span className="material-symbols-outlined !text-[18px]">close</span>
-                        </button>
                     </div>
                 </div>
             ) : (
