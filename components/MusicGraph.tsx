@@ -1207,9 +1207,9 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             const isSeed = d.type === 'artist' && isNodeInSeedList(d.id || d.label || '', seedArtists);
             if (isSeed) return 'album';
             if (d.type === 'artist') return 'equalizer';
-            if (d.type === 'genre') return 'music_note';
-            if (d.type === 'label') return 'copyright';
-            if (d.type === 'country') return 'public';
+            if (d.type === 'genre') return 'library_music';
+            if (d.type === 'label') return 'label';
+            if (d.type === 'country') return 'location_on';
             if (d.type === 'founded') return 'event';
             return 'circle';
         });

@@ -98,9 +98,9 @@ const ExampleMusicGraph: React.FC = () => {
         seed: { label: 'Seed Artist', shape: <span className="material-symbols-outlined text-[28px]" style={{ color: nodeTypeColorMap.seed, fontVariationSettings: "'FILL' 1" }}>album</span> },
         recommended: { label: 'AI Artist', shape: <span className="material-symbols-outlined text-[28px]" style={{ color: nodeTypeColorMap.ai, fontVariationSettings: "'FILL' 1" }}>equalizer</span> },
         founded: { label: 'Founded', shape: <span className="material-symbols-outlined text-[24px]" style={{ color: nodeTypeColorMap.founded, fontVariationSettings: "'FILL' 1" }}>event</span> },
-        label: { label: 'Label', shape: <span className="material-symbols-outlined text-[24px]" style={{ color: nodeTypeColorMap.label, fontVariationSettings: "'FILL' 1" }}>copyright</span> },
-        genre: { label: 'Genre', shape: <span className="material-symbols-outlined text-[20px]" style={{ color: nodeTypeColorMap.genre, fontVariationSettings: "'FILL' 1" }}>music_note</span> },
-        country: { label: 'Origin', shape: <span className="material-symbols-outlined text-[20px]" style={{ color: nodeTypeColorMap.country, fontVariationSettings: "'FILL' 1" }}>public</span> },
+        label: { label: 'Label', shape: <span className="material-symbols-outlined text-[24px]" style={{ color: nodeTypeColorMap.label, fontVariationSettings: "'FILL' 1" }}>label</span> },
+        genre: { label: 'Genre', shape: <span className="material-symbols-outlined text-[20px]" style={{ color: nodeTypeColorMap.genre, fontVariationSettings: "'FILL' 1" }}>library_music</span> },
+        country: { label: 'Origin', shape: <span className="material-symbols-outlined text-[20px]" style={{ color: nodeTypeColorMap.country, fontVariationSettings: "'FILL' 1" }}>location_on</span> },
     };
     
     const legendOrder: FilterKeys[] = ['seed', 'recommended', 'label', 'genre', 'country', 'founded'];
