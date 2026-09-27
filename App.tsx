@@ -6110,6 +6110,7 @@ const App: React.FC = () => {
     const processDeepLink = async () => {
       const pathname = window.location.pathname;
       const searchParams = new URLSearchParams(window.location.search);
+      const authKey = user ? user.uid : 'guest';
       const projectIdFromQuery = searchParams.get('id') || searchParams.get('projectId');
       const shareIdFromQuery = searchParams.get('shareId');
 
@@ -6192,8 +6193,9 @@ const App: React.FC = () => {
           if (!shareId && isSharePath) {
             shareId = pathname.substring(3).split('?')[0];
           }
-          if (shareId && shareId !== lastProcessedSeedsRef.current && !isLoading) {
-            lastProcessedSeedsRef.current = shareId;
+          const shareAuthKey = shareId ? `share_${shareId}_${authKey}` : null;
+          if (shareId && shareAuthKey !== lastProcessedSeedsRef.current && !isLoading) {
+            lastProcessedSeedsRef.current = shareAuthKey;
             setIsLoading(true);
             
             // Set view to Graph, but keep project ID NULL for read-only share
@@ -6345,7 +6347,6 @@ const App: React.FC = () => {
       }
 
       // --- PARAMETER PROCESSING ---
-      const authKey = user ? user.uid : 'guest';
       const sessionKey = `${pathname}${window.location.search}-${authKey}`;
 
       if (pathname === lastProcessedHashRef.current && sessionKey === lastProcessedSessionKeyRef.current && isAuthInitialized) {
@@ -6373,8 +6374,9 @@ const App: React.FC = () => {
       // Share imports are handled structurally above now
 
       // Handle Seed Import
-      if (seeds && seeds !== seedArtists && seeds !== lastProcessedSeedsRef.current && !isLoading) {
-        lastProcessedSeedsRef.current = seeds;
+      const seedsAuthKey = seeds ? `seeds_${seeds}_${authKey}` : null;
+      if (seeds && seeds !== seedArtists && seedsAuthKey !== lastProcessedSeedsRef.current && !isLoading) {
+        lastProcessedSeedsRef.current = seedsAuthKey;
         handleGenerateGraph(seeds);
       }
 
