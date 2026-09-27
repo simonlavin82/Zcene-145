@@ -98,6 +98,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     sky: '#38bdf8',
     indigo: '#6366f1',
     pink: '#ec4899',
+    orange: '#f97316',
     black: '#18181b',
     white: '#f4f4f5',
   };

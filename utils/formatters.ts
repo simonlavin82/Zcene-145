@@ -66,6 +66,7 @@ export const zceneCategoricalPalette = [
   '#38bdf8', // Electric Sky
   '#6366f1', // Vivid Indigo
   '#ec4899', // Pink
+  '#f97316', // Electric Orange
   '#18181b', // Black
   '#f4f4f5', // White
 ];

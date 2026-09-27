@@ -115,6 +115,7 @@ export const PROFILE_COLORS = [
   { name: 'sky', class: 'bg-[#38bdf8]' },
   { name: 'indigo', class: 'bg-[#6366f1]' },
   { name: 'pink', class: 'bg-[#ec4899]' },
+  { name: 'orange', class: 'bg-[#f97316]' },
   { name: 'black', class: 'bg-[#18181b] border border-zinc-700' },
   { name: 'white', class: 'bg-[#f4f4f5]' }
 ];

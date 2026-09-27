@@ -1160,7 +1160,8 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                     teal: '#2dd4bf',
                                                     sky: '#38bdf8',
                                                     indigo: '#6366f1',
-                                                    pink: '#ec4899'
+                                                    pink: '#ec4899',
+                                                    orange: '#f97316'
                                                 };
                                                 const colorHex = hexMap[data.profile.color] || '#a855f7';
                                                 return (

@@ -39,7 +39,7 @@ export const StackIcon: React.FC<{ className?: string }> = ({ className }) => (
 );
 
 export const LibraryIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <span className={`material-symbols-outlined select-none ${className}`} style={{ fontSize: 'inherit' }}>library_music</span>
+  <span className={`material-symbols-outlined select-none ${className}`} style={{ fontSize: 'inherit' }}>queue_music</span>
 );
 
 export const VisibilityIcon: React.FC<{ className?: string }> = ({ className }) => (

@@ -1051,6 +1051,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <ColorSwatch name="Electric Sky" hex="#38BDF8" className="bg-sky-400" />
                                     <ColorSwatch name="Vivid Indigo" hex="#6366F1" className="bg-indigo-500" />
                                     <ColorSwatch name="Pink" hex="#EC4899" className="bg-pink-500" />
+                                    <ColorSwatch name="Electric Orange" hex="#f97316" className="bg-orange-500" />
                                 </div>
                             </div>
                         </div>
@@ -1200,37 +1201,37 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-none border border-zinc-800">
                                      <div className="flex items-center gap-3 group cursor-pointer">
                                          <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center group-hover:bg-zinc-700 transition-colors" style={{ color: nodeTypeColorMap.seed }}>
-                                             <LegendSymbol symbol={d3.symbolCircle} size={400} />
+                                             <span className="material-symbols-outlined text-[28px]" style={{ fontVariationSettings: "'FILL' 1" }}>album</span>
                                          </div>
                                          <span className="text-sm font-medium">Seed Artist</span>
                                      </div>
                                      <div className="flex items-center gap-3 group cursor-pointer">
                                          <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center group-hover:bg-zinc-700 transition-colors" style={{ color: nodeTypeColorMap.ai }}>
-                                             <LegendSymbol symbol={d3.symbolStar} size={400} />
+                                             <span className="material-symbols-outlined text-[28px]" style={{ fontVariationSettings: "'FILL' 1" }}>equalizer</span>
                                          </div>
                                          <span className="text-sm font-medium">AI Artist</span>
                                      </div>
                                      <div className="flex items-center gap-3 group cursor-pointer">
                                          <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center group-hover:bg-zinc-700 transition-colors" style={{ color: nodeTypeColorMap.label }}>
-                                             <LegendSymbol symbol={d3.symbolDiamond} size={320} />
+                                             <span className="material-symbols-outlined text-[24px]" style={{ fontVariationSettings: "'FILL' 1" }}>label</span>
                                          </div>
                                          <span className="text-sm font-medium">Label</span>
                                      </div>
                                      <div className="flex items-center gap-3 group cursor-pointer">
                                          <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center group-hover:bg-zinc-700 transition-colors" style={{ color: nodeTypeColorMap.genre }}>
-                                             <LegendSymbol symbol={d3.symbolSquare} size={260} />
+                                             <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>library_music</span>
                                          </div>
                                          <span className="text-sm font-medium">Genre</span>
                                      </div>
                                      <div className="flex items-center gap-3 group cursor-pointer">
                                          <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center group-hover:bg-zinc-700 transition-colors" style={{ color: nodeTypeColorMap.country }}>
-                                             <LegendSymbol symbol={d3.symbolTriangle} size={260} />
+                                             <span className="material-symbols-outlined text-[26px]" style={{ fontVariationSettings: "'FILL' 1" }}>location_on</span>
                                          </div>
                                          <span className="text-sm font-medium">Origin</span>
                                      </div>
                                      <div className="flex items-center gap-3 group cursor-pointer">
                                          <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center group-hover:bg-zinc-700 transition-colors" style={{ color: nodeTypeColorMap.founded }}>
-                                             <LegendSymbol symbol={d3.symbolCross} size={320} />
+                                             <span className="material-symbols-outlined text-[24px]" style={{ fontVariationSettings: "'FILL' 1" }}>event</span>
                                          </div>
                                          <span className="text-sm font-medium">Founded</span>
                                      </div>
