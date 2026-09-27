@@ -2038,8 +2038,8 @@ const App: React.FC = () => {
       await setDoc(newDocRef, {
         ...originalData,
         name: newName,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
+        createdAt: new Date(),
+        updatedAt: new Date()
       });
       
       showToast("Project duplicated successfully");
