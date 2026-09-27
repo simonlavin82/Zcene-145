@@ -1704,7 +1704,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
 
 
                 {/* Mobile Bottom Navigation Tabs */}
-                <div className="fixed bottom-0 left-0 right-0 z-[100] h-16 bg-zinc-900/80 backdrop-blur-md border-t border-zinc-700/50 pb-[env(safe-area-inset-bottom)] md:hidden">
+                <div className={`fixed bottom-0 left-0 right-0 z-[100] h-16 bg-zinc-900/80 backdrop-blur-md border-t border-zinc-700/50 pb-[env(safe-area-inset-bottom)] md:hidden ${isMagazineViewOpen ? 'hidden' : ''}`}>
                     <nav className="flex h-full px-2">
                         {(['artists', 'spiderweb', 'details'] as MobileTab[]).map(tab => {
                             const totalDetails = displayBadgeCount;
