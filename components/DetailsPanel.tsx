@@ -544,10 +544,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
             if (!panelScrollRef.current || !actionIconsRef.current) return;
             
             const panel = panelScrollRef.current;
-            
-            // Base height of icons + 24px to consume the `pt-6` padding on the content wrapper.
-            // This pushes the icons fully out of view and brings the content flush to the header.
-            const targetOffset = actionIconsRef.current.offsetHeight + 24;
+            const targetOffset = actionIconsRef.current.offsetHeight;
             const maxScroll = panel.scrollHeight - panel.clientHeight;
 
             // Only apply if the layout has enough space, preventing it from clamping to 0 and triggering onScroll(false)
@@ -1085,7 +1082,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                     </div>
                 </div>
 
-                <div className={`flex-grow min-h-0 relative ${isFullScreenMode ? 'pt-6 pb-4 px-0 overflow-x-clip' : `px-4 pt-6 ${isSmallScreen ? 'pb-[calc(env(safe-area-inset-bottom)_+_6rem)]' : 'pb-8'}`}`}>
+                <div className={`flex-grow min-h-0 relative ${isFullScreenMode ? 'pt-6 pb-4 px-0 overflow-x-clip' : 'px-4 pt-6 pb-8'}`}>
                     {isLoading && !isLocked && details && (
                         <div className={`absolute inset-0 z-30 flex flex-col items-center justify-center text-center space-y-8 h-full ${isFullScreenMode ? 'bg-zinc-900/50 backdrop-blur-sm' : 'bg-zinc-900/90 backdrop-blur-sm bg-zinc-900'}`}>
                             <LoadingSpinner 
@@ -2519,7 +2516,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                         {/* 4) DEEP CUT CARDS GRID (Z-INDEX 10) */}
                         <div 
                             className={`${renderMode === 'magazine' 
-                                ? `grid grid-cols-[repeat(auto-fit,minmax(min(100%,400px),1fr))] gap-12 items-start max-w-[1400px] mx-auto pt-4 md:pt-6 lg:pt-8 pb-4 transition-opacity duration-300 ease-in-out ${!isMagazineViewOpen || isTransitioning ? 'opacity-0 min-w-[100vw]' : 'opacity-100 w-full'}` 
+                                ? `grid grid-cols-[repeat(auto-fit,minmax(min(100%,400px),1fr))] gap-12 items-start max-w-[1400px] mx-auto pt-4 md:pt-6 lg:pt-8 pb-[calc(env(safe-area-inset-bottom)_+_3rem)] transition-opacity duration-300 ease-in-out ${!isMagazineViewOpen || isTransitioning ? 'opacity-0 min-w-[100vw]' : 'opacity-100 w-full'}` 
                                 : `flex h-full w-full transition-all duration-300 ease-in-out will-change-transform touch-pan-y ${isTransitioning ? 'opacity-0' : 'opacity-100'}`
                             } relative z-10`}
                             style={renderMode === 'panel' ? { 
