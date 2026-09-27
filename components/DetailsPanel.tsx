@@ -2309,7 +2309,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                         <div className="max-w-[1400px] mx-auto w-full h-full flex items-center justify-between relative">
                             <div className="flex items-center gap-4 overflow-hidden w-full h-full -mx-1 px-1">
                                 <div className="flex items-center gap-4 flex-grow animate-in fade-in slide-in-from-left-4 duration-500">
-                                    <div className="flex items-center gap-3 flex-grow max-w-md">
+                                    <div className="flex items-center gap-3 flex-grow max-w-none md:max-w-md">
                                         <div className="relative flex-grow">
                                             <span className={`material-symbols-outlined absolute top-1/2 -translate-y-1/2 text-zinc-500 ${InputSizes.md.leftIcon}`}>search</span>
                                             <input 
@@ -2342,8 +2342,8 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                     </div>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-0.5 ml-4 shrink-0">
-                                {!isSmallScreen && (
+                            {!isSmallScreen && (
+                                <div className="flex items-center gap-0.5 ml-4 shrink-0">
                                     <button 
                                         onClick={() => onMagazineViewToggle(false)}
                                         className="flex items-center gap-1.5 px-4 py-2 border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 focus:outline-none transition-all duration-200 text-sm font-medium shrink-0 leading-none backdrop-blur-sm"
@@ -2352,8 +2352,8 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                         <span>Exit Magazine</span>
                                         <span className="material-symbols-outlined !text-[18px]">close</span>
                                     </button>
-                                )}
-                            </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 ) : (
@@ -2622,13 +2622,30 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
 
                     </div>
                     {isMagazineViewOpen && typeof document !== 'undefined' && createPortal(
-                        <div 
-                            onClick={scrollToTop} 
-                            className={`fixed bottom-8 right-8 z-[9999] flex flex-col items-center gap-1 text-zinc-500 hover:text-zinc-300 transition-all duration-300 cursor-pointer ${showScrollTop ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}
-                            aria-label="Scroll to top"
-                        >
-                            <span className="material-symbols-outlined !text-[20px]">expand_less</span>
-                            <span className="text-[9px] font-bold uppercase tracking-[0.3em] ml-[0.3em]">Top</span>
+                        <div className="fixed bottom-8 left-0 right-0 z-[1050] px-6 md:px-8 pointer-events-none flex items-center justify-between">
+                            <div className="w-12 md:w-16"></div> 
+                            
+                            {isSmallScreen && (
+                                <Button
+                                    variant="secondary"
+                                    size="md"
+                                    onClick={() => onMagazineViewToggle(false)}
+                                    className="pointer-events-auto shadow-2xl backdrop-blur-md"
+                                >
+                                    <span className="material-symbols-outlined !text-[18px]">close</span>
+                                    <span>Exit Magazine</span>
+                                </Button>
+                            )}
+                            {!isSmallScreen && <div className="w-12 md:w-16"></div>}
+
+                            <div 
+                                onClick={scrollToTop} 
+                                className={`w-12 md:w-16 flex flex-col items-center gap-1 text-zinc-500 hover:text-zinc-300 transition-all duration-300 cursor-pointer pointer-events-auto ${showScrollTop ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}
+                                aria-label="Scroll to top"
+                            >
+                                <span className="material-symbols-outlined !text-[20px]">expand_less</span>
+                                <span className="text-[9px] font-bold uppercase tracking-[0.3em] ml-[0.3em]">Top</span>
+                            </div>
                         </div>,
                         document.body
                     )}
@@ -2651,19 +2668,6 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                 document.body
             )}
             
-            {isSmallScreen && isMagazineViewOpen && (
-                <div className="fixed bottom-8 left-0 right-0 flex justify-center pointer-events-none z-[1050]">
-                    <Button
-                        variant="secondary"
-                        size="md"
-                        onClick={() => onMagazineViewToggle(false)}
-                        className="pointer-events-auto shadow-2xl backdrop-blur-md px-6 py-3"
-                    >
-                        <span className="material-symbols-outlined !text-[20px]">close</span>
-                        <span>Exit Magazine</span>
-                    </Button>
-                </div>
-            )}
         </div>
     );
 };
