@@ -5847,16 +5847,19 @@ const App: React.FC = () => {
           }
         }
 
-        console.log(`[ProjectLoader] Project not found in any accessible location.`);
+        console.log(`[ProjectLoader] Project not found in any accessible location. Redirecting.`);
         if (isMounted) {
-          const fallbackName = localStorage.getItem(`zcene_project_name_${currentProjectId}`) || 'Mock Zcene Sandbox';
-          setProjectName(fallbackName);
-          console.log(`[ProjectLoader] [Offline Sandbox] Hydrated project name from fallback: ${fallbackName}`);
+          setGraphData(null);
+          setProjectName('');
+          navigate(user ? '/dashboard' : '/', true);
         }
         isProjectLoadingRef.current = false;
       } catch (err) {
         if (isMounted) {
           console.error(`[ProjectLoader] Failure loading ${currentProjectId}:`, err);
+          setGraphData(null);
+          setProjectName('');
+          navigate(user ? '/dashboard' : '/', true);
         }
         isProjectLoadingRef.current = false;
       }
@@ -5869,7 +5872,7 @@ const App: React.FC = () => {
       isMounted = false;
       unsubscribeList.forEach(u => u());
     };
-  }, [user, isAuthInitialized, isFirebaseReady, currentProjectId]);
+  }, [user, isAuthInitialized, isFirebaseReady, currentProjectId, navigate]);
 
   // Reconnect to active background curation job if page refreshed during curation
   useEffect(() => {
