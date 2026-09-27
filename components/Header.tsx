@@ -179,8 +179,8 @@ const Header: React.FC<HeaderProps> = ({
                         {projectName || 'Untitled Project'}
                       </h1>
                     ) : (
-                      <div className="relative inline-grid grid-cols-1 items-center max-w-full">
-                        <span className={`invisible col-start-1 row-start-1 px-3 py-1 ${
+                      <div className="relative inline-grid grid-cols-1 items-center max-w-full ml-2">
+                        <span className={`invisible col-start-1 row-start-1 px-2 py-1 ${
                           isSmallScreen ? 'text-base' : 'text-lg'
                         } font-medium tracking-tight whitespace-pre`}>
                           {localName || "Untitled Project"}
@@ -193,7 +193,7 @@ const Header: React.FC<HeaderProps> = ({
                           placeholder="Untitled Project"
                           className={`col-start-1 row-start-1 w-full bg-transparent text-white font-medium ${
                             isSmallScreen ? 'text-base' : 'text-lg'
-                          } border border-transparent focus:ring-1 focus:ring-primary focus:bg-zinc-900/40 rounded-xl px-3 -mx-3 py-1 -my-1 placeholder:text-zinc-500 tracking-tight transition-all duration-200 focus:outline-none cursor-text`}
+                          } border border-transparent focus:ring-1 focus:ring-primary focus:bg-zinc-900/40 rounded-xl px-2 py-1 placeholder:text-zinc-500 tracking-tight transition-all duration-200 focus:outline-none cursor-text`}
                           title="Rename Project"
                         />
                       </div>
