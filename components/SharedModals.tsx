@@ -119,6 +119,8 @@ export const PROFILE_COLORS = [
   { name: 'white', class: 'bg-[#f4f4f5]' }
 ];
 
+export const MODAL_PROFILE_COLORS = PROFILE_COLORS.filter(c => c.name !== 'black' && c.name !== 'white');
+
 export const MyTasteDialog: React.FC<{
   isOpen: boolean;
   onClose: () => void;
@@ -161,7 +163,7 @@ export const MyTasteDialog: React.FC<{
     const newProfile = {
       id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
       name: `Profile ${profiles.length + 1}`,
-      color: PROFILE_COLORS[profiles.length % PROFILE_COLORS.length].name,
+      color: MODAL_PROFILE_COLORS[profiles.length % MODAL_PROFILE_COLORS.length].name,
       isActive: true,
       favoriteGenre: '',
       style: '',
@@ -260,7 +262,7 @@ export const MyTasteDialog: React.FC<{
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Color Theme</label>
                   <div className="flex items-center gap-2">
-                    {PROFILE_COLORS.map(color => (
+                    {MODAL_PROFILE_COLORS.map(color => (
                       <button
                         key={color.name}
                         onClick={() => updateProfile('color', color.name)}

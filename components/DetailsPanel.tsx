@@ -6,7 +6,7 @@ import { streamNodeChat, fetchLiveTourData, streamLocalHeuristicChat, fetchNodeD
 import { normalizeArtistId, titleCaseArtistId, cleanArtistDisplayName, isNodeInSeedList, getArtistDocWithRedirect, enforceArtistCacheSchema, isArtistIdMatch } from '../services/artistCacheService';
 import { analyticsService } from '../services/analyticsService';
 import { Spinner, HelpIcon, MicIcon, LoadingSpinner, DETAIL_THINKING_STEPS, StackIcon } from './Icons';
-import { TokenConfirmationDialog, FullItineraryDialog, PROFILE_COLORS } from './SharedModals';
+import { TokenConfirmationDialog, FullItineraryDialog, PROFILE_COLORS, MODAL_PROFILE_COLORS } from './SharedModals';
 import { SegmentedTextToggle } from './ui/SegmentedTextToggle';
 import { db } from '../services/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
@@ -473,7 +473,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         const newProfile: TasteProfile = {
             id: crypto.randomUUID(),
             name: profileName || `Profile ${currentTaste.length + 1}`,
-            color: PROFILE_COLORS[currentTaste.length % PROFILE_COLORS.length].name,
+            color: MODAL_PROFILE_COLORS[currentTaste.length % MODAL_PROFILE_COLORS.length].name,
             isActive: true,
             favoriteGenre: genre,
             style: style,
