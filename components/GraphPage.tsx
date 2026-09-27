@@ -1589,6 +1589,28 @@ const GraphPage: React.FC<GraphPageProps> = ({
           collapseBtnRef={isSmallScreen ? undefined : detailsCollapseBtnRef}
           isMagazineViewOpen={isMagazineViewOpen} 
           onMagazineViewToggle={onUpdateIsMagazineViewOpen} 
+          chatHistories={chatHistories} 
+          onUpdateChatHistories={onUpdateChatHistories} 
+          isActive={isActive} 
+          stack={stack} 
+          onToggleStack={onToggleStack} 
+          isGuest={isGuest}
+          user={user}
+          onAuthRequest={() => { user ? onSaveToDashboard?.() : onLogin(); }}
+          userTaste={profile?.taste}
+          onUpdateTasteProfile={async (taste) => { await onUpdateProfile({ taste }); }}
+          onShowToast={onShowToast}
+          onOpenTasteModal={() => window.dispatchEvent(new CustomEvent('open-taste-modal'))}
+          onStashArtist={(artistName) => {
+              const normalizedId = normalizeArtistId(artistName);
+              const isAlreadyInStack = stack.some(item => item.id === normalizedId);
+              if (!isAlreadyInStack) {
+                  const nodeToAdd = { id: normalizedId, type: 'artist' as const, label: titleCaseArtistId(artistName), group: 0 };
+                  onToggleStack(nodeToAdd);
+              }
+              setIsStackDialogOpen(true);
+          }}
+          onOpenStackDrawer={() => setIsStackDialogOpen(true)}
       />
   );
 
