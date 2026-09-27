@@ -169,7 +169,7 @@ const Header: React.FC<HeaderProps> = ({
                   {isDashboard ? (
                     <h1 
                       onClick={onLogoClick}
-                      className="hidden min-[385px]:block text-base md:text-lg font-medium text-white select-none cursor-pointer hover:text-primary transition-colors tracking-tight whitespace-nowrap"
+                      className="hidden min-[385px]:block text-base md:text-lg font-medium text-white select-none cursor-pointer ml-2 tracking-tight whitespace-nowrap"
                     >
                       Own Music Discovery
                     </h1>
