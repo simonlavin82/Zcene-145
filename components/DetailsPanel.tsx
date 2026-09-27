@@ -2516,7 +2516,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                         {/* 4) DEEP CUT CARDS GRID (Z-INDEX 10) */}
                         <div 
                             className={`${renderMode === 'magazine' 
-                                ? `grid grid-cols-[repeat(auto-fit,minmax(min(100%,400px),1fr))] gap-12 items-start max-w-[1400px] mx-auto pt-4 md:pt-6 lg:pt-8 pb-[calc(env(safe-area-inset-bottom)_+_5rem)] transition-opacity duration-300 ease-in-out ${!isMagazineViewOpen || isTransitioning ? 'opacity-0 min-w-[100vw]' : 'opacity-100 w-full'}` 
+                                ? `grid grid-cols-[repeat(auto-fit,minmax(min(100%,400px),1fr))] gap-12 items-start max-w-[1400px] mx-auto pt-4 md:pt-6 lg:pt-8 pb-4 transition-opacity duration-300 ease-in-out ${!isMagazineViewOpen || isTransitioning ? 'opacity-0 min-w-[100vw]' : 'opacity-100 w-full'}` 
                                 : `flex h-full w-full transition-all duration-300 ease-in-out will-change-transform touch-pan-y ${isTransitioning ? 'opacity-0' : 'opacity-100'}`
                             } relative z-10`}
                             style={renderMode === 'panel' ? { 
