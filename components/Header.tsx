@@ -240,7 +240,7 @@ const Header: React.FC<HeaderProps> = ({
                 <StackIcon className="!text-[18px]" />
                 <span className="text-xs font-medium">My Stack</span>
                 {stackCount > 0 && (
-                    <span className={`absolute -top-1 -right-1 h-4.5 w-4.5 rounded-md flex items-center justify-center text-[9px] font-bold border shadow-sm transition-all duration-500 ${isStackNew ? 'bg-zinc-900 text-white border-white/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>
+                    <span className={`absolute -top-1 -right-1 h-4.5 w-4.5 rounded-lg flex items-center justify-center text-[9px] font-bold border shadow-sm transition-all duration-500 ${isStackNew ? 'bg-zinc-900 text-white border-white/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>
                         {stackCount}
                     </span>
                 )}
@@ -268,9 +268,6 @@ const Header: React.FC<HeaderProps> = ({
                         title="Menu"
                     >
                         <MoreVertical size={18} />
-                        {isStackNew && (
-                            <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-primary border-2 border-background-dark"></span>
-                        )}
                     </button>
                     
                     <AnimatePresence>
@@ -321,7 +318,7 @@ const Header: React.FC<HeaderProps> = ({
                                 My Stack
                               </div>
                               {stackCount > 0 && (
-                                <span className="bg-zinc-800 text-zinc-500 border border-zinc-700 px-1.5 py-0.5 rounded text-[9px] font-bold">
+                                <span className="bg-zinc-800 text-zinc-500 border border-zinc-700 px-1.5 py-0.5 rounded-lg text-[9px] font-bold">
                                   {stackCount}
                                 </span>
                               )}
@@ -356,9 +353,6 @@ const Header: React.FC<HeaderProps> = ({
                         <div className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 hover:border-primary/50 flex items-center justify-center text-zinc-400 hover:text-primary hover:scale-110 transition-all">
                             <span className="material-symbols-outlined !text-[18px]">account_circle</span>
                         </div>
-                    )}
-                    {user && (
-                        <div className="absolute -bottom-1 -right-1 bg-green-500 w-2.5 h-2.5 rounded-full border-2 border-background-dark"></div>
                     )}
                 </button>
 
