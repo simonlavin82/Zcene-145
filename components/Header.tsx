@@ -165,7 +165,7 @@ const Header: React.FC<HeaderProps> = ({
                     <FaviconLogo className="h-full w-full text-primary pointer-events-none" />
                 </button>
                 
-                <div className="flex items-center pointer-events-auto flex-grow max-w-[280px] sm:max-w-[320px] md:max-w-[480px]">
+                <div className="flex items-center pointer-events-auto flex-1 min-w-0 mr-4 lg:mr-8">
                   {isDashboard ? (
                     <h1 
                       onClick={onLogoClick}
@@ -180,7 +180,7 @@ const Header: React.FC<HeaderProps> = ({
                       </h1>
                     ) : (
                       <div className="relative inline-grid grid-cols-1 items-center max-w-full">
-                        <span className={`invisible col-start-1 row-start-1 px-1.5 py-1 ${
+                        <span className={`invisible col-start-1 row-start-1 px-3 py-1 ${
                           isSmallScreen ? 'text-base' : 'text-lg'
                         } font-medium tracking-tight whitespace-pre`}>
                           {localName || "Untitled Project"}
@@ -193,7 +193,7 @@ const Header: React.FC<HeaderProps> = ({
                           placeholder="Untitled Project"
                           className={`col-start-1 row-start-1 w-full bg-transparent text-white font-medium ${
                             isSmallScreen ? 'text-base' : 'text-lg'
-                          } border border-transparent focus:ring-1 focus:ring-primary focus:bg-zinc-900/40 rounded-xl px-1.5 -mx-1.5 py-1 -my-1 placeholder:text-zinc-500 tracking-tight transition-all duration-200 focus:outline-none cursor-text`}
+                          } border border-transparent focus:ring-1 focus:ring-primary focus:bg-zinc-900/40 rounded-xl px-3 -mx-3 py-1 -my-1 placeholder:text-zinc-500 tracking-tight transition-all duration-200 focus:outline-none cursor-text`}
                           title="Rename Project"
                         />
                       </div>
