@@ -179,8 +179,8 @@ const Header: React.FC<HeaderProps> = ({
                         {projectName || 'Untitled Project'}
                       </h1>
                     ) : (
-                      <div className="relative inline-grid grid-cols-1 items-center max-w-full ml-2">
-                        <span className={`invisible col-start-1 row-start-1 px-2 py-1 ${
+                      <div className="relative inline-grid grid-cols-1 items-center max-w-full">
+                        <span className={`invisible col-start-1 row-start-1 px-2 py-1 border border-transparent ${
                           isSmallScreen ? 'text-base' : 'text-lg'
                         } font-medium tracking-tight whitespace-pre`}>
                           {localName || "Untitled Project"}
