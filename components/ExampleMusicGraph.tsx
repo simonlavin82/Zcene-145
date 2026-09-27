@@ -95,12 +95,12 @@ const ExampleMusicGraph: React.FC = () => {
     }, [isLegendExpanded]);
 
     const legendConfig: Record<string, { label: string; shape: React.ReactNode }> = {
-        seed: { label: 'Seed Artist', shape: <LegendSymbol symbol={d3.symbolCircle} size={400} style={{ color: nodeTypeColorMap.seed }}/> },
-        recommended: { label: 'AI Artist', shape: <LegendSymbol symbol={d3.symbolStar} size={400} style={{ color: nodeTypeColorMap.ai }} className="-mt-0.5"/> },
-        founded: { label: 'Founded', shape: <LegendSymbol symbol={d3.symbolCross} size={320} style={{ color: nodeTypeColorMap.founded }} /> },
-        label: { label: 'Label', shape: <LegendSymbol symbol={d3.symbolDiamond} size={320} style={{ color: nodeTypeColorMap.label }} /> },
-        genre: { label: 'Genre', shape: <LegendSymbol symbol={d3.symbolSquare} size={260} style={{ color: nodeTypeColorMap.genre }} /> },
-        country: { label: 'Origin', shape: <LegendSymbol symbol={d3.symbolTriangle} size={260} style={{ color: nodeTypeColorMap.country }} /> },
+        seed: { label: 'Seed Artist', shape: <span className="material-symbols-outlined text-[28px]" style={{ color: nodeTypeColorMap.seed, fontVariationSettings: "'FILL' 1" }}>album</span> },
+        recommended: { label: 'AI Artist', shape: <span className="material-symbols-outlined text-[28px]" style={{ color: nodeTypeColorMap.ai, fontVariationSettings: "'FILL' 1" }}>equalizer</span> },
+        founded: { label: 'Founded', shape: <span className="material-symbols-outlined text-[24px]" style={{ color: nodeTypeColorMap.founded, fontVariationSettings: "'FILL' 1" }}>event</span> },
+        label: { label: 'Label', shape: <span className="material-symbols-outlined text-[24px]" style={{ color: nodeTypeColorMap.label, fontVariationSettings: "'FILL' 1" }}>copyright</span> },
+        genre: { label: 'Genre', shape: <span className="material-symbols-outlined text-[20px]" style={{ color: nodeTypeColorMap.genre, fontVariationSettings: "'FILL' 1" }}>music_note</span> },
+        country: { label: 'Origin', shape: <span className="material-symbols-outlined text-[20px]" style={{ color: nodeTypeColorMap.country, fontVariationSettings: "'FILL' 1" }}>public</span> },
     };
     
     const legendOrder: FilterKeys[] = ['seed', 'recommended', 'label', 'genre', 'country', 'founded'];

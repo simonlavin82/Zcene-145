@@ -1112,8 +1112,16 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     .attr("fill", "transparent")
                     .style("pointer-events", "all");
 
-                g.append("path");
                 g.append("text")
+                    .attr("class", "node-icon material-symbols-outlined")
+                    .attr("text-anchor", "middle")
+                    .attr("dominant-baseline", "central")
+                    .style("font-variation-settings", "'FILL' 1")
+                    .style("pointer-events", "none")
+                    .style("user-select", "none");
+
+                g.append("text")
+                    .attr("class", "node-label")
                     .attr("text-anchor", "middle")
                     .attr("fill", "#e4e4e7")
                     .style("font-weight", "500")
@@ -1185,21 +1193,25 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     nodeElements
         .attr("class", d => `node-element ${d.isLoading || d.isPending ? 'animate-pulse' : ''}`);
 
-    nodeElements.select("path")
-        .attr("stroke-width", d => (d.type === 'artist' && isNodeInSeedList(d.id || d.label || '', seedArtists)) ? 3 : 2)
-        .attr("stroke", d => (d.type === 'artist' && isNodeInSeedList(d.id || d.label || '', seedArtists)) ? '#F6E468' : 'transparent')
+    nodeElements.select("text.node-icon")
         .attr("fill", d => getNodeColor(d))
         .attr("opacity", d => d.isLoading || d.isPending ? 0.35 : 1)
-        .attr("d", d => {
+        .style("font-size", d => {
             const isSeed = d.type === 'artist' && isNodeInSeedList(d.id || d.label || '', seedArtists);
-            const area = 350;
-            
-            if (d.type === 'artist') return isSeed ? d3.symbol().type(d3.symbolCircle).size(area)() : d3.symbol().type(d3.symbolStar).size(area + 50)();
-            if (d.type === 'genre') return d3.symbol().type(d3.symbolSquare).size(area - 50)();
-            if (d.type === 'label') return d3.symbol().type(d3.symbolDiamond).size(area)();
-            if (d.type === 'country') return d3.symbol().type(d3.symbolTriangle).size(area - 50)();
-            if (d.type === 'founded') return d3.symbol().type(d3.symbolCross).size(area - 50)();
-            return d3.symbol().type(d3.symbolCircle).size(area - 100)();
+            if (isSeed) return "28px";
+            if (d.type === 'artist') return "28px";
+            if (d.type === 'label' || d.type === 'founded') return "24px";
+            return "20px";
+        })
+        .text(d => {
+            const isSeed = d.type === 'artist' && isNodeInSeedList(d.id || d.label || '', seedArtists);
+            if (isSeed) return 'album';
+            if (d.type === 'artist') return 'equalizer';
+            if (d.type === 'genre') return 'music_note';
+            if (d.type === 'label') return 'copyright';
+            if (d.type === 'country') return 'public';
+            if (d.type === 'founded') return 'event';
+            return 'circle';
         });
 
     // Add loading spinner for loading nodes
@@ -1221,7 +1233,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
 
 
-    nodeElements.select("text")
+    nodeElements.select("text.node-label")
         .attr("y", 25)
         .style("font-size", "12px")
         .text(d => toDisplayLabel(d));
