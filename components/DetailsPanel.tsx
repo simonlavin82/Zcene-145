@@ -2502,9 +2502,9 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                 <div className="markdown-bio text-base leading-relaxed text-zinc-300 columns-1 md:columns-2 lg:columns-3 gap-12 font-sans">
                                     <Markdown
                                         components={{
-                                            p: ({node, children, ...props}) => <p className="mb-6 break-inside-avoid" {...props}>{renderWithHighlights(children, magazineSearchQuery)}</p>,
+                                            p: ({node, children, ...props}) => <p className="mb-6" {...props}>{renderWithHighlights(children, magazineSearchQuery)}</p>,
                                             strong: ({node, children, ...props}) => <strong className="font-semibold text-white" {...props}>{renderWithHighlights(children, magazineSearchQuery)}</strong>,
-                                            ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-6 break-inside-avoid space-y-2" {...props} />,
+                                            ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-6 space-y-2" {...props} />,
                                             li: ({node, children, ...props}) => <li className="marker:text-primary" {...props}>{renderWithHighlights(children, magazineSearchQuery)}</li>
                                         }}
                                     >
