@@ -1460,7 +1460,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
           />
 
           {/* New Inline Action Button: Moving from absolute footer to inline flow */}
-          <div className="px-4 pt-4 pb-12">
+          <div className={`px-4 pt-4 ${isSmallScreen ? 'pb-[calc(env(safe-area-inset-bottom)_+_6rem)]' : 'pb-12'}`}>
 
 
             {!isGuest ? (
@@ -1625,7 +1625,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
 
         {isSmallScreen ? (
             <>
-                <div className={`flex-grow flex-shrink min-h-0 flex flex-col overflow-hidden relative ${isMagazineViewOpen || activeTab === 'details' ? '' : 'pb-[calc(env(safe-area-inset-bottom)_+_4rem)]'}`}>
+                <div className="flex-grow flex-shrink min-h-0 flex flex-col overflow-hidden relative">
                     <div ref={mobileTabContainerRef} className="flex-grow overflow-hidden relative z-10 min-h-0" style={{ overscrollBehaviorY: 'contain' }}>
                         <div className="flex h-full transition-transform duration-300 ease-in-out" style={{ transform: `translateX(-${tabIndex * 100}%)` }}>
                             <div className="w-full flex-shrink-0 flex flex-col min-h-0 overflow-hidden relative">{ArtistsPanelContent}</div>
@@ -1704,7 +1704,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
 
 
                 {/* Mobile Bottom Navigation Tabs */}
-                <div className={`fixed bottom-0 left-0 right-0 z-[100] h-16 bg-zinc-900/80 backdrop-blur-md border-t border-zinc-700/50 pb-[env(safe-area-inset-bottom)] md:hidden ${isMagazineViewOpen || activeTab === 'details' ? 'hidden' : ''}`}>
+                <div className="fixed bottom-0 left-0 right-0 z-[100] h-16 bg-zinc-900/80 backdrop-blur-md border-t border-zinc-700/50 pb-[env(safe-area-inset-bottom)] md:hidden">
                     <nav className="flex h-full px-2">
                         {(['artists', 'spiderweb', 'details'] as MobileTab[]).map(tab => {
                             const totalDetails = displayBadgeCount;
