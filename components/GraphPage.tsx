@@ -1395,6 +1395,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
               <div className="mb-3">
                 {libraryArtists.length > 0 ? (
                     <button onClick={() => { setIsLibraryDialogOpen(true); if (!onboardingProgress.step1) updateOnboarding('step1'); }} className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 active:scale-95 transition-all text-xs font-medium leading-none">
+                      <span className="material-symbols-outlined !text-[16px]">queue_music</span>
                       Select from Library ({libraryArtists.length})
                     </button>
                 ) : (
