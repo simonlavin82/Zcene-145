@@ -1553,6 +1553,45 @@ const GraphPage: React.FC<GraphPageProps> = ({
 
   const displayBadgeCount = systemError ? 0 : activeNodes.length;
 
+  const detailsPanelElement = (
+      <DetailsPanel 
+          projectName={projectName}
+          selectedNode={selectedNode} 
+          activeNodes={activeNodes} 
+          isAdmin={isAdmin}
+          detailsCache={detailsCache} onUpdateDetailsCache={onUpdateDetailsCache}
+          loadingNodeIds={loadingNodeIds} 
+          onCloseNode={onCloseNode} 
+          onRefreshNode={onRefreshNode} 
+          onExtendNode={onExtendNode} 
+          error={detailsError} 
+          systemError={systemError}
+          graphData={data} 
+          libraryArtists={memoizedLibraryArtists} 
+          seedArtists={memoizedAllSeedArtists}
+          onAddArtist={(artist) => {
+              const normalizedArtist = normalizeArtistId(artist);
+              const isAlreadySeed = selectedSeedArtists.some(s => normalizeArtistId(s.name) === normalizedArtist);
+              if (isAlreadySeed) {
+                  setSelectedSeedArtists(prev => prev.filter(s => normalizeArtistId(s.name) !== normalizedArtist));
+              } else {
+                  setSelectedSeedArtists(prev => [...prev, { name: artist, enabled: true }]);
+              }
+          }}
+          isCollapsed={isSmallScreen ? false : isDetailsPanelCollapsed} 
+          onToggleCollapse={isSmallScreen ? () => {} : toggleDetailsPanel} 
+          isSmallScreen={isSmallScreen} 
+          onNodeClick={handleNodeClickInternal} 
+          onNavigate={onNavigate} 
+          isGlobalLoading={isLoading} 
+          onCancelGlobalLoading={onCancelGeneration} 
+          unreadCount={systemError ? 0 : unreadDetailsCount} 
+          collapseBtnRef={isSmallScreen ? undefined : detailsCollapseBtnRef}
+          isMagazineViewOpen={isMagazineViewOpen} 
+          onMagazineViewToggle={onUpdateIsMagazineViewOpen} 
+      />
+  );
+
   return (
     <div 
         className="absolute inset-0 flex flex-col overflow-hidden"
@@ -1626,7 +1665,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
         {isSmallScreen ? (
             <>
                 <div className="flex-grow flex-shrink min-h-0 flex flex-col overflow-hidden relative pb-[calc(env(safe-area-inset-bottom)+4rem)]">
-                    <div ref={mobileTabContainerRef} className={`flex-grow relative z-10 min-h-0 ${isMagazineViewOpen ? 'overflow-visible' : 'overflow-hidden'}`} style={{ overscrollBehaviorY: 'contain' }}>
+                    <div ref={mobileTabContainerRef} className="flex-grow overflow-hidden relative z-10 min-h-0" style={{ overscrollBehaviorY: 'contain' }}>
                         <div className="flex h-full transition-transform duration-300 ease-in-out" style={{ transform: `translateX(-${tabIndex * 100}%)` }}>
                             <div className="w-full flex-shrink-0 flex flex-col min-h-0 overflow-hidden relative">{ArtistsPanelContent}</div>
                             <div className="w-full flex-shrink-0 flex flex-col min-h-0 overflow-hidden relative">
@@ -1635,67 +1674,9 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                     <div className="flex-grow relative min-h-0 bg-zinc-900" ref={mobileGraphAreaRef}>{(isLoading || isHydrating || (data.nodes.length > 0 && isSimulationSettling)) && (<div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-md z-[90] flex flex-col items-center justify-center gap-4 pointer-events-auto"><LoadingSpinner subtext={loadingSubtext} /></div>)}{isFirstGeneration && !(isLoading || isHydrating || (data.nodes.length > 0 && isSimulationSettling)) && (<div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none"><ZceneEmptyState onNavigate={onNavigate} /></div>)}{data.nodes.length > 0 && (<MusicGraph data={data} libraryArtists={memoizedLibraryArtists} seedArtists={memoizedSeedArtists} onNodeClick={handleNodeClickInternal} selectedNode={selectedNode} peekedNode={peekedNode} isSmallScreen={isSmallScreen} activeFilters={activeFilters} searchQuery={searchQuery} setSearchQuery={setSearchQuery} toggleFilter={toggleFilterInternal} legendConfig={legendConfig} legendOrder={legendOrder} legendRef={desktopLegendAreaRef} onInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onLegendInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} isGuest={isGuest} detailsCache={detailsCache} isActive={isActive} onSimulationComplete={() => setIsSimulationSettling(false)} />)}</div>
                                 </div>
                             </div>
-                            <div className={`w-full flex-shrink-0 h-full flex flex-col min-h-0 overflow-hidden relative ${isMagazineViewOpen ? 'fixed inset-0 z-[1000] pt-0 md:pt-4' : ''}`}>
+                            <div className={`w-full flex-shrink-0 h-full flex flex-col min-h-0 overflow-hidden relative`}>
                                 <div className="h-full flex flex-col overflow-hidden bg-zinc-900" style={{ overscrollBehaviorY: 'contain' }}>
-                                    <DetailsPanel 
-                                        projectName={projectName}
-                                        selectedNode={selectedNode} 
-                                        activeNodes={activeNodes} 
-                                        isAdmin={isAdmin}
-                                        detailsCache={detailsCache} onUpdateDetailsCache={onUpdateDetailsCache}
-                                        loadingNodeIds={loadingNodeIds} 
-                                        onCloseNode={onCloseNode} 
-                                        onRefreshNode={onRefreshNode} 
-                                        onExtendNode={onExtendNode} 
-                                        error={detailsError} 
-                                        systemError={systemError}
-                                        graphData={data} 
-                                        libraryArtists={memoizedLibraryArtists} 
-                                        seedArtists={memoizedAllSeedArtists}
-                                        onAddArtist={(artist) => {
-                                            const normalizedArtist = normalizeArtistId(artist);
-                                            const isAlreadySeed = selectedSeedArtists.some(s => normalizeArtistId(s.name) === normalizedArtist);
-                                            if (isAlreadySeed) {
-                                                setSelectedSeedArtists(prev => prev.filter(s => normalizeArtistId(s.name) !== normalizedArtist));
-
-                                            } else {
-                                                setSelectedSeedArtists(prev => [...prev, { name: artist, enabled: true }]);
-
-                                            }
-                                        }}
-                                        isCollapsed={false} 
-                                        onToggleCollapse={() => {}} 
-                                        isSmallScreen={isSmallScreen} 
-                                        onNodeClick={handleNodeClickInternal} 
-                                        onNavigate={onNavigate} 
-                                        isGlobalLoading={isLoading} 
-                                        onCancelGlobalLoading={onCancelGeneration} 
-                                        unreadCount={unreadDetailsCount} 
-                                        isMagazineViewOpen={isMagazineViewOpen} 
-                                        onMagazineViewToggle={onUpdateIsMagazineViewOpen} 
-                                        chatHistories={chatHistories} 
-                                        onUpdateChatHistories={onUpdateChatHistories} 
-                                        isActive={isActive} 
-                                        stack={stack} 
-                                        onToggleStack={onToggleStack} 
-                                        isGuest={isGuest}
-                                        user={user}
-                                        onAuthRequest={() => { user ? onSaveToDashboard?.() : onLogin(); }}
-                                        userTaste={profile?.taste}
-                                        onUpdateTasteProfile={async (taste) => { await onUpdateProfile({ taste }); }}
-                                        onShowToast={onShowToast}
-                                        onOpenTasteModal={() => window.dispatchEvent(new CustomEvent('open-taste-modal'))}
-                                        onStashArtist={(artistName) => {
-                                            const normalizedId = normalizeArtistId(artistName);
-                                            const isAlreadyInStack = stack.some(item => item.id === normalizedId);
-                                            if (!isAlreadyInStack) {
-                                                const nodeToAdd = { id: normalizedId, type: 'artist' as const, label: titleCaseArtistId(artistName), group: 0 };
-                                                onToggleStack(nodeToAdd);
-                                            }
-                                            setIsStackDialogOpen(true);
-                                        }}
-                                        onOpenStackDrawer={() => setIsStackDialogOpen(true)}
-                                    />
+                                    {!isMagazineViewOpen && detailsPanelElement}
                                 </div>
                             </div>
                         </div>
@@ -1748,66 +1729,9 @@ const GraphPage: React.FC<GraphPageProps> = ({
                            <div className="w-full h-full bg-transparent group-hover:bg-primary/20 transition-colors"></div>
                          </div>
                        )}
-                       <DetailsPanel 
-                         projectName={projectName}
-                         selectedNode={selectedNode} 
-                         activeNodes={activeNodes} 
-                         isAdmin={isAdmin}
-                         detailsCache={detailsCache} onUpdateDetailsCache={onUpdateDetailsCache}
-                         loadingNodeIds={loadingNodeIds} 
-                         onCloseNode={nodeId => onCloseNode(nodeId)} 
-                         onRefreshNode={nodeId => onRefreshNode(nodeId)} 
-                         onExtendNode={onExtendNode} 
-                         error={detailsError} 
-                         systemError={systemError}
-                         graphData={data} 
-                         libraryArtists={memoizedLibraryArtists} 
-                         seedArtists={memoizedAllSeedArtists} 
-                         onAddArtist={(artist) => {
-                              const normalizedArtist = normalizeArtistId(artist);
-                              const isAlreadySeed = selectedSeedArtists.some(s => normalizeArtistId(s.name) === normalizedArtist);
-                              if (isAlreadySeed) {
-                                  setSelectedSeedArtists(prev => prev.filter(s => normalizeArtistId(s.name) !== normalizedArtist));
-
-                              } else {
-                                  setSelectedSeedArtists(prev => [...prev, { name: artist, enabled: true }]);
-
-                              }
-                         }} 
-                         isCollapsed={isDetailsPanelCollapsed} 
-                         onToggleCollapse={toggleDetailsPanel}
-                         isSmallScreen={isSmallScreen} 
-                         onNodeClick={handleNodeClickInternal} 
-                         onNavigate={onNavigate} 
-                         isGlobalLoading={isLoading} 
-                         onCancelGlobalLoading={onCancelGeneration} 
-                         unreadCount={systemError ? 0 : unreadDetailsCount} 
-                         collapseBtnRef={detailsCollapseBtnRef} 
-                         isMagazineViewOpen={isMagazineViewOpen} 
-                         onMagazineViewToggle={onUpdateIsMagazineViewOpen} 
-                         chatHistories={chatHistories} 
-                         onUpdateChatHistories={onUpdateChatHistories} 
-                         isActive={isActive} 
-                         stack={stack} 
-                         onToggleStack={onToggleStack} 
-                         isGuest={isGuest}
-                         user={user}
-                         onAuthRequest={() => { user ? onSaveToDashboard?.() : onLogin(); }}
-                         userTaste={profile?.taste}
-                         onUpdateTasteProfile={async (taste) => { await onUpdateProfile({ taste }); }}
-                         onShowToast={onShowToast}
-                         onOpenTasteModal={() => window.dispatchEvent(new CustomEvent('open-taste-modal'))}
-                         onStashArtist={(artistName) => {
-                              const normalizedId = normalizeArtistId(artistName);
-                              const isAlreadyInStack = stack.some(item => item.id === normalizedId);
-                              if (!isAlreadyInStack) {
-                                  const nodeToAdd = { id: normalizedId, type: 'artist' as const, label: titleCaseArtistId(artistName), group: 0 };
-                                  onToggleStack(nodeToAdd);
-                              }
-                              setIsStackDialogOpen(true);
-                         }}
-                         onOpenStackDrawer={() => setIsStackDialogOpen(true)}
-                       />
+                       <div className="relative flex-1 min-h-0 overflow-hidden flex flex-col">
+                            {detailsPanelElement}
+                       </div>
                 </aside>
             </main>
         )}
@@ -1819,6 +1743,11 @@ const GraphPage: React.FC<GraphPageProps> = ({
           showBack={disambiguationDialog?.showBack}
           onSelect={onSelectDisambiguation}
         />
+        {isSmallScreen && isMagazineViewOpen && (
+            <div className="fixed inset-0 z-[9999] bg-zinc-900 overflow-y-auto overscroll-contain">
+                {detailsPanelElement}
+            </div>
+        )}
     </div>
   );
 };
