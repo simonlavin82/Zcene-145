@@ -2343,14 +2343,16 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                 </div>
                             </div>
                             <div className="flex items-center gap-0.5 ml-4 shrink-0">
-                                <button 
-                                    onClick={() => onMagazineViewToggle(false)}
-                                    className="flex items-center gap-1.5 px-4 py-2 border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 focus:outline-none transition-all duration-200 text-sm font-medium shrink-0 leading-none backdrop-blur-sm"
-                                    title="Exit Magazine View"
-                                >
-                                    <span>Exit Magazine</span>
-                                    <span className="material-symbols-outlined !text-[18px]">close</span>
-                                </button>
+                                {!isSmallScreen && (
+                                    <button 
+                                        onClick={() => onMagazineViewToggle(false)}
+                                        className="flex items-center gap-1.5 px-4 py-2 border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 focus:outline-none transition-all duration-200 text-sm font-medium shrink-0 leading-none backdrop-blur-sm"
+                                        title="Exit Magazine View"
+                                    >
+                                        <span>Exit Magazine</span>
+                                        <span className="material-symbols-outlined !text-[18px]">close</span>
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -2451,21 +2453,6 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                     </>
                                 )}
                             </div>
-
-                            <Button
-                                variant={hasSeenMagazineView ? 'secondary' : 'outline'}
-                                size="sm"
-                                onClick={() => {
-                                    setHasSeenMagazineView(true);
-                                    onMagazineViewToggle(!isMagazineViewOpen);
-                                }}
-                                disabled={(magazineBtnState as string) === 'disabled'}
-                                className="backdrop-blur-sm"
-                                title="Enter Magazine View"
-                            >
-                                <span className="material-symbols-outlined !text-[16px]">auto_stories</span>
-                                <span>Magazine</span>
-                            </Button>
                         </div>
                     )}
 
@@ -2616,7 +2603,22 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                             </div>
                         )}
 
-
+                        {!isMagazineViewOpen && (
+                            <div className="absolute bottom-6 left-0 right-0 flex justify-center pointer-events-none z-50">
+                                <Button 
+                                    variant="secondary"
+                                    size="md"
+                                    onClick={() => {
+                                        setHasSeenMagazineView(true);
+                                        onMagazineViewToggle(true);
+                                    }}
+                                    className="pointer-events-auto shadow-xl backdrop-blur-md"
+                                >
+                                    <span className="material-symbols-outlined !text-[18px]">auto_stories</span>
+                                    <span>Magazine</span>
+                                </Button>
+                            </div>
+                        )}
 
                     </div>
                     {isMagazineViewOpen && typeof document !== 'undefined' && createPortal(
@@ -2647,6 +2649,20 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     missingArtists={["Live Chat Search (3 Messages)"]}
                 />,
                 document.body
+            )}
+            
+            {isSmallScreen && isMagazineViewOpen && (
+                <div className="fixed bottom-8 left-0 right-0 flex justify-center pointer-events-none z-[1050]">
+                    <Button
+                        variant="secondary"
+                        size="md"
+                        onClick={() => onMagazineViewToggle(false)}
+                        className="pointer-events-auto shadow-2xl backdrop-blur-md px-6 py-3"
+                    >
+                        <span className="material-symbols-outlined !text-[20px]">close</span>
+                        <span>Exit Magazine</span>
+                    </Button>
+                </div>
             )}
         </div>
     );
