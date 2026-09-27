@@ -80,7 +80,7 @@ export const getContrastTextColor = (hexColor: string): string => {
 export const nodeTypeColorMap: Record<string, string> = {
   label: zceneCategoricalPalette[1], // Teal
   genre: zceneCategoricalPalette[2], // Electric Sky
-  country: zceneCategoricalPalette[3], // Vivid Indigo (Origin)
+  country: '#f97316', // Orange (Origin)
   founded: zceneCategoricalPalette[4], // Pink
   seed: '#F6E468', // Primary Brand Yellow
   ai: zceneCategoricalPalette[0], // Purple

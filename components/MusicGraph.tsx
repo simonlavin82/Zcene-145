@@ -1200,6 +1200,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             const isSeed = d.type === 'artist' && isNodeInSeedList(d.id || d.label || '', seedArtists);
             if (isSeed) return "28px";
             if (d.type === 'artist') return "28px";
+            if (d.type === 'country') return "26px";
             if (d.type === 'label' || d.type === 'founded') return "24px";
             return "20px";
         })
