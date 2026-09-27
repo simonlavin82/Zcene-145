@@ -4,7 +4,7 @@ import { LayoutSizes } from './DesignSystem';
 import { User } from 'firebase/auth';
 import { AnimatePresence, motion } from 'framer-motion';
 import { UserTaste } from '../types';
-import { Flame, ArrowLeft, MoreVertical } from 'lucide-react';
+import { Flame, MoreVertical } from 'lucide-react';
 
 import { MyTasteDialog } from './SharedModals';
 
@@ -159,18 +159,10 @@ const Header: React.FC<HeaderProps> = ({
                 <button 
                   onClick={onLogoClick} 
                   title={isDashboard ? "Back to landing" : "Back to dashboard"} 
-                  className={`flex-shrink-0 flex justify-center items-center outline-none focus:outline-none active:scale-95 cursor-pointer pointer-events-auto transition-colors ${
-                    isDashboard 
-                      ? 'appearance-none bg-transparent border-none p-0 h-8 w-8 md:h-10 md:w-10' 
-                      : 'h-8 w-8 rounded-xl bg-transparent text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors'
-                  }`} 
+                  className="flex-shrink-0 flex justify-center items-center outline-none focus:outline-none active:scale-95 cursor-pointer pointer-events-auto transition-colors appearance-none bg-transparent border-none p-0 h-8 w-8 md:h-10 md:w-10" 
                   aria-label="Logo"
                 >
-                    {isDashboard ? (
-                        <FaviconLogo className="h-full w-full text-primary pointer-events-none" />
-                    ) : (
-                        <ArrowLeft size={18} strokeWidth={2} className="pointer-events-none" />
-                    )}
+                    <FaviconLogo className="h-full w-full text-primary pointer-events-none" />
                 </button>
                 
                 <div className="flex items-center pointer-events-auto flex-grow max-w-[280px] sm:max-w-[320px] md:max-w-[480px]">
