@@ -14,6 +14,7 @@ interface DashboardProjectCardProps {
   handleRenameClick: (project: Project) => void;
   setProjectToDelete: (id: string) => void;
   onShareProject?: (project: Project) => void;
+  onDuplicateProject?: (project: Project) => void;
 }
 
 export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
@@ -23,7 +24,8 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
   setActiveMenuId,
   handleRenameClick,
   setProjectToDelete,
-  onShareProject
+  onShareProject,
+  onDuplicateProject
 }) => {
   const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
   const displayTitle = cleanArtistDisplayName(project.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene"));
@@ -195,6 +197,18 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
                       >
                         <span className="material-symbols-outlined !text-[16px] text-zinc-500">share</span>
                         Share
+                      </button>
+                    )}
+                    {onDuplicateProject && (
+                      <button
+                        onClick={() => {
+                          setActiveMenuId(null);
+                          onDuplicateProject(project);
+                        }}
+                        className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                      >
+                        <span className="material-symbols-outlined !text-[16px] text-zinc-500">content_copy</span>
+                        Duplicate
                       </button>
                     )}
                     <div className="border-t border-zinc-800/80 my-1" />

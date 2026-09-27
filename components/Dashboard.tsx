@@ -43,6 +43,7 @@ interface DashboardProps {
   onSaveTaste?: (taste: UserTaste) => Promise<void>;
   crateColors?: Record<string, string>;
   onUpdateCrateColor?: (crate: string, color: string) => void;
+  onDuplicateProject?: (project: Project) => void;
 }
 
 const Dashboard: React.FC<DashboardProps> = ({
@@ -73,7 +74,8 @@ const Dashboard: React.FC<DashboardProps> = ({
   userTaste,
   onSaveTaste,
   crateColors,
-  onUpdateCrateColor
+  onUpdateCrateColor,
+  onDuplicateProject
 }) => {
   const [projectToDelete, setProjectToDelete] = React.useState<string | null>(null);
   const [projectToRename, setProjectToRename] = React.useState<Project | null>(null);
@@ -428,6 +430,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                           handleRenameClick={handleRenameClick}
                           setProjectToDelete={setProjectToDelete}
                           onShareProject={onShareProject}
+                          onDuplicateProject={onDuplicateProject}
                         />
                       ))}
                   </div>
@@ -676,6 +679,18 @@ const Dashboard: React.FC<DashboardProps> = ({
                                         >
                                           <span className="material-symbols-outlined !text-[16px] text-zinc-500">share</span>
                                           Share
+                                        </button>
+                                      )}
+                                      {onDuplicateProject && (
+                                        <button
+                                          onClick={() => {
+                                            setActiveMenuId(null);
+                                            onDuplicateProject(project);
+                                          }}
+                                          className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                                        >
+                                          <span className="material-symbols-outlined !text-[16px] text-zinc-500">content_copy</span>
+                                          Duplicate
                                         </button>
                                       )}
                                       <div className="border-t border-zinc-800/80 my-1" />

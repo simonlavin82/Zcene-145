@@ -2012,6 +2012,42 @@ const App: React.FC = () => {
     }
   }, [user, showToast]);
 
+  const handleDuplicateProject = useCallback(async (project: Project) => {
+    if (!user) return;
+    const originalPath = `users/${user.uid}/projects/${project.id}`;
+    
+    try {
+      // 1. Fetch the full canonical project document (Rule 22)
+      const docSnap = await getDoc(doc(db, 'users', user.uid, 'projects', project.id));
+      if (!docSnap.exists()) {
+        showToast("Original project not found.");
+        return;
+      }
+      
+      const originalData = docSnap.data();
+      
+      // 2. Mint a new Project ID
+      const newDocRef = doc(collection(db, 'users', user.uid, 'projects'));
+      
+      // 3. Mutate the name to append " (Copy)"
+      const baseName = originalData.name || 'Untitled Zcene';
+      const newName = `${baseName} (Copy)`;
+      
+      // 4. Save the payload 
+      // This executes a deep 1:1 clone of the entire object, bypassing ID collisions.
+      await setDoc(newDocRef, {
+        ...originalData,
+        name: newName,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+      
+      showToast("Project duplicated successfully");
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, originalPath);
+    }
+  }, [user, showToast]);
+
   const displayProjectName = useMemo(() => {
     let name = projectName;
     if (!name && seedArtists) {
@@ -7556,6 +7592,7 @@ const App: React.FC = () => {
             onDeleteProject={handleDeleteProject}
             onRenameProject={handleRenameProject}
             onShareProject={handleDashboardShareProject}
+            onDuplicateProject={handleDuplicateProject}
             onLogoClick={() => handleViewChange(View.Home)}
             onLogout={handleLogout}
             onDeleteAccount={handleDeleteAccount}
