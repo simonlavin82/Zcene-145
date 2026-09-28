@@ -1609,27 +1609,21 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                     Clear Chat
                                                 </button>
                                             )}
-                                            {chatMode === 'live' && (
-                                                <div className="text-[10px] text-zinc-500 font-mono tracking-widest flex items-center gap-1">
-                                                    <span className={`w-1.5 h-1.5 rounded-full ${3 - liveMessageCount > 0 ? 'bg-primary' : 'bg-red-500 animate-pulse'}`}></span>
-                                                    {Math.max(0, 3 - liveMessageCount)} / 3 Messages
-                                                </div>
-                                            )}
                                         </div>
                                     </div>
 
-                                    <div className="relative">
+                                    <div className="relative min-h-[160px] flex flex-col">
                                         {chatMode === 'live' ? (
-                                            <>
-                                                <textarea
-                                                    rows={3}
-                                                    value={chatInput}
-                                                    onChange={(e) => setChatInput(e.target.value)}
-                                                    onKeyDown={handleKeyDown}
-                                                    placeholder="Consult Zcene AI..."
-                                                    className="w-full bg-zinc-950 border border-zinc-700 py-2 pl-4 pr-16 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary transition-all rounded-xl resize-none min-h-[80px] scrollbar-thin scrollbar-thumb-zinc-700"
-                                                />
-                                                <div className="absolute right-2 bottom-3 flex flex-col items-center gap-2">
+                                            <div className="flex flex-col flex-1 gap-2">
+                                                <div className="relative flex-1 flex flex-col">
+                                                    <textarea
+                                                        value={chatInput}
+                                                        onChange={(e) => setChatInput(e.target.value)}
+                                                        onKeyDown={handleKeyDown}
+                                                        placeholder="Consult Zcene AI..."
+                                                        className="flex-1 w-full h-full bg-zinc-950 border border-zinc-700 py-2 pl-4 pr-16 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary transition-all rounded-xl resize-none scrollbar-thin scrollbar-thumb-zinc-700"
+                                                    />
+                                                    <div className="absolute right-2 bottom-3 flex flex-col items-center gap-2">
                                                     {!chatInput.trim() ? (
                                                         <button 
                                                             onClick={handleSpeechToText}
@@ -1659,8 +1653,15 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                     >
                                                         <span className="material-symbols-outlined !text-[22px]">arrow_upward</span>
                                                     </button>
+                                                    </div>
                                                 </div>
-                                            </>
+                                                <div className="flex justify-start px-1">
+                                                    <div className="text-[10px] text-zinc-500 font-mono tracking-widest flex items-center gap-1">
+                                                        <span className={`w-1.5 h-1.5 rounded-full ${3 - liveMessageCount > 0 ? 'bg-primary' : 'bg-red-500 animate-pulse'}`}></span>
+                                                        {Math.max(0, 3 - liveMessageCount)} / 3 Messages
+                                                    </div>
+                                                </div>
+                                            </div>
                                         ) : (
                                             <div className="flex flex-wrap gap-2">
                                                 {queryChips.map((chip, idx) => {
