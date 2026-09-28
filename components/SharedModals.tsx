@@ -29,7 +29,7 @@ export const MyStackDialog: React.FC<{
   if (!isOpen) return null;
 
   return (
-    <ModalBackdrop onClick={onClose}>
+    <ModalBackdrop onClick={onClose} className="z-[2000]">
         <ModalContainer>
             <ModalHeader>
                 <div className="flex items-center gap-2">
