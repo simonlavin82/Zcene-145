@@ -20,9 +20,10 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 - **activeNodes[0] Pinning:** The seed artist MUST be explicitly hoisted and pinned to `activeNodes[0]` during share generation and project creation to guarantee deterministic Deep Cut Sidebar hydration natively from index `[0]`.
 - The generated topology must ensure seeds are visually and programmatically anchored as the roots of the network.
 
-### 3. Universal Coordinate Amnesia (D3 Spatial Data)
-- Absolute D3 runtime coordinates (`x`, `y`, `vx`, `vy`, `fx`, `fy`) MUST be explicitly stripped from the `graphData` payload during The Share Generation (when saving clones or sharing projects). 
+### 3. Universal Coordinate Amnesia (D3 Spatial Data) — See also Rule 25
+- Absolute D3 runtime coordinates (`x`, `y`, `vx`, `vy`, `fx`, `fy`) MUST be explicitly stripped from the `graphData` payload during The Share Generation (when saving clones or sharing projects).
 - This enforces relational link weights to drive an organic, viewport-adaptive D3 recalculation upon load, preventing rigid snapshot locking.
+- **Scope Clarification (V8):** This rule applies exclusively to the Share Generation pathway (`/sharedZcenes/{id}`) and the Duplication Pathway (`Clone New Zcene`). Owned user project documents (`users/{uid}/projects/{id}`) use **Coordinate Memory** as defined in Rule 21. See Rule 25 for the formal scoped definition.
 
 ### 4. Deterministic Open Graph Routing
 - A deterministic top-level artist image URL (`seedImageUrl`) MUST be appended directly to the root of the project and shared Zcene payloads at creation.
@@ -102,3 +103,27 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 ### 21. Locked Semantic Topology & AI Physics Injection
 - **Rule:** D3 node dragging gestures are strictly forbidden. The graph operates as a Locked Semantic Topology to ensure mobile panning remains unobstructed and to preserve the calculated semantic clusters.
 - **Enforcement:** The D3 layout is strictly driven by the 'Final Node Positioning' step via `gemini-3.5-flash`. The AI generates float weights (0.1 to 1.0) using a lean bio payload strategy, which dictate variable link distance, spring rigidity, and collision radii. If the AI model fails or returns an empty array, the pipeline gracefully falls back to injecting a neutral weight of `0.5` across all links to guarantee physics stability.
+- **Coordinate Memory Sub-Clause (V8):** Once `simulation.on("end")` fires and all nodes are pinned via `fx`/`fy` in memory, the settled artist and label node positions MUST be persisted back to the owned project document (`users/{uid}/projects/{id}`) via a debounced `updateDoc` targeting the `canvasLayout` field only. This is called **Coordinate Memory**. The debounce window is 5 seconds; a dirty-check prevents redundant writes when the layout is unchanged. Coordinate Memory is strictly scoped to authenticated, non-guest, project-owning sessions. The Share Generation and Duplication pathways are explicitly excluded (see Rule 25).
+
+### 22. (Reserved for future architectural law)
+
+### 23. Topology Parity Mandate
+- **Rule:** Any stylistic, genre, or scene connection explicitly cited in the Root Breakdown narrative (Step 3.1, `generateRootsBreakdownBackend`) MUST have a corresponding edge entry in `finalGraph.links`.
+- **Enforcement:** A new `reconcileNarrativeEdges()` step (Step 3.2) in Column 3 (`processCurationJob.ts`) runs immediately after the Root Breakdown narrative is generated and before the ID Rewrite Map is applied. It calls `gemini-3.5-flash` with a structured JSON output schema to extract connections explicitly stated in the narrative that are absent from the current graph topology. Missing edges are injected into `finalGraph.links` and canonicalized by the subsequent ID Rewrite pass. The Semantic Link Weights step (Step 3.3) then evaluates all links, including newly reconciled ones.
+- **Deduplication guard:** Before injecting, each candidate edge is checked against the existing link set using the `[source, target].sort().join('--')` key pattern. Duplicate edges are silently discarded.
+- **Orphan safety:** The existing orphan-link pruner downstream automatically discards any reconciled edge whose source or target does not match a valid node ID in `finalGraph.nodes`.
+- **Failure mode:** If the reconciliation call fails or times out, the step is silently skipped via a `try/catch` with a `console.warn`. The pipeline proceeds with the original `finalGraph.links` intact.
+
+### 24. Verbal Identity
+- **Rule:** The Root Breakdown system prompt (`generateRootsBreakdownBackend` in `curatorService.ts`) MUST enforce Zcene's late-night record curator voice. Academic analysis language (e.g., "co-equal cross-analysis", "acoustic dimensions", "chronological intersections") and any regional English constraint (e.g., explicit UK English spellings) are strictly prohibited.
+- **Persona:** The curator is the kind of person who knows why a Bristol basement in 1991 changed everything, who connects a Chicago church organ to a Berlin techno floor, and who finds the overlooked B-side that explains an entire scene.
+- **Formatting contract:** Active curation verbs only (map, uncover, trace, surface, anchor, explore). Lead with cultural significance and scene context. Discovery over data: prioritize shared producers, venues, hometown scenes, and mutual influences over obvious genre tags. International scope: write for a global audience.
+- **Enforcement:** The `systemInstruction` variable in `generateRootsBreakdownBackend` is the single source of truth for voice. Any revert to the prior "expert archivist" persona is a violation of this rule.
+
+### 25. Selective Coordinate Amnesia
+- **Rule:** Coordinate amnesia (stripping `x`, `y`, `vx`, `vy`, `fx`, `fy`, `index` from node objects before write) applies **exclusively** to the following two pathways:
+  1. **Share Generation pathway** — writes to `/sharedZcenes/{id}` (`handleShareZcene`, `App.tsx` L1809–L1818).
+  2. **Duplication / Dashboard Share pathway** — writes to `/sharedZcenes/{id}` from Dashboard (`handleDashboardShareProject`, `App.tsx` L1924–L1929).
+- **Owned project documents** (`users/{uid}/projects/{id}`) are explicitly excluded from Coordinate Amnesia. They use **Coordinate Memory** (Rule 21 sub-clause) to persist settled positions.
+- **Rationale:** Shared and cloned Zcenes intentionally receive fresh organic D3 layouts because the recipient's viewport dimensions and graph context are unknown at write time. Owned projects retain their settled topology to eliminate re-orientation on re-entry.
+- **Enforcement:** The stripping destructure `const { x, y, vx, vy, fx, fy, index, ...cleanNode } = n` is an immutable pattern in share and duplication code paths. It must never be extended to project autosave, canvasLayout writes, or `handleCoordinatesSettled` writes.

@@ -3,7 +3,7 @@ import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { flushSync } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { AlertCircle, AlertTriangle, X, CheckCircle2, Key } from 'lucide-react';
-import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project, ArtistCacheEntry, COST_PER_AI_CALL } from './types';
+import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project, ArtistCacheEntry, COST_PER_AI_CALL, CanvasNodeRef } from './types';
 import { generateGraphData, fetchNodeDetails, extendGraphFromNode, resolveArtistCandidatesViaAI } from './services/geminiService';
 import { normalizeArtistId, readArtistCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, getEntityDocWithRedirect, getLabelDocWithRedirect, getAnyEntityDocWithRedirect, titleCaseArtistId, cleanArtistDisplayName, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema, stripUndefinedProperties, isNodeInSeedList, extractCountrySlug } from './services/artistCacheService';
 import { normalizeCountry } from './utils/normalization';
@@ -1602,6 +1602,11 @@ const App: React.FC = () => {
   const lastSyncedDocRef = useRef<string>('');
   const evictedNodeIdsRef = useRef<Set<string>>(new Set());
   const approvedSeedsRef = useRef<Set<string>>(new Set());
+  // Phase A — Coordinate Memory refs
+  // lastSettledLayoutRef: dirty-check string to avoid redundant Firestore writes
+  // coordinatePersistTimerRef: debounce handle cleared on rapid re-fires
+  const lastSettledLayoutRef = useRef<string>('');
+  const coordinatePersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { currentProjectOwnerIdRef.current = currentProjectOwnerId; }, [currentProjectOwnerId]);
   useEffect(() => { projectNameRef.current = projectName; }, [projectName]);
@@ -6119,6 +6124,45 @@ const App: React.FC = () => {
     return () => clearTimeout(timer);
   }, [user, isFirebaseReady, isAuthInitialized, currentProjectId, graphData, seedArtists, discoveryFilters, activeNodes, isMagazineViewOpen, chatHistories, lastViewedStackCount, currentCacheKey]);
 
+  // Phase A — Coordinate Memory
+  // Receives the settled artist/label canvas layout from MusicGraph.simulation.on("end")
+  // and persists it to Firestore canvasLayout field with a 5-second debounce.
+  //
+  // Guards (ALL must pass before any Firestore write executes):
+  //   • user        — must be authenticated
+  //   • !isGuest    — never writes for shared / guest Zcenes (Rule 25: Selective Coordinate Amnesia)
+  //   • currentProjectId — must be a valid owned project document
+  //
+  // The write targets ONLY the canvasLayout field via updateDoc (not setDoc/merge),
+  // so the share generation and duplication pathways are completely unaffected.
+  const handleCoordinatesSettled = useCallback((layout: CanvasNodeRef[]) => {
+    if (!user || isGuest || !currentProjectIdRef.current) return;
+    const serialized = JSON.stringify(layout);
+    if (serialized === lastSettledLayoutRef.current) {
+      // Identical layout — simulation re-fired with no positional change; skip write
+      return;
+    }
+    lastSettledLayoutRef.current = serialized;
+    // Cancel any pending debounce before scheduling a new one
+    if (coordinatePersistTimerRef.current) {
+      clearTimeout(coordinatePersistTimerRef.current);
+    }
+    coordinatePersistTimerRef.current = setTimeout(async () => {
+      const projectId = currentProjectIdRef.current;
+      if (!projectId || !user || isGuest) return; // re-check inside async closure
+      const projectPath = `users/${user.uid}/projects/${projectId}`;
+      try {
+        await updateDoc(doc(db, projectPath), {
+          canvasLayout: serialized,
+          updatedAt: serverTimestamp(),
+        });
+        console.log(`[Coordinate Memory] canvasLayout persisted for project: ${projectId}`);
+      } catch (err) {
+        console.warn(`[Coordinate Memory] updateDoc failed for ${projectPath}:`, err);
+      }
+    }, 5000);
+  }, [user, isGuest]);
+
   const lastProcessedHashRef = useRef<string>('');
   const lastProcessedSelectedRef = useRef<string | null>(null);
   const lastProcessedSessionKeyRef = useRef<string>('');
@@ -7744,6 +7788,7 @@ const App: React.FC = () => {
               setIsMenuOpen={setIsMenuOpen}
               disambiguationDialog={disambiguationDialog}
               onSelectDisambiguation={(choice) => disambiguationDialog?.onSelect(choice)}
+              onCoordinatesSettled={handleCoordinatesSettled}
             />
           )}
         </div>

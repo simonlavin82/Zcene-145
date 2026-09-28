@@ -2,7 +2,7 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import * as d3 from 'd3';
 import { Loader2 } from 'lucide-react';
-import { GraphData, Node, Link, GraphSettings, NodeDetails } from '../types';
+import { GraphData, Node, Link, GraphSettings, NodeDetails, CanvasNodeRef } from '../types';
 import { LegendSymbol } from './Icons';
 import { CanvasControlStyles, InputSizes } from './DesignSystem';
 import { zceneCategoricalPalette, zceneFallbackColor, nodeTypeColorMap } from '../utils/formatters';
@@ -37,6 +37,11 @@ interface MusicGraphProps {
   detailsCache?: Map<string, NodeDetails>;
   isActive?: boolean;
   onSimulationComplete?: () => void;
+  /** Phase A — Coordinate Memory: fired once when simulation settles, with the
+   * final fx/fy positions of all artist and label nodes. Only artist/label nodes
+   * are included (metadata petals are excluded — they are positioned relative to
+   * their parent artists and do not need independent persistence). */
+  onCoordinatesSettled?: (layout: CanvasNodeRef[]) => void;
 }
 
 const isSameNodeId = (id1: any, id2: any): boolean => {
@@ -105,13 +110,19 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   activeFilters, searchQuery, setSearchQuery, toggleFilter,
   legendConfig, legendOrder,
   legendRef, onInteraction, onLegendInteraction, isGuest,
-  detailsCache, isActive = false, onSimulationComplete
+  detailsCache, isActive = false, onSimulationComplete, onCoordinatesSettled
 }) => {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const onSimulationCompleteRef = useRef(onSimulationComplete);
   useEffect(() => {
     onSimulationCompleteRef.current = onSimulationComplete;
   }, [onSimulationComplete]);
+  // Phase A — Coordinate Memory: stable ref so the simulation.on("end") closure
+  // always calls the latest version of the callback without re-creating the sim.
+  const onCoordinatesSettledRef = useRef(onCoordinatesSettled);
+  useEffect(() => {
+    onCoordinatesSettledRef.current = onCoordinatesSettled;
+  }, [onCoordinatesSettled]);
   const simulationRef = useRef<d3.Simulation<Node, Link> | null>(null);
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
@@ -201,7 +212,15 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
   useEffect(() => {
     if (isActive && simulationRef.current) {
-      simulationRef.current.alpha(0.3).restart();
+      // Coordinate Memory guard: if artist/label nodes already have fx/fy pinned from
+      // a saved canvasLayout, use a minimal alpha to wake the tick handler without
+      // running a full physics pass that would rotate/drift the settled web.
+      const nodes = simulationRef.current.nodes();
+      const artistLabelNodes = nodes.filter(n => n.type === 'artist' || n.type === 'label');
+      const allPinned = artistLabelNodes.length > 0 &&
+        artistLabelNodes.every(n => n.fx !== null && n.fx !== undefined &&
+                                     n.fy !== null && n.fy !== undefined);
+      simulationRef.current.alpha(allPinned ? 0.001 : 0.3).restart();
     }
   }, [isActive]);
 
@@ -879,6 +898,27 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     }
                 });
 
+                // Phase A — Coordinate Memory: collect settled artist/label positions
+                // and fire the callback so App.tsx can persist them to Firestore.
+                // Only artist and label nodes carry independent semantic positions;
+                // metadata petals (genre, country, label, founded) are excluded.
+                if (onCoordinatesSettledRef.current) {
+                    const settledLayout: CanvasNodeRef[] = nodes
+                        .filter(n => (n.type === 'artist' || n.type === 'label')
+                                 && n.fx !== undefined && n.fx !== null
+                                 && n.fy !== undefined && n.fy !== null)
+                        .map(n => ({
+                            nodeId: n.id,
+                            x: n.x,
+                            y: n.y,
+                            fx: n.fx ?? null,
+                            fy: n.fy ?? null,
+                        }));
+                    if (settledLayout.length > 0) {
+                        onCoordinatesSettledRef.current(settledLayout);
+                    }
+                }
+
                 if (!hasInitialCentered.current && fitGraphToScreenRef.current) {
                     hasInitialCentered.current = true;
                     fitGraphToScreenRef.current(0);
@@ -1338,14 +1378,29 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         const restartAlpha = isLengthChange ? (isStructuralChange ? 1.0 : 0.2) : 0.2;
 
         if (isLengthChange) {
-            // Unpin all nodes so they can adjust to the new layout structure
+            // Unpin nodes so they can settle into the new layout —
+            // BUT only unpin nodes that don't already have saved canvasLayout coordinates.
+            // Nodes with valid fx/fy were loaded from Firestore and must NOT be cleared;
+            // clearing them destroys Coordinate Memory and forces a random re-layout.
             visibleNodes.forEach(n => {
-                n.fx = null;
-                n.fy = null;
+                const hasSavedCoords = n.fx !== null && n.fx !== undefined &&
+                                       n.fy !== null && n.fy !== undefined;
+                if (!hasSavedCoords) {
+                    n.fx = null;
+                    n.fy = null;
+                }
             });
-        }
 
-        simulation.alpha(restartAlpha).alphaTarget(0).restart();
+            // If ALL artist/label nodes are pinned (full canvasLayout restore), use a
+            // near-zero alpha: the simulation just needs one tick to render, not to run physics.
+            const artistLabelNodes = visibleNodes.filter(n => n.type === 'artist' || n.type === 'label');
+            const allPinned = artistLabelNodes.length > 0 &&
+                artistLabelNodes.every(n => n.fx !== null && n.fx !== undefined &&
+                                           n.fy !== null && n.fy !== undefined);
+            simulation.alpha(allPinned ? 0.001 : restartAlpha).alphaTarget(0).restart();
+        } else {
+            simulation.alpha(restartAlpha).alphaTarget(0).restart();
+        }
     }
   // Used dimensions.width > 0 to trigger initial mount safely while preserving physics isolation during resizes
   }, [visibleNodes, visibleLinks, seedArtists, activeFilters, dimensions.width > 0]);
