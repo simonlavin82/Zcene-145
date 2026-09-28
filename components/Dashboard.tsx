@@ -268,7 +268,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           <div className="w-full space-y-8">
           <div className="flex flex-col gap-6 w-full">
             <div className="flex flex-row items-start sm:items-center justify-between w-full gap-4">
-              <div className="flex flex-row items-center gap-2 h-[36px] flex-wrap sm:flex-nowrap">
+              <div className="flex flex-row items-center gap-2 flex-wrap sm:flex-nowrap">
                 {/* Sort Selector Toggle */}
                 <ViewToggle 
                   value={sortBy}
@@ -277,7 +277,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                     { id: 'recent', icon: 'schedule', label: 'Sort by Recent' },
                     { id: 'alphabetical', icon: 'sort_by_alpha', label: 'Sort Alphabetically' }
                   ]}
-                  className="h-full"
                 />
 
                 {/* Grid/List View Toggle */}
@@ -288,16 +287,15 @@ const Dashboard: React.FC<DashboardProps> = ({
                     { id: 'grid', icon: 'grid_view', label: 'Grid View' },
                     { id: 'list', icon: 'list', label: 'List View' }
                   ]}
-                  className="h-full"
                 />
               </div>
 
               {/* New Zcene Button */}
-              <div className="flex items-center h-[36px] flex-shrink-0">
+              <div className="flex items-center flex-shrink-0">
                 <button 
                   onClick={onCreateProject}
                   disabled={isCreatingProject}
-                  className="h-full rounded-xl bg-white text-brand-black text-sm px-4 font-medium flex items-center gap-2 whitespace-nowrap transition-opacity hover:opacity-90 disabled:opacity-50"
+                  className="h-[38px] rounded-xl bg-white text-brand-black text-sm px-4 font-medium flex items-center gap-2 whitespace-nowrap transition-opacity hover:opacity-90 disabled:opacity-50"
                 >
                   {isCreatingProject ? (
                     <>

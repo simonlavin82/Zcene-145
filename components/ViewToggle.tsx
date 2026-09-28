@@ -36,7 +36,7 @@ const ViewToggle = <T extends string>({
   const isFirst = value === options[0].id;
   
   return (
-    <div className={`flex items-center bg-zinc-950 border border-zinc-700/80 rounded-xl p-0.5 relative ${className}`}>
+    <div className={`flex items-center bg-zinc-950 border border-zinc-700/80 rounded-xl p-0.5 relative h-[38px] shrink-0 ${className}`}>
       {/* Square Sliding Active Badge */}
       <motion.div
         className="absolute top-0.5 left-0.5 w-8 h-8 bg-zinc-800 rounded-[10px] shadow-inner ring-1 ring-zinc-600/50"

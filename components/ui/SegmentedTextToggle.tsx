@@ -23,10 +23,10 @@ export const SegmentedTextToggle = <T extends string>({
   const isFirst = value === options[0].id;
   
   return (
-    <div className={`flex items-center bg-zinc-950 border border-zinc-700/80 p-0.5 relative w-[200px] h-9 select-none ${RADIUS_TOKENS.toggle} ${className}`}>
+    <div className={`flex items-center bg-zinc-950 border border-zinc-700/80 p-0.5 relative w-[200px] h-[38px] select-none ${RADIUS_TOKENS.toggle} ${className}`}>
       {/* Sliding Active Badge */}
       <motion.div
-        className="absolute top-0.5 left-0.5 bottom-0.5 w-[96px] bg-zinc-800 rounded-[10px] shadow-inner ring-1 ring-zinc-700/50"
+        className="absolute top-0.5 left-0.5 w-[96px] h-8 bg-zinc-800 rounded-[10px] shadow-inner ring-1 ring-zinc-700/50"
         initial={false}
         animate={{ x: isFirst ? 0 : 98 }}
         transition={{ type: 'spring', stiffness: 480, damping: 38 }}
