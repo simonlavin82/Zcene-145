@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import * as d3 from 'd3';
+import { motion } from 'motion/react';
 
 export const ZceneLogo: React.FC<{ className?: string }> = ({ className }) => (
   <svg className={className} width="255" height="90" viewBox="0 0 255 90" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -176,8 +177,20 @@ export const SortControls: React.FC<SortControlsProps> = ({ sortConfig, onSortCh
     { label: 'Sort by Selected', key: 'selected', icon: 'task_alt' },
   ];
   
+  const activeIndex = sortButtons.findIndex(btn => btn.key === sortConfig.key);
+
   return (
-    <div className="flex items-center bg-zinc-950 border border-zinc-700/80 rounded-xl p-0.5 relative">
+    <div className="flex items-center bg-zinc-950 border border-zinc-700/80 rounded-xl relative h-[38px] shrink-0 overflow-hidden">
+        {/* Square Sliding Active Badge */}
+        <motion.div
+            className="absolute top-0 left-0 w-9 h-9 bg-zinc-800"
+            initial={false}
+            animate={{ 
+                x: activeIndex * 36,
+                borderRadius: activeIndex === 0 ? "11px 0px 0px 11px" : activeIndex === 2 ? "0px 11px 11px 0px" : "0px"
+            }}
+            transition={{ type: 'spring', stiffness: 480, damping: 38 }}
+        />
         {sortButtons.map(btn => {
             const isActive = sortConfig.key === btn.key;
             
@@ -185,8 +198,8 @@ export const SortControls: React.FC<SortControlsProps> = ({ sortConfig, onSortCh
                 <button
                     key={btn.key}
                     onClick={() => onSortChange(btn.key)}
-                    className={`flex items-center justify-center w-8 h-8 rounded-lg transition-colors relative z-10 active:scale-95 ${
-                        isActive ? 'bg-zinc-800 text-white shadow-inner ring-1 ring-zinc-600/50' : 'text-zinc-500 hover:text-zinc-300'
+                    className={`flex items-center justify-center w-9 h-9 transition-colors relative z-10 active:scale-95 ${
+                        isActive ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'
                     }`}
                     title={btn.label}
                     aria-label={btn.label}
