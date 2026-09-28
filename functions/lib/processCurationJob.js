@@ -729,19 +729,24 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     // 3.1 Pro: Root Breakdown Narrative
                     rootBreakdownStr = await (0, curatorService_1.generateRootsBreakdownBackend)(inputPayload.artists, detailsCacheEntries, usageCollector);
                     finalGraph.synthesisRationale = rootBreakdownStr;
-                    // Phase B — Topology Parity (Rule 23): reconcile narrative citations against graph edges.
-                    // Runs BEFORE the ID Rewrite so node IDs in the narrative still match pre-rewrite graph IDs.
+                    // Phase 4a & 4b (Architecture V9): Topology Parity & Contextual Extraction
+                    // Runs concurrently BEFORE the ID Rewrite so node IDs in the narrative still match pre-rewrite graph IDs.
                     if (rootBreakdownStr && finalGraph.nodes && finalGraph.links && process.env.GEMINI_API_KEY) {
                         try {
-                            console.log(`[Curation Backend] Phase B: Auditing narrative for missing graph edges...`);
+                            console.log(`[Curation Backend] Phase 4a/4b: Auditing narrative for edges and extracting contextual snippets...`);
                             const existingLinkIds = finalGraph.links.map((l) => ({
                                 source: typeof l.source === 'string' ? l.source : l.source.id,
                                 target: typeof l.target === 'string' ? l.target : l.target.id,
                             }));
-                            const reconciled = await (0, curatorService_1.reconcileNarrativeEdges)(process.env.GEMINI_API_KEY, rootBreakdownStr, finalGraph.nodes.map((n) => ({ id: n.id, type: n.type })), existingLinkIds, usageCollector);
-                            if (reconciled.length > 0) {
-                                console.log(`[Curation Backend] Phase B: Injecting ${reconciled.length} narrative-cited missing edge(s):`, reconciled.map(e => `${e.source} → ${e.target}`));
-                                reconciled.forEach(edge => {
+                            const nodePayload = finalGraph.nodes.map((n) => ({ id: n.id, type: n.type }));
+                            const [reconciledEdges, extractedSnippets] = await Promise.all([
+                                (0, curatorService_1.reconcileNarrativeEdges)(process.env.GEMINI_API_KEY, rootBreakdownStr, nodePayload, existingLinkIds, usageCollector),
+                                (0, curatorService_1.extractNarrativeSnippets)(process.env.GEMINI_API_KEY, rootBreakdownStr, nodePayload, usageCollector)
+                            ]);
+                            // Apply Phase 4a: Topology Parity
+                            if (reconciledEdges.length > 0) {
+                                console.log(`[Curation Backend] Phase 4a: Injecting ${reconciledEdges.length} narrative-cited missing edge(s):`, reconciledEdges.map(e => `${e.source} → ${e.target}`));
+                                reconciledEdges.forEach(edge => {
                                     finalGraph.links.push({
                                         source: edge.source,
                                         target: edge.target,
@@ -752,11 +757,21 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                 });
                             }
                             else {
-                                console.log(`[Curation Backend] Phase B: No missing narrative edges found. Graph topology is already consistent.`);
+                                console.log(`[Curation Backend] Phase 4a: No missing narrative edges found. Graph topology is already consistent.`);
+                            }
+                            // Apply Phase 4b: Contextual Tooltips (Rule 26)
+                            if (extractedSnippets.length > 0) {
+                                console.log(`[Curation Backend] Phase 4b: Extracted ${extractedSnippets.length} narrative snippets for tooltips.`);
+                                const snippetMap = new Map(extractedSnippets.map(s => [s.nodeId, s.snippet]));
+                                finalGraph.nodes.forEach((n) => {
+                                    if (snippetMap.has(n.id)) {
+                                        n.narrativeSnippet = snippetMap.get(n.id);
+                                    }
+                                });
                             }
                         }
-                        catch (reconcileErr) {
-                            console.warn(`[Curation Backend] Phase B: reconcileNarrativeEdges failed (non-fatal):`, reconcileErr);
+                        catch (concurrentErr) {
+                            console.warn(`[Curation Backend] Phase 4a/4b: Narrative parsing failed (non-fatal):`, concurrentErr);
                         }
                     }
                     for (const entityObj of recommendedEntities) {

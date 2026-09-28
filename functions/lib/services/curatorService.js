@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateSemanticLinkWeights = exports.scrapeImageUrlBackend = exports.checkVideoPlayability = exports.scrapeVideoIdBackend = exports.fetchNodeDetailsBackend = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = exports.NODE_DETAILS_SCHEMA = exports.generateGraphDataBackend = exports.reconcileNarrativeEdges = exports.generateRootsBreakdownBackend = exports.validateSeedOriginBackend = exports.SEED_VALIDATION_SCHEMA = exports.GENERATE_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = exports.GRAPH_RESPONSE_SCHEMA = exports.extractCleanJsonString = exports.extractArtistSubGraph = exports.normalizeGraphData = exports.buildCompositeCacheKey = exports.extractCountrySlug = exports.sanitizeImageUrl = exports.extractValidYoutubeId = exports.titleCaseArtistId = exports.normalizeArtistId = exports.applyCanonicalAlias = exports.CANONICAL_ALIASES = void 0;
+exports.generateSemanticLinkWeights = exports.scrapeImageUrlBackend = exports.checkVideoPlayability = exports.scrapeVideoIdBackend = exports.fetchNodeDetailsBackend = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = exports.NODE_DETAILS_SCHEMA = exports.generateGraphDataBackend = exports.extractNarrativeSnippets = exports.reconcileNarrativeEdges = exports.generateRootsBreakdownBackend = exports.validateSeedOriginBackend = exports.SEED_VALIDATION_SCHEMA = exports.GENERATE_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = exports.GRAPH_RESPONSE_SCHEMA = exports.extractCleanJsonString = exports.extractArtistSubGraph = exports.normalizeGraphData = exports.buildCompositeCacheKey = exports.extractCountrySlug = exports.sanitizeImageUrl = exports.extractValidYoutubeId = exports.titleCaseArtistId = exports.normalizeArtistId = exports.applyCanonicalAlias = exports.CANONICAL_ALIASES = void 0;
 const genai_1 = require("@google/genai");
 const executeCurationPipeline_1 = require("../executeCurationPipeline");
 // --- UTILITIES PORTED FROM artistCacheService.ts ---
@@ -779,6 +779,81 @@ If no missing edges are found, return an empty array [].`;
     }
 };
 exports.reconcileNarrativeEdges = reconcileNarrativeEdges;
+// Phase 4b — Contextual Extraction (Rule 26): Narrative Snippets for Tooltips.
+// Extracts the most defining sentence/clause from the narrative for each node.
+const extractNarrativeSnippets = async (apiKey, narrative, nodes, usageCollector) => {
+    if (!narrative || !narrative.trim() || nodes.length === 0)
+        return [];
+    const currentModel = "gemini-3.5-flash";
+    const ai = new genai_1.GoogleGenAI({ apiKey, httpOptions: { timeout: 120000 } });
+    const artistNodes = nodes
+        .filter(n => n.type === 'artist' || n.type === 'label')
+        .map(n => n.id);
+    if (artistNodes.length === 0)
+        return [];
+    const prompt = `You are extracting contextual snippets for a music UI tooltip.
+
+Below is the Root Breakdown narrative generated for this graph, followed by the complete list of valid node IDs.
+
+Your task: Extract the single most defining sentence or clause from the narrative for each artist mentioned. Only extract snippets for IDs present in the Valid Node IDs list. Omit any artist not mentioned in the text. Do not rewrite the text; extract it verbatim.
+
+--- NARRATIVE ---
+${narrative}
+
+--- VALID NODE IDs (artist/label only) ---
+${JSON.stringify(artistNodes)}
+
+Return a JSON array of snippets. For each snippet provide:
+- nodeId: the exact node ID from the valid list
+- snippet: the verbatim sentence or clause describing them (max 120 chars)`;
+    const responseSchema = {
+        type: genai_1.Type.ARRAY,
+        description: "Extracted narrative snippets per node.",
+        items: {
+            type: genai_1.Type.OBJECT,
+            properties: {
+                nodeId: {
+                    type: genai_1.Type.STRING,
+                    description: "Exact node ID from the valid list."
+                },
+                snippet: {
+                    type: genai_1.Type.STRING,
+                    description: "Verbatim sentence or clause from the narrative."
+                }
+            },
+            required: ["nodeId", "snippet"]
+        }
+    };
+    try {
+        const response = await ai.models.generateContent({
+            model: currentModel,
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema,
+                temperature: 0.1,
+            }
+        });
+        if (response.usageMetadata) {
+            usageCollector.push(currentModel, {
+                promptTokenCount: response.usageMetadata.promptTokenCount || 0,
+                candidatesTokenCount: response.usageMetadata.candidatesTokenCount || 0,
+                totalTokenCount: response.usageMetadata.totalTokenCount || 0,
+            });
+        }
+        const text = response.text;
+        if (!text)
+            return [];
+        const parsed = JSON.parse(text);
+        const artistNodeSet = new Set(artistNodes);
+        return parsed.filter(s => artistNodeSet.has(s.nodeId));
+    }
+    catch (error) {
+        console.error("[extractNarrativeSnippets] Failed to extract narrative snippets:", error);
+        return [];
+    }
+};
+exports.extractNarrativeSnippets = extractNarrativeSnippets;
 const generateGraphDataBackend = async (artists, filters, cachedSubgraphsContext, baseGraph, disambiguationHints) => {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {

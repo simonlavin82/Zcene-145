@@ -872,6 +872,92 @@ If no missing edges are found, return an empty array [].`;
   }
 };
 
+// Phase 4b — Contextual Extraction (Rule 26): Narrative Snippets for Tooltips.
+// Extracts the most defining sentence/clause from the narrative for each node.
+export const extractNarrativeSnippets = async (
+  apiKey: string,
+  narrative: string,
+  nodes: Array<{ id: string; type: string }>,
+  usageCollector: UsageCollector
+): Promise<{ nodeId: string; snippet: string }[]> => {
+  if (!narrative || !narrative.trim() || nodes.length === 0) return [];
+
+  const currentModel = "gemini-3.5-flash";
+  const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: 120000 } });
+
+  const artistNodes = nodes
+    .filter(n => n.type === 'artist' || n.type === 'label')
+    .map(n => n.id);
+
+  if (artistNodes.length === 0) return [];
+
+  const prompt = `You are extracting contextual snippets for a music UI tooltip.
+
+Below is the Root Breakdown narrative generated for this graph, followed by the complete list of valid node IDs.
+
+Your task: Extract the single most defining sentence or clause from the narrative for each artist mentioned. Only extract snippets for IDs present in the Valid Node IDs list. Omit any artist not mentioned in the text. Do not rewrite the text; extract it verbatim.
+
+--- NARRATIVE ---
+${narrative}
+
+--- VALID NODE IDs (artist/label only) ---
+${JSON.stringify(artistNodes)}
+
+Return a JSON array of snippets. For each snippet provide:
+- nodeId: the exact node ID from the valid list
+- snippet: the verbatim sentence or clause describing them (max 120 chars)`;
+
+  const responseSchema = {
+    type: Type.ARRAY,
+    description: "Extracted narrative snippets per node.",
+    items: {
+      type: Type.OBJECT,
+      properties: {
+        nodeId: {
+          type: Type.STRING,
+          description: "Exact node ID from the valid list."
+        },
+        snippet: {
+          type: Type.STRING,
+          description: "Verbatim sentence or clause from the narrative."
+        }
+      },
+      required: ["nodeId", "snippet"]
+    }
+  };
+
+  try {
+    const response = await ai.models.generateContent({
+      model: currentModel,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema,
+        temperature: 0.1,
+      }
+    });
+
+    if (response.usageMetadata) {
+      usageCollector.push(currentModel, {
+        promptTokenCount: response.usageMetadata.promptTokenCount || 0,
+        candidatesTokenCount: response.usageMetadata.candidatesTokenCount || 0,
+        totalTokenCount: response.usageMetadata.totalTokenCount || 0,
+      });
+    }
+
+    const text = response.text;
+    if (!text) return [];
+
+    const parsed: { nodeId: string; snippet: string }[] = JSON.parse(text);
+
+    const artistNodeSet = new Set(artistNodes);
+    return parsed.filter(s => artistNodeSet.has(s.nodeId));
+  } catch (error) {
+    console.error("[extractNarrativeSnippets] Failed to extract narrative snippets:", error);
+    return [];
+  }
+};
+
 export const generateGraphDataBackend = async (
   artists: string,
   filters?: DiscoveryFilters,

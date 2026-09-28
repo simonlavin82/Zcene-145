@@ -22,6 +22,7 @@ export interface Node {
   vy?: number;
   fx?: number | null;
   fy?: number | null;
+  narrativeSnippet?: string;
 }
 
 export interface Link {

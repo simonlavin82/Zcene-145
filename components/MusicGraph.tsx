@@ -641,7 +641,8 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
                 // Fetch DNA/Recommendation Reason
                 const normId = normalizeArtistId(d.id);
-                const nodeDna = detailsCache?.get(d.id)?.recommendationReason ||
+                const nodeDna = d.narrativeSnippet ||
+                                detailsCache?.get(d.id)?.recommendationReason ||
                                 detailsCache?.get(d.id.toLowerCase())?.recommendationReason ||
                                 detailsCache?.get(normId)?.recommendationReason;
 
