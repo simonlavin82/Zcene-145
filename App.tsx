@@ -6152,11 +6152,18 @@ const App: React.FC = () => {
       if (!projectId || !user || isGuest) return; // re-check inside async closure
       const projectPath = `users/${user.uid}/projects/${projectId}`;
       try {
+        // Gate the resulting onSnapshot from re-running the full hydration cycle.
+        // The canvasLayout field is a position-only write; the Firestore listener
+        // must not treat it as a structural project update requiring re-hydration.
+        isHydratingSessionRef.current = true;
         await updateDoc(doc(db, projectPath), {
           canvasLayout: serialized,
           updatedAt: serverTimestamp(),
         });
         console.log(`[Coordinate Memory] canvasLayout persisted for project: ${projectId}`);
+        // 1s tail matches the autosave pattern — long enough to absorb the onSnapshot
+        // echo from Firestore, short enough not to block legitimate critical updates.
+        setTimeout(() => { isHydratingSessionRef.current = false; }, 1000);
       } catch (err) {
         console.warn(`[Coordinate Memory] updateDoc failed for ${projectPath}:`, err);
       }

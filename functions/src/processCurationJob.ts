@@ -4,6 +4,7 @@ import { getFirestore, FieldValue, Timestamp } from "firebase-admin/firestore";
 import { translateError } from "./services/errorTranslationLayer";
 import {
   generateRootsBreakdownBackend,
+  reconcileNarrativeEdges,
   normalizeArtistId,
   fetchNodeDetailsBackend,
   scrapeVideoIdBackend,
@@ -799,7 +800,41 @@ export const processCurationJob = onDocumentCreated({
       rootBreakdownStr = await generateRootsBreakdownBackend(inputPayload.artists, detailsCacheEntries, usageCollector);
       finalGraph.synthesisRationale = rootBreakdownStr;
 
-      // --- PRE-COMPUTE ID REWRITE MAP BEFORE GRAPH EXTRACTION ---
+      // Phase B — Topology Parity (Rule 23): reconcile narrative citations against graph edges.
+      // Runs BEFORE the ID Rewrite so node IDs in the narrative still match pre-rewrite graph IDs.
+      if (rootBreakdownStr && finalGraph.nodes && finalGraph.links && process.env.GEMINI_API_KEY) {
+        try {
+          console.log(`[Curation Backend] Phase B: Auditing narrative for missing graph edges...`);
+          const existingLinkIds = finalGraph.links.map((l: any) => ({
+            source: typeof l.source === 'string' ? l.source : (l.source as any).id,
+            target: typeof l.target === 'string' ? l.target : (l.target as any).id,
+          }));
+          const reconciled = await reconcileNarrativeEdges(
+            process.env.GEMINI_API_KEY,
+            rootBreakdownStr,
+            finalGraph.nodes.map((n: any) => ({ id: n.id, type: n.type })),
+            existingLinkIds,
+            usageCollector
+          );
+          if (reconciled.length > 0) {
+            console.log(`[Curation Backend] Phase B: Injecting ${reconciled.length} narrative-cited missing edge(s):`, reconciled.map(e => `${e.source} → ${e.target}`));
+            reconciled.forEach(edge => {
+              finalGraph.links.push({
+                source: edge.source,
+                target: edge.target,
+                value: 1,
+                weight: edge.weight,
+                context: edge.context,
+              });
+            });
+          } else {
+            console.log(`[Curation Backend] Phase B: No missing narrative edges found. Graph topology is already consistent.`);
+          }
+        } catch (reconcileErr) {
+          console.warn(`[Curation Backend] Phase B: reconcileNarrativeEdges failed (non-fatal):`, reconcileErr);
+        }
+      }
+
       
       for (const entityObj of recommendedEntities) {
         const recNorm = normalizeArtistId(entityObj.name);

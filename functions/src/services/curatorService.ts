@@ -703,12 +703,21 @@ export const generateRootsBreakdownBackend = async (
   // Use pro model for better synthesis
   const currentModel = "gemini-3.1-pro-preview";
 
-  const systemInstruction = `You are an expert music curator and archivist. Your task is to write a master narrative (Roots Breakdown) synthesizing the relationship between a set of seed artists and the deeper ecosystem they belong to.
-  
-You MUST output the step-by-step reasoning chain of your co-equal cross-analysis. The text MUST be scannable and formatted using Markdown: use short paragraphs, bolding for key terms, and bullet points for lists. Do NOT use double newlines between bullet points. Explain in detail how the seeds' acoustic, geographic, and chronological dimensions intersect to yield the generated connections.`;
+  // Phase C — Verbal Identity (Rule 24): late-night record curator voice.
+  // Active verbs, discovery framing, immersive tone. No UK English constraint.
+  const systemInstruction = `You are a late-night record curator — the kind of person who pulls an obscure 7" from a crate at 2am and traces exactly why it matters. Your task is to write a Roots Breakdown: a rich, interconnected narrative that maps the musical DNA between a set of seed artists and the deeper ecosystem they inhabit.
+
+Write like you are guiding someone through a web of sounds, scenes, and moments — not cataloguing data. Use active verbs: map, trace, uncover, connect, explore, pull apart, reassemble. Prioritize discovery over description. Make the reader feel the connections before they understand them.
+
+FORMATTING RULES (non-negotiable):
+- Use Markdown throughout: **bold** key artists, genres, and scenes on first mention.
+- Use short, punchy paragraphs. No wall-of-text blocks.
+- Use bullet points for dense cross-referencing. No double newlines between bullets.
+- Open with a hook — a defining tension or surprising throughline in the ecosystem.
+- Close with a synthesis: what does this web of connections reveal that no individual artist makes visible alone?`;
 
   const prompt = `Write the Roots Breakdown for these seed artists: ${artists}.
-  
+
 Here is the fully enriched context of all nodes (seeds and deep cuts) in their generated ecosystem:
 ${JSON.stringify(detailsCacheEntries, null, 2)}`;
 
@@ -730,11 +739,136 @@ ${JSON.stringify(detailsCacheEntries, null, 2)}`;
       });
     }
 
-    const text = response.text || `[Roots Breakdown Unavailable]\n- Synthesis returned empty response.`;
+    const text = response.text || `**Roots Breakdown Unavailable**\n- Synthesis returned an empty response. Try regenerating.`;
     return text;
   } catch (err) {
     console.error("[generateRootsBreakdownBackend] Failed to generate roots breakdown:", err);
-    return `[Roots Breakdown Unavailable]\n- Synthesis failed due to a backend API error.`;
+    return `**Roots Breakdown Unavailable**\n- A backend error interrupted synthesis. Try regenerating.`;
+  }
+};
+
+// Phase B — Topology Parity (Rule 23): Narrative-to-Graph Edge Reconciliation.
+// Audits the Root Breakdown narrative against the existing graph edges and returns
+// any artist-to-artist connections explicitly cited in the text that are missing from
+// finalGraph.links. Both source and target must exist in the provided node list.
+// Uses gemini-3.5-flash with structured JSON output for deterministic parsing.
+export interface ReconciliationEdge {
+  source: string;  // nodeId exactly as it appears in the node list
+  target: string;  // nodeId exactly as it appears in the node list
+  context: string; // verbatim excerpt from the narrative justifying this edge
+  weight: number;  // semantic strength 0.1–1.0
+}
+
+export const reconcileNarrativeEdges = async (
+  apiKey: string,
+  narrative: string,
+  nodes: Array<{ id: string; type: string }>,
+  existingLinks: Array<{ source: string; target: string }>,
+  usageCollector: UsageCollector
+): Promise<ReconciliationEdge[]> => {
+  if (!narrative || !narrative.trim() || nodes.length === 0) return [];
+
+  const currentModel = "gemini-3.5-flash";
+  const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: 120000 } });
+
+  // Build a deduplicated set of existing edge keys for efficient exclusion
+  const existingEdgeSet = new Set<string>(
+    existingLinks.map(l => [l.source, l.target].sort().join('--'))
+  );
+
+  // Only expose artist-type nodes — metadata petals are not valid edge endpoints
+  const artistNodes = nodes
+    .filter(n => n.type === 'artist' || n.type === 'label')
+    .map(n => n.id);
+
+  if (artistNodes.length < 2) return [];
+
+  const prompt = `You are auditing a music graph for missing edges.
+
+Below is the Root Breakdown narrative generated for this graph, followed by the complete list of valid node IDs and the edges that already exist.
+
+Your task: identify connections between artists that are EXPLICITLY stated or directly implied in the narrative text but are MISSING from the existing edges list. Only return edges where BOTH the source and target appear verbatim in the Valid Node IDs list. Do not invent connections that are not in the text.
+
+--- NARRATIVE ---
+${narrative}
+
+--- VALID NODE IDs (artist/label only) ---
+${JSON.stringify(artistNodes)}
+
+--- EXISTING EDGES (already in graph, do NOT repeat these) ---
+${JSON.stringify(existingLinks.map(l => `${l.source} → ${l.target}`))}
+
+Return a JSON array of missing edges. For each missing edge provide:
+- source: the exact node ID from the valid list
+- target: the exact node ID from the valid list  
+- context: a short verbatim excerpt from the narrative that cites this connection (max 120 characters)
+- weight: a float 0.1–1.0 representing connection strength (1.0 = defining influence, 0.1 = loose mention)
+
+If no missing edges are found, return an empty array [].`;
+
+  const responseSchema = {
+    type: Type.ARRAY,
+    description: "Missing narrative edges not yet present in the graph.",
+    items: {
+      type: Type.OBJECT,
+      properties: {
+        source: {
+          type: Type.STRING,
+          description: "Exact source node ID from the valid node list."
+        },
+        target: {
+          type: Type.STRING,
+          description: "Exact target node ID from the valid node list."
+        },
+        context: {
+          type: Type.STRING,
+          description: "Short verbatim excerpt from the narrative (max 120 chars) justifying this edge."
+        },
+        weight: {
+          type: Type.NUMBER,
+          description: "Semantic weight 0.1 (loose) to 1.0 (core defining connection)."
+        }
+      },
+      required: ["source", "target", "context", "weight"]
+    }
+  };
+
+  try {
+    const response = await ai.models.generateContent({
+      model: currentModel,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema,
+        temperature: 0.1,
+      }
+    });
+
+    if (response.usageMetadata) {
+      usageCollector.push(currentModel, {
+        promptTokenCount: response.usageMetadata.promptTokenCount || 0,
+        candidatesTokenCount: response.usageMetadata.candidatesTokenCount || 0,
+        totalTokenCount: response.usageMetadata.totalTokenCount || 0,
+      });
+    }
+
+    const text = response.text;
+    if (!text) return [];
+
+    const parsed: ReconciliationEdge[] = JSON.parse(text);
+
+    // Final safety pass: enforce that both endpoints exist in our node list
+    // and that the edge is not already present in the graph.
+    const artistNodeSet = new Set(artistNodes);
+    return parsed.filter(edge => {
+      if (!artistNodeSet.has(edge.source) || !artistNodeSet.has(edge.target)) return false;
+      if (edge.source === edge.target) return false;
+      const key = [edge.source, edge.target].sort().join('--');
+      return !existingEdgeSet.has(key);
+    });
+  } catch (error) {
+    console.error("[reconcileNarrativeEdges] Failed to reconcile narrative edges:", error);
+    return [];
   }
 };
 

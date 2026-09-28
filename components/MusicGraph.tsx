@@ -898,15 +898,13 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     }
                 });
 
-                // Phase A — Coordinate Memory: collect settled artist/label positions
-                // and fire the callback so App.tsx can persist them to Firestore.
-                // Only artist and label nodes carry independent semantic positions;
-                // metadata petals (genre, country, label, founded) are excluded.
+                // Phase A — Coordinate Memory: collect ALL settled node positions
+                // (artists, labels, and all metadata petals: genre, country, founded).
+                // Zero Coordinate Amnesia requires every node type to be pinned.
                 if (onCoordinatesSettledRef.current) {
                     const settledLayout: CanvasNodeRef[] = nodes
-                        .filter(n => (n.type === 'artist' || n.type === 'label')
-                                 && n.fx !== undefined && n.fx !== null
-                                 && n.fy !== undefined && n.fy !== null)
+                        .filter(n => n.fx !== undefined && n.fx !== null
+                                  && n.fy !== undefined && n.fy !== null)
                         .map(n => ({
                             nodeId: n.id,
                             x: n.x,
