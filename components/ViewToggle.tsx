@@ -39,7 +39,7 @@ const ViewToggle = <T extends string>({
     <div className={`flex items-center bg-zinc-950 border border-zinc-700/80 rounded-xl p-0.5 relative ${className}`}>
       {/* Square Sliding Active Badge */}
       <motion.div
-        className="absolute top-0.5 left-0.5 w-8 h-8 bg-zinc-800 rounded-[6px] shadow-inner ring-1 ring-zinc-600/50"
+        className="absolute top-0.5 left-0.5 w-8 h-8 bg-zinc-800 rounded-[10px] shadow-inner ring-1 ring-zinc-600/50"
         initial={false}
         animate={{
           x: isFirst ? 0 : 32,
@@ -53,7 +53,7 @@ const ViewToggle = <T extends string>({
 
       <button
         onClick={() => onChange(options[0].id)}
-        className={`flex items-center justify-center w-8 h-8 rounded-lg transition-colors relative z-10 active:scale-95 ${
+        className={`flex items-center justify-center w-8 h-8 rounded-[10px] transition-colors relative z-10 active:scale-95 ${
           value === options[0].id ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'
         }`}
         title={options[0].label}
@@ -64,7 +64,7 @@ const ViewToggle = <T extends string>({
 
       <button
         onClick={() => onChange(options[1].id)}
-        className={`flex items-center justify-center w-8 h-8 rounded-lg transition-colors relative z-10 active:scale-95 ${
+        className={`flex items-center justify-center w-8 h-8 rounded-[10px] transition-colors relative z-10 active:scale-95 ${
           value === options[1].id ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'
         }`}
         title={options[1].label}
