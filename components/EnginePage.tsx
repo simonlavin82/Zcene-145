@@ -446,6 +446,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
         { id: 'graph-generation', title: 'Graph Generation' },
         { id: 'deep-cut-details', title: 'Deep Cut Details' },
         { id: 'data-synthesis', title: 'Data Synthesis & Persistence' },
+        { id: 'custom-svg-integration', title: 'Custom SVG Integration Pipeline' },
         { id: 'conversational-ai', title: 'Conversational AI' },
         { id: 'access-management', title: 'Access Management' },
     ];
@@ -1566,6 +1567,51 @@ The Zcene AI curation and client proxy pipelines implement a 4-tier defense-in-d
 4. CROSS-ENVIRONMENT SYNC:
    This defense-in-depth parsing contract is identically enforced across client proxies (services/geminiService.ts), Cloud Functions curation jobs (functions/src/services/curatorService.ts), and Node.js server endpoints (server.js).
 `} />
+                    </section>
+
+                    {/* ── CUSTOM SVG INTEGRATION PIPELINE ── */}
+                    <section id="custom-svg-integration">
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">Custom SVG Integration Pipeline</h2>
+
+                        <div className="space-y-8">
+                            <div className="bg-zinc-900/50 p-6 rounded-xl border border-zinc-800">
+                                <h3 className="text-xl font-medium text-primary mb-3">Architectural Rules for External Icons</h3>
+                                <p className="text-zinc-300 leading-relaxed mb-6">
+                                    When introducing non-Material external brand assets (e.g., Bandcamp, Spotify), they must be sanitized and converted into reusable React components to preserve styling continuity across states.
+                                </p>
+
+                                <ul className="space-y-4 text-sm text-zinc-400">
+                                    <li className="flex items-start gap-3">
+                                        <span className="material-symbols-outlined text-green-500 !text-[18px] mt-0.5">check_circle</span>
+                                        <div>
+                                            <strong className="text-zinc-200 block mb-1">1. Preserve Original ViewBox</strong>
+                                            Drop explicit `width` and `height` properties from the parent `svg` tag, but retain the exact `viewBox` coordinates (e.g., `viewBox="0 0 800 800"`) to prevent distortion.
+                                        </div>
+                                    </li>
+                                    <li className="flex items-start gap-3">
+                                        <span className="material-symbols-outlined text-green-500 !text-[18px] mt-0.5">check_circle</span>
+                                        <div>
+                                            <strong className="text-zinc-200 block mb-1">2. Strip Hardcoded Colors</strong>
+                                            Locate all `fill="#XXXXXX"` or `stroke="#XXXXXX"` hex values in paths.
+                                        </div>
+                                    </li>
+                                    <li className="flex items-start gap-3">
+                                        <span className="material-symbols-outlined text-green-500 !text-[18px] mt-0.5">check_circle</span>
+                                        <div>
+                                            <strong className="text-zinc-200 block mb-1">3. Inject Contextual Color</strong>
+                                            Replace stripped colors with `fill="currentColor"` or `stroke="currentColor"`. This guarantees the component perfectly respects the parent element's `text-zinc-400` defaults and `hover:text-white` hover states.
+                                        </div>
+                                    </li>
+                                    <li className="flex items-start gap-3">
+                                        <span className="material-symbols-outlined text-green-500 !text-[18px] mt-0.5">check_circle</span>
+                                        <div>
+                                            <strong className="text-zinc-200 block mb-1">4. Component Wrapping</strong>
+                                            Wrap the final sanitized `&lt;svg&gt;` markup inside a React functional component inside `components/Icons.tsx` accepting standard `className` props.
+                                        </div>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
                     </section>
 
                     {/* ── CONVERSATIONAL AI ── */}

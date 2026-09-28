@@ -5,7 +5,7 @@ import { Node, NodeDetails, GraphData, View, ChatMessage, StackItem, UserTaste, 
 import { streamNodeChat, fetchLiveTourData, streamLocalHeuristicChat, fetchNodeDetails } from '../services/geminiService';
 import { normalizeArtistId, titleCaseArtistId, cleanArtistDisplayName, isNodeInSeedList, getArtistDocWithRedirect, enforceArtistCacheSchema, isArtistIdMatch } from '../services/artistCacheService';
 import { analyticsService } from '../services/analyticsService';
-import { Spinner, HelpIcon, MicIcon, LoadingSpinner, DETAIL_THINKING_STEPS, StackIcon } from './Icons';
+import { Spinner, HelpIcon, MicIcon, LoadingSpinner, DETAIL_THINKING_STEPS, StackIcon, BandcampIcon } from './Icons';
 import { TokenConfirmationDialog, FullItineraryDialog, PROFILE_COLORS, MODAL_PROFILE_COLORS } from './SharedModals';
 import { SegmentedTextToggle } from './ui/SegmentedTextToggle';
 import { db } from '../services/firebase';
@@ -1484,9 +1484,13 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                         className="flex items-center justify-start px-4 py-2 rounded-xl font-medium transition-all active:scale-[0.98] bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-white border border-zinc-700 hover:border-zinc-600"
                                                     >
                                                         <div className="flex items-center gap-3">
-                                                            <span className="material-symbols-outlined !text-[18px]">
-                                                                {isBandcamp ? 'album' : 'public'}
-                                                            </span>
+                                                            {isBandcamp ? (
+                                                                <BandcampIcon className="w-[18px] h-[18px] flex-shrink-0" />
+                                                            ) : (
+                                                                <span className="material-symbols-outlined !text-[18px]">
+                                                                    public
+                                                                </span>
+                                                            )}
                                                             <span className="px-0.5 tracking-normal text-sm">
                                                                 {isBandcamp ? 'Bandcamp' : link.site}
                                                             </span>

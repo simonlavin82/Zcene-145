@@ -7,7 +7,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View } from '../types';
 import * as d3 from 'd3';
-import { ZceneLogo, InstagramIcon, ZceneAbbreviatedLogo, FaviconLogo, LegendSymbol, SortControls, Spinner, HelpIcon, MicIcon, VisibilityIcon, VisibilityOffIcon, LoadingSpinner, DETAIL_THINKING_STEPS, GRAPH_THINKING_STEPS } from './Icons';
+import { ZceneLogo, InstagramIcon, ZceneAbbreviatedLogo, FaviconLogo, LegendSymbol, SortControls, Spinner, HelpIcon, MicIcon, VisibilityIcon, VisibilityOffIcon, LoadingSpinner, DETAIL_THINKING_STEPS, GRAPH_THINKING_STEPS, BandcampIcon } from './Icons';
 import ViewToggle from './ViewToggle';
 import Header from './Header';
 import { AdminViewToggle } from './ui/AdminViewToggle';
@@ -1161,6 +1161,23 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <IconDisplay icon={<span className="material-symbols-outlined">hub</span>} name="Organic View" pxSize="18px" description="Switches the graph to the default organic layout." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
                                     <IconDisplay icon={<span className="material-symbols-outlined">bubble_chart</span>} name="Cluster View" pxSize="18px" description="Switches the graph to the clustered attribute layout." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
                                     <IconDisplay icon={<Waypoints size={18} />} name="Roots Breakdown" pxSize="18px" description="Dimensional Topology / Roots Breakdown." implementation="size={18}" />
+                                </div>
+                            </div>
+
+                            <div>
+                                <h3 className="text-xl font-medium text-zinc-200 mb-6">Platform Integrations</h3>
+                                <p className="text-base text-zinc-400 leading-relaxed max-w-3xl mb-8">
+                                    For third-party integrations where native Material symbols are insufficient, we utilize custom SVG components. These custom icons strictly adhere to our "Standard UI" scale rules (18px) to ensure perfect visual balance alongside native symbols.
+                                </p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    <IconDisplay 
+                                        icon={<BandcampIcon className="w-[18px] h-[18px]" />} 
+                                        name="BandcampIcon" 
+                                        pxSize="18px" 
+                                        description="Custom SVG Integration. Used in Artist Catalogs to link external artist stores." 
+                                        implementation="<BandcampIcon className='w-[18px] h-[18px]' />" 
+                                        overrideIconClass="" 
+                                    />
                                 </div>
                             </div>
 

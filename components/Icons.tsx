@@ -198,3 +198,9 @@ export const SortControls: React.FC<SortControlsProps> = ({ sortConfig, onSortCh
     </div>
   );
 };
+
+export const BandcampIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} viewBox="0 0 800 800" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M708.375 214.2L537.079 586.554L91.6621 584.804L262.462 213.458L708.375 214.2Z" stroke="currentColor" strokeWidth="50" strokeMiterlimit="15" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
