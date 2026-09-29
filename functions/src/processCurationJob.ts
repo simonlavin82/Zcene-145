@@ -441,6 +441,12 @@ export const processCurationJob = onDocumentCreated({
             chunk.map(async (entityObj: any, idx: number) => {
               const rawName = entityObj.name;
               let artistNormId = entityObj.id; // Bug 1 & 2 Fix: Preserve the pre-slugged ID
+              // V11.5 Guardrail: Strip any filter tags the AI may have hallucinated onto the node ID.
+              // This must happen at the point of entry — BEFORE any cache lookups or hydration —
+              // so that a poisoned ID like "spaced-us-after:2018" is sanitized to "spaced-us"
+              // before it can propagate into detailsCacheEntries or Firestore.
+              artistNormId = artistNormId.replace(/-(after|before|genre|inc_genres|exc_origins|inc_origins):[^-\s]+/gi, '');
+              entityObj.id = artistNormId; // Keep entityObj.id in sync so hydration result at line 700 is clean
               
               const isLabel = entityObj.type === 'label';
 
@@ -1291,7 +1297,7 @@ export const processCurationJob = onDocumentCreated({
           
           // Bug 2: The Overwrite Violation - skip proactive cache update for perfect hits
           if (recDetails && recDetails._isReadOnly && !matchingSeedNorm) {
-            console.log(`[Curation Backend] Skipping proactive cache update for perfect hit (${collName}): ${compositeCanonicalId}`);
+            console.log(`[Curation Backend] Skipping proactive cache update for perfect hit (${collName}): ${cleanCanonicalId} (cacheKey: ${compositeCanonicalId})`);
             continue;
           }
 
@@ -1352,7 +1358,7 @@ export const processCurationJob = onDocumentCreated({
                 hasUniqueSpiderweb: (matchingSeedNorm && !isLabel && !isComplexGeneration) ? true : false,
                 dataIntegrityStatus: matchingSeedNorm ? (recDetails?._isStub ? 'degraded' : 'verified') : undefined,
               });
-              console.log(`[Curation Backend] Proactively created DEEP entry for recommendation (${collName}): ${compositeCanonicalId}`);
+              console.log(`[Curation Backend] Proactively created DEEP entry for recommendation (${collName}): ${cleanCanonicalId} (cacheKey: ${compositeCanonicalId})`);
             } else {
               const finalRecDetails = isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(normalizeDetailsForWrite(recDetails));
               
@@ -1414,8 +1420,7 @@ export const processCurationJob = onDocumentCreated({
               }
 
               await recDocRef.update(sanitizeUndefinedProperties(updatePayload));
-              console.log(`[Curation Backend] Proactively updated detailsCache for recommendation (${collName}): ${compositeCanonicalId}`);
-            }
+              console.log(`[Curation Backend] Proactively updated detailsCache for recommendation (${collName}): ${cleanCanonicalId} (cacheKey: ${compositeCanonicalId})`);            }
 
             }
 

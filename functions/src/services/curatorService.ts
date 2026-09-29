@@ -723,8 +723,13 @@ FORMATTING RULES (non-negotiable):
 
   let seedAnchorInstruction = '';
   if (filters && (filters.foundedAfter || filters.foundedBefore || filters.includeGenres)) {
-     const temporal = filters.foundedAfter ? `founded AFTER ${filters.foundedAfter}` : '';
-     seedAnchorInstruction = ` The user explicitly anchored this generation with a filter: ${temporal} ${filters.includeGenres ? filters.includeGenres.join(', ') : ''}. You MUST acknowledge this thematic context as a driving force in your narrative synthesis.`;
+     const filterDesc = [
+        filters.foundedAfter ? `founded AFTER ${filters.foundedAfter}` : '',
+        filters.foundedBefore ? `founded BEFORE ${filters.foundedBefore}` : '',
+        filters.includeGenres?.length ? `within genres: ${filters.includeGenres.join(', ')}` : ''
+     ].filter(Boolean).join('; ');
+
+     seedAnchorInstruction = `\n\nSEED ANCHOR CONSTRAINT (MANDATORY): This ecosystem was generated with an active filter: [${filterDesc}]. Your narrative MUST explicitly frame this filter as the defining thematic lens of the ecosystem. Reference this era or genre constraint as an organizing principle in your opening paragraph. Do NOT write as if this were an unconstrained generation — the filter is a core architectural requirement, not optional context. Failure to acknowledge the filter constraint is a violation of the generation contract.`;
   }
 
   const coAnchorMandate = isMultiSeed ? 
