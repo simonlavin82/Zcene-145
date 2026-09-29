@@ -715,9 +715,15 @@ FORMATTING RULES (non-negotiable):
 - Use bullet points for dense cross-referencing. No double newlines between bullets.
 - Open with a hook — a defining tension or surprising throughline in the ecosystem.
 - Close with a synthesis: what does this web of connections reveal that no individual artist makes visible alone?
-- For the artistSnippets field, generate an array of objects. Each object must have an 'id' (the canonical artist/label name) and a 'snippet' containing a dedicated, punchy, standalone 1-sentence "epicenter hook". This must be a complete sentence that summarizes their specific role in this exact ecosystem (e.g. "Radiohead was the band staring at the static on the television screen."). Generate a hook for the seed artist(s) and EVERY satellite artist/label you mention.`;
+- For the artistSnippets field, generate an array of objects. Each object must have an 'id' (the canonical artist/label name) and a 'snippet' containing a dedicated, punchy, standalone 1-sentence "epicenter hook". This must be a complete sentence that summarizes their specific role in this exact ecosystem (e.g. "Radiohead was the band staring at the static on the television screen."). Generate a hook for EVERY seed artist and EVERY satellite artist/label you mention.`;
 
-  const prompt = `Write the Roots Breakdown for these seed artists: ${artists}.
+  const seedList = artists.split('::').map(s => stripCountrySlug(normalizeArtistId(s)));
+  const isMultiSeed = seedList.length > 1;
+
+  const coAnchorMandate = isMultiSeed ? 
+    `\n\nCRITICAL CO-ANCHOR MANDATE (Rule 27): This is a multi-seed generation for the following equal anchors: ${artists.replace(/::/g, ', ')}. You MUST treat EVERY seed artist as a co-equal foundational anchor. Do not relegate any seed to a "satellite" status or focus the narrative on just one artist due to their fame. The resulting breakdown must weave them together as co-equal pillars of the ecosystem.` : '';
+
+  const prompt = `Write the Roots Breakdown for these seed artists: ${artists.replace(/::/g, ', ')}.${coAnchorMandate}
 
 Here is the fully enriched context of all nodes (seeds and deep cuts) in their generated ecosystem:
 ${JSON.stringify(detailsCacheEntries, null, 2)}`;

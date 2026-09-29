@@ -873,14 +873,14 @@ export const processCurationJob = onDocumentCreated({
             }
         }
         
-        const compositeCanonicalId = buildCompositeCacheKey(disambiguatedCanonicalId, inputPayload.filters || undefined);
-        idRewriteMap.set(recNorm, compositeCanonicalId);
+        const finalCanonicalId = disambiguatedCanonicalId;
+        idRewriteMap.set(recNorm, finalCanonicalId);
         
         if (matchingSeedNorm) {
-           idRewriteMap.set(matchingSeedNorm, compositeCanonicalId);
+           idRewriteMap.set(matchingSeedNorm, finalCanonicalId);
         }
         if (recDetailsEntry) {
-           (recDetailsEntry as any)[0] = compositeCanonicalId; // update entry in-place for later logic
+           (recDetailsEntry as any)[0] = finalCanonicalId; // update entry in-place for later logic
         }
       }
       
@@ -888,12 +888,12 @@ export const processCurationJob = onDocumentCreated({
       for (const seed of artistList) {
         const seedNorm = normalizeArtistId(seed);
         const canonicalSeedId = resolvedSeedNormMap.get(seedNorm) ?? seedNorm;
-        const compositeCanonicalId = buildCompositeCacheKey(canonicalSeedId, inputPayload.filters || undefined);
+        const finalCanonicalId = canonicalSeedId;
         if (!idRewriteMap.has(seedNorm)) {
-          idRewriteMap.set(seedNorm, compositeCanonicalId);
+          idRewriteMap.set(seedNorm, finalCanonicalId);
         }
         if (canonicalSeedId !== seedNorm && !idRewriteMap.has(canonicalSeedId)) {
-          idRewriteMap.set(canonicalSeedId, compositeCanonicalId);
+          idRewriteMap.set(canonicalSeedId, finalCanonicalId);
         }
       }
 

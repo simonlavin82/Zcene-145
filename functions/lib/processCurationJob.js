@@ -786,25 +786,25 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                 disambiguatedCanonicalId = `${recNorm}-${originSlug}`;
                             }
                         }
-                        const compositeCanonicalId = (0, curatorService_1.buildCompositeCacheKey)(disambiguatedCanonicalId, inputPayload.filters || undefined);
-                        idRewriteMap.set(recNorm, compositeCanonicalId);
+                        const finalCanonicalId = disambiguatedCanonicalId;
+                        idRewriteMap.set(recNorm, finalCanonicalId);
                         if (matchingSeedNorm) {
-                            idRewriteMap.set(matchingSeedNorm, compositeCanonicalId);
+                            idRewriteMap.set(matchingSeedNorm, finalCanonicalId);
                         }
                         if (recDetailsEntry) {
-                            recDetailsEntry[0] = compositeCanonicalId; // update entry in-place for later logic
+                            recDetailsEntry[0] = finalCanonicalId; // update entry in-place for later logic
                         }
                     }
                     // Also ensure primary seeds are correctly mapped
                     for (const seed of artistList) {
                         const seedNorm = (0, curatorService_1.normalizeArtistId)(seed);
                         const canonicalSeedId = resolvedSeedNormMap.get(seedNorm) ?? seedNorm;
-                        const compositeCanonicalId = (0, curatorService_1.buildCompositeCacheKey)(canonicalSeedId, inputPayload.filters || undefined);
+                        const finalCanonicalId = canonicalSeedId;
                         if (!idRewriteMap.has(seedNorm)) {
-                            idRewriteMap.set(seedNorm, compositeCanonicalId);
+                            idRewriteMap.set(seedNorm, finalCanonicalId);
                         }
                         if (canonicalSeedId !== seedNorm && !idRewriteMap.has(canonicalSeedId)) {
-                            idRewriteMap.set(canonicalSeedId, compositeCanonicalId);
+                            idRewriteMap.set(canonicalSeedId, finalCanonicalId);
                         }
                     }
                     // ── Apply Canonical ID Rewrite and Strict Deduplication to Graph Topology BEFORE Extraction ──
