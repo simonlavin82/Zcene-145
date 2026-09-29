@@ -689,7 +689,8 @@ export const validateSeedOriginBackend = async (
 export const generateRootsBreakdownBackend = async (
   artists: string,
   detailsCacheEntries: any[],
-  usageCollector?: UsageCollector
+  usageCollector?: UsageCollector,
+  filters?: any
 ): Promise<{ editorialMarkdown: string; artistSnippets: { id: string; snippet: string }[] } | null> => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -720,8 +721,14 @@ FORMATTING RULES (non-negotiable):
   const seedList = artists.split('::').map(s => stripCountrySlug(normalizeArtistId(s)));
   const isMultiSeed = seedList.length > 1;
 
+  let seedAnchorInstruction = '';
+  if (filters && (filters.foundedAfter || filters.foundedBefore || filters.includeGenres)) {
+     const temporal = filters.foundedAfter ? `founded AFTER ${filters.foundedAfter}` : '';
+     seedAnchorInstruction = ` The user explicitly anchored this generation with a filter: ${temporal} ${filters.includeGenres ? filters.includeGenres.join(', ') : ''}. You MUST acknowledge this thematic context as a driving force in your narrative synthesis.`;
+  }
+
   const coAnchorMandate = isMultiSeed ? 
-    `\n\nCRITICAL CO-ANCHOR MANDATE (Rule 27): This is a multi-seed generation for the following equal anchors: ${artists.replace(/::/g, ', ')}. You MUST treat EVERY seed artist as a co-equal foundational anchor. Do not relegate any seed to a "satellite" status or focus the narrative on just one artist due to their fame. The resulting breakdown must weave them together as co-equal pillars of the ecosystem.` : '';
+    `\n\nCRITICAL CO-ANCHOR MANDATE (Rule 27): This is a multi-seed generation for the following equal anchors: ${artists.replace(/::/g, ', ')}. You MUST treat EVERY seed artist as a co-equal foundational anchor. Do not relegate any seed to a "satellite" status or focus the narrative on just one artist due to their fame. The resulting breakdown must weave them together as co-equal pillars of the ecosystem.${seedAnchorInstruction}` : `\n\nCRITICAL ANCHOR MANDATE (Rule 27):${seedAnchorInstruction}`;
 
   const prompt = `Write the Roots Breakdown for these seed artists: ${artists.replace(/::/g, ', ')}.${coAnchorMandate}
 
@@ -987,6 +994,7 @@ export const generateGraphDataBackend = async (
       filterRules += `\n\n(Note: The seed artists [${artists}] are the ONLY exception. ALL other artists MUST obey these rules.)`;
       filterRules += "\n\nCAPACITY LIMIT: You MUST NOT generate more than 12-15 NEW artist nodes. Including metadata nodes, do not exceed 60 nodes in total. Quality over quantity.";
       filterRules += "\n\nFINAL VERIFICATION: Audit your list. If an artist violates any rules above, delete them.";
+      filterRules += "\n\nID SANITIZATION (CRITICAL): The `id` string for all nodes in the JSON graph MUST be the exact, canonical ID for the entity. NEVER concatenate, append, or inject any filter strings, era tags, or genre tags onto the `id` field. For example, use `id: 'spaced-us'`, NEVER `id: 'spaced-us-after:2019'`. Failure to follow this rule corrupts the global database.";
       
       systemInstruction += filterRules;
       

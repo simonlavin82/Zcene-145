@@ -797,7 +797,7 @@ export const processCurationJob = onDocumentCreated({
     let rootBreakdownStr = "";
     try {
       // Step 3 (V10): Native JSON Generation (Root Breakdown + 1-Sentence Hooks)
-      const rootBreakdownPayload = await generateRootsBreakdownBackend(inputPayload.artists, detailsCacheEntries, usageCollector);
+      const rootBreakdownPayload = await generateRootsBreakdownBackend(inputPayload.artists, detailsCacheEntries, usageCollector, inputPayload.filters);
       
       if (rootBreakdownPayload) {
         rootBreakdownStr = rootBreakdownPayload.editorialMarkdown;
@@ -1278,10 +1278,16 @@ export const processCurationJob = onDocumentCreated({
             continue;
           }
 
-          const disambiguatedCanonicalId = recDetailsEntry ? (recDetailsEntry as any)[0] : recNorm;
-          const compositeCanonicalId = buildCompositeCacheKey(disambiguatedCanonicalId, inputPayload.filters || undefined);
-
-          const recDocRef = db.collection(collName).doc(compositeCanonicalId);
+          const rawCanonicalId = recDetailsEntry ? (recDetailsEntry as any)[0] : recNorm;
+          
+          // Guardrail: Strip any surviving filter tags hallucinated by the AI
+          const cleanCanonicalId = rawCanonicalId.replace(/-(after|before|genre):[^-\s]+/g, '');
+          
+          // The composite key is strictly for tracking the transient cache property and caching fields, NEVER for the doc path
+          const compositeCanonicalId = buildCompositeCacheKey(cleanCanonicalId, inputPayload.filters || undefined);
+          
+          // Ensure the doc path ALWAYS writes strictly to the global, canonical ID
+          const recDocRef = db.collection(collName).doc(cleanCanonicalId);
           
           // Bug 2: The Overwrite Violation - skip proactive cache update for perfect hits
           if (recDetails && recDetails._isReadOnly && !matchingSeedNorm) {
