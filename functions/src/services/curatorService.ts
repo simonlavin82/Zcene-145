@@ -690,7 +690,7 @@ export const generateRootsBreakdownBackend = async (
   artists: string,
   detailsCacheEntries: any[],
   usageCollector?: UsageCollector
-): Promise<string> => {
+): Promise<{ editorialMarkdown: string; artistSnippets: Record<string, string> } | null> => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY is not defined in environment secrets.");
@@ -704,22 +704,38 @@ export const generateRootsBreakdownBackend = async (
   const currentModel = "gemini-3.1-pro-preview";
 
   // Phase C — Verbal Identity (Rule 24): late-night record curator voice.
-  // Active verbs, discovery framing, immersive tone. No UK English constraint.
-  const systemInstruction = `You are a late-night record curator — the kind of person who pulls an obscure 7" from a crate at 2am and traces exactly why it matters. Your task is to write a Roots Breakdown: a rich, interconnected narrative that maps the musical DNA between a set of seed artists and the deeper ecosystem they inhabit.
+  // V10: Structured JSON output with integrated hooks.
+  const systemInstruction = `You are a late-night record curator — the kind of person who pulls an obscure 7" from a crate at 2am and traces exactly why it matters. Your task is to write a Roots Breakdown: a rich, interconnected narrative that maps the musical DNA between a set of seed artists and the deeper ecosystem they inhabit, AND simultaneously generate specific 1-sentence hooks for the key artists involved.
 
 Write like you are guiding someone through a web of sounds, scenes, and moments — not cataloguing data. Use active verbs: map, trace, uncover, connect, explore, pull apart, reassemble. Prioritize discovery over description. Make the reader feel the connections before they understand them.
 
 FORMATTING RULES (non-negotiable):
-- Use Markdown throughout: **bold** key artists, genres, and scenes on first mention.
+- Use Markdown throughout the editorialMarkdown field: **bold** key artists, genres, and scenes on first mention.
 - Use short, punchy paragraphs. No wall-of-text blocks.
 - Use bullet points for dense cross-referencing. No double newlines between bullets.
 - Open with a hook — a defining tension or surprising throughline in the ecosystem.
-- Close with a synthesis: what does this web of connections reveal that no individual artist makes visible alone?`;
+- Close with a synthesis: what does this web of connections reveal that no individual artist makes visible alone?
+- For the artistSnippets field, extract or write a dedicated, punchy 1-sentence "epicenter hook" for the seed artist(s) and any satellite artists/labels you mention. This must be a complete sentence that summarizes their specific role in this exact ecosystem (e.g. "Radiohead was the band staring at the static on the television screen.").`;
 
   const prompt = `Write the Roots Breakdown for these seed artists: ${artists}.
 
 Here is the fully enriched context of all nodes (seeds and deep cuts) in their generated ecosystem:
 ${JSON.stringify(detailsCacheEntries, null, 2)}`;
+
+  const responseSchema = {
+    type: Type.OBJECT,
+    properties: {
+      editorialMarkdown: {
+        type: Type.STRING,
+        description: "The main Roots Breakdown narrative in Markdown format.",
+      },
+      artistSnippets: {
+        type: Type.OBJECT,
+        description: "A dictionary mapping artist/label IDs (keys) to a single, punchy 1-sentence epicenter hook describing their role in this web (values).",
+      }
+    },
+    required: ["editorialMarkdown", "artistSnippets"]
+  };
 
   try {
     const response = await ai.models.generateContent({
@@ -728,6 +744,8 @@ ${JSON.stringify(detailsCacheEntries, null, 2)}`;
         config: {
             systemInstruction,
             temperature: 0.7,
+            responseMimeType: "application/json",
+            responseSchema,
         }
     });
 
@@ -739,11 +757,12 @@ ${JSON.stringify(detailsCacheEntries, null, 2)}`;
       });
     }
 
-    const text = response.text || `**Roots Breakdown Unavailable**\n- Synthesis returned an empty response. Try regenerating.`;
-    return text;
+    const text = response.text;
+    if (!text) return null;
+    return JSON.parse(text) as { editorialMarkdown: string; artistSnippets: Record<string, string> };
   } catch (err) {
     console.error("[generateRootsBreakdownBackend] Failed to generate roots breakdown:", err);
-    return `**Roots Breakdown Unavailable**\n- A backend error interrupted synthesis. Try regenerating.`;
+    return null;
   }
 };
 
@@ -868,92 +887,6 @@ If no missing edges are found, return an empty array [].`;
     });
   } catch (error) {
     console.error("[reconcileNarrativeEdges] Failed to reconcile narrative edges:", error);
-    return [];
-  }
-};
-
-// Phase 4b — Contextual Extraction (Rule 26): Narrative Snippets for Tooltips.
-// Extracts the most defining sentence/clause from the narrative for each node.
-export const extractNarrativeSnippets = async (
-  apiKey: string,
-  narrative: string,
-  nodes: Array<{ id: string; type: string }>,
-  usageCollector: UsageCollector
-): Promise<{ nodeId: string; snippet: string }[]> => {
-  if (!narrative || !narrative.trim() || nodes.length === 0) return [];
-
-  const currentModel = "gemini-3.5-flash";
-  const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: 120000 } });
-
-  const artistNodes = nodes
-    .filter(n => n.type === 'artist' || n.type === 'label')
-    .map(n => n.id);
-
-  if (artistNodes.length === 0) return [];
-
-  const prompt = `You are extracting contextual snippets for a music UI tooltip.
-
-Below is the Root Breakdown narrative generated for this graph, followed by the complete list of valid node IDs.
-
-Your task: Extract the single most defining sentence or clause from the narrative for each artist mentioned. Only extract snippets for IDs present in the Valid Node IDs list. Omit any artist not mentioned in the text. Do not rewrite the text; extract it verbatim.
-
---- NARRATIVE ---
-${narrative}
-
---- VALID NODE IDs (artist/label only) ---
-${JSON.stringify(artistNodes)}
-
-Return a JSON array of snippets. For each snippet provide:
-- nodeId: the exact node ID from the valid list
-- snippet: the verbatim sentence or clause describing them (max 120 chars)`;
-
-  const responseSchema = {
-    type: Type.ARRAY,
-    description: "Extracted narrative snippets per node.",
-    items: {
-      type: Type.OBJECT,
-      properties: {
-        nodeId: {
-          type: Type.STRING,
-          description: "Exact node ID from the valid list."
-        },
-        snippet: {
-          type: Type.STRING,
-          description: "Verbatim sentence or clause from the narrative."
-        }
-      },
-      required: ["nodeId", "snippet"]
-    }
-  };
-
-  try {
-    const response = await ai.models.generateContent({
-      model: currentModel,
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema,
-        temperature: 0.1,
-      }
-    });
-
-    if (response.usageMetadata) {
-      usageCollector.push(currentModel, {
-        promptTokenCount: response.usageMetadata.promptTokenCount || 0,
-        candidatesTokenCount: response.usageMetadata.candidatesTokenCount || 0,
-        totalTokenCount: response.usageMetadata.totalTokenCount || 0,
-      });
-    }
-
-    const text = response.text;
-    if (!text) return [];
-
-    const parsed: { nodeId: string; snippet: string }[] = JSON.parse(text);
-
-    const artistNodeSet = new Set(artistNodes);
-    return parsed.filter(s => artistNodeSet.has(s.nodeId));
-  } catch (error) {
-    console.error("[extractNarrativeSnippets] Failed to extract narrative snippets:", error);
     return [];
   }
 };

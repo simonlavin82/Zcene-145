@@ -2048,10 +2048,27 @@ export const streamNodeChat = async (
     
     const contextNodes = graphData.nodes.map(n => `"${n.id}" (${n.type})`).slice(0, 30).join(', ');
     
+    // V10: Contextualize Chat with Node Snippet and Edge Contexts
+    const nodeEdges = graphData.links.filter(l => 
+      (typeof l.source === 'object' ? l.source.id : l.source) === currentNode.id ||
+      (typeof l.target === 'object' ? l.target.id : l.target) === currentNode.id
+    );
+    const edgeContexts = nodeEdges.map(l => {
+      const sId = typeof l.source === 'object' ? l.source.id : l.source;
+      const tId = typeof l.target === 'object' ? l.target.id : l.target;
+      const other = sId === currentNode.id ? tId : sId;
+      return `${l.context || 'connected'} to ${other}`;
+    }).filter(Boolean).join(', ');
+    
+    const narrativeSnippetText = (currentNode as any).narrativeSnippet ? `\n    Their defining narrative hook in this specific web is: "${(currentNode as any).narrativeSnippet}".` : '';
+    const edgeContextText = edgeContexts ? `\n    They are connected to the following artists in this specific context: [${edgeContexts}].` : '';
+
     const systemInstruction = `You are Zcene, a world-class music curator and edgy historian. 
     Your tone is atmospheric, precise, and empowering. You are an expert-friend to the user.
     
-    You are currently discussing "${currentNode.id}" (${currentNode.type}).
+    System Context: You are discussing "${currentNode.id}" (${currentNode.type}).${narrativeSnippetText}${edgeContextText}
+    Base your answers firmly on this reality.
+
     The user's current Zcene map includes: [${contextNodes}].
     
     STRICT CHAT OUTPUT RULES:
