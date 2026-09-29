@@ -13,7 +13,7 @@ The curation pipeline is strictly divided into three distinct execution columns.
   - **Step 5 (Active Loader Gate):** LOCKED.
   - **Step 7 (Drop Loader & Render Zcene):** Drops the loader only when Column 3 sets project status to 'completed'.
 - **Column 2: HTTP Fast-Track (executeCurationPipeline.ts):** Synchronous execution layer. Responsible for pre-flight origin slugging (returning conflicts to the user), fast-track cache fallback, generative topology (ensuring Deep Cuts connect back to the seed), generating baseline `seedStubs` on cache misses, and saving the baseline topology to Firestore. Returns immediately while creating the curationJobs doc (with injected `seedStubs`), handing full responsibility to the async worker.
-- **Column 3: Background Worker (processCurationJob.ts):** Asynchronous hydration layer. Follows a strict progression: Hydrate Node Batch -> Final Node Positioning -> Root Breakdown -> Persist Assets. Never writes missing hydration data as 'null'; explicitly falls back to pre-hydrated `seedStubs` for failed primary seeds (JIT Fallback) to prevent database corruption. Writes fully hydrated nodes back to cache.
+- **Column 3: Background Worker (processCurationJob.ts):** Asynchronous hydration layer. Follows a strict progression: Hydrate Node Batch -> Final Node Positioning -> Root Synthesis (Native JSON Generation schema returning `{ editorialMarkdown, artistSnippets }`) -> Topology Parity (`reconcileNarrativeEdges` - Rule 23) -> Persist Assets. The architecture inherently bypasses any secondary contextual extraction pass. Never writes missing hydration data as 'null'; explicitly falls back to pre-hydrated `seedStubs` for failed primary seeds (JIT Fallback) to prevent database corruption. Writes fully hydrated nodes back to cache.
 
 ### 2. Strict Seed Hoisting & Pinning
 Seed nodes must ALWAYS be elevated to the highest priority in the topology.
@@ -115,7 +115,7 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 - **Failure mode:** If the reconciliation call fails or times out, the step is silently skipped via a `try/catch` with a `console.warn`. The pipeline proceeds with the original `finalGraph.links` intact.
 
 ### 24. Verbal Identity
-- **Rule:** The Root Breakdown system prompt (`generateRootsBreakdownBackend` in `curatorService.ts`) MUST enforce Zcene's late-night record curator voice. Academic analysis language (e.g., "co-equal cross-analysis", "acoustic dimensions", "chronological intersections") and any regional English constraint (e.g., explicit UK English spellings) are strictly prohibited.
+- **Rule:** The Root Breakdown system prompt (`generateRootsBreakdownBackend` in `curatorService.ts`) MUST enforce Zcene's late-night record curator voice. Academic analysis language (e.g., "co-equal cross-analysis", "acoustic dimensions", "chronological intersections") and any regional English constraint (e.g., explicit UK English spellings) are strictly prohibited. The "2 AM record curator" generates 1-sentence epicenter hooks natively within the synthesis phase.
 - **Persona:** The curator is the kind of person who knows why a Bristol basement in 1991 changed everything, who connects a Chicago church organ to a Berlin techno floor, and who finds the overlooked B-side that explains an entire scene.
 - **Formatting contract:** Active curation verbs only (map, uncover, trace, surface, anchor, explore). Lead with cultural significance and scene context. Discovery over data: prioritize shared producers, venues, hometown scenes, and mutual influences over obvious genre tags. International scope: write for a global audience.
 - **Enforcement:** The `systemInstruction` variable in `generateRootsBreakdownBackend` is the single source of truth for voice. Any revert to the prior "expert archivist" persona is a violation of this rule.
@@ -127,3 +127,6 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 - **Owned project documents** (`users/{uid}/projects/{id}`) are explicitly excluded from Coordinate Amnesia. They use **Coordinate Memory** (Rule 21 sub-clause) to persist settled positions.
 - **Rationale:** Shared and cloned Zcenes intentionally receive fresh organic D3 layouts because the recipient's viewport dimensions and graph context are unknown at write time. Owned projects retain their settled topology to eliminate re-orientation on re-entry.
 - **Enforcement:** The stripping destructure `const { x, y, vx, vy, fx, fy, index, ...cleanNode } = n` is an immutable pattern in share and duplication code paths. It must never be extended to project autosave, canvasLayout writes, or `handleCoordinatesSettled` writes.
+
+### 26. Contextual Tooltips
+- **Rule:** Spiderweb node tooltips must prioritize the AI-generated `narrativeSnippet` (epicenter hook) over the encyclopedic `summary` to provide cohesive, web-specific context.

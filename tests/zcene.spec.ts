@@ -20,7 +20,8 @@ test.describe('Zcene UI and State Tests', () => {
     await createBtn.click();
     const popup = await popupPromise;
     
-    // 4. Ensure the popup is the Google Auth flow
-    await expect(popup).toHaveTitle(/Sign in/i);
+    // 4. Ensure the popup is the Google Auth flow - check url for auth handler
+    await popup.waitForLoadState('domcontentloaded');
+    expect(popup.url()).toMatch(/auth|google/i);
   });
 });

@@ -678,6 +678,16 @@ the entire dataset, the app evolves existing visual structures.
      ensure every link's 'source' and 'target' corresponds to a validated node ID.
    - Client detailsCache callback: The UI remains locked until the Background Worker completes this atomic hydration block. Once the project status hits 'completed', the frontend natively pipes the 100% self-contained details payload into memory, guaranteeing instant offline O(1) resolution for every node on the board.
 
+5. VERBAL IDENTITY & CONTEXTUAL TOOLTIPS (THE "2 AM RECORD CURATOR"):
+   Zcene features a bespoke narrative layer powered by our custom "2 AM Record Curator" AI persona. 
+   Instead of just pulling encyclopedic facts, Zcene dynamically writes a cohesive essay explaining the 
+   specific musical DNA connecting the web. 
+   - Contextual Tooltips: Spiderweb hover states are natively powered by this intelligence. Hovering over a band 
+     won't just tell you *who* they are, but *why* they were pulled into this specific ecosystem, 
+     delivering a punchy 1-sentence "epicenter hook" drawn directly from the curator's analysis.
+   - Fallback Logic: The UI prioritizes these generated \`narrativeSnippet\` hooks, falling back to 
+     the global encyclopedic \`summary\` only if necessary.
+
 5. GLOBAL CACHE ALIGNMENT & PROACTIVE 'DEEP CACHE' STRATEGY (artistCacheService.ts / App.tsx):
    Before invoking Gemini for Phase 02 Orchestration, the engine computes a 
    normalized single-artist ID (using Unicode NFD accent-stripping and hyphen replacement) 
