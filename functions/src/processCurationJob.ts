@@ -480,6 +480,11 @@ export const processCurationJob = onDocumentCreated({
                         continue;
                       }
 
+                      // V11.6: Reject poisoned canonical docs (pre-V11.5 orphans) that contain filter tags
+                      if (/-(after|before|genre|inc_genres|exc_origins|inc_origins):[^-\s]+/i.test(snap.id)) {
+                        continue;
+                      }
+
                       if (snap.id !== artistNormId && snapData.artistId && snapData.artistId.startsWith(baseNormId)) {
                         // Prefer docs that already have graphData (fully curated)
                         if (snapData.graphData || snap.id === artistNormId) {
@@ -497,6 +502,10 @@ export const processCurationJob = onDocumentCreated({
                 } catch (dedupErr) {
                   console.warn(`[Curation Backend] Slug dedup query failed for "${rawName}", proceeding with derived ID:`, dedupErr);
                 }
+                
+                // V11.6: Re-sanitize after slug dedup in case the dedup loop adopted a poisoned historical ID
+                artistNormId = artistNormId.replace(/-(after|before|genre|inc_genres|exc_origins|inc_origins):[^-\s]+/gi, '');
+                entityObj.id = artistNormId;
               }
 
               // 1. Check local Firestore Cache first

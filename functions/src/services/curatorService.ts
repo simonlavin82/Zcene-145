@@ -665,7 +665,7 @@ CRITICAL RULES (non-negotiable):
       model: currentModel,
       contents: prompt,
       config: {
-        systemInstruction: "You are a music data validator. Return ONLY valid JSON matching the schema.",
+        systemInstruction: "You are a strict music data validator. You do NOT infer intent. If the user input contains a spelling error, return the REAL canonical artist name (e.g. if given 'turstile', return id: 'Turnstile', correctedInput: true). Return ONLY valid JSON matching the schema.",
         temperature: 0.1, // very low temperature for validation
         responseMimeType: "application/json",
         responseSchema: SEED_VALIDATION_SCHEMA

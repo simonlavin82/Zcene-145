@@ -65,6 +65,14 @@ export const validateSeedOriginCallable = onCall({
 
   const validationResult = await validateSeedOriginBackend(seed);
 
+  // V11.6 Fix 2: Programmatically enforce correctedInput for typos
+  const inputNorm = normalizeArtistId(seed);
+  const returnedNorm = normalizeArtistId(validationResult.id);
+  if (validationResult.isValid && inputNorm !== returnedNorm) {
+    validationResult.correctedInput = true;
+    console.log(`[validateSeedOriginCallable] Canonical mismatch: "${seed}" (${inputNorm}) → "${validationResult.id}" (${returnedNorm})`);
+  }
+
   // V11.6 Fix 2B (Rule 11): Hard-block the pipeline for unrecognizable entities.
   // isValid: false means the model could not confidently map the input to any known artist.
   // Throwing here prevents a broken stub from being minted and the pipeline from executing.
