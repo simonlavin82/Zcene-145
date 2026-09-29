@@ -650,7 +650,7 @@ FORMATTING RULES (non-negotiable):
 - Use bullet points for dense cross-referencing. No double newlines between bullets.
 - Open with a hook — a defining tension or surprising throughline in the ecosystem.
 - Close with a synthesis: what does this web of connections reveal that no individual artist makes visible alone?
-- For the artistSnippets field, extract or write a dedicated, punchy 1-sentence "epicenter hook" for the seed artist(s) and any satellite artists/labels you mention. This must be a complete sentence that summarizes their specific role in this exact ecosystem (e.g. "Radiohead was the band staring at the static on the television screen.").`;
+- For the artistSnippets field, generate an array of objects. Each object must have an 'id' (the canonical artist/label name) and a 'snippet' containing a dedicated, punchy, standalone 1-sentence "epicenter hook". This must be a complete sentence that summarizes their specific role in this exact ecosystem (e.g. "Radiohead was the band staring at the static on the television screen."). Generate a hook for the seed artist(s) and EVERY satellite artist/label you mention.`;
     const prompt = `Write the Roots Breakdown for these seed artists: ${artists}.
 
 Here is the fully enriched context of all nodes (seeds and deep cuts) in their generated ecosystem:
@@ -663,8 +663,16 @@ ${JSON.stringify(detailsCacheEntries, null, 2)}`;
                 description: "The main Roots Breakdown narrative in Markdown format.",
             },
             artistSnippets: {
-                type: genai_1.Type.OBJECT,
-                description: "A dictionary mapping artist/label IDs (keys) to a single, punchy 1-sentence epicenter hook describing their role in this web (values).",
+                type: genai_1.Type.ARRAY,
+                description: "A list of punchy 1-sentence epicenter hooks for the seed and satellite artists/labels mentioned in the breakdown.",
+                items: {
+                    type: genai_1.Type.OBJECT,
+                    properties: {
+                        id: { type: genai_1.Type.STRING, description: "The canonical name of the artist or label." },
+                        snippet: { type: genai_1.Type.STRING, description: "A punchy, standalone 1-sentence epicenter hook describing their specific role in this ecosystem." }
+                    },
+                    required: ["id", "snippet"]
+                }
             }
         },
         required: ["editorialMarkdown", "artistSnippets"]

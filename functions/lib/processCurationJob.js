@@ -732,11 +732,13 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         rootBreakdownStr = rootBreakdownPayload.editorialMarkdown;
                         finalGraph.synthesisRationale = rootBreakdownStr;
                         // Apply native 1-sentence hooks for tooltips (Rule 26)
-                        if (rootBreakdownPayload.artistSnippets) {
-                            console.log(`[Curation Backend] Step 3: Natively extracted ${Object.keys(rootBreakdownPayload.artistSnippets).length} epicenter hooks.`);
+                        if (rootBreakdownPayload.artistSnippets && Array.isArray(rootBreakdownPayload.artistSnippets)) {
+                            console.log(`[Curation Backend] Step 3: Natively extracted ${rootBreakdownPayload.artistSnippets.length} epicenter hooks.`);
                             finalGraph.nodes.forEach((n) => {
-                                if (rootBreakdownPayload.artistSnippets[n.id]) {
-                                    n.narrativeSnippet = rootBreakdownPayload.artistSnippets[n.id];
+                                const snippetObj = rootBreakdownPayload.artistSnippets.find((s) => (0, curatorService_1.normalizeArtistId)(s.id) === (0, curatorService_1.normalizeArtistId)(n.id) ||
+                                    s.id.toLowerCase() === n.id.toLowerCase());
+                                if (snippetObj && snippetObj.snippet) {
+                                    n.narrativeSnippet = snippetObj.snippet;
                                 }
                             });
                         }
