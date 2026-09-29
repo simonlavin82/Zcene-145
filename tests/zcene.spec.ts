@@ -21,7 +21,6 @@ test.describe('Zcene UI and State Tests', () => {
     const popup = await popupPromise;
     
     // 4. Ensure the popup is the Google Auth flow - check url for auth handler
-    await popup.waitForLoadState('domcontentloaded');
-    expect(popup.url()).toMatch(/auth|google/i);
+    await popup.waitForURL(/.*(auth|google|firebaseapp).*/i, { timeout: 10000 });
   });
 });
