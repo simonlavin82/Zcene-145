@@ -64,6 +64,23 @@ export const validateSeedOriginCallable = onCall({
   }
 
   const validationResult = await validateSeedOriginBackend(seed);
+
+  // V11.6 Fix 2B (Rule 11): Hard-block the pipeline for unrecognizable entities.
+  // isValid: false means the model could not confidently map the input to any known artist.
+  // Throwing here prevents a broken stub from being minted and the pipeline from executing.
+  if (!validationResult.isValid) {
+    console.warn(`[validateSeedOriginCallable] Rule 11 BLOCK: Seed "${seed}" returned isValid: false. Rejecting pipeline.`);
+    throw new HttpsError(
+      "not-found",
+      `"${seed}" could not be identified as a real musical artist or label. Please check the spelling and try again.`
+    );
+  }
+
+  // Log typo corrections so operators can monitor misuse patterns.
+  if (validationResult.correctedInput) {
+    console.log(`[validateSeedOriginCallable] Typo correction applied: "${seed}" → "${validationResult.id}"`);
+  }
+
   return validationResult;
 });
 

@@ -617,29 +617,33 @@ export const SEED_VALIDATION_SCHEMA = {
   properties: {
     id: {
       type: Type.STRING,
-      description: "The canonical, professional name of the artist."
+      description: "The canonical, correctly-spelled, professional name of the artist. If the input was a typo, return the corrected spelling here."
     },
     origin: {
       type: Type.STRING,
-      description: "The country of origin for the artist (e.g., 'USA', 'UK')."
+      description: "The country of origin for the artist (e.g., 'USA', 'UK'). Return an empty string if isValid is false."
     },
     genre: {
       type: Type.STRING,
-      description: "The primary genre of the artist."
+      description: "The primary genre of the artist. Return an empty string if isValid is false."
     },
     isValid: {
       type: Type.BOOLEAN,
-      description: "True if this is a real, recognized musical entity. False if it is a hallucination or invalid input."
+      description: "True if this is a real, recognized musical entity that can be confidently identified. False if the input cannot be mapped to any known artist."
+    },
+    correctedInput: {
+      type: Type.BOOLEAN,
+      description: "True if the returned 'id' is a spelling correction of the user's original input (e.g. input was 'turstile', id returned is 'Turnstile'). False if the id matches the input exactly (case-insensitive)."
     }
   },
-  required: ["id", "origin", "genre", "isValid"]
+  required: ["id", "origin", "genre", "isValid", "correctedInput"]
 };
 
 // --- CORE CURATOR LOGIC ---
 
 export const validateSeedOriginBackend = async (
   artistId: string
-): Promise<{ id: string; origin: string; genre: string; isValid: boolean; apiUsage?: any }> => {
+): Promise<{ id: string; origin: string; genre: string; isValid: boolean; correctedInput: boolean; apiUsage?: any }> => {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -649,7 +653,13 @@ export const validateSeedOriginBackend = async (
     const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: 300000 } });
     const currentModel = "gemini-3.5-flash"; // Phase 1: Origin Validation uses 3.5 Flash
 
-    const prompt = `Validate this seed artist: "${artistId}". Is this a real musical entity? Extract its canonical name, country of origin, and primary genre.`;
+    const prompt = `Validate this seed artist: "${artistId}".
+
+CRITICAL RULES (non-negotiable):
+1. TYPO CORRECTION (MANDATORY): If the input is an obvious misspelling or transposition of a real artist name (e.g. "turstile" for "Turnstile", "radiohed" for "Radiohead", "nirvanna" for "Nirvana"), you MUST return the correctly-spelled canonical name in the 'id' field and set 'correctedInput' to true. Do NOT return the original typo'd spelling as the id under any circumstances.
+2. REAL ENTITY CHECK: If the entity is a real, recognizable musical artist, band, or label, set 'isValid' to true with full origin and genre.
+3. NOT_FOUND (MANDATORY): If the input cannot be confidently mapped to any known, real musical entity — even after attempting typo correction — set 'isValid' to false. In this case, 'id' should be the original input and 'origin'/'genre' should be empty strings.
+4. Do NOT invent or hallucinate artists. If in doubt, return isValid: false.`;
   
     const response = await ai.models.generateContent({
       model: currentModel,
@@ -785,7 +795,15 @@ ${JSON.stringify(detailsCacheEntries, null, 2)}`;
 
     const text = response.text;
     if (!text) return null;
-    return JSON.parse(text) as { editorialMarkdown: string; artistSnippets: { id: string; snippet: string }[] };
+    const parsed = JSON.parse(text) as { editorialMarkdown: string; artistSnippets: { id: string; snippet: string }[] };
+    // V11.6 Fix 1: Unescape literal \n sequences that the structured JSON output mode over-escapes.
+    // Gemini packs Markdown into a strict JSON string field and sometimes emits \n as the
+    // two-character sequence backslash-n rather than a true Unicode newline, causing the
+    // frontend to render literal "\n" and "\n*" instead of line breaks and bullet points.
+    if (parsed?.editorialMarkdown) {
+      parsed.editorialMarkdown = parsed.editorialMarkdown.replace(/\\n/g, '\n');
+    }
+    return parsed;
   } catch (err) {
     console.error("[generateRootsBreakdownBackend] Failed to generate roots breakdown:", err);
     return null;
