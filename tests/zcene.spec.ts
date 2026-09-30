@@ -25,95 +25,57 @@ test.describe('Zcene UI and State Tests', () => {
   });
 
   test('Share link generates valid Tier 2 payload and renders cleanly without MIME crash', async ({ page }) => {
-    // 1. Mock the Backend Generation Request to stop live API billing
-    await page.route('**/api/gemini/**', async route => {
-      const mockPayload = {
-        candidates: [{
-          content: {
-            parts: [{
-              text: JSON.stringify({
-                nodes: [
-                  { id: "Deftones", type: "artist", group: 1, x: 200, y: 200 },
-                  { id: "Chino Moreno", type: "artist", group: 2, x: 250, y: 220 }
-                ],
-                links: [
-                  { source: "Deftones", target: "Chino Moreno", value: 1, type: "member" }
-                ]
-              })
-            }]
-          }
-        }]
-      };
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(mockPayload)
-      });
-    });
-
-    // 2. Navigate to the app root and bypass Global Wall
-    await page.goto('http://localhost:3000');
+    // 1. Direct Routing to Mock Project to bypass Auth and Dashboard
+    // 'sandbox-project-1' triggers offline hydration in App.tsx, bypassing Firestore reads and Auth requirements.
+    await page.goto('http://localhost:3000/p/sandbox-project-1');
     await page.evaluate(() => sessionStorage.setItem('zcene_beta_unlocked', 'true'));
     await page.reload();
 
-    // 3. Login via Google Auth popup (Firebase Emulator)
-    const createBtn = page.getByRole('button', { name: /Create/i }).first();
-    await expect(createBtn).toBeVisible({ timeout: 15000 });
-    
-    // We must handle the auth popup to access the GraphPage
-    const popupPromise = page.waitForEvent('popup');
-    await createBtn.click();
-    const popup = await popupPromise;
-    await popup.waitForLoadState();
-    
-    // Try to auto-login in the emulator UI
-    try {
-      const addNewAccountBtn = popup.getByRole('button', { name: /Add new account/i });
-      if (await addNewAccountBtn.isVisible()) {
-        await addNewAccountBtn.click();
-        await popup.getByRole('button', { name: /Auto-generate/i }).click();
-        await popup.getByRole('button', { name: /Sign in/i }).click();
+    // Wait for the mock graph to render (Share button is conditional on graphData.nodes.length > 0)
+    const shareButton = page.locator('button:has-text("Share")').first();
+    await expect(shareButton).toBeVisible({ timeout: 15000 });
+
+    // 2. Intercept Firestore Request to assert payload
+    let capturedPayload = '';
+    await page.route('https://firestore.googleapis.com/**', async route => {
+      const request = route.request();
+      const postData = request.postData() || '';
+      
+      // We look for the WebChannel/REST request that contains the sharedZcenes collection
+      if (request.method() === 'POST' && postData.includes('sharedZcenes')) {
+        capturedPayload = postData;
+        
+        // Fulfill with a mock REST response for a Firestore document to satisfy the client
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            name: 'projects/zcene-production/databases/(default)/documents/sharedZcenes/mock-share-id',
+            fields: {},
+            createTime: new Date().toISOString(),
+            updateTime: new Date().toISOString()
+          })
+        });
+      } else {
+        await route.continue();
       }
-    } catch (e) {
-      // Ignore if already logged in or different UI
-    }
-    
-    // Wait for redirect to project page
-    await page.waitForURL(/\/p\/.*/, { timeout: 15000 }).catch(async () => {
-      // Fallback if we were already logged in but didn't redirect
-      await createBtn.click();
-      await page.waitForURL(/\/p\/.*/, { timeout: 15000 });
     });
+
+    // 3. Click Share
+    await shareButton.click();
     
-    // Generate a simple graph
-    // Note: Depends on search input being available on the Graph Page
-    const searchInput = page.locator('input[placeholder*="Add artist"]');
-    await expect(searchInput).toBeVisible({ timeout: 15000 });
-    await searchInput.fill('Deftones');
-    await searchInput.press('Enter');
-    
-    // Fix Race Condition: Resolve Mandatory Disambiguation Modal
-    // The architecture strictly requires confirming the seed origin before generation (Rule 20)
-    const modalHeader = page.locator('h3', { hasText: /(Look What I Found|Disambiguation|Validate Origin)/i });
-    await expect(modalHeader).toBeVisible({ timeout: 15000 });
-    
-    // Click either the cached candidate or "Search Live AI"
-    const confirmButton = page.locator('button').filter({ hasText: /Search Live AI|Deftones/i }).first();
-    await confirmButton.click();
-    
-    // Wait for the graph to render and the Share button to appear (Instant due to mock)
-    await page.waitForSelector('text="Share"', { state: 'visible', timeout: 5000 });
-    
-    // 2. Click Share and get URL
-    await page.click('button:has-text("Share")');
-    await page.waitForSelector('h3:has-text("Share Zcene")');
-    
+    // Wait for the UI to transition to the Share state (Share Modal / Input URL)
     const shareInput = page.locator('input[readonly]');
-    await expect(shareInput).toBeVisible();
-    const shareUrl = await shareInput.inputValue();
-    expect(shareUrl).toContain('/z/');
+    await expect(shareInput).toBeVisible({ timeout: 15000 });
     
-    // 3. Navigate directly to the generated /z/ URL in a new context/tab to verify MIME routing
+    // 4. Assert Tier 2 Schema Compliance (expireAt MUST exist, updatedAt MUST NOT exist)
+    expect(capturedPayload).toContain('expireAt');
+    expect(capturedPayload).not.toContain('updatedAt');
+    
+    // 5. Navigate to the generated /z/ URL in a new context/tab to verify MIME routing
+    const shareUrl = await shareInput.inputValue();
+    expect(shareUrl).toContain('/z/mock-share-id');
+    
     const newContext = await page.context().browser()?.newContext();
     const newPage = await newContext!.newPage();
     
@@ -126,7 +88,7 @@ test.describe('Zcene UI and State Tests', () => {
     
     await newPage.goto(shareUrl);
     
-    // 4. Assert that the page renders the EnginePage/Graph and does NOT white-screen
+    // 6. Assert that the page renders the EnginePage/Graph and does NOT white-screen
     await expect(newPage.locator('#root')).toBeVisible();
     
     // Verify that the specific MIME type error is NOT present in the console logs
