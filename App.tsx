@@ -1838,7 +1838,6 @@ const App: React.FC = () => {
         supportsLabelDeepCuts: true,
         authorId: user.uid,
         createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
         expireAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30-Day Hard TTL
       };
 
@@ -1946,6 +1945,7 @@ const App: React.FC = () => {
         expireAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30-Day Hard TTL
       };
       delete sharePayload.id; // Exclude the local ID
+      delete sharePayload.updatedAt; // Tier 2 Shared Zcenes are read-only, no updatedAt
 
       // Phase 3: Append seedImageUrl if resolved
       if (dashboardSeedImageUrl) {
