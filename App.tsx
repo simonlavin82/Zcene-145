@@ -3392,6 +3392,9 @@ const App: React.FC = () => {
         let genre = '';
         let isKnownCacheHit = false;
         let candidateId = undefined;
+        let isCorrected = false;
+        let correctedQuery = undefined;
+        let originalQuery = undefined;
 
         if (cacheCandidates.length > 0) {
           predictedOrigin = cacheCandidates[0].origin || '';
@@ -3407,6 +3410,22 @@ const App: React.FC = () => {
             if (data && data.isValid) {
               predictedOrigin = data.origin || '';
               genre = data.genre || '';
+              
+              if (data.correctedInput && data.id && data.id !== rawInput) {
+                isCorrected = true;
+                correctedQuery = data.id;
+                originalQuery = rawInput;
+                
+                // Rule 11: Post-Validation Cache Intercept
+                const interceptCandidates = await searchDisambiguationCandidates(data.id);
+                if (interceptCandidates.length > 0) {
+                  console.log(`[Rule 11] Post-Validation Cache Intercept: Typo "${rawInput}" corrected to "${data.id}" which exists in cache! Upgrading to cache hit.`);
+                  predictedOrigin = interceptCandidates[0].origin || predictedOrigin;
+                  genre = interceptCandidates[0].genre || genre;
+                  isKnownCacheHit = true;
+                  candidateId = interceptCandidates[0].id;
+                }
+              }
             }
           } catch (e: any) {
              console.warn("Origin validation failed:", e);
@@ -3419,7 +3438,10 @@ const App: React.FC = () => {
           predictedOrigin,
           genre,
           isKnownCacheHit,
-          candidateId
+          candidateId,
+          isCorrected,
+          correctedQuery,
+          originalQuery
         };
       }));
 
@@ -3452,10 +3474,11 @@ const App: React.FC = () => {
           if (preFlightSeed.isKnownCacheHit && preFlightSeed.predictedOrigin === rawCountryName && preFlightSeed.candidateId) {
             resolvedArtistSeeds[i] = normalizeArtistId(preFlightSeed.candidateId);
           } else {
-            resolvedArtistSeeds[i] = searchId;
-            activeDisambiguationHints[searchId] = rawCountryName;
+            const seedToUse = preFlightSeed.isCorrected && preFlightSeed.correctedQuery ? preFlightSeed.correctedQuery : searchId;
+            resolvedArtistSeeds[i] = seedToUse;
+            activeDisambiguationHints[seedToUse] = rawCountryName;
             if (preFlightSeed.genre) {
-              activeDisambiguationGenres[searchId] = preFlightSeed.genre;
+              activeDisambiguationGenres[seedToUse] = preFlightSeed.genre;
             }
           }
           hasDisambiguated = true;

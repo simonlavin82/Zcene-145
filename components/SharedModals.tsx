@@ -1376,6 +1376,10 @@ export interface PreFlightSeed {
   predictedOrigin: string;
   genre?: string;
   isKnownCacheHit: boolean;
+  candidateId?: string;
+  isCorrected?: boolean;
+  correctedQuery?: string;
+  originalQuery?: string;
 }
 
 export interface ConsolidatedValidationModalProps {
@@ -1408,7 +1412,7 @@ export function ConsolidatedValidationModal({ isOpen, seeds, onConfirm, onCancel
 
   return (
     <ModalBackdrop onClick={onCancel} className="z-[1100]">
-      <ModalContainer className="overflow-visible relative z-[1150]">
+      <ModalContainer className="!overflow-visible relative z-[1150]">
         <form onSubmit={e => { e.preventDefault(); onConfirm(origins); }} className="flex flex-col w-full" onClick={e => e.stopPropagation()}>
           <ModalHeader>
             <div className="flex items-center gap-2">
@@ -1419,7 +1423,7 @@ export function ConsolidatedValidationModal({ isOpen, seeds, onConfirm, onCancel
               <span className="material-symbols-outlined !text-[18px]">close</span>
             </button>
           </ModalHeader>
-          <ModalBody className="p-5 flex flex-col gap-4 overflow-visible">
+          <ModalBody className="p-5 flex flex-col gap-4 !overflow-visible">
             <p className="text-sm font-light text-zinc-400 leading-relaxed">
               Please verify the regional origins for your selected artists.
             </p>
@@ -1428,9 +1432,16 @@ export function ConsolidatedValidationModal({ isOpen, seeds, onConfirm, onCancel
                 <div key={seed.id} className="flex flex-col gap-2 p-3 bg-zinc-900/50 border border-zinc-700/50 rounded-xl">
                   <div className="flex items-center justify-between">
                     <div className="flex flex-col">
-                      <span className="text-white font-medium text-base truncate">{seed.query}</span>
+                      <span className="text-white font-medium text-base truncate">
+                        {seed.isCorrected && seed.correctedQuery ? seed.correctedQuery : seed.query}
+                      </span>
                       {seed.genre && (
                         <span className="text-xs text-zinc-400 font-light truncate">{seed.genre}</span>
+                      )}
+                      {seed.isCorrected && seed.originalQuery && (
+                        <span className="text-[10px] text-amber-500/80 font-medium truncate mt-0.5">
+                          Auto-corrected from "{seed.originalQuery}"
+                        </span>
                       )}
                     </div>
                     {seed.isKnownCacheHit && (
