@@ -145,7 +145,6 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   const activeHoveredLinkRef = useRef<{ link: Link } | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [isCardExpanded, setIsCardExpanded] = useState(false);
-  const hoveredNodeIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     setIsCardExpanded(false);
