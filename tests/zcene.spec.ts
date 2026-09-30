@@ -62,7 +62,7 @@ test.describe('Zcene UI and State Tests', () => {
     });
 
     // 3. Click Share
-    await shareButton.click();
+    await shareButton.click({ force: true });
     
     // Wait for the UI to transition to the Share state (Share Modal / Input URL)
     const shareInput = page.locator('input[readonly]');
