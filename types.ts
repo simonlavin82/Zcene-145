@@ -126,7 +126,6 @@ export interface ArtistCacheEntry {
   cacheVersion: number;    // Schema version
   createdAt?: any;         // serverTimestamp()
   updatedAt?: any;         // serverTimestamp()
-  cachedAt: any;           // Legacy alias for backward compatibility
   hitCount: number;
   detailsCache?: string;   // JSON string or raw text of NodeDetails/bio
   filters?: DiscoveryFilters;

@@ -1839,6 +1839,7 @@ const App: React.FC = () => {
         authorId: user.uid,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
+        expireAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30-Day Hard TTL
       };
 
       // Phase 3: Append seedImageUrl if resolved — enables O(1) OG image lookup in server.js
@@ -6825,8 +6826,7 @@ const App: React.FC = () => {
       // Overwrite the global cache doc with the MERGED data and a new cachedAt timestamp
       const updatePayload = {
         detailsCache: mergedDetails,
-        updatedAt: serverTimestamp(),
-        cachedAt: serverTimestamp()
+        updatedAt: serverTimestamp()
       };
       enforceArtistCacheSchema(updatePayload);
 
@@ -7338,8 +7338,7 @@ const App: React.FC = () => {
                               redirectTo: cacheId,
                               cacheVersion: 4,
                               createdAt: serverTimestamp(),
-                              updatedAt: serverTimestamp(),
-                              cachedAt: serverTimestamp()
+                              updatedAt: serverTimestamp()
                             }));
                             console.log(`[Reconciliation] Converted base document "${simpleArtistId}" into a redirect to "${cacheId}".`);
                           }
@@ -7353,7 +7352,6 @@ const App: React.FC = () => {
                       const updatePayload = {
                         detailsCache: details,
                         updatedAt: serverTimestamp(),
-                        cachedAt: serverTimestamp(),
                         synthesisRationale: details.synthesisRationale || null
                       };
                       enforceArtistCacheSchema(updatePayload);
@@ -7375,7 +7373,6 @@ const App: React.FC = () => {
                         cacheVersion: 4,
                         createdAt: serverTimestamp(),
                         updatedAt: serverTimestamp(),
-                        cachedAt: serverTimestamp(),
                         hitCount: 0,
                         isDeep: true,
                         detailsCache: details,
@@ -7394,8 +7391,7 @@ const App: React.FC = () => {
                         redirectTo: canonicalId,
                         cacheVersion: 4,
                         createdAt: serverTimestamp(),
-                        updatedAt: serverTimestamp(),
-                        cachedAt: serverTimestamp()
+                        updatedAt: serverTimestamp()
                       }));
                       console.log(`[Deep Cut Queue] Created Alias Redirect: ${cacheId} -> ${canonicalId}`);
                     }

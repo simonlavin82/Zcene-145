@@ -766,7 +766,6 @@ export const writeArtistCacheMany = async (
           cacheVersion: 4,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
-          cachedAt: serverTimestamp(),
           hitCount: 0,
           isDeep: preserveFullGraph || false,
           isPrimarySeed: isPrimarySeed && !isLabel,
@@ -802,7 +801,6 @@ export const writeArtistCacheMany = async (
             const updatePayload: any = {
               detailsCache: isLabel ? sanitizeLabelProfile(artistDetails) : (typeof artistDetails === 'string' ? JSON.parse(artistDetails) : artistDetails),
               updatedAt: serverTimestamp(),
-              cachedAt: serverTimestamp(),
               cacheVersion: 4,
               [idFieldKey]: canonicalId,
               cacheKey: compositeCanonicalId,
@@ -824,7 +822,6 @@ export const writeArtistCacheMany = async (
             filters: filters || {},
             cacheVersion: 4,
             hitCount: (existing.hitCount || 0) + 1,
-            cachedAt: existing.cachedAt || serverTimestamp(),
             updatedAt: serverTimestamp(),
             isDeep: preserveFullGraph || false,
             isPrimarySeed: !isLabel,
@@ -840,7 +837,6 @@ export const writeArtistCacheMany = async (
           // Update detailsCache if it was missing or stale
           const updatePayload: any = {
             detailsCache: isLabel ? sanitizeLabelProfile(artistDetails) : (typeof artistDetails === 'string' ? JSON.parse(artistDetails) : artistDetails),
-            cachedAt: existing?.cachedAt || serverTimestamp(),
             updatedAt: serverTimestamp(),
             cacheVersion: 4,
             [idFieldKey]: canonicalId,
@@ -868,7 +864,6 @@ export const writeArtistCacheMany = async (
           cacheVersion: 4,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
-          cachedAt: serverTimestamp(),
           redirectTo: compositeCanonicalId
         }));
         console.log(`[${isLabel ? 'LabelCache' : 'ArtistCache'}] Created/Healed Bare Alias Pointer Stub: ${artistId} -> ${compositeCanonicalId}`);
@@ -1070,7 +1065,7 @@ export const isCacheExpired = (dataOrTimestamp: any): boolean => {
   if (!dataOrTimestamp) return true;
   
   // Handle full data object with fallback priority
-  const ts = dataOrTimestamp.updatedAt || dataOrTimestamp.cachedAt || dataOrTimestamp.createdAt || dataOrTimestamp;
+  const ts = dataOrTimestamp.updatedAt || dataOrTimestamp.createdAt || dataOrTimestamp;
   
   if (!ts) return true;
   let date: Date;

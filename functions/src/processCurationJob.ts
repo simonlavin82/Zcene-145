@@ -1134,8 +1134,7 @@ export const processCurationJob = onDocumentCreated({
 
             const canonicalUpdate: any = {
               'detailsCache.synthesisRationale': FieldValue.delete(),
-              updatedAt: FieldValue.serverTimestamp(),
-              cachedAt: FieldValue.serverTimestamp()
+              updatedAt: FieldValue.serverTimestamp()
             };
 
             let finalRationale = rootBreakdownStr;
@@ -1361,7 +1360,6 @@ export const processCurationJob = onDocumentCreated({
                 cacheVersion: 4,
                 createdAt: FieldValue.serverTimestamp(),
                 updatedAt: FieldValue.serverTimestamp(),
-                cachedAt: FieldValue.serverTimestamp(),
 
                 isDeep: true, // Marked Deep!
                 isPrimarySeed: !!matchingSeedNorm,
@@ -1379,7 +1377,6 @@ export const processCurationJob = onDocumentCreated({
               const updatePayload: any = {
                 detailsCache: finalRecDetails,
                 updatedAt: FieldValue.serverTimestamp(),
-                cachedAt: FieldValue.serverTimestamp(),
                 cacheVersion: 4,
                 [idFieldKey]: recNorm,
                 cacheKey: cleanCanonicalId,
