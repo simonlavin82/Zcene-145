@@ -62,11 +62,9 @@ exports.validateSeedOriginCallable = (0, https_1.onCall)({
     }
     const validationResult = await (0, curatorService_1.validateSeedOriginBackend)(seed);
     // V11.6 Fix 2: Programmatically enforce correctedInput for typos
-    const inputNorm = (0, curatorService_1.normalizeArtistId)(seed);
-    const returnedNorm = (0, curatorService_1.normalizeArtistId)(validationResult.id);
-    if (validationResult.isValid && inputNorm !== returnedNorm) {
+    if (validationResult.isValid && seed.toLowerCase() !== validationResult.id.toLowerCase()) {
         validationResult.correctedInput = true;
-        console.log(`[validateSeedOriginCallable] Canonical mismatch: "${seed}" (${inputNorm}) → "${validationResult.id}" (${returnedNorm})`);
+        console.log(`[validateSeedOriginCallable] Case-insensitive mismatch: "${seed}" → "${validationResult.id}"`);
     }
     // V11.6 Fix 2B (Rule 11): Hard-block the pipeline for unrecognizable entities.
     // isValid: false means the model could not confidently map the input to any known artist.

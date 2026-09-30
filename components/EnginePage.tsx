@@ -65,6 +65,13 @@ const ARCHITECTURE_RULES = [
     { id: 18, title: "Authorization Lifecycle", desc: "Token/billing authorization state must be strictly scoped to the active generation event." },
     { id: 19, title: "External Link Security", desc: "Official Website and Bandcamp links must rely on deterministic client-side search templates." },
     { id: 20, title: "Mandatory Disambiguation on Direct Hits", desc: "Green Line MUST NEVER bypass the user confirmation phase." },
+    { id: 21, title: "Locked Topology & Coordinate Memory", desc: "Node positions derived from AI link weights. (fx, fy) coordinates are persisted to canvasLayout to lock orientation." },
+    { id: 22, title: "Deep Cloning Isolation", desc: "Duplication executes a deep 1:1 clone of the project object to ensure localized edits never mutate the original canonical document." },
+    { id: 23, title: "Topology Parity Mandate", desc: "Any connection explicitly cited in the Root Breakdown narrative MUST have a corresponding physical edge in the graph." },
+    { id: 24, title: "Verbal Identity", desc: "The Root Breakdown system prompt must enforce the 'late-night record curator' voice." },
+    { id: 25, title: "Selective Coordinate Amnesia", desc: "When generating a shared link or duplicating, fixed coordinates are stripped so guests experience a fresh D3 layout." },
+    { id: 26, title: "Contextual Tooltips", desc: "Hover states and tooltips must prioritize native narrative snippets generated during the Root Breakdown." },
+    { id: 27, title: "Multi-Seed Co-Anchoring", desc: "Complex Generations MUST dynamically force the AI to co-anchor the narrative to explore the relationship between all seeds." },
     { id: 28, title: "Canonical Global Caching", desc: "Global caching must use pure canonical IDs. Query filters are barred from document paths to prevent cache fracturing." },
 ];
 
