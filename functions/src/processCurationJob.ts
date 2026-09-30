@@ -1134,6 +1134,7 @@ export const processCurationJob = onDocumentCreated({
 
             const canonicalUpdate: any = {
               'detailsCache.synthesisRationale': FieldValue.delete(),
+              updatedAt: FieldValue.serverTimestamp(),
               cachedAt: FieldValue.serverTimestamp()
             };
 
@@ -1299,14 +1300,17 @@ export const processCurationJob = onDocumentCreated({
           
           // Ensure the doc path ALWAYS writes strictly to the global, canonical ID
           const recDocRef = db.collection(collName).doc(cleanCanonicalId);
+          const recSnap = await recDocRef.get();
           
           // Bug 2: The Overwrite Violation - skip proactive cache update for perfect hits
           if (recDetails && recDetails._isReadOnly && !matchingSeedNorm) {
             console.log(`[Curation Backend] Skipping proactive cache update for perfect hit (${collName}): ${cleanCanonicalId}`);
+            if (recSnap.exists && !recSnap.data()?.createdAt && recSnap.createTime) {
+              await recDocRef.update({ createdAt: recSnap.createTime });
+              console.log(`[Curation Backend] Backfilled missing createdAt for read-only doc: ${cleanCanonicalId}`);
+            }
             continue;
           }
-
-          const recSnap = await recDocRef.get();
 
             if (!recSnap.exists) {
               const finalRecDetails = isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(normalizeDetailsForWrite(recDetails));
@@ -1355,8 +1359,9 @@ export const processCurationJob = onDocumentCreated({
                 filters: (matchingSeedNorm && !isLabel && !isComplexGeneration) ? inputPayload.filters || null : null,
                 synthesisRationale: (matchingSeedNorm && finalGraph.synthesisRationale && !isComplexGeneration) ? finalGraph.synthesisRationale : null,
                 cacheVersion: 4,
-                cachedAt: FieldValue.serverTimestamp(),
+                createdAt: FieldValue.serverTimestamp(),
                 updatedAt: FieldValue.serverTimestamp(),
+                cachedAt: FieldValue.serverTimestamp(),
 
                 isDeep: true, // Marked Deep!
                 isPrimarySeed: !!matchingSeedNorm,
@@ -1373,8 +1378,8 @@ export const processCurationJob = onDocumentCreated({
 
               const updatePayload: any = {
                 detailsCache: finalRecDetails,
-                cachedAt: FieldValue.serverTimestamp(),
                 updatedAt: FieldValue.serverTimestamp(),
+                cachedAt: FieldValue.serverTimestamp(),
                 cacheVersion: 4,
                 [idFieldKey]: recNorm,
                 cacheKey: cleanCanonicalId,

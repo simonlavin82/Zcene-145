@@ -1942,6 +1942,7 @@ const App: React.FC = () => {
         graphData: dashboardCleanGraphData,  // Phase 1: coord-stripped
         authorId: user.uid,
         createdAt: serverTimestamp(),
+        expireAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30-Day Hard TTL
       };
       delete sharePayload.id; // Exclude the local ID
 
@@ -2510,7 +2511,7 @@ const App: React.FC = () => {
                     // incomplete (no imageUrl or no bio). Cosmetic label gaps (genre/origin) are not
                     // sufficient to justify overwriting the displayed text with a raw Gemini response.
                     const isCriticallyIncomplete = !imageUrl || !bio || bio.trim().length < 5;
-                    if (isCriticallyIncomplete || isCacheExpired(data.cachedAt)) {
+                    if (isCriticallyIncomplete || isCacheExpired(data)) {
                         console.log("[Node Click] Cache is critically incomplete or expired; triggering background revalidation:", node.id);
                         triggerBackgroundRevalidation(node, standardizedId);
                     }
@@ -6824,6 +6825,7 @@ const App: React.FC = () => {
       // Overwrite the global cache doc with the MERGED data and a new cachedAt timestamp
       const updatePayload = {
         detailsCache: mergedDetails,
+        updatedAt: serverTimestamp(),
         cachedAt: serverTimestamp()
       };
       enforceArtistCacheSchema(updatePayload);
@@ -7064,7 +7066,7 @@ const App: React.FC = () => {
                     if (cacheDoc.exists()) {
                        const data = cacheDoc.data();
                       if (data) {
-                         isStale = isCacheExpired(data.cachedAt) || !validateNodeDetailsContent(data.detailsCache);
+                         isStale = isCacheExpired(data) || !validateNodeDetailsContent(data.detailsCache);
                       }
                       if (data && data.detailsCache && validateNodeDetailsContent(data.detailsCache)) {
                          try {
@@ -7335,6 +7337,8 @@ const App: React.FC = () => {
                               cacheKey: simpleArtistId,
                               redirectTo: cacheId,
                               cacheVersion: 4,
+                              createdAt: serverTimestamp(),
+                              updatedAt: serverTimestamp(),
                               cachedAt: serverTimestamp()
                             }));
                             console.log(`[Reconciliation] Converted base document "${simpleArtistId}" into a redirect to "${cacheId}".`);
@@ -7348,6 +7352,7 @@ const App: React.FC = () => {
                     if (docExists) {
                       const updatePayload = {
                         detailsCache: details,
+                        updatedAt: serverTimestamp(),
                         cachedAt: serverTimestamp(),
                         synthesisRationale: details.synthesisRationale || null
                       };
@@ -7368,6 +7373,8 @@ const App: React.FC = () => {
                         graphData: JSON.stringify(normalizedGraph),
                         filters: discoveryFiltersRef.current || {},
                         cacheVersion: 4,
+                        createdAt: serverTimestamp(),
+                        updatedAt: serverTimestamp(),
                         cachedAt: serverTimestamp(),
                         hitCount: 0,
                         isDeep: true,
@@ -7386,6 +7393,8 @@ const App: React.FC = () => {
                         artistId: cacheId,
                         redirectTo: canonicalId,
                         cacheVersion: 4,
+                        createdAt: serverTimestamp(),
+                        updatedAt: serverTimestamp(),
                         cachedAt: serverTimestamp()
                       }));
                       console.log(`[Deep Cut Queue] Created Alias Redirect: ${cacheId} -> ${canonicalId}`);

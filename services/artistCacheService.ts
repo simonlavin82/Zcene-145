@@ -764,8 +764,9 @@ export const writeArtistCacheMany = async (
           synthesisRationale: (isLabel || !isPrimarySeed) ? null : (normalizedGraph.synthesisRationale || null),
           filters: filters || {},
           cacheVersion: 4,
-          cachedAt: serverTimestamp(),
+          createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
+          cachedAt: serverTimestamp(),
           hitCount: 0,
           isDeep: preserveFullGraph || false,
           isPrimarySeed: isPrimarySeed && !isLabel,
@@ -800,6 +801,7 @@ export const writeArtistCacheMany = async (
           if (artistDetails) {
             const updatePayload: any = {
               detailsCache: isLabel ? sanitizeLabelProfile(artistDetails) : (typeof artistDetails === 'string' ? JSON.parse(artistDetails) : artistDetails),
+              updatedAt: serverTimestamp(),
               cachedAt: serverTimestamp(),
               cacheVersion: 4,
               [idFieldKey]: canonicalId,
@@ -864,8 +866,9 @@ export const writeArtistCacheMany = async (
           [idFieldKeyLocal]: artistId,
           seedArtists: name,
           cacheVersion: 4,
-          cachedAt: serverTimestamp(),
+          createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
+          cachedAt: serverTimestamp(),
           redirectTo: compositeCanonicalId
         }));
         console.log(`[${isLabel ? 'LabelCache' : 'ArtistCache'}] Created/Healed Bare Alias Pointer Stub: ${artistId} -> ${compositeCanonicalId}`);
@@ -1060,23 +1063,29 @@ export const readLegacyArtistCache = async (
 };
 
 /**
- * Checks if the cachedAt timestamp is older than 365 days (1 year).
+ * Checks if the timestamp is older than 365 days (1 year).
+ * Accepts an entire document data object or a single timestamp field for legacy compatibility.
  */
-export const isCacheExpired = (cachedAt: any): boolean => {
-  if (!cachedAt) return true;
+export const isCacheExpired = (dataOrTimestamp: any): boolean => {
+  if (!dataOrTimestamp) return true;
+  
+  // Handle full data object with fallback priority
+  const ts = dataOrTimestamp.updatedAt || dataOrTimestamp.cachedAt || dataOrTimestamp.createdAt || dataOrTimestamp;
+  
+  if (!ts) return true;
   let date: Date;
-  if (typeof cachedAt.toDate === 'function') {
-    date = cachedAt.toDate();
-  } else if (cachedAt instanceof Date) {
-    date = cachedAt;
-  } else if (typeof cachedAt === 'string') {
-    date = new Date(cachedAt);
-  } else if (cachedAt.seconds) {
-    date = new Date(cachedAt.seconds * 1000);
-  } else if (typeof cachedAt === 'number') {
-    date = new Date(cachedAt);
-  } else if (cachedAt.nanoseconds && typeof cachedAt.seconds === 'number') {
-    date = new Date(cachedAt.seconds * 1000);
+  if (typeof ts.toDate === 'function') {
+    date = ts.toDate();
+  } else if (ts instanceof Date) {
+    date = ts;
+  } else if (typeof ts === 'string') {
+    date = new Date(ts);
+  } else if (ts.seconds) {
+    date = new Date(ts.seconds * 1000);
+  } else if (typeof ts === 'number') {
+    date = new Date(ts);
+  } else if (ts.nanoseconds && typeof ts.seconds === 'number') {
+    date = new Date(ts.seconds * 1000);
   } else {
     return true;
   }

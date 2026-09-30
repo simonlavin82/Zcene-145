@@ -1025,6 +1025,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                     }
                                     const canonicalUpdate = {
                                         'detailsCache.synthesisRationale': firestore_2.FieldValue.delete(),
+                                        updatedAt: firestore_2.FieldValue.serverTimestamp(),
                                         cachedAt: firestore_2.FieldValue.serverTimestamp()
                                     };
                                     let finalRationale = rootBreakdownStr;
@@ -1171,12 +1172,16 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     const cleanCanonicalId = rawCanonicalId.replace(/-(after|before|genre):[^-\s]+/g, '');
                     // Ensure the doc path ALWAYS writes strictly to the global, canonical ID
                     const recDocRef = db.collection(collName).doc(cleanCanonicalId);
+                    const recSnap = await recDocRef.get();
                     // Bug 2: The Overwrite Violation - skip proactive cache update for perfect hits
                     if (recDetails && recDetails._isReadOnly && !matchingSeedNorm) {
                         console.log(`[Curation Backend] Skipping proactive cache update for perfect hit (${collName}): ${cleanCanonicalId}`);
+                        if (recSnap.exists && !recSnap.data()?.createdAt && recSnap.createTime) {
+                            await recDocRef.update({ createdAt: recSnap.createTime });
+                            console.log(`[Curation Backend] Backfilled missing createdAt for read-only doc: ${cleanCanonicalId}`);
+                        }
                         continue;
                     }
-                    const recSnap = await recDocRef.get();
                     if (!recSnap.exists) {
                         const finalRecDetails = isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(normalizeDetailsForWrite(recDetails));
                         if (recDetailsEntry) {
@@ -1222,8 +1227,9 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             filters: (matchingSeedNorm && !isLabel && !isComplexGeneration) ? inputPayload.filters || null : null,
                             synthesisRationale: (matchingSeedNorm && finalGraph.synthesisRationale && !isComplexGeneration) ? finalGraph.synthesisRationale : null,
                             cacheVersion: 4,
-                            cachedAt: firestore_2.FieldValue.serverTimestamp(),
+                            createdAt: firestore_2.FieldValue.serverTimestamp(),
                             updatedAt: firestore_2.FieldValue.serverTimestamp(),
+                            cachedAt: firestore_2.FieldValue.serverTimestamp(),
                             isDeep: true, // Marked Deep!
                             isPrimarySeed: !!matchingSeedNorm,
                             hasUniqueSpiderweb: (matchingSeedNorm && !isLabel && !isComplexGeneration) ? true : false,
@@ -1238,8 +1244,8 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         }
                         const updatePayload = {
                             detailsCache: finalRecDetails,
-                            cachedAt: firestore_2.FieldValue.serverTimestamp(),
                             updatedAt: firestore_2.FieldValue.serverTimestamp(),
+                            cachedAt: firestore_2.FieldValue.serverTimestamp(),
                             cacheVersion: 4,
                             [idFieldKey]: recNorm,
                             cacheKey: cleanCanonicalId,
