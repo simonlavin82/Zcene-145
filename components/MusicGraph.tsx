@@ -4,7 +4,7 @@ import * as d3 from 'd3';
 import { Loader2 } from 'lucide-react';
 import { GraphData, Node, Link, GraphSettings, NodeDetails, CanvasNodeRef } from '../types';
 import { LegendSymbol } from './Icons';
-import { CanvasControlStyles, InputSizes } from './DesignSystem';
+import { CanvasControlStyles, InputSizes, Button } from './DesignSystem';
 import { zceneCategoricalPalette, zceneFallbackColor, nodeTypeColorMap } from '../utils/formatters';
 import { normalizeArtistId, isNodeInSeedList } from '../services/artistCacheService';
 
@@ -144,6 +144,12 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   const [hoverQuadrant, setHoverQuadrant] = useState<'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'>('top-right');
   const activeHoveredLinkRef = useRef<{ link: Link } | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+  const [isCardExpanded, setIsCardExpanded] = useState(false);
+  const hoveredNodeIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    setIsCardExpanded(false);
+  }, [hoveredLink?.sourceId]);
   const hoveredNodeIdRef = useRef<string | null>(null);
   const activeHoveredNodeRef = useRef<Node | null>(null);
 
@@ -1555,7 +1561,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                         /* Desktop: absolute positioning without mouse-following coordinates */
                         ? {
                             position: 'absolute' as const,
-                            pointerEvents: 'none' as const,
+                            pointerEvents: isCardExpanded || (hoveredLink.connections && hoveredLink.connections.length > 3) ? 'auto' : 'none',
                             zIndex: 50
                           }
                         /* Mobile: absolute top-drop banner within the canvas container */
@@ -1564,55 +1570,29 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                             top: 0,
                             left: 0,
                             right: 0,
-                            pointerEvents: 'none',
+                            pointerEvents: isCardExpanded || (hoveredLink.connections && hoveredLink.connections.length > 3) ? 'auto' : 'none',
                             zIndex: 50
                         }
                 }
                 className={
                     typeof window !== 'undefined' && window.innerWidth >= 1024
                         /* Desktop visual tokens + quadrant class positioning */
-                        ? `bg-zinc-950/95 border border-zinc-700/80 px-3.5 py-2.5 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md rounded-xl flex flex-col gap-2 text-left min-w-[200px] max-w-[320px] absolute ${
+                        ? `bg-zinc-950/95 border border-zinc-700/80 px-3.5 py-2.5 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md rounded-xl flex flex-col gap-2 text-left min-w-[200px] max-w-[320px] max-h-[400px] overflow-hidden absolute ${
                             hoverQuadrant === 'top-left' ? 'top-6 left-6' :
                             hoverQuadrant === 'top-right' ? 'top-6 right-6' :
                             hoverQuadrant === 'bottom-left' ? 'bottom-6 left-24' :
                             'bottom-6 right-24'
                           }`
                         /* Mobile visual tokens — full-width top-drop banner */
-                        : 'bg-zinc-950/95 border-b border-zinc-700/80 px-4 py-3 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md w-full flex flex-col gap-2 text-left'
+                        : 'bg-zinc-950/95 border-b border-zinc-700/80 px-4 py-3 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md w-full flex flex-col gap-2 text-left max-h-[50vh] overflow-hidden'
                 }
             >
-                <span className="font-poppins text-sm text-white border-b border-zinc-800 pb-1 mb-1 font-medium">{hoveredLink.sourceId}</span>
+                <span className="font-poppins text-sm text-white border-b border-zinc-800 pb-1 mb-1 font-medium shrink-0">{hoveredLink.sourceId}</span>
                 
-                {/* Zone 1: Direct Connections / Fallback.
-                     On mobile we slice to ≤4 rows so the flex column shrink-wraps
-                     naturally — no height cap or overflow clipping needed.
-                     The D3 canvas continues to draw all edges regardless. */}
-                {hoveredLink.connections && hoveredLink.connections.length > 0 ? (
-                    <div className="flex flex-col gap-1">
-                        {(isSmallScreen
-                            ? hoveredLink.connections.slice(0, 4)
-                            : hoveredLink.connections
-                        ).map((c, i) => (
-                            <div key={i} className="text-xs font-medium text-zinc-300 leading-tight">
-                                <span className="text-zinc-400 font-normal">{c.context}</span>{" "}
-                                <span className="text-primary font-normal">{c.targetName}</span>
-                            </div>
-                        ))}
-                    </div>
-                ) : hoveredLink.fallbackMessage ? (
-                    <div className="text-xs italic text-zinc-500 font-normal leading-normal">
-                        {hoveredLink.fallbackMessage}
-                    </div>
-                ) : null}
-
-                {/* Zone 2: Spiderweb DNA */}
+                {/* Zone 1: Spiderweb DNA (Narrative First) */}
                 {hoveredLink.dna && (
-                    <div className={
-                        (hoveredLink.connections && hoveredLink.connections.length > 0) || hoveredLink.fallbackMessage
-                            ? "mt-1 pt-1.5 border-t border-zinc-800/60"
-                            : ""
-                    }>
-                        <p className={`text-xs leading-4 font-normal text-zinc-400 m-0${isSmallScreen ? ' line-clamp-2' : ''}`}>{hoveredLink.dna
+                    <div className="shrink-0">
+                        <p className={`text-xs leading-4 font-normal text-zinc-400 m-0${isSmallScreen && !isCardExpanded ? ' line-clamp-3' : ''}`}>{hoveredLink.dna
                             ?.replace(/\btechnicolor\b/gi, 'technicolour')
                             .replace(/\bcolors\b/gi, 'colours')
                             .replace(/\bcolorful\b/gi, 'colourful')
@@ -1620,6 +1600,41 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                             .replace(/\bcolorize\b/gi, 'colourise')
                             .replace(/\bcolor\b/gi, 'colour')
                         }</p>
+                    </div>
+                )}
+
+                {/* Zone 2: Direct Connections / Fallback */}
+                {((hoveredLink.connections && hoveredLink.connections.length > 0) || hoveredLink.fallbackMessage) && (
+                    <div className={`flex flex-col gap-1 overflow-y-auto ${hoveredLink.dna ? "mt-1 pt-1.5 border-t border-zinc-800/60" : ""}`}>
+                        {hoveredLink.connections && hoveredLink.connections.length > 0 ? (
+                            (isCardExpanded ? hoveredLink.connections : hoveredLink.connections.slice(0, 3)).map((c, i) => (
+                                <div key={i} className="text-xs font-medium text-zinc-300 leading-tight">
+                                    <span className="text-zinc-400 font-normal">{c.context}</span>{" "}
+                                    <span className="text-primary font-normal">{c.targetName}</span>
+                                </div>
+                            ))
+                        ) : hoveredLink.fallbackMessage ? (
+                            <div className="text-xs italic text-zinc-500 font-normal leading-normal shrink-0">
+                                {hoveredLink.fallbackMessage}
+                            </div>
+                        ) : null}
+                    </div>
+                )}
+                
+                {/* Dynamic CTA / Close Button */}
+                {hoveredLink.connections && hoveredLink.connections.length > 3 && !isCardExpanded && (
+                    <div className="pt-1 shrink-0">
+                        <Button variant="secondary" size="sm" fullWidth onClick={() => setIsCardExpanded(true)}>
+                            View {hoveredLink.connections.length - 3} more connections
+                        </Button>
+                    </div>
+                )}
+                
+                {isCardExpanded && (
+                    <div className="pt-1 shrink-0">
+                        <Button variant="secondary" size="sm" fullWidth onClick={() => setHoveredLink(null)}>
+                            Close
+                        </Button>
                     </div>
                 )}
             </div>
