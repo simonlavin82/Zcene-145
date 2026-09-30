@@ -10,7 +10,6 @@ import {
   scrapeVideoIdBackend,
   checkVideoPlayability,
   scrapeImageUrlBackend,
-  buildCompositeCacheKey,
   extractArtistSubGraph,
   validateSeedOriginBackend,
   extractCountrySlug,
@@ -1298,15 +1297,12 @@ export const processCurationJob = onDocumentCreated({
           // Guardrail: Strip any surviving filter tags hallucinated by the AI
           const cleanCanonicalId = rawCanonicalId.replace(/-(after|before|genre):[^-\s]+/g, '');
           
-          // The composite key is strictly for tracking the transient cache property and caching fields, NEVER for the doc path
-          const compositeCanonicalId = buildCompositeCacheKey(cleanCanonicalId, inputPayload.filters || undefined);
-          
           // Ensure the doc path ALWAYS writes strictly to the global, canonical ID
           const recDocRef = db.collection(collName).doc(cleanCanonicalId);
           
           // Bug 2: The Overwrite Violation - skip proactive cache update for perfect hits
           if (recDetails && recDetails._isReadOnly && !matchingSeedNorm) {
-            console.log(`[Curation Backend] Skipping proactive cache update for perfect hit (${collName}): ${cleanCanonicalId} (cacheKey: ${compositeCanonicalId})`);
+            console.log(`[Curation Backend] Skipping proactive cache update for perfect hit (${collName}): ${cleanCanonicalId}`);
             continue;
           }
 
@@ -1351,7 +1347,7 @@ export const processCurationJob = onDocumentCreated({
               }
 
               await recDocRef.set({
-                cacheKey: compositeCanonicalId,
+                cacheKey: cleanCanonicalId,
                 [idFieldKey]: recNorm,
                 seedArtists: recArtist,
                 graphData: (safeExtractedGraph && !isComplexGeneration) ? JSON.stringify(safeExtractedGraph) : null,
@@ -1367,7 +1363,7 @@ export const processCurationJob = onDocumentCreated({
                 hasUniqueSpiderweb: (matchingSeedNorm && !isLabel && !isComplexGeneration) ? true : false,
                 dataIntegrityStatus: matchingSeedNorm ? (recDetails?._isStub ? 'degraded' : 'verified') : undefined,
               });
-              console.log(`[Curation Backend] Proactively created DEEP entry for recommendation (${collName}): ${cleanCanonicalId} (cacheKey: ${compositeCanonicalId})`);
+              console.log(`[Curation Backend] Proactively created DEEP entry for recommendation (${collName}): ${cleanCanonicalId}`);
             } else {
               const finalRecDetails = isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(normalizeDetailsForWrite(recDetails));
               
@@ -1381,7 +1377,7 @@ export const processCurationJob = onDocumentCreated({
                 updatedAt: FieldValue.serverTimestamp(),
                 cacheVersion: 4,
                 [idFieldKey]: recNorm,
-                cacheKey: compositeCanonicalId,
+                cacheKey: cleanCanonicalId,
                 isDeep: true
               };
 
@@ -1429,7 +1425,7 @@ export const processCurationJob = onDocumentCreated({
               }
 
               await recDocRef.update(sanitizeUndefinedProperties(updatePayload));
-              console.log(`[Curation Backend] Proactively updated detailsCache for recommendation (${collName}): ${cleanCanonicalId} (cacheKey: ${compositeCanonicalId})`);            }
+              console.log(`[Curation Backend] Proactively updated detailsCache for recommendation (${collName}): ${cleanCanonicalId}`);            }
 
             }
 

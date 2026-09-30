@@ -61,6 +61,24 @@ exports.validateSeedOriginCallable = (0, https_1.onCall)({
         throw new https_1.HttpsError("unauthenticated", "Invalid or missing API password");
     }
     const validationResult = await (0, curatorService_1.validateSeedOriginBackend)(seed);
+    // V11.6 Fix 2: Programmatically enforce correctedInput for typos
+    const inputNorm = (0, curatorService_1.normalizeArtistId)(seed);
+    const returnedNorm = (0, curatorService_1.normalizeArtistId)(validationResult.id);
+    if (validationResult.isValid && inputNorm !== returnedNorm) {
+        validationResult.correctedInput = true;
+        console.log(`[validateSeedOriginCallable] Canonical mismatch: "${seed}" (${inputNorm}) → "${validationResult.id}" (${returnedNorm})`);
+    }
+    // V11.6 Fix 2B (Rule 11): Hard-block the pipeline for unrecognizable entities.
+    // isValid: false means the model could not confidently map the input to any known artist.
+    // Throwing here prevents a broken stub from being minted and the pipeline from executing.
+    if (!validationResult.isValid) {
+        console.warn(`[validateSeedOriginCallable] Rule 11 BLOCK: Seed "${seed}" returned isValid: false. Rejecting pipeline.`);
+        throw new https_1.HttpsError("not-found", `"${seed}" could not be identified as a real musical artist or label. Please check the spelling and try again.`);
+    }
+    // Log typo corrections so operators can monitor misuse patterns.
+    if (validationResult.correctedInput) {
+        console.log(`[validateSeedOriginCallable] Typo correction applied: "${seed}" → "${validationResult.id}"`);
+    }
     return validationResult;
 });
 exports.executeCurationPipeline = (0, https_1.onCall)({

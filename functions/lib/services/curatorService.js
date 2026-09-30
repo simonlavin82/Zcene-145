@@ -567,22 +567,26 @@ exports.SEED_VALIDATION_SCHEMA = {
     properties: {
         id: {
             type: genai_1.Type.STRING,
-            description: "The canonical, professional name of the artist."
+            description: "The canonical, correctly-spelled, professional name of the artist. If the input was a typo, return the corrected spelling here."
         },
         origin: {
             type: genai_1.Type.STRING,
-            description: "The country of origin for the artist (e.g., 'USA', 'UK')."
+            description: "The country of origin for the artist (e.g., 'USA', 'UK'). Return an empty string if isValid is false."
         },
         genre: {
             type: genai_1.Type.STRING,
-            description: "The primary genre of the artist."
+            description: "The primary genre of the artist. Return an empty string if isValid is false."
         },
         isValid: {
             type: genai_1.Type.BOOLEAN,
-            description: "True if this is a real, recognized musical entity. False if it is a hallucination or invalid input."
+            description: "True if this is a real, recognized musical entity that can be confidently identified. False if the input cannot be mapped to any known artist."
+        },
+        correctedInput: {
+            type: genai_1.Type.BOOLEAN,
+            description: "True if the returned 'id' is a spelling correction of the user's original input (e.g. input was 'turstile', id returned is 'Turnstile'). False if the id matches the input exactly (case-insensitive)."
         }
     },
-    required: ["id", "origin", "genre", "isValid"]
+    required: ["id", "origin", "genre", "isValid", "correctedInput"]
 };
 // --- CORE CURATOR LOGIC ---
 const validateSeedOriginBackend = async (artistId) => {
@@ -593,12 +597,18 @@ const validateSeedOriginBackend = async (artistId) => {
         }
         const ai = new genai_1.GoogleGenAI({ apiKey, httpOptions: { timeout: 300000 } });
         const currentModel = "gemini-3.5-flash"; // Phase 1: Origin Validation uses 3.5 Flash
-        const prompt = `Validate this seed artist: "${artistId}". Is this a real musical entity? Extract its canonical name, country of origin, and primary genre.`;
+        const prompt = `Validate this seed artist: "${artistId}".
+
+CRITICAL RULES (non-negotiable):
+1. TYPO CORRECTION (MANDATORY): If the input is an obvious misspelling or transposition of a real artist name (e.g. "turstile" for "Turnstile", "radiohed" for "Radiohead", "nirvanna" for "Nirvana"), you MUST return the correctly-spelled canonical name in the 'id' field and set 'correctedInput' to true. Do NOT return the original typo'd spelling as the id under any circumstances.
+2. REAL ENTITY CHECK: If the entity is a real, recognizable musical artist, band, or label, set 'isValid' to true with full origin and genre.
+3. NOT_FOUND (MANDATORY): If the input cannot be confidently mapped to any known, real musical entity — even after attempting typo correction — set 'isValid' to false. In this case, 'id' should be the original input and 'origin'/'genre' should be empty strings.
+4. Do NOT invent or hallucinate artists. If in doubt, return isValid: false.`;
         const response = await ai.models.generateContent({
             model: currentModel,
             contents: prompt,
             config: {
-                systemInstruction: "You are a music data validator. Return ONLY valid JSON matching the schema.",
+                systemInstruction: "You are a strict music data validator. You do NOT infer intent. If the user input contains a spelling error, return the REAL canonical artist name (e.g. if given 'turstile', return id: 'Turnstile', correctedInput: true). Return ONLY valid JSON matching the schema.",
                 temperature: 0.1, // very low temperature for validation
                 responseMimeType: "application/json",
                 responseSchema: exports.SEED_VALIDATION_SCHEMA
@@ -627,7 +637,7 @@ const validateSeedOriginBackend = async (artistId) => {
     }
 };
 exports.validateSeedOriginBackend = validateSeedOriginBackend;
-const generateRootsBreakdownBackend = async (artists, detailsCacheEntries, usageCollector) => {
+const generateRootsBreakdownBackend = async (artists, detailsCacheEntries, usageCollector, filters) => {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
         throw new Error("GEMINI_API_KEY is not defined in environment secrets.");
@@ -650,11 +660,20 @@ FORMATTING RULES (non-negotiable):
 - Use bullet points for dense cross-referencing. No double newlines between bullets.
 - Open with a hook — a defining tension or surprising throughline in the ecosystem.
 - Close with a synthesis: what does this web of connections reveal that no individual artist makes visible alone?
-- For the artistSnippets field, generate an array of objects. Each object must have an 'id' (the canonical artist/label name) and a 'snippet' containing a dedicated, punchy, standalone 1-sentence "epicenter hook". This must be a complete sentence that summarizes their specific role in this exact ecosystem (e.g. "Radiohead was the band staring at the static on the television screen."). Generate a hook for the seed artist(s) and EVERY satellite artist/label you mention.`;
+- For the artistSnippets field, generate an array of objects. Each object must have an 'id' (the canonical artist/label name) and a 'snippet' containing a dedicated, punchy, standalone 1-sentence "epicenter hook". This must be a complete sentence that summarizes their specific role in this exact ecosystem (e.g. "Radiohead was the band staring at the static on the television screen."). Generate a hook for EVERY seed artist and EVERY satellite artist/label you mention.`;
     const seedList = artists.split('::').map(s => (0, executeCurationPipeline_1.stripCountrySlug)((0, exports.normalizeArtistId)(s)));
     const isMultiSeed = seedList.length > 1;
+    let seedAnchorInstruction = '';
+    if (filters && (filters.foundedAfter || filters.foundedBefore || filters.includeGenres)) {
+        const filterDesc = [
+            filters.foundedAfter ? `founded AFTER ${filters.foundedAfter}` : '',
+            filters.foundedBefore ? `founded BEFORE ${filters.foundedBefore}` : '',
+            filters.includeGenres?.length ? `within genres: ${filters.includeGenres.join(', ')}` : ''
+        ].filter(Boolean).join('; ');
+        seedAnchorInstruction = `\n\nSEED ANCHOR CONSTRAINT (MANDATORY): This ecosystem was generated with an active filter: [${filterDesc}]. Your narrative MUST explicitly frame this filter as the defining thematic lens of the ecosystem. Reference this era or genre constraint as an organizing principle in your opening paragraph. Do NOT write as if this were an unconstrained generation — the filter is a core architectural requirement, not optional context. Failure to acknowledge the filter constraint is a violation of the generation contract.`;
+    }
     const coAnchorMandate = isMultiSeed ?
-        `\n\nCRITICAL CO-ANCHOR MANDATE (Rule 27): This is a multi-seed generation for the following equal anchors: ${artists.replace(/::/g, ', ')}. You MUST treat EVERY seed artist as a co-equal foundational anchor. Do not relegate any seed to a "satellite" status or focus the narrative on just one artist due to their fame. The resulting breakdown must weave them together as co-equal pillars of the ecosystem.` : '';
+        `\n\nCRITICAL CO-ANCHOR MANDATE (Rule 27): This is a multi-seed generation for the following equal anchors: ${artists.replace(/::/g, ', ')}. You MUST treat EVERY seed artist as a co-equal foundational anchor. Do not relegate any seed to a "satellite" status or focus the narrative on just one artist due to their fame. The resulting breakdown must weave them together as co-equal pillars of the ecosystem.${seedAnchorInstruction}` : `\n\nCRITICAL ANCHOR MANDATE (Rule 27):${seedAnchorInstruction}`;
     const prompt = `Write the Roots Breakdown for these seed artists: ${artists.replace(/::/g, ', ')}.${coAnchorMandate}
 
 Here is the fully enriched context of all nodes (seeds and deep cuts) in their generated ecosystem:
@@ -702,7 +721,15 @@ ${JSON.stringify(detailsCacheEntries, null, 2)}`;
         const text = response.text;
         if (!text)
             return null;
-        return JSON.parse(text);
+        const parsed = JSON.parse(text);
+        // V11.6 Fix 1: Unescape literal \n sequences that the structured JSON output mode over-escapes.
+        // Gemini packs Markdown into a strict JSON string field and sometimes emits \n as the
+        // two-character sequence backslash-n rather than a true Unicode newline, causing the
+        // frontend to render literal "\n" and "\n*" instead of line breaks and bullet points.
+        if (parsed?.editorialMarkdown) {
+            parsed.editorialMarkdown = parsed.editorialMarkdown.replace(/\\n/g, '\n');
+        }
+        return parsed;
     }
     catch (err) {
         console.error("[generateRootsBreakdownBackend] Failed to generate roots breakdown:", err);
@@ -880,6 +907,7 @@ const generateGraphDataBackend = async (artists, filters, cachedSubgraphsContext
         filterRules += `\n\n(Note: The seed artists [${artists}] are the ONLY exception. ALL other artists MUST obey these rules.)`;
         filterRules += "\n\nCAPACITY LIMIT: You MUST NOT generate more than 12-15 NEW artist nodes. Including metadata nodes, do not exceed 60 nodes in total. Quality over quantity.";
         filterRules += "\n\nFINAL VERIFICATION: Audit your list. If an artist violates any rules above, delete them.";
+        filterRules += "\n\nID SANITIZATION (CRITICAL): The `id` string for all nodes in the JSON graph MUST be the exact, canonical ID for the entity. NEVER concatenate, append, or inject any filter strings, era tags, or genre tags onto the `id` field. For example, use `id: 'spaced-us'`, NEVER `id: 'spaced-us-after:2019'`. Failure to follow this rule corrupts the global database.";
         systemInstruction += filterRules;
         let reminder = `\n\nREMINDER: All new artists MUST meet the active filters:`;
         if (filters.foundedAfter)

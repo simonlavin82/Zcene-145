@@ -399,6 +399,12 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     const chunkResults = await Promise.all(chunk.map(async (entityObj, idx) => {
                         const rawName = entityObj.name;
                         let artistNormId = entityObj.id; // Bug 1 & 2 Fix: Preserve the pre-slugged ID
+                        // V11.5 Guardrail: Strip any filter tags the AI may have hallucinated onto the node ID.
+                        // This must happen at the point of entry — BEFORE any cache lookups or hydration —
+                        // so that a poisoned ID like "spaced-us-after:2018" is sanitized to "spaced-us"
+                        // before it can propagate into detailsCacheEntries or Firestore.
+                        artistNormId = artistNormId.replace(/-(after|before|genre|inc_genres|exc_origins|inc_origins):[^-\s]+/gi, '');
+                        entityObj.id = artistNormId; // Keep entityObj.id in sync so hydration result at line 700 is clean
                         const isLabel = entityObj.type === 'label';
                         // ── Slug Deduplication Guard ───────────────────────────────────────────
                         // Before using artistNormId (which may be derived from a new slug), query
@@ -429,6 +435,10 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                         if (snap.id.endsWith('-scotland') || snap.id.endsWith('-wales') || snap.id.endsWith('-northern-ireland') || snap.id.endsWith('-england')) {
                                             continue;
                                         }
+                                        // V11.6: Reject poisoned canonical docs (pre-V11.5 orphans) that contain filter tags
+                                        if (/-(after|before|genre|inc_genres|exc_origins|inc_origins):[^-\s]+/i.test(snap.id)) {
+                                            continue;
+                                        }
                                         if (snap.id !== artistNormId && snapData.artistId && snapData.artistId.startsWith(baseNormId)) {
                                             // Prefer docs that already have graphData (fully curated)
                                             if (snapData.graphData || snap.id === artistNormId) {
@@ -447,6 +457,9 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             catch (dedupErr) {
                                 console.warn(`[Curation Backend] Slug dedup query failed for "${rawName}", proceeding with derived ID:`, dedupErr);
                             }
+                            // V11.6: Re-sanitize after slug dedup in case the dedup loop adopted a poisoned historical ID
+                            artistNormId = artistNormId.replace(/-(after|before|genre|inc_genres|exc_origins|inc_origins):[^-\s]+/gi, '');
+                            entityObj.id = artistNormId;
                         }
                         // 1. Check local Firestore Cache first
                         let details = null;
@@ -727,7 +740,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 let rootBreakdownStr = "";
                 try {
                     // Step 3 (V10): Native JSON Generation (Root Breakdown + 1-Sentence Hooks)
-                    const rootBreakdownPayload = await (0, curatorService_1.generateRootsBreakdownBackend)(inputPayload.artists, detailsCacheEntries, usageCollector);
+                    const rootBreakdownPayload = await (0, curatorService_1.generateRootsBreakdownBackend)(inputPayload.artists, detailsCacheEntries, usageCollector, inputPayload.filters);
                     if (rootBreakdownPayload) {
                         rootBreakdownStr = rootBreakdownPayload.editorialMarkdown;
                         finalGraph.synthesisRationale = rootBreakdownStr;
@@ -1153,12 +1166,14 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         console.warn(`[Curation Backend] Recommendation cache write skipped for "${recNorm}" — schema validation failed: ${validationErr.message}`);
                         continue;
                     }
-                    const disambiguatedCanonicalId = recDetailsEntry ? recDetailsEntry[0] : recNorm;
-                    const compositeCanonicalId = (0, curatorService_1.buildCompositeCacheKey)(disambiguatedCanonicalId, inputPayload.filters || undefined);
-                    const recDocRef = db.collection(collName).doc(compositeCanonicalId);
+                    const rawCanonicalId = recDetailsEntry ? recDetailsEntry[0] : recNorm;
+                    // Guardrail: Strip any surviving filter tags hallucinated by the AI
+                    const cleanCanonicalId = rawCanonicalId.replace(/-(after|before|genre):[^-\s]+/g, '');
+                    // Ensure the doc path ALWAYS writes strictly to the global, canonical ID
+                    const recDocRef = db.collection(collName).doc(cleanCanonicalId);
                     // Bug 2: The Overwrite Violation - skip proactive cache update for perfect hits
                     if (recDetails && recDetails._isReadOnly && !matchingSeedNorm) {
-                        console.log(`[Curation Backend] Skipping proactive cache update for perfect hit (${collName}): ${compositeCanonicalId}`);
+                        console.log(`[Curation Backend] Skipping proactive cache update for perfect hit (${collName}): ${cleanCanonicalId}`);
                         continue;
                     }
                     const recSnap = await recDocRef.get();
@@ -1199,7 +1214,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             }
                         }
                         await recDocRef.set({
-                            cacheKey: compositeCanonicalId,
+                            cacheKey: cleanCanonicalId,
                             [idFieldKey]: recNorm,
                             seedArtists: recArtist,
                             graphData: (safeExtractedGraph && !isComplexGeneration) ? JSON.stringify(safeExtractedGraph) : null,
@@ -1214,7 +1229,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             hasUniqueSpiderweb: (matchingSeedNorm && !isLabel && !isComplexGeneration) ? true : false,
                             dataIntegrityStatus: matchingSeedNorm ? (recDetails?._isStub ? 'degraded' : 'verified') : undefined,
                         });
-                        console.log(`[Curation Backend] Proactively created DEEP entry for recommendation (${collName}): ${compositeCanonicalId}`);
+                        console.log(`[Curation Backend] Proactively created DEEP entry for recommendation (${collName}): ${cleanCanonicalId}`);
                     }
                     else {
                         const finalRecDetails = isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(normalizeDetailsForWrite(recDetails));
@@ -1227,7 +1242,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             updatedAt: firestore_2.FieldValue.serverTimestamp(),
                             cacheVersion: 4,
                             [idFieldKey]: recNorm,
-                            cacheKey: compositeCanonicalId,
+                            cacheKey: cleanCanonicalId,
                             isDeep: true
                         };
                         if (matchingSeedNorm) {
@@ -1274,7 +1289,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             }
                         }
                         await recDocRef.update(sanitizeUndefinedProperties(updatePayload));
-                        console.log(`[Curation Backend] Proactively updated detailsCache for recommendation (${collName}): ${compositeCanonicalId}`);
+                        console.log(`[Curation Backend] Proactively updated detailsCache for recommendation (${collName}): ${cleanCanonicalId}`);
                     }
                 }
                 // Topology already rewritten and deduplicated in the pre-computation block before Step 5.
