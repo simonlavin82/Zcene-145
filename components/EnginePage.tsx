@@ -73,6 +73,7 @@ const ARCHITECTURE_RULES = [
     { id: 26, title: "Contextual Tooltips", desc: "Hover states and tooltips must prioritize native narrative snippets generated during the Root Breakdown." },
     { id: 27, title: "Multi-Seed Co-Anchoring", desc: "Complex Generations MUST dynamically force the AI to co-anchor the narrative to explore the relationship between all seeds." },
     { id: 28, title: "Canonical Global Caching", desc: "Global caching must use pure canonical IDs. Query filters are barred from document paths to prevent cache fracturing." },
+    { id: 29, title: "V12 Data Lifecycle Matrix", desc: "Global Assets are dynamic. Shared Links are frozen snapshots with a 30-day hard expiration (TTL). Owned Zcenes persist indefinitely." },
 ];
 
 const DiscoveryFlowDiagram: React.FC = () => (

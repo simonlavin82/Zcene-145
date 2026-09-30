@@ -41,10 +41,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, shareUr
 
             <ModalBody className="space-y-4">
               <p className="leading-relaxed">
-                Anyone with the link can view this read-only snapshot. 
-                <span className="block mt-1 text-zinc-400 text-sm">
-                  Note: Shared links are ephemeral and automatically expire after 30 days.
-                </span>
+                Anyone with the link can view this music discovery journey.
               </p>
 
               <div className="relative flex items-center gap-3 bg-zinc-950 border border-zinc-800 rounded-xl p-3 overflow-hidden group">
