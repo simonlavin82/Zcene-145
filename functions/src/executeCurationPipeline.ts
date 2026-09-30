@@ -66,11 +66,9 @@ export const validateSeedOriginCallable = onCall({
   const validationResult = await validateSeedOriginBackend(seed);
 
   // V11.6 Fix 2: Programmatically enforce correctedInput for typos
-  const inputNorm = normalizeArtistId(seed);
-  const returnedNorm = normalizeArtistId(validationResult.id);
-  if (validationResult.isValid && inputNorm !== returnedNorm) {
+  if (validationResult.isValid && seed.toLowerCase() !== validationResult.id.toLowerCase()) {
     validationResult.correctedInput = true;
-    console.log(`[validateSeedOriginCallable] Canonical mismatch: "${seed}" (${inputNorm}) → "${validationResult.id}" (${returnedNorm})`);
+    console.log(`[validateSeedOriginCallable] Case-insensitive mismatch: "${seed}" → "${validationResult.id}"`);
   }
 
   // V11.6 Fix 2B (Rule 11): Hard-block the pipeline for unrecognizable entities.

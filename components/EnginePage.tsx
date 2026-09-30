@@ -65,6 +65,7 @@ const ARCHITECTURE_RULES = [
     { id: 18, title: "Authorization Lifecycle", desc: "Token/billing authorization state must be strictly scoped to the active generation event." },
     { id: 19, title: "External Link Security", desc: "Official Website and Bandcamp links must rely on deterministic client-side search templates." },
     { id: 20, title: "Mandatory Disambiguation on Direct Hits", desc: "Green Line MUST NEVER bypass the user confirmation phase." },
+    { id: 28, title: "Canonical Global Caching", desc: "Global caching must use pure canonical IDs. Query filters are barred from document paths to prevent cache fracturing." },
 ];
 
 const DiscoveryFlowDiagram: React.FC = () => (
@@ -116,6 +117,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                     <ul className="text-[12px] text-zinc-400 space-y-4">
                         <li><span className="text-primary font-medium">Fail-Fast Media Gatekeeper:</span> Re-hydrates any node missing crucial iTunes/Spotify imagery or biography.</li>
                         <li><span className="text-primary font-medium">Metadata Hydration:</span> Fetches rich data via Gemini Flash & Google Search, then writes back to cache.</li>
+                        <li><span className="text-primary font-medium">Persist Assets:</span> Writes hydrated nodes using pure canonical IDs. Zcene strictly separates bespoke temporal/genre generation from its canonical global artist library, ensuring absolute data purity.</li>
                     </ul>
                 </div>
             </div>

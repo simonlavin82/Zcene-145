@@ -130,3 +130,8 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 
 ### 26. Contextual Tooltips
 - **Rule:** Spiderweb node tooltips must prioritize the AI-generated `narrativeSnippet` (epicenter hook) over the encyclopedic `summary` to provide cohesive, web-specific context.
+
+### 28. Canonical Global Caching (Filter Barring)
+- **Rule:** Global entity caching MUST use pure canonical IDs for document paths (`cleanCanonicalId`). 
+- **Enforcement:** Query filters (e.g., `after:2019`, `genre:hardcore`) are strictly barred from canonical document paths. This explicitly prevents cache fracturing and phantom cache misses.
+- **Rationale:** Zcene strictly separates bespoke temporal/genre Zcene generation (which lives in ephemeral project topologies) from its canonical global artist library (which must remain a pure, singular source of truth for all users).
