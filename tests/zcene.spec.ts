@@ -25,14 +25,69 @@ test.describe('Zcene UI and State Tests', () => {
   });
 
   test('Share link generates valid Tier 2 payload and renders cleanly without MIME crash', async ({ page }) => {
-    // 1. Navigate to the app root and bypass Global Wall
+    // 1. Mock the Backend Generation Request to stop live API billing
+    await page.route('**/api/gemini/**', async route => {
+      const mockPayload = {
+        candidates: [{
+          content: {
+            parts: [{
+              text: JSON.stringify({
+                nodes: [
+                  { id: "Deftones", type: "artist", group: 1, x: 200, y: 200 },
+                  { id: "Chino Moreno", type: "artist", group: 2, x: 250, y: 220 }
+                ],
+                links: [
+                  { source: "Deftones", target: "Chino Moreno", value: 1, type: "member" }
+                ]
+              })
+            }]
+          }
+        }]
+      };
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(mockPayload)
+      });
+    });
+
+    // 2. Navigate to the app root and bypass Global Wall
     await page.goto('http://localhost:3000');
     await page.evaluate(() => sessionStorage.setItem('zcene_beta_unlocked', 'true'));
     await page.reload();
+
+    // 3. Login via Google Auth popup (Firebase Emulator)
+    const createBtn = page.getByRole('button', { name: /Create/i }).first();
+    await expect(createBtn).toBeVisible({ timeout: 15000 });
+    
+    // We must handle the auth popup to access the GraphPage
+    const popupPromise = page.waitForEvent('popup');
+    await createBtn.click();
+    const popup = await popupPromise;
+    await popup.waitForLoadState();
+    
+    // Try to auto-login in the emulator UI
+    try {
+      const addNewAccountBtn = popup.getByRole('button', { name: /Add new account/i });
+      if (await addNewAccountBtn.isVisible()) {
+        await addNewAccountBtn.click();
+        await popup.getByRole('button', { name: /Auto-generate/i }).click();
+        await popup.getByRole('button', { name: /Sign in/i }).click();
+      }
+    } catch (e) {
+      // Ignore if already logged in or different UI
+    }
+    
+    // Wait for redirect to project page
+    await page.waitForURL(/\/p\/.*/, { timeout: 15000 }).catch(async () => {
+      // Fallback if we were already logged in but didn't redirect
+      await createBtn.click();
+      await page.waitForURL(/\/p\/.*/, { timeout: 15000 });
+    });
     
     // Generate a simple graph
-    // Note: Depends on search input being available on the home page for bypassed users
-    const searchInput = page.locator('input[placeholder*="Enter an artist"]');
+    // Note: Depends on search input being available on the Graph Page
+    const searchInput = page.locator('input[placeholder*="Add artist"]');
     await expect(searchInput).toBeVisible({ timeout: 15000 });
     await searchInput.fill('Deftones');
     await searchInput.press('Enter');
@@ -46,8 +101,8 @@ test.describe('Zcene UI and State Tests', () => {
     const confirmButton = page.locator('button').filter({ hasText: /Search Live AI|Deftones/i }).first();
     await confirmButton.click();
     
-    // Wait for the graph to render and the Share button to appear (Increased timeout for LLM generation)
-    await page.waitForSelector('text="Share"', { state: 'visible', timeout: 60000 });
+    // Wait for the graph to render and the Share button to appear (Instant due to mock)
+    await page.waitForSelector('text="Share"', { state: 'visible', timeout: 5000 });
     
     // 2. Click Share and get URL
     await page.click('button:has-text("Share")');
