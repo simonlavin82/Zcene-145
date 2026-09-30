@@ -45,15 +45,17 @@ test.describe('Zcene UI and State Tests', () => {
       if (request.method() === 'POST' && postData.includes('sharedZcenes')) {
         capturedPayload = postData;
         
-        // Fulfill with a mock REST response for a Firestore document to satisfy the client
+        // Fulfill with a mock REST response for a Firestore Commit RPC to satisfy the client
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            name: 'projects/zcene-production/databases/(default)/documents/sharedZcenes/mock-share-id',
-            fields: {},
-            createTime: new Date().toISOString(),
-            updateTime: new Date().toISOString()
+            commitTime: new Date().toISOString(),
+            writeResults: [
+              {
+                updateTime: new Date().toISOString()
+              }
+            ]
           })
         });
       } else {
@@ -65,7 +67,7 @@ test.describe('Zcene UI and State Tests', () => {
     await shareButton.click({ force: true });
     
     // Wait for the UI to transition to the Share state (Share Modal / Input URL)
-    const shareInput = page.locator('input[readonly]');
+    const shareInput = page.locator('input[value*="/z/"]').first();
     await expect(shareInput).toBeVisible({ timeout: 15000 });
     
     // 4. Assert Tier 2 Schema Compliance (expireAt MUST exist, updatedAt MUST NOT exist)
@@ -74,7 +76,7 @@ test.describe('Zcene UI and State Tests', () => {
     
     // 5. Navigate to the generated /z/ URL in a new context/tab to verify MIME routing
     const shareUrl = await shareInput.inputValue();
-    expect(shareUrl).toContain('/z/mock-share-id');
+    expect(shareUrl).toContain('/z/');
     
     const newContext = await page.context().browser()?.newContext();
     const newPage = await newContext!.newPage();
