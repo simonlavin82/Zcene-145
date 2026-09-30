@@ -30,7 +30,8 @@ export interface Link {
   target: string | Node;
   value: number;
   weight?: number;
-  context?: string;
+  forwardContext?: string;
+  inverseContext?: string;
 }
 
 export interface GraphData {

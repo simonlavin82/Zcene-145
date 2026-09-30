@@ -531,12 +531,16 @@ export const GRAPH_RESPONSE_SCHEMA = {
             type: Type.INTEGER,
             description: "The strength of the connection, typically a constant value like 1."
           },
-          context: {
+          forwardContext: {
             type: Type.STRING,
-            description: "A brief, 3-7 word explanation of the relationship in present tense, e.g., 'releases music on Flatspot Records' or 'formed in San Jose, California' or 'influenced musical style'."
+            description: "A brief, 3-7 word explanation of the relationship in present tense from source to target, e.g., 'discovers and champions' or 'formed in' or 'influenced'."
+          },
+          inverseContext: {
+            type: Type.STRING,
+            description: "A brief explanation from target to source, reversing the semantics, e.g., 'discovered and championed by' or 'was formed in' or 'was influenced by'."
           }
         },
-        required: ["source", "target", "value", "context"]
+        required: ["source", "target", "value", "forwardContext", "inverseContext"]
       }
     }
   },
@@ -554,7 +558,9 @@ export const GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = `I have an existing m
         4.  In addition, identify and add 8-12 NEW related artists that are musically connected to the seed artists. For these NEW artists, you MUST also identify and create their respective genre, label, country, and especially their 'founded' year nodes (YYYY) to ensure the spiderweb is rich with chronological data. Assign them to the same 'group' as the seed artist they relate to, or a new group if they relate to multiple.
         5.  TEMPORAL ECOSYSTEM & SCENE AUTHENTICITY RULE (STRICT): You MUST reconstruct the true historical scene and temporal ecosystem of the seed artist(s). Node selection must be strictly restricted to the primary active era, geographic scene, and lived touring ecosystem of the seed(s). For example, if a seed artist was primarily active in a late-1990s scene, you MUST surface their exact period-accurate peers from that specific 1990s era. If the seed is a modern 2020s band, you MUST surface contemporary peers from their current 2020s ecosystem. Do NOT suggest modern algorithmic equivalents for legacy bands, and do NOT pull in historical legacy ancestors for modern bands unless they genuinely shared the same active touring scene. The graph must represent a period-accurate, contemporary snapshot of the artist's specific moment in time.
         6.  It is absolutely critical that each 'founded' node is linked ONLY to the correct artist node who was founded in that year.
-        7.  LINK RELATIONSHIP CONTEXT: Each link in the 'links' array MUST include a 'context' string explaining the connection concisely (e.g. 'founded in 1994' or 'is a sub-genre of' or 'signed to XL Recordings' or 'is related to'). Keep the context to a brief 3-7 words in present tense.
+        7.  LINK RELATIONSHIP CONTEXT (Dual-Context): Each link in the 'links' array MUST natively output two strings:
+            - 'forwardContext': Explains the connection from source to target (e.g. 'discovers and champions', 'is a sub-genre of').
+            - 'inverseContext': Reverses the semantic direction from target to source (e.g. 'discovered and championed by', 'is the parent genre of').
         8.  JSON SCHEMA: The output must be a single, valid JSON object with 'nodes' and 'links' arrays matching the schema.
         
         STRUCTURAL ONLY: You MUST NOT generate or include any biographies, summaries, member lists, discographies, or detailed profile metadata for the artists. The response must strictly contain only structural layout nodes (id, type, group) and connection links (source, target, value, context).
@@ -583,10 +589,12 @@ Follow these rules precisely:
 6.  MANDATORY SEED NODES: You MUST ensure an 'artist' node exists for EVERY seed artist listed in {{artists}}. If a seed artist is NOT already present in the cached subgraphs context, you MUST create a new 'artist' node for them, assign a unique 'group' number, and explicitly anchor new artist links to this exact node ID.
 7.  NEW BRIDGING BANDS: If you add new bridging bands, you must also identify and create their respective genre, label, country, and founded year nodes (YYYY) and link them to build a rich graph.
 8.  TEMPORAL ECOSYSTEM & SCENE AUTHENTICITY RULE (STRICT): You MUST reconstruct the true historical scene and temporal ecosystem of the seed artist(s). Node selection must be strictly restricted to the primary active era, geographic scene, and lived touring ecosystem of the seed(s). For example, if a seed artist was primarily active in a late-1990s scene, you MUST surface their exact period-accurate peers from that specific 1990s era. If the seed is a modern 2020s band, you MUST surface contemporary peers from their current 2020s ecosystem. Do NOT suggest modern algorithmic equivalents for legacy bands, and do NOT pull in historical legacy ancestors for modern bands unless they genuinely shared the same active touring scene. The graph must represent a period-accurate, contemporary snapshot of the artist's specific moment in time.
-9.  LINK RELATIONSHIP CONTEXT: Each link in the 'links' array MUST also include a 'context' string explaining the connection (e.g. 'releases music on Epitaph Records' or 'formed in 1988'). Keep the context to a brief 3-7 words in present tense.
-10. JSON SCHEMA: The output must be a single, valid JSON object with 'nodes' and 'links' arrays matching the schema.
+9.  LINK RELATIONSHIP CONTEXT (Dual-Context): Each link MUST natively output two strings:
+    - 'forwardContext': Explains connection from source to target.
+    - 'inverseContext': Reverses semantic direction from target to source.
+10. JSON SCHEMA: The output must be a single, valid JSON object matching the 'nodes' and 'links' array structure.
 
-STRUCTURAL ONLY: You MUST NOT generate or include any biographies, summaries, member lists, discographies, or detailed profile metadata for the artists. The response must strictly contain only structural layout nodes (id, type, group) and connection links (source, target, value, context).
+STRUCTURAL ONLY: You MUST NOT generate or include any biographies, summaries, member lists, discographies, or detailed profile metadata for the artists. The response must strictly contain only structural layout nodes (id, type, group) and connection links (source, target, value, forwardContext, inverseContext).
 
 ABSOLUTELY CRITICAL: Ensure NO ORPHANED LINKS. Every source/target in the 'links' array must map to a node in the 'nodes' array.
 
@@ -594,14 +602,14 @@ Your entire response MUST be ONLY the raw JSON object, without any surrounding t
 
 export const GENERATE_GRAPH_PROMPT_TEMPLATE = `Given the following list of seed artists: {{artists}}. Generate a music family tree connecting them. The output must be a single, valid JSON object with keys: 'nodes', and 'links'.
 'nodes' should be an array of objects, each with 'id', 'type', and 'group'. The 'type' can be 'artist', 'genre', 'label', 'country', or 'founded'.
-'links' should be an array of objects, each with 'source', 'target', 'value', and 'context' string describing the nature of their relationship.
+'links' should be an array of objects, each with 'source', 'target', 'value', 'forwardContext', and 'inverseContext' describing the directional relationship.
 
 Follow these rules precisely:
 1.  CANONICAL NAMING: For ALL nodes, use the canonical, professional spelling and capitalization as recognized by the music industry. For example, use "Radiohead" even if the seed provided was "radiohead", and "blink-182" with a lowercase 'b' and hyphen if that is its official name.
 2.  MANDATORY: You MUST create an 'artist' node for EVERY seed artist provided in the list: {{artists}}. Assign a unique 'group' number for each seed artist.
 3.  For each seed artist, find and add nodes for their primary genre, record label, country of origin, and the year they were formed/founded (YYYY). The 'id' for the year node must be the 4-digit year (e.g. "1994") and its type must be 'founded'.
 4.  In addition, find and add 12 to 18 NEW related artists that are musically connected to the seed artists, but you have the flexibility to scale down if the specific musical scene is smaller and fewer genuine connections exist. Do not pad the graph with irrelevant artists just to hit the number. For these NEW artists, you MUST also identify and create their respective genre, label, country, and especially their 'founded' year nodes (YYYY) to ensure the spiderweb is rich with chronological data. ONLY include artists that strictly meet any provided discovery filters. Labels are explicitly EXCLUDED from this cap; generate the natural amount of Label nodes required to accurately connect the generated artists together.
-5.  For all artists (seed and related), create links connecting them to their respective genre, label, country, and founded year nodes. CRITICAL TOPOLOGY RULE: You MUST create direct links connecting the seed artist(s) to the NEW related artists you introduce. Every new artist MUST be connected back to the central spiderweb, either directly to the seed artist, or through a chain of artist-to-artist links. DO NOT leave any artist nodes floating or only connected to metadata nodes. All direct connections of a seed artist should share their 'group' number. Each link MUST include a 'context' string explaining the relationship (e.g., 'releases music on XL Recordings' or 'founded in 1985' or 'is a genre of'). Keep the context to a brief 3-7 words in present tense.
+5.  For all artists (seed and related), create links connecting them to their respective genre, label, country, and founded year nodes. CRITICAL TOPOLOGY RULE: You MUST create direct links connecting the seed artist(s) to the NEW related artists you introduce. Every new artist MUST be connected back to the central spiderweb, either directly to the seed artist, or through a chain of artist-to-artist links. DO NOT leave any artist nodes floating or only connected to metadata nodes. All direct connections of a seed artist should share their 'group' number. Each link MUST include a 'forwardContext' and 'inverseContext' string explaining the bidirectional relationship (e.g., 'releases music on XL Recordings' / 'released by'). Keep the contexts brief.
 6.  TEMPORAL ECOSYSTEM & SCENE AUTHENTICITY RULE (STRICT): You MUST reconstruct the true historical scene and temporal ecosystem of the seed artist(s). Node selection must be strictly restricted to the primary active era, geographic scene, and lived touring ecosystem of the seed(s). For example, if a seed artist was primarily active in a late-1990s scene, you MUST surface their exact period-accurate peers from that specific 1990s era. If the seed is a modern 2020s band, you MUST surface contemporary peers from their current 2020s ecosystem. Do NOT suggest modern algorithmic equivalents for legacy bands, and do NOT pull in historical legacy ancestors for modern bands unless they genuinely shared the same active touring scene. The graph must represent a period-accurate, contemporary snapshot of the artist's specific moment in time.
 7.  CRITICAL: Each 'founded' node MUST be linked ONLY to the correct artist who was founded in that year.
 8.  JSON SCHEMA: The output must be a single, valid JSON object with 'nodes' and 'links' arrays matching the schema.
@@ -864,7 +872,8 @@ ${JSON.stringify(existingLinks.map(l => `${l.source} → ${l.target}`))}
 Return a JSON array of missing edges. For each missing edge provide:
 - source: the exact node ID from the valid list
 - target: the exact node ID from the valid list  
-- context: a short verbatim excerpt from the narrative that cites this connection (max 120 characters)
+- forwardContext: short verbatim excerpt describing action from source to target
+- inverseContext: short verbatim excerpt (or reversed text) describing action from target to source
 - weight: a float 0.1–1.0 representing connection strength (1.0 = defining influence, 0.1 = loose mention)
 
 If no missing edges are found, return an empty array [].`;
@@ -883,16 +892,20 @@ If no missing edges are found, return an empty array [].`;
           type: Type.STRING,
           description: "Exact target node ID from the valid node list."
         },
-        context: {
+        forwardContext: {
           type: Type.STRING,
-          description: "Short verbatim excerpt from the narrative (max 120 chars) justifying this edge."
+          description: "Short excerpt describing relationship from source to target."
+        },
+        inverseContext: {
+          type: Type.STRING,
+          description: "Short excerpt or inverse phrase from target to source."
         },
         weight: {
           type: Type.NUMBER,
           description: "Semantic weight 0.1 (loose) to 1.0 (core defining connection)."
         }
       },
-      required: ["source", "target", "context", "weight"]
+      required: ["source", "target", "forwardContext", "inverseContext", "weight"]
     }
   };
 

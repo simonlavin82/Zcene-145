@@ -1025,8 +1025,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                     }
                                     const canonicalUpdate = {
                                         'detailsCache.synthesisRationale': firestore_2.FieldValue.delete(),
-                                        updatedAt: firestore_2.FieldValue.serverTimestamp(),
-                                        cachedAt: firestore_2.FieldValue.serverTimestamp()
+                                        updatedAt: firestore_2.FieldValue.serverTimestamp()
                                     };
                                     let finalRationale = rootBreakdownStr;
                                     // Topology Hydration Check for Stubs
@@ -1229,7 +1228,6 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             cacheVersion: 4,
                             createdAt: firestore_2.FieldValue.serverTimestamp(),
                             updatedAt: firestore_2.FieldValue.serverTimestamp(),
-                            cachedAt: firestore_2.FieldValue.serverTimestamp(),
                             isDeep: true, // Marked Deep!
                             isPrimarySeed: !!matchingSeedNorm,
                             hasUniqueSpiderweb: (matchingSeedNorm && !isLabel && !isComplexGeneration) ? true : false,
@@ -1245,7 +1243,6 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         const updatePayload = {
                             detailsCache: finalRecDetails,
                             updatedAt: firestore_2.FieldValue.serverTimestamp(),
-                            cachedAt: firestore_2.FieldValue.serverTimestamp(),
                             cacheVersion: 4,
                             [idFieldKey]: recNorm,
                             cacheKey: cleanCanonicalId,

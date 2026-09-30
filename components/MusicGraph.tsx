@@ -630,8 +630,9 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     if (!connectionsByArtist.has(normOtherId)) {
                         connectionsByArtist.set(normOtherId, { node: otherNode, contexts: [] });
                     }
-                    if (l.context) {
-                        connectionsByArtist.get(normOtherId)!.contexts.push(l.context);
+                    const contextStr = (sId === d.id) ? l.forwardContext : l.inverseContext;
+                    if (contextStr) {
+                        connectionsByArtist.get(normOtherId)!.contexts.push(contextStr);
                     }
                 });
 
@@ -1619,9 +1620,12 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     <div className={`flex flex-col gap-1 overflow-y-auto ${hoveredLink.dna ? "mt-1 pt-1.5" : ""}`}>
                         {hoveredLink.connections && hoveredLink.connections.length > 0 ? (
                             (!isSmallScreen || isCardExpanded ? hoveredLink.connections : hoveredLink.connections.slice(0, 3)).map((c, i) => (
-                                <div key={i} className="text-xs font-medium text-zinc-300 leading-tight">
-                                    <span className="text-zinc-400 font-normal">{c.context}</span>{" "}
-                                    <span className="text-primary font-normal">{c.targetName}</span>
+                                <div key={i} className="text-xs font-medium text-zinc-300 leading-tight flex gap-1">
+                                    <span className="text-zinc-500 font-normal shrink-0">•</span>
+                                    <span>
+                                        <span className="text-zinc-400 font-normal">{c.context}</span>{" "}
+                                        <span className="text-primary font-normal">{c.targetName}</span>
+                                    </span>
                                 </div>
                             ))
                         ) : hoveredLink.fallbackMessage ? (
