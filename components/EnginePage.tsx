@@ -72,8 +72,7 @@ const ARCHITECTURE_RULES = [
     { id: 25, title: "Selective Coordinate Amnesia", desc: "When generating a shared link or duplicating, fixed coordinates are stripped so guests experience a fresh D3 layout." },
     { id: 26, title: "Contextual Tooltips", desc: "Hover states and tooltips must prioritize native narrative snippets generated during the Root Breakdown." },
     { id: 27, title: "Multi-Seed Co-Anchoring", desc: "Complex Generations MUST dynamically force the AI to co-anchor the narrative to explore the relationship between all seeds." },
-    { id: 28, title: "Canonical Global Caching", desc: "Global caching must use pure canonical IDs. Query filters are barred from document paths to prevent cache fracturing." },
-    { id: 29, title: "V12 Data Lifecycle Matrix", desc: "Global Assets are dynamic. Shared Links are frozen snapshots with a 30-day hard expiration (TTL). Owned Zcenes persist indefinitely." },
+    { id: 28, title: "Canonical Global Caching", desc: "Global caching must use pure canonical IDs. Query filters are barred from document paths to prevent cache fracturing." }
 ];
 
 const DiscoveryFlowDiagram: React.FC = () => (
@@ -360,6 +359,67 @@ const SeedHoistingVisualizer: React.FC = () => (
     </div>
 );
 
+const DataLifecycleMatrix: React.FC = () => (
+    <div className="w-full py-8 px-6 bg-zinc-950/50 rounded-xl border border-zinc-800 mb-12">
+        <h3 className="text-zinc-200 font-medium text-lg mb-6 uppercase tracking-wider">Data Lifecycle Matrix</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Tier 1 */}
+            <div className="bg-zinc-900 border border-zinc-700 p-5 rounded-xl">
+                <div className="flex items-center gap-2 mb-3">
+                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                    <div className="text-blue-400 font-bold text-xs uppercase tracking-wider">Tier 1: Global Assets</div>
+                </div>
+                <div className="text-zinc-500 text-xs mb-4 uppercase">artists / labels</div>
+                <div className="space-y-2 text-sm">
+                    <div className="flex justify-between border-b border-zinc-800 pb-2"><span className="text-zinc-400">createdAt</span><span className="text-white">Immutable</span></div>
+                    <div className="flex justify-between border-b border-zinc-800 pb-2"><span className="text-zinc-400">updatedAt</span><span className="text-green-400">Mutable</span></div>
+                    <div className="flex justify-between border-b border-zinc-800 pb-2"><span className="text-zinc-400">expireAt</span><span className="text-zinc-600">NULL (No TTL)</span></div>
+                    <div className="flex justify-between"><span className="text-zinc-400">cachedAt</span><span className="text-red-500 line-through">Eradicated</span></div>
+                </div>
+                <div className="mt-4 text-xs text-zinc-500 leading-relaxed">
+                    Canonical source of truth. Scraped/Generated via Gemini + Google Search.
+                </div>
+            </div>
+
+            {/* Tier 2 */}
+            <div className="bg-zinc-900 border border-zinc-700 p-5 rounded-xl">
+                <div className="flex items-center gap-2 mb-3">
+                    <div className="w-2 h-2 rounded-full bg-purple-500"></div>
+                    <div className="text-purple-400 font-bold text-xs uppercase tracking-wider">Tier 2: Ephemeral</div>
+                </div>
+                <div className="text-zinc-500 text-xs mb-4 uppercase">sharedZcenes</div>
+                <div className="space-y-2 text-sm">
+                    <div className="flex justify-between border-b border-zinc-800 pb-2"><span className="text-zinc-400">createdAt</span><span className="text-white">Immutable</span></div>
+                    <div className="flex justify-between border-b border-zinc-800 pb-2"><span className="text-zinc-400">updatedAt</span><span className="text-zinc-600">NULL (Read-Only)</span></div>
+                    <div className="flex justify-between border-b border-zinc-800 pb-2"><span className="text-zinc-400">expireAt</span><span className="text-orange-400">+30 Days Hard TTL</span></div>
+                    <div className="flex justify-between"><span className="text-zinc-400">cachedAt</span><span className="text-red-500 line-through">Eradicated</span></div>
+                </div>
+                <div className="mt-4 text-xs text-zinc-500 leading-relaxed">
+                    Frozen snapshots generated for sharing. Coordinates stripped (Amnesia).
+                </div>
+            </div>
+
+            {/* Tier 3 */}
+            <div className="bg-zinc-900 border border-zinc-700 p-5 rounded-xl">
+                <div className="flex items-center gap-2 mb-3">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                    <div className="text-emerald-400 font-bold text-xs uppercase tracking-wider">Tier 3: Owned</div>
+                </div>
+                <div className="text-zinc-500 text-xs mb-4 uppercase">users/uid/projects</div>
+                <div className="space-y-2 text-sm">
+                    <div className="flex justify-between border-b border-zinc-800 pb-2"><span className="text-zinc-400">createdAt</span><span className="text-white">Immutable</span></div>
+                    <div className="flex justify-between border-b border-zinc-800 pb-2"><span className="text-zinc-400">updatedAt</span><span className="text-green-400">Mutable</span></div>
+                    <div className="flex justify-between border-b border-zinc-800 pb-2"><span className="text-zinc-400">expireAt</span><span className="text-zinc-600">NULL (No TTL)</span></div>
+                    <div className="flex justify-between"><span className="text-zinc-400">cachedAt</span><span className="text-red-500 line-through">Eradicated</span></div>
+                </div>
+                <div className="mt-4 text-xs text-zinc-500 leading-relaxed">
+                    User-controlled topologies. Preserves fixed coordinate memory.
+                </div>
+            </div>
+        </div>
+    </div>
+);
+
 const GatekeeperFlowchart: React.FC = () => (
     <div className="bg-zinc-900/30 p-8 rounded-xl border border-zinc-700/50 mb-12">
         <h3 className="text-zinc-200 font-medium text-lg mb-6 uppercase tracking-wider text-center">Fail-Fast iTunes Image Gatekeeper</h3>
@@ -441,6 +501,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
     const sections = [
         { id: 'site-map', title: 'Site Map' },
         { id: 'architecture', title: 'Architecture' },
+        { id: 'data-lifecycle', title: 'Data Lifecycle Matrix' },
         { id: 'graph-intelligence', title: 'Graph Intelligence' },
         { id: 'visualization-engine', title: 'Visualization Engine' },
         { id: 'sticky-peek-gateway', title: 'Sticky Peek + Action Gateway' },
@@ -955,6 +1016,10 @@ the entire dataset, the app evolves existing visual structures.
     - If geographic routing or link traversal is executed before the graph state is unified (i.e. before the Link ID normalization block), the engine will suffer from Phase-Timing Mismatches (e.g. attempting to match a canonical node ID like 'slam-coke-de' against an un-normalized link source like 'slam-coke'), resulting in silently orphaned geographic edges.
 `} />
                         <DiscoveryFlowDiagram />
+
+                        <section id="data-lifecycle" className="pt-8 scroll-mt-24">
+                            <DataLifecycleMatrix />
+                        </section>
                         <SeedHoistingVisualizer />
                     </section>
 
