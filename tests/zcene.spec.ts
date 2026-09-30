@@ -37,8 +37,17 @@ test.describe('Zcene UI and State Tests', () => {
     await searchInput.fill('Deftones');
     await searchInput.press('Enter');
     
-    // Wait for the graph to render and the Share button to appear
-    await page.waitForSelector('text="Share"', { state: 'visible', timeout: 30000 });
+    // Fix Race Condition: Resolve Mandatory Disambiguation Modal
+    // The architecture strictly requires confirming the seed origin before generation (Rule 20)
+    const modalHeader = page.locator('h3', { hasText: /(Look What I Found|Disambiguation|Validate Origin)/i });
+    await expect(modalHeader).toBeVisible({ timeout: 15000 });
+    
+    // Click either the cached candidate or "Search Live AI"
+    const confirmButton = page.locator('button').filter({ hasText: /Search Live AI|Deftones/i }).first();
+    await confirmButton.click();
+    
+    // Wait for the graph to render and the Share button to appear (Increased timeout for LLM generation)
+    await page.waitForSelector('text="Share"', { state: 'visible', timeout: 60000 });
     
     // 2. Click Share and get URL
     await page.click('button:has-text("Share")');
