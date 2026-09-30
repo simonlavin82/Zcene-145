@@ -1586,7 +1586,6 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                         : 'bg-zinc-950/95 border-b border-zinc-700/80 px-4 py-3 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md w-full flex flex-col gap-2 text-left max-h-[50vh] overflow-hidden'
                 }
             >
-                <span className="font-poppins text-sm text-white border-b border-zinc-800 pb-1 mb-1 font-medium shrink-0">{hoveredLink.sourceId}</span>
                 
                 {/* Zone 1: Spiderweb DNA (Narrative First) */}
                 {hoveredLink.dna && (
@@ -1604,7 +1603,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                                 if (cleanedDna && hoveredLink.sourceId && cleanedDna.startsWith(hoveredLink.sourceId)) {
                                     return (
                                         <>
-                                            <span className="text-yellow-400 font-medium">{hoveredLink.sourceId}</span>
+                                            <span className="text-primary font-normal">{hoveredLink.sourceId}</span>
                                             {cleanedDna.slice(hoveredLink.sourceId.length)}
                                         </>
                                     );
