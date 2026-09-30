@@ -1591,22 +1591,35 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 {/* Zone 1: Spiderweb DNA (Narrative First) */}
                 {hoveredLink.dna && (
                     <div className="shrink-0">
-                        <p className={`text-xs leading-4 font-normal text-zinc-400 m-0${isSmallScreen && !isCardExpanded ? ' line-clamp-3' : ''}`}>{hoveredLink.dna
-                            ?.replace(/\btechnicolor\b/gi, 'technicolour')
-                            .replace(/\bcolors\b/gi, 'colours')
-                            .replace(/\bcolorful\b/gi, 'colourful')
-                            .replace(/\bcoloring\b/gi, 'colouring')
-                            .replace(/\bcolorize\b/gi, 'colourise')
-                            .replace(/\bcolor\b/gi, 'colour')
-                        }</p>
+                        <p className={`text-xs leading-4 font-normal text-zinc-400 m-0${isSmallScreen && !isCardExpanded ? ' line-clamp-3' : ''}`}>
+                            {(() => {
+                                let cleanedDna = hoveredLink.dna
+                                    ?.replace(/\btechnicolor\b/gi, 'technicolour')
+                                    .replace(/\bcolors\b/gi, 'colours')
+                                    .replace(/\bcolorful\b/gi, 'colourful')
+                                    .replace(/\bcoloring\b/gi, 'colouring')
+                                    .replace(/\bcolorize\b/gi, 'colourise')
+                                    .replace(/\bcolor\b/gi, 'colour');
+                                
+                                if (cleanedDna && hoveredLink.sourceId && cleanedDna.startsWith(hoveredLink.sourceId)) {
+                                    return (
+                                        <>
+                                            <span className="text-yellow-400 font-medium">{hoveredLink.sourceId}</span>
+                                            {cleanedDna.slice(hoveredLink.sourceId.length)}
+                                        </>
+                                    );
+                                }
+                                return cleanedDna;
+                            })()}
+                        </p>
                     </div>
                 )}
 
                 {/* Zone 2: Direct Connections / Fallback */}
                 {((hoveredLink.connections && hoveredLink.connections.length > 0) || hoveredLink.fallbackMessage) && (
-                    <div className={`flex flex-col gap-1 overflow-y-auto ${hoveredLink.dna ? "mt-1 pt-1.5 border-t border-zinc-800/60" : ""}`}>
+                    <div className={`flex flex-col gap-1 overflow-y-auto ${hoveredLink.dna ? "mt-1 pt-1.5" : ""}`}>
                         {hoveredLink.connections && hoveredLink.connections.length > 0 ? (
-                            (isCardExpanded ? hoveredLink.connections : hoveredLink.connections.slice(0, 3)).map((c, i) => (
+                            (!isSmallScreen || isCardExpanded ? hoveredLink.connections : hoveredLink.connections.slice(0, 3)).map((c, i) => (
                                 <div key={i} className="text-xs font-medium text-zinc-300 leading-tight">
                                     <span className="text-zinc-400 font-normal">{c.context}</span>{" "}
                                     <span className="text-primary font-normal">{c.targetName}</span>
@@ -1621,17 +1634,17 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 )}
                 
                 {/* Dynamic CTA / Close Button */}
-                {hoveredLink.connections && hoveredLink.connections.length > 3 && !isCardExpanded && (
-                    <div className="pt-1 shrink-0">
-                        <Button variant="secondary" size="sm" fullWidth onClick={() => setIsCardExpanded(true)}>
+                {isSmallScreen && hoveredLink.connections && hoveredLink.connections.length > 3 && !isCardExpanded && (
+                    <div className="pt-2 shrink-0 flex justify-center pointer-events-auto">
+                        <Button variant="secondary" size="sm" onClick={() => setIsCardExpanded(true)}>
                             View {hoveredLink.connections.length - 3} more connections
                         </Button>
                     </div>
                 )}
                 
-                {isCardExpanded && (
-                    <div className="pt-1 shrink-0">
-                        <Button variant="secondary" size="sm" fullWidth onClick={() => setHoveredLink(null)}>
+                {isSmallScreen && isCardExpanded && (
+                    <div className="pt-2 shrink-0 flex justify-center pointer-events-auto">
+                        <Button variant="secondary" size="sm" onClick={() => setHoveredLink(null)}>
                             Close
                         </Button>
                     </div>
