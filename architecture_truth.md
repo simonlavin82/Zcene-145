@@ -135,3 +135,9 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 - **Rule:** Global entity caching MUST use pure canonical IDs for document paths (`cleanCanonicalId`). 
 - **Enforcement:** Query filters (e.g., `after:2019`, `genre:hardcore`) are strictly barred from canonical document paths. This explicitly prevents cache fracturing and phantom cache misses.
 - **Rationale:** Zcene strictly separates bespoke temporal/genre Zcene generation (which lives in ephemeral project topologies) from its canonical global artist library (which must remain a pure, singular source of truth for all users).
+
+### 29. V12 Data Lifecycle Matrix
+- **Rule:** Timestamps strictly conform to the 3-Tier Storage Matrix. `cachedAt` is permanently eradicated.
+- **Tier 1: Global Assets (artists & labels):** `createdAt` (Immutable), `updatedAt` (Mutable). No TTL.
+- **Tier 2: Ephemeral Storage (sharedZcenes):** `createdAt` (Immutable), `expireAt` (+30 Days Hard TTL). `updatedAt` is strictly NULL/Removed (read-only snapshots).
+- **Tier 3: Owned Storage (User Projects):** `createdAt` (Immutable), `updatedAt` (Mutable).
