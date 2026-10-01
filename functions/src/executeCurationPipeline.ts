@@ -437,28 +437,32 @@ export const executeCurationPipeline = onCall({
       await db.collection('users').doc(payload.userId).collection('projects').doc(payload.projectId).update(projectUpdate);
       console.log(`[Pipeline Diamond] -> Successfully updated project ${payload.projectId} graphData via Admin SDK`);
       
-      curationJobId = payload.jobId || db.collection('curationJobs').doc().id;
-      const jobRef = db.collection('curationJobs').doc(curationJobId);
-      await jobRef.set({
-        status: "pending",
-        jobType: "graph_generation",
-        userId: payload.userId,
-        createdAt: FieldValue.serverTimestamp(),
-        updatedAt: FieldValue.serverTimestamp(),
-        inputPayload: {
-           ...payload,
-           baseGraph: finalGraph,
-           generationType: determinedGenerationType,
-           foregroundApiUsage: collectedTokens,
-           seedStubs: seedStubs
-        }
-      });
-      console.log(`[Pipeline Diamond] -> Created curation job ${curationJobId} for background hydration`);
+      if (determinedGenerationType !== "Direct Hit") {
+        curationJobId = payload.jobId || db.collection('curationJobs').doc().id;
+        const jobRef = db.collection('curationJobs').doc(curationJobId);
+        await jobRef.set({
+          status: "pending",
+          jobType: "graph_generation",
+          userId: payload.userId,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+          inputPayload: {
+             ...payload,
+             baseGraph: finalGraph,
+             generationType: determinedGenerationType,
+             foregroundApiUsage: collectedTokens,
+             seedStubs: seedStubs
+          }
+        });
+        console.log(`[Pipeline Diamond] -> Created curation job ${curationJobId} for background hydration`);
 
-      // Update project with activeJobId
-      await db.collection('users').doc(payload.userId).collection('projects').doc(payload.projectId).update({
-         activeJobId: curationJobId
-      });
+        // Update project with activeJobId
+        await db.collection('users').doc(payload.userId).collection('projects').doc(payload.projectId).update({
+           activeJobId: curationJobId
+        });
+      } else {
+        console.log(`[Pipeline Diamond] -> Single Seed Cache Hit: Skipping background hydration job.`);
+      }
 
     } catch (err) {
       console.error(`[Pipeline Diamond] -> Failed to update project doc ${payload.projectId} / spawn job`, err);

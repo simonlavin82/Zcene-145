@@ -3497,7 +3497,11 @@ const App: React.FC = () => {
         );
         const isCustomNext = resolvedArtistSeeds.length > 1 || hasActiveFiltersNext;
         
-        handleGenerateGraph(newArtistsStr, isRegeneration, graphToEnhance, true, !isCustomNext, overrideFilters, activeDisambiguationHints, true);
+        // Rule 11 Fix: If all resolved seeds are known cache hits, do not skip cache lookup in the next pass
+        const allKnownCacheHits = cacheCandidatesPerSeed.every(s => s.isKnownCacheHit && s.predictedOrigin === finalOrigins[s.id]);
+        const nextSkipCacheLookup = !allKnownCacheHits;
+        
+        handleGenerateGraph(newArtistsStr, isRegeneration, graphToEnhance, nextSkipCacheLookup, !isCustomNext, overrideFilters, activeDisambiguationHints, true);
         return;
       }
     }

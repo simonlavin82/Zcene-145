@@ -1426,7 +1426,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             const allPinned = artistLabelNodes.length > 0 &&
                 artistLabelNodes.every(n => n.fx !== null && n.fx !== undefined &&
                                            n.fy !== null && n.fy !== undefined);
-            simulation.alpha(allPinned ? 0.01 : restartAlpha).alphaTarget(0).restart();
+            simulation.alpha(allPinned ? 0.001 : restartAlpha).alphaTarget(0).restart();
         } else {
             simulation.alpha(restartAlpha).alphaTarget(0).restart();
         }
