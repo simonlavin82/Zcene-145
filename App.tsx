@@ -2895,9 +2895,11 @@ const App: React.FC = () => {
     }
 
     // Phase 2: Upfront Project Minting (Step Zero)
+    let freshlyMintedProjectId: string | null = null;
     if (user && !currentProjectId && !isGuest && !isRegeneration && !graphToEnhance) {
       const newDocRef = doc(collection(db, 'users', user.uid, 'projects'));
       const newId = newDocRef.id;
+      freshlyMintedProjectId = newId;
       setCurrentProjectId(newId);
       currentProjectIdRef.current = newId;
       navigate(`/p/${newId}`);
@@ -3462,6 +3464,16 @@ const App: React.FC = () => {
         sessionTokenApprovedRef.current = false;
         setActiveNodeIds(prevActiveNodeIds);
         setSeedArtists(prevSeedArtists);
+
+        if (freshlyMintedProjectId && user) {
+          deleteDoc(doc(db, 'users', user.uid, 'projects', freshlyMintedProjectId))
+            .catch(err => console.error("Failed to GC orphaned project:", err));
+            
+          setCurrentProjectId(null);
+          currentProjectIdRef.current = null;
+          navigate('/dashboard', { replace: true });
+        }
+
         return;
       }
 
