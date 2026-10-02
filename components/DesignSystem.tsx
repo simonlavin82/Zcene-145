@@ -1316,7 +1316,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                 <h5 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Mobile Variant (Top Drop Banner)</h5>
                                                 <div className="bg-zinc-900/30 border border-zinc-800 flex flex-col items-center justify-start h-[360px] relative overflow-hidden rounded-lg">
                                                      <div className="w-full bg-zinc-950/95 border-b border-zinc-700/80 px-4 py-3 backdrop-blur-md flex flex-col gap-2 text-left shadow-[0_8px_30px_rgb(0,0,0,0.8)] absolute top-0 left-0 max-h-[55vh]">
-                                                         <div className="overflow-y-auto shrink min-h-0 flex flex-col gap-2 scrollbar-thin scrollbar-thumb-zinc-800">
+                                                         <div className="overflow-y-auto shrink min-h-0 flex flex-col gap-2 scrollbar-hide">
                                                              <div className="shrink-0">
                                                                   <p className={`text-sm leading-relaxed font-normal text-zinc-400 m-0${!demoMobileBannerExpanded ? ' line-clamp-4' : ''}`}>A defining force in modern beatdown hardcore, originating from Michigan.</p>
                                                              </div>

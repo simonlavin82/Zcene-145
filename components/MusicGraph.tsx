@@ -1612,7 +1612,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 }
             >
                 
-                <div className="overflow-y-auto shrink min-h-0 flex flex-col gap-2 scrollbar-thin scrollbar-thumb-zinc-800">
+                <div className={`overflow-y-auto shrink min-h-0 flex flex-col gap-2 ${isSmallScreen ? 'scrollbar-hide' : 'scrollbar-thin scrollbar-thumb-zinc-800'}`}>
                     {/* Zone 1: Spiderweb DNA (Narrative First) */}
                     {hoveredLink.dna && (
                         <div className="shrink-0">
