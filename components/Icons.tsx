@@ -108,7 +108,7 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
     }, [steps]);
 
     return (
-        <div className="flex flex-col items-center justify-center gap-4 text-center">
+        <div data-testid="active-loader" className="flex flex-col items-center justify-center gap-4 text-center">
             <div className="w-12 h-12 border-4 border-zinc-500 border-t-primary animate-spin rounded-full"></div>
             <div className="flex flex-col items-center gap-1.5">
                 <div className="h-6 flex items-center justify-center">

@@ -394,11 +394,11 @@ export const TokenConfirmationDialog: React.FC<{
 
   return (
     <ModalBackdrop className="z-[130]" onClick={onClose}>
-      <ModalContainer>
+      <ModalContainer data-testid="token-gate-modal">
         <ModalHeader>
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary !text-[18px]">info</span>
-            <h3 className="text-lg font-medium text-white">
+            <h3 className="text-lg font-medium text-white" data-testid="token-gate-title">
               {type === 'live_synthesis' ? 'Confirm Live Synthesis' : 'Token Quota Warning'}
             </h3>
           </div>
@@ -505,6 +505,7 @@ export const TokenConfirmationDialog: React.FC<{
           <div className="pt-2">
             <div className="relative">
               <Input 
+                data-testid="token-password-input"
                 type={showPassword ? 'text' : 'password'}
                 placeholder="API Access Password" 
                 value={password}
@@ -550,6 +551,7 @@ export const TokenConfirmationDialog: React.FC<{
             </button>
           ) : (
             <button 
+              data-testid="token-cancel-button"
               onClick={onClose} 
               className="px-4 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent"
             >
@@ -557,6 +559,7 @@ export const TokenConfirmationDialog: React.FC<{
             </button>
           )}
           <button 
+            data-testid="token-authorize-button"
             onClick={() => onConfirm(password)} 
             disabled={!password}
             className="px-4 py-1.5 bg-white text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90 disabled:opacity-50"
@@ -1397,7 +1400,7 @@ export function ConsolidatedValidationModal({ isOpen, seeds, onConfirm, onCancel
 
   return (
     <ModalBackdrop onClick={onCancel} className="z-[1100]">
-      <ModalContainer className="!overflow-visible relative z-[1150]">
+      <ModalContainer data-testid="validation-modal" className="!overflow-visible relative z-[1150]">
         <form onSubmit={e => { e.preventDefault(); onConfirm(); }} className="flex flex-col w-full" onClick={e => e.stopPropagation()}>
           <ModalHeader>
             <div className="flex items-center gap-2">
@@ -1425,7 +1428,7 @@ export function ConsolidatedValidationModal({ isOpen, seeds, onConfirm, onCancel
                       )}
                     </div>
                     
-                    <span className="text-xs text-zinc-400 font-light truncate">
+                    <span data-testid="validation-origin-text" className="text-xs text-zinc-400 font-light truncate">
                       {seed.predictedOrigin || 'Unknown Origin'}{seed.genre ? ` • ${seed.genre}` : ''}
                     </span>
                     
@@ -1451,7 +1454,7 @@ export function ConsolidatedValidationModal({ isOpen, seeds, onConfirm, onCancel
             <button type="button" onClick={onCancel} className="px-4 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent">
               Cancel
             </button>
-            <button type="submit" className="px-6 py-2 bg-white text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all cursor-pointer whitespace-nowrap">
+            <button data-testid="validation-confirm-button" type="submit" className="px-6 py-2 bg-white text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all cursor-pointer whitespace-nowrap">
               Confirm & Generate
             </button>
           </ModalFooter>
