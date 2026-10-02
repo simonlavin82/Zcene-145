@@ -8,7 +8,7 @@ export default defineConfig({
   reporter: 'html',
   
   // Define the global setup for authentication
-  globalSetup: require.resolve('./tests/global.setup.ts'),
+  globalSetup: './tests/global.setup.ts',
   
   use: {
     // Utilize the saved authenticated state

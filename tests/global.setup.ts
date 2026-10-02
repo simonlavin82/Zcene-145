@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 
 async function globalSetup(config: FullConfig) {
-  const authDir = path.join(__dirname, '../playwright/.auth');
+  const authDir = path.join(process.cwd(), 'playwright/.auth');
   if (!fs.existsSync(authDir)) {
     fs.mkdirSync(authDir, { recursive: true });
   }
