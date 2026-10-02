@@ -3360,12 +3360,16 @@ const App: React.FC = () => {
               setIsLoading(false);
               isProjectLoadingRef.current = false;
 
-              if (freshlyMintedProjectId && user) {
-                deleteDoc(doc(db, 'users', user.uid, 'projects', freshlyMintedProjectId))
-                  .catch(err => console.error("Failed to GC orphaned project:", err));
-                setCurrentProjectId(null);
-                currentProjectIdRef.current = null;
-                navigate('/dashboard', true);
+              const isProjectEmpty = !graphData || !graphData.nodes || graphData.nodes.length === 0;
+              if (user && (freshlyMintedProjectId || isProjectEmpty)) {
+                const idToDelete = freshlyMintedProjectId || currentProjectId;
+                if (idToDelete) {
+                  deleteDoc(doc(db, 'users', user.uid, 'projects', idToDelete))
+                    .catch(err => console.error("Failed to GC orphaned project:", err));
+                  setCurrentProjectId(null);
+                  currentProjectIdRef.current = null;
+                  navigate('/dashboard', true);
+                }
               }
 
               return;
@@ -3394,12 +3398,16 @@ const App: React.FC = () => {
           isHydratingSessionRef.current = false;
           isProjectLoadingRef.current = false;
 
-          if (freshlyMintedProjectId && user) {
-            deleteDoc(doc(db, 'users', user.uid, 'projects', freshlyMintedProjectId))
-              .catch(err => console.error("Failed to GC orphaned project:", err));
-            setCurrentProjectId(null);
-            currentProjectIdRef.current = null;
-            navigate('/dashboard', true);
+          const isProjectEmpty = !graphData || !graphData.nodes || graphData.nodes.length === 0;
+          if (user && (freshlyMintedProjectId || isProjectEmpty)) {
+            const idToDelete = freshlyMintedProjectId || currentProjectId;
+            if (idToDelete) {
+              deleteDoc(doc(db, 'users', user.uid, 'projects', idToDelete))
+                .catch(err => console.error("Failed to GC orphaned project:", err));
+              setCurrentProjectId(null);
+              currentProjectIdRef.current = null;
+              navigate('/dashboard', true);
+            }
           }
 
           return;
@@ -3486,13 +3494,16 @@ const App: React.FC = () => {
         setActiveNodeIds(prevActiveNodeIds);
         setSeedArtists(prevSeedArtists);
 
-        if (freshlyMintedProjectId && user) {
-          deleteDoc(doc(db, 'users', user.uid, 'projects', freshlyMintedProjectId))
-            .catch(err => console.error("Failed to GC orphaned project:", err));
-            
-          setCurrentProjectId(null);
-          currentProjectIdRef.current = null;
-          navigate('/dashboard', true);
+        const isProjectEmpty = !graphData || !graphData.nodes || graphData.nodes.length === 0;
+        if (user && (freshlyMintedProjectId || isProjectEmpty)) {
+          const idToDelete = freshlyMintedProjectId || currentProjectId;
+          if (idToDelete) {
+            deleteDoc(doc(db, 'users', user.uid, 'projects', idToDelete))
+              .catch(err => console.error("Failed to GC orphaned project:", err));
+            setCurrentProjectId(null);
+            currentProjectIdRef.current = null;
+            navigate('/dashboard', true);
+          }
         }
 
         return;
