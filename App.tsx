@@ -94,10 +94,11 @@ const generateGraphDataViaCloudJob = async (
   seedImageUrl?: string,
   confirmTokenUsageHook?: (type: any, cached: any, missing: any, enrichment: any, showBack: any, errorMsg?: string) => Promise<string | false | 'back'>,
   closeTokenConfirmationHook?: () => void
-): Promise<GraphData> => {
+): Promise<{ graphData: GraphData, activeJobId?: string }> => {
   let success = false;
   let currentError: string | undefined = undefined;
   let finalGraphData = null;
+  let activeJobId = undefined;
 
   while (!success) {
     const password = sessionStorage.getItem('zcene_api_password');
@@ -128,6 +129,7 @@ const generateGraphDataViaCloudJob = async (
 
       if (closeTokenConfirmationHook) closeTokenConfirmationHook();
       finalGraphData = data.graphData;
+      activeJobId = data.activeJobId;
       success = true;
     } catch (error: any) {
       console.error("🔥 HTTPS CALLABLE FAILED:", error);
@@ -152,7 +154,7 @@ const generateGraphDataViaCloudJob = async (
     }
   }
 
-  return finalGraphData;
+  return { graphData: finalGraphData as unknown as GraphData, activeJobId };
 };
 
 
@@ -4058,6 +4060,7 @@ const App: React.FC = () => {
         // Call Gemini ONLY for the missing and enrichment artists
         const useCloudCuration = import.meta.env.VITE_USE_CLOUD_CURATION === 'true';
         let partialGraphPromise;
+        let partialActiveJobId: string | undefined = undefined;
         if (useCloudCuration && user?.uid) {
           console.log("[Music Discovery] Routing partial graph generation via Cloud-Side Curation.");
           partialGraphPromise = generateGraphDataViaCloudJob(
@@ -4093,7 +4096,11 @@ const App: React.FC = () => {
         );
 
         const startTime = Date.now();
-        const freshData = await Promise.race([partialGraphPromise, timeoutPromise]) as GraphData;
+        const rawFreshData = await Promise.race([partialGraphPromise, timeoutPromise]) as any;
+        const freshData = rawFreshData?.graphData ? (rawFreshData.graphData as GraphData) : (rawFreshData as GraphData);
+        if (rawFreshData?.activeJobId) {
+          partialActiveJobId = rawFreshData.activeJobId;
+        }
         console.log(`[Music Discovery] Partial AI fetch in ${((Date.now() - startTime) / 1000).toFixed(1)}s for: [${toFetch.join(', ')}]`);
 
         if (controller.signal.aborted) return;
@@ -4358,6 +4365,7 @@ const App: React.FC = () => {
 
       const useCloudCuration = import.meta.env.VITE_USE_CLOUD_CURATION === 'true';
       let graphPromise;
+      let activeJobId: string | undefined = undefined;
       if (useCloudCuration && user?.uid) {
         console.log("[Music Discovery] Routing graph generation via Cloud-Side Curation.");
         const jobId = `job-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
@@ -4455,7 +4463,11 @@ const App: React.FC = () => {
       );
 
       const startTime = Date.now();
-      const newData = await Promise.race([graphPromise, timeoutPromise]) as GraphData;
+      const rawNewData = await Promise.race([graphPromise, timeoutPromise]) as any;
+      const newData = rawNewData?.graphData ? (rawNewData.graphData as GraphData) : (rawNewData as GraphData);
+      if (rawNewData?.activeJobId) {
+        activeJobId = rawNewData.activeJobId;
+      }
       console.log(`[Music Discovery] AI generated graph in ${((Date.now() - startTime) / 1000).toFixed(1)}s`);
 
       if (controller && controller.signal.aborted) return;
@@ -4464,8 +4476,8 @@ const App: React.FC = () => {
       // If we are using the cloud worker pipeline on a saved project, we MUST ignore this HTTP 200 OK 
       // structural payload. The UI state will remain locked (isLoading = true) until the background 
       // worker fully hydrates the graph and the onSnapshot listener detects status === 'completed'.
-      if (useCloudCuration && user?.uid && currentProjectId && !isGuest) {
-        console.log("[Render Lock] Structural payload received (200 OK). Bypassing legacy state merge. Awaiting background hydration.");
+      if (useCloudCuration && user?.uid && (currentProjectId || currentProjectIdRef.current) && !isGuest && activeJobId) {
+        console.log(`[Render Lock] Structural payload received (200 OK) with activeJobId ${activeJobId}. Bypassing legacy state merge. Awaiting background hydration.`);
         return; 
       }
 
@@ -4738,12 +4750,14 @@ const App: React.FC = () => {
               const nodeIndex = final.nodes.findIndex((n: any) => n.id === selectedNodeData.id);
               if (nodeIndex !== -1) final.nodes[nodeIndex] = selectedNodeData;
           }
+          const finalStatus = activeJobId ? 'curating' : 'completed';
           await updateDoc(doc(db, projectPath), {
             graphData: JSON.stringify(final),
             activeNodes: finalActive,
             seedArtists: resolvedArtists,
             detailsCache: JSON.stringify(Array.from(detailsCacheRef.current.entries())),
-            status: 'completed',
+            status: finalStatus,
+            ...(activeJobId ? { activeJobId } : {}),
             updatedAt: serverTimestamp()
           });
           console.log("[Phase 3 Hydration Guard] Updated project doc after Generation. Awaiting onSnapshot.");
