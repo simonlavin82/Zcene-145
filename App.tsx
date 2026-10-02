@@ -3041,7 +3041,29 @@ const App: React.FC = () => {
         }
       }
 
-      // 2. Visual Confirmation (ConsolidatedValidationModal)
+      // Determine quota requirements
+      const requiresLiveSynthesis = isLiveSynthesis || isLiveSynthesisTemp;
+      const hasMisses = cacheCandidatesPerSeed.some(s => !s.isKnownCacheHit);
+      
+      let tokenType = 'generation';
+      if (requiresLiveSynthesis) tokenType = 'live_synthesis';
+      else if (needsCacheUpgrade) tokenType = 'cache_upgrade';
+      
+      const requiresQuota = requiresLiveSynthesis || hasMisses || needsCacheUpgrade;
+
+      // 3. Financial Confirmation (Token Quota)
+      if (requiresQuota && !bypassTokenConfirmation && !sessionTokenApprovedRef.current) {
+          const confirmedToken = await confirmTokenUsage(tokenType as any, [], artistList, undefined, false);
+          if (!confirmedToken || confirmedToken === 'back') {
+            sessionTokenApprovedRef.current = false;
+            setActiveNodeIds(prevActiveNodeIds);
+            setSeedArtists(prevSeedArtists);
+            return;
+          }
+          sessionTokenApprovedRef.current = true;
+      }
+
+      // 3. Visual Confirmation (ConsolidatedValidationModal)
       if (!bypassDisambiguation && cacheCandidatesPerSeed.length > 0) {
           const confirmed = await new Promise<boolean>((resolve) => {
             setConsolidatedValidationDialog({
@@ -3066,28 +3088,7 @@ const App: React.FC = () => {
           artistList.splice(0, artistList.length, singleCacheResolvedSearchId);
       }
 
-      // Determine quota requirements
-      const requiresLiveSynthesis = isLiveSynthesis || isLiveSynthesisTemp;
-      const hasMisses = cacheCandidatesPerSeed.some(s => !s.isKnownCacheHit);
       
-      let tokenType = 'generation';
-      if (requiresLiveSynthesis) tokenType = 'live_synthesis';
-      else if (needsCacheUpgrade) tokenType = 'cache_upgrade';
-      
-      const requiresQuota = requiresLiveSynthesis || hasMisses || needsCacheUpgrade;
-
-      // 3. Financial Confirmation (Token Quota)
-      if (requiresQuota && !bypassTokenConfirmation && !sessionTokenApprovedRef.current) {
-          const confirmedToken = await confirmTokenUsage(tokenType as any, [], artistList, undefined, false);
-          if (!confirmedToken || confirmedToken === 'back') {
-            sessionTokenApprovedRef.current = false;
-            setActiveNodeIds(prevActiveNodeIds);
-            setSeedArtists(prevSeedArtists);
-            return;
-          }
-          sessionTokenApprovedRef.current = true;
-      }
-
       // 4. Database Minting (Step Zero)
       let freshlyMintedProjectId = null;
       if (user && !currentProjectId && !isGuest && !isRegeneration && !graphToEnhance) {
