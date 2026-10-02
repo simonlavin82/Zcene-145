@@ -3371,7 +3371,7 @@ const App: React.FC = () => {
         const allKnownCacheHits = cacheCandidatesPerSeed.length > 0 && cacheCandidatesPerSeed.every(s => s.isKnownCacheHit);
         const nextSkipCacheLookup = !allKnownCacheHits;
         
-        handleGenerateGraph(newArtistsStr, isRegeneration, graphToEnhance, nextSkipCacheLookup, !isCustomNext, overrideFilters, activeDisambiguationHints, true);
+        handleGenerateGraph(newArtistsStr, isRegeneration, graphToEnhance, nextSkipCacheLookup, !isCustomNext || sessionTokenApprovedRef.current, overrideFilters, activeDisambiguationHints, true);
         return;
       }
 // AbortController is now initialized at the start of the function.
@@ -3473,7 +3473,7 @@ const App: React.FC = () => {
           const resolvedArtists = mappedSeeds.join('::');
           setSeedArtists(resolvedArtists);
           console.log(`[Phase 02 Cache] Redirect detected, restarting generation with: ${resolvedArtists}`);
-          handleGenerateGraph(resolvedArtists, isRegeneration, graphToEnhance, skipCacheLookup, bypassTokenConfirmation, overrideFilters);
+          handleGenerateGraph(resolvedArtists, isRegeneration, graphToEnhance, skipCacheLookup, bypassTokenConfirmation || sessionTokenApprovedRef.current, overrideFilters);
           return;
         }
 
