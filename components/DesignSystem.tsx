@@ -402,6 +402,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
     const [demoChatToggle, setDemoChatToggle] = useState<'instant' | 'live'>('instant');
     const [demoProfileActive, setDemoProfileActive] = useState(false);
     const [demoExpandedRow, setDemoExpandedRow] = useState<string | null>(null);
+    const [demoMobileBannerExpanded, setDemoMobileBannerExpanded] = useState(false);
     const [selectedOnboardingStep, setSelectedOnboardingStep] = useState<string>('step1');
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -1277,32 +1278,111 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         A contextual container displayed over the graph nodes on hover. It renders high-contrast, real-time relational information organized into direct metadata connections and core 'Spiderweb DNA' background recommendations.
                                     </p>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                                        <div className="space-y-6">
-                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Visual Component Preview</h4>
-                                            <div className="p-8 bg-zinc-900/30 border border-zinc-800 flex items-center justify-center min-h-[260px]">
-                                                 <div className="w-[320px] bg-zinc-950/95 border border-zinc-700/80 px-3.5 py-2.5 backdrop-blur-md rounded-xl flex flex-col gap-2 text-left">
-                                                     <div className="overflow-y-auto shrink min-h-0 flex flex-col gap-2 scrollbar-thin scrollbar-thumb-zinc-800">
-                                                         <div className="shrink-0">
-                                                              <p className="text-sm leading-relaxed font-normal text-zinc-400 m-0">A defining force in modern beatdown hardcore, originating from Michigan.</p>
-                                                         </div>
-                                                         <div className="flex flex-col gap-1 mt-1 pt-1.5">
-                                                             <div className="text-sm font-medium text-zinc-300 leading-tight flex gap-1">
-                                                                 <span className="text-zinc-500 font-normal shrink-0">•</span>
-                                                                 <span>
-                                                                     <span className="text-zinc-400 font-normal">Performs in the genre of</span>{" "}
-                                                                     <span className="text-primary font-normal">Beatdown Hardcore</span>
-                                                                 </span>
+                                        <div className="space-y-8">
+                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Visual Component Previews</h4>
+                                            
+                                            {/* Desktop Variant */}
+                                            <div className="space-y-3">
+                                                <h5 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Desktop Variant (Floating Card)</h5>
+                                                <div className="p-8 bg-zinc-900/30 border border-zinc-800 flex items-center justify-center min-h-[260px] rounded-lg">
+                                                     <div className="w-[320px] bg-zinc-950/95 border border-zinc-700/80 px-3.5 py-2.5 backdrop-blur-md rounded-xl flex flex-col gap-2 text-left shadow-[0_8px_30px_rgb(0,0,0,0.8)]">
+                                                         <div className="overflow-y-auto shrink min-h-0 flex flex-col gap-2 scrollbar-thin scrollbar-thumb-zinc-800">
+                                                             <div className="shrink-0">
+                                                                  <p className="text-sm leading-relaxed font-normal text-zinc-400 m-0">A defining force in modern beatdown hardcore, originating from Michigan.</p>
                                                              </div>
-                                                             <div className="text-sm font-medium text-zinc-300 leading-tight flex gap-1">
-                                                                 <span className="text-zinc-500 font-normal shrink-0">•</span>
-                                                                 <span>
-                                                                     <span className="text-zinc-400 font-normal">Releases music on</span>{" "}
-                                                                     <span className="text-primary font-normal">Triple B Records</span>
-                                                                 </span>
+                                                             <div className="flex flex-col gap-1 mt-1 pt-1.5">
+                                                                 <div className="text-sm font-medium text-zinc-300 leading-tight flex gap-1">
+                                                                     <span className="text-zinc-500 font-normal shrink-0">•</span>
+                                                                     <span>
+                                                                         <span className="text-zinc-400 font-normal">Performs in the genre of</span>{" "}
+                                                                         <span className="text-primary font-normal">Beatdown Hardcore</span>
+                                                                     </span>
+                                                                 </div>
+                                                                 <div className="text-sm font-medium text-zinc-300 leading-tight flex gap-1">
+                                                                     <span className="text-zinc-500 font-normal shrink-0">•</span>
+                                                                     <span>
+                                                                         <span className="text-zinc-400 font-normal">Releases music on</span>{" "}
+                                                                         <span className="text-primary font-normal">Triple B Records</span>
+                                                                     </span>
+                                                                 </div>
                                                              </div>
                                                          </div>
                                                      </div>
-                                                 </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Mobile Variant */}
+                                            <div className="space-y-3">
+                                                <h5 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Mobile Variant (Top Drop Banner)</h5>
+                                                <div className="bg-zinc-900/30 border border-zinc-800 flex flex-col items-center justify-start h-[360px] relative overflow-hidden rounded-lg">
+                                                     <div className="w-full bg-zinc-950/95 border-b border-zinc-700/80 px-4 py-3 backdrop-blur-md flex flex-col gap-2 text-left shadow-[0_8px_30px_rgb(0,0,0,0.8)] absolute top-0 left-0 max-h-[55vh]">
+                                                         <div className="overflow-y-auto shrink min-h-0 flex flex-col gap-2 scrollbar-thin scrollbar-thumb-zinc-800">
+                                                             <div className="shrink-0">
+                                                                  <p className={`text-sm leading-relaxed font-normal text-zinc-400 m-0${!demoMobileBannerExpanded ? ' line-clamp-4' : ''}`}>A defining force in modern beatdown hardcore, originating from Michigan.</p>
+                                                             </div>
+                                                             <div className="flex flex-col gap-1 mt-1 pt-1.5">
+                                                                 <div className="text-sm font-medium text-zinc-300 leading-tight flex gap-1">
+                                                                     <span className="text-zinc-500 font-normal shrink-0">•</span>
+                                                                     <span>
+                                                                         <span className="text-zinc-400 font-normal">Performs in the genre of</span>{" "}
+                                                                         <span className="text-primary font-normal">Beatdown Hardcore</span>
+                                                                     </span>
+                                                                 </div>
+                                                                 <div className="text-sm font-medium text-zinc-300 leading-tight flex gap-1">
+                                                                     <span className="text-zinc-500 font-normal shrink-0">•</span>
+                                                                     <span>
+                                                                         <span className="text-zinc-400 font-normal">Releases music on</span>{" "}
+                                                                         <span className="text-primary font-normal">Triple B Records</span>
+                                                                     </span>
+                                                                 </div>
+                                                                 
+                                                                 {demoMobileBannerExpanded && (
+                                                                     <>
+                                                                         <div className="text-sm font-medium text-zinc-300 leading-tight flex gap-1">
+                                                                             <span className="text-zinc-500 font-normal shrink-0">•</span>
+                                                                             <span>
+                                                                                 <span className="text-zinc-400 font-normal">Signed to</span>{" "}
+                                                                                 <span className="text-primary font-normal">Closed Casket Activities</span>
+                                                                             </span>
+                                                                         </div>
+                                                                         <div className="text-sm font-medium text-zinc-300 leading-tight flex gap-1">
+                                                                             <span className="text-zinc-500 font-normal shrink-0">•</span>
+                                                                             <span>
+                                                                                 <span className="text-zinc-400 font-normal">Shared early LA scene with</span>{" "}
+                                                                                 <span className="text-primary font-normal">God's Hate</span>
+                                                                             </span>
+                                                                         </div>
+                                                                         <div className="text-sm font-medium text-zinc-300 leading-tight flex gap-1">
+                                                                             <span className="text-zinc-500 font-normal shrink-0">•</span>
+                                                                             <span>
+                                                                                 <span className="text-zinc-400 font-normal">Toured extensively with</span>{" "}
+                                                                                 <span className="text-primary font-normal">Terror</span>
+                                                                             </span>
+                                                                         </div>
+                                                                     </>
+                                                                 )}
+                                                             </div>
+                                                         </div>
+                                                         
+                                                         <div className="pt-2 shrink-0 flex justify-center pointer-events-auto">
+                                                             {!demoMobileBannerExpanded ? (
+                                                                 <button 
+                                                                     onClick={() => setDemoMobileBannerExpanded(true)}
+                                                                     className="bg-zinc-800 text-zinc-200 px-3 py-1 text-xs rounded-xl font-medium border border-zinc-700 hover:bg-zinc-700 transition-colors"
+                                                                 >
+                                                                     View 7 more connections
+                                                                 </button>
+                                                             ) : (
+                                                                 <button 
+                                                                     onClick={() => setDemoMobileBannerExpanded(false)}
+                                                                     className="bg-zinc-800 text-zinc-200 px-3 py-1 text-xs rounded-xl font-medium border border-zinc-700 hover:bg-zinc-700 transition-colors"
+                                                                 >
+                                                                     Close
+                                                                 </button>
+                                                             )}
+                                                         </div>
+                                                     </div>
+                                                </div>
                                             </div>
                                         </div>
                                         <div className="space-y-6">
