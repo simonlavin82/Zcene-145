@@ -1281,20 +1281,27 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Visual Component Preview</h4>
                                             <div className="p-8 bg-zinc-900/30 border border-zinc-800 flex items-center justify-center min-h-[260px]">
                                                  <div className="w-[320px] bg-zinc-950/95 border border-zinc-700/80 px-3.5 py-2.5 backdrop-blur-md rounded-xl flex flex-col gap-2 text-left">
-                                                     <span className="font-poppins text-sm text-white border-b border-zinc-800 pb-1 mb-1 font-medium">Never Ending Game</span>
-                                                     <div className="flex flex-col gap-1">
-                                                         <div className="text-sm font-medium text-zinc-300 leading-tight">
-                                                             <span className="text-zinc-400 font-normal">Performs in the genre of</span>{" "}
-                                                             <span className="text-primary font-normal">Beatdown Hardcore</span>
+                                                     <div className="overflow-y-auto shrink min-h-0 flex flex-col gap-2 scrollbar-thin scrollbar-thumb-zinc-800">
+                                                         <div className="shrink-0">
+                                                              <p className="text-sm leading-relaxed font-normal text-zinc-400 m-0">A defining force in modern beatdown hardcore, originating from Michigan.</p>
                                                          </div>
-                                                         <div className="text-sm font-medium text-zinc-300 leading-tight">
-                                                             <span className="text-zinc-400 font-normal">Releases music on</span>{" "}
-                                                             <span className="text-primary font-normal">Triple B Records</span>
+                                                         <div className="flex flex-col gap-1 mt-1 pt-1.5">
+                                                             <div className="text-sm font-medium text-zinc-300 leading-tight flex gap-1">
+                                                                 <span className="text-zinc-500 font-normal shrink-0">•</span>
+                                                                 <span>
+                                                                     <span className="text-zinc-400 font-normal">Performs in the genre of</span>{" "}
+                                                                     <span className="text-primary font-normal">Beatdown Hardcore</span>
+                                                                 </span>
+                                                             </div>
+                                                             <div className="text-sm font-medium text-zinc-300 leading-tight flex gap-1">
+                                                                 <span className="text-zinc-500 font-normal shrink-0">•</span>
+                                                                 <span>
+                                                                     <span className="text-zinc-400 font-normal">Releases music on</span>{" "}
+                                                                     <span className="text-primary font-normal">Triple B Records</span>
+                                                                 </span>
+                                                             </div>
                                                          </div>
                                                      </div>
-                                                     <div className="mt-1 pt-1.5 border-t border-zinc-800/60">
-                                                          <p className="text-sm leading-relaxed font-normal text-zinc-400 m-0">A defining force in modern beatdown hardcore, originating from Michigan.</p>
-                                                      </div>
                                                  </div>
                                             </div>
                                         </div>
@@ -1303,7 +1310,6 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <ul className="space-y-3 text-sm text-zinc-400">
                                                 <li><strong>Background Architecture:</strong> <code>bg-zinc-950/95 border border-zinc-700/80 px-3.5 py-2.5 backdrop-blur-md</code></li>
                                                 <li><strong>Border Radius:</strong> <code>rounded-xl</code> (12px) for consistent, modern container framing.</li>
-                                                <li><strong>Title Typography:</strong> <code>font-poppins font-medium text-sm text-white</code> for sharp, readable Title Case presentation.</li>
                                                 <li><strong>Relational Contexts:</strong> Uses <code>text-zinc-400 font-normal</code> for structural descriptions and <code>text-primary font-normal</code> for highlighted details.</li>
                                                 <li><strong>Micro-Bio / Editorial Typography:</strong> Bio description text uses <code>text-sm leading-relaxed font-normal text-zinc-400</code> matching the 14px Deep Cut scale to maximize legibility on dark backgrounds. Rendered as a block-level <code>&lt;p&gt;</code> element so line-height applies correctly.</li>
                                                 <li><strong>Responsive Canvas Pattern:</strong> On desktop (<code>≥ 1024px</code>), the panel floats above (or below if within 140px of the top edge) the hovered node using absolute coordinate tracking. On mobile, it collapses to an absolute canvas-anchored top-drop banner restricted to <code>max-h-[55vh]</code> at <code>top: 0</code>. Internally, it utilizes a unified <code>overflow-y-auto</code> layout wrapper combining both narrative DNA and direct connection lists to ensure uniform, synchronized scrolling.</li>
