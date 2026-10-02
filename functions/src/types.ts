@@ -32,6 +32,7 @@ export interface Link {
   weight?: number;
   forwardContext?: string;
   inverseContext?: string;
+  context?: string;
 }
 
 export interface GraphData {

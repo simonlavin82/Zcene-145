@@ -3365,7 +3365,7 @@ const App: React.FC = () => {
                   .catch(err => console.error("Failed to GC orphaned project:", err));
                 setCurrentProjectId(null);
                 currentProjectIdRef.current = null;
-                navigate('/dashboard', { replace: true });
+                navigate('/dashboard', true);
               }
 
               return;
@@ -3399,7 +3399,7 @@ const App: React.FC = () => {
               .catch(err => console.error("Failed to GC orphaned project:", err));
             setCurrentProjectId(null);
             currentProjectIdRef.current = null;
-            navigate('/dashboard', { replace: true });
+            navigate('/dashboard', true);
           }
 
           return;
@@ -3492,7 +3492,7 @@ const App: React.FC = () => {
             
           setCurrentProjectId(null);
           currentProjectIdRef.current = null;
-          navigate('/dashboard', { replace: true });
+          navigate('/dashboard', true);
         }
 
         return;
@@ -3948,7 +3948,7 @@ const App: React.FC = () => {
               seedArtists: name,
               graphData: JSON.stringify({ nodes: [{ id: name, type: 'artist', label: cleanArtistDisplayName(name), group: 1 }], links: [] }),
               cacheVersion: 4,
-              cachedAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
+              updatedAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
               hitCount: 0,
               detailsCache: JSON.stringify({
                 summary: `**${name}** is a standard sandbox mock cached band for test scenarios.`,
@@ -3978,7 +3978,7 @@ const App: React.FC = () => {
                 seedArtists: name,
                 graphData: JSON.stringify({ nodes, links }),
                 cacheVersion: 4,
-                cachedAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
+                updatedAt: { seconds: Date.now() / 1000, nanoseconds: 0 } as any,
                 hitCount: 0,
                 detailsCache: details ? JSON.stringify(details) : undefined
               };
