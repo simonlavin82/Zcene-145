@@ -4032,7 +4032,7 @@ const App: React.FC = () => {
         }
 
         let confirmed: string | false | 'back' | true = true;
-        if (!bypassTokenConfirmation) {
+        if (!bypassTokenConfirmation && !sessionTokenApprovedRef.current) {
           confirmed = await confirmTokenUsage(
             enrichmentRequired.length > 0 && missing.length === 0 ? 'cache_upgrade' : 'generation',
             fullHits,
