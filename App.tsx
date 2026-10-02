@@ -3355,9 +3355,19 @@ const App: React.FC = () => {
               bypassToken = true;
               // Fall through to live generation logic (which will generate and write back)
             } else {
-              console.log(`[Front Gate Cache] User cancelled cache upgrade. Falling back to legacy data.`);
+              console.log(`[Front Gate Cache] User cancelled cache upgrade. Aborting generation.`);
               isHydratingSessionRef.current = false;
-              handleGenerateGraph(artists, isRegeneration, graphToEnhance, true, true);
+              setIsLoading(false);
+              isProjectLoadingRef.current = false;
+
+              if (freshlyMintedProjectId && user) {
+                deleteDoc(doc(db, 'users', user.uid, 'projects', freshlyMintedProjectId))
+                  .catch(err => console.error("Failed to GC orphaned project:", err));
+                setCurrentProjectId(null);
+                currentProjectIdRef.current = null;
+                navigate('/dashboard', { replace: true });
+              }
+
               return;
             }
           }
@@ -3378,9 +3388,20 @@ const App: React.FC = () => {
         const confirmed = await confirmTokenUsage(isLiveSynthesisTemp ? 'live_synthesis' : 'generation', [], artistList, undefined, false);
         if (!confirmed || confirmed === 'back') {
           sessionTokenApprovedRef.current = false;
+          setActiveNodeIds(prevActiveNodeIds);
+          setSeedArtists(prevSeedArtists);
           setIsLoading(false);
           isHydratingSessionRef.current = false;
           isProjectLoadingRef.current = false;
+
+          if (freshlyMintedProjectId && user) {
+            deleteDoc(doc(db, 'users', user.uid, 'projects', freshlyMintedProjectId))
+              .catch(err => console.error("Failed to GC orphaned project:", err));
+            setCurrentProjectId(null);
+            currentProjectIdRef.current = null;
+            navigate('/dashboard', { replace: true });
+          }
+
           return;
         }
         sessionTokenApprovedRef.current = true;
