@@ -6107,6 +6107,11 @@ const App: React.FC = () => {
     }
 
     const timer = setTimeout(async () => {
+      if (currentProjectIdRef.current !== currentProjectId) {
+        console.log(`[Database Reporter] Aborting save: Project ID changed or was garbage collected.`);
+        return;
+      }
+
       const projectPath = `users/${user.uid}/projects/${currentProjectId}`;
       try {
         isHydratingSessionRef.current = true;
