@@ -745,6 +745,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                 value={renameValue}
                 onChange={(e) => setRenameValue(e.target.value)}
                 autoFocus
+                autoComplete="off"
+                data-1p-ignore="true"
+                data-lpignore="true"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     const trimmed = renameValue.trim();
