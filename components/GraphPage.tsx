@@ -112,14 +112,6 @@ interface GraphPageProps {
   setIsStackDialogOpen: (open: boolean) => void;
   isMenuOpen: boolean;
   setIsMenuOpen: (open: boolean) => void;
-  disambiguationDialog: {
-    isOpen: boolean;
-    query: string;
-    candidates: DisambiguationCandidate[];
-    isLiveAISuggestions?: boolean;
-    showBack?: boolean;
-  } | null;
-  onSelectDisambiguation: (choice: string | 'synthesis' | 'cancel' | 'back') => void;
   onStashArtist?: (artistName: string) => void;
   /** Phase A — Coordinate Memory: passed through to MusicGraph, fired when
    * the D3 simulation settles with final artist/label node positions. */
@@ -682,7 +674,6 @@ const GraphPage: React.FC<GraphPageProps> = ({
   isDeleteAccountModalOpen, setIsDeleteAccountModalOpen,
   isStackDialogOpen, setIsStackDialogOpen,
   isMenuOpen, setIsMenuOpen,
-  disambiguationDialog, onSelectDisambiguation,
   onStashArtist,
   onCoordinatesSettled,
   isHydrating
@@ -1761,14 +1752,6 @@ const GraphPage: React.FC<GraphPageProps> = ({
                 </aside>
             </main>
         )}
-        <DisambiguationModal
-          isOpen={!!disambiguationDialog}
-          query={disambiguationDialog?.query || ''}
-          candidates={disambiguationDialog?.candidates || []}
-          isLiveAISuggestions={disambiguationDialog?.isLiveAISuggestions}
-          showBack={disambiguationDialog?.showBack}
-          onSelect={onSelectDisambiguation}
-        />
         {isSmallScreen && isMagazineViewOpen && (
             <div className="fixed inset-0 z-[9999] bg-zinc-900 overflow-y-auto overscroll-contain">
                 {detailsPanelElement}

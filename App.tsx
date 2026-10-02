@@ -1188,18 +1188,10 @@ const App: React.FC = () => {
   const [consolidatedValidationDialog, setConsolidatedValidationDialog] = useState<{
     isOpen: boolean;
     seeds: PreFlightSeed[];
-    onConfirm: (origins: Record<string, string>) => void;
+    onConfirm: () => void;
     onCancel: () => void;
   } | null>(null);
-  const [disambiguationDialog, setDisambiguationDialog] = useState<{
-    isOpen: boolean;
-    query: string;
-    candidates: DisambiguationCandidate[];
-    showBack?: boolean;
-    onSelect: (candidateId: string | 'synthesis' | 'cancel' | 'back') => void;
-    isLiveAISuggestions: boolean;
-  } | null>(null);
-  const [filterGuidanceState, setFilterGuidanceState] = useState<{
+    const [filterGuidanceState, setFilterGuidanceState] = useState<{
     isOpen: boolean;
     seedArtists: string[];
     filters: DiscoveryFilters;
@@ -1274,21 +1266,7 @@ const App: React.FC = () => {
     setTokenConfirmation(prev => prev ? { ...prev, error: errorMsg } : null);
   }, []);
 
-  const confirmDisambiguationChoice = useCallback((query: string, candidates: DisambiguationCandidate[]) => {
-    return new Promise<string | 'synthesis' | 'cancel' | 'back'>((resolve) => {
-      setDisambiguationDialog({
-        isOpen: true,
-        query,
-        candidates,
-        isLiveAISuggestions: false,
-        onSelect: (choice) => {
-          setDisambiguationDialog(null);
-          resolve(choice);
-        }
-      });
-    });
-  }, []);
-  const resolveContextualEntityIds = useCallback(async (
+    const resolveContextualEntityIds = useCallback(async (
     artistsStr: string,
     filters: DiscoveryFilters
   ): Promise<string> => {
@@ -2894,46 +2872,7 @@ const App: React.FC = () => {
       return;
     }
 
-    // Phase 2: Upfront Project Minting (Step Zero)
-    let freshlyMintedProjectId: string | null = null;
-    if (user && !currentProjectId && !isGuest && !isRegeneration && !graphToEnhance) {
-      const newDocRef = doc(collection(db, 'users', user.uid, 'projects'));
-      const newId = newDocRef.id;
-      freshlyMintedProjectId = newId;
-      setCurrentProjectId(newId);
-      currentProjectIdRef.current = newId;
-      navigate(`/p/${newId}`);
-
-      let defaultName = projectName || "Untitled Zcene";
-      if (!projectName || projectName === "Untitled Zcene" || isLiveSynthesisTemp) {
-        const seeds = artists.split('::').map(s => s.trim()).filter(Boolean);
-        if (seeds.length > 1) {
-          defaultName = seeds.map(formatSeed).join(' + ');
-        } else if (seeds.length === 1) {
-          defaultName = formatSeed(seeds[0]);
-        }
-      }
-
-      await setDoc(newDocRef, {
-        name: defaultName,
-        seedArtists: artists,
-        graphData: JSON.stringify({ nodes: [], links: [] }),
-        activeNodes: [],
-        detailsCache: '[]',
-        chatHistories: '[]',
-        discoveryFilters: '{}',
-        lastViewedStackCount: 0,
-        isMagazineViewOpen: false,
-        authorId: user.uid,
-        supportsLabelDeepCuts: true,
-        schemaVersion: 2,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        status: 'curating'
-      });
-      console.log(`[Step Zero] Minted new project: ${newId}`);
-    }
-
+    
     const artistList = artists.split('::').map(a => normalizeArtistId(a)).filter(Boolean);
     if (artistList.length > 25) {
       isHydratingSessionRef.current = false;
@@ -2955,19 +2894,223 @@ const App: React.FC = () => {
 
       const isLiveSynthesis = hasActiveFilters || artistList.length > 1;
 
+      // 1. Silent Phase: Build PreFlightSeeds for all artists
+      let cacheCandidatesPerSeed: any[] = [];
+      let needsCacheUpgrade = false;
+      let hasFullCacheHitForSingle = false;
+      let singleCacheDocData = null;
+      let singleCacheResolvedSearchId = "";
+
+      if (!bypassDisambiguation && !skipCacheLookup) {
+        cacheCandidatesPerSeed = await Promise.all(artistList.map(async (searchId, i) => {
+          const rawInput = artists.split('::').map(s => s.trim()).filter(Boolean)[i] || searchId;
+          const searchIdLower = searchId.toLowerCase();
+          
+          let predictedOrigin = '';
+          let genre = '';
+          let isKnownCacheHit = false;
+          let candidateId = undefined;
+          let isCorrected = false;
+          let correctedQuery = undefined;
+          let originalQuery = undefined;
+
+          // Silent DB Check
+          let cacheDoc = await getAnyEntityDocWithRedirect(searchId);
+          if (!cacheDoc.exists()) {
+            cacheDoc = await getAnyEntityDocWithRedirect(searchIdLower);
+          }
+
+          if (cacheDoc.exists()) {
+            const data = cacheDoc.data();
+            const validation = validateCacheEntry(data, true);
+            let parsedGraph = null;
+            try { parsedGraph = typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData; } catch (e) {}
+            const hasGraph = parsedGraph && parsedGraph.nodes && parsedGraph.nodes.length > 0;
+            
+            if (hasGraph) {
+                isKnownCacheHit = true;
+                const canonicalId = data?.cacheKey || data?.artistId || cacheDoc.id;
+                candidateId = canonicalId;
+                
+                // Extract origin/genre from detailsCache
+                let parsedDetails = null;
+                if (data.detailsCache) {
+                    try { parsedDetails = parseDetailsCacheSafely(data.detailsCache); } catch(e) {}
+                }
+                let unwrappedDetails = parsedDetails;
+                if (Array.isArray(unwrappedDetails) && unwrappedDetails.length > 0) {
+                    unwrappedDetails = Array.isArray(unwrappedDetails[0]) ? unwrappedDetails[0][1] : unwrappedDetails[0];
+                }
+                predictedOrigin = unwrappedDetails?.details?.origin || unwrappedDetails?.origin || unwrappedDetails?.location || unwrappedDetails?.country || "";
+                genre = unwrappedDetails?.details?.genre || unwrappedDetails?.genre || unwrappedDetails?.genres || "";
+                
+                if (artistList.length === 1 && !hasActiveFilters) {
+                    singleCacheDocData = data;
+                    singleCacheResolvedSearchId = (canonicalId && canonicalId.toLowerCase() !== searchIdLower) ? canonicalId : searchId;
+                    if (!validation.isFullyQualified) {
+                        needsCacheUpgrade = true;
+                    } else {
+                        hasFullCacheHitForSingle = true;
+                    }
+                } else if (!validation.isFullyQualified) {
+                    needsCacheUpgrade = true;
+                }
+            }
+          }
+
+          // If not found in DB cache, use API
+          if (!isKnownCacheHit) {
+            const cacheCandidates = await searchDisambiguationCandidates(searchId);
+            if (cacheCandidates.length > 0) {
+              predictedOrigin = cacheCandidates[0].origin || '';
+              genre = cacheCandidates[0].genre || '';
+              isKnownCacheHit = true;
+              candidateId = cacheCandidates[0].id;
+            } else {
+              try {
+                let currentPassword = sessionStorage.getItem('zcene_api_password') || undefined;
+                const validate = httpsCallable(functions, 'validateSeedOriginCallable');
+                const result = await validate({ seed: rawInput, ...(currentPassword && { password: currentPassword }) });
+                const data = result.data as any;
+                if (data && data.isValid) {
+                  predictedOrigin = data.origin || '';
+                  genre = data.genre || '';
+                  
+                  if (data.correctedInput && data.id && data.id !== rawInput) {
+                    isCorrected = true;
+                    correctedQuery = data.id;
+                    originalQuery = rawInput;
+                    
+                    const interceptCandidates = await searchDisambiguationCandidates(data.id);
+                    if (interceptCandidates.length > 0) {
+                      predictedOrigin = interceptCandidates[0].origin || predictedOrigin;
+                      genre = interceptCandidates[0].genre || genre;
+                      isKnownCacheHit = true;
+                      candidateId = interceptCandidates[0].id;
+                    }
+                  }
+                }
+              } catch (e) {
+                 console.warn("Origin validation failed:", e);
+              }
+            }
+          }
+          
+          return {
+            id: searchId,
+            query: rawInput,
+            predictedOrigin,
+            genre,
+            isKnownCacheHit,
+            candidateId,
+            isCorrected,
+            correctedQuery,
+            originalQuery
+          };
+        }));
+      }
+
+      setIsLoading(false);
+      isHydratingSessionRef.current = false;
+      isProjectLoadingRef.current = false;
+
+      // 2. Visual Confirmation (ConsolidatedValidationModal)
+      if (!bypassDisambiguation && cacheCandidatesPerSeed.length > 0) {
+          const confirmed = await new Promise<boolean>((resolve) => {
+            setConsolidatedValidationDialog({
+              isOpen: true,
+              seeds: cacheCandidatesPerSeed,
+              onConfirm: () => { setConsolidatedValidationDialog(null); resolve(true); },
+              onCancel: () => { setConsolidatedValidationDialog(null); resolve(false); }
+            });
+          });
+
+          if (!confirmed) {
+            sessionTokenApprovedRef.current = false;
+            setActiveNodeIds(prevActiveNodeIds);
+            setSeedArtists(prevSeedArtists);
+            return;
+          }
+      }
+
+      // Re-hydrate singleCacheResolvedSearchId into artistList if single seed redirect
+      if (hasFullCacheHitForSingle && singleCacheResolvedSearchId && singleCacheResolvedSearchId !== artistList[0]) {
+          setSeedArtists(singleCacheResolvedSearchId);
+          artistList.splice(0, artistList.length, singleCacheResolvedSearchId);
+      }
+
+      // Determine quota requirements
+      const requiresLiveSynthesis = isLiveSynthesis || isLiveSynthesisTemp;
+      const hasMisses = cacheCandidatesPerSeed.some(s => !s.isKnownCacheHit);
+      
+      let tokenType = 'generation';
+      if (requiresLiveSynthesis) tokenType = 'live_synthesis';
+      else if (needsCacheUpgrade) tokenType = 'cache_upgrade';
+      
+      const requiresQuota = requiresLiveSynthesis || hasMisses || needsCacheUpgrade;
+
+      // 3. Financial Confirmation (Token Quota)
+      if (requiresQuota && !bypassTokenConfirmation && !sessionTokenApprovedRef.current) {
+          const confirmedToken = await confirmTokenUsage(tokenType as any, [], artistList, undefined, false);
+          if (!confirmedToken || confirmedToken === 'back') {
+            sessionTokenApprovedRef.current = false;
+            setActiveNodeIds(prevActiveNodeIds);
+            setSeedArtists(prevSeedArtists);
+            return;
+          }
+          sessionTokenApprovedRef.current = true;
+      }
+
+      // 4. Database Minting (Step Zero)
+      let freshlyMintedProjectId = null;
+      if (user && !currentProjectId && !isGuest && !isRegeneration && !graphToEnhance) {
+        const newDocRef = doc(collection(db, 'users', user.uid, 'projects'));
+        const newId = newDocRef.id;
+        freshlyMintedProjectId = newId;
+        setCurrentProjectId(newId);
+        currentProjectIdRef.current = newId;
+        navigate(`/p/${newId}`);
+
+        let defaultName = projectName || "Untitled Zcene";
+        if (!projectName || projectName === "Untitled Zcene" || isLiveSynthesisTemp) {
+          const seeds = artists.split('::').map(s => s.trim()).filter(Boolean);
+          if (seeds.length > 1) {
+            defaultName = seeds.map(formatSeed).join(' + ');
+          } else if (seeds.length === 1) {
+            defaultName = formatSeed(seeds[0]);
+          }
+        }
+
+        await setDoc(newDocRef, {
+          name: defaultName,
+          seedArtists: artists,
+          graphData: JSON.stringify({ nodes: [], links: [] }),
+          activeNodes: [],
+          detailsCache: '[]',
+          chatHistories: '[]',
+          discoveryFilters: '{}',
+          lastViewedStackCount: 0,
+          isMagazineViewOpen: false,
+          authorId: user.uid,
+          supportsLabelDeepCuts: true,
+          schemaVersion: 2,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          status: 'curating'
+        });
+        console.log(`[Step Zero] Minted new project: ${newId} AFTER validation gates`);
+      }
+
+      // Concurrently fetch baseline cache ...
       if (isLiveSynthesis) {
-        // Concurrently fetch baseline cache to populate detailsCache and preserve biographies
         const normalizedArtistList = artistList.map(name => name.toLowerCase());
         readArtistCacheMany(normalizedArtistList, user?.uid).then(baseCacheResult => {
           baseCacheResult.cached.forEach((entry, key) => {
             if (entry && entry.detailsCache) {
               try {
                 let parsedData = parseDetailsCacheSafely(entry.detailsCache);
-                
-                // Context Check: Verify if the parsed origin aligns with the active search constraints
                 const originVal = parsedData?.details?.origin || parsedData?.origin || parsedData?.location || parsedData?.country || "";
                 const normOrigin = originVal.toLowerCase().trim();
-                
                 let isOriginMismatched = false;
                 if (activeDiscoveryFilters.includeOrigins && activeDiscoveryFilters.includeOrigins.length > 0) {
                   isOriginMismatched = !activeDiscoveryFilters.includeOrigins.some(c => {
@@ -2982,11 +3125,7 @@ const App: React.FC = () => {
                   });
                   if (isExcluded) isOriginMismatched = true;
                 }
-
-                if (isOriginMismatched) {
-                  console.log(`[Baseline Prefetch Gate] Discarding baseline cache for ${key} due to origin mismatch: "${originVal}" does not match active filter.`);
-                  return; // Skip setting this entry in detailsCache
-                }
+                if (isOriginMismatched) return;
 
                 const entryBio = parsedData?.summary || parsedData?.bio || parsedData?.description || parsedData?.text || "";
                 if (entryBio && entryBio.length > 5) {
@@ -3021,511 +3160,173 @@ const App: React.FC = () => {
                     return updated;
                   });
                 }
-              } catch (e) {
-                console.warn("[DetailsCache] Failed to parse baseline detailsCache:", e);
-              }
+              } catch (e) { }
             }
           });
-        }).catch(e => console.warn("[DetailsCache] Failed to fetch baseline cache:", e));
+        }).catch(e => console.warn(e));
       }
 
-    // --- STRICT FRONT-GATE CACHE CHECK ---
-    // If this is a fresh search for a single artist without special filters, check the cache immediately
-    // Skip entirely if skipCacheLookup is true (e.g. user explicitly rejected cache hit in disambiguation gate)
-    if (!skipCacheLookup && artistList.length === 1 && !hasActiveFilters) {
-      const searchId = artistList[0];
-      const searchIdLower = searchId.toLowerCase();
-      
-      try {
-        let cacheDoc = await getAnyEntityDocWithRedirect(searchId);
-        if (!cacheDoc.exists()) {
-          cacheDoc = await getAnyEntityDocWithRedirect(searchIdLower);
-        }
-        
-        if (!cacheDoc.exists()) {
-          console.log("Decision State:", {
-            searchedId: searchId,
-            foundDoc: false,
-            hasGraph: false,
-            hasDetails: false,
-            finalDecision: 'API'
-          });
-        } else {
-          const data = cacheDoc.data();
-          // getArtistDocWithRedirect already followed any redirectTo chain and returned the canonical doc's data.
-          // Compute the canonical ID so we can update the seedArtists state, but do NOT re-dispatch
-          // handleGenerateGraph — we already have the resolved data and can fall straight through to
-          // the cache-hit path below.  Re-dispatching caused the Token Quota Warning to appear because
-          // bypassTokenConfirmation was not propagated to the recursive call.
-          const canonicalArtistId = data?.cacheKey || data?.artistId || cacheDoc.id;
-          const resolvedSearchId = (canonicalArtistId && canonicalArtistId.toLowerCase() !== searchIdLower)
-            ? canonicalArtistId
-            : searchId;
-
-          if (resolvedSearchId !== searchId) {
-            console.log(`[Front Gate Cache] Redirect resolved inline: ${searchId} -> ${resolvedSearchId} (data already in hand, no re-dispatch)`);
-            setSeedArtists(resolvedSearchId);
-            
-            // CRITICAL FIX: Synchronize artistList with the resolved aliases so downstream cache-hit rendering
-            // checks the correct node IDs instead of the raw input, preventing duplicates
-            artistList.splice(0, artistList.length, resolvedSearchId);
-          }
-
-
+      // 5. Apply Cache Hit for Single Qualified Hits
+      if (hasFullCacheHitForSingle && singleCacheDocData) {
+          const searchId = artistList[0];
+          const searchIdLower = searchId.toLowerCase();
+          const data = singleCacheDocData;
+          const resolvedSearchId = singleCacheResolvedSearchId;
+          
           let parsedGraph = null;
-          try {
-            parsedGraph = typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData;
-          } catch (e) {
-            console.warn("Failed to parse cached graphData");
-          }
+          try { parsedGraph = typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData; } catch (e) {}
 
-          const isDeep = data?.isDeep === true;
-          const validation = validateCacheEntry(data, true);
-          const hasGraph = parsedGraph && parsedGraph.nodes && parsedGraph.nodes.length > 0;
-          const hasDetailsObj = !!data.detailsCache && (
-            typeof data.detailsCache === 'string'
-              ? data.detailsCache.trim().length > 0
-              : Object.keys(data.detailsCache).length > 0
-          );
+          const rationaleVal = data.synthesisRationale || parsedGraph.synthesisRationale;
+          if (rationaleVal) parsedGraph.synthesisRationale = rationaleVal;
           
-          // Relaxed cache qualification check: if graphData exists, accept as cache hit!
-          const isQualified = !!hasGraph;
+          const normalizedGraph = applyHumanCasedLabels(normalizeGraphData(parsedGraph), artists);
+          console.log(`[Front Gate Cache] GOLD STANDARD HIT! Bypassing all generation logic. searchId: ${searchId} -> resolvedId: ${resolvedSearchId}, nodes: ${normalizedGraph.nodes.length}`);
           
-          console.log("Decision State:", {
-            searchedId: searchId,
-            resolvedId: resolvedSearchId,
-            firestoreDocId: cacheDoc.id,
-            foundDoc: true,
-            hasGraph,
-            graphNodeCount: parsedGraph?.nodes?.length ?? 0,
-            hasDetails: hasDetailsObj,
-            isQualifiedByCacheEntry: validation.isFullyQualified,
-            finalDecision: isQualified ? 'CACHE' : 'API'
-          });
-          
-          console.log(`[Front Gate Cache Check] searchId: ${searchId}, resolvedId: ${resolvedSearchId}, isQualified: ${isQualified}`);
-          console.log(`[Front Gate Cache Details] isDeep: ${isDeep}, hasGraph: ${hasGraph}, hasDetailsObj: ${hasDetailsObj}, isFullyQualified: ${validation.isFullyQualified}`);
-          if (!isQualified) {
-            console.log(`[Front Gate Cache Rejected Reasons] searchId: ${searchId}:`, {
-              missingGraphData: !parsedGraph,
-              emptyGraphNodes: parsedGraph && (!parsedGraph.nodes || parsedGraph.nodes.length === 0),
-              isDeep: isDeep,
-              validationErrors: validation
-            });
-          }
-          
-          if (data && isQualified) {
-            let proceedWithCache = true;
-            if (!bypassDisambiguation && !bypassTokenConfirmation) {
-                let parsedDetails: any = null;
-                if (data.detailsCache) {
-                    try { parsedDetails = parseDetailsCacheSafely(data.detailsCache); } catch(e) {}
-                }
-                
-                let unwrappedDetails = parsedDetails;
-                if (Array.isArray(unwrappedDetails) && unwrappedDetails.length > 0) {
-                    unwrappedDetails = Array.isArray(unwrappedDetails[0]) ? unwrappedDetails[0][1] : unwrappedDetails[0];
-                }
-                
-                const normalizedGraphTemp = parsedGraph && parsedGraph.nodes ? applyHumanCasedLabels(normalizeGraphData(parsedGraph), artists) : {nodes:[]};
-                const primaryNodeTemp = normalizedGraphTemp.nodes.find((n: any) => 
-                    n.id.toLowerCase() === searchIdLower || 
-                    normalizeArtistId(n.id) === normalizeArtistId(searchId) || 
-                    isArtistIdMatch(n.id, searchId)
-                ) as any;
-
-                const candidateLabel = unwrappedDetails?.details?.artist || unwrappedDetails?.artist || unwrappedDetails?.name || primaryNodeTemp?.label || searchId;
-                const candidateOrigin = unwrappedDetails?.details?.origin || unwrappedDetails?.origin || unwrappedDetails?.location || unwrappedDetails?.country || primaryNodeTemp?.origin || "";
-                const candidateGenre = unwrappedDetails?.details?.genre || unwrappedDetails?.genre || unwrappedDetails?.genres || primaryNodeTemp?.genre || "";
-
-                const choice = await confirmDisambiguationChoice(searchId, [{
-                    id: primaryNodeTemp?.id || searchId,
-                    label: candidateLabel,
-                    origin: candidateOrigin,
-                    genre: candidateGenre
-                }]);
-                
-                if (choice === 'cancel' || choice === 'back') {
-                   setIsLoading(false);
-                   isFetchingDetailsRef.current = false;
-                   isHydratingSessionRef.current = false;
-                   return;
-                }
-                if (choice === 'synthesis') {
-                   console.log("[Front Gate Cache] User requested synthesis via Disambiguation. Bypassing cache hit.");
-                   proceedWithCache = false;
-                }
-            }
-
-            if (proceedWithCache && parsedGraph && parsedGraph.nodes && parsedGraph.nodes.length > 0) {
-              const rationaleVal = data.synthesisRationale || parsedGraph.synthesisRationale;
-              if (rationaleVal) {
-                parsedGraph.synthesisRationale = rationaleVal;
-              }
-              const normalizedGraph = applyHumanCasedLabels(normalizeGraphData(parsedGraph), artists);
-              console.log(`[Front Gate Cache] GOLD STANDARD HIT! Bypassing all generation logic. searchId: ${searchId} -> resolvedId: ${resolvedSearchId}, nodes: ${normalizedGraph.nodes.length}`);
-              // Delay setting graph data until details are hydrated
-              // setGraphData(normalizedGraph); // Moved down
-              
-              // 3. Extract the detailsCache string from the same document read
-              let parsedDetails: any = null;
-              if (data.detailsCache) {
-                  try {
-                      parsedDetails = parseDetailsCacheSafely(data.detailsCache);
-                      
-                      const bio = parsedDetails?.summary || parsedDetails?.bio || parsedDetails?.description || parsedDetails?.text || "";
-                      if (bio && bio.length > 5) {
-                         const detailsPayload = {
-                            summary: bio,
-                            imageUrl: parsedDetails?.imageUrl || parsedDetails?.image || "",
-                            details: {
-                               artist: parsedDetails?.details?.artist || parsedDetails?.artist || parsedDetails?.name || data.seedArtists || data.artistId || searchId,
-                               genre: parsedDetails?.details?.genre || parsedDetails?.genre || parsedDetails?.genres || "",
-                               origin: parsedDetails?.details?.origin || parsedDetails?.origin || parsedDetails?.location || parsedDetails?.country || "",
-                               founded: parsedDetails?.details?.founded || parsedDetails?.founded || parsedDetails?.formed || parsedDetails?.year || "",
-                               notableArtists: parsedDetails?.details?.notableArtists || parsedDetails?.notableArtists || []
-                            },
-                            members: parsedDetails?.members || [],
-                            links: parsedDetails?.links || [],
-                            discography: parsedDetails?.discography || [],
-                            tourInfo: parsedDetails?.tourInfo || "",
-                            recommendationReason: parsedDetails?.recommendationReason || parsedDetails?.reason || "",
-                            groundingLinks: parsedDetails?.groundingLinks || [],
-                            youtubeVideoId: typeof parsedDetails?.youtubeVideoId === 'string' && parsedDetails.youtubeVideoId.trim().length === 11
-                                ? parsedDetails.youtubeVideoId.trim()
-                                : undefined,
-                            youtubeSearchQuery: typeof parsedDetails?.youtubeSearchQuery === 'string' && parsedDetails.youtubeSearchQuery.trim().length > 0
-                                ? parsedDetails.youtubeSearchQuery.trim()
-                                : undefined,
-                            tourDates: parsedDetails?.tourDates || [],
-                            tourCachedAt: parsedDetails?.tourCachedAt || "",
-                            synthesisRationale: parsedDetails?.synthesisRationale || normalizedGraph.synthesisRationale || undefined
-                         };
-                          console.log("[Phase 3 Cache Payload – Front Gate]", searchId, JSON.stringify({ youtubeVideoId: detailsPayload.youtubeVideoId, youtubeSearchQuery: detailsPayload.youtubeSearchQuery }));
-                          
-                          const canonicalId = data?.cacheKey || searchId;
-                          const canonicalIdLower = canonicalId.toLowerCase();
-                          const normalizedCanonicalId = normalizeArtistId(canonicalId);
-                          
-                          setDetailsCache(prev => {
-                            const updated = new Map(prev);
-                            updated.set(searchIdLower, detailsPayload);
-                            updated.set(searchId, detailsPayload);
-                            updated.set(normalizeArtistId(searchId), detailsPayload);
-                            updated.set(canonicalIdLower, detailsPayload);
-                            updated.set(canonicalId, detailsPayload);
-                            updated.set(normalizedCanonicalId, detailsPayload);
-                            if (data?.artistId) {
-                              updated.set(data.artistId.toLowerCase(), detailsPayload);
-                              updated.set(normalizeArtistId(data.artistId), detailsPayload);
-                            }
-                            return updated;
-                          });
-                      }
-                  } catch(e) { console.warn("Failed to parse detailsCache", e); }
-              }
-              
-              // 4. Find the primary node and instantly hydrate it with the biography text
-              const primaryNode = normalizedGraph.nodes.find((n: any) => 
-                n.id.toLowerCase() === searchIdLower || 
-                normalizeArtistId(n.id) === normalizeArtistId(searchId) || 
-                isArtistIdMatch(n.id, searchId)
-              ) as any;
-              if (primaryNode) {
-                  let unwrappedDetails = parsedDetails;
-                  if (Array.isArray(unwrappedDetails) && unwrappedDetails.length > 0) {
-                      unwrappedDetails = Array.isArray(unwrappedDetails[0]) ? unwrappedDetails[0][1] : unwrappedDetails[0];
-                  }
-                  const bio = unwrappedDetails?.summary || unwrappedDetails?.bio || unwrappedDetails?.description || unwrappedDetails?.text || primaryNode.bio || primaryNode.summary || "";
-                  const hydratedNode = {
-                      ...primaryNode,
-                      bio: bio,
-                      summary: bio,
-                      imageUrl: unwrappedDetails?.imageUrl || unwrappedDetails?.image || primaryNode.imageUrl || "",
-                      genre: unwrappedDetails?.details?.genre || unwrappedDetails?.genre || unwrappedDetails?.genres || primaryNode.genre || "",
-                      origin: unwrappedDetails?.details?.origin || unwrappedDetails?.origin || unwrappedDetails?.location || unwrappedDetails?.country || primaryNode.origin || "",
-                      founded: unwrappedDetails?.details?.founded || unwrappedDetails?.founded || unwrappedDetails?.formed || unwrappedDetails?.year || primaryNode.founded || "",
-                      isLibrary: true,
-                      type: 'artist' as const,
-                      group: 0
-                  };
-                  
-                  const nodeIndex = normalizedGraph.nodes.findIndex((n: any) => n.id === hydratedNode.id);
-                  if (nodeIndex !== -1) {
-                      normalizedGraph.nodes[nodeIndex] = hydratedNode;
-                  }
-                  
-                  if (!currentProjectIdRef.current || isGuest) {
-                    setSelectedNode(hydratedNode);
-                    setActiveNodeIds([hydratedNode.id]);
-                  }
-              }
-              
+          let parsedDetails: any = null;
+          if (data.detailsCache) {
               try {
-                await batchHydrateDetailsCache(normalizedGraph.nodes, normalizedGraph.links);
-              } catch (e) {
-                console.warn("[Front Gate Cache] Failed batch hydration of nodes:", e);
-              }
-              
-              artistList.forEach(name => {
-                approvedSeedsRef.current.add(normalizeArtistId(name));
-              });
-
-              // Phase 3 Hydration Guard
-              if (currentProjectIdRef.current && user && !isGuest) {
-                const projectPath = `users/${user.uid}/projects/${currentProjectIdRef.current}`;
-                try {
-                  const seeds = artists.split('::').map(a => normalizeArtistId(a.trim()));
-                  const hoistedActiveNodes: string[] = [];
-                  
-                  // 1. Hoist the exact primary node first if resolved
-                  if (primaryNode) {
-                    hoistedActiveNodes.push(primaryNode.id);
+                  parsedDetails = parseDetailsCacheSafely(data.detailsCache);
+                  const bio = parsedDetails?.summary || parsedDetails?.bio || parsedDetails?.description || parsedDetails?.text || "";
+                  if (bio && bio.length > 5) {
+                     const detailsPayload = {
+                        summary: bio,
+                        imageUrl: parsedDetails?.imageUrl || parsedDetails?.image || "",
+                        details: {
+                           artist: parsedDetails?.details?.artist || parsedDetails?.artist || parsedDetails?.name || data.seedArtists || data.artistId || searchId,
+                           genre: parsedDetails?.details?.genre || parsedDetails?.genre || parsedDetails?.genres || "",
+                           origin: parsedDetails?.details?.origin || parsedDetails?.origin || parsedDetails?.location || parsedDetails?.country || "",
+                           founded: parsedDetails?.details?.founded || parsedDetails?.founded || parsedDetails?.formed || parsedDetails?.year || "",
+                           notableArtists: parsedDetails?.details?.notableArtists || parsedDetails?.notableArtists || []
+                        },
+                        members: parsedDetails?.members || [],
+                        links: parsedDetails?.links || [],
+                        discography: parsedDetails?.discography || [],
+                        tourInfo: parsedDetails?.tourInfo || "",
+                        recommendationReason: parsedDetails?.recommendationReason || parsedDetails?.reason || "",
+                        groundingLinks: parsedDetails?.groundingLinks || [],
+                        youtubeVideoId: typeof parsedDetails?.youtubeVideoId === 'string' && parsedDetails.youtubeVideoId.trim().length === 11 ? parsedDetails.youtubeVideoId.trim() : undefined,
+                        youtubeSearchQuery: typeof parsedDetails?.youtubeSearchQuery === 'string' && parsedDetails.youtubeSearchQuery.trim().length > 0 ? parsedDetails.youtubeSearchQuery.trim() : undefined,
+                        tourDates: parsedDetails?.tourDates || [],
+                        tourCachedAt: parsedDetails?.tourCachedAt || "",
+                        synthesisRationale: parsedDetails?.synthesisRationale || normalizedGraph.synthesisRationale || undefined
+                     };
+                      
+                      const canonicalId = data?.cacheKey || searchId;
+                      const canonicalIdLower = canonicalId.toLowerCase();
+                      const normalizedCanonicalId = normalizeArtistId(canonicalId);
+                      
+                      setDetailsCache(prev => {
+                        const updated = new Map(prev);
+                        updated.set(searchIdLower, detailsPayload);
+                        updated.set(searchId, detailsPayload);
+                        updated.set(normalizeArtistId(searchId), detailsPayload);
+                        updated.set(canonicalIdLower, detailsPayload);
+                        updated.set(canonicalId, detailsPayload);
+                        updated.set(normalizedCanonicalId, detailsPayload);
+                        if (data?.artistId) {
+                          updated.set(data.artistId.toLowerCase(), detailsPayload);
+                          updated.set(normalizeArtistId(data.artistId), detailsPayload);
+                        }
+                        return updated;
+                      });
                   }
-                  
-                  // 2. Identify any other canonical seed nodes from the graph and hoist them
-                  normalizedGraph.nodes.forEach((n: any) => {
-                    if (isNodeInSeedList(n.id, seeds) && n.id !== primaryNode?.id) {
-                      hoistedActiveNodes.push(n.id);
-                    }
-                  });
-                  
-                  // 3. Append all remaining non-seed nodes
-                  normalizedGraph.nodes.forEach((n: any) => {
-                    if (!hoistedActiveNodes.includes(n.id)) {
-                      hoistedActiveNodes.push(n.id);
-                    }
-                  });
-
-                  await updateDoc(doc(db, projectPath), {
-                    graphData: JSON.stringify(normalizedGraph),
-                    activeNodes: hoistedActiveNodes,
-                    seedArtists: artists,
-                    detailsCache: JSON.stringify(Array.from(detailsCacheRef.current.entries())),
-                    status: 'completed',
-                    generationType: 'Direct Hit',
-                    updatedAt: serverTimestamp()
-                  });
-                  console.log("[Phase 3 Hydration Guard] Updated project doc via Cache Hit. Awaiting onSnapshot.");
-                } catch (e) {
-                  console.error("Failed to update project doc for hydration", e);
-                }
-              } else {
-                setGraphData(normalizedGraph);
-                setSeedArtists(artists);
+              } catch(e) { }
+          }
+          
+          const primaryNode = normalizedGraph.nodes.find((n: any) => 
+            n.id.toLowerCase() === searchIdLower || 
+            normalizeArtistId(n.id) === normalizeArtistId(searchId) || 
+            isArtistIdMatch(n.id, searchId)
+          ) as any;
+          
+          if (primaryNode) {
+              let unwrappedDetails = parsedDetails;
+              if (Array.isArray(unwrappedDetails) && unwrappedDetails.length > 0) {
+                  unwrappedDetails = Array.isArray(unwrappedDetails[0]) ? unwrappedDetails[0][1] : unwrappedDetails[0];
               }
-
-              setIsLoading(false);
-              isFetchingDetailsRef.current = false;
-              isHydratingSessionRef.current = false;
+              const bio = unwrappedDetails?.summary || unwrappedDetails?.bio || unwrappedDetails?.description || unwrappedDetails?.text || primaryNode.bio || primaryNode.summary || "";
+              const hydratedNode = {
+                  ...primaryNode,
+                  bio: bio,
+                  summary: bio,
+                  imageUrl: unwrappedDetails?.imageUrl || unwrappedDetails?.image || primaryNode.imageUrl || "",
+                  genre: unwrappedDetails?.details?.genre || unwrappedDetails?.genre || unwrappedDetails?.genres || primaryNode.genre || "",
+                  origin: unwrappedDetails?.details?.origin || unwrappedDetails?.origin || unwrappedDetails?.location || unwrappedDetails?.country || primaryNode.origin || "",
+                  founded: unwrappedDetails?.details?.founded || unwrappedDetails?.founded || unwrappedDetails?.formed || unwrappedDetails?.year || primaryNode.founded || "",
+                  isLibrary: true,
+                  type: 'artist' as const,
+                  group: 0
+              };
               
-              if (!validation.isFullyQualified) {
-                console.log('[Front Gate Cache] Cache doc found but not fully qualified. Background revalidation queued.');
-              } else if (data?.hasUniqueSpiderweb) {
-                showCacheToast();
+              const nodeIndex = normalizedGraph.nodes.findIndex((n: any) => n.id === hydratedNode.id);
+              if (nodeIndex !== -1) {
+                  normalizedGraph.nodes[nodeIndex] = hydratedNode;
               }
-              return;
-            }
-          } else {
-            console.log(`[Front Gate Cache] Cache doc found for "${searchId}" but failed strict validation. Intercepting for self-healing.`);
-            setIsLoading(true);
-            
-            let parsedGraph = null;
+              
+              if (!currentProjectIdRef.current || isGuest) {
+                setSelectedNode(hydratedNode);
+                setActiveNodeIds([hydratedNode.id]);
+              }
+          }
+          
+          try { await batchHydrateDetailsCache(normalizedGraph.nodes, normalizedGraph.links); } catch (e) {}
+          
+          artistList.forEach(name => { approvedSeedsRef.current.add(normalizeArtistId(name)); });
+
+          if (currentProjectIdRef.current && user && !isGuest) {
+            const projectPath = `users/${user.uid}/projects/${currentProjectIdRef.current}`;
             try {
-              parsedGraph = typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData;
-            } catch (e) {}
-            if (parsedGraph && parsedGraph.nodes && parsedGraph.nodes.length > 0) {
-              const normalizedGraph = applyHumanCasedLabels(normalizeGraphData(parsedGraph), artists);
-              normalizedGraph.nodes = normalizedGraph.nodes.map((n: any) => {
-                if (n.type === 'artist' && (normalizeArtistId(n.id) === normalizeArtistId(searchId) || n.id.toLowerCase() === searchIdLower || isArtistIdMatch(n.id, searchId))) {
-                  return { ...n, isPending: true };
-                }
-                return n;
+              const seeds = artists.split('::').map(a => normalizeArtistId(a.trim()));
+              const hoistedActiveNodes: string[] = [];
+              if (primaryNode) hoistedActiveNodes.push(primaryNode.id);
+              normalizedGraph.nodes.forEach((n: any) => { if (isNodeInSeedList(n.id, seeds) && n.id !== primaryNode?.id) hoistedActiveNodes.push(n.id); });
+              normalizedGraph.nodes.forEach((n: any) => { if (!hoistedActiveNodes.includes(n.id)) hoistedActiveNodes.push(n.id); });
+
+              await updateDoc(doc(db, projectPath), {
+                graphData: JSON.stringify(normalizedGraph),
+                activeNodes: hoistedActiveNodes,
+                seedArtists: artists,
+                detailsCache: JSON.stringify(Array.from(detailsCacheRef.current.entries())),
+                status: 'completed',
+                generationType: 'Direct Hit',
+                updatedAt: serverTimestamp()
               });
-              setGraphData(normalizedGraph);
-              setActiveNodeIds([searchId]);
-            }
-
-            let confirmed: string | false | 'back' | true = true;
-            if (!bypassTokenConfirmation) {
-              confirmed = await confirmTokenUsage('cache_upgrade', [], [searchId], []);
-            }
-            if (confirmed) {
-              console.log(`[Front Gate Cache] User confirmed cache upgrade. Overwriting old entry.`);
-              bypassToken = true;
-              // Fall through to live generation logic (which will generate and write back)
-            } else {
-              console.log(`[Front Gate Cache] User cancelled cache upgrade. Aborting generation.`);
-              isHydratingSessionRef.current = false;
-              setIsLoading(false);
-              isProjectLoadingRef.current = false;
-
-              const isProjectEmpty = !graphData || !graphData.nodes || graphData.nodes.length === 0;
-              if (user && (freshlyMintedProjectId || isProjectEmpty)) {
-                const idToDelete = freshlyMintedProjectId || currentProjectId;
-                if (idToDelete) {
-                  deleteDoc(doc(db, 'users', user.uid, 'projects', idToDelete))
-                    .catch(err => console.error("Failed to GC orphaned project:", err));
-                  setCurrentProjectId(null);
-                  currentProjectIdRef.current = null;
-                  navigate('/dashboard', true);
-                }
-              }
-
-              return;
-            }
+            } catch (e) { }
+          } else {
+            setGraphData(normalizedGraph);
+            setSeedArtists(artists);
           }
-        }
-      } catch (err) {
-        console.warn("[Front Gate Cache] Read failed, falling through:", err);
-      }
-    }
 
-    // ─── STAGE 0: UNIFIED DISAMBIGUATION GATE & TOKEN GUARD ────────────────────
-    let resolvedArtistSeeds = [...artistList];
-    let activeDisambiguationHints: Record<string, string> = disambiguationHints || {};
-    let activeDisambiguationGenres: Record<string, string> = disambiguationGenres || {};
-    let hasDisambiguated = false;
-
-    if (!bypassTokenConfirmation && !bypassDisambiguation) {
-      if (!sessionTokenApprovedRef.current) {
-        const confirmed = await confirmTokenUsage(isLiveSynthesisTemp ? 'live_synthesis' : 'generation', [], artistList, undefined, false);
-        if (!confirmed || confirmed === 'back') {
-          sessionTokenApprovedRef.current = false;
-          setActiveNodeIds(prevActiveNodeIds);
-          setSeedArtists(prevSeedArtists);
           setIsLoading(false);
+          isFetchingDetailsRef.current = false;
           isHydratingSessionRef.current = false;
-          isProjectLoadingRef.current = false;
-
-          const isProjectEmpty = !graphData || !graphData.nodes || graphData.nodes.length === 0;
-          if (user && (freshlyMintedProjectId || isProjectEmpty)) {
-            const idToDelete = freshlyMintedProjectId || currentProjectId;
-            if (idToDelete) {
-              deleteDoc(doc(db, 'users', user.uid, 'projects', idToDelete))
-                .catch(err => console.error("Failed to GC orphaned project:", err));
-              setCurrentProjectId(null);
-              currentProjectIdRef.current = null;
-              navigate('/dashboard', true);
-            }
-          }
-
+          if (data?.hasUniqueSpiderweb) showCacheToast();
           return;
-        }
-        sessionTokenApprovedRef.current = true;
       }
-
-      const cacheCandidatesPerSeed = await Promise.all(artistList.map(async (searchId, i) => {
-        const rawInput = artists.split('::').map(s => s.trim()).filter(Boolean)[i] || searchId;
-        const cacheCandidates = await searchDisambiguationCandidates(searchId);
-        
-        let predictedOrigin = '';
-        let genre = '';
-        let isKnownCacheHit = false;
-        let candidateId = undefined;
-        let isCorrected = false;
-        let correctedQuery = undefined;
-        let originalQuery = undefined;
-
-        if (cacheCandidates.length > 0) {
-          predictedOrigin = cacheCandidates[0].origin || '';
-          genre = cacheCandidates[0].genre || '';
-          isKnownCacheHit = true;
-          candidateId = cacheCandidates[0].id;
-        } else {
-          try {
-            let currentPassword = sessionStorage.getItem('zcene_api_password') || undefined;
-            const validate = httpsCallable(functions, 'validateSeedOriginCallable');
-            const result = await validate({ seed: rawInput, ...(currentPassword && { password: currentPassword }) });
-            const data = result.data as any;
-            if (data && data.isValid) {
-              predictedOrigin = data.origin || '';
-              genre = data.genre || '';
-              
-              if (data.correctedInput && data.id && data.id !== rawInput) {
-                isCorrected = true;
-                correctedQuery = data.id;
-                originalQuery = rawInput;
-                
-                // Rule 11: Post-Validation Cache Intercept
-                const interceptCandidates = await searchDisambiguationCandidates(data.id);
-                if (interceptCandidates.length > 0) {
-                  console.log(`[Rule 11] Post-Validation Cache Intercept: Typo "${rawInput}" corrected to "${data.id}" which exists in cache! Upgrading to cache hit.`);
-                  predictedOrigin = interceptCandidates[0].origin || predictedOrigin;
-                  genre = interceptCandidates[0].genre || genre;
-                  isKnownCacheHit = true;
-                  candidateId = interceptCandidates[0].id;
-                }
-              }
-            }
-          } catch (e: any) {
-             console.warn("Origin validation failed:", e);
-          }
-        }
-        
-        return {
-          id: searchId,
-          query: rawInput,
-          predictedOrigin,
-          genre,
-          isKnownCacheHit,
-          candidateId,
-          isCorrected,
-          correctedQuery,
-          originalQuery
-        };
-      }));
-
-      setIsLoading(false);
-      isHydratingSessionRef.current = false;
-      isProjectLoadingRef.current = false;
-
-      const confirmed = await new Promise<boolean>((resolve) => {
-        setConsolidatedValidationDialog({
-          isOpen: true,
-          seeds: cacheCandidatesPerSeed,
-          onConfirm: () => { setConsolidatedValidationDialog(null); resolve(true); },
-          onCancel: () => { setConsolidatedValidationDialog(null); resolve(false); }
-        });
-      });
-
-      if (!confirmed) {
-        sessionTokenApprovedRef.current = false;
-        setActiveNodeIds(prevActiveNodeIds);
-        setSeedArtists(prevSeedArtists);
-
-        const isProjectEmpty = !graphData || !graphData.nodes || graphData.nodes.length === 0;
-        if (user && (freshlyMintedProjectId || isProjectEmpty)) {
-          const idToDelete = freshlyMintedProjectId || currentProjectId;
-          if (idToDelete) {
-            deleteDoc(doc(db, 'users', user.uid, 'projects', idToDelete))
-              .catch(err => console.error("Failed to GC orphaned project:", err));
-            setCurrentProjectId(null);
-            currentProjectIdRef.current = null;
-            navigate('/dashboard', true);
-          }
-        }
-
-        return;
-      }
+      
+      // Fall through to API Live Generation
+      let resolvedArtistSeeds = [...artistList];
+      let activeDisambiguationHints: Record<string, string> = disambiguationHints || {};
+      let activeDisambiguationGenres: Record<string, string> = disambiguationGenres || {};
+      let hasDisambiguated = false;
 
       for (let i = 0; i < artistList.length; i++) {
         const searchId = artistList[i];
-        const preFlightSeed = cacheCandidatesPerSeed[i];
-        const rawCountryName = preFlightSeed.predictedOrigin;
-
-        if (rawCountryName) {
-          if (preFlightSeed.isKnownCacheHit && preFlightSeed.predictedOrigin === rawCountryName && preFlightSeed.candidateId) {
-            resolvedArtistSeeds[i] = normalizeArtistId(preFlightSeed.candidateId);
-          } else {
-            const seedToUse = preFlightSeed.isCorrected && preFlightSeed.correctedQuery ? preFlightSeed.correctedQuery : searchId;
-            resolvedArtistSeeds[i] = seedToUse;
-            activeDisambiguationHints[seedToUse] = rawCountryName;
-            if (preFlightSeed.genre) {
-              activeDisambiguationGenres[seedToUse] = preFlightSeed.genre;
+        if (cacheCandidatesPerSeed.length > 0) {
+            const preFlightSeed = cacheCandidatesPerSeed[i];
+            const rawCountryName = preFlightSeed.predictedOrigin;
+            
+            if (rawCountryName) {
+              if (preFlightSeed.isKnownCacheHit && preFlightSeed.predictedOrigin === rawCountryName && preFlightSeed.candidateId) {
+                resolvedArtistSeeds[i] = normalizeArtistId(preFlightSeed.candidateId);
+              } else {
+                const seedToUse = preFlightSeed.isCorrected && preFlightSeed.correctedQuery ? preFlightSeed.correctedQuery : searchId;
+                resolvedArtistSeeds[i] = seedToUse;
+                activeDisambiguationHints[seedToUse] = rawCountryName;
+                if (preFlightSeed.genre) activeDisambiguationGenres[seedToUse] = preFlightSeed.genre;
+              }
+              hasDisambiguated = true;
             }
-          }
-          hasDisambiguated = true;
         }
       }
 
@@ -3540,16 +3341,13 @@ const App: React.FC = () => {
           (activeDiscoveryFilters.additionalInstructions && activeDiscoveryFilters.additionalInstructions.trim().length > 0)
         );
         const isCustomNext = resolvedArtistSeeds.length > 1 || hasActiveFiltersNext;
-        
-        // Rule 11 Fix: If all resolved seeds are known cache hits, do not skip cache lookup in the next pass
-        const allKnownCacheHits = cacheCandidatesPerSeed.every(s => s.isKnownCacheHit && s.predictedOrigin === s.predictedOrigin);
+        const allKnownCacheHits = cacheCandidatesPerSeed.length > 0 && cacheCandidatesPerSeed.every(s => s.isKnownCacheHit);
         const nextSkipCacheLookup = !allKnownCacheHits;
         
         handleGenerateGraph(newArtistsStr, isRegeneration, graphToEnhance, nextSkipCacheLookup, !isCustomNext, overrideFilters, activeDisambiguationHints, true);
         return;
       }
-    }
-    // AbortController is now initialized at the start of the function.
+// AbortController is now initialized at the start of the function.
     setActiveNodeIds(prev => {
       const currentActiveIds = new Set(prev.map(id => id.toLowerCase()));
       const nextActive = [...prev];
@@ -7630,7 +7428,6 @@ const App: React.FC = () => {
     
     // 5. Clear active Cloud Run jobs & modals
     setActiveJobId(null);
-    setDisambiguationDialog(null);
   }, []);
 
   const formattedGraphData = useMemo(() => {
@@ -7874,8 +7671,6 @@ const App: React.FC = () => {
               setIsStackDialogOpen={setIsStackDialogOpen}
               isMenuOpen={isMenuOpen}
               setIsMenuOpen={setIsMenuOpen}
-              disambiguationDialog={disambiguationDialog}
-              onSelectDisambiguation={(choice) => disambiguationDialog?.onSelect(choice)}
               onCoordinatesSettled={handleCoordinatesSettled}
             />
           )}
@@ -8125,7 +7920,7 @@ const App: React.FC = () => {
       <ConsolidatedValidationModal
         isOpen={!!consolidatedValidationDialog?.isOpen}
         seeds={consolidatedValidationDialog?.seeds || []}
-        onConfirm={(origins) => consolidatedValidationDialog?.onConfirm(origins)}
+        onConfirm={() => consolidatedValidationDialog?.onConfirm()}
         onCancel={() => consolidatedValidationDialog?.onCancel()}
       />
 
