@@ -42,9 +42,9 @@ const ZceneEmptyState: React.FC<{ onNavigate: (view: View) => void }> = ({ onNav
                 <HelpIcon className="!text-[18px]" />
             </button>
         </div>
-        <div className="mt-3 text-zinc-400 text-xs space-y-4">
+        <div className="mt-3 text-zinc-400 text-sm space-y-4">
             <p className="text-center px-4">Start with a few of your favourite artists, and Zcene will map how they connect across genres, labels, origins, and scenes.</p>
-            <div className="text-left bg-zinc-800/30 p-5 rounded-none border border-zinc-700/50 mx-4 text-xs">
+            <div className="text-left bg-zinc-800/30 p-5 rounded-none border border-zinc-700/50 mx-4 text-sm">
                 <p className="font-medium text-zinc-200 mb-2">How it works</p>
                 <ol className="list-decimal list-inside space-y-1 text-zinc-400">
                     <li>Add 1–5 artists (or import your library).</li>
@@ -1521,7 +1521,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     <div className="flex flex-col items-center justify-center text-center p-6 bg-zinc-900/50 rounded-none border border-zinc-800/80">
                                         <span className="material-symbols-outlined !text-4xl text-primary/50 mb-3">lock</span>
                                         <h5 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-200 mb-2">DEEPER CONNECTION</h5>
-                                        <p className="text-xs text-zinc-400 leading-relaxed mb-4">
+                                        <p className="text-sm text-zinc-400 leading-relaxed max-w-xs mx-auto mb-4">
                                             Unlock our advanced AI assistant features to map deeper relationships across your music canvas.
                                         </p>
                                         {user ? (

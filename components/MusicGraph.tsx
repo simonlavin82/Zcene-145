@@ -1615,7 +1615,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 {/* Zone 1: Spiderweb DNA (Narrative First) */}
                 {hoveredLink.dna && (
                     <div className="shrink-0">
-                        <p className={`text-xs leading-4 font-normal text-zinc-400 m-0${isSmallScreen && !isCardExpanded ? ' line-clamp-3' : ''}`}>
+                        <p className={`text-sm leading-relaxed font-normal text-zinc-400 m-0${isSmallScreen && !isCardExpanded ? ' line-clamp-4' : ''}`}>
                             {(() => {
                                 let cleanedDna = hoveredLink.dna
                                     ?.replace(/\btechnicolor\b/gi, 'technicolour')
@@ -1644,7 +1644,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     <div className={`flex flex-col gap-1 overflow-y-auto ${hoveredLink.dna ? "mt-1 pt-1.5" : ""}`}>
                         {hoveredLink.connections && hoveredLink.connections.length > 0 ? (
                             (!isSmallScreen || isCardExpanded ? hoveredLink.connections : hoveredLink.connections.slice(0, 3)).map((c, i) => (
-                                <div key={i} className="text-xs font-medium text-zinc-300 leading-tight flex gap-1">
+                                <div key={i} className="text-sm font-medium text-zinc-300 leading-tight flex gap-1">
                                     <span className="text-zinc-500 font-normal shrink-0">•</span>
                                     <span>
                                         <span className="text-zinc-400 font-normal">{c.context}</span>{" "}
@@ -1653,7 +1653,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                                 </div>
                             ))
                         ) : hoveredLink.fallbackMessage ? (
-                            <div className="text-xs italic text-zinc-500 font-normal leading-normal shrink-0">
+                            <div className="text-sm italic text-zinc-500 font-normal leading-normal shrink-0">
                                 {hoveredLink.fallbackMessage}
                             </div>
                         ) : null}
