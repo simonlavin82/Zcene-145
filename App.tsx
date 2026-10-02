@@ -1482,8 +1482,8 @@ const App: React.FC = () => {
             }
           } catch (e) {}
         }
-        // Fall back to detailsCache for label/origin/genre enrichment ONLY if topology exists
-        if (hasTopology && data.detailsCache) {
+        // Fall back to detailsCache for label/origin/genre enrichment (works for both graphs and stubs)
+        if (data.detailsCache) {
           const parsed = parseDetailsCacheSafely(data.detailsCache);
           if (parsed) {
             labelVal = parsed?.details?.artist || parsed?.name || labelVal;
@@ -1492,9 +1492,9 @@ const App: React.FC = () => {
           }
         }
 
-        if (!hasTopology) {
-          console.log(`[Disambiguation] Skipping "${docId}" — Artist Cache Stub (no topology). Will proceed to fresh synthesis.`);
-          continue;
+        const isStub = !hasTopology;
+        if (isStub) {
+          console.log(`[Disambiguation] Processing "${docId}" as Artist Cache Stub (no topology).`);
         }
         
         const candidateKey = normalizeArtistId(docId);
@@ -1503,7 +1503,8 @@ const App: React.FC = () => {
             id: docId,
             label: cleanArtistDisplayName(labelVal),
             origin: originVal,
-            genre: genreVal
+            genre: genreVal,
+            isStub: isStub
           });
         }
       }
@@ -2957,7 +2958,7 @@ const App: React.FC = () => {
             }
           }
 
-          // If not found in DB cache, use API
+          // Phase 1 (Strict DB Cache): check disambiguation fallback
           if (!isKnownCacheHit) {
             const cacheCandidates = await searchDisambiguationCandidates(searchId);
             if (cacheCandidates.length > 0) {
@@ -2965,34 +2966,11 @@ const App: React.FC = () => {
               genre = cacheCandidates[0].genre || '';
               isKnownCacheHit = true;
               candidateId = cacheCandidates[0].id;
-            } else {
-              try {
-                let currentPassword = sessionStorage.getItem('zcene_api_password') || undefined;
-                const validate = httpsCallable(functions, 'validateSeedOriginCallable');
-                const result = await validate({ seed: rawInput, ...(currentPassword && { password: currentPassword }) });
-                const data = result.data as any;
-                if (data && data.isValid) {
-                  predictedOrigin = data.origin || '';
-                  genre = data.genre || '';
-                  
-                  if (data.correctedInput && data.id && data.id !== rawInput) {
-                    isCorrected = true;
-                    correctedQuery = data.id;
-                    originalQuery = rawInput;
-                    
-                    const interceptCandidates = await searchDisambiguationCandidates(data.id);
-                    if (interceptCandidates.length > 0) {
-                      predictedOrigin = interceptCandidates[0].origin || predictedOrigin;
-                      genre = interceptCandidates[0].genre || genre;
-                      isKnownCacheHit = true;
-                      candidateId = interceptCandidates[0].id;
-                    }
-                  }
-                }
-              } catch (e) {
-                 console.warn("Origin validation failed:", e);
+              if (cacheCandidates[0].isStub) {
+                needsCacheUpgrade = true;
               }
             }
+            // TOTAL CACHE MISS: Leave as !isKnownCacheHit. API lookup deferred to Phase 1.5.
           }
           
           return {
@@ -3012,6 +2990,54 @@ const App: React.FC = () => {
       setIsLoading(false);
       isHydratingSessionRef.current = false;
       isProjectLoadingRef.current = false;
+
+      // Phase 1.5: Total Cache Miss Branch (API Lookup with Early Token Gate)
+      if (!bypassDisambiguation && !skipCacheLookup && cacheCandidatesPerSeed.some(s => !s.isKnownCacheHit)) {
+        // Trigger Password/Token Gate Early for API Authorization
+        if (!bypassTokenConfirmation && !sessionTokenApprovedRef.current) {
+          const confirmedToken = await confirmTokenUsage('live_synthesis', [], artistList, undefined, false);
+          if (!confirmedToken || confirmedToken === 'back') {
+            sessionTokenApprovedRef.current = false;
+            setActiveNodeIds(prevActiveNodeIds);
+            setSeedArtists(prevSeedArtists);
+            return;
+          }
+          sessionTokenApprovedRef.current = true;
+        }
+
+        // Execute API Lookup for misses now that we have authorization
+        let currentPassword = sessionStorage.getItem('zcene_api_password') || undefined;
+        const validate = httpsCallable(functions, 'validateSeedOriginCallable');
+
+        for (let s of cacheCandidatesPerSeed) {
+          if (!s.isKnownCacheHit) {
+            try {
+              const result = await validate({ seed: s.query, ...(currentPassword && { password: currentPassword }) });
+              const data = result.data as any;
+              if (data && data.isValid) {
+                s.predictedOrigin = data.origin || '';
+                s.genre = data.genre || '';
+                
+                if (data.correctedInput && data.id && data.id !== s.query) {
+                  s.isCorrected = true;
+                  s.correctedQuery = data.id;
+                  s.originalQuery = s.query;
+                  
+                  const interceptCandidates = await searchDisambiguationCandidates(data.id);
+                  if (interceptCandidates.length > 0) {
+                    s.predictedOrigin = interceptCandidates[0].origin || s.predictedOrigin;
+                    s.genre = interceptCandidates[0].genre || s.genre;
+                    s.isKnownCacheHit = true;
+                    s.candidateId = interceptCandidates[0].id;
+                  }
+                }
+              }
+            } catch (e) {
+               console.warn("Origin validation failed for " + s.query + ":", e);
+            }
+          }
+        }
+      }
 
       // 2. Visual Confirmation (ConsolidatedValidationModal)
       if (!bypassDisambiguation && cacheCandidatesPerSeed.length > 0) {

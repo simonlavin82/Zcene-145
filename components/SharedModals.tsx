@@ -718,6 +718,7 @@ export interface DisambiguationCandidate {
   label: string;
   origin: string;
   genre: string;
+  isStub?: boolean;
 }
 
 export interface DisambiguationModalProps {
