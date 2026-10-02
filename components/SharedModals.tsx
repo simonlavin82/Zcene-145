@@ -1385,39 +1385,22 @@ export interface PreFlightSeed {
 export interface ConsolidatedValidationModalProps {
   isOpen: boolean;
   seeds: PreFlightSeed[];
-  onConfirm: (finalOrigins: Record<string, string>) => void;
+  onConfirm: () => void;
   onCancel: () => void;
 }
 
 export function ConsolidatedValidationModal({ isOpen, seeds, onConfirm, onCancel }: ConsolidatedValidationModalProps) {
-  const [origins, setOrigins] = useState<Record<string, string>>(() => {
-    const initial: Record<string, string> = {};
-    seeds.forEach(s => initial[s.id] = s.predictedOrigin);
-    return initial;
-  });
-
-  React.useEffect(() => {
-    setOrigins(prev => {
-      const next: Record<string, string> = {};
-      let changed = false;
-      seeds.forEach(s => {
-        next[s.id] = prev[s.id] !== undefined ? prev[s.id] : s.predictedOrigin;
-        if (prev[s.id] === undefined) changed = true;
-      });
-      return changed ? next : prev;
-    });
-  }, [seeds]);
 
   if (!isOpen) return null;
 
   return (
     <ModalBackdrop onClick={onCancel} className="z-[1100]">
       <ModalContainer className="!overflow-visible relative z-[1150]">
-        <form onSubmit={e => { e.preventDefault(); onConfirm(origins); }} className="flex flex-col w-full" onClick={e => e.stopPropagation()}>
+        <form onSubmit={e => { e.preventDefault(); onConfirm(); }} className="flex flex-col w-full" onClick={e => e.stopPropagation()}>
           <ModalHeader>
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-primary !text-[18px]">checklist</span>
-              <h3 className="text-lg font-medium text-white">Confirm Your Seeds</h3>
+              <h3 className="text-lg font-medium text-white">Confirm Your Artists</h3>
             </div>
             <button type="button" onClick={onCancel} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none">
               <span className="material-symbols-outlined !text-[18px]">close</span>
@@ -1430,36 +1413,34 @@ export function ConsolidatedValidationModal({ isOpen, seeds, onConfirm, onCancel
             <div className="flex flex-col gap-4">
               {seeds.map(seed => (
                 <div key={seed.id} className="flex flex-col gap-2 p-3 bg-zinc-900/50 border border-zinc-700/50 rounded-xl">
-                  <div className="flex items-center justify-between">
-                    <div className="flex flex-col">
+                  <div className="flex flex-col">
+                    <div className="flex items-center gap-2">
                       <span className="text-white font-medium text-base truncate">
                         {seed.isCorrected && seed.correctedQuery ? seed.correctedQuery : seed.query}
                       </span>
-                      {seed.genre && (
-                        <span className="text-xs text-zinc-400 font-light truncate">{seed.genre}</span>
-                      )}
-                      {seed.isCorrected && seed.originalQuery && (
-                        <span className="text-[10px] text-amber-500/80 font-medium truncate mt-0.5">
-                          Auto-corrected from "{seed.originalQuery}"
-                        </span>
+                      {seed.isKnownCacheHit && (
+                        <span className="text-[9px] uppercase tracking-wider text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded-full font-semibold">CACHE HIT</span>
                       )}
                     </div>
-                    {seed.isKnownCacheHit && (
-                      <span className="text-[10px] uppercase tracking-wider text-primary/80 bg-primary/10 px-2 py-0.5 rounded-full font-semibold">Cache Hit</span>
+                    
+                    <span className="text-xs text-zinc-400 font-light truncate">
+                      {seed.predictedOrigin || 'Unknown Origin'}{seed.genre ? ` • ${seed.genre}` : ''}
+                    </span>
+                    
+                    {seed.isCorrected && seed.originalQuery && (
+                      <span className="text-[10px] text-amber-500/80 font-medium truncate mt-0.5">
+                        Auto-corrected from "{seed.originalQuery}"
+                      </span>
                     )}
                   </div>
                   {(!seed.predictedOrigin || seed.predictedOrigin.trim() === '') && (
-                    <div className="bg-amber-950/30 border border-amber-900/50 rounded-lg p-2.5 mb-1 flex items-start gap-2">
+                    <div className="bg-amber-950/30 border border-amber-900/50 rounded-lg p-2.5 mt-1 flex items-start gap-2">
                       <span className="material-symbols-outlined text-amber-500 !text-[16px] mt-0.5">warning</span>
                       <p className="text-xs text-amber-200/90 leading-relaxed">
-                        We couldn't confidently locate this artist. Please assign an origin manually.
+                        We couldn't confidently locate this artist.
                       </p>
                     </div>
                   )}
-                  <CountryFilterDropdown 
-                    value={origins[seed.id] || ''} 
-                    onChange={v => setOrigins(prev => ({ ...prev, [seed.id]: v }))} 
-                  />
                 </div>
               ))}
             </div>

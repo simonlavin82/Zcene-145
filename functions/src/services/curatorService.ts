@@ -1478,6 +1478,8 @@ export const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed infor
     
     Extract the 11-character YouTube video ID directly from the URLs provided in the EXTERNAL SEARCH CONTEXT. Do not hallucinate URLs. If you cannot find a verified active video ID, or if the search results do not show the full URL, you MUST return null. Never guess or hallucinate a video ID.
     
+    NEGATIVE CONSTRAINT: NEVER use em-dashes (—) or long hyphens for dramatic effect or clause separation. Use standard editorial punctuation.
+    
     CRITICAL OUTPUT REQUIREMENTS (STRICTLY ENFORCED):
     1. You MUST respond with a single, valid JSON object matching the schema below. Do NOT write any conversational text or prose outside the JSON.
     2. Do NOT include markdown code fences (do NOT wrap the response in \`\`\`json ... \`\`\`). Output raw JSON directly.

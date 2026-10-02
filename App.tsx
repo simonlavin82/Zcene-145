@@ -3480,16 +3480,16 @@ const App: React.FC = () => {
       isHydratingSessionRef.current = false;
       isProjectLoadingRef.current = false;
 
-      const finalOrigins = await new Promise<Record<string, string> | null>((resolve) => {
+      const confirmed = await new Promise<boolean>((resolve) => {
         setConsolidatedValidationDialog({
           isOpen: true,
           seeds: cacheCandidatesPerSeed,
-          onConfirm: (origins) => { setConsolidatedValidationDialog(null); resolve(origins); },
-          onCancel: () => { setConsolidatedValidationDialog(null); resolve(null); }
+          onConfirm: () => { setConsolidatedValidationDialog(null); resolve(true); },
+          onCancel: () => { setConsolidatedValidationDialog(null); resolve(false); }
         });
       });
 
-      if (!finalOrigins) {
+      if (!confirmed) {
         sessionTokenApprovedRef.current = false;
         setActiveNodeIds(prevActiveNodeIds);
         setSeedArtists(prevSeedArtists);
@@ -3511,8 +3511,8 @@ const App: React.FC = () => {
 
       for (let i = 0; i < artistList.length; i++) {
         const searchId = artistList[i];
-        const rawCountryName = finalOrigins[searchId];
         const preFlightSeed = cacheCandidatesPerSeed[i];
+        const rawCountryName = preFlightSeed.predictedOrigin;
 
         if (rawCountryName) {
           if (preFlightSeed.isKnownCacheHit && preFlightSeed.predictedOrigin === rawCountryName && preFlightSeed.candidateId) {
@@ -3542,7 +3542,7 @@ const App: React.FC = () => {
         const isCustomNext = resolvedArtistSeeds.length > 1 || hasActiveFiltersNext;
         
         // Rule 11 Fix: If all resolved seeds are known cache hits, do not skip cache lookup in the next pass
-        const allKnownCacheHits = cacheCandidatesPerSeed.every(s => s.isKnownCacheHit && s.predictedOrigin === finalOrigins[s.id]);
+        const allKnownCacheHits = cacheCandidatesPerSeed.every(s => s.isKnownCacheHit && s.predictedOrigin === s.predictedOrigin);
         const nextSkipCacheLookup = !allKnownCacheHits;
         
         handleGenerateGraph(newArtistsStr, isRegeneration, graphToEnhance, nextSkipCacheLookup, !isCustomNext, overrideFilters, activeDisambiguationHints, true);
