@@ -2927,34 +2927,33 @@ const App: React.FC = () => {
             try { parsedGraph = typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData; } catch (e) {}
             const hasGraph = parsedGraph && parsedGraph.nodes && parsedGraph.nodes.length > 0;
             
-            if (hasGraph) {
-                isKnownCacheHit = true;
-                const canonicalId = data?.cacheKey || data?.artistId || cacheDoc.id;
-                candidateId = canonicalId;
-                
-                // Extract origin/genre from detailsCache
-                let parsedDetails = null;
-                if (data.detailsCache) {
-                    try { parsedDetails = parseDetailsCacheSafely(data.detailsCache); } catch(e) {}
-                }
-                let unwrappedDetails = parsedDetails;
-                if (Array.isArray(unwrappedDetails) && unwrappedDetails.length > 0) {
-                    unwrappedDetails = Array.isArray(unwrappedDetails[0]) ? unwrappedDetails[0][1] : unwrappedDetails[0];
-                }
-                predictedOrigin = unwrappedDetails?.details?.origin || unwrappedDetails?.origin || unwrappedDetails?.location || unwrappedDetails?.country || "";
-                genre = unwrappedDetails?.details?.genre || unwrappedDetails?.genre || unwrappedDetails?.genres || "";
-                
-                if (artistList.length === 1 && !hasActiveFilters) {
-                    singleCacheDocData = data;
-                    singleCacheResolvedSearchId = (canonicalId && canonicalId.toLowerCase() !== searchIdLower) ? canonicalId : searchId;
-                    if (!validation.isFullyQualified) {
-                        needsCacheUpgrade = true;
-                    } else {
-                        hasFullCacheHitForSingle = true;
-                    }
-                } else if (!validation.isFullyQualified) {
+            // Extract metadata for both full hits and Cache Stubs
+            isKnownCacheHit = true;
+            const canonicalId = data?.cacheKey || data?.artistId || cacheDoc.id;
+            candidateId = canonicalId;
+            
+            // Extract origin/genre from detailsCache OR details object
+            let parsedDetails = null;
+            if (data.detailsCache) {
+                try { parsedDetails = parseDetailsCacheSafely(data.detailsCache); } catch(e) {}
+            }
+            let unwrappedDetails = parsedDetails;
+            if (Array.isArray(unwrappedDetails) && unwrappedDetails.length > 0) {
+                unwrappedDetails = Array.isArray(unwrappedDetails[0]) ? unwrappedDetails[0][1] : unwrappedDetails[0];
+            }
+            predictedOrigin = unwrappedDetails?.details?.origin || unwrappedDetails?.origin || unwrappedDetails?.location || unwrappedDetails?.country || data?.details?.origin || "";
+            genre = unwrappedDetails?.details?.genre || unwrappedDetails?.genre || unwrappedDetails?.genres || data?.details?.genre || "";
+            
+            if (artistList.length === 1 && !hasActiveFilters) {
+                singleCacheDocData = data;
+                singleCacheResolvedSearchId = (canonicalId && canonicalId.toLowerCase() !== searchIdLower) ? canonicalId : searchId;
+                if (!hasGraph || !validation.isFullyQualified) {
                     needsCacheUpgrade = true;
+                } else {
+                    hasFullCacheHitForSingle = true;
                 }
+            } else if (!hasGraph || !validation.isFullyQualified) {
+                needsCacheUpgrade = true;
             }
           }
 
