@@ -1608,57 +1608,59 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                             'bottom-6 right-24'
                           }`
                         /* Mobile visual tokens — full-width top-drop banner */
-                        : 'bg-zinc-950/95 border-b border-zinc-700/80 px-4 py-3 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md w-full flex flex-col gap-2 text-left max-h-[50vh] overflow-hidden'
+                        : 'bg-zinc-950/95 border-b border-zinc-700/80 px-4 py-3 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md w-full flex flex-col gap-2 text-left max-h-[55vh] overflow-hidden'
                 }
             >
                 
-                {/* Zone 1: Spiderweb DNA (Narrative First) */}
-                {hoveredLink.dna && (
-                    <div className="shrink-0">
-                        <p className={`text-sm leading-relaxed font-normal text-zinc-400 m-0${isSmallScreen && !isCardExpanded ? ' line-clamp-4' : ''}`}>
-                            {(() => {
-                                let cleanedDna = hoveredLink.dna
-                                    ?.replace(/\btechnicolor\b/gi, 'technicolour')
-                                    .replace(/\bcolors\b/gi, 'colours')
-                                    .replace(/\bcolorful\b/gi, 'colourful')
-                                    .replace(/\bcoloring\b/gi, 'colouring')
-                                    .replace(/\bcolorize\b/gi, 'colourise')
-                                    .replace(/\bcolor\b/gi, 'colour');
-                                const matchedPrefix = extractFuzzyPrefix(cleanedDna || '', hoveredLink.sourceId || '');
-                                if (matchedPrefix && cleanedDna) {
-                                    return (
-                                        <>
-                                            <span className="text-primary font-normal">{matchedPrefix}</span>
-                                            {cleanedDna.slice(matchedPrefix.length)}
-                                        </>
-                                    );
-                                }
-                                return cleanedDna;
-                            })()}
-                        </p>
-                    </div>
-                )}
+                <div className="overflow-y-auto shrink min-h-0 flex flex-col gap-2 scrollbar-thin scrollbar-thumb-zinc-800">
+                    {/* Zone 1: Spiderweb DNA (Narrative First) */}
+                    {hoveredLink.dna && (
+                        <div className="shrink-0">
+                            <p className={`text-sm leading-relaxed font-normal text-zinc-400 m-0${isSmallScreen && !isCardExpanded ? ' line-clamp-4' : ''}`}>
+                                {(() => {
+                                    let cleanedDna = hoveredLink.dna
+                                        ?.replace(/\btechnicolor\b/gi, 'technicolour')
+                                        .replace(/\bcolors\b/gi, 'colours')
+                                        .replace(/\bcolorful\b/gi, 'colourful')
+                                        .replace(/\bcoloring\b/gi, 'colouring')
+                                        .replace(/\bcolorize\b/gi, 'colourise')
+                                        .replace(/\bcolor\b/gi, 'colour');
+                                    const matchedPrefix = extractFuzzyPrefix(cleanedDna || '', hoveredLink.sourceId || '');
+                                    if (matchedPrefix && cleanedDna) {
+                                        return (
+                                            <>
+                                                <span className="text-primary font-normal">{matchedPrefix}</span>
+                                                {cleanedDna.slice(matchedPrefix.length)}
+                                            </>
+                                        );
+                                    }
+                                    return cleanedDna;
+                                })()}
+                            </p>
+                        </div>
+                    )}
 
-                {/* Zone 2: Direct Connections / Fallback */}
-                {((hoveredLink.connections && hoveredLink.connections.length > 0) || hoveredLink.fallbackMessage) && (
-                    <div className={`flex flex-col gap-1 overflow-y-auto ${hoveredLink.dna ? "mt-1 pt-1.5" : ""}`}>
-                        {hoveredLink.connections && hoveredLink.connections.length > 0 ? (
-                            (!isSmallScreen || isCardExpanded ? hoveredLink.connections : hoveredLink.connections.slice(0, 3)).map((c, i) => (
-                                <div key={i} className="text-sm font-medium text-zinc-300 leading-tight flex gap-1">
-                                    <span className="text-zinc-500 font-normal shrink-0">•</span>
-                                    <span>
-                                        <span className="text-zinc-400 font-normal">{c.context}</span>{" "}
-                                        <span className="text-primary font-normal">{c.targetName}</span>
-                                    </span>
+                    {/* Zone 2: Direct Connections / Fallback */}
+                    {((hoveredLink.connections && hoveredLink.connections.length > 0) || hoveredLink.fallbackMessage) && (
+                        <div className={`flex flex-col gap-1 ${hoveredLink.dna ? "mt-1 pt-1.5" : ""}`}>
+                            {hoveredLink.connections && hoveredLink.connections.length > 0 ? (
+                                (!isSmallScreen || isCardExpanded ? hoveredLink.connections : hoveredLink.connections.slice(0, 3)).map((c, i) => (
+                                    <div key={i} className="text-sm font-medium text-zinc-300 leading-tight flex gap-1">
+                                        <span className="text-zinc-500 font-normal shrink-0">•</span>
+                                        <span>
+                                            <span className="text-zinc-400 font-normal">{c.context}</span>{" "}
+                                            <span className="text-primary font-normal">{c.targetName}</span>
+                                        </span>
+                                    </div>
+                                ))
+                            ) : hoveredLink.fallbackMessage ? (
+                                <div className="text-sm italic text-zinc-500 font-normal leading-normal shrink-0">
+                                    {hoveredLink.fallbackMessage}
                                 </div>
-                            ))
-                        ) : hoveredLink.fallbackMessage ? (
-                            <div className="text-sm italic text-zinc-500 font-normal leading-normal shrink-0">
-                                {hoveredLink.fallbackMessage}
-                            </div>
-                        ) : null}
-                    </div>
-                )}
+                            ) : null}
+                        </div>
+                    )}
+                </div>
                 
                 {/* Dynamic CTA / Close Button */}
                 {isSmallScreen && hoveredLink.connections && hoveredLink.connections.length > 3 && !isCardExpanded && (
