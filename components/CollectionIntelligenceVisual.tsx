@@ -18,7 +18,7 @@ const CollectionIntelligenceVisual: React.FC<{ className?: string }> = ({ classN
                 {/* Header (Matching DetailsPanel Header) */}
                 <div className="h-12 flex-shrink-0 border-b border-zinc-600/50 flex items-center justify-between px-4 bg-zinc-900 relative z-20">
                     <div className="flex items-center gap-2">
-                        <h2 className="text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Deep Cut</h2>
+                        <h2 className="text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Deep Cuts</h2>
                         <span className="h-5 w-5 flex flex-shrink-0 items-center justify-center text-[9px] font-bold border rounded-md transition-all duration-500 bg-brand-black text-primary border-primary/50">
                             4
                         </span>
@@ -91,32 +91,32 @@ const CollectionIntelligenceVisual: React.FC<{ className?: string }> = ({ classN
                                 </div>
                                 <div className="flex flex-wrap items-center gap-2 mt-1">
                                     <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-400 bg-zinc-800/80 px-2 py-0.5 border border-zinc-700/50 rounded-md">artist</span>
-                                    <span className="text-[10px] font-semibold uppercase tracking-[0.2em] bg-purple-500/20 text-purple-400 px-2 py-0.5 border border-purple-500/30 flex items-center gap-1 rounded-md">
-                                        <span className="material-symbols-outlined !text-[12px]">star</span>AI
-                                    </span>
-                                </div>
                             </div>
                         </div>
                     </div>
 
                     <div className="px-4 py-8 space-y-10">
                         {/* Style Bar (Matching DetailsPanel Style Meter) */}
-                        <div className="flex flex-col gap-1.5 w-full">
-                            <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">
-                                <span>MY STYLE</span>
-                                <span className="font-mono text-[#a855f7] font-bold">
-                                    2/3 Hits
-                                </span>
+                        <div className="flex flex-col gap-2 w-full">
+                            <div className="flex justify-between items-center text-[10px]">
+                                <span className="text-zinc-300 font-medium">Core Taste</span>
+                                <div className="flex items-center gap-1.5">
+                                    <span className="font-mono font-bold text-[#a855f7]">
+                                        3/4 Hits
+                                    </span>
+                                </div>
                             </div>
-                            <div className="grid grid-cols-3 gap-1.5 w-full">
-                                <div className="h-2 bg-[#a855f7] border border-[#a855f7] transition-all" title="Genre: Matched" />
-                                <div className="h-2 bg-[#a855f7] border border-[#a855f7] transition-all" title="Origin: Matched" />
-                                <div className="h-2 bg-transparent border border-[#52525b] border-solid transition-all" title="Era: Unmatched" />
+                            <div className="grid grid-cols-4 gap-1.5 w-full relative group">
+                                <div className="h-2 border transition-all duration-300 relative bg-[#a855f7] border-[#a855f7] border-solid" />
+                                <div className="h-2 border transition-all duration-300 relative bg-[#a855f7] border-[#a855f7] border-solid" />
+                                <div className="h-2 border transition-all duration-300 relative bg-transparent border-[#52525b] border-solid" />
+                                <div className="h-2 border transition-all duration-300 relative bg-[#a855f7] border-[#a855f7] border-solid" />
                             </div>
-                            <div className="flex justify-between text-[8px] font-mono tracking-widest text-zinc-500 uppercase select-none">
-                                <span className="text-[#a855f7] font-bold">GENRE</span>
-                                <span className="text-[#a855f7] font-bold">ORIGIN</span>
-                                <span className="text-zinc-400">ERA</span>
+                            <div className="flex justify-between text-[8px] font-mono tracking-widest text-zinc-500 uppercase select-none mt-0">
+                                <span>GENRE</span>
+                                <span>STYLE</span>
+                                <span>ORIGIN</span>
+                                <span>ERA</span>
                             </div>
                         </div>
 

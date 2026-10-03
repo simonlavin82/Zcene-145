@@ -45,7 +45,7 @@ const InteractionVisual = () => (
                 <span className="material-symbols-outlined !text-3xl">ads_click</span>
             </div>
             <h4 className="text-base font-medium text-zinc-200 mb-2">Click Nodes</h4>
-            <p className="text-sm text-zinc-500 leading-relaxed">Clicking any node opens the Deep Cut, where the real insights live.</p>
+            <p className="text-sm text-zinc-500 leading-relaxed">Clicking any node opens the Deep Cuts, where the real insights live.</p>
         </div>
     </div>
 );
@@ -69,10 +69,13 @@ const ArtistManagementMock = () => (
                 <span className="material-symbols-outlined text-zinc-600 pr-2 !text-base">remove_circle</span>
             </div>
         </div>
-        <div className="pt-2">
-            <div className="w-full bg-primary border border-primary/30 py-3 text-center">
-                <span className="text-xs font-bold text-brand-black uppercase tracking-widest">Update Zcene</span>
-            </div>
+        <div className="pt-4 pb-2">
+            <button className="w-full flex items-center justify-center gap-2 bg-white px-6 py-2 text-sm rounded-xl font-medium text-brand-black transition-all duration-500 hover:opacity-90">
+                <span>Update Zcene</span>
+                <span className="h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border transition-all duration-500 bg-transparent border-brand-black text-brand-black">
+                    1
+                </span>
+            </button>
         </div>
     </div>
 );
@@ -428,7 +431,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
                                     </li>
                                 </ul>
                             </div>
-                            <MockUIContainer title="Artist Panel">
+                            <MockUIContainer title="SEEDS">
                                 <ArtistManagementMock />
                             </MockUIContainer>
                         </div>
@@ -465,12 +468,12 @@ const HelpPage: React.FC<HelpPageProps> = ({
 
                     <HelpSection id="digging-details" title="Digging for details">
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-                             <MockUIContainer title="Deep Cut Panel">
+                             <MockUIContainer title="Deep Cuts Panel">
                                 <DeepCutMock />
                             </MockUIContainer>
                             <div className="space-y-8">
                                 <p className="text-zinc-400 text-base leading-relaxed">
-                                    The Deep Cut sidebar is where analysis happens. Every node you click is queued here for investigation.
+                                    The Deep Cuts sidebar is where analysis happens. Every node you click is queued here for investigation.
                                 </p>
                                 <div className="space-y-6">
                                     <div className="p-6 bg-zinc-900/50 rounded-xl border border-zinc-800">
@@ -500,7 +503,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
                             <div className="space-y-8">
                                 <p className="text-zinc-400 text-base leading-relaxed">
-                                    For deep analysis, use <strong>Magazine View</strong>. It expands your Deep Cut queue into a full-window responsive grid.
+                                    For deep analysis, use <strong>Magazine View</strong>. It expands your Deep Cuts queue into a full-window responsive grid.
                                 </p>
                                 <div className="p-6 bg-primary/10 border border-primary/20 rounded-xl">
                                     <h5 className="text-white font-medium mb-3 flex items-center gap-3">
@@ -508,7 +511,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
                                         How to trigger
                                     </h5>
                                     <p className="text-sm text-zinc-400 leading-relaxed">
-                                        Click the "Magazine" icon in the Deep Cut header (Desktop only). This allows you to read multiple artist profiles simultaneously like a digital music publication.
+                                        Click the "Magazine" icon in the Deep Cuts header (Desktop only). This allows you to read multiple artist profiles simultaneously like a digital music publication.
                                     </p>
                                 </div>
                             </div>
@@ -530,7 +533,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
                                 <ul className="space-y-4">
                                     <li className="flex items-start gap-4">
                                         <span className="material-symbols-outlined text-primary">bookmark_add</span>
-                                        <p className="text-sm text-zinc-400"><strong className="text-zinc-200">Save:</strong> Use the bookmark icon on any Deep Cut card to save an artist or label.</p>
+                                        <p className="text-sm text-zinc-400"><strong className="text-zinc-200">Save:</strong> Use the bookmark icon on any Deep Cuts card to save an artist or label.</p>
                                     </li>
                                     <li className="flex items-start gap-4">
                                         <span className="material-symbols-outlined text-primary">layers</span>

@@ -429,12 +429,12 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
             </div>
         </section>
 
-        {/* Feature: Deep Cut (Zinc 900) */}
+        {/* Feature: Deep Cuts (Zinc 900) */}
         <section className="py-24 sm:py-32 bg-zinc-900/50 border-y border-zinc-800/50">
             <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="max-w-3xl mx-auto text-center space-y-12">
                     <div className="space-y-8">
-                        <h2 className="text-4xl sm:text-6xl font-medium text-white tracking-tighter uppercase">Deep Cut</h2>
+                        <h2 className="text-4xl sm:text-6xl font-medium text-white tracking-tighter uppercase">Deep Cuts</h2>
                         <h3 className="text-zinc-400 text-lg max-w-2xl mx-auto leading-relaxed">
                             Dig deeper into the artists you love, add new ones, and explore <span className="text-white font-medium">bios, connections, discogs</span> and external links. This is how you <span className="text-white font-medium">curate</span> your next music journey.
                         </h3>

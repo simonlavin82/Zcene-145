@@ -659,7 +659,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                     <section id="typography">
                         <h2 className="text-3xl font-medium text-white border-b-2 border-primary/50 pb-2 mb-8">Typography Scale</h2>
                         <p className="text-sm text-zinc-400 mb-12 max-w-2xl leading-relaxed">
-                            Our typography system balances 1990s aesthetic impact with modern legibility. We use heavy weights (Bold) for large headlines while employing medium weights (Medium 500) and wide tracking (tracking-widest) for all-caps section markers and panel headers ("YOUR ZCENES", "ARTISTS", "SPIDERWEB", "DEEP CUT") to ensure category labels act as understated structural markers without competing with main project titles or brand logos.
+                            Our typography system balances 1990s aesthetic impact with modern legibility. We use heavy weights (Bold) for large headlines while employing medium weights (Medium 500) and wide tracking (tracking-widest) for all-caps section markers and panel headers ("YOUR ZCENES", "ARTISTS", "SPIDERWEB", "DEEP CUTS") to ensure category labels act as understated structural markers without competing with main project titles or brand logos.
                         </p>
                         <div className="space-y-16">
                             {/* Font Families */}
@@ -672,7 +672,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-xl space-y-3">
                                     <h4 className="text-xs font-semibold text-purple-400 uppercase tracking-widest">Secondary Insight Font</h4>
                                     <p className="text-3xl font-serif italic text-white">System Serif</p>
-                                    <p className="text-sm text-zinc-400 leading-relaxed">Used exclusively for Curator Insights within the Deep Cut cards. It provides a tactile, editorial contrast to the technical Poppins interface.</p>
+                                    <p className="text-sm text-zinc-400 leading-relaxed">Used exclusively for Curator Insights within the Deep Cuts cards. It provides a tactile, editorial contrast to the technical Poppins interface.</p>
                                 </div>
                             </div>
 
@@ -689,7 +689,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                      <TypographyScaleRow role="Hero Title (H1)" sample="Be the Author" className="text-7xl font-bold tracking-tighter" classSpec="text-7xl font-bold" pixelSize="72px" weight="Bold (700)" usage="Landing page headlines. Retains heavy weight for thematic character." />
                                      <TypographyScaleRow role="Section Title (H2)" sample="Discover Music" className="text-5xl font-bold tracking-tight" classSpec="text-5xl font-bold" pixelSize="48px" weight="Bold (700)" usage="Major section headers. Retains heavy weight for thematic character." />
                                      <TypographyScaleRow role="Lead / Subtitle" sample="Combine the power of AI..." className="text-2xl font-medium" classSpec="text-2xl font-medium" pixelSize="24px" weight="Medium (500)" usage="Introductory text." />
-                                     <TypographyScaleRow role="Panel Title (H3)" sample="Deep Cut" className="text-lg font-medium uppercase tracking-widest" classSpec="text-lg font-medium uppercase tracking-widest" pixelSize="18px" weight="Medium (500)" usage="Panel and dashboard headers. Refined weight with wide tracking for improved hierarchy." />
+                                     <TypographyScaleRow role="Panel Title (H3)" sample="Deep Cuts" className="text-lg font-medium uppercase tracking-widest" classSpec="text-lg font-medium uppercase tracking-widest" pixelSize="18px" weight="Medium (500)" usage="Panel and dashboard headers. Refined weight with wide tracking for improved hierarchy." />
                                      <TypographyScaleRow role="Body (Content)" sample="The quick brown fox jumps over the lazy dog." className="text-base text-zinc-300 leading-relaxed font-normal" classSpec="text-base font-normal" pixelSize="16px" weight="Regular (400)" usage="Standard Body Copy, bios, and descriptions." />
                                      <TypographyScaleRow role="Data Value" sample="Emo / Indie Rock" className="text-sm font-normal text-zinc-200" classSpec="text-sm font-normal" pixelSize="14px" weight="Regular" usage="Key data points within cards and details panels. Kept static at 14px across all breakpoints to ensure optimum scannability without layout fracturing." />
                                      <TypographyScaleRow role="System Timestamp / Data" sample="27/06/2026 • 8:09 am" className="font-mono text-xs text-zinc-300 font-normal" classSpec="font-mono text-xs font-normal" pixelSize="12px" weight="Regular (400)" usage="Standardized across project cards, ledger timestamps, and chat logs." />
@@ -711,7 +711,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                      <TypographyScaleRow role="Hero Title (H1)" sample="Be the Author" className="text-4xl font-bold tracking-tighter" classSpec="text-4xl font-bold" pixelSize="36px" weight="Bold (700)" usage="Landing page headlines." />
                                      <TypographyScaleRow role="Section Title (H2)" sample="Discover Music" className="text-3xl font-bold tracking-tight" classSpec="text-3xl font-bold" pixelSize="30px" weight="Bold (700)" usage="Major section headers." />
                                      <TypographyScaleRow role="Lead / Subtitle" sample="Combine the power of AI..." className="text-lg font-medium" classSpec="text-lg font-medium" pixelSize="18px" weight="Medium (500)" usage="Introductory text." />
-                                     <TypographyScaleRow role="Panel Title (H3)" sample="Deep Cut" className="text-base font-medium uppercase tracking-widest" classSpec="text-base font-medium uppercase tracking-widest" pixelSize="16px" weight="Medium (500)" usage="Panel headers." />
+                                     <TypographyScaleRow role="Panel Title (H3)" sample="Deep Cuts" className="text-base font-medium uppercase tracking-widest" classSpec="text-base font-medium uppercase tracking-widest" pixelSize="16px" weight="Medium (500)" usage="Panel headers." />
                                      <TypographyScaleRow role="Body (Content)" sample="The quick brown fox jumps over the lazy dog." className="text-sm text-zinc-300 font-normal" classSpec="text-sm font-normal" pixelSize="14px" weight="Regular (400)" usage="Max readability." />
                                 </div>
                             </div>
@@ -891,7 +891,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                         <h2 className="text-3xl font-medium text-white border-b-2 border-primary/50 pb-2 mb-8">Style Compatibility</h2>
                         <div className="space-y-12">
                             <p className="text-base text-zinc-400 leading-relaxed max-w-3xl">
-                                Zcene includes a deterministic, client-side visual compatibility meter within Deep Cut panels that compares the selected artist's attributes directly against the user's active "Style" profile.
+                                Zcene includes a deterministic, client-side visual compatibility meter within Deep Cuts panels that compares the selected artist's attributes directly against the user's active "Style" profile.
                             </p>
                             
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -1148,8 +1148,8 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                                     <IconDisplay icon={<span className="material-symbols-outlined">left_panel_open</span>} name="Left Panel Open" pxSize="18px" description="Structural Sidebar Layout Toggles: Expands Left Artist Panel." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
                                     <IconDisplay icon={<span className="material-symbols-outlined">left_panel_close</span>} name="Left Panel Close" pxSize="18px" description="Structural Sidebar Layout Toggles: Collapses Left Artist Panel." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
-                                    <IconDisplay icon={<span className="material-symbols-outlined">right_panel_open</span>} name="Right Panel Open" pxSize="18px" description="Structural Sidebar Layout Toggles: Expands Right Deep Cut Panel." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
-                                    <IconDisplay icon={<span className="material-symbols-outlined">right_panel_close</span>} name="Right Panel Close" pxSize="18px" description="Structural Sidebar Layout Toggles: Collapses Right Deep Cut Panel." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">right_panel_open</span>} name="Right Panel Open" pxSize="18px" description="Structural Sidebar Layout Toggles: Expands Right Deep Cuts Panel." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">right_panel_close</span>} name="Right Panel Close" pxSize="18px" description="Structural Sidebar Layout Toggles: Collapses Right Deep Cuts Panel." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
                                     <IconDisplay icon={<span className="material-symbols-outlined">close</span>} name="Close Panel / Exit" pxSize="18px" description="Exits magazine full-screen view or closes side panels." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
                                     <IconDisplay icon={<span className="material-symbols-outlined">remove</span>} name="Remove Card" pxSize="18px" description="Dismisses/removes a single artist details card from the workspace stack view." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
                                     <IconDisplay icon={<span className="material-symbols-outlined">refresh</span>} name="Refresh" pxSize="18px" description="Reloads content for a specific node or panel." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
@@ -1391,7 +1391,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                 <li><strong>Background Architecture:</strong> <code>bg-zinc-950/95 border border-zinc-700/80 px-3.5 py-2.5 backdrop-blur-md</code></li>
                                                 <li><strong>Border Radius:</strong> <code>rounded-xl</code> (12px) for consistent, modern container framing.</li>
                                                 <li><strong>Relational Contexts:</strong> Uses <code>text-zinc-400 font-normal</code> for structural descriptions and <code>text-primary font-normal</code> for highlighted details.</li>
-                                                <li><strong>Micro-Bio / Editorial Typography:</strong> Bio description text uses <code>text-sm leading-relaxed font-normal text-zinc-400</code> matching the 14px Deep Cut scale to maximize legibility on dark backgrounds. Rendered as a block-level <code>&lt;p&gt;</code> element so line-height applies correctly.</li>
+                                                <li><strong>Micro-Bio / Editorial Typography:</strong> Bio description text uses <code>text-sm leading-relaxed font-normal text-zinc-400</code> matching the 14px Deep Cuts scale to maximize legibility on dark backgrounds. Rendered as a block-level <code>&lt;p&gt;</code> element so line-height applies correctly.</li>
                                                 <li><strong>Responsive Canvas Pattern:</strong> On desktop (<code>≥ 1024px</code>), the panel floats above (or below if within 140px of the top edge) the hovered node using absolute coordinate tracking. On mobile, it collapses to an absolute canvas-anchored top-drop banner restricted to <code>max-h-[55vh]</code> at <code>top: 0</code>. Internally, it utilizes a unified <code>overflow-y-auto</code> layout wrapper combining both narrative DNA and direct connection lists to ensure uniform, synchronized scrolling.</li>
                                                 <li><strong>Client-Side UK English Sanitisation:</strong> Upstream Firestore description strings are intercepted at the render layer via strict word-boundary regex chains (<code>\b</code> anchors) to enforce UK English spelling variants (e.g. <em>colour</em>, <em>technicolour</em>) before mounting to the DOM.</li>
                                             </ul>
@@ -1587,7 +1587,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                 </div>
                                 <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
-                                    Solid dark-background buttons with defined 1px borders used as our standard secondary interactive buttons across the application, including panel utility actions and external catalog links (e.g. <strong>Official Website</strong>, <strong>Watch on YouTube</strong> in the Deep Cut panel). They provide distinct visual substance and structure.
+                                    Solid dark-background buttons with defined 1px borders used as our standard secondary interactive buttons across the application, including panel utility actions and external catalog links (e.g. <strong>Official Website</strong>, <strong>Watch on YouTube</strong> in the Deep Cuts panel). They provide distinct visual substance and structure.
                                     <br /><br />
                                     While these buttons default to center alignment, they fully support structural overrides (e.g., <code className="text-zinc-300">w-full justify-start</code>) for contextual uses like vertical catalog menus. This ensures layout flexibility without creating bespoke tokens.
                                 </p>
@@ -1645,7 +1645,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                 </div>
                                 <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
-                                    Specialized context-aware chips used in the Deep Cut investigation panel. They feature three distinct visual states to guide the user: available (outline), spent (dimmed), and interactive dropdowns (native <code>&lt;select&gt;</code> masked as a chip).
+                                    Specialized context-aware chips used in the Deep Cuts investigation panel. They feature three distinct visual states to guide the user: available (outline), spent (dimmed), and interactive dropdowns (native <code>&lt;select&gt;</code> masked as a chip).
                                 </p>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
                                     <div className="space-y-4">
@@ -1880,7 +1880,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                 </div>
                                 <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
-                                    Used within the Deep Cut panel to allow users to quickly add related artists to their seed list. These follow the "Utility Bordered" pattern but with tighter padding and a distinct "Added" state.
+                                    Used within the Deep Cuts panel to allow users to quickly add related artists to their seed list. These follow the "Utility Bordered" pattern but with tighter padding and a distinct "Added" state.
                                 </p>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
                                      <div className="space-y-4">
@@ -1937,7 +1937,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                 </div>
                                 <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
-                                    Used for structural actions like Deep Cut utilities (e.g. Add to Taste, Explore, Remove). These feature a solid container with a distinct stroke border (<code className="text-zinc-300">bg-zinc-900 border border-zinc-700/50 shadow-lg</code>), providing a self-contained look.
+                                    Used for structural actions like Deep Cuts utilities (e.g. Add to Taste, Explore, Remove). These feature a solid container with a distinct stroke border (<code>className="text-zinc-300"bg-zinc-900 border border-zinc-700/50 shadow-lg</code>), providing a self-contained look.
                                 </p>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
                                     <div className="flex flex-col items-center gap-4">
