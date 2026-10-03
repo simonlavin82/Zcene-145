@@ -96,7 +96,7 @@ const ExampleMusicGraph: React.FC = () => {
 
     const legendConfig: Record<string, { label: string; shape: React.ReactNode }> = {
         seed: { label: 'Seed Artist', shape: <span className="material-symbols-outlined text-[28px]" style={{ color: nodeTypeColorMap.seed, fontVariationSettings: "'FILL' 1" }}>album</span> },
-        recommended: { label: 'AI Artist', shape: <span className="material-symbols-outlined text-[28px]" style={{ color: nodeTypeColorMap.ai, fontVariationSettings: "'FILL' 1" }}>equalizer</span> },
+        recommended: { label: 'Artist', shape: <span className="material-symbols-outlined text-[28px]" style={{ color: nodeTypeColorMap.ai, fontVariationSettings: "'FILL' 1" }}>equalizer</span> },
         founded: { label: 'Founded', shape: <span className="material-symbols-outlined text-[24px]" style={{ color: nodeTypeColorMap.founded, fontVariationSettings: "'FILL' 1" }}>event</span> },
         label: { label: 'Label', shape: <span className="material-symbols-outlined text-[24px]" style={{ color: nodeTypeColorMap.label, fontVariationSettings: "'FILL' 1" }}>label</span> },
         genre: { label: 'Genre', shape: <span className="material-symbols-outlined text-[20px]" style={{ color: nodeTypeColorMap.genre, fontVariationSettings: "'FILL' 1" }}>library_music</span> },

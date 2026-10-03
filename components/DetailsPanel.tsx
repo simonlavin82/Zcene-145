@@ -760,12 +760,11 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
     const libraryArtistSet = useMemo(() => new Set(libraryArtists.map(a => normalizeArtistId(a))), [libraryArtists]);
 
-    const normalizedArtistNodeId = isArtistNode ? normalizeArtistId(node.id) : '';
+    const resolvedArtistName = getArtistDisplayName(details, node);
+    const normalizedArtistNodeId = isArtistNode ? normalizeArtistId(resolvedArtistName) : '';
 
     const isLibraryArtist = isArtistNode && libraryArtistSet.has(normalizedArtistNodeId);
     const isSeedArtist = isArtistNode && isNodeInSeedList(node.id || node.label || '', seedArtists);
-    const isAiSuggestion = isArtistNode && !isSeedArtist;
-    const isManualAdd = isArtistNode && isSeedArtist && !isLibraryArtist;
 
     const activeTasteProfilesData = useMemo(() => {
         if (!userTaste || !Array.isArray(userTaste) || !details) return [];
@@ -1073,10 +1072,9 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 </div>
                             </div>
                             <div className={`flex flex-wrap items-center gap-2 transition-all duration-300 overflow-hidden ${isHeaderStuck ? 'max-h-0 opacity-0 mt-0' : 'max-h-10 opacity-100 mt-1'}`}>
-                                <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-400 bg-zinc-800/80 px-2 py-0.5 border border-zinc-700/50 rounded-md">{node.type}</span>
-                                {isManualAdd && <span className="text-[10px] font-semibold uppercase tracking-[0.2em] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 border border-emerald-500/30 rounded-md">Manual</span>}
-                                {isAiSuggestion && <span className="text-[10px] font-semibold uppercase tracking-[0.2em] bg-purple-500/20 text-purple-400 px-2 py-0.5 border border-purple-500/30 flex items-center gap-1 rounded-md"><span className="material-symbols-outlined !text-[12px]">star</span>AI</span>}
-                                {isLibraryArtist && <span className="text-[10px] font-semibold uppercase tracking-[0.2em] bg-sky-500/20 text-sky-400 px-2 py-0.5 border border-sky-500/30 rounded-md">Library</span>}
+                                <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-300 bg-zinc-800/50 px-2 py-0.5 rounded-xl">{node.type}</span>
+                                {isSeedArtist && <span className="text-[10px] font-semibold uppercase tracking-widest bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-xl">SEED</span>}
+                                {isLibraryArtist && <span className="text-[10px] font-semibold uppercase tracking-widest bg-sky-500/20 text-sky-300 px-2 py-0.5 rounded-xl">Library</span>}
                             </div>
                         </div>
                     </div>

@@ -1033,8 +1033,8 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
                                     <ColorSwatch name="Error" hex="#ef4444" className="bg-red-500" />
                                     <ColorSwatch name="Library Tag" hex="#0ea5e9" className="bg-sky-500" />
-                                    <ColorSwatch name="AI Tag" hex="#a855f7" className="bg-purple-500" />
-                                    <ColorSwatch name="Manual Add" hex="#10b981" className="bg-emerald-500" />
+                                    <ColorSwatch name="Discovery Node" hex="#a855f7" className="bg-purple-500" />
+                                    <ColorSwatch name="Seed Node" hex="#10b981" className="bg-emerald-500" />
                                     <ColorSwatch name="Warning / Unsaved State Orange" hex="#f97316" className="bg-[#f97316]" style={{ backgroundColor: '#f97316' }} description="Indicates guest status, unsaved shared view workspaces, or critical session warnings." />
                                 </div>
                             </div>
@@ -1227,7 +1227,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                          <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center group-hover:bg-zinc-700 transition-colors" style={{ color: nodeTypeColorMap.ai }}>
                                              <span className="material-symbols-outlined text-[28px]" style={{ fontVariationSettings: "'FILL' 1" }}>equalizer</span>
                                          </div>
-                                         <span className="text-sm font-medium">AI Artist</span>
+                                         <span className="text-sm font-medium">Artist</span>
                                      </div>
                                      <div className="flex items-center gap-3 group cursor-pointer">
                                          <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center group-hover:bg-zinc-700 transition-colors" style={{ color: nodeTypeColorMap.label }}>
@@ -2318,28 +2318,34 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                             <BadgeDisplay 
                                 badge={
-                                    <span className="text-[10px] font-semibold uppercase tracking-widest bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-xl flex items-center gap-1 w-fit">
-                                        <span className="material-symbols-outlined !text-[12px]">star</span>AI
-                                    </span>
+                                    <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-300 bg-zinc-800/50 px-2 py-0.5 rounded-xl w-fit">ARTIST</span>
                                 }
-                                title="AI"
-                                description="Suggested by Zcene AI based on seed context."
-                                implementation="bg-purple-500/20 text-purple-300"
+                                title="Artist"
+                                description="Base entity denoting an artist node in the discovery graph."
+                                implementation="text-zinc-300 bg-zinc-800/50"
                             />
                             <BadgeDisplay 
                                 badge={
-                                    <span className="text-[10px] font-semibold uppercase tracking-widest bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-xl w-fit">Manual</span>
+                                    <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-300 bg-zinc-800/50 px-2 py-0.5 rounded-xl w-fit">LABEL</span>
                                 }
-                                title="Manual"
-                                description="Added manually by the user via search entry."
+                                title="Label"
+                                description="Base entity denoting a record label node."
+                                implementation="text-zinc-300 bg-zinc-800/50"
+                            />
+                            <BadgeDisplay 
+                                badge={
+                                    <span className="text-[10px] font-semibold uppercase tracking-widest bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-xl w-fit">SEED</span>
+                                }
+                                title="Seed"
+                                description="Identifies the user's starting point anchor node."
                                 implementation="bg-emerald-500/20 text-emerald-300"
                             />
                             <BadgeDisplay 
                                 badge={
-                                    <span className="text-[10px] font-semibold uppercase tracking-widest bg-sky-500/20 text-sky-300 px-2 py-0.5 rounded-xl w-fit">Library</span>
+                                    <span className="text-[10px] font-semibold uppercase tracking-widest bg-sky-500/20 text-sky-300 px-2 py-0.5 rounded-xl w-fit">LIBRARY</span>
                                 }
                                 title="Library"
                                 description="Identified as part of the user's uploaded music library."
@@ -2373,17 +2379,17 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                 </div>
 
-                                {/* AI ARTISTS */}
+                                {/* ARTISTS */}
                                 <div className="flex flex-col p-5 border border-zinc-700/50 rounded-none hover:border-zinc-500 transition-colors bg-zinc-900/20">
                                     <div className="mb-4">
                                         <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
-                                            AI ARTISTS: 24
+                                            ARTISTS: 24
                                         </span>
                                     </div>
-                                    <h4 className="font-medium text-white mb-1">AI ARTISTS</h4>
-                                    <p className="text-sm text-zinc-400 leading-relaxed mb-4 flex-grow">Count of non-seed artist nodes in the graph — i.e. all artists recommended by the AI engine. Only rendered when <code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.graphData</code> is present.</p>
+                                    <h4 className="font-medium text-white mb-1">ARTISTS</h4>
+                                    <p className="text-sm text-zinc-400 leading-relaxed mb-4 flex-grow">Count of non-seed artist nodes in the graph — i.e. all artists recommended by the discovery engine. Only rendered when <code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.graphData</code> is present.</p>
                                     <div className="space-y-1 mt-auto">
-                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block">Copy: AI ARTISTS: {'{'}recommendedCount{'}'}</p>
+                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block">Copy: ARTISTS: {'{'}recommendedCount{'}'}</p>
                                         <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block mt-1">Style: text-zinc-300 bg-zinc-900/50 border-white/10</p>
                                     </div>
                                 </div>
@@ -2649,7 +2655,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <h4 className="text-base font-medium text-zinc-200">Project Card — Grid View Preview</h4>
                                     </div>
                                     <p className="text-sm text-zinc-400 leading-relaxed max-w-2xl">
-                                        Badges sit flush in the card footer, without top borders, creating a cleaner negative space. Card backgrounds support a 50/50 split grid when multiple seed artists are present. The <code className="text-xs text-primary bg-zinc-800 px-1 rounded">AI ARTISTS</code>, <code className="text-xs text-primary bg-zinc-800 px-1 rounded">LABELS</code>, and <code className="text-xs text-primary bg-zinc-800 px-1 rounded">DEEP CUTS</code> badges are conditionally rendered only when <code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.graphData</code> is present. The <code className="text-xs text-primary bg-zinc-800 px-1 rounded">MAPPED</code> status pill now lives in the card header directly beneath the modified date.
+                                        Badges sit flush in the card footer, without top borders, creating a cleaner negative space. Card backgrounds support a 50/50 split grid when multiple seed artists are present. The <code className="text-xs text-primary bg-zinc-800 px-1 rounded">ARTISTS</code>, <code className="text-xs text-primary bg-zinc-800 px-1 rounded">LABELS</code>, and <code className="text-xs text-primary bg-zinc-800 px-1 rounded">DEEP CUTS</code> badges are conditionally rendered only when <code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.graphData</code> is present. The <code className="text-xs text-primary bg-zinc-800 px-1 rounded">MAPPED</code> status pill now lives in the card header directly beneath the modified date.
                                     </p>
 
                                     {/* Mock Card */}
@@ -2716,7 +2722,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                     <th className="py-4 px-6 font-semibold">Title</th>
                                                     <th className="py-4 px-6 font-semibold">Modified Date</th>
                                                     <th className="py-4 px-6 font-semibold">Seeds</th>
-                                                    <th className="py-4 px-6 font-semibold">AI Artists</th>
+                                                    <th className="py-4 px-6 font-semibold">Artists</th>
                                                     <th className="py-4 px-6 font-semibold">Deep Cuts</th>
                                                     <th className="py-4 px-6 font-semibold">Status</th>
                                                     <th className="py-4 px-6 font-semibold text-right">Actions</th>
@@ -3649,7 +3655,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         trigger: 'Post-Graph',
                                         position: 'bottom (or top on mobile)',
                                         anchor: 'desktopLegendAreaRef / mobileLegendAreaRef (Spiderweb Legend Area)',
-                                        content: 'Drag, zoom and toggle node types to focus on what matters most: Seed Artists, AI Artists, Genres, Labels, Origins, Founded.',
+                                        content: 'Drag, zoom and toggle node types to focus on what matters most: Seed Artists, Artists, Genres, Labels, Origins, Founded.',
                                         description: 'Introduces interactive navigation (pan/zoom) and node filtering capabilities in the central graph canvas.'
                                     },
                                     {

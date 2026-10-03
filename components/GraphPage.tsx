@@ -1534,7 +1534,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
 
   const legendConfig: Record<FilterKeys, { label: string; shape: React.ReactNode }> = {
     seed: { label: 'Seed Artist', shape: <span className="material-symbols-outlined text-[28px]" style={{ color: nodeTypeColorMap.seed, fontVariationSettings: "'FILL' 1" }}>album</span> },
-    recommended: { label: 'AI Artist', shape: <span className="material-symbols-outlined text-[28px]" style={{ color: nodeTypeColorMap.ai, fontVariationSettings: "'FILL' 1" }}>equalizer</span> },
+    recommended: { label: 'Artist', shape: <span className="material-symbols-outlined text-[28px]" style={{ color: nodeTypeColorMap.ai, fontVariationSettings: "'FILL' 1" }}>equalizer</span> },
     founded: { label: 'Founded', shape: <span className="material-symbols-outlined text-[24px]" style={{ color: nodeTypeColorMap.founded, fontVariationSettings: "'FILL' 1" }}>event</span> },
     label: { label: 'Label', shape: <span className="material-symbols-outlined text-[24px]" style={{ color: nodeTypeColorMap.label, fontVariationSettings: "'FILL' 1" }}>label</span> },
     genre: { label: 'Genre', shape: <span className="material-symbols-outlined text-[20px]" style={{ color: nodeTypeColorMap.genre, fontVariationSettings: "'FILL' 1" }}>library_music</span> },
@@ -1620,7 +1620,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
     >
         <OnboardingTooltip isVisible={visibleTooltips.step1} content="Add your seed artists to start your Zcene. These are your starting points, you can type them or select from your library." position="bottom" anchorRef={artistInputRef} onDismiss={() => updateOnboarding('step1')} />
         <OnboardingTooltip isVisible={visibleTooltips.step2} content="Click here to create your Zcene from your selected artists and see the connections visually." position="top" anchorRef={createZceneBtnRef} onDismiss={() => updateOnboarding('step2')} />
-        <OnboardingTooltip isVisible={visibleTooltips.step3} content="Drag, zoom and toggle node types to focus on what matters most: Seed Artists, AI Artists, Genres, Labels, Origins, Founded." position={isSmallScreen ? "top" : "bottom"} anchorRef={isSmallScreen ? mobileLegendAreaRef : desktopLegendAreaRef} onDismiss={() => updateOnboarding('step3')} />
+        <OnboardingTooltip isVisible={visibleTooltips.step3} content="Drag, zoom and toggle node types to focus on what matters most: Seed Artists, Artists, Genres, Labels, Origins, Founded." position={isSmallScreen ? "top" : "bottom"} anchorRef={isSmallScreen ? mobileLegendAreaRef : desktopLegendAreaRef} onDismiss={() => updateOnboarding('step3')} />
         <OnboardingTooltip isVisible={visibleTooltips.step5} content="This is the Deep Cut, explore bios, connections, and insights." position={isSmallScreen ? "bottom" : "left"} anchorRef={isSmallScreen ? deepCutTabRef : detailsCollapseBtnRef} onDismiss={() => updateOnboarding('step5')} />
 
         <input type="file" accept=".csv,.txt,.xml" ref={fileInputRef} onChange={handleFileChange} className="hidden" />

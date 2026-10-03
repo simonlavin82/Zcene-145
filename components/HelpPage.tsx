@@ -254,7 +254,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
         {
             symbol: d3.symbolStar,
             symbolSize: 400,
-            title: 'AI Artist',
+            title: 'Artist',
             description: "Artists suggested by the AI that share some musical DNA with your seeds. Toggle these to find new favourites."
         },
         {
