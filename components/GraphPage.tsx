@@ -201,7 +201,7 @@ const DiscoveryFiltersPanel: React.FC<{
         <span className={`material-symbols-outlined !text-sm transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
           expand_more
         </span>
-        Seed Filters
+        Anchors
         {hasActiveFilters && !isExpanded && (
           <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
         )}
@@ -291,7 +291,7 @@ const DiscoveryFiltersPanel: React.FC<{
               className="text-[10px] font-bold text-primary/60 hover:text-primary uppercase tracking-wider transition-colors flex items-center gap-1"
             >
               <span className="material-symbols-outlined !text-xs">restart_alt</span>
-              Reset Filters
+              Reset Anchors
             </button>
           )}
         </div>
@@ -311,11 +311,11 @@ const ZceneEmptyState: React.FC<{ onNavigate: (view: View) => void }> = ({ onNav
         </button>
     </div>
     <div className="mt-3 text-zinc-400 text-xs space-y-4">
-        <p className="text-center px-4">Start with a few of your favourite artists, and Zcene will map how they connect across genres, labels, origins, and scenes.</p>
+        <p className="text-center px-4">Start with a few of your favourite seeds, and Zcene will map how they connect across genres, labels, origins, and scenes.</p>
         <div className="text-left bg-zinc-800/30 p-5 rounded-none border border-zinc-700/50 mx-4 text-xs">
             <p className="font-medium text-zinc-200 mb-2">How it works</p>
             <ol className="list-decimal list-inside space-y-1 text-zinc-400">
-                <li>Add 1–5 artists (or import your library).</li>
+                <li>Add 1–5 seeds (or import your library).</li>
                 <li>Create your Zcene.</li>
                 <li>Drag, filter, and explore the spiderweb.</li>
             </ol>
@@ -392,7 +392,7 @@ const LimitReachedDialog: React.FC<{ isOpen: boolean; onClose: () => void; }> = 
                     </button>
                 </ModalHeader>
                 <ModalBody>
-                    To ensure the best performance and graph quality, you can only add up to 5 seed artists.
+                    To ensure the best performance and graph quality, you can only add up to 5 seeds.
                 </ModalBody>
                 <ModalFooter>
                     <button onClick={onClose} className="px-4 py-1.5 bg-white text-brand-black rounded-xl font-medium text-sm transition-colors hover:opacity-90">
@@ -1403,7 +1403,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
             )}
             {!isGuest && (
               <form onSubmit={handleAddFromSearch} className="relative">
-                  <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" data-testid="seed-input" ref={artistInputRef} onFocus={() => { if (!onboardingProgress.step1) updateOnboarding('step1'); }} type="search" placeholder="Add artist" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-4 pr-12 text-sm font-normal text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all" />
+                  <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" data-testid="seed-input" ref={artistInputRef} onFocus={() => { if (!onboardingProgress.step1) updateOnboarding('step1'); }} type="search" placeholder="Add seed" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-4 pr-12 text-sm font-normal text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all" />
                   <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
                       {!searchTerm && (
                           <button type="button" onClick={() => handleSpeechToText('artists')} className={`w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl transition-colors leading-none ${isListeningForArtists ? 'text-primary animate-pulse' : 'text-zinc-400 hover:text-white'}`} title="Search by voice">
@@ -1415,7 +1415,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                               <span className="material-symbols-outlined !text-[18px]">close</span>
                           </button>
                       )}
-                      <button data-testid="curate-button" type="submit" disabled={!searchTerm.trim()} className={`flex items-center justify-center rounded-xl w-7 h-7 flex-shrink-0 transition-all duration-300 disabled:cursor-not-allowed leading-none ${!searchTerm.trim() ? 'bg-zinc-800 text-zinc-600' : 'bg-white text-brand-black hover:scale-110 active:scale-95'}`} aria-label="Add artists">
+                      <button data-testid="curate-button" type="submit" disabled={!searchTerm.trim()} className={`flex items-center justify-center rounded-xl w-7 h-7 flex-shrink-0 transition-all duration-300 disabled:cursor-not-allowed leading-none ${!searchTerm.trim() ? 'bg-zinc-800 text-zinc-600' : 'bg-white text-brand-black hover:scale-110 active:scale-95'}`} aria-label="Add seeds">
                           <span className="material-symbols-outlined !text-lg">add</span>
                       </button>
                   </div>
@@ -1424,7 +1424,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
           </div>
           {selectedSeedArtists.length > 0 && (
             <div className="px-4 pt-2 pb-4">
-                <h3 className="text-[10px] font-medium mb-2 uppercase tracking-widest text-zinc-500">Seed Artists</h3>
+                <h3 className="text-[10px] font-medium mb-2 uppercase tracking-widest text-zinc-500">Artists</h3>
               <div className="space-y-1">
                 {selectedSeedArtists.map(artist => (
                   <div key={artist.name} className="flex items-center gap-1 group">
@@ -1618,9 +1618,9 @@ const GraphPage: React.FC<GraphPageProps> = ({
             backgroundPosition: 'center'
         }}
     >
-        <OnboardingTooltip isVisible={visibleTooltips.step1} content="Add your seed artists to start your Zcene. These are your starting points, you can type them or select from your library." position="bottom" anchorRef={artistInputRef} onDismiss={() => updateOnboarding('step1')} />
+        <OnboardingTooltip isVisible={visibleTooltips.step1} content="Add your seeds to start your Zcene. These are your starting points, you can type them or select from your library." position="bottom" anchorRef={artistInputRef} onDismiss={() => updateOnboarding('step1')} />
         <OnboardingTooltip isVisible={visibleTooltips.step2} content="Click here to create your Zcene from your selected artists and see the connections visually." position="top" anchorRef={createZceneBtnRef} onDismiss={() => updateOnboarding('step2')} />
-        <OnboardingTooltip isVisible={visibleTooltips.step3} content="Drag, zoom and toggle node types to focus on what matters most: Seed Artists, Artists, Genres, Labels, Origins, Founded." position={isSmallScreen ? "top" : "bottom"} anchorRef={isSmallScreen ? mobileLegendAreaRef : desktopLegendAreaRef} onDismiss={() => updateOnboarding('step3')} />
+        <OnboardingTooltip isVisible={visibleTooltips.step3} content="Drag, zoom and toggle node types to focus on what matters most: Seeds, Artists, Genres, Labels, Origins, Founded." position={isSmallScreen ? "top" : "bottom"} anchorRef={isSmallScreen ? mobileLegendAreaRef : desktopLegendAreaRef} onDismiss={() => updateOnboarding('step3')} />
         <OnboardingTooltip isVisible={visibleTooltips.step5} content="This is the Deep Cut, explore bios, connections, and insights." position={isSmallScreen ? "bottom" : "left"} anchorRef={isSmallScreen ? deepCutTabRef : detailsCollapseBtnRef} onDismiss={() => updateOnboarding('step5')} />
 
         <input type="file" accept=".csv,.txt,.xml" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
@@ -1729,7 +1729,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
             <main className={`flex-grow flex flex-row relative min-h-0 gap-4 ${isSmallScreen ? 'px-4' : 'px-6 lg:px-8'} pb-6`}>
                 <aside style={{ width: `${leftPanelWidth}px` }} className={`relative h-full z-50 flex flex-col flex-shrink-0 bg-zinc-900 border border-zinc-600/50 transition-all duration-300 ease-in-out overflow-hidden min-h-0 ${isMagazineViewOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                     {!isLeftPanelCollapsed && (<div onMouseDown={handleMouseDown('left')} className="absolute top-0 right-0 h-full w-2 cursor-col-resize select-none touch-none z-[100] group" aria-label="Resize left panel" role="separator"><div className="w-full h-full bg-transparent group-hover:bg-primary/20 transition-colors"></div></div>)}
-                    <div className={`${LayoutSizes.headerBar} flex-shrink-0 border-b border-zinc-600/50 flex items-center relative z-[60] ${isLeftPanelCollapsed ? 'justify-center px-1' : 'justify-between px-4'}`}>{!isLeftPanelCollapsed && (<div className="flex items-center gap-2 overflow-hidden"><h2 className="text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Artists</h2><span className={`h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border transition-all duration-500 shadow-sm ${artistIndicatorStyles}`}>{enabledArtistsCount}</span></div>)}<button onClick={handleToggleLeftPanel} className="relative z-[70] w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none pointer-events-auto" title={isLeftPanelCollapsed ? "Expand Panel" : "Collapse Panel"}><span className="material-symbols-outlined !text-[18px]">{isLeftPanelCollapsed ? 'left_panel_open' : 'left_panel_close'}</span></button></div>
+                    <div className={`${LayoutSizes.headerBar} flex-shrink-0 border-b border-zinc-600/50 flex items-center relative z-[60] ${isLeftPanelCollapsed ? 'justify-center px-1' : 'justify-between px-4'}`}>{!isLeftPanelCollapsed && (<div className="flex items-center gap-2 overflow-hidden"><h2 className="text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Seeds</h2><span className={`h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border transition-all duration-500 shadow-sm ${artistIndicatorStyles}`}>{enabledArtistsCount}</span></div>)}<button onClick={handleToggleLeftPanel} className="relative z-[70] w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none pointer-events-auto" title={isLeftPanelCollapsed ? "Expand Panel" : "Collapse Panel"}><span className="material-symbols-outlined !text-[18px]">{isLeftPanelCollapsed ? 'left_panel_open' : 'left_panel_close'}</span></button></div>
                     {isLeftPanelCollapsed ? (<div className="flex-grow flex-col items-center justify-between py-6 text-zinc-400"><div className="flex flex-col items-center gap-y-6">{ libraryArtists.length > 0 ? (<button onClick={() => { setIsLibraryDialogOpen(true); if (!onboardingProgress.step1) updateOnboarding('step1'); }} title="Select from Library" className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none"><span className="material-symbols-outlined !text-[18px]">queue_music</span></button>) : (<button onClick={() => { fileInputRef.current?.click(); if (!onboardingProgress.step1) updateOnboarding('step1'); }} title="Import Music Library" className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none"><span className="material-symbols-outlined !text-[18px]">upload</span></button>)}</div><div className="absolute bottom-6 left-1/2 -translate-x-1/2"><button onClick={handleApplyChanges} disabled={!isArtistPending || isLoading || isOverLimit} className="group" title="Update Zcene"><span className={`h-8 w-8 rounded-md flex items-center justify-center text-sm font-bold border-2 transition-all duration-500 ${artistIndicatorStyles} ${enabledArtistsCount === 0 ? 'opacity-100' : 'group-active:scale-95'}`}>{enabledArtistsCount}</span></button></div></div>) : ( <div className="relative flex-1 min-h-0 overflow-hidden flex flex-col">{ArtistsPanelContent}</div> )}
                 </aside>
 

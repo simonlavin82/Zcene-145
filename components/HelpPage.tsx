@@ -248,7 +248,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
         {
             symbol: d3.symbolCircle,
             symbolSize: 260,
-            title: 'Seed Artist',
+            title: 'Seed',
             description: "These are the artists you added. They're the starting point for your whole map."
         },
         {

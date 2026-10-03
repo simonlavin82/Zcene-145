@@ -60,7 +60,7 @@ export const VisibilityOffIcon: React.FC<{ className?: string }> = ({ className 
 );
 
 export const GRAPH_THINKING_STEPS = [
-    "Analysing seed artists...",
+    "Analysing seeds...",
     "Identifying core genres and influences...",
     "Searching for related artists...",
     "Mapping connections to record labels...",

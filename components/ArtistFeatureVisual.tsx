@@ -17,7 +17,7 @@ const ArtistFeatureVisual: React.FC<{ className?: string }> = ({ className }) =>
                 {/* Header (Matching App's Panel Header) */}
                 <div className="h-12 flex-shrink-0 border-b border-zinc-600/50 flex items-center justify-between px-4 bg-zinc-900 relative z-[60]">
                     <div className="flex items-center gap-2 overflow-hidden">
-                        <h2 className="text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Artists</h2>
+                        <h2 className="text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Seeds</h2>
                         <span className="h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border transition-all duration-500 bg-transparent border-brand-black text-brand-black">
                             2
                         </span>
@@ -41,7 +41,7 @@ const ArtistFeatureVisual: React.FC<{ className?: string }> = ({ className }) =>
                                     type="search"
                                     value="The Get Up Kids"
                                     readOnly
-                                    placeholder="Add artists"
+                                    placeholder="Add seeds"
                                     className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-4 pr-12 text-sm font-normal text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
                                 />
                                 <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
@@ -58,7 +58,7 @@ const ArtistFeatureVisual: React.FC<{ className?: string }> = ({ className }) =>
                         </div>
 
                         <div className="px-4 pt-2 pb-4">
-                            <h3 className="text-[10px] font-medium mb-2 uppercase tracking-widest text-zinc-500">Seed Artists</h3>
+                            <h3 className="text-[10px] font-medium mb-2 uppercase tracking-widest text-zinc-500">Artists</h3>
                             <div className="space-y-1">
                                 <div className="flex items-center gap-1 group">
                                     <div className="flex items-center gap-3 flex-grow overflow-hidden text-left p-2 rounded-xl bg-zinc-700/60 text-white backdrop-blur-sm transition-all border border-transparent">
@@ -84,7 +84,7 @@ const ArtistFeatureVisual: React.FC<{ className?: string }> = ({ className }) =>
                         <div className="px-4 mb-2">
                              <button className="flex items-center gap-2 text-[10px] font-bold text-zinc-500 hover:text-zinc-300 transition-colors uppercase tracking-widest">
                                 <span className="material-symbols-outlined !text-sm">expand_more</span>
-                                Seed Filters
+                                Anchors
                              </button>
                         </div>
 

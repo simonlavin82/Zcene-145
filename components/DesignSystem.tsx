@@ -1221,7 +1221,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                          <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center group-hover:bg-zinc-700 transition-colors" style={{ color: nodeTypeColorMap.seed }}>
                                              <span className="material-symbols-outlined text-[28px]" style={{ fontVariationSettings: "'FILL' 1" }}>album</span>
                                          </div>
-                                         <span className="text-sm font-medium">Seed Artist</span>
+                                         <span className="text-sm font-medium">Seed</span>
                                      </div>
                                      <div className="flex items-center gap-3 group cursor-pointer">
                                          <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center group-hover:bg-zinc-700 transition-colors" style={{ color: nodeTypeColorMap.ai }}>
@@ -2368,13 +2368,13 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="flex flex-col p-5 border border-zinc-700/50 rounded-none hover:border-zinc-500 transition-colors bg-zinc-900/20">
                                     <div className="mb-4">
                                         <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
-                                            Seed Artist: 3
+                                            SEED: 3
                                         </span>
                                     </div>
                                     <h4 className="font-medium text-white mb-1">SEED</h4>
-                                    <p className="text-sm text-zinc-400 leading-relaxed mb-4 flex-grow">Count of seed artists the user manually anchored the Zcene around. Always visible — present even before the graph is mapped.</p>
+                                    <p className="text-sm text-zinc-400 leading-relaxed mb-4 flex-grow">Count of seeds the user manually anchored the Zcene around. Always visible — present even before the graph is mapped.</p>
                                     <div className="space-y-1 mt-auto">
-                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block">Copy: Seed Artist: {'{'}seedList.length{'}'}</p>
+                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block">Copy: SEED: {'{'}seedList.length{'}'}</p>
                                         <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block mt-1">Style: text-zinc-300 bg-zinc-900/50 border-white/10</p>
                                     </div>
                                 </div>
@@ -2387,7 +2387,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </span>
                                     </div>
                                     <h4 className="font-medium text-white mb-1">ARTISTS</h4>
-                                    <p className="text-sm text-zinc-400 leading-relaxed mb-4 flex-grow">Count of non-seed artist nodes in the graph — i.e. all artists recommended by the discovery engine. Only rendered when <code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.graphData</code> is present.</p>
+                                    <p className="text-sm text-zinc-400 leading-relaxed mb-4 flex-grow">Count of non-seed nodes in the graph — i.e. all artists recommended by the discovery engine. Only rendered when <code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.graphData</code> is present.</p>
                                     <div className="space-y-1 mt-auto">
                                         <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block">Copy: ARTISTS: {'{'}recommendedCount{'}'}</p>
                                         <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block mt-1">Style: text-zinc-300 bg-zinc-900/50 border-white/10</p>
@@ -2453,8 +2453,8 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     All discovery metric badges use a <strong>label-first</strong> syntax — the descriptive label appears before the numeric value, separated by a colon and space. This mirrors the language used in the spiderweb filter legends and creates instant visual alignment across the product.
                                 </p>
                                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-2">
-                                    <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 font-mono text-sm text-primary">"Seed Artist: X"</div>
-                                    <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 font-mono text-sm text-primary">"AI ARTISTS: X"</div>
+                                    <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 font-mono text-sm text-primary">"SEED: X"</div>
+                                    <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 font-mono text-sm text-primary">"ARTISTS: X"</div>
                                     <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 font-mono text-sm text-primary">"LABELS: X"</div>
                                     <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 font-mono text-sm text-primary">"DEEP CUTS: X"</div>
                                 </div>
@@ -2470,7 +2470,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <h4 className="text-base font-medium text-white">Mobile Safety — <code className="text-sm text-primary font-mono">whitespace-nowrap</code></h4>
                                 </div>
                                 <p className="text-sm text-zinc-400 leading-relaxed max-w-3xl">
-                                    Individual badge labels <strong>must</strong> carry <code className="text-xs text-primary bg-zinc-800 px-1.5 py-0.5 rounded font-mono">whitespace-nowrap</code>. Without it, a badge like <em>"AI ARTISTS: 24"</em> can split across two lines on narrow viewports, breaking the data token into an unreadable fragment. The class ensures each badge renders as a solid, locked visual unit regardless of screen width.
+                                    Individual badge labels <strong>must</strong> carry <code className="text-xs text-primary bg-zinc-800 px-1.5 py-0.5 rounded font-mono">whitespace-nowrap</code>. Without it, a badge like <em>"ARTISTS: 24"</em> can split across two lines on narrow viewports, breaking the data token into an unreadable fragment. The class ensures each badge renders as a solid, locked visual unit regardless of screen width.
                                 </p>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                                     <div className="space-y-2">
@@ -2480,7 +2480,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </div>
                                         <div className="flex gap-1.5 flex-wrap p-3 bg-zinc-900 rounded-lg border border-zinc-800">
                                             <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">SEED: 3</span>
-                                            <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">AI ARTISTS: 24</span>
+                                            <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">ARTISTS: 24</span>
                                             <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">DEEP CUTS: 7</span>
                                         </div>
                                     </div>
@@ -2490,7 +2490,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <code className="text-xs text-zinc-300 font-mono leading-relaxed">className="..." {/* no whitespace-nowrap */}</code>
                                         </div>
                                         <div className="p-3 bg-zinc-900 rounded-lg border border-zinc-800">
-                                            <p className="text-xs text-zinc-500 leading-relaxed italic">Labels may break mid-token ("AI ARTISTS:" / "24") on narrow mobile viewports, destroying scannability.</p>
+                                            <p className="text-xs text-zinc-500 leading-relaxed italic">Labels may break mid-token ("ARTISTS:" / "24") on narrow mobile viewports, destroying scannability.</p>
                                         </div>
                                     </div>
                                 </div>
@@ -2569,8 +2569,8 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                         </div>
                                                     </div>
                                                     <div className="mt-4 pt-3 border-t border-white/5 flex items-center gap-1.5 flex-wrap">
-                                                        <span className="text-[8px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">Seed Artist: 1</span>
-                                                        <span className="text-[8px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">AI ARTISTS: 22</span>
+                                                        <span className="text-[8px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">SEED: 1</span>
+                                                        <span className="text-[8px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">ARTISTS: 22</span>
                                                         <span className="text-[8px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">LABELS: 3</span>
                                                         <span className="text-[8px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">DEEP CUTS: 5</span>
                                                     </div>
@@ -2655,7 +2655,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <h4 className="text-base font-medium text-zinc-200">Project Card — Grid View Preview</h4>
                                     </div>
                                     <p className="text-sm text-zinc-400 leading-relaxed max-w-2xl">
-                                        Badges sit flush in the card footer, without top borders, creating a cleaner negative space. Card backgrounds support a 50/50 split grid when multiple seed artists are present. The <code className="text-xs text-primary bg-zinc-800 px-1 rounded">ARTISTS</code>, <code className="text-xs text-primary bg-zinc-800 px-1 rounded">LABELS</code>, and <code className="text-xs text-primary bg-zinc-800 px-1 rounded">DEEP CUTS</code> badges are conditionally rendered only when <code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.graphData</code> is present. The <code className="text-xs text-primary bg-zinc-800 px-1 rounded">MAPPED</code> status pill now lives in the card header directly beneath the modified date.
+                                        Badges sit flush in the card footer, without top borders, creating a cleaner negative space. Card backgrounds support a 50/50 split grid when multiple seeds are present. The <code className="text-xs text-primary bg-zinc-800 px-1 rounded">ARTISTS</code>, <code className="text-xs text-primary bg-zinc-800 px-1 rounded">LABELS</code>, and <code className="text-xs text-primary bg-zinc-800 px-1 rounded">DEEP CUTS</code> badges are conditionally rendered only when <code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.graphData</code> is present. The <code className="text-xs text-primary bg-zinc-800 px-1 rounded">MAPPED</code> status pill now lives in the card header directly beneath the modified date.
                                     </p>
 
                                     {/* Mock Card */}
@@ -2681,11 +2681,11 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                 <div className="flex items-center flex-wrap gap-x-1 gap-y-1.5">
                                                     {/* 1. SEED */}
                                                     <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
-                                                        Seed Artist: 3
+                                                        SEED: 3
                                                     </span>
-                                                    {/* 2. AI ARTISTS */}
+                                                    {/* 2. ARTISTS */}
                                                     <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
-                                                        AI ARTISTS: 24
+                                                        ARTISTS: 24
                                                     </span>
                                                     {/* 3. LABELS */}
                                                     <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
@@ -2699,7 +2699,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             </div>
                                         </div>
                                         <p className="text-[10px] text-zinc-500 font-mono mt-2">
-                                            Sequence: Seed Artist → AI ARTISTS → LABELS → DEEP CUTS
+                                            Sequence: SEED → ARTISTS → LABELS → DEEP CUTS
                                         </p>
                                     </div>
                                 </div>
@@ -2744,10 +2744,10 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                             SEED: 3
                                                         </span>
                                                     </td>
-                                                    {/* 2. AI ARTISTS */}
+                                                    {/* 2. ARTISTS */}
                                                     <td className="py-4 px-6 font-normal bg-zinc-900 group-hover:bg-primary/5 transition-colors relative z-10">
                                                         <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
-                                                            AI ARTISTS: 24
+                                                            ARTISTS: 24
                                                         </span>
                                                     </td>
                                                     {/* 3. DEEP CUTS */}
@@ -2802,7 +2802,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </table>
                                     </div>
                                     <p className="text-[10px] text-zinc-500 font-mono">
-                                        Row 1: fully mapped — all 4 badges present. Row 2: unmapped — AI ARTISTS &amp; DEEP CUTS columns suppressed (—).
+                                        Row 1: fully mapped — all 4 badges present. Row 2: unmapped — ARTISTS &amp; DEEP CUTS columns suppressed (—).
                                     </p>
                                 </div>
 
@@ -3634,9 +3634,9 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         title: 'Add Artists',
                                         trigger: 'On Entry',
                                         position: 'bottom',
-                                        anchor: 'artistInputRef (Add Seed Artists Input)',
-                                        content: 'Add your seed artists to start your Zcene. These are your starting points, you can type them or select from your library.',
-                                        description: 'Instructs the user where to enter seed artists to start the visualization workflow.'
+                                        anchor: 'artistInputRef (Add Seeds Input)',
+                                        content: 'Add your seeds to start your Zcene. These are your starting points, you can type them or select from your library.',
+                                        description: 'Instructs the user where to enter seeds to start the visualization workflow.'
                                     },
                                     {
                                         id: 'step2',
@@ -3646,7 +3646,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         position: 'top',
                                         anchor: 'createZceneBtnRef (Create Zcene Button)',
                                         content: 'Click here to create your Zcene from your selected artists and see the connections visually.',
-                                        description: 'Appears once the user adds at least one seed artist, drawing their attention to the primary CTA button for graph generation.'
+                                        description: 'Appears once the user adds at least one seed, drawing their attention to the primary CTA button for graph generation.'
                                     },
                                     {
                                         id: 'step3',
@@ -3655,7 +3655,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         trigger: 'Post-Graph',
                                         position: 'bottom (or top on mobile)',
                                         anchor: 'desktopLegendAreaRef / mobileLegendAreaRef (Spiderweb Legend Area)',
-                                        content: 'Drag, zoom and toggle node types to focus on what matters most: Seed Artists, Artists, Genres, Labels, Origins, Founded.',
+                                        content: 'Drag, zoom and toggle node types to focus on what matters most: Seeds, Artists, Genres, Labels, Origins, Founded.',
                                         description: 'Introduces interactive navigation (pan/zoom) and node filtering capabilities in the central graph canvas.'
                                     },
                                     {
@@ -3936,7 +3936,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="space-y-6">
                                      <h3 className="text-xl font-medium text-zinc-200">Desktop (lg+)</h3>
                                     <div className="p-6 bg-zinc-950 rounded-xl border border-zinc-800 aspect-video relative flex gap-2">
-                                         <div className="w-1/4 h-full bg-zinc-900 border border-zinc-800 rounded-xl flex items-center justify-center text-[10px] text-zinc-600 font-medium uppercase tracking-widest">Artists</div>
+                                         <div className="w-1/4 h-full bg-zinc-900 border border-zinc-800 rounded-xl flex items-center justify-center text-[10px] text-zinc-600 font-medium uppercase tracking-widest">Seeds</div>
                                         <div className="flex-grow h-full bg-zinc-900 border border-zinc-800 rounded-xl flex flex-col">
                                             <div className="flex-grow flex items-center justify-center text-[10px] text-zinc-600 font-medium uppercase tracking-widest">Spiderweb</div>
                                             <div className="h-8 bg-zinc-800 border-t border-zinc-700 mx-2 mb-2 rounded-xl flex items-center justify-center text-[8px] text-zinc-500">Ad Space</div>
