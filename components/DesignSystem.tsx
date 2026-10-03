@@ -2337,19 +2337,19 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             />
                             <BadgeDisplay 
                                 badge={
-                                    <span className="text-[10px] font-semibold uppercase tracking-widest bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-xl w-fit">SEED</span>
+                                    <span className="text-[10px] font-semibold uppercase tracking-widest bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded-xl w-fit">SEED</span>
                                 }
                                 title="Seed"
                                 description="Identifies the user's starting point anchor node."
-                                implementation="bg-emerald-500/20 text-emerald-300"
+                                implementation="bg-yellow-500/20 text-yellow-300"
                             />
                             <BadgeDisplay 
                                 badge={
-                                    <span className="text-[10px] font-semibold uppercase tracking-widest bg-sky-500/20 text-sky-300 px-2 py-0.5 rounded-xl w-fit">LIBRARY</span>
+                                    <span className="text-[10px] font-semibold uppercase tracking-widest bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-xl w-fit">LIBRARY</span>
                                 }
                                 title="Library"
                                 description="Identified as part of the user's uploaded music library."
-                                implementation="bg-sky-500/20 text-sky-300"
+                                implementation="bg-emerald-500/20 text-emerald-300"
                             />
                         </div>
 

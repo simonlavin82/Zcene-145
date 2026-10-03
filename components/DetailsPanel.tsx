@@ -1053,10 +1053,10 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                         isFullScreenMode
                             ? isHeaderStuck
                                 ? 'w-fit bg-zinc-900/80 backdrop-blur-md border border-zinc-700 rounded-none px-3 md:px-4 py-1.5 shadow-lg -ml-1 md:-ml-4'
-                                : 'w-full bg-transparent border border-transparent px-0 pt-2 pb-3'
-                            : `w-full px-4 ${isHeaderStuck ? 'py-2' : 'pt-2 pb-3'}`
+                                : 'w-full bg-transparent border border-transparent px-0 pt-2 pb-1'
+                            : `w-full px-4 ${isHeaderStuck ? 'py-2' : 'pt-2 pb-1'}`
                     }`}>
-                    <div className={`flex flex-col ${isHeaderStuck ? 'gap-0' : 'gap-3'} min-w-0 flex-grow transition-all duration-300`}>
+                    <div className={`flex flex-col ${isHeaderStuck ? 'gap-0' : 'gap-1.5'} min-w-0 flex-grow transition-all duration-300`}>
                             <div className="flex items-center gap-2">
                                 <div 
                                     onClick={handleCopyId}
@@ -1073,8 +1073,8 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             </div>
                             <div className={`flex flex-wrap items-center gap-2 transition-all duration-300 overflow-hidden ${isHeaderStuck ? 'max-h-0 opacity-0 mt-0' : 'max-h-10 opacity-100 mt-1'}`}>
                                 <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-300 bg-zinc-800/50 px-2 py-0.5 rounded-xl">{node.type}</span>
-                                {isSeedArtist && <span className="text-[10px] font-semibold uppercase tracking-widest bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-xl">SEED</span>}
-                                {isLibraryArtist && <span className="text-[10px] font-semibold uppercase tracking-widest bg-sky-500/20 text-sky-300 px-2 py-0.5 rounded-xl">Library</span>}
+                                {isSeedArtist && <span className="text-[10px] font-semibold uppercase tracking-widest bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded-xl">SEED</span>}
+                                {isLibraryArtist && <span className="text-[10px] font-semibold uppercase tracking-widest bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-xl">LIBRARY</span>}
                             </div>
                         </div>
                     </div>
