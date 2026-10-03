@@ -185,7 +185,7 @@ const Header: React.FC<HeaderProps> = ({
                         } font-medium tracking-tight whitespace-pre`}>
                           {localName || "Untitled Project"}
                         </span>
-                        <input
+                        <input autoComplete="off" data-1p-ignore="true" data-lpignore="true"
                           value={localName}
                           onChange={(e) => setLocalName(e.target.value)}
                           onBlur={handleCommit}

@@ -37,7 +37,7 @@ const ArtistFeatureVisual: React.FC<{ className?: string }> = ({ className }) =>
                                 </button>
                             </div>
                             <div className="relative">
-                                <input
+                                <input autoComplete="off" data-1p-ignore="true" data-lpignore="true"
                                     type="search"
                                     value="The Get Up Kids"
                                     readOnly

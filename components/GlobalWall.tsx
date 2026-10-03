@@ -27,7 +27,7 @@ interface GlobalWallProps {
  *   access is automatically revoked when the browser tab is closed.
  *
  * Design System compliance:
- * - Input: uses the official <Input> component from DesignSystem.tsx.
+ * - Input: uses the official <Input autoComplete="off" data-1p-ignore="true" data-lpignore="true"> component from DesignSystem.tsx.
  * - Button: uses the official <Button variant="primary"> from DesignSystem.tsx.
  * - Logo: rendered in brand yellow via text-primary.
  */
@@ -126,7 +126,7 @@ const GlobalWallGate: React.FC<GlobalWallProps> = ({ children }) => {
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           {/* Official Input component — yellow focus ring, bg-zinc-950, border-zinc-700 */}
           <div className="relative">
-            <Input
+            <Input autoComplete="off" data-1p-ignore="true" data-lpignore="true"
               ref={inputRef}
               id="global-wall-password"
               type={showPassword ? 'text' : 'password'}

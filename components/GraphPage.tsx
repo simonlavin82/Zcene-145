@@ -244,7 +244,7 @@ const DiscoveryFiltersPanel: React.FC<{
 
           <div className="space-y-1.5">
             <label className="text-[10px] font-medium text-zinc-500 uppercase tracking-widest block">Include Genres</label>
-            <input
+            <input autoComplete="off" data-1p-ignore="true" data-lpignore="true"
               type="text"
               placeholder="e.g. Hardcore Punk, Grunge"
               value={filters.includeGenres?.join(', ') || ''}
@@ -255,7 +255,7 @@ const DiscoveryFiltersPanel: React.FC<{
 
           <div className="space-y-1.5">
             <label className="text-[10px] font-medium text-zinc-500 uppercase tracking-widest block">Include Origins</label>
-            <input
+            <input autoComplete="off" data-1p-ignore="true" data-lpignore="true"
               type="text"
               placeholder="e.g. Canada, UK"
               value={filters.includeOrigins?.join(', ') || ''}
@@ -266,7 +266,7 @@ const DiscoveryFiltersPanel: React.FC<{
 
           <div className="space-y-1.5">
             <label className="text-[10px] font-medium text-zinc-500 uppercase tracking-widest block">Exclude Origins</label>
-            <input
+            <input autoComplete="off" data-1p-ignore="true" data-lpignore="true"
               type="text"
               placeholder="e.g. Australia"
               value={filters.excludeOrigins?.join(', ') || ''}
@@ -539,7 +539,7 @@ const LibraryDialog: React.FC<{
             <div className="relative z-10 p-4 flex-shrink-0 border-b border-zinc-700 space-y-3">
                 <div className="relative">
                     <span className={`material-symbols-outlined absolute top-1/2 -translate-y-1/2 text-zinc-500 ${InputSizes.md.leftIcon}`}>search</span>
-                    <input
+                    <input autoComplete="off" data-1p-ignore="true" data-lpignore="true"
                         type="search"
                         placeholder="Search your library..."
                         value={searchTerm}
@@ -1403,7 +1403,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
             )}
             {!isGuest && (
               <form onSubmit={handleAddFromSearch} className="relative">
-                  <input data-testid="seed-input" ref={artistInputRef} onFocus={() => { if (!onboardingProgress.step1) updateOnboarding('step1'); }} type="search" placeholder="Add artist" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-4 pr-12 text-sm font-normal text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all" />
+                  <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" data-testid="seed-input" ref={artistInputRef} onFocus={() => { if (!onboardingProgress.step1) updateOnboarding('step1'); }} type="search" placeholder="Add artist" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-4 pr-12 text-sm font-normal text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all" />
                   <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
                       {!searchTerm && (
                           <button type="button" onClick={() => handleSpeechToText('artists')} className={`w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl transition-colors leading-none ${isListeningForArtists ? 'text-primary animate-pulse' : 'text-zinc-400 hover:text-white'}`} title="Search by voice">

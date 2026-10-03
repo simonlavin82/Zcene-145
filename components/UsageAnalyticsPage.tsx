@@ -735,7 +735,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                         {!isNormalUserView && (
                             <div className={`flex-grow flex items-center gap-4 bg-zinc-950 px-4 py-2 border border-zinc-800 h-[38px] ${RADIUS_TOKENS.input}`}>
                                 <span className="material-symbols-outlined text-zinc-500 select-none">search</span>
-                                <input
+                                <input autoComplete="off" data-1p-ignore="true" data-lpignore="true"
                                     type="text"
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}

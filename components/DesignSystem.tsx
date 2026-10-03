@@ -63,7 +63,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ variant = 'md', className = '', ...props }, ref) => {
     const size = InputSizes[variant];
     return (
-      <input
+      <input autoComplete="off" data-1p-ignore="true" data-lpignore="true"
         ref={ref}
         className={`w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none ${size.base} px-4 ${className}`}
         {...props}
@@ -240,7 +240,7 @@ const PasswordInputDemo: React.FC = () => {
         <span className="text-[10px] font-mono text-primary bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">Interactive Demo</span>
       </div>
       <div className="relative">
-        <input
+        <input autoComplete="off" data-1p-ignore="true" data-lpignore="true"
           type={show ? 'text' : 'password'}
           value={value}
           onChange={e => setValue(e.target.value)}
@@ -2822,7 +2822,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                                     <div className="space-y-4">
                                         <div className="p-6 bg-zinc-950 rounded-none border border-zinc-800 flex flex-col gap-4 justify-center">
-                                            <input 
+                                            <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
                                                 type="text" 
                                                 placeholder="Compact Input (sm)" 
                                                 className={`w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none ${InputSizes.sm.base} px-3`} 
@@ -2840,7 +2840,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
 
                                     <div className="space-y-4">
                                         <div className="p-6 bg-zinc-950 rounded-none border border-zinc-800 flex flex-col gap-4 justify-center">
-                                            <input 
+                                            <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
                                                 type="text" 
                                                 placeholder="Standard Input (md)" 
                                                 className={`w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none ${InputSizes.md.base} px-4`} 
@@ -2868,7 +2868,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <p className="text-xs text-zinc-500 uppercase tracking-widest font-semibold">Empty State (Mic Available)</p>
                                         <div className="relative">
                                             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 !text-[18px]">search</span>
-                                            <input 
+                                            <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
                                                 type="search" 
                                                 placeholder="Search..." 
                                                 className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-10 pr-12 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none" 
@@ -2885,7 +2885,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <p className="text-xs text-zinc-500 uppercase tracking-widest font-semibold">Filled State (Clear Available)</p>
                                         <div className="relative">
                                             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 !text-[18px]">search</span>
-                                            <input 
+                                            <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
                                                 type="search" 
                                                 placeholder="Search..." 
                                                 defaultValue="Spaced"
@@ -2961,7 +2961,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Focus State</p>
-                                        <input 
+                                        <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
                                             type="text" 
                                             defaultValue="Active Focus" 
                                             className="w-full appearance-none rounded-xl border border-primary bg-zinc-950 py-2 px-4 text-sm text-white ring-1 ring-primary outline-none" 
@@ -2969,7 +2969,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Error State</p>
-                                        <input 
+                                        <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
                                             type="text" 
                                             defaultValue="Invalid Entry" 
                                             className="w-full appearance-none rounded-xl border-red-500 bg-zinc-950 py-2 px-4 text-sm text-white focus:ring-1 focus:ring-red-500 outline-none" 
@@ -2978,7 +2978,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Disabled State</p>
-                                        <input 
+                                        <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
                                             disabled
                                             type="text" 
                                             placeholder="Locked Input" 
@@ -3010,7 +3010,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
 `const [show, setShow] = useState(false);
 
 <div className="relative">
-  <input
+  <input autoComplete="off" data-1p-ignore="true" data-lpignore="true"
     type={show ? 'text' : 'password'}
     className="... pr-11"
   />
@@ -4357,7 +4357,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <div className="space-y-2">
                                             <label className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Origin / Location</label>
                                             <div className="relative">
-                                                <input 
+                                                <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
                                                     type="text" 
                                                     placeholder="e.g. London, UK" 
                                                     className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white focus:ring-1 focus:ring-primary outline-none" 

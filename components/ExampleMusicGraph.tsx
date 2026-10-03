@@ -448,7 +448,7 @@ const ExampleMusicGraph: React.FC = () => {
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                         <div className="relative flex items-center gap-2">
                             <div className="relative hidden sm:block">
-                                <input 
+                                <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
                                     type="search" 
                                     readOnly
                                     placeholder="Search" 

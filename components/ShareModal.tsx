@@ -46,7 +46,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, shareUr
 
               <div className="relative flex items-center gap-3 bg-zinc-950 border border-zinc-800 rounded-xl p-3 overflow-hidden group">
                 <span className="material-symbols-outlined text-zinc-500 !text-[18px]">link</span>
-                <input 
+                <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
                   readOnly 
                   value={shareUrl}
                   className="flex-1 bg-transparent text-zinc-300 text-sm outline-none font-mono truncate"

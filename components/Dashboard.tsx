@@ -740,7 +740,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             </ModalHeader>
 
             <ModalBody>
-              <input 
+              <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
                 type="text" 
                 value={renameValue}
                 onChange={(e) => setRenameValue(e.target.value)}

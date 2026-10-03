@@ -286,7 +286,7 @@ export const MyTasteDialog: React.FC<{
 
               <div className="space-y-1.5">
                 <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Profile Name</label>
-                <input 
+                <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
                   type="text" 
                   value={activeProfile.name}
                   onChange={(e) => updateProfile('name', e.target.value)}
@@ -298,7 +298,7 @@ export const MyTasteDialog: React.FC<{
 
               <div className="space-y-1.5">
                 <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Genre</label>
-                <input 
+                <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
                   type="text" 
                   placeholder="e.g. Hardcore Punk"
                   value={activeProfile.favoriteGenre}
@@ -309,7 +309,7 @@ export const MyTasteDialog: React.FC<{
 
               <div className="space-y-1.5">
                 <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Style</label>
-                <input 
+                <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
                   type="text" 
                   placeholder="e.g. melodic, post"
                   value={activeProfile.style}
@@ -320,7 +320,7 @@ export const MyTasteDialog: React.FC<{
 
               <div className="space-y-1.5">
                 <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Origin</label>
-                <input 
+                <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
                   type="text" 
                   placeholder="e.g. Baltimore"
                   value={activeProfile.favoriteOrigin}
@@ -504,7 +504,7 @@ export const TokenConfirmationDialog: React.FC<{
 
           <div className="pt-2">
             <div className="relative">
-              <Input 
+              <Input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
                 data-testid="token-password-input"
                 type={showPassword ? 'text' : 'password'}
                 placeholder="API Access Password" 
@@ -783,7 +783,7 @@ export const CountryFilterDropdown: React.FC<CountryFilterDropdownProps> = ({ va
   return (
     <div className="relative w-full overflow-visible">
       <div className="relative flex items-center">
-        <input 
+        <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
           type="text" 
           placeholder="Type origin country..."
           value={value}
@@ -1311,7 +1311,7 @@ export const FilterGuidanceModal: React.FC<{
 
             <div className="space-y-1.5">
               <label className="text-[10px] font-medium text-zinc-500 uppercase tracking-widest block">Include Genres</label>
-              <input
+              <input autoComplete="off" data-1p-ignore="true" data-lpignore="true"
                 type="text"
                 placeholder="e.g. Hardcore Punk, Grunge"
                 value={filters.includeGenres?.join(', ') || ''}
@@ -1322,7 +1322,7 @@ export const FilterGuidanceModal: React.FC<{
 
             <div className="space-y-1.5">
               <label className="text-[10px] font-medium text-zinc-500 uppercase tracking-widest block">Include Origins</label>
-              <input
+              <input autoComplete="off" data-1p-ignore="true" data-lpignore="true"
                 type="text"
                 placeholder="e.g. Canada, UK"
                 value={filters.includeOrigins?.join(', ') || ''}
@@ -1333,7 +1333,7 @@ export const FilterGuidanceModal: React.FC<{
             
             <div className="space-y-1.5">
               <label className="text-[10px] font-medium text-zinc-500 uppercase tracking-widest block">Exclude Origins</label>
-              <input
+              <input autoComplete="off" data-1p-ignore="true" data-lpignore="true"
                 type="text"
                 placeholder="e.g. Australia"
                 value={filters.excludeOrigins?.join(', ') || ''}

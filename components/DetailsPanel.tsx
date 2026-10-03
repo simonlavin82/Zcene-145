@@ -2269,7 +2269,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                         <div className="flex items-center gap-2 flex-grow animate-in fade-in slide-in-from-top-2 duration-500">
                             <div className="relative flex-grow max-w-none">
                                 <span className={`material-symbols-outlined absolute top-1/2 -translate-y-1/2 text-zinc-500 ${InputSizes.md.leftIcon}`}>search</span>
-                                <input 
+                                <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
                                     type="search"
                                     placeholder="Search..."
                                     value={magazineSearchQuery}
@@ -2309,7 +2309,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                     <div className="flex items-center gap-3 flex-grow max-w-none md:max-w-md">
                                         <div className="relative flex-grow">
                                             <span className={`material-symbols-outlined absolute top-1/2 -translate-y-1/2 text-zinc-500 ${InputSizes.md.leftIcon}`}>search</span>
-                                            <input 
+                                            <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
                                                 type="search"
                                                 placeholder="Search..."
                                                 value={magazineSearchQuery}

@@ -1766,7 +1766,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     search
                 </span>
                 
-                <input 
+                <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
                     ref={graphSearchInputRef}
                     type="search" 
                     placeholder="Find in spiderweb..." 
