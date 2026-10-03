@@ -111,6 +111,14 @@ const Dashboard: React.FC<DashboardProps> = ({
     setProjectToRename(project);
   };
 
+  const normalizeCategory = (category: string): string => {
+    if (!category) return "UNASSIGNED";
+    return category
+      .trim()
+      .replace(/-/g, ' ')
+      .toUpperCase();
+  };
+
   const groupedProjects = React.useMemo(() => {
     const groups: Record<string, Project[]> = {};
 
@@ -132,7 +140,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
       let bucketKey = "UNASSIGNED";
       if (genresList.length > 0) {
-        bucketKey = genresList[0].trim().toUpperCase();
+        bucketKey = normalizeCategory(genresList[0]);
       }
 
       if (!groups[bucketKey]) {
