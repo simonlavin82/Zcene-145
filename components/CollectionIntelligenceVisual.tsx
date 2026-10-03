@@ -91,6 +91,7 @@ const CollectionIntelligenceVisual: React.FC<{ className?: string }> = ({ classN
                                 </div>
                                 <div className="flex flex-wrap items-center gap-2 mt-1">
                                     <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-400 bg-zinc-800/80 px-2 py-0.5 border border-zinc-700/50 rounded-md">artist</span>
+                                </div>
                             </div>
                         </div>
                     </div>

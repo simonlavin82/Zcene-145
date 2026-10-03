@@ -136,7 +136,6 @@ const GlobalWallGate: React.FC<GlobalWallProps> = ({ children }) => {
                 if (error) setError(null);
               }}
               placeholder="Access code"
-              autoComplete="current-password"
               disabled={isLoading}
               className="pr-11 disabled:opacity-50 disabled:cursor-not-allowed"
             />

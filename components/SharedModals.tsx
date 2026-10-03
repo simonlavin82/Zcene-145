@@ -515,7 +515,6 @@ export const TokenConfirmationDialog: React.FC<{
                 }}
                 className="pr-10"
                 autoFocus
-                autoComplete="new-password"
               />
               <button
                 type="button"
