@@ -597,13 +597,13 @@ const Dashboard: React.FC<DashboardProps> = ({
                             <td className={`py-4 px-6 font-normal ${tdClass}`}>
                               {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
                               <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
-                                SEED: {seedList.length}
+                                SEED ARTISTS: {seedList.length}
                               </span>
                             </td>
                             <td className={`py-4 px-6 font-normal ${tdClass}`}>
                               {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
                               <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
-                                AI ARTISTS: {recommendedCount}
+                                ARTISTS: {recommendedCount}
                               </span>
                             </td>
                             <td className={`py-4 px-6 font-normal ${tdClass}`}>

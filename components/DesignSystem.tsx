@@ -2368,13 +2368,13 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="flex flex-col p-5 border border-zinc-700/50 rounded-none hover:border-zinc-500 transition-colors bg-zinc-900/20">
                                     <div className="mb-4">
                                         <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
-                                            SEED: 3
+                                            SEED ARTISTS: 3
                                         </span>
                                     </div>
                                     <h4 className="font-medium text-white mb-1">SEED</h4>
                                     <p className="text-sm text-zinc-400 leading-relaxed mb-4 flex-grow">Count of seeds the user manually anchored the Zcene around. Always visible — present even before the graph is mapped.</p>
                                     <div className="space-y-1 mt-auto">
-                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block">Copy: SEED: {'{'}seedList.length{'}'}</p>
+                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block">Copy: SEED ARTISTS: {'{'}seedList.length{'}'}</p>
                                         <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block mt-1">Style: text-zinc-300 bg-zinc-900/50 border-white/10</p>
                                     </div>
                                 </div>
@@ -2453,7 +2453,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     All discovery metric badges use a <strong>label-first</strong> syntax — the descriptive label appears before the numeric value, separated by a colon and space. This mirrors the language used in the spiderweb filter legends and creates instant visual alignment across the product.
                                 </p>
                                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-2">
-                                    <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 font-mono text-sm text-primary">"SEED: X"</div>
+                                    <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 font-mono text-sm text-primary">"SEED ARTISTS: X"</div>
                                     <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 font-mono text-sm text-primary">"ARTISTS: X"</div>
                                     <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 font-mono text-sm text-primary">"LABELS: X"</div>
                                     <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 font-mono text-sm text-primary">"DEEP CUTS: X"</div>
@@ -2479,7 +2479,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <code className="text-xs text-zinc-300 font-mono leading-relaxed">className="... whitespace-nowrap"</code>
                                         </div>
                                         <div className="flex gap-1.5 flex-wrap p-3 bg-zinc-900 rounded-lg border border-zinc-800">
-                                            <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">SEED: 3</span>
+                                            <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">SEED ARTISTS: 3</span>
                                             <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">ARTISTS: 24</span>
                                             <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">DEEP CUTS: 7</span>
                                         </div>
@@ -2569,7 +2569,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                         </div>
                                                     </div>
                                                     <div className="mt-4 pt-3 border-t border-white/5 flex items-center gap-1.5 flex-wrap">
-                                                        <span className="text-[8px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">SEED: 1</span>
+                                                        <span className="text-[8px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">SEED ARTISTS: 1</span>
                                                         <span className="text-[8px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">ARTISTS: 22</span>
                                                         <span className="text-[8px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">LABELS: 3</span>
                                                         <span className="text-[8px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">DEEP CUTS: 5</span>
@@ -2681,7 +2681,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                 <div className="flex items-center flex-wrap gap-x-1 gap-y-1.5">
                                                     {/* 1. SEED */}
                                                     <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
-                                                        SEED: 3
+                                                        SEED ARTISTS: 3
                                                     </span>
                                                     {/* 2. ARTISTS */}
                                                     <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-1.5 py-0.5 bg-zinc-900/50 rounded-md border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
@@ -2741,7 +2741,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                     {/* 1. SEED */}
                                                     <td className="py-4 px-6 font-normal bg-zinc-900 group-hover:bg-primary/5 transition-colors relative z-10">
                                                         <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
-                                                            SEED: 3
+                                                            SEED ARTISTS: 3
                                                         </span>
                                                     </td>
                                                     {/* 2. ARTISTS */}
@@ -2778,7 +2778,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                     {/* 1. SEED */}
                                                     <td className="py-4 px-6 font-normal bg-zinc-950/40 group-hover:bg-primary/5 transition-colors">
                                                         <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
-                                                            SEED: 1
+                                                            SEED ARTISTS: 1
                                                         </span>
                                                     </td>
                                                     {/* 2–3: hidden when unmapped */}
