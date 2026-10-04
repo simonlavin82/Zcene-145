@@ -13,7 +13,7 @@ export const MyStackDialog: React.FC<{
   isOpen: boolean;
   onClose: () => void;
   stack: StackItem[];
-  onRemove: (node: Node) => void;
+  onRemove: (docId: string) => void;
   onView: (id: string | null) => void;
   onAddArtist: (artistName: string) => void;
   seedArtists: string[];
@@ -57,7 +57,7 @@ export const MyStackDialog: React.FC<{
                         const isCopied = copiedId === item.id;
                         
                         return (
-                            <div key={item.id} className="group flex items-center justify-between py-2.5 border-b border-zinc-800/50 last:border-0 hover:bg-zinc-900/30 px-3 -mx-3 rounded-lg transition-colors">
+                            <div key={item.docId || item.id} className="group flex items-center justify-between py-2.5 border-b border-zinc-800/50 last:border-0 hover:bg-zinc-900/30 px-3 -mx-3 rounded-lg transition-colors">
                                 <div 
                                     className="flex-grow min-w-0 cursor-pointer flex flex-col justify-center -translate-y-0.5"
                                     onClick={() => handleCopy(item.id, nameToCopy)}
@@ -81,7 +81,7 @@ export const MyStackDialog: React.FC<{
                                 </div>
                                 <div className="flex items-center flex-shrink-0 pl-4">
                                     <button 
-                                        onClick={() => onRemove({ id: item.id, type: item.type as any, group: 0 })}
+                                        onClick={() => onRemove(item.docId || item.id)}
                                         className="w-7 h-7 flex items-center justify-center rounded-md text-zinc-500 hover:text-red-400 hover:bg-red-400/10 transition-colors"
                                         title="Remove from stack"
                                     >

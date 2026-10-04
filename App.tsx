@@ -2526,8 +2526,9 @@ const App: React.FC = () => {
 
     const stackPath = `users/${user.uid}/stack`;
     const safeNodeId = node.id.replace(/[^a-zA-Z0-9_\-]/g, '_');
-    const itemRef = doc(db, stackPath, safeNodeId);
-    const itemPath = `${stackPath}/${safeNodeId}`;
+    const docId = `${safeNodeId}_${currentProjectId || 'global'}`;
+    const itemRef = doc(db, stackPath, docId);
+    const itemPath = `${stackPath}/${docId}`;
 
     try {
       const newItem: StackItem = {
@@ -2535,7 +2536,8 @@ const App: React.FC = () => {
         type: node.type || "artist",
         dateSaved: Date.now(),
         link: link || "",
-        ...(projectName && { discoveredVia: projectName })
+        ...(projectName && { discoveredVia: projectName }),
+        docId: docId
       };
 
       // PRE-FLIGHT DIAGNOSTIC LOGGING
@@ -2565,21 +2567,20 @@ const App: React.FC = () => {
       });
       handleFirestoreError(err, OperationType.WRITE, itemPath);
     }
-  }, [user, showToast, handleLogin, projectName]);
+  }, [user, showToast, handleLogin, projectName, currentProjectId]);
 
-  const handleRemoveFromStack = useCallback(async (node: Node) => {
-    if (!user) return;
+  const handleRemoveFromStack = useCallback(async (docId: string) => {
+    if (!user || !docId) return;
     const stackPath = `users/${user.uid}/stack`;
-    const safeNodeId = node.id.replace(/[^a-zA-Z0-9_\-]/g, '_');
-    const itemRef = doc(db, stackPath, safeNodeId);
+    const itemRef = doc(db, stackPath, docId);
     
     try {
-      console.log(`[Database Reporter] Attempting DELETE | Path: ${stackPath}/${safeNodeId}`);
+      console.log(`[Database Reporter] Attempting DELETE | Path: ${stackPath}/${docId}`);
       await deleteDoc(itemRef);
       console.log(`[Database Reporter] SUCCESS: Item removed from Stack.`);
     } catch (err: any) {
-      console.error(`[Database Reporter] STACK REMOVE OPERATION FAILED at: ${stackPath}/${safeNodeId}`);
-      handleFirestoreError(err, OperationType.DELETE, `${stackPath}/${safeNodeId}`);
+      console.error(`[Database Reporter] STACK REMOVE OPERATION FAILED at: ${stackPath}/${docId}`);
+      handleFirestoreError(err, OperationType.DELETE, `${stackPath}/${docId}`);
     }
   }, [user]);
 
@@ -7746,7 +7747,7 @@ const App: React.FC = () => {
           }
         }}
         stack={stack}
-        onRemove={(node) => handleRemoveFromStack(node)}
+        onRemove={(docId) => handleRemoveFromStack(docId as string)}
         onView={(id) => {
           if (id) {
             const node = graphData?.nodes.find(n => n.id.toLowerCase() === id.toLowerCase());
