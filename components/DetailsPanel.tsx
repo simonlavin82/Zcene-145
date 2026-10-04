@@ -2403,7 +2403,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                         const isRichData = details && details.imageUrl && details.summary.length > 200;
                                         const isHero = isMagazineViewOpen && (node.id === selectedNode?.id || (isRichData && node.type === 'artist'));
                                         const isInStack = stack.some(item => item.id.toLowerCase() === node.id.toLowerCase());
-                                        const pinSequenceIndex = pinnedArray.findIndex(id => id.toLowerCase() === node.id.toLowerCase());
+                                        const pinSequenceIndex = pinnedArray.findIndex((id: any) => typeof id === 'string' && id.toLowerCase() === node.id.toLowerCase());
                                         const pinSequence = pinSequenceIndex !== -1 ? pinSequenceIndex + 1 : undefined;
 
                                         return (
