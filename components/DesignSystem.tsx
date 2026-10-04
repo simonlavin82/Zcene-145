@@ -1939,7 +1939,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
                                     Used for structural actions like Deep Cuts utilities (e.g. Add to Taste, Explore, Remove). These feature a solid container with a distinct stroke border (<code>className="text-zinc-300"bg-zinc-900 border border-zinc-700/50 shadow-lg</code>), providing a self-contained look.
                                 </p>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
                                     <div className="flex flex-col items-center gap-4">
                                         <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-700/50 rounded-xl leading-none text-zinc-400 bg-zinc-900 shadow-lg hover:text-white hover:bg-zinc-800 transition-colors">
                                             <span className="material-symbols-outlined !text-[18px]">settings</span>
@@ -1972,6 +1972,24 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                 <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
                                                     <span className="w-2 h-2 rounded-sm bg-white border border-zinc-300"></span>
                                                     text-white
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col items-center gap-4">
+                                        <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-primary/50 rounded-xl leading-none text-primary bg-primary/10 shadow-lg transition-colors">
+                                            <span className="material-symbols-outlined !text-[18px]">settings</span>
+                                        </button>
+                                        <div className="flex flex-col items-center gap-2">
+                                            <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Selected Toggle Status</p>
+                                            <div className="flex flex-wrap justify-center gap-1.5">
+                                                <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                    <span className="w-2 h-2 rounded-sm bg-primary/10 border border-primary/50"></span>
+                                                    bg-primary/10 border-primary/50
+                                                </span>
+                                                <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                    <span className="w-2 h-2 rounded-sm bg-primary border border-primary/80"></span>
+                                                    text-primary
                                                 </span>
                                             </div>
                                         </div>

@@ -239,6 +239,7 @@ interface NodeDetailsCardProps {
   isSmallScreen: boolean;
   onTogglePin: () => void;
   isPinned: boolean;
+  pinSequence?: number;
   onNodeClick: (node: Node | null, forceActionState?: boolean) => void;
 
   onNavigate: (view: View) => void;
@@ -421,7 +422,7 @@ const ProfileRow: React.FC<ProfileRowProps> = ({ data, colorHex, isSmallScreen, 
 
 export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
   node, details, isLoading, isGlobalLoading, graphData, libraryArtists, seedArtists, onAddArtist, isSmallScreen, 
-  onTogglePin, isPinned, onNodeClick, onNavigate, 
+  onTogglePin, isPinned, pinSequence, onNodeClick, onNavigate, 
   chatHistory, onSendMessage, isChatLoading, chatMode, onChatModeChange, liveMessageCount, onDeleteMessage, onClearChat, isFullScreenMode = false, isHero = false, isInStack, onToggleStack, onToggleMagazineView, searchQuery, isGuest = false, onAuthRequest, user, userTaste, isAdmin = false,
   onUpdateTasteProfile, onShowToast, onOpenTasteModal, isActive = true, onStashArtist, onOpenStackDrawer, stack
 }) => {
@@ -953,14 +954,19 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
                             <button 
                                 onClick={onTogglePin} 
-                                className={`w-8 h-8 flex flex-shrink-0 items-center justify-center border rounded-xl active:scale-95 transition-all duration-200 leading-none ${
+                                className={`relative w-8 h-8 flex flex-shrink-0 items-center justify-center border rounded-xl active:scale-95 transition-all duration-200 leading-none ${
                                     isPinned 
                                         ? 'border-primary/50 text-primary bg-primary/10 hover:bg-primary/20 hover:border-primary/70' 
                                         : 'border-zinc-800/80 text-zinc-500 hover:text-zinc-200 hover:border-zinc-700 hover:bg-zinc-800'
                                 }`} 
                                 title={isPinned ? "Unpin Card" : "Pin Card"}
                             >
-                                <Pin className={`w-[18px] h-[18px] ${isPinned ? 'fill-primary' : ''}`} />
+                                <Pin className="w-[18px] h-[18px]" />
+                                {pinSequence !== undefined && (
+                                    <div className="absolute -top-1 -right-1 flex items-center justify-center w-4 h-4 bg-zinc-900 border border-zinc-700 text-[9px] font-bold text-white rounded-full">
+                                        {pinSequence}
+                                    </div>
+                                )}
                             </button>
 
 
@@ -1815,14 +1821,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         return isGlobalLoading || loadingNodeIds.size > 0 || isSelectedNodeHydrating;
     }, [isGlobalLoading, loadingNodeIds, isSelectedNodeHydrating]);
 
-    useEffect(() => {
-        if (selectedNode && activeNodes && activeNodes.length > 0) {
-            const idx = activeNodes.findIndex(n => n.id.toLowerCase() === selectedNode.id.toLowerCase());
-            if (idx !== -1) {
-                setViewedIndex(idx);
-            }
-        }
-    }, [selectedNode, activeNodes]);
+
 
     const hasOpenedMagazineRef = useRef(false);
     const lastScrolledNodeIdRef = useRef<string | null>(null);
@@ -2062,6 +2061,15 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     const viewedNode = useMemo(() => {
         return filteredAndSortedNodes[viewedIndex] || null;
     }, [filteredAndSortedNodes, viewedIndex]);
+
+    useEffect(() => {
+        if (selectedNode && filteredAndSortedNodes && filteredAndSortedNodes.length > 0) {
+            const idx = filteredAndSortedNodes.findIndex(n => n.id.toLowerCase() === selectedNode.id.toLowerCase());
+            if (idx !== -1) {
+                setViewedIndex(idx);
+            }
+        }
+    }, [selectedNode, filteredAndSortedNodes]);
 
     const viewedNodeDetails = viewedNode ? detailsCache.get(viewedNode.id) : null;
     const viewedNodeImageUrl = viewedNodeDetails?.imageUrl || (viewedNodeDetails?.details as any)?.imageUrl || undefined;
@@ -2388,13 +2396,17 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                     )}
                                 </div>
                             ) : (
-                                filteredAndSortedNodes.map((node) => {
-                                    const details = detailsCache.get(node.id) || detailsCache.get(node.id.toLowerCase()) || detailsCache.get(normalizeArtistId(node.id)) || null;
-                                    const isRichData = details && details.imageUrl && details.summary.length > 200;
-                                    const isHero = isMagazineViewOpen && (node.id === selectedNode?.id || (isRichData && node.type === 'artist'));
-                                    const isInStack = stack.some(item => item.id.toLowerCase() === node.id.toLowerCase());
+                                (() => {
+                                    const pinnedArray = Array.from(pinnedNodes);
+                                    return filteredAndSortedNodes.map((node) => {
+                                        const details = detailsCache.get(node.id) || detailsCache.get(node.id.toLowerCase()) || detailsCache.get(normalizeArtistId(node.id)) || null;
+                                        const isRichData = details && details.imageUrl && details.summary.length > 200;
+                                        const isHero = isMagazineViewOpen && (node.id === selectedNode?.id || (isRichData && node.type === 'artist'));
+                                        const isInStack = stack.some(item => item.id.toLowerCase() === node.id.toLowerCase());
+                                        const pinSequenceIndex = pinnedArray.findIndex(id => id.toLowerCase() === node.id.toLowerCase());
+                                        const pinSequence = pinSequenceIndex !== -1 ? pinSequenceIndex + 1 : undefined;
 
-                                    return (
+                                        return (
                                         <div 
                                             key={node.id} 
                                             id={`magazine-card-${node.id}`}
@@ -2414,6 +2426,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 isSmallScreen={isSmallScreen}
                                                 onTogglePin={() => onTogglePinNode(node.id)}
                                                 isPinned={pinnedNodes.has(node.id) || pinnedNodes.has(node.id.toLowerCase())}
+                                                pinSequence={pinSequence}
                                                 onNodeClick={onNodeClick}
                                                 onNavigate={onNavigate}
                                                 chatHistory={chatHistories.get(node.id) || []}
@@ -2447,6 +2460,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                         </div>
                                     );
                                 })
+                                })()
                             )}
                         </div>
                         {!isMagazineViewOpen && error && activeNodes.length === 0 && (
