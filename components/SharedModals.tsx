@@ -363,7 +363,7 @@ export const MyTasteDialog: React.FC<{
                 Cancel
               </button>
               <button onClick={handleSaveClick} disabled={isSaving} className="px-6 py-1.5 bg-white text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90 disabled:opacity-50">
-                {isSaving ? 'Saving...' : 'Save'}
+                {isSaving ? 'Saving...' : 'Done'}
               </button>
             </div>
           </div>

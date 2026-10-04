@@ -209,21 +209,6 @@ const Header: React.FC<HeaderProps> = ({
                     onLogin?.();
                     return;
                   }
-                  setIsTasteDialogOpen(true);
-                }}
-                className={`h-8 hidden md:flex flex-shrink-0 items-center justify-center rounded-xl bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 transition-colors leading-none shadow-lg border border-zinc-700/50 relative pl-2 pr-3 gap-2`} 
-                title="Style"
-            >
-                <Flame size={18} />
-                <span className="text-xs font-medium">Style</span>
-            </button>
-
-            <button 
-                onClick={() => {
-                  if (!user) {
-                    onLogin?.();
-                    return;
-                  }
                   onOpenStack();
                 }}
                 className={`h-8 hidden md:flex flex-shrink-0 items-center justify-center rounded-xl bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 transition-colors leading-none shadow-lg border border-zinc-700/50 relative pl-2 pr-3 gap-2`} 
@@ -236,6 +221,21 @@ const Header: React.FC<HeaderProps> = ({
                         {stackCount}
                     </span>
                 )}
+            </button>
+
+            <button 
+                onClick={() => {
+                  if (!user) {
+                    onLogin?.();
+                    return;
+                  }
+                  setIsTasteDialogOpen(true);
+                }}
+                className={`h-8 hidden md:flex flex-shrink-0 items-center justify-center rounded-xl bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 transition-colors leading-none shadow-lg border border-zinc-700/50 relative pl-2 pr-3 gap-2`} 
+                title="Style"
+            >
+                <Flame size={18} />
+                <span className="text-xs font-medium">Style</span>
             </button>
 
             {!isDashboard && onShare && !isSmallScreen && (

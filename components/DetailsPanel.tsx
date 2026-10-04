@@ -907,15 +907,6 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                 {/* 1. Action Icons (Not Sticky) — ref measures its rendered height for the dynamic scroll target */}
                 <div ref={actionIconsRef} className={`pt-3 ${isFullScreenMode ? 'px-0 bg-transparent' : 'px-4 bg-zinc-900'} z-20 flex-shrink-0`}>
                     <div className={`flex items-center justify-end gap-1 flex-shrink-0 ${isFullScreenMode ? 'w-fit ml-auto' : ''}`}>
-                            {isArtistNode && details && (
-                                <button
-                                    onClick={() => handleAddToTaste(node, details)}
-                                    className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 hover:bg-zinc-800 active:scale-95 leading-none text-zinc-400 hover:text-white hover:bg-zinc-800"
-                                    title="Add to Style"
-                                >
-                                    <Flame size={18} />
-                                </button>
-                            )}
                             {(isArtistNode || isLabelNode) && (
                                 <button
                                     onClick={() => {
@@ -930,6 +921,15 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     title="Save to My Stack"
                                 >
                                     <StackIcon className="!text-[18px]" />
+                                </button>
+                            )}
+                            {isArtistNode && details && (
+                                <button
+                                    onClick={() => handleAddToTaste(node, details)}
+                                    className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 hover:bg-zinc-800 active:scale-95 leading-none text-zinc-400 hover:text-white hover:bg-zinc-800"
+                                    title="Add to Style"
+                                >
+                                    <Flame size={18} />
                                 </button>
                             )}
 
