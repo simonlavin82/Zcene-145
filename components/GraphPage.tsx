@@ -81,6 +81,7 @@ interface GraphPageProps {
   onShowToast: (message: string) => void;
   onRefreshUI: () => void;
   onAddToStack: (node: Node, link?: string) => void;
+  stackCount: number;
   lastViewedStackCount: number;
   onUpdateLastViewedStackCount: (count: number) => void;
   discoveryFilters: DiscoveryFilters;
@@ -658,7 +659,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
   onCancelGeneration, onFileUpload, onNodeClick, selectedNode, peekedNode,
   activeNodes, detailsCache, onUpdateDetailsCache, loadingNodeIds, onTogglePinNode, pinnedNodes, onRefreshNode, detailsError, systemError, onLogoClick, onNavigate, onClearLibrary, onClearZcene, isActive,
   chatHistories, onUpdateChatHistories, onShowToast, onRefreshUI, onAddToStack,
-  lastViewedStackCount, onUpdateLastViewedStackCount,
+  stackCount, lastViewedStackCount, onUpdateLastViewedStackCount,
   discoveryFilters, onUpdateDiscoveryFilters, areFiltersChanged = false,
   isMagazineViewOpen, onUpdateIsMagazineViewOpen,
   onRemoveNode,
@@ -1133,7 +1134,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
   const memoizedAllSeedArtists = useMemo(() => selectedSeedArtists.map(a => a.name), [selectedSeedArtists]);
 
   // My Stack Action State logic: Action if stack size has grown since last visit to dialog
-  const isStackNew = useMemo(() => stack.length > lastViewedStackCount, [stack.length, lastViewedStackCount]);
+  const isStackNew = useMemo(() => stackCount > lastViewedStackCount, [stackCount, lastViewedStackCount]);
   const unreadDetailsCount = useMemo(() => activeNodes.filter(n => !readNodeIds.has(n.id.trim().toLowerCase())).length, [activeNodes, readNodeIds]);
   const artistIndicatorStyles = useMemo(() => isArtistPending ? 'bg-zinc-900 text-white border-white/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700', [isArtistPending]);
   
@@ -1651,9 +1652,9 @@ const GraphPage: React.FC<GraphPageProps> = ({
             onProjectNameChange={onProjectNameChange}
             isSmallScreen={isSmallScreen}
             isMagazineViewOpen={isMagazineViewOpen}
-            stackCount={stack.length}
+            stackCount={stackCount}
             isStackNew={isStackNew}
-            onOpenStack={() => { setIsStackDialogOpen(true); if (stack.length !== lastViewedStackCount) onUpdateLastViewedStackCount(stack.length); }}
+            onOpenStack={() => { setIsStackDialogOpen(true); if (stackCount !== lastViewedStackCount) onUpdateLastViewedStackCount(stackCount); }}
             onShare={handleShareZcene}
             isSharing={isSharing || isSharingZcene}
             isCopied={isCopied}

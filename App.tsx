@@ -7543,7 +7543,7 @@ const App: React.FC = () => {
               }}
               onNavigate={handleMenuNavigate} onClearLibrary={handleClearLib} onClearZcene={handleClearZcene}
               isActive={currentView === View.Graph} chatHistories={chatHistories} onUpdateChatHistories={setChatHistories}
-              onShowToast={showToast} onRefreshUI={handleRefreshUI} onAddToStack={handleAddToStack}
+              onShowToast={showToast} onRefreshUI={handleRefreshUI} onAddToStack={handleAddToStack} stackCount={stack.length}
               onShareZcene={handleTriggerShareModal} isSharingZcene={isSharing}
               onDeleteAccount={handleDeleteAccount}
               isAdmin={isAdmin}
