@@ -5336,7 +5336,8 @@ const App: React.FC = () => {
                 // Synchronously auto-select/hydrate the first active node if nothing is selected
                 if (!selectedNode && resolvedActiveNodes.length > 0 && hasAutoSelectedRef.current !== currentProjectId) {
                   hasAutoSelectedRef.current = currentProjectId;
-                  const defaultNodeId = resolvedActiveNodes[0];
+                  const pinnedList = data.pinnedNodes || [];
+                  const defaultNodeId = pinnedList.length > 0 ? pinnedList[0] : resolvedActiveNodes[0];
                   const defaultNode = g.nodes.find((n: any) => n.id.toLowerCase() === defaultNodeId.toLowerCase() || normalizeArtistId(n.id) === normalizeArtistId(defaultNodeId));
                   if (defaultNode) {
                     const normId = normalizeArtistId(defaultNode.id);
@@ -6165,7 +6166,8 @@ const App: React.FC = () => {
                   
                   // Synchronously auto-select/hydrate the first active node if nothing is selected
                   if (!selectedNode && resolvedActiveNodes.length > 0) {
-                    const defaultNodeId = resolvedActiveNodes[0];
+                    const pinnedList = data.pinnedNodes || [];
+                    const defaultNodeId = pinnedList.length > 0 ? pinnedList[0] : resolvedActiveNodes[0];
                     const defaultNode = g.nodes.find((n: any) => n.id.toLowerCase() === defaultNodeId.toLowerCase() || normalizeArtistId(n.id) === normalizeArtistId(defaultNodeId));
                     if (defaultNode) {
                       const normId = normalizeArtistId(defaultNode.id);
