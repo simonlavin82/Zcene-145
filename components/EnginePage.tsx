@@ -10,6 +10,9 @@ import {
     FETCH_NODE_DETAILS_PROMPT_TEMPLATE
 } from '../services/geminiService';
 import { ERROR_MAPPING_RULES, TOAST_MAPPING_RULES } from '../services/errorTranslationLayer';
+import Markdown from 'react-markdown';
+import { Terminal, ChevronDown, ChevronRight } from 'lucide-react';
+import { BACKEND_REGRESSION_RUNBOOK } from '../docs/backend-regression-runbook';
 
 interface SourcePageProps {
     onNavigate: (view: View) => void;
@@ -452,6 +455,32 @@ const GatekeeperFlowchart: React.FC = () => (
     </div>
 );
 
+const RunbookAccordion: React.FC = () => {
+    const [isOpen, setIsOpen] = useState(false);
+    return (
+        <div className="bg-zinc-900/30 rounded-xl border border-zinc-700/50 mb-12 overflow-hidden">
+            <button 
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full flex items-center justify-between p-6 bg-zinc-900/50 hover:bg-zinc-800/50 transition-colors text-left"
+            >
+                <div className="flex items-center gap-3 text-zinc-200 font-medium text-lg uppercase tracking-wider">
+                    <Terminal className="w-5 h-5 text-primary" />
+                    Runbooks & Automation
+                </div>
+                {isOpen ? <ChevronDown className="w-5 h-5 text-zinc-400" /> : <ChevronRight className="w-5 h-5 text-zinc-400" />}
+            </button>
+            {isOpen && (
+                <div className="p-8 border-t border-zinc-700/50">
+                    <div className="prose prose-invert prose-sm max-w-none prose-pre:bg-zinc-950 prose-pre:border prose-pre:border-zinc-800">
+                        <Markdown>{BACKEND_REGRESSION_RUNBOOK}</Markdown>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+
 export const EnginePage: React.FC<SourcePageProps> = ({ 
     onNavigate, 
     isActive, 
@@ -501,6 +530,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
     const sections = [
         { id: 'site-map', title: 'Site Map' },
         { id: 'architecture', title: 'Architecture' },
+        { id: 'runbooks', title: 'Runbooks & Automation' },
         { id: 'data-lifecycle', title: 'Data Lifecycle Matrix' },
         { id: 'graph-intelligence', title: 'Graph Intelligence' },
         { id: 'visualization-engine', title: 'Visualization Engine' },
@@ -687,6 +717,12 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                     <section id="architecture">
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">Architecture</h2>
                         <AsyncHydrationDiagram />
+                    </section>
+
+                    {/* ── RUNBOOKS ── */}
+                    <section id="runbooks">
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8 mt-12">Runbooks & Automation</h2>
+                        <RunbookAccordion />
                     </section>
 
                     {/* ── GRAPH INTELLIGENCE ── */}
