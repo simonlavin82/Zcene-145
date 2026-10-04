@@ -1203,19 +1203,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <IconDisplay icon={<VisibilityIcon className="w-[18px] h-[18px]" />} name="Show Password (Eye)" pxSize="18px" description="Toggles password field to visible. Used on all password inputs." implementation="&lt;VisibilityIcon className=&quot;w-[18px] h-[18px]&quot; /&gt;" />
                                     <IconDisplay icon={<VisibilityOffIcon className="w-[18px] h-[18px]" />} name="Hide Password (Eye-Off)" pxSize="18px" description="Paired with Eye; shown when the password is currently revealed." implementation="&lt;VisibilityOffIcon className=&quot;w-[18px] h-[18px]&quot; /&gt;" />
                                     <IconDisplay icon={<Pin size={18} />} name="Pin / Deep Cuts Curate" pxSize="18px" description="Action icon for explicitly curating/pinning a Deep Cut node to the top of the stack." implementation="&lt;Pin size={18} /&gt;" />
-                                    <IconDisplay 
-                                        icon={
-                                            <div className="relative">
-                                                <Pin size={18} className="text-primary" />
-                                                <div className="absolute -top-1 -right-1 flex items-center justify-center w-4 h-4 bg-zinc-900 border border-zinc-700 text-[9px] font-bold text-white rounded-full">1</div>
-                                            </div>
-                                        } 
-                                        name="Active Pin w/ Sequence" 
-                                        pxSize="18px" 
-                                        description="Active state denoting a pinned card. The numerical badge indicates its precise index sequence. Always anchored absolute -top-1 -right-1." 
-                                        implementation="&lt;Pin /&gt; with absolute badge" 
-                                        overrideIconClass="" 
-                                    />
+
                                 </div>
                             </div>
                         </div>

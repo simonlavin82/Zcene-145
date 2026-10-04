@@ -939,18 +939,6 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 </button>
                             )}
 
-                            {isArtistNode && !isGuest && (
-                                <button
-                                    onClick={() => onAddArtist(normalizeArtistId(node.id))}
-                                    className={`w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 active:scale-95 leading-none ${isSeedArtist ? 'text-primary bg-primary/5 border-primary/30' : 'text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-primary'}`}
-                                    title={isSeedArtist ? "Remove from Seeds" : "Add to Seeds"}
-                                >
-                                    <span className="material-symbols-outlined !text-[18px]">
-                                        {isSeedArtist ? 'check_circle' : 'add_circle'}
-                                    </span>
-                                </button>
-                            )}
-
 
                             <button 
                                 onClick={onTogglePin} 
