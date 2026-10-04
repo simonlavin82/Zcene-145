@@ -514,7 +514,7 @@ const LibraryDialog: React.FC<{
             
             return selectedGenres.some(selected => {
                 const selLower = selected.trim().toLowerCase();
-                return Array.from(artistGenres).some(g => g.trim().toLowerCase() === selLower);
+                return Array.from(artistGenres).some(g => (g as string).trim().toLowerCase() === selLower);
             });
         });
 

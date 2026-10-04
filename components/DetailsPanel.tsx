@@ -652,8 +652,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         const formatTitle = (str: string) => {
             return str.split(/[-\s]+/).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
         };
-        
-        const connectionPeers = Array.from(new Set(peers)).map(peer => cleanArtistDisplayName(peer, graphData.nodes)).sort();
+        const connectionPeers = Array.from(new Set(peers)).map(peer => cleanArtistDisplayName(peer as string, graphData.nodes)).sort();
         
         return { queryChips: chips, connectionPeers };
     }, [node.id, isLabelNode, graphData.links, graphData.nodes]);

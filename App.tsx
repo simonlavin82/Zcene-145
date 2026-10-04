@@ -2432,8 +2432,6 @@ const App: React.FC = () => {
                     groundingLinks,
                     youtubeVideoId,
                     youtubeSearchQuery,
-                    tourDates,
-                    tourCachedAt,
                     synthesisRationale: data.synthesisRationale || parsed?.synthesisRationale || ""
                 };
 
@@ -4153,12 +4151,12 @@ const App: React.FC = () => {
             }
 
             // Write to Firestore
-            const combinedDetailsMap = new Map([
+            const combinedDetailsMap = new Map<string, NodeDetails>([
               ...fetchedDetailsMap,
               ...detailsCacheRef.current,
               ...healedDetailsCacheRef.current,
               ...detailsCache
-            ]);
+            ] as [string, NodeDetails][]);
             const allEntityNamesToCache = Array.from(new Set([...toFetch, ...freshData.nodes.filter(n => n.type === 'artist' || n.type === 'label').map(n => n.label || n.id)]));
             await writeArtistCacheMany(allEntityNamesToCache, freshData, user?.uid, activeDiscoveryFilters, true, true, combinedDetailsMap, toFetch);
           };
@@ -4621,12 +4619,12 @@ const App: React.FC = () => {
             return;
           }
           setSupportsLabelDeepCuts(true);
-          const combinedDetailsMap = new Map([
+          const combinedDetailsMap = new Map<string, NodeDetails>([
             ...fetchedDetailsMap,
             ...detailsCacheRef.current,
             ...healedDetailsCacheRef.current,
             ...detailsCache
-          ]);
+          ] as [string, NodeDetails][]);
           const hasActiveFilters = !!(
             activeDiscoveryFilters.foundedAfter ||
             activeDiscoveryFilters.foundedBefore ||
@@ -5123,8 +5121,6 @@ const App: React.FC = () => {
           groundingLinks,
           youtubeVideoId,
           youtubeSearchQuery,
-          tourDates,
-          tourCachedAt,
           synthesisRationale: parsed?.synthesisRationale
         };
 
@@ -6883,8 +6879,6 @@ const App: React.FC = () => {
                                   tourInfo,
                                   recommendationReason,
                                   groundingLinks,
-                                  tourDates,
-                                  tourCachedAt,
                                   synthesisRationale: data.synthesisRationale || parsed.synthesisRationale || ""
                                 };
                                console.log("[Global Cache] Fallback successful for:", node.id);
@@ -7098,9 +7092,7 @@ const App: React.FC = () => {
                                     discography: parsed.discography || [],
                                     tourInfo: parsed.tourInfo || "",
                                     recommendationReason: parsed.recommendationReason || "",
-                                    groundingLinks: parsed.groundingLinks || [],
-                                    tourDates: parsed.tourDates || [],
-                                    tourCachedAt: parsed.tourCachedAt || ""
+                                    groundingLinks: parsed.groundingLinks || []
                                   };
                                   details = fallbackDetails;
                                   console.log(`[Reconciliation] Merging detailsCache from legacy base doc.`);
