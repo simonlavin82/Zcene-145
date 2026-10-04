@@ -1,39 +1,32 @@
-import { chromium, FullConfig } from '@playwright/test';
-import fs from 'fs';
-import path from 'path';
+import { test as setup, expect } from '@playwright/test';
+import * as fs from 'fs';
+import * as path from 'path';
 
-async function globalSetup(config: FullConfig) {
-  const authDir = path.join(process.cwd(), 'playwright/.auth');
-  if (!fs.existsSync(authDir)) {
-    fs.mkdirSync(authDir, { recursive: true });
-  }
+const authFile = path.join(__dirname, '../playwright/.auth/user.json');
 
-  // Instead of actually going through the Firebase UI which is brittle,
-  // we will inject a synthetic authentication state into localStorage.
-  // Zcene uses Firebase Auth, so we will stub the indexedDB or localStorage as needed.
-  // For a truly robust setup, we use an API token or a mock user object.
+setup('authenticate', async ({ page }) => {
+  // Perform authentication steps. Replace these actions with your own.
+  await page.goto('http://localhost:3000/login');
   
-  const statePath = path.join(authDir, 'user.json');
+  // Example for Firebase Auth logic. Update selectors as necessary.
+  // await page.getByLabel('Email').fill('user@example.com');
+  // await page.getByLabel('Password').fill('password123');
+  // await page.getByRole('button', { name: 'Sign in' }).click();
+
+  // Alternatively, if you need to set Local Storage or IndexedDB manually for Firebase Auth bypassing:
+  // await page.evaluate(() => {
+  //   window.localStorage.setItem('firebase:authUser:YOUR_API_KEY:YOUR_APP_NAME', '{"uid": "test-user-id", ...}');
+  // });
+
+  // Wait until the page receives the cookies/storage state after successful login.
+  // Sometimes, this involves waiting for a specific URL or element to be visible.
+  // await page.waitForURL('http://localhost:3000/');
+  // await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+
+  // End of authentication steps.
   
-  // Create a base storageState with mock data that Zcene's Auth Context will accept
-  const storageState = {
-    cookies: [],
-    origins: [
-      {
-        origin: 'http://localhost:5173',
-        localStorage: [
-          // If Zcene checks a specific localStorage key for auth, put it here.
-          // In development/test mode, the Firebase emulator handles auth automatically
-          // or we can just mock a token. For this setup, we'll write an empty state
-          // and let the test runner inject an auth override or let Zcene auto-login 
-          // a guest user if available.
-        ],
-      },
-    ],
-  };
+  // Ensure the directory exists
+  fs.mkdirSync(path.dirname(authFile), { recursive: true });
 
-  fs.writeFileSync(statePath, JSON.stringify(storageState));
-  console.log('✅ Global auth setup complete. State saved to:', statePath);
-}
-
-export default globalSetup;
+  await page.context().storageState({ path: authFile });
+});
