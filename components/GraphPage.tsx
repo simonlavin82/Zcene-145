@@ -122,6 +122,7 @@ interface GraphPageProps {
 const DEFAULT_LEFT_PANEL_WIDTH = 320;
 const DEFAULT_RIGHT_PANEL_WIDTH = 440;
 const MIN_PANEL_WIDTH = 250;
+const MIN_RIGHT_PANEL_WIDTH = 340;
 const MAX_PANEL_WIDTH = 600;
 const COLLAPSED_WIDTH = 64;
 const MIN_GRAPH_WIDTH = 400;
@@ -1243,7 +1244,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
         leftPanelPreCollapseWidth.current = clampedWidth;
     } else {
         const newWidth = startWidthRef.current - dx;
-        const clampedWidth = Math.max(MIN_PANEL_WIDTH, Math.min(newWidth, MAX_PANEL_WIDTH));
+        const clampedWidth = Math.max(MIN_RIGHT_PANEL_WIDTH, Math.min(newWidth, MAX_PANEL_WIDTH));
         setRightPanelWidth(clampedWidth);
         rightPanelPreCollapseWidth.current = clampedWidth;
     }

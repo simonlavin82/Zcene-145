@@ -903,7 +903,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
     const panelContent = (
         <>
-            <div className="flex flex-col h-full">
+            <div className="flex flex-col min-h-full">
                 {/* 1. Action Icons (Not Sticky) — ref measures its rendered height for the dynamic scroll target */}
                 <div ref={actionIconsRef} className={`pt-3 ${isFullScreenMode ? 'px-0 bg-transparent' : 'px-4 bg-zinc-900'} z-20 flex-shrink-0`}>
                     <div className={`flex items-center justify-end gap-1 flex-shrink-0 ${isFullScreenMode ? 'w-fit ml-auto' : ''}`}>
@@ -995,7 +995,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                     </div>
                 </div>
 
-                <div className={`flex-grow min-h-0 relative overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-zinc-800 ${isFullScreenMode ? 'pt-6 pb-4 px-0' : 'px-4 pt-6 pb-8'}`}>
+                <div className={`flex-grow min-h-0 relative ${isFullScreenMode ? 'pt-6 pb-4 px-0 overflow-x-clip' : 'px-4 pt-6 pb-8'}`}>
                     {isLoading && !isLocked && details && (
                         <div className={`absolute inset-0 z-30 flex flex-col items-center justify-center text-center space-y-8 h-full ${isFullScreenMode ? 'bg-zinc-900/50 backdrop-blur-sm' : 'bg-zinc-900/90 backdrop-blur-sm bg-zinc-900'}`}>
                             <LoadingSpinner 
@@ -1175,19 +1175,19 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
 
 
-                            <div className={`grid grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 py-4 border-b border-zinc-800/50`}>
+                            <div className={`grid grid-cols-3 gap-3 sm:gap-6 py-4 border-b border-zinc-800/50`}>
                                 <div>
                                     <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Genre</h4>
-                                    <p className="text-sm font-normal text-zinc-200 break-words">{details.details?.genre || 'Unknown'}</p>
+                                    <p className="text-sm font-normal text-zinc-200">{details.details?.genre || 'Unknown'}</p>
                                 </div>
                                 <div>
                                     <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Origin</h4>
-                                    <p className="text-sm font-normal text-zinc-200 break-words">{details.details?.origin || 'Unknown'}</p>
+                                    <p className="text-sm font-normal text-zinc-200">{details.details?.origin || 'Unknown'}</p>
                                 </div>
                                 {details.details?.founded && (
                                     <div>
                                         <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Founded</h4>
-                                        <p className="text-sm font-normal text-zinc-200 break-words">{details.details.founded}</p>
+                                        <p className="text-sm font-normal text-zinc-200">{details.details.founded}</p>
                                     </div>
                                 )}
 
