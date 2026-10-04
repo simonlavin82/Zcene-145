@@ -46,6 +46,13 @@ export default defineConfig(({ mode }) => {
       }
     },
     plugins: [react(), tailwindcss()],
+    test: {
+      globals: true,
+      environment: 'jsdom',
+      setupFiles: './tests/setup.ts',
+      include: ['**/*.test.{ts,tsx}'],
+      exclude: ['**/*.spec.{ts,tsx}', 'node_modules/**/*']
+    },
     define: {
       'process.env.API_KEY': env.GEMINI_API_KEY ? JSON.stringify(env.GEMINI_API_KEY) : 'window.GEMINI_API_KEY',
       'process.env.GEMINI_API_KEY': env.GEMINI_API_KEY ? JSON.stringify(env.GEMINI_API_KEY) : 'window.GEMINI_API_KEY'

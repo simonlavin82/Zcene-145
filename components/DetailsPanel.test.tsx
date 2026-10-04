@@ -2,17 +2,17 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { NodeDetailsCard } from './DetailsPanel';
 
-jest.mock('react-markdown', () => (props: any) => <div data-testid="markdown">{props.children}</div>);
-jest.mock('lucide-react', () => ({
+vi.mock('react-markdown', () => (props: any) => <div data-testid="markdown">{props.children}</div>);
+vi.mock('lucide-react', () => ({
   Flame: () => <div data-testid="flame-icon" />
 }));
-jest.mock('../services/geminiService', () => ({
+vi.mock('../services/geminiService', () => ({
   streamNodeChat: jest.fn(),
   fetchLiveTourData: jest.fn(),
   streamLocalHeuristicChat: jest.fn(),
   fetchNodeDetails: jest.fn(),
 }));
-jest.mock('../services/artistCacheService', () => ({
+vi.mock('../services/artistCacheService', () => ({
   normalizeArtistId: (id: string) => id,
   titleCaseArtistId: (id: string) => id,
   cleanArtistDisplayName: (id: string) => id,
@@ -21,10 +21,10 @@ jest.mock('../services/artistCacheService', () => ({
   enforceArtistCacheSchema: jest.fn(),
   isArtistIdMatch: () => false,
 }));
-jest.mock('../services/analyticsService', () => ({
+vi.mock('../services/analyticsService', () => ({
   analyticsService: { track: jest.fn() }
 }));
-jest.mock('../services/firebase', () => ({
+vi.mock('../services/firebase', () => ({
   db: {},
   doc: jest.fn(),
   updateDoc: jest.fn(),
