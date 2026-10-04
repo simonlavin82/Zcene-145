@@ -1740,25 +1740,7 @@ const App: React.FC = () => {
       if (!sharePayload) throw new Error("Could not build payload");
 
       // --- Universal Serializer + Blacklist Mutation ---
-      // 1. D3 Amnesia: Delete rigid coordinate locks so guests get organic simulation
-      delete sharePayload.canvasLayout;
-      if (sharePayload.graphData) {
-        const g = JSON.parse(sharePayload.graphData);
-        g.nodes = (g.nodes || []).map((n: any) => {
-          const { x, y, vx, vy, fx, fy, index, ...cleanNode } = n;
-          return cleanNode;
-        });
-        g.links = (g.links || []).map((l: any) => ({
-          ...l,
-          source: typeof l.source === 'object' ? l.source.id : l.source,
-          target: typeof l.target === 'object' ? l.target.id : l.target,
-        }));
-        sharePayload.graphData = JSON.stringify(g);
-      }
-
-      // 2. TTL Injection: Ensure ephemeral garbage collection for shares
-      sharePayload.expireAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-
+      applyShareBlacklistMutation(sharePayload);
 
       const docRef = await addDoc(collection(db, path), sharePayload);
 
@@ -7818,6 +7800,28 @@ const App: React.FC = () => {
     </div>
   </GlobalWall>
   );
+};
+
+export const applyShareBlacklistMutation = (sharePayload: any) => {
+  // 1. D3 Amnesia: Delete rigid coordinate locks so guests get organic simulation
+  delete sharePayload.canvasLayout;
+  if (sharePayload.graphData) {
+    const g = JSON.parse(sharePayload.graphData);
+    g.nodes = (g.nodes || []).map((n: any) => {
+      const { x, y, vx, vy, fx, fy, index, ...cleanNode } = n;
+      return cleanNode;
+    });
+    g.links = (g.links || []).map((l: any) => ({
+      ...l,
+      source: typeof l.source === 'object' ? l.source.id : l.source,
+      target: typeof l.target === 'object' ? l.target.id : l.target,
+    }));
+    sharePayload.graphData = JSON.stringify(g);
+  }
+
+  // 2. TTL Injection: Ensure ephemeral garbage collection for shares
+  sharePayload.expireAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  return sharePayload;
 };
 
 export default App;
