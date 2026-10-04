@@ -30,3 +30,8 @@ The Unified Canvas is generated and processed through the standard Three-Column 
 ### 5. Consolidated Gap-Filling & Master Narrative Sync
 - **Single-Seed Paths:** Commit their newly minted master narrative and fully hydrated Deep Cut details back to the global registry.
 - **Multi-Seed/Filtered (Bespoke) Paths:** Cleanly bypass the global commit for the master narrative to prevent data pollution. The generated bespoke topology is saved strictly to the unique user project (`detailsCacheEntries`).
+
+### 6. Universal Serializer & Ephemeral Blacklist
+- The system no longer relies on custom DTO whitelists for sharing or duplicating projects. 
+- **Universal Serializer:** Extracts a strict 1:1 base payload of the project to guarantee absolute data parity across all Save, Share, and Duplicate actions.
+- **Ephemeral Blacklist Mutation:** For Guest Share links, the generated base payload undergoes an aggressive post-serialization mutation. This blacklist explicitly purges all rigid coordinate locks (`canvasLayout`, `fx`, `fy`) to guarantee guest viewports calculate organic D3 layouts from scratch, and injects a strict 30-day TTL (`expireAt`).

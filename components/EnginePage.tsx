@@ -69,13 +69,14 @@ const ARCHITECTURE_RULES = [
     { id: 19, title: "External Link Security", desc: "Official Website and Bandcamp links must rely on deterministic client-side search templates." },
     { id: 20, title: "Mandatory Disambiguation on Direct Hits", desc: "Green Line MUST NEVER bypass the user confirmation phase." },
     { id: 21, title: "Locked Topology & Coordinate Memory", desc: "Node positions derived from AI link weights. (fx, fy) coordinates are persisted to canvasLayout to lock orientation." },
-    { id: 22, title: "Deep Cloning Isolation", desc: "Duplication executes a deep 1:1 clone of the project object to ensure localized edits never mutate the original canonical document." },
+    { id: 22, title: "Deep Cloning Isolation", desc: "Duplication executes a deep 1:1 clone of the project object via the Universal Serializer to ensure localized edits never mutate the original canonical document." },
     { id: 23, title: "Topology Parity Mandate", desc: "Any connection explicitly cited in the Root Breakdown narrative MUST have a corresponding physical edge in the graph." },
     { id: 24, title: "Verbal Identity", desc: "The Root Breakdown system prompt must enforce the 'late-night record curator' voice." },
-    { id: 25, title: "Selective Coordinate Amnesia", desc: "When generating a shared link or duplicating, fixed coordinates are stripped so guests experience a fresh D3 layout." },
+    { id: 25, title: "Selective Coordinate Amnesia", desc: "When generating a shared link, fixed coordinates are stripped via a post-serialization Blacklist Mutation so guests experience a fresh D3 layout." },
     { id: 26, title: "Contextual Tooltips", desc: "Hover states and tooltips must prioritize native narrative snippets generated during the Root Breakdown." },
     { id: 27, title: "Multi-Seed Co-Anchoring", desc: "Complex Generations MUST dynamically force the AI to co-anchor the narrative to explore the relationship between all seeds." },
-    { id: 28, title: "Canonical Global Caching", desc: "Global caching must use pure canonical IDs. Query filters are barred from document paths to prevent cache fracturing." }
+    { id: 28, title: "Canonical Global Caching", desc: "Global caching must use pure canonical IDs. Query filters are barred from document paths to prevent cache fracturing." },
+    { id: 29, title: "Universal Payload Serializer", desc: "A Single Source of Truth for generating Zcene payloads. Guarantees 1:1 data parity between Saves, Duplicates, and Shares prior to any ephemeral mutations." }
 ];
 
 const DiscoveryFlowDiagram: React.FC = () => (
@@ -1178,16 +1179,19 @@ designed to minimize friction for new users while rewarding existing authors.
    - Authentication: If logged out, the request is queued and the user is 
      redirected to Google Login.
    - Hydration: After login, the pending action is triggered automatically.
-   - Deep Copy: The application performs a server-side expansion of the 
-     client-side state and writes it as a BRAND NEW document in the user's 
-     personal project collection.
+   - Universal Base Payload: The application invokes the Universal Serializer 
+     to extract a perfect 1:1 base payload of the project and writes it as a 
+     BRAND NEW document in the user's personal project collection.
    - Ownership Transfer: The user becomes the full 'Author' of the clone, 
      instantly unlocking all discovery engine features (Spiderweb expansion, 
      Consult AI, and project renaming).
 
-4. COORDINATE AMNESIA ("Fresh Slate" Data Cloning):
-   When a user shares a project, we capture the raw graphData but aggressively 
-   strip all D3 physics coordinates (x, y, fx, fy, vx, vy) from the payload. 
+4. COORDINATE AMNESIA & BLACKLIST MUTATION:
+   When a user shares a project, we don't rely on a fragile whitelist. Instead, 
+   the Universal Serializer extracts a full 1:1 base payload clone. We then 
+   apply an aggressive Ephemeral Blacklist Mutation that strictly strips out 
+   all rigid coordinate locks (canvasLayout, fx/fy) and injects a 30-day TTL.
+   
    This is a deliberate, load-bearing feature. By enforcing spatial amnesia, 
    the guest's D3 engine natively detects the nodes as "new" and organically 
    recalculates the entire layout from scratch. This completely prevents viewport 
