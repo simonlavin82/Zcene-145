@@ -1736,87 +1736,29 @@ const App: React.FC = () => {
     setIsSharing(true);
     const path = 'sharedZcenes';
     try {
-      const artistEntityIds = graphData!.nodes
-        .filter((n: any) => n.type === 'artist')
-        .map((n: any) => normalizeArtistId(n.id));
-      const labelEntityIds = graphData!.nodes
-        .filter((n: any) => n.type === 'label')
-        .map((n: any) => normalizeArtistId(n.id));
-      const seedList = seedArtists.split('::').map((a: string) => a.trim()).filter(Boolean);
-      const normalizedIds = seedList.map((name: string) => normalizeArtistId(name));
+      const sharePayload = buildBaseProjectPayload();
+      if (!sharePayload) throw new Error("Could not build payload");
 
-      // ARCHITECTURE: Strict Seed Pinning
-      // Phase 2A (share path): Build canonical seed-first activeNodes order for the share doc.
-      // Mirrors the same hoisting applied by the background worker (Phase 2B) so Guest Mode
-      // always receives resolvedActiveNodes[0] === seed artist.
-      const shareSeedNorms = seedList.map((s: string) => normalizeArtistId(s));
-      const hoistedShareActiveNodes: string[] = [];
-      activeNodeIds.forEach(id => { if (isNodeInSeedList(id, shareSeedNorms)) hoistedShareActiveNodes.push(id); });
-      activeNodeIds.forEach(id => { if (!isNodeInSeedList(id, shareSeedNorms)) hoistedShareActiveNodes.push(id); });
-
-      // ARCHITECTURE: Deterministic Open Graph Routing
-      // Phase 3: Resolve seed artist image URL for deterministic Open Graph routing.
-      // Denormalising onto the share doc eliminates the server's secondary Firestore
-      // round-trip to /artists/{id}, which can miss on cold-start or unhydrated Direct Hit seeds.
-      const primaryShareSeedNorm = shareSeedNorms[0] || '';
-      const shareImageDetails = primaryShareSeedNorm
-        ? (detailsCache.get(primaryShareSeedNorm) || detailsCache.get((seedList[0] || '').toLowerCase()))
-        : null;
-      const actualDisplayName = (shareImageDetails as any)?.name || (shareImageDetails as any)?.details?.name;
-      const resolvedSeedImageUrl: string = (shareImageDetails as any)?.imageUrl || '';
-
-      // ARCHITECTURE: Universal Coordinate Amnesia
-      // Phase 1: Build a coordinate-clean graphData for the share payload.
-      // The in-memory graphData React state carries runtime D3 fields (fx:null, fy:null)
-      // injected by the onSnapshot handler. Strip them at write time so Guest Mode always
-      // receives a clean topology that D3 can lay out organically.
-      const shareCleanNodes = (graphData!.nodes || []).map((n: any) => {
-        const { x, y, vx, vy, fx, fy, index, ...cleanNode } = n as any;
-        return cleanNode;
-      });
-      const shareCleanLinks = (graphData!.links || []).map((l: any) => ({
-        ...l,
-        source: typeof l.source === 'object' ? l.source.id : l.source,
-        target: typeof l.target === 'object' ? l.target.id : l.target,
-      }));
-      const shareCleanGraphData = { ...graphData!, nodes: shareCleanNodes, links: shareCleanLinks };
-
-      const sharePayload: Record<string, any> = {
-        name: (projectName && projectName !== seedArtists.split('::')[0]) 
-          ? projectName 
-          : (actualDisplayName || (seedArtists ? seedArtists.split('::')[0] : 'Shared Zcene')),
-        seedArtists,
-        activeNodes: hoistedShareActiveNodes,  // Phase 2A: seed-first ordering
-        artistIds: artistEntityIds.length > 0 ? artistEntityIds : normalizedIds,
-        labelIds: labelEntityIds,
-        chatHistories: JSON.stringify(Array.from(chatHistories.entries())),
-        discoveryFilters: JSON.stringify(discoveryFilters),
-        lastViewedStackCount,
-        isMagazineViewOpen: false,
-        schemaVersion: 2,
-        supportsLabelDeepCuts: true,
-        authorId: user.uid,
-        createdAt: serverTimestamp(),
-        expireAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30-Day Hard TTL
-      };
-
-      // Phase 3: Append seedImageUrl if resolved — enables O(1) OG image lookup in server.js
-      if (resolvedSeedImageUrl) {
-        sharePayload.seedImageUrl = resolvedSeedImageUrl;
+      // --- Universal Serializer + Blacklist Mutation ---
+      // 1. D3 Amnesia: Delete rigid coordinate locks so guests get organic simulation
+      delete sharePayload.canvasLayout;
+      if (sharePayload.graphData) {
+        const g = JSON.parse(sharePayload.graphData);
+        g.nodes = (g.nodes || []).map((n: any) => {
+          const { x, y, vx, vy, fx, fy, index, ...cleanNode } = n;
+          return cleanNode;
+        });
+        g.links = (g.links || []).map((l: any) => ({
+          ...l,
+          source: typeof l.source === 'object' ? l.source.id : l.source,
+          target: typeof l.target === 'object' ? l.target.id : l.target,
+        }));
+        sharePayload.graphData = JSON.stringify(g);
       }
 
-      // Ensure discovery filters are saved accurately
-      const currentFilters = discoveryFiltersRef.current;
-      sharePayload.discoveryFilters = currentFilters;
+      // 2. TTL Injection: Ensure ephemeral garbage collection for shares
+      sharePayload.expireAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-      if (currentCacheKey) {
-        sharePayload.cacheKey = currentCacheKey;
-        sharePayload.graphData = JSON.stringify(shareCleanGraphData);  // Phase 1: coord-stripped
-        sharePayload.detailsCache = JSON.stringify(Array.from(detailsCache.entries()));
-      } else {
-        sharePayload.graphData = JSON.stringify(shareCleanGraphData);  // Phase 1: coord-stripped
-        sharePayload.detailsCache = JSON.stringify(Array.from(detailsCache.entries()));
-      }
 
       const docRef = await addDoc(collection(db, path), sharePayload);
 
@@ -2584,6 +2526,86 @@ const App: React.FC = () => {
     }
   }, [user]);
 
+  // --- Rule 29: Universal Payload Serializer ---
+  // A Single Source of Truth for "what constitutes a Zcene payload".
+  // Centralizes 1:1 data parity between Saves, Duplicates, and Shares.
+  const buildBaseProjectPayload = useCallback(() => {
+    if (!graphData) return null;
+
+    const seedList = seedArtists.split('::').map((a: string) => a.trim()).filter(Boolean);
+    const saveSeedNorms = seedList.map((s: string) => normalizeArtistId(s));
+    
+    // Phase 2A — Canonical Seed Pinning (Seed Hoisting)
+    const hoistedSaveActiveNodes: string[] = [];
+    activeNodeIds.forEach(id => { if (isNodeInSeedList(id, saveSeedNorms)) hoistedSaveActiveNodes.push(id); });
+    activeNodeIds.forEach(id => { if (!isNodeInSeedList(id, saveSeedNorms)) hoistedSaveActiveNodes.push(id); });
+
+    // Seed Image URL Resolution
+    const primarySaveSeedNorm = saveSeedNorms[0] || '';
+    let saveImageDetails = null;
+    if (primarySaveSeedNorm) {
+      saveImageDetails = detailsCache.get(primarySaveSeedNorm) || detailsCache.get((seedList[0] || '').toLowerCase());
+      if (!saveImageDetails) {
+        const fallbackKey = Array.from(detailsCache.keys()).find(k => (k as string).startsWith(primarySaveSeedNorm + '-'));
+        if (fallbackKey) {
+          saveImageDetails = detailsCache.get(fallbackKey);
+        }
+      }
+    }
+    
+    const actualDisplayName = (saveImageDetails as any)?.name || (saveImageDetails as any)?.details?.name;
+    let resolvedSeedImageUrl: string = (saveImageDetails as any)?.imageUrl || (saveImageDetails as any)?.details?.imageUrl || '';
+    if (!resolvedSeedImageUrl && sharedSeedImageUrlRef.current) {
+      resolvedSeedImageUrl = sharedSeedImageUrlRef.current;
+    }
+
+    const canvasLayout = graphData.nodes
+      .filter((n: any) => n.type === 'artist' || n.type === 'label')
+      .map((n: any) => ({ nodeId: n.id, x: n.x, y: n.y, fx: n.fx ?? null, fy: n.fy ?? null }));
+
+    const artistEntityIds = graphData.nodes
+      .filter((n: any) => n.type === 'artist')
+      .map((n: any) => normalizeArtistId(n.id));
+    const labelEntityIds = graphData.nodes
+      .filter((n: any) => n.type === 'label')
+      .map((n: any) => normalizeArtistId(n.id));
+    const normalizedIds = seedList.map((name: string) => normalizeArtistId(name));
+
+    const basePayload: Record<string, any> = {
+      name: (projectName && projectName !== seedList[0]) 
+        ? projectName 
+        : (actualDisplayName || (seedArtists ? seedList[0] : 'Untitled Zcene')),
+      seedArtists,
+      activeNodes: hoistedSaveActiveNodes,
+      pinnedNodes: Array.from(pinnedNodes),
+      chatHistories: JSON.stringify(Array.from(chatHistories.entries())),
+      discoveryFilters: JSON.stringify(discoveryFiltersRef.current || discoveryFilters),
+      lastViewedStackCount,
+      isMagazineViewOpen: false,
+      authorId: user?.uid || 'guest',
+      status: 'completed',
+      generationType: 'Clone',
+      schemaVersion: 2,
+      supportsLabelDeepCuts: true,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      artistIds: artistEntityIds.length > 0 ? artistEntityIds : normalizedIds,
+      labelIds: labelEntityIds,
+      canvasLayout: JSON.stringify(canvasLayout),
+      graphData: JSON.stringify(graphData),
+      detailsCache: JSON.stringify(Array.from(detailsCache.entries())),
+    };
+
+    if (currentCacheKey) {
+      basePayload.cacheKey = currentCacheKey;
+    }
+    if (resolvedSeedImageUrl) {
+      basePayload.seedImageUrl = resolvedSeedImageUrl;
+    }
+
+    return basePayload;
+  }, [graphData, seedArtists, activeNodeIds, pinnedNodes, chatHistories, discoveryFilters, lastViewedStackCount, projectName, detailsCache, user, currentCacheKey]);
+
   const handleSaveToDashboard = useCallback(async () => {
     if (!user) {
       // Phase 4A — Auth Handoff Preserver:
@@ -2608,89 +2630,20 @@ const App: React.FC = () => {
     setIsCreatingProject(true);
     const newDocRef = doc(collection(db, 'users', user.uid, 'projects'));
     const newId = newDocRef.id;
-
-    // Phase 05: Build lightweight canvas layout — artist and label nodes (x/y/fx/fy).
-    // Heavy graphData and detailsCache live in the global cache, referenced by cacheKey.
-    const canvasLayout = graphData.nodes
-      .filter(n => n.type === 'artist' || n.type === 'label')
-      .map(n => ({ nodeId: n.id, x: n.x, y: n.y, fx: n.fx ?? null, fy: n.fy ?? null }));
-
     const path = `users/${user.uid}/projects/${newId}`;
+
     try {
-      // Phase 2A — Canonical Seed Pinning:
-      // Always hoist seed artist(s) to activeNodes[0..k] before persisting.
-      // This guarantees that the onSnapshot handler's auto-select (L5387) opens the
-      // Deep Cut panel on the seed artist, not on a scrambled non-seed node.
-      const saveSeedNorms = seedArtists.split('::').map((a: string) => normalizeArtistId(a.trim())).filter(Boolean);
-      const hoistedSaveActiveNodes: string[] = [];
-      activeNodeIds.forEach(id => { if (isNodeInSeedList(id, saveSeedNorms)) hoistedSaveActiveNodes.push(id); });
-      activeNodeIds.forEach(id => { if (!isNodeInSeedList(id, saveSeedNorms)) hoistedSaveActiveNodes.push(id); });
+      const docPayload = buildBaseProjectPayload();
+      if (!docPayload) throw new Error("Could not build payload");
 
-      // Phase 3: Extract and append seedImageUrl from active detailsCache to the newly cloned project
-      const primarySaveSeedNorm = saveSeedNorms[0] || '';
-      
-      let saveImageDetails = null;
-      if (primarySaveSeedNorm) {
-        saveImageDetails = detailsCache.get(primarySaveSeedNorm) || detailsCache.get((seedArtists.split('::')[0] || '').trim().toLowerCase());
-        
-        // AI canonical slugs (e.g., spaced-us-usa) won't match 'spaced'. Find prefix matches.
-        if (!saveImageDetails) {
-          const fallbackKey = Array.from(detailsCache.keys()).find(k => (k as string).startsWith(primarySaveSeedNorm + '-'));
-          if (fallbackKey) {
-            saveImageDetails = detailsCache.get(fallbackKey);
-          }
-        }
-      }
-      
-      const actualDisplayName = (saveImageDetails as any)?.name || (saveImageDetails as any)?.details?.name;
-      let resolvedSeedImageUrl: string = (saveImageDetails as any)?.imageUrl || (saveImageDetails as any)?.details?.imageUrl || '';
-      if (!resolvedSeedImageUrl && sharedSeedImageUrlRef.current) {
-        resolvedSeedImageUrl = sharedSeedImageUrlRef.current;
-      }
-
-      const docPayload: Record<string, any> = {
-        name: (projectName && projectName !== seedArtists.split('::')[0]) 
-          ? projectName 
-          : (actualDisplayName || (seedArtists ? seedArtists.split('::')[0] : 'Saved Zcene')),
-        seedArtists,
-        activeNodes: hoistedSaveActiveNodes,  // Phase 2A: seed-first ordering
-        pinnedNodes: Array.from(pinnedNodes),
-        chatHistories: JSON.stringify(Array.from(chatHistories.entries())),
-        discoveryFilters: JSON.stringify(discoveryFilters),
-        lastViewedStackCount,
-        isMagazineViewOpen: false,
-        authorId: user.uid,
-        status: 'completed',
-        generationType: 'Clone', // Ensures clones don't trigger false ledger events
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      };
+      // For saved projects, we rely on the global cache and don't need to bloat the doc with inline detailsCache
+      delete docPayload.detailsCache;
 
       if (currentCacheKey) {
-        // Legacy path: if a compound cacheKey is still present in state (e.g. from a
-        // session started before Phase 1 landed), write it for backward compatibility.
-        // New sessions will always use artistIds instead.
-        docPayload.cacheKey = currentCacheKey;
-        docPayload.canvasLayout = JSON.stringify(canvasLayout);
-      } else {
-        // Phase 1+: write individual entity ID references + canvas layout.
-        // Each ID points to its own isolated /artists/{id} or /labels/{id} Firestore document.
-        const artistEntityIds = graphData.nodes
-          .filter((n: any) => n.type === 'artist')
-          .map((n: any) => normalizeArtistId(n.id));
-        const labelEntityIds = graphData.nodes
-          .filter((n: any) => n.type === 'label')
-          .map((n: any) => normalizeArtistId(n.id));
-        const seedList = seedArtists.split('::').map((a: string) => a.trim()).filter(Boolean);
-        const normalizedIds = seedList.map((name: string) => normalizeArtistId(name));
-        docPayload.artistIds = artistEntityIds.length > 0 ? artistEntityIds : normalizedIds;
-        docPayload.labelIds = labelEntityIds;
-        docPayload.canvasLayout = JSON.stringify(canvasLayout);
-        docPayload.graphData = JSON.stringify(graphData);
-      }
-      
-      if (resolvedSeedImageUrl) {
-        docPayload.seedImageUrl = resolvedSeedImageUrl;
+        // Legacy path: if a compound cacheKey is still present in state, drop redundant inline graphData blob
+        delete docPayload.graphData;
+        delete docPayload.artistIds;
+        delete docPayload.labelIds;
       }
 
       await setDoc(newDocRef, docPayload);
@@ -2703,7 +2656,7 @@ const App: React.FC = () => {
     } finally {
       setIsCreatingProject(false);
     }
-  }, [user, graphData, seedArtists, projectName, activeNodes, detailsCache, chatHistories, discoveryFilters, lastViewedStackCount, currentCacheKey, handleLogin, showToast, navigate, isViewingShare]);
+  }, [user, graphData, seedArtists, projectName, buildBaseProjectPayload, currentCacheKey, handleLogin, showToast, navigate, isViewingShare]);
 
   const handleDashboardRestartWalkthrough = useCallback(async () => {
     if (user) {
