@@ -1708,7 +1708,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                             const totalDetails = displayBadgeCount;
                             return (
                                 <button key={tab} ref={tab === 'details' ? deepCutTabRef : null} onClick={() => { setActiveTab(tab); if (tab === 'details') { if (!onboardingProgress.step5) updateOnboarding('step5'); /* Fix C: only auto-select when nothing is selected; preserve explicit user tap */ if (!selectedNode) selectFirstUnread(); } }} className={`flex-1 flex items-center justify-center gap-2 text-sm font-medium border-t-2 transition-colors -mt-[1px] ${activeTab === tab ? 'text-primary border-primary' : 'text-zinc-400 border-transparent hover:text-white active:text-white'}`}>
-                                    <span className="uppercase tracking-widest">{tab === 'details' ? 'Deep Cut' : tab}</span>
+                                    <span className="uppercase tracking-widest">{tab === 'details' ? 'Deep Cuts' : tab === 'artists' ? 'Seeds' : tab}</span>
                                     {tab === 'artists' && (
                                         <span className={`h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border shadow-sm transition-all duration-500 ${artistIndicatorStyles}`}>
                                             {enabledArtistsCount}
