@@ -1707,7 +1707,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         >
             {!isCompactMode ? (
                 /* Wide canvas: single-row ribbon — flex-nowrap prevents wrapping ever occurring */
-                <div className="flex flex-nowrap justify-center overflow-hidden border border-zinc-700 bg-zinc-900/90 backdrop-blur-md px-4 py-3 items-center gap-3 pointer-events-auto shadow-2xl rounded-2xl">
+                <div className="flex flex-nowrap justify-center overflow-hidden border border-zinc-700 bg-zinc-900/90 backdrop-blur-md p-3 items-center gap-3 pointer-events-auto shadow-2xl rounded-none">
                     {legendOrder.map(f => (
                         <div
                             key={f}
