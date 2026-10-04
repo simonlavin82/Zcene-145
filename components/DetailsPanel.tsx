@@ -1930,6 +1930,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     const filteredAndSortedNodes = useMemo(() => {
         if (systemError) return [];
         let result = [...activeNodes];
+        const pinnedSequenceArr = Array.from(pinnedNodes);
 
         // Component-Level Primacy: If activeNodes is empty but we have a selectedNode that is locked,
         // display the selectedNode card immediately instead of flashing the spinner.
@@ -1963,6 +1964,16 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
             // 1. Sort by Pinned State first
             const isAPinned = pinnedNodes.has(a.id) || pinnedNodes.has(a.id.toLowerCase());
             const isBPinned = pinnedNodes.has(b.id) || pinnedNodes.has(b.id.toLowerCase());
+            
+            if (isAPinned && isBPinned) {
+                let idxA = pinnedSequenceArr.indexOf(a.id);
+                if (idxA === -1) idxA = pinnedSequenceArr.indexOf(a.id.toLowerCase());
+                
+                let idxB = pinnedSequenceArr.indexOf(b.id);
+                if (idxB === -1) idxB = pinnedSequenceArr.indexOf(b.id.toLowerCase());
+                
+                return idxA - idxB;
+            }
             if (isAPinned && !isBPinned) return -1;
             if (!isAPinned && isBPinned) return 1;
 
