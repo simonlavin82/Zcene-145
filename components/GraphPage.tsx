@@ -66,7 +66,8 @@ interface GraphPageProps {
   onUpdateDetailsCache: (cache: Map<string, NodeDetails>) => void;
   loadingNodeIds: Set<string>;
   isHydrating?: boolean;
-  onCloseNode: (nodeId: string) => void;
+  onTogglePinNode: (nodeId: string) => void;
+  pinnedNodes: Set<string>;
   onRefreshNode: (nodeId: string) => void;
   detailsError: string | null;
   systemError: string | null;
@@ -656,7 +657,7 @@ const LibraryDialog: React.FC<{
 const GraphPage: React.FC<GraphPageProps> = ({
   data, baseGraph, libraryArtists, seedArtists, onRegenerate, onFork, isLoading,
   onCancelGeneration, onFileUpload, onNodeClick, selectedNode, peekedNode,
-  activeNodes, detailsCache, onUpdateDetailsCache, loadingNodeIds, onCloseNode, onRefreshNode, detailsError, systemError, onLogoClick, onNavigate, onClearLibrary, onClearZcene, isActive,
+  activeNodes, detailsCache, onUpdateDetailsCache, loadingNodeIds, onTogglePinNode, pinnedNodes, onRefreshNode, detailsError, systemError, onLogoClick, onNavigate, onClearLibrary, onClearZcene, isActive,
   chatHistories, onUpdateChatHistories, onShowToast, onRefreshUI, stack, onToggleStack,
   lastViewedStackCount, onUpdateLastViewedStackCount,
   discoveryFilters, onUpdateDiscoveryFilters, areFiltersChanged = false,
@@ -1556,7 +1557,8 @@ const GraphPage: React.FC<GraphPageProps> = ({
           isAdmin={isAdmin}
           detailsCache={detailsCache} onUpdateDetailsCache={onUpdateDetailsCache}
           loadingNodeIds={loadingNodeIds} 
-          onCloseNode={onCloseNode} 
+          onTogglePinNode={onTogglePinNode} 
+          pinnedNodes={pinnedNodes} 
           onRefreshNode={onRefreshNode} 
 
           error={detailsError} 

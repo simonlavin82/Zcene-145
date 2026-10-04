@@ -6,7 +6,8 @@ vi.mock('react-markdown', () => ({
   default: (props: any) => <div data-testid="markdown">{props.children}</div>
 }));
 vi.mock('lucide-react', () => ({
-  Flame: () => <div data-testid="flame-icon" />
+  Flame: () => <div data-testid="flame-icon" />,
+  Pin: () => <div data-testid="pin-icon" />
 }));
 vi.mock('../services/geminiService', () => ({
   streamNodeChat: vi.fn(),

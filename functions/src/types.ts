@@ -172,6 +172,7 @@ export interface Project {
   detailsCache?: string;    // JSON Map
   // --- Always present ---
   activeNodes: string[];
+  pinnedNodes?: string[];
   chatHistories?: string;   // JSON Map
   discoveryFilters?: string; // JSON
   lastViewedStackCount?: number;

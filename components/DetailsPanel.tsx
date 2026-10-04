@@ -12,7 +12,7 @@ import { db } from '../services/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import { formatSystemTimestamp } from '../utils/formatters';
 import { Select, InputSizes, LayoutSizes, Button } from './DesignSystem';
-import { Flame } from 'lucide-react';
+import { Flame, Pin } from 'lucide-react';
 import { useDominantColor } from '../hooks/useDominantColor';
 const SENTINEL_INSIGHT = 'No insight provided.';
 
@@ -237,7 +237,8 @@ interface NodeDetailsCardProps {
   seedArtists: string[];
   onAddArtist: (artistName: string) => void;
   isSmallScreen: boolean;
-  onClose: () => void;
+  onTogglePin: () => void;
+  isPinned: boolean;
   onNodeClick: (node: Node | null, forceActionState?: boolean) => void;
 
   onNavigate: (view: View) => void;
@@ -420,7 +421,7 @@ const ProfileRow: React.FC<ProfileRowProps> = ({ data, colorHex, isSmallScreen, 
 
 export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
   node, details, isLoading, isGlobalLoading, graphData, libraryArtists, seedArtists, onAddArtist, isSmallScreen, 
-  onClose, onNodeClick, onNavigate, 
+  onTogglePin, isPinned, onNodeClick, onNavigate, 
   chatHistory, onSendMessage, isChatLoading, chatMode, onChatModeChange, liveMessageCount, onDeleteMessage, onClearChat, isFullScreenMode = false, isHero = false, isInStack, onToggleStack, onToggleMagazineView, searchQuery, isGuest = false, onAuthRequest, user, userTaste, isAdmin = false,
   onUpdateTasteProfile, onShowToast, onOpenTasteModal, isActive = true, onStashArtist, onOpenStackDrawer, stack
 }) => {
@@ -950,8 +951,16 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             )}
 
 
-                            <button onClick={onClose} className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-700 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none" title="Remove Card">
-                                    <span className="material-symbols-outlined !text-[18px]">remove</span>
+                            <button 
+                                onClick={onTogglePin} 
+                                className={`w-8 h-8 flex flex-shrink-0 items-center justify-center border rounded-xl active:scale-95 transition-all duration-200 leading-none ${
+                                    isPinned 
+                                        ? 'border-primary/50 text-primary bg-primary/10 hover:bg-primary/20 hover:border-primary/70' 
+                                        : 'border-zinc-800/80 text-zinc-500 hover:text-zinc-200 hover:border-zinc-700 hover:bg-zinc-800'
+                                }`} 
+                                title={isPinned ? "Unpin Card" : "Pin Card"}
+                            >
+                                <Pin className={`w-[18px] h-[18px] ${isPinned ? 'fill-primary' : ''}`} />
                             </button>
 
 
@@ -1618,7 +1627,8 @@ interface DetailsPanelProps {
   detailsCache: Map<string, NodeDetails>;
   onUpdateDetailsCache?: (cache: Map<string, NodeDetails>) => void;
   loadingNodeIds: Set<string>;
-  onCloseNode: (nodeId: string) => void;
+  onTogglePinNode: (nodeId: string) => void;
+  pinnedNodes: Set<string>;
   onRefreshNode: (nodeId: string) => void;
   error: string | null;
   systemError: string | null;
@@ -1657,7 +1667,7 @@ interface DetailsPanelProps {
 }
 
 export const DetailsPanel: React.FC<DetailsPanelProps> = ({
-  selectedNode, activeNodes, detailsCache, onUpdateDetailsCache, loadingNodeIds, onCloseNode, onRefreshNode,
+  selectedNode, activeNodes, detailsCache, onUpdateDetailsCache, loadingNodeIds, onTogglePinNode, pinnedNodes, onRefreshNode,
   error, systemError, graphData, libraryArtists, seedArtists, onAddArtist, isCollapsed, onToggleCollapse,
   isSmallScreen, onNodeClick, onNavigate, isGlobalLoading, onCancelGlobalLoading, unreadCount, isActive, collapseBtnRef,
   isMagazineViewOpen, onMagazineViewToggle, chatHistories, onUpdateChatHistories, stack, onToggleStack,
@@ -2017,11 +2027,15 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         }
 
         // Sort
-        if (isMagazineViewOpen && magazineSortBy !== 'none') {
-            result.sort((a, b) => {
-                const detailsA = detailsCache.get(a.id) || detailsCache.get(a.id.toLowerCase()) || detailsCache.get(normalizeArtistId(a.id));
-                const detailsB = detailsCache.get(b.id) || detailsCache.get(b.id.toLowerCase()) || detailsCache.get(normalizeArtistId(b.id));
-                
+        result.sort((a, b) => {
+            // 1. Sort by Pinned State first
+            const isAPinned = pinnedNodes.has(a.id) || pinnedNodes.has(a.id.toLowerCase());
+            const isBPinned = pinnedNodes.has(b.id) || pinnedNodes.has(b.id.toLowerCase());
+            if (isAPinned && !isBPinned) return -1;
+            if (!isAPinned && isBPinned) return 1;
+
+            // 2. Magazine Sort (if applicable)
+            if (isMagazineViewOpen && magazineSortBy !== 'none') {
                 if (magazineSortBy === 'artist') {
                     const isArtistA = a.type !== 'label';
                     const isArtistB = b.type !== 'label';
@@ -2037,13 +2051,13 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     if (!isLabelA && isLabelB) return 1;
                     return (a.label || a.id).localeCompare(b.label || b.id);
                 }
-                
-                return 0;
-            });
-        }
+            }
+            
+            return 0; // Preserve default chronological order
+        });
 
         return result;
-    }, [activeNodes, isMagazineViewOpen, magazineSortBy, magazineSearchQuery, detailsCache]);
+    }, [activeNodes, isMagazineViewOpen, magazineSortBy, magazineSearchQuery, detailsCache, pinnedNodes]);
 
     const viewedNode = useMemo(() => {
         return filteredAndSortedNodes[viewedIndex] || null;
@@ -2398,7 +2412,8 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 seedArtists={seedArtists}
                                                 onAddArtist={onAddArtist}
                                                 isSmallScreen={isSmallScreen}
-                                                onClose={() => onCloseNode(node.id)}
+                                                onTogglePin={() => onTogglePinNode(node.id)}
+                                                isPinned={pinnedNodes.has(node.id) || pinnedNodes.has(node.id.toLowerCase())}
                                                 onNodeClick={onNodeClick}
                                                 onNavigate={onNavigate}
                                                 chatHistory={chatHistories.get(node.id) || []}

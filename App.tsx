@@ -1120,6 +1120,7 @@ const App: React.FC = () => {
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [peekedNode, setPeekedNode] = useState<Node | null>(null);
   const [activeNodeIds, setActiveNodeIds] = useState<string[]>([]);
+  const [pinnedNodes, setPinnedNodes] = useState<Set<string>>(new Set());
   const [stack, setStack] = useState<StackItem[]>([]);
   const [lastViewedStackCount, setLastViewedStackCount] = useState<number>(0);
   const [baseGraph, setBaseGraph] = useState<GraphData | null>(null);
@@ -1558,7 +1559,6 @@ const App: React.FC = () => {
   const lastViewedStackCountRef = useRef<number>(0);
   const currentCacheKeyRef = useRef<string | null>(null);
   const lastSyncedDocRef = useRef<string>('');
-  const evictedNodeIdsRef = useRef<Set<string>>(new Set());
   const approvedSeedsRef = useRef<Set<string>>(new Set());
   // Phase A — Coordinate Memory refs
   // lastSettledLayoutRef: dirty-check string to avoid redundant Firestore writes
@@ -2363,13 +2363,9 @@ const App: React.FC = () => {
     // If the local detailsCache is empty (e.g. freshly loaded project), query the root artists collection directly.
     // Firestore stores detailsCache as a JSON string — parse it and unwrap any array wrapper layers.
     let globalDoc: any | null = null;
-    const isEvicted = evictedNodeIdsRef.current.has(node.id) || 
-                      evictedNodeIdsRef.current.has(node.id.toLowerCase()) || 
-                      evictedNodeIdsRef.current.has(normalizeArtistId(node.id));
-    if (!isEvicted) {
-        try {
-            const standardizedId = normalizeArtistId(node.id);
-            globalDoc = await getEntityDocWithRedirect(disambiguatedCacheId, node.type === 'label' ? 'label' : 'artist');
+    try {
+        const standardizedId = normalizeArtistId(node.id);
+        globalDoc = await getEntityDocWithRedirect(disambiguatedCacheId, node.type === 'label' ? 'label' : 'artist');
             
             if (globalDoc.data()?._isStub && disambiguatedCacheId !== standardizedId) {
                 globalDoc = await getEntityDocWithRedirect(standardizedId, node.type === 'label' ? 'label' : 'artist');
@@ -2486,7 +2482,6 @@ const App: React.FC = () => {
         } catch(err) {
             console.warn("[Node Click] Global fallback read failed:", err);
         }
-    }
 
     const isNodeInGraph = graphData && graphData.nodes.some((n: any) => 
       n.id.toLowerCase() === node.id.toLowerCase() || 
@@ -2654,6 +2649,7 @@ const App: React.FC = () => {
           : (actualDisplayName || (seedArtists ? seedArtists.split('::')[0] : 'Saved Zcene')),
         seedArtists,
         activeNodes: hoistedSaveActiveNodes,  // Phase 2A: seed-first ordering
+        pinnedNodes: Array.from(pinnedNodes),
         chatHistories: JSON.stringify(Array.from(chatHistories.entries())),
         discoveryFilters: JSON.stringify(discoveryFilters),
         lastViewedStackCount,
@@ -5604,6 +5600,7 @@ const App: React.FC = () => {
   resolvedActiveNodes = [...resolvedActiveNodes, ...missingEntities];
 }
                       setActiveNodeIds(resolvedActiveNodes);
+                  setPinnedNodes(new Set(data.pinnedNodes || []));
                     }
 
                 }
@@ -5949,6 +5946,7 @@ const App: React.FC = () => {
           discoveryFilters: JSON.stringify(discoveryFilters),
           lastViewedStackCount,
           activeNodes: graphData?.nodes ? Array.from(new Set([...activeNodeIds, ...graphData.nodes.map(n => n.id)])).filter(id => graphData.nodes.some(n => n.id === id)) : activeNodeIds,
+          pinnedNodes: Array.from(pinnedNodes),
           isMagazineViewOpen: isMagazineViewOpen && activeNodes.length > 0,
           chatHistories: JSON.stringify(Array.from(chatHistories.entries())),
           authorId: user.uid,
@@ -6254,6 +6252,7 @@ const App: React.FC = () => {
   resolvedActiveNodes = [...resolvedActiveNodes, ...missingEntities];
 }
                   setActiveNodeIds(resolvedActiveNodes);
+                  setPinnedNodes(new Set(data.pinnedNodes || []));
                   
                   // Synchronously auto-select/hydrate the first active node if nothing is selected
                   if (!selectedNode && resolvedActiveNodes.length > 0) {
@@ -6381,18 +6380,27 @@ const App: React.FC = () => {
     };
   }, [handleGenerateGraph, seedArtists, isLoading, graphData, handleNodeClick, isAuthInitialized, user, isFirebaseReady, showToast, isAdmin, navigate, projects]);
 
-  const handleCloseNode = useCallback((nodeId: string) => {
-    setActiveNodeIds(prev => {
-      const idx = prev.findIndex(id => id.toLowerCase() === nodeId.toLowerCase());
-      if (idx === -1) return prev;
-      const next = prev.filter((_, i) => i !== idx);
-      if (selectedNode?.id.toLowerCase() === nodeId.toLowerCase()) {
-        const remaining = activeNodes.filter(n => n.id.toLowerCase() !== nodeId.toLowerCase());
-        setSelectedNode(remaining.length ? remaining[Math.min(idx, remaining.length - 1)] : null);
+  const handleTogglePinNode = useCallback((nodeId: string) => {
+    setPinnedNodes(prev => {
+      const next = new Set(prev);
+      const searchId = nodeId.toLowerCase();
+      
+      let foundId = null;
+      for (const id of next) {
+        if (id.toLowerCase() === searchId) {
+          foundId = id;
+          break;
+        }
+      }
+
+      if (foundId) {
+        next.delete(foundId);
+      } else {
+        next.add(nodeId);
       }
       return next;
     });
-  }, [selectedNode, activeNodes]);
+  }, []);
 
   const handleRefreshNode = useCallback(async (nodeId: string) => {
     // ── Token Quota Gate ───────────────────────────────────────────────────────
@@ -6437,9 +6445,6 @@ const App: React.FC = () => {
     });
 
     // 3. Mark as evicted so the details queue skips cache lookup
-    evictedNodeIdsRef.current.add(nodeId);
-    evictedNodeIdsRef.current.add(nodeId.toLowerCase());
-    evictedNodeIdsRef.current.add(cacheId);
 
     // 4. Trigger spinner immediately
     setLoadingNodeIds(prev => new Set(prev).add(nodeId));
@@ -6807,12 +6812,7 @@ const App: React.FC = () => {
                 let fallbackDetails: NodeDetails | null = null;
                 let isStale = false;
                 
-                const isEvicted = evictedNodeIdsRef.current.has(node.id) || 
-                                  evictedNodeIdsRef.current.has(node.id.toLowerCase()) || 
-                                  evictedNodeIdsRef.current.has(simpleId) ||
-                                  evictedNodeIdsRef.current.has(disambiguatedCacheId);
-                if (!isEvicted) {
-                  try {
+                try {
                     let cacheId = disambiguatedCacheId;
                     let cacheDoc = await getEntityDocWithRedirect(cacheId, node.type === 'label' ? 'label' : 'artist');
                     
@@ -6885,9 +6885,8 @@ const App: React.FC = () => {
                              }
                          } catch(e) { console.warn("Failed parsing global detailsCache", e); }
                       }
-                   }
+                    }
                 } catch (e) { console.warn("[Global Cache] Fallback read failed", e); }
-                }
 
                 let details: NodeDetails;
                 if (fallbackDetails && !checkIsProfileStaleOrCorrupt(fallbackDetails)) {
@@ -6986,10 +6985,6 @@ const App: React.FC = () => {
                   return updated;
                 });
                 
-                evictedNodeIdsRef.current.delete(node.id);
-                evictedNodeIdsRef.current.delete(node.id.toLowerCase());
-                evictedNodeIdsRef.current.delete(simpleId);
-                evictedNodeIdsRef.current.delete(disambiguatedCacheId);
 
                 incrementDeepCutsOpenedCount();
 
@@ -7533,7 +7528,7 @@ const App: React.FC = () => {
                 }; r.readAsText(f);
               }}
               onNodeClick={handleNodeClick} selectedNode={formattedSelectedNode} peekedNode={formattedPeekedNode} activeNodes={formattedActiveNodes}
-              detailsCache={detailsCache} onUpdateDetailsCache={setDetailsCache} loadingNodeIds={loadingNodeIds} onCloseNode={handleCloseNode}
+              detailsCache={detailsCache} onUpdateDetailsCache={setDetailsCache} loadingNodeIds={loadingNodeIds} onTogglePinNode={handleTogglePinNode} pinnedNodes={pinnedNodes}
               onRefreshNode={handleRefreshNode} detailsError={detailsError} systemError={error}
               onLogoClick={() => {
                 if (isGuest) {
