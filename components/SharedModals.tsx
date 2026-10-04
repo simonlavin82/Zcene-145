@@ -1397,6 +1397,8 @@ export function ConsolidatedValidationModal({ isOpen, seeds, onConfirm, onCancel
 
   if (!isOpen) return null;
 
+  const hasInvalidSeeds = seeds.some(seed => !seed.predictedOrigin || seed.predictedOrigin.trim() === '' || seed.predictedOrigin === 'Unknown Origin');
+
   return (
     <ModalBackdrop onClick={onCancel} className="z-[1100]">
       <ModalContainer data-testid="validation-modal" className="!overflow-visible relative z-[1150]">
@@ -1453,7 +1455,7 @@ export function ConsolidatedValidationModal({ isOpen, seeds, onConfirm, onCancel
             <button type="button" onClick={onCancel} className="px-4 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent">
               Cancel
             </button>
-            <button data-testid="validation-confirm-button" type="submit" className="px-6 py-2 bg-white text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all cursor-pointer whitespace-nowrap">
+            <button data-testid="validation-confirm-button" type="submit" disabled={hasInvalidSeeds} className={`px-6 py-2 bg-white text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all cursor-pointer whitespace-nowrap ${hasInvalidSeeds ? 'opacity-50 cursor-not-allowed' : ''}`}>
               Confirm & Generate
             </button>
           </ModalFooter>

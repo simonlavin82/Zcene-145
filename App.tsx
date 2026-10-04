@@ -1688,6 +1688,7 @@ const App: React.FC = () => {
     // Update route immediately
     navigate(`/p/${newId}`);
     setIsCreatingProject(true);
+    setIsLoading(false);
 
     const path = `users/${user.uid}/projects/${newId}`;
     try {
@@ -5924,6 +5925,9 @@ const App: React.FC = () => {
       setIsLoading(true);
     } else if (projectStatus === 'failed') {
       console.log(`[Re-hydration Hook] Project status: failed. Clearing loading state.`);
+      setIsLoading(false);
+    } else if (!projectStatus || projectStatus === 'idle') {
+      console.log(`[Re-hydration Hook] Project status: idle/null. Clearing loading state.`);
       setIsLoading(false);
     }
   }, [user, currentProjectId, isFirebaseReady, isGuest, projectStatus, graphData, selectedNode, seedArtists, handleNodeClick]);
