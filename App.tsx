@@ -5633,6 +5633,7 @@ const App: React.FC = () => {
         discoveryFilters: typeof data.discoveryFilters === 'string' ? data.discoveryFilters : JSON.stringify(data.discoveryFilters || {}),
         lastViewedStackCount: data.lastViewedStackCount || 0,
         activeNodes: data.activeNodes || [],
+        pinnedNodes: data.pinnedNodes || [],
         isMagazineViewOpen: false, // Don't rely on saved state for initial mount
         chatHistories: typeof data.chatHistories === 'string' ? data.chatHistories : JSON.stringify(data.chatHistories || []),
         canvasLayout: data.canvasLayout || '[]',
@@ -5848,20 +5849,19 @@ const App: React.FC = () => {
     if (!user || !isFirebaseReady || !isAuthInitialized || !currentProjectId || isGuest) return;
     if (!graphData || isProjectLoadingRef.current) return;
 
-    // Build canvas layout and payload for dirty comparison
-    const canvasLayout = graphData.nodes
-      .filter(n => n.type === 'artist' || n.type === 'label')
-      .map(n => ({ nodeId: n.id, x: n.x, y: n.y, fx: n.fx ?? null, fy: n.fy ?? null }));
+    const basePayload = buildBaseProjectPayload();
+    if (!basePayload) return;
 
     const currentPayload = {
-      seedArtists,
-      discoveryFilters: JSON.stringify(discoveryFilters),
-      lastViewedStackCount,
-      activeNodes: graphData?.nodes ? Array.from(new Set([...activeNodeIds, ...graphData.nodes.map(n => n.id)])).filter(id => graphData.nodes.some(n => n.id === id)) : activeNodeIds,
-      isMagazineViewOpen: isMagazineViewOpen && activeNodes.length > 0,
-      chatHistories: JSON.stringify(Array.from(chatHistories.entries())),
-      canvasLayout: JSON.stringify(canvasLayout),
-      graphData: JSON.stringify(graphData)
+      seedArtists: basePayload.seedArtists,
+      discoveryFilters: basePayload.discoveryFilters,
+      lastViewedStackCount: basePayload.lastViewedStackCount,
+      activeNodes: basePayload.activeNodes,
+      pinnedNodes: basePayload.pinnedNodes,
+      isMagazineViewOpen: basePayload.isMagazineViewOpen,
+      chatHistories: basePayload.chatHistories,
+      canvasLayout: basePayload.canvasLayout,
+      graphData: basePayload.graphData
     };
 
     if (lastSyncedDocRef.current && JSON.stringify(currentPayload) === lastSyncedDocRef.current) {
@@ -5881,46 +5881,15 @@ const App: React.FC = () => {
 
         console.log(`[Database Reporter] Attempting PROJECT SAVE | Path: ${projectPath}`);
         
-        const docPayload: Record<string, any> = {
-          seedArtists,
-          discoveryFilters: JSON.stringify(discoveryFilters),
-          lastViewedStackCount,
-          activeNodes: graphData?.nodes ? Array.from(new Set([...activeNodeIds, ...graphData.nodes.map(n => n.id)])).filter(id => graphData.nodes.some(n => n.id === id)) : activeNodeIds,
-          pinnedNodes: Array.from(pinnedNodes),
-          isMagazineViewOpen: isMagazineViewOpen && activeNodes.length > 0,
-          chatHistories: JSON.stringify(Array.from(chatHistories.entries())),
-          authorId: user.uid,
-          supportsLabelDeepCuts: supportsLabelDeepCuts,
-          schemaVersion: supportsLabelDeepCuts ? 2 : 1,
-          updatedAt: serverTimestamp(),
-        };
+        const docPayload: Record<string, any> = { ...basePayload };
+        delete docPayload.detailsCache;
+        delete docPayload.createdAt; // Retain original creation time
 
         const hasGraphNodes = graphData && graphData.nodes && graphData.nodes.length > 0;
         if (hasGraphNodes && projectStatus !== 'curating') {
           if (currentCacheKey) {
             // Legacy path: preserve the compound cacheKey if it was set in the current session
-            // (e.g. session started before Phase 1 was deployed). Write it for backward compatibility.
             docPayload.cacheKey = currentCacheKey;
-            docPayload.canvasLayout = JSON.stringify(canvasLayout);
-          } else {
-            // Phase 1+: derive the artistIds array from all artist nodes currently in the graph.
-            // Each entry points to an individual /artists/{id} Firestore document.
-            const currentArtistList = graphData.nodes
-              .filter((n: any) => n.type === 'artist')
-              .map((n: any) => normalizeArtistId(n.id));
-            const currentLabelList = graphData.nodes
-              .filter((n: any) => n.type === 'label')
-              .map((n: any) => normalizeArtistId(n.id));
-
-            if (currentArtistList.length > 0 || currentLabelList.length > 0) {
-              docPayload.artistIds = currentArtistList;
-              docPayload.labelIds = currentLabelList;
-              docPayload.canvasLayout = JSON.stringify(canvasLayout);
-              docPayload.graphData = JSON.stringify(graphData);
-            } else {
-              // No artists present yet — fall back to full blob (should be rare)
-              docPayload.graphData = JSON.stringify(graphData);
-            }
           }
         }
 
@@ -5953,7 +5922,7 @@ const App: React.FC = () => {
     }, 3000);
 
     return () => clearTimeout(timer);
-  }, [user, isFirebaseReady, isAuthInitialized, currentProjectId, graphData, seedArtists, discoveryFilters, activeNodes, isMagazineViewOpen, chatHistories, lastViewedStackCount, currentCacheKey]);
+  }, [user, isFirebaseReady, isAuthInitialized, currentProjectId, graphData, seedArtists, discoveryFilters, activeNodes, isMagazineViewOpen, chatHistories, lastViewedStackCount, currentCacheKey, pinnedNodes, buildBaseProjectPayload, projectStatus]);
 
   // Phase A — Coordinate Memory
   // Receives the settled artist/label canvas layout from MusicGraph.simulation.on("end")
