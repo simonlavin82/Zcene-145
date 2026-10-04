@@ -322,7 +322,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         return acc;
       }, new Map<string, Node>()).values()
     );
-    const finalVisibleNodeIds = new Set(finalVisibleNodes.map(n => String(n.id).toLowerCase()));
+    const finalVisibleNodeIds = new Set(finalVisibleNodes.map(n => String((n as Node).id).toLowerCase()));
     const finalVisibleLinks = data.links
       .filter(link => {
         if (!link.source || !link.target) return false;
