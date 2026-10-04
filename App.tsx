@@ -5265,6 +5265,8 @@ const App: React.FC = () => {
         setIsMagazineViewOpen(false); // Safely default to workspace view on initial load
       }
 
+      setPinnedNodes(new Set(data.pinnedNodes || []));
+
       try {
         let loadedFromGraphData = false;
         let hydratedNodes: Node[] = [];
@@ -5540,7 +5542,6 @@ const App: React.FC = () => {
   resolvedActiveNodes = [...resolvedActiveNodes, ...missingEntities];
 }
                       setActiveNodeIds(resolvedActiveNodes);
-                  setPinnedNodes(new Set(data.pinnedNodes || []));
                     }
 
                 }
@@ -6161,7 +6162,6 @@ const App: React.FC = () => {
   resolvedActiveNodes = [...resolvedActiveNodes, ...missingEntities];
 }
                   setActiveNodeIds(resolvedActiveNodes);
-                  setPinnedNodes(new Set(data.pinnedNodes || []));
                   
                   // Synchronously auto-select/hydrate the first active node if nothing is selected
                   if (!selectedNode && resolvedActiveNodes.length > 0) {
