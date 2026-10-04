@@ -6401,7 +6401,7 @@ const App: React.FC = () => {
       if (foundId) {
         next.delete(foundId);
       } else {
-        next.add(nodeId);
+        next.add(searchId);
       }
       return next;
     });

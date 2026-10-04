@@ -939,7 +939,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 className={`relative w-8 h-8 flex flex-shrink-0 items-center justify-center border rounded-xl active:scale-95 transition-all duration-200 leading-none ${
                                     isPinned 
                                         ? 'border-zinc-700/50 text-primary bg-zinc-900 hover:text-primary hover:border-zinc-500 hover:bg-zinc-800' 
-                                        : 'border-zinc-800/80 text-zinc-500 hover:text-zinc-200 hover:border-zinc-700 hover:bg-zinc-800'
+                                        : 'border-zinc-800/80 text-zinc-400 hover:text-white hover:border-zinc-700 hover:bg-zinc-800'
                                 }`} 
                                 title={isPinned ? "Unpin Card" : "Pin Card"}
                             >
@@ -1927,49 +1927,6 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         onUpdateChatHistories(new Map(chatHistories).set(nodeId, []));
     };
 
-    const handleNext = useCallback(() => {
-        if (activeNodes && viewedIndex < activeNodes.length - 1) {
-            const nextIdx = viewedIndex + 1;
-            setViewedIndex(nextIdx);
-            onNodeClick(activeNodes[nextIdx], true);
-        }
-    }, [viewedIndex, activeNodes, onNodeClick]);
-
-    const handlePrev = useCallback(() => {
-        if (activeNodes && viewedIndex > 0) {
-            const prevIdx = viewedIndex - 1;
-            setViewedIndex(prevIdx);
-            onNodeClick(activeNodes[prevIdx], true);
-        }
-    }, [viewedIndex, activeNodes, onNodeClick]);
-
-    const handleTouchStart = (e: React.TouchEvent) => {
-        // Fix A: ignore gestures when panel is not the active tab
-        if (isMagazineViewOpen || !isActive) return;
-        touchEndX.current = null;
-        touchStartX.current = e.targetTouches[0].clientX;
-    };
-
-    const handleTouchMove = (e: React.TouchEvent) => {
-        if (isMagazineViewOpen || !isActive) return;
-        touchEndX.current = e.targetTouches[0].clientX;
-    };
-
-    const handleTouchEnd = () => {
-        // Fix A: ignore if panel is not active, or if we have no valid gesture coords
-        if (isMagazineViewOpen || !isActive || !touchStartX.current || !touchEndX.current) return;
-        const distance = touchStartX.current - touchEndX.current;
-        const isLeftSwipe = distance > minSwipeDistance;
-        const isRightSwipe = distance < -minSwipeDistance;
-        
-        if (isLeftSwipe) handleNext();
-        if (isRightSwipe) handlePrev();
-    };
-
-    const toggleFullScreen = () => {
-        onMagazineViewToggle(!isMagazineViewOpen);
-    };
-
     const filteredAndSortedNodes = useMemo(() => {
         if (systemError) return [];
         let result = [...activeNodes];
@@ -2033,6 +1990,51 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
 
         return result;
     }, [activeNodes, isMagazineViewOpen, magazineSortBy, magazineSearchQuery, detailsCache, pinnedNodes]);
+
+    const handleNext = useCallback(() => {
+        if (filteredAndSortedNodes && viewedIndex < filteredAndSortedNodes.length - 1) {
+            const nextIdx = viewedIndex + 1;
+            setViewedIndex(nextIdx);
+            onNodeClick(filteredAndSortedNodes[nextIdx], true);
+        }
+    }, [viewedIndex, filteredAndSortedNodes, onNodeClick]);
+
+    const handlePrev = useCallback(() => {
+        if (filteredAndSortedNodes && viewedIndex > 0) {
+            const prevIdx = viewedIndex - 1;
+            setViewedIndex(prevIdx);
+            onNodeClick(filteredAndSortedNodes[prevIdx], true);
+        }
+    }, [viewedIndex, filteredAndSortedNodes, onNodeClick]);
+
+    const handleTouchStart = (e: React.TouchEvent) => {
+        // Fix A: ignore gestures when panel is not the active tab
+        if (isMagazineViewOpen || !isActive) return;
+        touchEndX.current = null;
+        touchStartX.current = e.targetTouches[0].clientX;
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        if (isMagazineViewOpen || !isActive) return;
+        touchEndX.current = e.targetTouches[0].clientX;
+    };
+
+    const handleTouchEnd = () => {
+        // Fix A: ignore if panel is not active, or if we have no valid gesture coords
+        if (isMagazineViewOpen || !isActive || !touchStartX.current || !touchEndX.current) return;
+        const distance = touchStartX.current - touchEndX.current;
+        const isLeftSwipe = distance > minSwipeDistance;
+        const isRightSwipe = distance < -minSwipeDistance;
+        
+        if (isLeftSwipe) handleNext();
+        if (isRightSwipe) handlePrev();
+    };
+
+    const toggleFullScreen = () => {
+        onMagazineViewToggle(!isMagazineViewOpen);
+    };
+
+
 
     const viewedNode = useMemo(() => {
         return filteredAndSortedNodes[viewedIndex] || null;
@@ -2231,10 +2233,10 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                 </div>
             ) : (
                 <div className="flex-grow flex flex-col min-h-0 h-full overflow-hidden">
-                    {!isMagazineViewOpen && activeNodes.length > 0 && (
+                    {!isMagazineViewOpen && filteredAndSortedNodes.length > 0 && (
                         <div className="flex justify-between items-center w-full px-4 py-2 border-b border-zinc-700/50 bg-zinc-900 flex-shrink-0 gap-3">
                             <div className="flex items-center space-x-3 overflow-hidden flex-1 pr-2">
-                                {activeNodes.length > 1 && (
+                                {filteredAndSortedNodes.length > 1 && (
                                     <>
                                         <button 
                                             onClick={handlePrev} 
@@ -2245,7 +2247,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                         </button>
                                         <button 
                                             onClick={handleNext} 
-                                            disabled={viewedIndex === activeNodes.length - 1}
+                                            disabled={viewedIndex === filteredAndSortedNodes.length - 1}
                                             className="w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 rounded-xl transition-colors disabled:opacity-20 disabled:pointer-events-none leading-none select-none outline-none focus:outline-none"
                                         >
                                             <span className="material-symbols-outlined !text-[18px]">chevron_right</span>
@@ -2256,7 +2258,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 ref={trackRef}
                                                 className="flex items-center flex-nowrap overflow-x-auto scrollbar-hide [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full h-full px-1"
                                             >
-                                                {activeNodes.map((node, i) => {
+                                                {filteredAndSortedNodes.map((node, i) => {
                                                     const isLoading = loadingNodeIds.has(node.id) || jitLoadingIds.has(normalizeArtistId(node.id));
                                                     const isActive = i === viewedIndex;
                                                     return (
