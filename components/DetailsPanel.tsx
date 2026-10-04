@@ -956,7 +956,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 onClick={onTogglePin} 
                                 className={`relative w-8 h-8 flex flex-shrink-0 items-center justify-center border rounded-xl active:scale-95 transition-all duration-200 leading-none ${
                                     isPinned 
-                                        ? 'border-primary/50 text-primary bg-primary/10 hover:bg-primary/20 hover:border-primary/70' 
+                                        ? 'border-zinc-700/50 text-primary bg-zinc-900 hover:text-primary hover:border-zinc-500 hover:bg-zinc-800' 
                                         : 'border-zinc-800/80 text-zinc-500 hover:text-zinc-200 hover:border-zinc-700 hover:bg-zinc-800'
                                 }`} 
                                 title={isPinned ? "Unpin Card" : "Pin Card"}

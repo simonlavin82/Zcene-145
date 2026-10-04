@@ -13,7 +13,7 @@ import Header from './Header';
 import { AdminViewToggle } from './ui/AdminViewToggle';
 import { SegmentedTextToggle } from './ui/SegmentedTextToggle';
 import { InfoTooltip } from './ui/InfoTooltip';
-import { Waypoints, Flame, Check, ArrowLeft } from 'lucide-react';
+import { Waypoints, Flame, Check, ArrowLeft, Pin } from 'lucide-react';
 import { TelemetryOverviewCards, DiscoveryLedgerTable, UserTelemetry } from './UsageAnalyticsPage';
 import { CountryFilterDropdown } from './SharedModals';
 import { extractInitials, generateDeterministicGradient, nodeTypeColorMap } from '../utils/formatters';
@@ -1202,6 +1202,20 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <IconDisplay icon={<Flame size={18} />} name="Taste Profile (Flame)" pxSize="18px" description="Represents user's taste compatibility (high energy/independent culture)." implementation="&lt;Flame size={18} /&gt;" />
                                     <IconDisplay icon={<VisibilityIcon className="w-[18px] h-[18px]" />} name="Show Password (Eye)" pxSize="18px" description="Toggles password field to visible. Used on all password inputs." implementation="&lt;VisibilityIcon className=&quot;w-[18px] h-[18px]&quot; /&gt;" />
                                     <IconDisplay icon={<VisibilityOffIcon className="w-[18px] h-[18px]" />} name="Hide Password (Eye-Off)" pxSize="18px" description="Paired with Eye; shown when the password is currently revealed." implementation="&lt;VisibilityOffIcon className=&quot;w-[18px] h-[18px]&quot; /&gt;" />
+                                    <IconDisplay icon={<Pin size={18} />} name="Pin / Deep Cuts Curate" pxSize="18px" description="Action icon for explicitly curating/pinning a Deep Cut node to the top of the stack." implementation="&lt;Pin size={18} /&gt;" />
+                                    <IconDisplay 
+                                        icon={
+                                            <div className="relative">
+                                                <Pin size={18} className="text-primary" />
+                                                <div className="absolute -top-1 -right-1 flex items-center justify-center w-4 h-4 bg-zinc-900 border border-zinc-700 text-[9px] font-bold text-white rounded-full">1</div>
+                                            </div>
+                                        } 
+                                        name="Active Pin w/ Sequence" 
+                                        pxSize="18px" 
+                                        description="Active state denoting a pinned card. The numerical badge indicates its precise index sequence. Always anchored absolute -top-1 -right-1." 
+                                        implementation="&lt;Pin /&gt; with absolute badge" 
+                                        overrideIconClass="" 
+                                    />
                                 </div>
                             </div>
                         </div>
@@ -1977,15 +1991,15 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </div>
                                     </div>
                                     <div className="flex flex-col items-center gap-4">
-                                        <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-primary/50 rounded-xl leading-none text-primary bg-primary/10 shadow-lg transition-colors">
+                                        <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-700/50 rounded-xl leading-none text-primary bg-zinc-900 shadow-lg transition-colors">
                                             <span className="material-symbols-outlined !text-[18px]">settings</span>
                                         </button>
                                         <div className="flex flex-col items-center gap-2">
                                             <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Selected Toggle Status</p>
                                             <div className="flex flex-wrap justify-center gap-1.5">
                                                 <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
-                                                    <span className="w-2 h-2 rounded-sm bg-primary/10 border border-primary/50"></span>
-                                                    bg-primary/10 border-primary/50
+                                                    <span className="w-2 h-2 rounded-sm bg-zinc-900 border border-zinc-700/50"></span>
+                                                    bg-zinc-900 border-zinc-700/50
                                                 </span>
                                                 <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
                                                     <span className="w-2 h-2 rounded-sm bg-primary border border-primary/80"></span>
