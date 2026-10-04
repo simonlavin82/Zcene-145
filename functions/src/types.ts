@@ -75,8 +75,6 @@ export interface NodeDetails {
     title: string;
     url: string;
   }>;
-  tourDates?: string[];
-  tourCachedAt?: string;
   synthesisRationale?: string;
   _isSentinel?: boolean;
 }

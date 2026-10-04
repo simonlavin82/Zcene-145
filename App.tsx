@@ -17,7 +17,7 @@ import HelpPage from './components/HelpPage';
 import GraphPage from './components/GraphPage';
 import HomePage from './components/HomePage';
 import Dashboard from './components/Dashboard';
-import { MyStackDialog, TokenConfirmationDialog, DisambiguationCandidate, ExploreActionDialog, FilterGuidanceModal, ConsolidatedValidationModal, PreFlightSeed } from './components/SharedModals';
+import { MyStackDialog, TokenConfirmationDialog, DisambiguationCandidate, FilterGuidanceModal, ConsolidatedValidationModal, PreFlightSeed } from './components/SharedModals';
 import { ModalBackdrop, ModalContainer, ModalHeader, ModalFooter, ModalBody } from './components/ui/Dialog';
 
 import { ShareModal } from './components/ShareModal';
@@ -1199,29 +1199,6 @@ const App: React.FC = () => {
     filters: DiscoveryFilters;
     errorMessage?: string;
   } | null>(null);
-  const [exploreConfirmation, setExploreConfirmation] = useState<{
-    isOpen: boolean;
-    artistName: string;
-    onConfirm: () => void;
-    onCancel: () => void;
-  } | null>(null);
-
-  const confirmExploreAction = useCallback((artistName: string) => {
-    return new Promise<boolean>((resolve) => {
-      setExploreConfirmation({
-        isOpen: true,
-        artistName,
-        onConfirm: () => {
-          setExploreConfirmation(null);
-          resolve(true);
-        },
-        onCancel: () => {
-          setExploreConfirmation(null);
-          resolve(false);
-        }
-      });
-    });
-  }, []);
 
   const confirmTokenUsage = useCallback((
     type: 'generation' | 'extension' | 'deep_cut_creation' | 'partial_synthesis' | 'cache_upgrade' | 'data_quality_optimization' | 'live_tour_search' | 'live_synthesis',
@@ -6485,122 +6462,6 @@ const App: React.FC = () => {
           });
       });
   }, [confirmTokenUsage]);
-  const handleExtendNode = useCallback(async (node: Node) => {
-    if (!graphData) return;
-
-    const artistDisplayName = node.label || titleCaseArtistId(node.id);
-    const exploreConfirmed = await confirmExploreAction(artistDisplayName);
-    if (!exploreConfirmed) return;
-
-    // Restoring Immersive Discovery Flow: Bypass the cache check on node expansions
-    // to force open the Cost Dialogue and dispatch a live API call upon user confirmation.
-
-    const confirmed = await confirmTokenUsage('extension', [], [artistDisplayName]);
-    if (!confirmed) return;
-
-    // 1. Mark the parent node as a seed if it's an artist
-    if (node.type === 'artist') {
-      const currentSeeds = seedArtists.split('::').map(s => s.trim().toLowerCase()).filter(Boolean);
-      if (!currentSeeds.includes(node.id.toLowerCase())) {
-        setSeedArtists(prev => prev ? `${prev}::${node.id}` : node.id);
-      }
-    }
-
-    // 2. Add a temporary loading node connected to the parent
-    const loadingNodeId = `loading-${Date.now()}`;
-    const loadingNode: Node = {
-      id: loadingNodeId,
-      label: 'Discovering...',
-      type: 'artist',
-      group: node.group,
-      isLoading: true,
-      x: node.x,
-      y: node.y
-    };
-
-    setGraphData(prev => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        nodes: [...prev.nodes, loadingNode],
-        links: [...prev.links, { source: node.id, target: loadingNodeId, value: 1 }]
-      };
-    });
-
-    try {
-      const extension = await extendGraphFromNode(node, graphData);
-
-      // Identify newly discovered artists and labels in the extension
-      const discoveredArtistNodes = extension.nodes.filter(n => n.type === 'artist' || n.type === 'label');
-      const discoveredArtistNames = discoveredArtistNodes.map(n => n.id);
-
-      const filteredNodes = graphData.nodes.filter(n => n.id !== loadingNodeId);
-      const filteredLinks = graphData.links.filter(l => {
-        const s = typeof l.source === 'string' ? l.source : (l.source as Node).id;
-        const t = typeof l.target === 'string' ? l.target : (l.target as Node).id;
-        return s !== loadingNodeId && t !== loadingNodeId;
-      });
-
-      const baseGraph = { nodes: filteredNodes, links: filteredLinks, synthesisRationale: graphData.synthesisRationale };
-      const mergedGraph = mergeGraphData(baseGraph, extension);
-
-      // Double-Write to Global Cache: Await global cache writes before updating canvas graphData state.
-      // This prevents the project canvas auto-save from racing ahead before the cache entries exist.
-      if (discoveredArtistNames.length > 0) {
-        const hasActiveFilters = !!(
-          discoveryFilters.foundedAfter ||
-          discoveryFilters.foundedBefore ||
-          (discoveryFilters.includeOrigins && discoveryFilters.includeOrigins.length > 0) ||
-          (discoveryFilters.excludeOrigins && discoveryFilters.excludeOrigins.length > 0) ||
-          (discoveryFilters.includeGenres && discoveryFilters.includeGenres.length > 0) ||
-          (discoveryFilters.additionalInstructions && discoveryFilters.additionalInstructions.trim().length > 0)
-        );
-        const isMultiSeed = seedArtists.includes('::');
-        
-        if (isMultiSeed || hasActiveFilters) {
-          console.log(`[Phase 4 Sandbox Guard] Bypassing global cache writes for network extension. Multi-Seed: ${isMultiSeed}, Filters: ${hasActiveFilters}`);
-        } else {
-
-          try {
-            const combinedDetailsMap = new Map([
-              ...detailsCacheRef.current,
-              ...healedDetailsCacheRef.current,
-              ...detailsCache
-            ]);
-            const allEntityNamesToCache = Array.from(new Set([...discoveredArtistNames, ...mergedGraph.nodes.filter(n => n.type === 'artist' || n.type === 'label').map(n => n.label || n.id)]));
-            await writeArtistCacheMany(allEntityNamesToCache, mergedGraph, user?.uid, discoveryFilters, true, false, combinedDetailsMap, discoveredArtistNames);
-            console.log(`[Node Extension] Global cache double-write confirmed for: ${allEntityNamesToCache.join(', ')}`);
-          } catch (e) {
-            console.error('[Node Extension] Global cache double-write failed:', e);
-          }
-        }
-      }
-
-      setGraphData(mergedGraph);
-
-      // Show toast for the new discovery
-      const newArtist = extension.nodes.find(n => n.type === 'artist' || n.type === 'label');
-      if (newArtist) {
-
-      }
-
-    } catch (err: any) {
-      setError(humanizeError(err));
-      // Cleanup loading node on error
-      setGraphData(prev => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          nodes: prev.nodes.filter(n => n.id !== loadingNodeId),
-          links: prev.links.filter(l => {
-            const s = typeof l.source === 'string' ? l.source : (l.source as Node).id;
-            const t = typeof l.target === 'string' ? l.target : (l.target as Node).id;
-            return s !== loadingNodeId && t !== loadingNodeId;
-          })
-        };
-      });
-    }
-  }, [graphData, seedArtists, user, discoveryFilters, showToast, humanizeError, confirmExploreAction, confirmTokenUsage]);
 
   const handleRemoveNode = useCallback((node: Node) => {
     setGraphData(prev => {
@@ -7698,7 +7559,7 @@ const App: React.FC = () => {
               lastViewedStackCount={lastViewedStackCount} onUpdateLastViewedStackCount={setLastViewedStackCount}
               discoveryFilters={discoveryFilters} onUpdateDiscoveryFilters={setDiscoveryFilters}
               isMagazineViewOpen={isMagazineViewOpen} onUpdateIsMagazineViewOpen={setIsMagazineViewOpen}
-              onExtendNode={handleExtendNode} onRemoveNode={handleRemoveNode}
+              onRemoveNode={handleRemoveNode}
               user={user} isGuest={isGuest}
               profile={profile}
               projectName={displayProjectName}
@@ -7925,12 +7786,6 @@ const App: React.FC = () => {
         shareUrl={activeShareUrl || ''}
       />
 
-      <ExploreActionDialog
-        isOpen={!!exploreConfirmation}
-        onClose={() => exploreConfirmation?.onCancel()}
-        onConfirm={() => exploreConfirmation?.onConfirm()}
-        artistName={exploreConfirmation?.artistName || ''}
-      />
 
       <FilterGuidanceModal
         isOpen={filterGuidanceState?.isOpen || false}

@@ -573,50 +573,7 @@ export const TokenConfirmationDialog: React.FC<{
 
 
 // --- Full Itinerary Dialog Component ---
-export const FullItineraryDialog: React.FC<{
-  isOpen: boolean;
-  onClose: () => void;
-  artistName: string;
-  tourDates: string[];
-}> = ({ isOpen, onClose, artistName, tourDates }) => {
-  if (!isOpen) return null;
 
-  return (
-    <ModalBackdrop className="z-[130]" onClick={onClose}>
-      <ModalContainer>
-        <ModalHeader>
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary !text-[18px]">calendar_month</span>
-            <h3 className="text-base font-medium text-white">Full Itinerary: {artistName}</h3>
-          </div>
-          <button 
-            onClick={onClose}
-            className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none"
-          >
-            <span className="material-symbols-outlined !text-[18px]">close</span>
-          </button>
-        </ModalHeader>
-
-        <div className="flex-grow overflow-y-auto p-5 space-y-2 max-h-[60vh]">
-          {tourDates.map((date, idx) => (
-            <p key={idx} className="text-sm font-normal text-zinc-300 py-1.5 border-b border-zinc-800/40 last:border-0">
-              • {date}
-            </p>
-          ))}
-        </div>
-
-        <ModalFooter>
-          <button 
-            onClick={onClose}
-            className="px-5 py-1.5 bg-white text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90"
-          >
-            Close
-          </button>
-        </ModalFooter>
-      </ModalContainer>
-    </ModalBackdrop>
-  );
-};
 
 
 // --- Generative Rationale Modal Component ---
@@ -1153,54 +1110,6 @@ export function DisambiguationModal({ isOpen, query, candidates, onSelect, isLiv
     );
 };
 
-export const ExploreActionDialog: React.FC<{
-  isOpen: boolean;
-  onClose: () => void;
-  onConfirm: () => void;
-  artistName: string;
-}> = ({ isOpen, onClose, onConfirm, artistName }) => {
-  if (!isOpen) return null;
-
-  return (
-    <ModalBackdrop className="z-[130]" onClick={onClose}>
-      <ModalContainer>
-        <ModalHeader>
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary !text-[18px]">explore</span>
-            <h3 className="text-lg font-medium text-white">Explore & Expand Spiderweb</h3>
-          </div>
-          <button 
-            onClick={onClose} 
-            className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none"
-          >
-            <span className="material-symbols-outlined !text-[18px]">close</span>
-          </button>
-        </ModalHeader>
-
-        <div className="p-5 text-sm text-zinc-300">
-          <p className="leading-relaxed">
-            You are expanding the spiderweb graph outward from <strong className="text-white font-semibold">{artistName}</strong>. Confirming will generate one additional AI artist node directly connecting to this artist and seamlessly weave it into your active session.
-          </p>
-        </div>
-
-        <ModalFooter>
-          <button
-            onClick={onClose}
-            className="px-4 py-1.5 border border-zinc-700 hover:border-zinc-500 text-zinc-300 hover:text-white rounded-xl font-medium text-sm transition-colors active:scale-95 cursor-pointer"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            className="px-4 py-1.5 bg-white text-brand-black rounded-xl font-semibold text-sm active:scale-95 transition-all hover:bg-yellow-400 cursor-pointer"
-          >
-            Continue
-          </button>
-        </ModalFooter>
-      </ModalContainer>
-    </ModalBackdrop>
-  );
-};
 
 
 

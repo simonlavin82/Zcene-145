@@ -2,11 +2,11 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom';
 import Markdown from 'react-markdown';
 import { Node, NodeDetails, GraphData, View, ChatMessage, StackItem, UserTaste, TasteProfile, COST_PER_AI_CALL } from '../types';
-import { streamNodeChat, fetchLiveTourData, streamLocalHeuristicChat, fetchNodeDetails } from '../services/geminiService';
+import { streamNodeChat, streamLocalHeuristicChat, fetchNodeDetails } from '../services/geminiService';
 import { normalizeArtistId, titleCaseArtistId, cleanArtistDisplayName, isNodeInSeedList, getArtistDocWithRedirect, enforceArtistCacheSchema, isArtistIdMatch } from '../services/artistCacheService';
 import { analyticsService } from '../services/analyticsService';
 import { Spinner, HelpIcon, MicIcon, LoadingSpinner, DETAIL_THINKING_STEPS, StackIcon, BandcampIcon } from './Icons';
-import { TokenConfirmationDialog, FullItineraryDialog, PROFILE_COLORS, MODAL_PROFILE_COLORS } from './SharedModals';
+import { TokenConfirmationDialog, PROFILE_COLORS, MODAL_PROFILE_COLORS } from './SharedModals';
 import { SegmentedTextToggle } from './ui/SegmentedTextToggle';
 import { db } from '../services/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
@@ -239,7 +239,7 @@ interface NodeDetailsCardProps {
   isSmallScreen: boolean;
   onClose: () => void;
   onNodeClick: (node: Node | null, forceActionState?: boolean) => void;
-  onExtendNode?: (node: Node) => void;
+
   onNavigate: (view: View) => void;
   chatHistory: ChatMessage[];
   onSendMessage: (message: string) => void;
@@ -420,7 +420,7 @@ const ProfileRow: React.FC<ProfileRowProps> = ({ data, colorHex, isSmallScreen, 
 
 export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
   node, details, isLoading, isGlobalLoading, graphData, libraryArtists, seedArtists, onAddArtist, isSmallScreen, 
-  onClose, onNodeClick, onExtendNode, onNavigate, 
+  onClose, onNodeClick, onNavigate, 
   chatHistory, onSendMessage, isChatLoading, chatMode, onChatModeChange, liveMessageCount, onDeleteMessage, onClearChat, isFullScreenMode = false, isHero = false, isInStack, onToggleStack, onToggleMagazineView, searchQuery, isGuest = false, onAuthRequest, user, userTaste, isAdmin = false,
   onUpdateTasteProfile, onShowToast, onOpenTasteModal, isActive = true, onStashArtist, onOpenStackDrawer, stack
 }) => {
@@ -681,79 +681,6 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         return tiers;
     }, [details?.imageUrl]);
     
-    const [tourStatus, setTourStatus] = useState<'idle' | 'cost_warning' | 'fetching' | 'resolved_summary' | 'full_itinerary_modal'>('idle');
-    const [tourDates, setTourDates] = useState<string[]>([]);
-    const [tourError, setTourError] = useState<string | null>(null);
-
-    useEffect(() => {
-        const cachedDates = details?.tourDates;
-        const cachedTimestamp = details?.tourCachedAt;
-
-        if (cachedTimestamp && !isTourCacheStale(cachedTimestamp)) {
-            setTourDates(cachedDates || []);
-            setTourStatus('resolved_summary');
-        } else {
-            setTourStatus('idle');
-            setTourDates([]);
-        }
-        setTourError(null);
-    }, [node.id, details]);
-
-    const handleFetchTourData = async () => {
-        setTourStatus('fetching');
-        setTourError(null);
-        try {
-            const data = await fetchLiveTourData(node.id);
-            const parsed = parseTourDates(data);
-            const freshDates = parsed.isTouring ? parsed.dates : [];
-            const freshCachedAt = new Date().toISOString();
-
-            setTourDates(freshDates);
-            setTourStatus('resolved_summary');
-
-            // Mutate local memory details object to persist it during active session
-            if (details) {
-                details.tourDates = freshDates;
-                details.tourCachedAt = freshCachedAt;
-            }
-
-            // Sync to global Firestore document under detailsCache JSON
-            const cacheId = normalizeArtistId(node.id);
-            (async () => {
-                try {
-                    const existingSnap = await getArtistDocWithRedirect(cacheId);
-                    if (existingSnap.exists()) {
-                        const snapData = existingSnap.data();
-                        let existingDetailsCache: any = {};
-                        if (snapData && snapData.detailsCache) {
-                            existingDetailsCache = typeof snapData.detailsCache === 'string'
-                                ? JSON.parse(snapData.detailsCache)
-                                : snapData.detailsCache;
-                        }
-
-                        const updatedDetails = {
-                            ...existingDetailsCache,
-                            tourDates: freshDates,
-                            tourCachedAt: freshCachedAt
-                        };
-
-                        const updatePayload = {
-                            detailsCache: updatedDetails
-                        };
-                        enforceArtistCacheSchema(updatePayload);
-                        await updateDoc(doc(db, 'artists', existingSnap.id), updatePayload);
-                        console.log(`[Tour Cache] Successfully synced tour data to Firestore for: ${existingSnap.id}`);
-                    }
-                } catch (dbErr) {
-                    console.warn("[Tour Cache] Failed to sync tour data back to Firestore:", dbErr);
-                }
-            })();
-        } catch (err) {
-            console.error("Failed to fetch live tour data:", err);
-            setTourError("Failed to fetch live tour data. Please try again.");
-            setTourStatus('idle');
-        }
-    };
 
     const chatContainerRef = useRef<HTMLDivElement>(null);
     const prevHistoryLength = useRef(chatHistory.length);
@@ -1010,15 +937,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     <StackIcon className="!text-[18px]" />
                                 </button>
                             )}
-                            {isArtistNode && !isGuest && onExtendNode && (
-                                <button
-                                    onClick={() => onExtendNode(node)}
-                                    className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 active:scale-95 leading-none text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-primary cursor-pointer"
-                                    title="Explore & expand graph outward from this artist"
-                                >
-                                    <span className="material-symbols-outlined !text-[18px]">explore</span>
-                                </button>
-                            )}
+
                             {isArtistNode && !isGuest && (
                                 <button
                                     onClick={() => onAddArtist(normalizeArtistId(node.id))}
@@ -1275,61 +1194,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                         <p className="text-sm font-normal text-zinc-200">{details.details.founded}</p>
                                     </div>
                                 )}
-                                {!isLabelNode && (() => {
-                                    return (
-                                        <div>
-                                            <h4 className="font-bold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">
-                                                Status
-                                            </h4>
-                                            <div className="flex flex-col gap-1">
-                                                {tourStatus === 'idle' && (
-                                                    <div className="flex flex-col gap-1">
-                                                        <button 
-                                                            onClick={() => {
-                                                                setTourError(null);
-                                                                setTourStatus('cost_warning');
-                                                            }}
-                                                            className="text-zinc-400 hover:text-primary transition-colors text-sm font-normal underline underline-offset-4 decoration-zinc-700 text-left w-fit"
-                                                        >
-                                                            Check tours
-                                                        </button>
-                                                        {tourError && (
-                                                            <p className="text-xs text-red-400 mt-1">{tourError}</p>
-                                                        )}
-                                                    </div>
-                                                )}
-                                                
-                                                {tourStatus === 'fetching' && (
-                                                    <div className="flex items-center gap-2 text-sm font-normal text-zinc-200 animate-pulse">
-                                                        Checking...
-                                                    </div>
-                                                )}
- 
-                                                {(tourStatus === 'resolved_summary' || tourStatus === 'full_itinerary_modal') && (
-                                                    <div className="space-y-1">
-                                                        {tourDates.length > 0 ? (
-                                                            <>
-                                                                <p className="text-sm font-normal text-zinc-200">
-                                                                    • {tourDates[0]}
-                                                                </p>
-                                                                <button 
-                                                                    onClick={() => setTourStatus('full_itinerary_modal')}
-                                                                    className="text-primary hover:underline text-xs font-semibold mt-1 text-left block"
-                                                                >
-                                                                    view tour
-                                                                </button>
-                                                            </>
-                                                        ) : (
-                                                            <p className="text-sm font-normal text-zinc-400">
-                                                                No active tour dates found for 2026.
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    );
-                                })()}
+
                             </div>
 
                             <div className="space-y-4">
@@ -1718,29 +1583,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                 </div>
             </div>
 
-            {/* Token Confirmation Dialog */}
-            {tourStatus === 'cost_warning' && createPortal(
-                <TokenConfirmationDialog
-                    isOpen={true}
-                    onClose={() => setTourStatus('idle')}
-                    onConfirm={handleFetchTourData}
-                    type="live_tour_search"
-                    cachedArtists={[]}
-                    missingArtists={[getArtistDisplayName(details, node)]}
-                />,
-                document.body
-            )}
 
-            {/* Full Itinerary Modal Container */}
-            {tourStatus === 'full_itinerary_modal' && createPortal(
-                <FullItineraryDialog
-                    isOpen={true}
-                    onClose={() => setTourStatus('resolved_summary')}
-                    artistName={getArtistDisplayName(details, node)}
-                    tourDates={tourDates}
-                />,
-                document.body
-            )}
         </>
     );
 
@@ -1788,7 +1631,7 @@ interface DetailsPanelProps {
   onToggleCollapse: () => void;
   isSmallScreen: boolean;
   onNodeClick: (node: Node | null, forceActionState?: boolean) => void;
-  onExtendNode?: (node: Node) => void;
+
   onNavigate: (view: View) => void;
   isGlobalLoading: boolean;
   onCancelGlobalLoading: () => void;
@@ -1817,7 +1660,7 @@ interface DetailsPanelProps {
 export const DetailsPanel: React.FC<DetailsPanelProps> = ({
   selectedNode, activeNodes, detailsCache, onUpdateDetailsCache, loadingNodeIds, onCloseNode, onRefreshNode,
   error, systemError, graphData, libraryArtists, seedArtists, onAddArtist, isCollapsed, onToggleCollapse,
-  isSmallScreen, onNodeClick, onExtendNode, onNavigate, isGlobalLoading, onCancelGlobalLoading, unreadCount, isActive, collapseBtnRef,
+  isSmallScreen, onNodeClick, onNavigate, isGlobalLoading, onCancelGlobalLoading, unreadCount, isActive, collapseBtnRef,
   isMagazineViewOpen, onMagazineViewToggle, chatHistories, onUpdateChatHistories, stack, onToggleStack,
   isGuest = false, onAuthRequest, user, userTaste, isAdmin = false,
   onUpdateTasteProfile, onShowToast, onOpenTasteModal, projectName, onStashArtist, onOpenStackDrawer
@@ -2578,7 +2421,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 onAuthRequest={onAuthRequest}
                                                 userTaste={userTaste}
                                                 isAdmin={isAdmin}
-                                                onExtendNode={onExtendNode}
+
                                                 onUpdateTasteProfile={onUpdateTasteProfile}
                                                 onShowToast={onShowToast}
                                                 onOpenTasteModal={onOpenTasteModal}

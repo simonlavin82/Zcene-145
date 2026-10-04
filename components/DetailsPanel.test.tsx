@@ -10,7 +10,6 @@ vi.mock('lucide-react', () => ({
 }));
 vi.mock('../services/geminiService', () => ({
   streamNodeChat: vi.fn(),
-  fetchLiveTourData: vi.fn(),
   streamLocalHeuristicChat: vi.fn(),
   fetchNodeDetails: vi.fn(),
 }));

@@ -88,7 +88,7 @@ interface GraphPageProps {
   areFiltersChanged?: boolean;
   isMagazineViewOpen: boolean;
   onUpdateIsMagazineViewOpen: (isOpen: boolean) => void;
-  onExtendNode?: (node: Node) => void;
+
   onRemoveNode?: (node: Node) => void;
   user: User | null;
   profile: any;
@@ -661,7 +661,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
   lastViewedStackCount, onUpdateLastViewedStackCount,
   discoveryFilters, onUpdateDiscoveryFilters, areFiltersChanged = false,
   isMagazineViewOpen, onUpdateIsMagazineViewOpen,
-  onExtendNode, onRemoveNode,
+  onRemoveNode,
   user, profile, onUpdateProfile, isAuthInitialized, onLogin, onLogout,
   onDeleteAccount,
   onSaveToDashboard,
@@ -1558,7 +1558,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
           loadingNodeIds={loadingNodeIds} 
           onCloseNode={onCloseNode} 
           onRefreshNode={onRefreshNode} 
-          onExtendNode={onExtendNode} 
+
           error={detailsError} 
           systemError={systemError}
           graphData={data} 
