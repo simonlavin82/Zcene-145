@@ -6382,12 +6382,12 @@ const App: React.FC = () => {
 
   const handleTogglePinNode = useCallback((nodeId: string) => {
     setPinnedNodes(prev => {
-      const next = new Set(prev);
+      const next = new Set<string>(prev);
       const searchId = nodeId.toLowerCase();
       
-      let foundId = null;
+      let foundId: string | null = null;
       for (const id of next) {
-        if (id.toLowerCase() === searchId) {
+        if (typeof id === 'string' && id.toLowerCase() === searchId) {
           foundId = id;
           break;
         }
