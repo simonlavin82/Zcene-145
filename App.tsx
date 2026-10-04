@@ -6139,6 +6139,7 @@ const App: React.FC = () => {
                 setSeedArtists(data.seedArtists);
                 if (data.name !== undefined) setProjectName(data.name);
                 if (data.seedImageUrl) sharedSeedImageUrlRef.current = data.seedImageUrl;
+                setPinnedNodes(new Set(data.pinnedNodes || []));
                 
                 let expandedCache = new Map();
                 if (data.detailsCache) {
