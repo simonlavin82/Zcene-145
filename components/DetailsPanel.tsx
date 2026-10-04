@@ -253,8 +253,7 @@ interface NodeDetailsCardProps {
   onClearChat?: () => void;
   isFullScreenMode?: boolean;
   isHero?: boolean;
-  isInStack: boolean;
-  onToggleStack: (node: Node, link?: string) => void;
+  onAddToStack: (node: Node, link?: string) => void;
   onToggleMagazineView?: () => void;
   searchQuery?: string;
   isGuest?: boolean;
@@ -268,7 +267,6 @@ interface NodeDetailsCardProps {
   isActive?: boolean;
   onStashArtist?: (artistName: string) => void;
   onOpenStackDrawer?: () => void;
-  stack: StackItem[];
 }
 
 const parseTourDates = (text: string): { isTouring: boolean; dates: string[] } => {
@@ -423,8 +421,8 @@ const ProfileRow: React.FC<ProfileRowProps> = ({ data, colorHex, isSmallScreen, 
 export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
   node, details, isLoading, isGlobalLoading, graphData, libraryArtists, seedArtists, onAddArtist, isSmallScreen, 
   onTogglePin, isPinned, pinSequence, onNodeClick, onNavigate, 
-  chatHistory, onSendMessage, isChatLoading, chatMode, onChatModeChange, liveMessageCount, onDeleteMessage, onClearChat, isFullScreenMode = false, isHero = false, isInStack, onToggleStack, onToggleMagazineView, searchQuery, isGuest = false, onAuthRequest, user, userTaste, isAdmin = false,
-  onUpdateTasteProfile, onShowToast, onOpenTasteModal, isActive = true, onStashArtist, onOpenStackDrawer, stack
+  chatHistory, onSendMessage, isChatLoading, chatMode, onChatModeChange, liveMessageCount, onDeleteMessage, onClearChat, isFullScreenMode = false, isHero = false, onAddToStack, onToggleMagazineView, searchQuery, isGuest = false, onAuthRequest, user, userTaste, isAdmin = false,
+  onUpdateTasteProfile, onShowToast, onOpenTasteModal, isActive = true, onStashArtist, onOpenStackDrawer
 }) => {
     const handleAddToTaste = async (node: Node, details: NodeDetails) => {
         if (!user) {
@@ -925,15 +923,11 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                             onAuthRequest?.();
                                             return;
                                         }
-                                        if (isInStack) {
-                                            onOpenStackDrawer?.();
-                                        } else {
-                                            onToggleStack(node, links.purchase?.[0]?.url);
-                                            onOpenStackDrawer?.();
-                                        }
+                                        onAddToStack(node, links.purchase?.[0]?.url);
+                                        onOpenStackDrawer?.();
                                     }}
-                                    className={`w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 active:scale-95 leading-none cursor-pointer ${isInStack ? 'text-primary bg-primary/5 border-primary/30' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'}`}
-                                    title={isInStack ? "Remove from My Stack" : "Save to My Stack"}
+                                    className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 active:scale-95 leading-none cursor-pointer text-zinc-400 hover:text-white hover:bg-zinc-800"
+                                    title="Save to My Stack"
                                 >
                                     <StackIcon className="!text-[18px]" />
                                 </button>
@@ -1229,7 +1223,6 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                 n.type === 'artist' && isArtistIdMatch(n.id, artistName)
                                             );
                                             const isExistingInGraph = !!existingNode;
-                                            const isAlreadyInStack = stack.some(item => item.id === normalizedArtist);
 
                                             if (isGuest) {
                                               return (
@@ -1261,16 +1254,12 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                     className={`border py-1.5 px-4 transition-all text-sm flex items-center gap-1.5 rounded-xl cursor-pointer ${
                                                         isExistingInGraph 
                                                             ? 'border-zinc-700 bg-zinc-800 text-white hover:bg-zinc-700' 
-                                                            : isAlreadyInStack
-                                                                ? 'border-primary/30 bg-primary/5 text-primary hover:bg-primary/10'
-                                                                : 'border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:text-white hover:bg-zinc-800 hover:border-zinc-700 active:scale-95'
+                                                            : 'border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:text-white hover:bg-zinc-800 hover:border-zinc-700 active:scale-95'
                                                     }`}
                                                 >
                                                     <span className="truncate tracking-normal">{artistName}</span>
                                                     {isExistingInGraph ? (
                                                         <span className="material-symbols-outlined !text-[14px] text-primary">check_circle</span>
-                                                    ) : isAlreadyInStack ? (
-                                                        <StackIcon className="!text-[14px] text-primary" />
                                                     ) : (
                                                         <StackIcon className="!text-[14px] opacity-70" />
                                                     )}
@@ -1645,8 +1634,7 @@ interface DetailsPanelProps {
   onMagazineViewToggle: (isOpen: boolean) => void;
   chatHistories: Map<string, ChatMessage[]>;
   onUpdateChatHistories: (histories: Map<string, ChatMessage[]>) => void;
-  stack: StackItem[];
-  onToggleStack: (node: Node, link?: string) => void;
+  onAddToStack: (node: Node, link?: string) => void;
   isGuest?: boolean;
   user?: any;
   onAuthRequest?: () => void;
@@ -1664,7 +1652,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
   selectedNode, activeNodes, detailsCache, onUpdateDetailsCache, loadingNodeIds, onTogglePinNode, pinnedNodes, onRefreshNode,
   error, systemError, graphData, libraryArtists, seedArtists, onAddArtist, isCollapsed, onToggleCollapse,
   isSmallScreen, onNodeClick, onNavigate, isGlobalLoading, onCancelGlobalLoading, unreadCount, isActive, collapseBtnRef,
-  isMagazineViewOpen, onMagazineViewToggle, chatHistories, onUpdateChatHistories, stack, onToggleStack,
+  isMagazineViewOpen, onMagazineViewToggle, chatHistories, onUpdateChatHistories, onAddToStack,
   isGuest = false, onAuthRequest, user, userTaste, isAdmin = false,
   onUpdateTasteProfile, onShowToast, onOpenTasteModal, projectName, onStashArtist, onOpenStackDrawer
 }) => {
@@ -2390,7 +2378,6 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                         const details = detailsCache.get(node.id) || detailsCache.get(node.id.toLowerCase()) || detailsCache.get(normalizeArtistId(node.id)) || null;
                                         const isRichData = details && details.imageUrl && details.summary.length > 200;
                                         const isHero = isMagazineViewOpen && (node.id === selectedNode?.id || (isRichData && node.type === 'artist'));
-                                        const isInStack = stack.some(item => item.id.toLowerCase() === node.id.toLowerCase());
                                         const pinSequenceIndex = pinnedArray.findIndex((id: any) => typeof id === 'string' && id.toLowerCase() === node.id.toLowerCase());
                                         const pinSequence = pinSequenceIndex !== -1 ? pinSequenceIndex + 1 : undefined;
 
@@ -2427,8 +2414,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 onClearChat={() => handleClearChat(node.id)}
                                                 isFullScreenMode={isMagazineViewOpen}
                                                 isHero={isHero}
-                                                isInStack={isInStack}
-                                                onToggleStack={onToggleStack}
+                                                onAddToStack={onAddToStack}
                                                 onToggleMagazineView={() => onMagazineViewToggle(!isMagazineViewOpen)}
                                                 searchQuery={isMagazineViewOpen ? magazineSearchQuery : undefined}
                                                 isGuest={isGuest}
@@ -2443,7 +2429,6 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 isActive={node.id === viewedNode?.id}
                                                 onStashArtist={onStashArtist}
                                                 onOpenStackDrawer={onOpenStackDrawer}
-                                                stack={stack}
                                             />
                                         </div>
                                     );

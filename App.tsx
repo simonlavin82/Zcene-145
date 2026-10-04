@@ -2517,7 +2517,7 @@ const App: React.FC = () => {
 
   }, [selectedNode, peekedNode, isSmallScreen, supportsLabelDeepCuts, showToast, isGuest]);
 
-  const handleToggleStack = useCallback(async (node: Node, link?: string) => {
+  const handleAddToStack = useCallback(async (node: Node, link?: string) => {
     if (!user) {
       setPendingAuthAction({ type: 'toggleStack', payload: { node, link } });
       handleLogin();
@@ -2528,44 +2528,32 @@ const App: React.FC = () => {
     const safeNodeId = node.id.replace(/[^a-zA-Z0-9_\-]/g, '_');
     const itemRef = doc(db, stackPath, safeNodeId);
     const itemPath = `${stackPath}/${safeNodeId}`;
-    let exists = false;
 
     try {
-      const existingItem = stack.find(item => item.id.toLowerCase() === node.id.toLowerCase());
-      exists = !!existingItem;
-      if (exists) {
-        console.log(`[Database Reporter] Attempting DELETE | Path: ${itemPath}`);
-        await deleteDoc(itemRef);
-        console.log(`[Database Reporter] SUCCESS: Item removed from Stack.`);
+      const newItem: StackItem = {
+        id: node.id,
+        type: node.type || "artist",
+        dateSaved: Date.now(),
+        link: link || "",
+        ...(projectName && { discoveredVia: projectName })
+      };
 
-      } else {
-        const newItem: StackItem = {
-          id: node.id,
-          type: node.type || "artist",
-          dateSaved: Date.now(),
-          link: link || "",
-          ...(projectName && { discoveredVia: projectName })
-        };
+      // PRE-FLIGHT DIAGNOSTIC LOGGING
+      console.log(`[Deep Cut Stack] PRE-FLIGHT CHECK - Object to be sent to Firestore:`, JSON.stringify(newItem, null, 2));
 
-        // PRE-FLIGHT DIAGNOSTIC LOGGING
-        console.log(`[Deep Cut Stack] PRE-FLIGHT CHECK - Object to be sent to Firestore:`, JSON.stringify(newItem, null, 2));
+      // Check for undefined or illegal fields
+      Object.entries(newItem).forEach(([key, value]) => {
+        if (value === undefined) {
+          console.warn(`[Deep Cut Stack] WARNING: Field '${key}' is undefined! This will cause Firebase failure.`);
+          // Cleanup to prevent crash
+          delete (newItem as any)[key];
+        }
+      });
 
-        // Check for undefined or illegal fields
-        Object.entries(newItem).forEach(([key, value]) => {
-          if (value === undefined) {
-            console.warn(`[Deep Cut Stack] WARNING: Field '${key}' is undefined! This will cause Firebase failure.`);
-            // Cleanup to prevent crash
-            delete (newItem as any)[key];
-          }
-        });
-
-        console.log(`[Database Reporter] Attempting WRITE | Path: ${itemPath}`);
-        await setDoc(itemRef, newItem);
-        console.log(`[Database Reporter] SUCCESS: Item added to Stack.`);
-
-        // SYNC VERIFICATION: Only show toast AFTER we know for sure it's in the DB
-        // showToast(`Added to My Stack`); - Removed because the drawer handles feedback
-      }
+      console.log(`[Database Reporter] Attempting WRITE | Path: ${itemPath}`);
+      await setDoc(itemRef, newItem);
+      console.log(`[Database Reporter] SUCCESS: Item added to Stack.`);
+      showToast(`Saved to My Stack`);
     } catch (err: any) {
       console.error(`[Database Reporter] STACK OPERATION FAILED at: ${itemPath}`);
       console.error("Full Firestore Error Object:", {
@@ -2575,9 +2563,25 @@ const App: React.FC = () => {
         stack: err?.stack,
         ...err
       });
-      handleFirestoreError(err, exists ? OperationType.DELETE : OperationType.WRITE, itemPath);
+      handleFirestoreError(err, OperationType.WRITE, itemPath);
     }
-  }, [user, stack, showToast, handleLogin, projectName]);
+  }, [user, showToast, handleLogin, projectName]);
+
+  const handleRemoveFromStack = useCallback(async (node: Node) => {
+    if (!user) return;
+    const stackPath = `users/${user.uid}/stack`;
+    const safeNodeId = node.id.replace(/[^a-zA-Z0-9_\-]/g, '_');
+    const itemRef = doc(db, stackPath, safeNodeId);
+    
+    try {
+      console.log(`[Database Reporter] Attempting DELETE | Path: ${stackPath}/${safeNodeId}`);
+      await deleteDoc(itemRef);
+      console.log(`[Database Reporter] SUCCESS: Item removed from Stack.`);
+    } catch (err: any) {
+      console.error(`[Database Reporter] STACK REMOVE OPERATION FAILED at: ${stackPath}/${safeNodeId}`);
+      handleFirestoreError(err, OperationType.DELETE, `${stackPath}/${safeNodeId}`);
+    }
+  }, [user]);
 
   const handleSaveToDashboard = useCallback(async () => {
     if (!user) {
@@ -4891,14 +4895,14 @@ const App: React.FC = () => {
 
       console.log(`[Lazy Registration] Executing pending action: ${type}`);
       if (type === 'toggleStack') {
-        handleToggleStack(payload.node, payload.link);
+        handleAddToStack(payload.node, payload.link);
       } else if (type === 'generateGraph') {
         handleGenerateGraph(payload.artists, payload.isRegeneration, payload.graphToEnhance);
       } else if (type === 'saveToDashboard') {
         handleSaveToDashboard();
       }
     }
-  }, [user, isAuthInitialized, pendingAuthAction, handleToggleStack, handleGenerateGraph, handleSaveToDashboard]);
+  }, [user, isAuthInitialized, pendingAuthAction, handleAddToStack, handleGenerateGraph, handleSaveToDashboard]);
 
   // Phase 4B — Auth Handoff Restore:
   // After a successful Google Sign-In (which may have been a full-page redirect), check
@@ -7539,7 +7543,7 @@ const App: React.FC = () => {
               }}
               onNavigate={handleMenuNavigate} onClearLibrary={handleClearLib} onClearZcene={handleClearZcene}
               isActive={currentView === View.Graph} chatHistories={chatHistories} onUpdateChatHistories={setChatHistories}
-              onShowToast={showToast} onRefreshUI={handleRefreshUI} stack={stack} onToggleStack={handleToggleStack}
+              onShowToast={showToast} onRefreshUI={handleRefreshUI} onAddToStack={handleAddToStack}
               onShareZcene={handleTriggerShareModal} isSharingZcene={isSharing}
               onDeleteAccount={handleDeleteAccount}
               isAdmin={isAdmin}
@@ -7742,7 +7746,7 @@ const App: React.FC = () => {
           }
         }}
         stack={stack}
-        onRemove={(node) => handleToggleStack(node)}
+        onRemove={(node) => handleRemoveFromStack(node)}
         onView={(id) => {
           if (id) {
             const node = graphData?.nodes.find(n => n.id.toLowerCase() === id.toLowerCase());

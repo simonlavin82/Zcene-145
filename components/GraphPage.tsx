@@ -80,8 +80,7 @@ interface GraphPageProps {
   onUpdateChatHistories: (histories: Map<string, ChatMessage[]>) => void;
   onShowToast: (message: string) => void;
   onRefreshUI: () => void;
-  stack: StackItem[];
-  onToggleStack: (node: Node, link?: string) => void;
+  onAddToStack: (node: Node, link?: string) => void;
   lastViewedStackCount: number;
   onUpdateLastViewedStackCount: (count: number) => void;
   discoveryFilters: DiscoveryFilters;
@@ -658,7 +657,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
   data, baseGraph, libraryArtists, seedArtists, onRegenerate, onFork, isLoading,
   onCancelGeneration, onFileUpload, onNodeClick, selectedNode, peekedNode,
   activeNodes, detailsCache, onUpdateDetailsCache, loadingNodeIds, onTogglePinNode, pinnedNodes, onRefreshNode, detailsError, systemError, onLogoClick, onNavigate, onClearLibrary, onClearZcene, isActive,
-  chatHistories, onUpdateChatHistories, onShowToast, onRefreshUI, stack, onToggleStack,
+  chatHistories, onUpdateChatHistories, onShowToast, onRefreshUI, onAddToStack,
   lastViewedStackCount, onUpdateLastViewedStackCount,
   discoveryFilters, onUpdateDiscoveryFilters, areFiltersChanged = false,
   isMagazineViewOpen, onUpdateIsMagazineViewOpen,
@@ -1589,8 +1588,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
           chatHistories={chatHistories} 
           onUpdateChatHistories={onUpdateChatHistories} 
           isActive={isActive} 
-          stack={stack} 
-          onToggleStack={onToggleStack} 
+          onAddToStack={onAddToStack} 
           isGuest={isGuest}
           user={user}
           onAuthRequest={() => { user ? onSaveToDashboard?.() : onLogin(); }}
@@ -1600,11 +1598,8 @@ const GraphPage: React.FC<GraphPageProps> = ({
           onOpenTasteModal={() => window.dispatchEvent(new CustomEvent('open-taste-modal'))}
           onStashArtist={(artistName) => {
               const normalizedId = normalizeArtistId(artistName);
-              const isAlreadyInStack = stack.some(item => item.id === normalizedId);
-              if (!isAlreadyInStack) {
-                  const nodeToAdd = { id: normalizedId, type: 'artist' as const, label: titleCaseArtistId(artistName), group: 0 };
-                  onToggleStack(nodeToAdd);
-              }
+              const nodeToAdd = { id: normalizedId, type: 'artist' as const, label: titleCaseArtistId(artistName), group: 0 };
+              onAddToStack(nodeToAdd);
               setIsStackDialogOpen(true);
           }}
           onOpenStackDrawer={() => setIsStackDialogOpen(true)}
