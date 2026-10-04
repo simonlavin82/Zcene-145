@@ -1,0 +1,9 @@
+{
+  "nodes": [
+    { "id": "sub-pop-usa", "label": "Sub Pop", "type": "label", "origin": "USA", "genres": [] },
+    { "id": "nirvana-usa", "label": "Nirvana", "type": "artist", "origin": "USA", "genres": ["Grunge"] }
+  ],
+  "links": [
+    { "source": "sub-pop-usa", "target": "nirvana-usa" }
+  ]
+}
