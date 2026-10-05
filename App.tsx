@@ -2897,7 +2897,7 @@ const App: React.FC = () => {
       let singleCacheDocData = null;
       let singleCacheResolvedSearchId = "";
 
-      if (!bypassDisambiguation && !skipCacheLookup) {
+      if (!skipCacheLookup) {
         cacheCandidatesPerSeed = await Promise.all(artistList.map(async (searchId, i) => {
           const rawInput = artists.split('::').map(s => s.trim()).filter(Boolean)[i] || searchId;
           const searchIdLower = searchId.toLowerCase();
@@ -2947,7 +2947,7 @@ const App: React.FC = () => {
           }
 
           // Phase 1 (Strict DB Cache): check disambiguation fallback
-          if (!isKnownCacheHit) {
+          if (!bypassDisambiguation && !isKnownCacheHit) {
             const cacheCandidates = await searchDisambiguationCandidates(searchId);
             if (cacheCandidates.length > 0) {
               predictedOrigin = cacheCandidates[0].origin || '';
