@@ -5334,32 +5334,6 @@ const App: React.FC = () => {
 }
                 setActiveNodeIds(resolvedActiveNodes);
                 
-                // Synchronously auto-select/hydrate the first active node if nothing is selected
-                if (!selectedNode && resolvedActiveNodes.length > 0 && hasAutoSelectedRef.current !== currentProjectId) {
-                  hasAutoSelectedRef.current = currentProjectId;
-                  const pinnedList = data.pinnedNodes || [];
-                  const defaultNodeId = pinnedList.length > 0 ? pinnedList[0] : resolvedActiveNodes[0];
-                  const defaultNode = g.nodes.find((n: any) => n.id.toLowerCase() === defaultNodeId.toLowerCase() || normalizeArtistId(n.id) === normalizeArtistId(defaultNodeId));
-                  if (defaultNode) {
-                    const normId = normalizeArtistId(defaultNode.id);
-                    const cachedDetails = detailsCacheRef.current.get(normId) || detailsCacheRef.current.get(defaultNode.id.toLowerCase());
-                    if (cachedDetails && cachedDetails.summary && !cachedDetails._isSentinel) {
-                      const hydratedNode = {
-                        ...defaultNode,
-                        bio: cachedDetails.summary,
-                        summary: cachedDetails.summary,
-                        genre: cachedDetails.details?.genre || "",
-                        origin: cachedDetails.details?.origin || "",
-                        founded: cachedDetails.details?.founded || "",
-                        name: cachedDetails.details?.artist || defaultNode.id,
-                        imageUrl: cachedDetails.imageUrl || ""
-                      };
-                      setSelectedNode(hydratedNode);
-                    } else {
-                      setSelectedNode(defaultNode);
-                    }
-                  }
-                }
               }
 
               loadedFromGraphData = true;
@@ -6166,31 +6140,6 @@ const App: React.FC = () => {
 }
                   setActiveNodeIds(resolvedActiveNodes);
                   
-                  // Synchronously auto-select/hydrate the first active node if nothing is selected
-                  if (!selectedNode && resolvedActiveNodes.length > 0) {
-                    const pinnedList = data.pinnedNodes || [];
-                    const defaultNodeId = pinnedList.length > 0 ? pinnedList[0] : resolvedActiveNodes[0];
-                    const defaultNode = g.nodes.find((n: any) => n.id.toLowerCase() === defaultNodeId.toLowerCase() || normalizeArtistId(n.id) === normalizeArtistId(defaultNodeId));
-                    if (defaultNode) {
-                      const normId = normalizeArtistId(defaultNode.id);
-                      const cachedDetails = expandedCache.get(normId) || expandedCache.get(defaultNode.id.toLowerCase());
-                      if (cachedDetails && cachedDetails.summary && !cachedDetails._isSentinel) {
-                        const hydratedNode = {
-                          ...defaultNode,
-                          bio: cachedDetails.summary,
-                          summary: cachedDetails.summary,
-                          genre: cachedDetails.details?.genre || "",
-                          origin: cachedDetails.details?.origin || "",
-                          founded: cachedDetails.details?.founded || "",
-                          name: cachedDetails.details?.artist || defaultNode.id,
-                          imageUrl: cachedDetails.imageUrl || ""
-                        };
-                        setSelectedNode(hydratedNode);
-                      } else {
-                        setSelectedNode(defaultNode);
-                      }
-                    }
-                  }
                 }
 
               } else {
