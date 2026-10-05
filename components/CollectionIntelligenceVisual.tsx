@@ -33,28 +33,23 @@ const CollectionIntelligenceVisual: React.FC<{ className?: string }> = ({ classN
 
                 {/* Top Pagination Bar (Matching DetailsPanel Top Navigation) */}
                 <div className="flex justify-between items-center w-full px-4 py-2 border-b border-zinc-700/50 bg-zinc-900 flex-shrink-0 gap-3">
-                    <div className="flex items-center space-x-3 overflow-hidden">
-                        <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-xl transition-colors leading-none">
+                    <div className="flex items-center space-x-3 overflow-hidden flex-1 pr-2">
+                        <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 rounded-xl transition-colors leading-none select-none outline-none focus:outline-none">
                             <span className="material-symbols-outlined !text-[18px]">chevron_left</span>
                         </button>
-                        <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-xl transition-colors leading-none">
+                        <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 rounded-xl transition-colors leading-none select-none outline-none focus:outline-none">
                             <span className="material-symbols-outlined !text-[18px]">chevron_right</span>
                         </button>
                         
-                        <div className="relative flex items-center max-w-[80px] overflow-hidden flex-shrink-0">
-                            <div className="flex items-center gap-1 flex-nowrap pr-4 overflow-hidden">
-                                <div className="h-1 w-4 bg-primary transition-all cursor-pointer flex-shrink-0 rounded-full" />
-                                <div className="h-1 w-1 bg-zinc-600 transition-all cursor-pointer flex-shrink-0 rounded-full" />
-                                <div className="h-1 w-1 bg-zinc-600 transition-all cursor-pointer flex-shrink-0 rounded-full" />
-                                <div className="h-1 w-1 bg-zinc-600 transition-all cursor-pointer flex-shrink-0 rounded-full" />
+                        <div className="relative flex items-center overflow-hidden flex-1 h-6 min-w-[40px] md:max-w-[240px] lg:max-w-[280px]">
+                            <div className="flex items-center gap-1 flex-nowrap pr-4 overflow-x-auto scrollbar-hide w-full h-full px-1">
+                                <div className="h-1 w-4 bg-primary transition-all flex-shrink-0 rounded-full" />
+                                <div className="h-1 w-1 bg-zinc-600 transition-all flex-shrink-0 rounded-full" />
+                                <div className="h-1 w-1 bg-zinc-600 transition-all flex-shrink-0 rounded-full" />
+                                <div className="h-1 w-1 bg-zinc-600 transition-all flex-shrink-0 rounded-full" />
                             </div>
                         </div>
                     </div>
-
-                    <button className="flex items-center gap-1.5 px-3 py-1.5 border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 active:scale-95 transition-all text-xs font-medium shrink-0 leading-none">
-                        <span className="material-symbols-outlined !text-[16px]">auto_stories</span>
-                        <span>Magazine View</span>
-                    </button>
                 </div>
 
                 <div className="flex-grow overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800">
@@ -62,35 +57,33 @@ const CollectionIntelligenceVisual: React.FC<{ className?: string }> = ({ classN
                     <div className="px-4 pt-3 pb-3 border-b border-zinc-800/50 bg-zinc-900 z-20 flex-shrink-0">
                         <div className="flex flex-col gap-2 mb-2">
                             <div className="flex items-center justify-end gap-1 flex-shrink-0">
-                                {/* Stack Icon */}
-                                <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-700 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none">
-                                    <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
-                                    </svg>
+                                <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 active:scale-95 leading-none cursor-pointer text-zinc-400 hover:text-white hover:bg-zinc-800" title="Save to My Stack">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path><path d="M12 12v9"></path><path d="m8 17 4 4 4-4"></path></svg>
                                 </button>
-                                {/* Add to Seeds button */}
-                                <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl text-primary bg-primary/5 border-primary/30 hover:border-zinc-700 active:scale-95 transition-all duration-200 leading-none">
-                                    <span className="material-symbols-outlined !text-[18px]">check_circle</span>
+                                <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 hover:bg-zinc-800 active:scale-95 leading-none text-zinc-400 hover:text-white hover:bg-zinc-800" title="Add to Style">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"></path></svg>
                                 </button>
-                                {/* Remove Card button */}
-                                <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-700 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none">
-                                    <span className="material-symbols-outlined !text-[18px]">remove</span>
+                                <button className="relative w-8 h-8 flex flex-shrink-0 items-center justify-center border rounded-xl active:scale-95 transition-all duration-200 leading-none border-zinc-700/50 text-primary bg-zinc-900 hover:text-primary hover:border-zinc-500 hover:bg-zinc-800" title="Unpin Card">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="17" x2="12" y2="22"></line><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.6V6a3 3 0 0 0-3-3h-0a3 3 0 0 0-3 3v4.6a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path></svg>
+                                    <div className="absolute -top-1 -right-1 flex items-center justify-center w-4 h-4 bg-zinc-900 border border-zinc-700 text-[9px] font-bold text-white rounded-full">
+                                        2
+                                    </div>
                                 </button>
                             </div>
                             
-                            <div className="flex flex-col gap-1 min-w-0 flex-grow">
+                            <div className="flex flex-col gap-1.5 min-w-0 flex-grow">
                                 <div className="flex items-center gap-2">
                                     <div className="group flex items-center gap-2 cursor-copy w-fit transition-all min-w-0">
                                         <h3 className="text-xl font-medium text-white leading-[0.9] py-1 break-normal">
-                                            The Get Up Kids
+                                            Spaced
                                         </h3>
                                         <span className="material-symbols-outlined !text-[16px] text-zinc-500 opacity-0 group-hover:opacity-100 transition-all duration-300">
                                             content_copy
                                         </span>
                                     </div>
                                 </div>
-                                <div className="flex flex-wrap items-center gap-2 mt-1">
-                                    <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-400 bg-zinc-800/80 px-2 py-0.5 border border-zinc-700/50 rounded-md">artist</span>
+                                <div className="flex flex-wrap items-center gap-2 transition-all duration-300 overflow-hidden max-h-10 opacity-100 mt-1">
+                                    <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-300 bg-zinc-800/50 px-2 py-0.5 rounded-xl">artist</span>
                                 </div>
                             </div>
                         </div>
@@ -100,18 +93,18 @@ const CollectionIntelligenceVisual: React.FC<{ className?: string }> = ({ classN
                         {/* Style Bar (Matching DetailsPanel Style Meter) */}
                         <div className="flex flex-col gap-2 w-full">
                             <div className="flex justify-between items-center text-[10px]">
-                                <span className="text-zinc-300 font-medium">Core Taste</span>
+                                <span className="text-zinc-300 font-medium">Higher Power</span>
                                 <div className="flex items-center gap-1.5">
-                                    <span className="font-mono font-bold text-[#a855f7]">
-                                        3/4 Hits
+                                    <span className="font-mono font-bold text-[#38bdf8]">
+                                        2/4 Hits
                                     </span>
                                 </div>
                             </div>
                             <div className="grid grid-cols-4 gap-1.5 w-full relative group">
-                                <div className="h-2 border transition-all duration-300 relative bg-[#a855f7] border-[#a855f7] border-solid" />
-                                <div className="h-2 border transition-all duration-300 relative bg-[#a855f7] border-[#a855f7] border-solid" />
+                                <div className="h-2 border transition-all duration-300 relative bg-[#38bdf8] border-[#38bdf8] border-solid" />
+                                <div className="h-2 border transition-all duration-300 relative bg-[#38bdf8] border-[#38bdf8] border-solid" />
                                 <div className="h-2 border transition-all duration-300 relative bg-transparent border-[#52525b] border-solid" />
-                                <div className="h-2 border transition-all duration-300 relative bg-[#a855f7] border-[#a855f7] border-solid" />
+                                <div className="h-2 border transition-all duration-300 relative bg-transparent border-[#52525b] border-solid" />
                             </div>
                             <div className="flex justify-between text-[8px] font-mono tracking-widest text-zinc-500 uppercase select-none mt-0">
                                 <span>GENRE</span>
@@ -121,10 +114,23 @@ const CollectionIntelligenceVisual: React.FC<{ className?: string }> = ({ classN
                             </div>
                         </div>
 
+                        {/* Album Art */}
+                        <div className="relative mx-auto w-fit mt-6 mb-2">
+                            <div className="absolute inset-[-15%] rounded-full opacity-35 blur-2xl transition-colors duration-1000 z-0 pointer-events-none" style={{ backgroundColor: '#38bdf8' }} />
+                            <div className="w-40 h-40 sm:w-44 sm:h-44 flex-shrink-0 mx-auto bg-zinc-900 overflow-hidden relative ring-1 ring-white/10 ring-inset rounded-lg group z-10 shadow-[0_12px_36px_0px_rgba(0,0,0,0.85),0_3px_8px_0px_rgba(0,0,0,0.65)]">
+                                <img 
+                                    src="https://storage.googleapis.com/zcene-prod-assets/Spaced%20album%20cover.jpg"
+                                    alt="Spaced" 
+                                    className="relative w-full h-full object-cover block scale-105 group-hover:scale-100 transition-all duration-1000 opacity-100 z-20"
+                                    onError={(e) => { e.currentTarget.src = "https://storage.googleapis.com/zcene-prod-assets/The%20Get%20Up%20Kids.jpeg"; }}
+                                />
+                            </div>
+                        </div>
+
                         {/* Bio Quote (Matching DetailsPanel Quote block) */}
                         <div className="pt-2">
                             <p className="italic text-zinc-100 leading-tight font-serif tracking-tight text-[clamp(1.125rem,1.5vw,1.25rem)]">
-                                "The Get Up Kids are essential architects of the second-wave emo sound. Their ability to blend raw emotional vulnerability with infectious power-pop hooks created a blueprint that defined a generation of alternative music."
+                                "Spaced revitalizes the hardcore punk genre by injecting vibrant, alternative textures into traditional fast-paced aggression. Their forward-thinking approach makes them a crucial voice in the underground music landscape."
                             </p>
                         </div>
 
@@ -233,6 +239,14 @@ const CollectionIntelligenceVisual: React.FC<{ className?: string }> = ({ classN
                             </div>
                         </div>
                     </div>
+                </div>
+
+                {/* Floating Magazine Pill Badge */}
+                <div className="absolute bottom-6 left-0 right-0 flex justify-center pointer-events-none z-50">
+                    <button className="pointer-events-auto flex items-center justify-center gap-2 h-10 px-5 bg-zinc-800 text-white rounded-full font-medium text-sm transition-all duration-300 shadow-xl backdrop-blur-md border border-zinc-700 hover:bg-zinc-700 active:scale-95">
+                        <span className="material-symbols-outlined !text-[18px]">auto_stories</span>
+                        <span>Magazine</span>
+                    </button>
                 </div>
             </div>
         </div>
