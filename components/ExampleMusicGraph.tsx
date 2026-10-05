@@ -105,122 +105,6 @@ const ExampleMusicGraph: React.FC = () => {
     
     const legendOrder: FilterKeys[] = ['seed', 'recommended', 'label', 'genre', 'country', 'founded'];
 
-    // Automated Discovery Flow Animation
-    useEffect(() => {
-        const runDiscoveryFlow = async () => {
-        // 1. Wait a bit at start
-        await new Promise(r => setTimeout(r, 3000));
-
-        // 2. Select a node to "discover" from (e.g., The Get Up Kids)
-        const targetNodeId = 'The Get Up Kids';
-        setAnimatingNode(targetNodeId);
-        isDiscoveryFlowActiveRef.current = true;
-        
-        // Wake up simulation and keep it warm for the UI overlay
-        if (simulationRef.current) {
-            simulationRef.current.alphaTarget(0.05).restart();
-        }
-        
-        // Sync position immediately so UI shows up even if simulation is cold
-        const initialSimNodes = simulationRef.current?.nodes() || [];
-        const initialTarget = initialSimNodes.find(n => n.id === targetNodeId);
-        if (initialTarget) {
-            setAnimatingNodePos({ x: initialTarget.x ?? 0, y: initialTarget.y ?? 0 });
-        }
-        
-        // 3. Show Action Buttons (+/-) - they should appear to come "out" of the node
-        await new Promise(r => setTimeout(r, 1000));
-        setShowDiscoveryUI(true);
-
-        // 4. Simulate "Click" on + (Visual feedback)
-        await new Promise(r => setTimeout(r, 1500));
-        setIsDiscovering(true);
-
-        // 4.2 Small delay to let the click animation "sink in"
-        await new Promise(r => setTimeout(r, 400));
-
-        // 4.5 Add temporary "Loading" node
-        const loadingNodeId = 'loading-node';
-        setGraphData(prev => {
-            // Get fresh positions from simulation for zero-jump
-            const simNodes = simulationRef.current?.nodes() || [];
-            const targetNode = simNodes.find(n => n.id === targetNodeId);
-            
-            const loadingNode: Node = { 
-                id: loadingNodeId, 
-                type: 'artist', 
-                group: 5, 
-                isLoading: true,
-                label: 'Discovering...',
-                // Inherit current position and velocity for zero-jump
-                x: targetNode?.x,
-                y: targetNode?.y,
-                vx: targetNode?.vx,
-                vy: targetNode?.vy
-            };
-            return {
-                nodes: [...prev.nodes, loadingNode],
-                links: [...prev.links, { source: targetNodeId, target: loadingNodeId, value: 1 }]
-            };
-        });
-
-        // 5. Add new node and link (Extended time for emphasis)
-        await new Promise(r => setTimeout(r, 4500));
-        const newNodeId = 'New Found Glory';
-        
-        setGraphData(prev => {
-            // Find the loading node's last position AND velocity from the simulation to inherit it
-            const simNodes = simulationRef.current?.nodes() || [];
-            const simLoadingNode = simNodes.find(n => n.id === loadingNodeId);
-            
-            // Remove loading node and add real node
-            const filteredNodes = prev.nodes.filter(n => n.id !== loadingNodeId);
-            const filteredLinks = prev.links.filter(l => {
-                const tId = typeof l.target === 'string' ? l.target : l.target.id;
-                return tId !== loadingNodeId;
-            });
-
-            if (filteredNodes.find(n => n.id === newNodeId)) return prev;
-            
-            const newNode: Node = { 
-                id: newNodeId, 
-                type: 'artist', 
-                group: 5,
-                x: simLoadingNode?.x, 
-                y: simLoadingNode?.y,
-                vx: simLoadingNode?.vx,
-                vy: simLoadingNode?.vy
-            };
-            const newNodes = [...filteredNodes, newNode];
-            const newLinks = [...filteredLinks, { source: targetNodeId, target: newNodeId, value: 1 }];
-            
-            // Also update the target node to be a "seed" (visually)
-            const updatedNodes = newNodes.map(n => 
-                n.id === targetNodeId ? { ...n, isSeed: true } : n
-            );
-
-            return { nodes: updatedNodes, links: newLinks };
-        });
-
-            // 6. Hide UI and clear animation state
-            await new Promise(r => setTimeout(r, 2000));
-            setShowDiscoveryUI(false);
-            setIsDiscovering(false);
-            setAnimatingNode(null);
-            isDiscoveryFlowActiveRef.current = false;
-            if (simulationRef.current) {
-                simulationRef.current.alphaTarget(0);
-            }
-
-            // 7. Reset after a long pause to loop
-            await new Promise(r => setTimeout(r, 10000));
-            isResettingRef.current = true;
-            setGraphData(JSON.parse(JSON.stringify(exampleGraphData)));
-            runDiscoveryFlow();
-        };
-
-        runDiscoveryFlow();
-    }, []);
 
     useEffect(() => {
         if (!svgRef.current || dimensions.width === 0) return;
@@ -342,54 +226,53 @@ const ExampleMusicGraph: React.FC = () => {
             .join(
                 enter => {
                     const g = enter.append("g").attr("class", "node");
-                    g.append("path").attr("class", "node-shape");
                     g.append("text")
+                        .attr("class", "node-icon material-symbols-outlined")
+                        .attr("text-anchor", "middle")
+                        .attr("dominant-baseline", "central")
+                        .style("font-variation-settings", "'FILL' 1")
+                        .style("pointer-events", "none")
+                        .style("user-select", "none");
+                    g.append("text")
+                        .attr("class", "font-medium")
                         .attr("text-anchor", "middle")
                         .attr("fill", "#e4e4e7")
                         .style("pointer-events", "none")
-                        .style("text-shadow", "0 0 5px #000, 0 0 5px #000")
-                        .attr("class", "font-medium");
+                        .style("text-shadow", "0 0 5px #000, 0 0 5px #000");
                     return g;
                 }
             );
 
         const seedIds = ['Jimmy Eat World', 'blink-182'];
         
-        node.select(".node-shape")
-            .attr("d", (d: any) => {
-                if (d.isLoading) return d3.symbol().type(d3.symbolCircle).size(600)();
+        node.select(".node-icon")
+            .text((d: any) => {
                 const isSeed = seedIds.includes(d.id) || d.isSeed;
-                const area = d.type === 'artist' ? 350 : 250;
-
-                if (d.type === 'artist') {
-                    return isSeed ? d3.symbol().type(d3.symbolCircle).size(area)() : d3.symbol().type(d3.symbolStar).size(area + 50)();
-                }
-                if (d.type === 'genre') return d3.symbol().type(d3.symbolSquare).size(area - 50)();
-                if (d.type === 'label') return d3.symbol().type(d3.symbolDiamond).size(area)();
-                if (d.type === 'country') return d3.symbol().type(d3.symbolTriangle).size(area - 50)();
-                if (d.type === 'founded') return d3.symbol().type(d3.symbolCross).size(area - 50)();
-                return d3.symbol().type(d3.symbolCircle).size(area - 100)();
+                if (d.type === 'artist') return isSeed ? 'album' : 'equalizer';
+                if (d.type === 'genre') return 'library_music';
+                if (d.type === 'label') return 'label';
+                if (d.type === 'country') return 'location_on';
+                if (d.type === 'founded') return 'event';
+                return 'circle';
+            })
+            .style("font-size", (d: any) => {
+                const isSeed = seedIds.includes(d.id) || d.isSeed;
+                if (d.type === 'artist') return isSeed ? '32px' : '26px';
+                if (d.type === 'genre') return '20px';
+                if (d.type === 'country') return '26px';
+                if (d.type === 'label' || d.type === 'founded') return '24px';
+                return '20px';
             })
             .attr("fill", (d: any) => {
-                if (d.isLoading) return nodeTypeColorMap.ai;
                 const isSeed = seedIds.includes(d.id) || d.isSeed;
                 if (d.type === 'artist') {
                     return isSeed ? nodeTypeColorMap.seed : nodeTypeColorMap.ai;
                 }
                 if (!d.type) return zceneFallbackColor;
                 return nodeTypeColorMap[d.type] || colorScale(d.type);
-            })
-            .attr("stroke", (d: any) => {
-                if (d.isLoading) return "#A855F7";
-                const isSeed = seedIds.includes(d.id) || d.isSeed;
-                if (isSeed) return "#F6E468";
-                return "transparent";
-            })
-            .attr("stroke-width", (d: any) => (seedIds.includes(d.id) || d.isSeed || d.isLoading) ? 3 : 2)
-            .attr("opacity", (d: any) => d.isLoading ? 0.6 : 1)
-            .attr("class", (d: any) => d.isLoading ? "animate-pulse" : "node-shape");
+            });
 
-        node.select("text")
+        node.select(".font-medium")
             .attr("y", 25)
             .style("font-size", "12px")
             .text((d: any) => d.isLoading ? 'Discovering...' : d.id)
