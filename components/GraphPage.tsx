@@ -1301,8 +1301,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
             const wouldBeCramped = (totalWidth - leftPanelWidth - rightPanelPreCollapseWidth.current - (16 * 3)) < MIN_GRAPH_WIDTH;
             if (wouldBeCramped) setIsLeftPanelCollapsed(true);
         }
-        const isCurrentRead = selectedNode && readNodeIds.has(selectedNode.id.trim().toLowerCase());
-        if (!selectedNode || isCurrentRead) selectFirstUnread();
+        if (!selectedNode) selectFirstUnread();
     }
     setIsDetailsPanelCollapsed(prev => !prev);
   }, [isDetailsPanelCollapsed, isLeftPanelCollapsed, leftPanelWidth, onboardingProgress.step5, selectedNode, readNodeIds, selectFirstUnread]);
