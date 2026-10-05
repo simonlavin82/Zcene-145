@@ -3128,6 +3128,8 @@ const App: React.FC = () => {
               artistList.splice(0, artistList.length, singleCacheResolvedSearchId);
           }
           await applyLocalTopologyHit(artistList[0], singleCacheDocData, artistList, artists);
+          isHydratingSessionRef.current = false;
+          setIsLoading(false);
           return;
       }
       
@@ -5774,7 +5776,7 @@ const App: React.FC = () => {
   // Save Current Project to Firestore (Silent background task)
   useEffect(() => {
     if (!user || !isFirebaseReady || !isAuthInitialized || !currentProjectId || isGuest) return;
-    if (!graphData || isProjectLoadingRef.current) return;
+    if (!graphData || isProjectLoadingRef.current || isHydratingSessionRef.current) return;
 
     const basePayload = buildBaseProjectPayload();
     if (!basePayload) return;
