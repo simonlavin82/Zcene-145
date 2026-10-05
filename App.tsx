@@ -2799,6 +2799,7 @@ const App: React.FC = () => {
     setIsLoading(false);
     isFetchingDetailsRef.current = false;
     isHydratingSessionRef.current = false;
+    isProjectLoadingRef.current = false;
     if (data?.hasUniqueSpiderweb) showCacheToast();
   }, [user, isGuest, showCacheToast, setGraphData, setSeedArtists, setSelectedNode, setActiveNodeIds, setDetailsCache]);
 
@@ -3123,6 +3124,7 @@ const App: React.FC = () => {
           }
           await applyLocalTopologyHit(artistList[0], singleCacheDocData, artistList, artists);
           isHydratingSessionRef.current = false;
+          isProjectLoadingRef.current = false;
           setIsLoading(false);
           return;
       }
