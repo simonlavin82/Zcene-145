@@ -3077,6 +3077,50 @@ const App: React.FC = () => {
       }
 
       
+      // --- DISAMBIGUATION RE-ROUTE BLOCK (HOISTED) ---
+      let resolvedArtistSeeds = [...artistList];
+      let activeDisambiguationHints: Record<string, string> = disambiguationHints || {};
+      let activeDisambiguationGenres: Record<string, string> = disambiguationGenres || {};
+      let hasDisambiguated = false;
+
+      for (let i = 0; i < artistList.length; i++) {
+        const searchId = artistList[i];
+        if (cacheCandidatesPerSeed.length > 0) {
+            const preFlightSeed = cacheCandidatesPerSeed[i];
+            const rawCountryName = preFlightSeed.predictedOrigin;
+            
+            if (rawCountryName) {
+              if (preFlightSeed.isKnownCacheHit && preFlightSeed.predictedOrigin === rawCountryName && preFlightSeed.candidateId) {
+                resolvedArtistSeeds[i] = normalizeArtistId(preFlightSeed.candidateId);
+              } else {
+                const seedToUse = preFlightSeed.isCorrected && preFlightSeed.correctedQuery ? preFlightSeed.correctedQuery : searchId;
+                resolvedArtistSeeds[i] = seedToUse;
+                activeDisambiguationHints[seedToUse] = rawCountryName;
+                if (preFlightSeed.genre) activeDisambiguationGenres[seedToUse] = preFlightSeed.genre;
+              }
+              hasDisambiguated = true;
+            }
+        }
+      }
+
+      if (hasDisambiguated) {
+        const newArtistsStr = resolvedArtistSeeds.join('::');
+        const hasActiveFiltersNext = !!(
+          activeDiscoveryFilters.foundedAfter ||
+          activeDiscoveryFilters.foundedBefore ||
+          (activeDiscoveryFilters.includeOrigins && activeDiscoveryFilters.includeOrigins.length > 0) ||
+          (activeDiscoveryFilters.excludeOrigins && activeDiscoveryFilters.excludeOrigins.length > 0) ||
+          (activeDiscoveryFilters.includeGenres && activeDiscoveryFilters.includeGenres.length > 0) ||
+          (activeDiscoveryFilters.additionalInstructions && activeDiscoveryFilters.additionalInstructions.trim().length > 0)
+        );
+        const isCustomNext = resolvedArtistSeeds.length > 1 || hasActiveFiltersNext;
+        const allKnownCacheHits = cacheCandidatesPerSeed.length > 0 && cacheCandidatesPerSeed.every(s => s.isKnownCacheHit);
+        const nextSkipCacheLookup = !allKnownCacheHits;
+        
+        handleGenerateGraph(newArtistsStr, isRegeneration, graphToEnhance, nextSkipCacheLookup, !isCustomNext || sessionTokenApprovedRef.current, overrideFilters, activeDisambiguationHints, true);
+        return;
+      }
+
       // 5. Apply Cache Hit for Single Qualified Hits (Local Routing)
       if (routingDecision === 'TOPOLOGY_HIT' && artistList.length === 1 && singleCacheDocData) {
           if (singleCacheResolvedSearchId && singleCacheResolvedSearchId !== artistList[0]) {
@@ -3193,49 +3237,7 @@ const App: React.FC = () => {
         }).catch(e => console.warn(e));
       }
 
-      // Fall through to API Live Generation
-      let resolvedArtistSeeds = [...artistList];
-      let activeDisambiguationHints: Record<string, string> = disambiguationHints || {};
-      let activeDisambiguationGenres: Record<string, string> = disambiguationGenres || {};
-      let hasDisambiguated = false;
 
-      for (let i = 0; i < artistList.length; i++) {
-        const searchId = artistList[i];
-        if (cacheCandidatesPerSeed.length > 0) {
-            const preFlightSeed = cacheCandidatesPerSeed[i];
-            const rawCountryName = preFlightSeed.predictedOrigin;
-            
-            if (rawCountryName) {
-              if (preFlightSeed.isKnownCacheHit && preFlightSeed.predictedOrigin === rawCountryName && preFlightSeed.candidateId) {
-                resolvedArtistSeeds[i] = normalizeArtistId(preFlightSeed.candidateId);
-              } else {
-                const seedToUse = preFlightSeed.isCorrected && preFlightSeed.correctedQuery ? preFlightSeed.correctedQuery : searchId;
-                resolvedArtistSeeds[i] = seedToUse;
-                activeDisambiguationHints[seedToUse] = rawCountryName;
-                if (preFlightSeed.genre) activeDisambiguationGenres[seedToUse] = preFlightSeed.genre;
-              }
-              hasDisambiguated = true;
-            }
-        }
-      }
-
-      if (hasDisambiguated) {
-        const newArtistsStr = resolvedArtistSeeds.join('::');
-        const hasActiveFiltersNext = !!(
-          activeDiscoveryFilters.foundedAfter ||
-          activeDiscoveryFilters.foundedBefore ||
-          (activeDiscoveryFilters.includeOrigins && activeDiscoveryFilters.includeOrigins.length > 0) ||
-          (activeDiscoveryFilters.excludeOrigins && activeDiscoveryFilters.excludeOrigins.length > 0) ||
-          (activeDiscoveryFilters.includeGenres && activeDiscoveryFilters.includeGenres.length > 0) ||
-          (activeDiscoveryFilters.additionalInstructions && activeDiscoveryFilters.additionalInstructions.trim().length > 0)
-        );
-        const isCustomNext = resolvedArtistSeeds.length > 1 || hasActiveFiltersNext;
-        const allKnownCacheHits = cacheCandidatesPerSeed.length > 0 && cacheCandidatesPerSeed.every(s => s.isKnownCacheHit);
-        const nextSkipCacheLookup = !allKnownCacheHits;
-        
-        handleGenerateGraph(newArtistsStr, isRegeneration, graphToEnhance, nextSkipCacheLookup, !isCustomNext || sessionTokenApprovedRef.current, overrideFilters, activeDisambiguationHints, true);
-        return;
-      }
 // AbortController is now initialized at the start of the function.
     setActiveNodeIds(prev => {
       const currentActiveIds = new Set(prev.map(id => id.toLowerCase()));
