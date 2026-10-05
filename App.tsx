@@ -5776,7 +5776,7 @@ const App: React.FC = () => {
   // Save Current Project to Firestore (Silent background task)
   useEffect(() => {
     if (!user || !isFirebaseReady || !isAuthInitialized || !currentProjectId || isGuest) return;
-    if (!graphData || isProjectLoadingRef.current || isHydratingSessionRef.current) return;
+    if (!graphData || isProjectLoadingRef.current || isHydratingSessionRef.current || filterGuidanceState.isOpen) return;
 
     const basePayload = buildBaseProjectPayload();
     if (!basePayload) return;

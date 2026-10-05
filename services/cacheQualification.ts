@@ -106,18 +106,14 @@ export const qualifyCacheEntry = (data: any, seedId?: string): CacheQualificatio
   const missing: string[] = [];
 
   // ── 1. Structural topology ────────────────────────────────────────────────
-  // Explicit metadata flags mean this doc's graphData is a fragment owned by a
-  // different seed (e.g. a peer-band sub-graph). That is a correctness issue,
-  // not a quality issue, so it is treated as "no usable topology".
-  const ownsTopology = data._isStub !== true && data.isPrimarySeed !== false && data.hasUniqueSpiderweb !== false;
-  const graph = ownsTopology ? parseGraphField(data.graphData) : null;
+  const graph = parseGraphField(data.graphData);
   const hasNodes = !!graph && graph.nodes.length > 0;
   const hasEdges = !!graph && graph.links.length > 0;
-  if (!ownsTopology) missing.push('owned-topology');
+  
   if (!hasNodes) missing.push('nodes');
   if (!hasEdges) missing.push('edges');
 
-  const isStructurallyUsable = ownsTopology && hasNodes && hasEdges;
+  const isStructurallyUsable = hasNodes && hasEdges;
 
   // ── 2. Seed profile (bio / genre / image) ─────────────────────────────────
   const profile = extractSeedProfile(data.detailsCache, seedId || data.artistId || data.cacheKey);
