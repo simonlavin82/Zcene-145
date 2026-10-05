@@ -2744,14 +2744,26 @@ const App: React.FC = () => {
     try { await batchHydrateDetailsCache(normalizedGraph.nodes, normalizedGraph.links); } catch (e) {}
     artistList.forEach(name => { approvedSeedsRef.current.add(normalizeArtistId(name)); });
 
-    if (currentProjectIdRef.current && user && !isGuest) {
-      const projectPath = `users/${user.uid}/projects/${currentProjectIdRef.current}`;
+    let targetProjectId = currentProjectIdRef.current;
+    let isNewProject = false;
+    
+    if (!targetProjectId && user && !isGuest) {
+       const newDocRef = doc(collection(db, 'users', user.uid, 'projects'));
+       targetProjectId = newDocRef.id;
+       isNewProject = true;
+       currentProjectIdRef.current = targetProjectId;
+       setCurrentProjectId(targetProjectId);
+       navigate(`/p/${targetProjectId}`);
+    }
+
+    if (targetProjectId && user && !isGuest) {
+      const projectPath = `users/${user.uid}/projects/${targetProjectId}`;
       try {
         const hoistedActiveNodes: string[] = [];
         if (primaryNode) hoistedActiveNodes.push(primaryNode.id);
         normalizedGraph.nodes.forEach((n: any) => { if (!hoistedActiveNodes.includes(n.id)) hoistedActiveNodes.push(n.id); });
 
-        await updateDoc(doc(db, projectPath), {
+        const payload = {
           graphData: JSON.stringify(normalizedGraph),
           activeNodes: hoistedActiveNodes,
           seedArtists: artistsString,
@@ -2759,7 +2771,24 @@ const App: React.FC = () => {
           status: 'completed',
           generationType: 'Direct Hit',
           updatedAt: serverTimestamp()
-        });
+        };
+
+        if (isNewProject) {
+           await setDoc(doc(db, projectPath), {
+              ...payload,
+              name: artistsString,
+              authorId: user.uid,
+              createdAt: serverTimestamp(),
+              schemaVersion: 2,
+              chatHistories: '[]',
+              discoveryFilters: '{}',
+              lastViewedStackCount: 0,
+              isMagazineViewOpen: false,
+              supportsLabelDeepCuts: true
+           });
+        } else {
+           await updateDoc(doc(db, projectPath), payload);
+        }
       } catch (e) { }
     } else {
       setGraphData(normalizedGraph);
@@ -3048,6 +3077,17 @@ const App: React.FC = () => {
       }
 
       
+      // 5. Apply Cache Hit for Single Qualified Hits (Local Routing)
+      if (routingDecision === 'TOPOLOGY_HIT' && artistList.length === 1 && singleCacheDocData) {
+          if (singleCacheResolvedSearchId && singleCacheResolvedSearchId !== artistList[0]) {
+              setSeedArtists(singleCacheResolvedSearchId);
+              artistList.splice(0, artistList.length, singleCacheResolvedSearchId);
+          }
+          await applyLocalTopologyHit(artistList[0], singleCacheDocData, artistList, artists);
+          return;
+      }
+      
+      
       // 4. Database Minting (Step Zero)
       let freshlyMintedProjectId = null;
       if (user && !currentProjectId && !isGuest && !isRegeneration && !graphToEnhance) {
@@ -3153,16 +3193,6 @@ const App: React.FC = () => {
         }).catch(e => console.warn(e));
       }
 
-      // 5. Apply Cache Hit for Single Qualified Hits (Local Routing)
-      if (routingDecision === 'TOPOLOGY_HIT' && artistList.length === 1 && singleCacheDocData) {
-          if (singleCacheResolvedSearchId && singleCacheResolvedSearchId !== artistList[0]) {
-              setSeedArtists(singleCacheResolvedSearchId);
-              artistList.splice(0, artistList.length, singleCacheResolvedSearchId);
-          }
-          await applyLocalTopologyHit(artistList[0], singleCacheDocData, artistList, artists);
-          return;
-      }
-      
       // Fall through to API Live Generation
       let resolvedArtistSeeds = [...artistList];
       let activeDisambiguationHints: Record<string, string> = disambiguationHints || {};
