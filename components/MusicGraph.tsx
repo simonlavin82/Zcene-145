@@ -950,13 +950,18 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
                 if (!hasInitialCentered.current && fitGraphToScreenRef.current) {
                     hasInitialCentered.current = true;
-                    fitGraphToScreenRef.current(0);
+                    
                     setTimeout(() => {
-                        if (svgRef.current && zoomRef.current) {
-                            d3.select(svgRef.current).transition().duration(300).call(zoomRef.current.scaleBy, 1.5);
+                        if (fitGraphToScreenRef.current) {
+                            fitGraphToScreenRef.current(0);
+                            setTimeout(() => {
+                                if (svgRef.current && zoomRef.current) {
+                                    d3.select(svgRef.current).transition().duration(300).call(zoomRef.current.scaleBy, 1.5);
+                                }
+                                if (onSimulationCompleteRef.current) onSimulationCompleteRef.current();
+                            }, 50);
                         }
-                        if (onSimulationCompleteRef.current) onSimulationCompleteRef.current();
-                    }, 50);
+                    }, 150);
                 }
             });
         simulationRef.current = simulation;
