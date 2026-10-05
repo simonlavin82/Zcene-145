@@ -21,10 +21,8 @@ const exampleGraphData: GraphData = {
     { id: '1992', type: 'founded', group: 6 },
     { id: 'Pop Punk', type: 'genre', group: 2 },
     { id: 'MCA Records', type: 'label', group: 7 },
-    { id: 'United States', type: 'country', group: 8 },
     { id: 'Alkaline Trio', type: 'artist', group: 9 },
     { id: 'Punk Rock', type: 'genre', group: 10 },
-    { id: 'United States', type: 'country', group: 11 },
   ],
   links: [
     { source: 'Jimmy Eat World', target: '1993', value: 1 },
@@ -335,10 +333,10 @@ const ExampleMusicGraph: React.FC = () => {
                         <svg ref={svgRef} className="w-full h-full pointer-events-none relative z-10" />
                         
                         {/* Search Icon Top Right */}
-                        <div className="absolute top-6 right-6 sm:right-10 z-40 flex justify-end transition-all duration-300">
-                            <div className="group relative h-[38px] w-[38px] flex items-center justify-center transition-all duration-300 ease-in-out overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900/80 backdrop-blur-md shadow-xl text-zinc-400 hover:text-white pointer-events-auto cursor-pointer">
+                        <div className="absolute top-6 right-8 sm:right-10 z-40 flex justify-end transition-all duration-300 pointer-events-auto">
+                            <button className="w-12 h-12 bg-zinc-900/80 border border-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center backdrop-blur-md shadow-xl transition-all active:scale-90 rounded-xl">
                                 <span className="material-symbols-outlined !text-[20px]">search</span>
-                            </div>
+                            </button>
                         </div>
                         
                         {/* Legend Positioning (Matching MusicGraph Legend) */}
