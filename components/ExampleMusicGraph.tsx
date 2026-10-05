@@ -329,7 +329,7 @@ const ExampleMusicGraph: React.FC = () => {
                 </div>
 
                 <div className="flex-grow relative min-h-0 flex flex-col">
-                    <div className="flex-grow relative">
+                    <div className="flex-grow relative min-h-0 overflow-hidden">
                         <svg ref={svgRef} className="w-full h-full pointer-events-none relative z-10" />
                         
                         {/* Search Icon Top Right */}
