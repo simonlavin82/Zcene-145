@@ -2791,10 +2791,10 @@ const App: React.FC = () => {
            await updateDoc(doc(db, projectPath), payload);
         }
       } catch (e) { }
-    } else {
-      setGraphData(normalizedGraph);
-      setSeedArtists(artistsString);
     }
+    
+    setGraphData(normalizedGraph);
+    setSeedArtists(artistsString);
 
     setIsLoading(false);
     isFetchingDetailsRef.current = false;
