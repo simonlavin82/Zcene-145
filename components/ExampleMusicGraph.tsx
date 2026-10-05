@@ -328,6 +328,11 @@ const ExampleMusicGraph: React.FC = () => {
                     <div className="flex items-center gap-2">
                         <h2 className="text-sm sm:text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Spiderweb</h2>
                     </div>
+                    <div className="flex items-center gap-2">
+                        <button className="w-9 h-9 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none active:scale-95 border border-transparent">
+                            <span className="material-symbols-outlined !text-[20px]">search</span>
+                        </button>
+                    </div>
                 </div>
 
                 <div className="flex-grow relative min-h-0 flex flex-col">
@@ -383,9 +388,6 @@ const ExampleMusicGraph: React.FC = () => {
 
                         {/* Graph Controls Overlay (Matching MusicGraph Controls) */}
                         <div className="absolute bottom-12 sm:bottom-16 right-8 sm:right-10 flex flex-col gap-3 z-30">
-                            <button className="w-12 h-12 bg-zinc-900/80 border border-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center backdrop-blur-md shadow-xl transition-all active:scale-90 rounded-xl">
-                                <span className="material-symbols-outlined !text-[20px]">search</span>
-                            </button>
                             <button className="w-12 h-12 bg-zinc-900/80 border border-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center backdrop-blur-md shadow-xl transition-all active:scale-90 rounded-xl">
                                 <span className="material-symbols-outlined !text-[20px]">center_focus_strong</span>
                             </button>
