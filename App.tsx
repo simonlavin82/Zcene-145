@@ -5284,7 +5284,12 @@ const App: React.FC = () => {
 
               loadedFromGraphData = true;
             } else {
-              console.warn('[ProjectLoader] Project document contains empty graph. Falling back to Phase 1 cache lookup.');
+              if (isHydratingSessionRef.current) {
+                console.log('[ProjectLoader] Project contains empty graph, but local session is actively hydrating. Bypassing fallback.');
+                loadedFromGraphData = true; // Pretend it loaded to prevent rogue legacy lookups
+              } else {
+                console.warn('[ProjectLoader] Project document contains empty graph. Falling back to Phase 1 cache lookup.');
+              }
             }
           } catch (e) {
             console.error('[ProjectLoader] Failed to hydrate directly from graphData:', e);
