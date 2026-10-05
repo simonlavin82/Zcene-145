@@ -818,6 +818,27 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
       prevHistoryLength.current = chatHistory.length;
     }, [chatHistory, isChatLoading]);
 
+    const wasPinnedRef = useRef(isPinned);
+    
+    useEffect(() => {
+        if (isFullScreenMode && isPinned && !wasPinnedRef.current) {
+            // Card was just pinned in Magazine View — anchor viewport to its top
+            const SCROLL_PADDING = 40; // Same padding used elsewhere for floating headers
+            const timeoutId = setTimeout(() => {
+                const container = document.getElementById('magazine-scroll-container');
+                const targetEl = document.getElementById(`magazine-card-${node.id}`);
+                if (container && targetEl) {
+                    const containerRect = container.getBoundingClientRect();
+                    const targetRect = targetEl.getBoundingClientRect();
+                    const relativeTop = targetRect.top - containerRect.top + container.scrollTop;
+                    container.scrollTo({ top: relativeTop - SCROLL_PADDING, behavior: 'smooth' });
+                }
+            }, 50); // Small delay to allow the React DOM to re-order the cards first
+            return () => clearTimeout(timeoutId);
+        }
+        wasPinnedRef.current = isPinned;
+    }, [isPinned, isFullScreenMode, node.id]);
+
     const handleSend = () => {
       if (!chatInput.trim() || isChatLoading) return;
       onSendMessage(chatInput);
@@ -935,7 +956,10 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
 
                             <button 
-                                onClick={onTogglePin} 
+                                onClick={(e) => {
+                                    e.currentTarget.blur();
+                                    onTogglePin();
+                                }} 
                                 className={`relative w-8 h-8 flex flex-shrink-0 items-center justify-center border rounded-xl active:scale-95 transition-all duration-200 leading-none ${
                                     isPinned 
                                         ? 'border-zinc-700/50 text-primary bg-zinc-900 hover:text-primary hover:border-zinc-500 hover:bg-zinc-800' 
