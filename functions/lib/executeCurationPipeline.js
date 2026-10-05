@@ -85,7 +85,10 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
     memory: "1GiB",
 }, async (request) => {
     const payload = request.data;
-    console.log(`[Curation Backend] Executing executeCurationPipeline with payload:`, payload);
+    const safePayload = { ...payload };
+    if (safePayload.password)
+        safePayload.password = '[REDACTED]';
+    console.log(`[Curation Backend] Executing executeCurationPipeline with payload:`, safePayload);
     if (!payload || !payload.artists) {
         throw new https_1.HttpsError("invalid-argument", "Missing artists in payload");
     }
@@ -114,6 +117,7 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
     let needsProGeneration = false;
     let hasStubHit = false;
     let hasCacheMiss = false;
+    const cachedDocsData = {};
     for (const seed of artistList) {
         const seedNorm = (0, curatorService_1.normalizeArtistId)(seed);
         let cachedDetails = null;
@@ -152,6 +156,7 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
             const cacheDoc = await db.collection("artists").doc(resolvedSeedNorm).get();
             if (cacheDoc.exists) {
                 const cacheData = cacheDoc.data();
+                cachedDocsData[resolvedSeedNorm] = cacheData;
                 if (cacheData && cacheData.graphData) {
                     const rawGraph = typeof cacheData.graphData === 'string' ? JSON.parse(cacheData.graphData) : cacheData.graphData;
                     if (rawGraph && rawGraph.nodes && rawGraph.nodes.length > 0) {
@@ -261,7 +266,7 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
             }
         }
     }
-    if (artistList.length > 1) {
+    if (artistList.length > 1 || payload.intent === 'cache_upgrade') {
         needsProGeneration = true;
     }
     let finalGraph = payload.baseGraph || { nodes: [], links: [] };
@@ -276,9 +281,9 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
     else if (!payload.baseGraph || payload.baseGraph.nodes.length === 0) {
         console.log(`[Pipeline Diamond] -> Single Seed Cache Hit: Extracting topology from cache`);
         const seedNorm = (0, curatorService_1.normalizeArtistId)(artistList[0]);
-        const cacheDoc = await db.collection("artists").doc(seedNorm).get();
-        if (cacheDoc.exists) {
-            const cacheData = cacheDoc.data();
+        // The doc was already fetched in the loop above
+        const cacheData = cachedDocsData[seedNorm] || null;
+        if (cacheData) {
             if (cacheData && cacheData.graphData) {
                 const rawGraph = typeof cacheData.graphData === 'string' ? JSON.parse(cacheData.graphData) : cacheData.graphData;
                 // Deep clone to ensure we do not mutate any in-memory objects

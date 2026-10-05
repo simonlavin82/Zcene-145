@@ -2718,15 +2718,16 @@ const App: React.FC = () => {
         if (Array.isArray(unwrappedDetails) && unwrappedDetails.length > 0) {
             unwrappedDetails = Array.isArray(unwrappedDetails[0]) ? unwrappedDetails[0][1] : unwrappedDetails[0];
         }
-        const bio = unwrappedDetails?.summary || unwrappedDetails?.bio || unwrappedDetails?.description || unwrappedDetails?.text || primaryNode.bio || primaryNode.summary || "";
+        const pNode: any = primaryNode;
+        const bio = unwrappedDetails?.summary || unwrappedDetails?.bio || unwrappedDetails?.description || unwrappedDetails?.text || pNode.bio || pNode.summary || "";
         const hydratedNode = {
-            ...primaryNode,
+            ...pNode,
             bio,
             summary: bio,
-            imageUrl: unwrappedDetails?.imageUrl || unwrappedDetails?.image || primaryNode.imageUrl || "",
-            genre: unwrappedDetails?.details?.genre || unwrappedDetails?.genre || unwrappedDetails?.genres || primaryNode.genre || "",
-            origin: unwrappedDetails?.details?.origin || unwrappedDetails?.origin || unwrappedDetails?.location || unwrappedDetails?.country || primaryNode.origin || "",
-            founded: unwrappedDetails?.details?.founded || unwrappedDetails?.founded || unwrappedDetails?.formed || unwrappedDetails?.year || primaryNode.founded || "",
+            imageUrl: unwrappedDetails?.imageUrl || unwrappedDetails?.image || pNode.imageUrl || "",
+            genre: unwrappedDetails?.details?.genre || unwrappedDetails?.genre || unwrappedDetails?.genres || pNode.genre || "",
+            origin: unwrappedDetails?.details?.origin || unwrappedDetails?.origin || unwrappedDetails?.location || unwrappedDetails?.country || pNode.origin || "",
+            founded: unwrappedDetails?.details?.founded || unwrappedDetails?.founded || unwrappedDetails?.formed || unwrappedDetails?.year || pNode.founded || "",
             isLibrary: true,
             type: 'artist' as const,
             group: 0
@@ -2954,9 +2955,6 @@ const App: React.FC = () => {
               genre = cacheCandidates[0].genre || '';
               isKnownCacheHit = true;
               candidateId = cacheCandidates[0].id;
-              if (cacheCandidates[0].isStub) {
-                needsCacheUpgrade = true;
-              }
             }
             // TOTAL CACHE MISS: Leave as !isKnownCacheHit. API lookup deferred to Phase 1.5.
           }
@@ -3070,11 +3068,7 @@ const App: React.FC = () => {
           }
       }
 
-      // Re-hydrate singleCacheResolvedSearchId into artistList if single seed redirect
-      if (hasFullCacheHitForSingle && singleCacheResolvedSearchId && singleCacheResolvedSearchId !== artistList[0]) {
-          setSeedArtists(singleCacheResolvedSearchId);
-          artistList.splice(0, artistList.length, singleCacheResolvedSearchId);
-      }
+
 
       
       // --- DISAMBIGUATION RE-ROUTE BLOCK (HOISTED) ---
