@@ -96,7 +96,9 @@ export const executeCurationPipeline = onCall({
   memory: "1GiB",
 }, async (request) => {
   const payload = request.data;
-  console.log(`[Curation Backend] Executing executeCurationPipeline with payload:`, payload);
+  const safePayload = { ...payload };
+  if (safePayload.password) safePayload.password = '[REDACTED]';
+  console.log(`[Curation Backend] Executing executeCurationPipeline with payload:`, safePayload);
 
   if (!payload || !payload.artists) {
     throw new HttpsError("invalid-argument", "Missing artists in payload");
@@ -132,6 +134,7 @@ export const executeCurationPipeline = onCall({
   
   let hasStubHit = false;
   let hasCacheMiss = false;
+  const cachedDocsData: Record<string, any> = {};
   
   for (const seed of artistList) {
      const seedNorm = normalizeArtistId(seed);
@@ -172,6 +175,7 @@ export const executeCurationPipeline = onCall({
         const cacheDoc = await db.collection("artists").doc(resolvedSeedNorm).get();
         if (cacheDoc.exists) {
            const cacheData = cacheDoc.data();
+           cachedDocsData[resolvedSeedNorm] = cacheData;
            if (cacheData && cacheData.graphData) {
                const rawGraph = typeof cacheData.graphData === 'string' ? JSON.parse(cacheData.graphData) : cacheData.graphData;
                if (rawGraph && rawGraph.nodes && rawGraph.nodes.length > 0) {
@@ -282,7 +286,7 @@ export const executeCurationPipeline = onCall({
      }
   }
   
-  if (artistList.length > 1) {
+  if (artistList.length > 1 || payload.intent === 'cache_upgrade') {
      needsProGeneration = true;
   }
 
@@ -304,9 +308,9 @@ export const executeCurationPipeline = onCall({
   } else if (!payload.baseGraph || payload.baseGraph.nodes.length === 0) {
     console.log(`[Pipeline Diamond] -> Single Seed Cache Hit: Extracting topology from cache`);
     const seedNorm = normalizeArtistId(artistList[0]);
-    const cacheDoc = await db.collection("artists").doc(seedNorm).get();
-    if (cacheDoc.exists) {
-        const cacheData = cacheDoc.data();
+    // The doc was already fetched in the loop above
+    const cacheData = cachedDocsData[seedNorm] || null;
+    if (cacheData) {
         if (cacheData && cacheData.graphData) {
             const rawGraph = typeof cacheData.graphData === 'string' ? JSON.parse(cacheData.graphData) : cacheData.graphData;
             // Deep clone to ensure we do not mutate any in-memory objects

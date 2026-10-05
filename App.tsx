@@ -940,88 +940,15 @@ const validateRootsBreakdown = (rationale?: string, isSingleArtist: boolean = fa
 };
 
 
+import { qualifyCacheEntry, deriveRoutingDecision, CacheVerdict, RoutingDecision } from './services/cacheQualification';
+
 const validateCacheEntry = (data: any, isSingleArtist: boolean = false): CacheValidationResult => {
-  if (!data) {
-    return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
-  }
-
-  // 1. graphData exists, parses cleanly, and contains nodes
-  if (!data.graphData || data.isPrimarySeed === false || data.hasUniqueSpiderweb === false) {
-    return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
-  }
-
-  try {
-    const graph = typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData;
-    if (!graph || !graph.nodes || !Array.isArray(graph.nodes) || graph.nodes.length === 0) {
-      return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
-    }
-
-    // Topology sanity check against legacy polluted records (e.g., Buggin loaded with Spaced's graph)
-    if (data.isPrimarySeed === undefined && graph.links && Array.isArray(graph.links)) {
-      const targetId = normalizeArtistId(data.artistId || data.seedArtists || "");
-      const myLinks = graph.links.filter((l: any) => {
-        const sId = typeof l.source === 'string' ? l.source : (l.source as any)?.id || "";
-        const tId = typeof l.target === 'string' ? l.target : (l.target as any)?.id || "";
-        return normalizeArtistId(sId) === targetId || normalizeArtistId(tId) === targetId;
-      });
-      if (myLinks.length < 3 && graph.nodes.length > 5) {
-        return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
-      }
-    }
-
-    // Check for peer bands
-    const artistNodes = graph.nodes.filter((n: any) => n.type === 'artist' || !n.type);
-    const needsPeerBands = artistNodes.length < 2;
-
-    // 2. Graph edge context strings are meaningful (not generic fallbacks)
-    let hasGenericContext = false;
-    if (graph.links && Array.isArray(graph.links)) {
-      const genericStrings = ["is connected to", "is musically related to"];
-      hasGenericContext = graph.links.some((l: any) => 
-        l.context && genericStrings.includes(l.context.toLowerCase().trim())
-      );
-    }
-    if (hasGenericContext) {
-      return { isFullyQualified: false, needsPeerBands, needsFutureFields: true };
-    }
-
-    // 5. Enforce synthesisRationale presence and validate it
-    const rationale = data.synthesisRationale || graph.synthesisRationale;
-    if (!rationale || !validateRootsBreakdown(rationale, isSingleArtist)) {
-      return { isFullyQualified: false, needsPeerBands, needsFutureFields: true };
-    }
-
-    // 3. detailsCache exists, parses cleanly, and contains a non-trivial biography (>5 chars, no mock)
-    if (!data.detailsCache) {
-      return { isFullyQualified: false, needsPeerBands, needsFutureFields: true };
-    }
-    const details = parseDetailsCacheSafely(data.detailsCache);
-    if (!details) {
-      return { isFullyQualified: false, needsPeerBands, needsFutureFields: true };
-    }
-    const bio = details.summary || details.bio || details.description || details.text || "";
-    if (typeof bio !== 'string' || bio.trim().length <= 5 || bio.toLowerCase().includes("sandbox mock")) {
-      return { isFullyQualified: false, needsPeerBands, needsFutureFields: true };
-    }
-
-    // 4. genre and origin fields are non-empty and not "unknown"
-    const genre = details.details?.genre || details.genre;
-    const origin = details.details?.origin || details.origin;
-    if (!genre || typeof genre !== 'string' || genre.trim().length === 0 || genre.toLowerCase().trim() === "unknown") {
-      return { isFullyQualified: false, needsPeerBands, needsFutureFields: true };
-    }
-    if (!origin || typeof origin !== 'string' || origin.trim().length === 0 || origin.toLowerCase().trim() === "unknown") {
-      return { isFullyQualified: false, needsPeerBands, needsFutureFields: true };
-    }
-
-    return {
-      isFullyQualified: !needsPeerBands,
-      needsPeerBands,
-      needsFutureFields: false
-    };
-  } catch (e) {
-    return { isFullyQualified: false, needsPeerBands: false, needsFutureFields: false };
-  }
+  const result = qualifyCacheEntry(data);
+  return {
+    isFullyQualified: result.isFullyQualified,
+    needsPeerBands: false,
+    needsFutureFields: false
+  };
 };
 
 const isCacheEntryFullyQualified = (data: any, isSingleArtist: boolean = false): boolean => {
