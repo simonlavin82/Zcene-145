@@ -13,7 +13,7 @@ const exampleGraphData: GraphData = {
     { id: 'Emo', type: 'genre', group: 2 },
     { id: 'Alternative Rock', type: 'genre', group: 2 },
     { id: 'Vagrant Records', type: 'label', group: 3 },
-    { id: 'Mesa, Arizona', type: 'country', group: 4 },
+    { id: 'United States', type: 'country', group: 4 },
     // AI Suggested Artists (Simulating recommendations)
     { id: 'The Get Up Kids', type: 'artist', group: 5 },
     { id: 'Weezer', type: 'artist', group: 5 },
@@ -21,17 +21,17 @@ const exampleGraphData: GraphData = {
     { id: '1992', type: 'founded', group: 6 },
     { id: 'Pop Punk', type: 'genre', group: 2 },
     { id: 'MCA Records', type: 'label', group: 7 },
-    { id: 'Poway, California', type: 'country', group: 8 },
+    { id: 'United States', type: 'country', group: 8 },
     { id: 'Alkaline Trio', type: 'artist', group: 9 },
     { id: 'Punk Rock', type: 'genre', group: 10 },
-    { id: 'Chicago, Illinois', type: 'country', group: 11 },
+    { id: 'United States', type: 'country', group: 11 },
   ],
   links: [
     { source: 'Jimmy Eat World', target: '1993', value: 1 },
     { source: 'Jimmy Eat World', target: 'Emo', value: 1 },
     { source: 'Jimmy Eat World', target: 'Alternative Rock', value: 1 },
     { source: 'Jimmy Eat World', target: 'Vagrant Records', value: 1 },
-    { source: 'Jimmy Eat World', target: 'Mesa, Arizona', value: 1 },
+    { source: 'Jimmy Eat World', target: 'United States', value: 1 },
     { source: 'Jimmy Eat World', target: 'The Get Up Kids', value: 1 },
     { source: 'The Get Up Kids', target: 'Emo', value: 1 },
     { source: 'Jimmy Eat World', target: 'Weezer', value: 1 },
@@ -39,11 +39,11 @@ const exampleGraphData: GraphData = {
     { source: 'blink-182', target: '1992', value: 1 },
     { source: 'blink-182', target: 'Pop Punk', value: 1 },
     { source: 'blink-182', target: 'MCA Records', value: 1 },
-    { source: 'blink-182', target: 'Poway, California', value: 1 },
+    { source: 'blink-182', target: 'United States', value: 1 },
     { source: 'blink-182', target: 'Jimmy Eat World', value: 1 },
     { source: 'Alkaline Trio', target: 'Punk Rock', value: 1 },
     { source: 'Alkaline Trio', target: 'Vagrant Records', value: 1 },
-    { source: 'Alkaline Trio', target: 'Chicago, Illinois', value: 1 },
+    { source: 'Alkaline Trio', target: 'United States', value: 1 },
     { source: 'Alkaline Trio', target: 'blink-182', value: 1 },
   ],
 };
@@ -328,17 +328,18 @@ const ExampleMusicGraph: React.FC = () => {
                     <div className="flex items-center gap-2">
                         <h2 className="text-sm sm:text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Spiderweb</h2>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <button className="w-9 h-9 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none active:scale-95 border border-transparent">
-                            <span className="material-symbols-outlined !text-[20px]">search</span>
-                        </button>
-                    </div>
                 </div>
 
                 <div className="flex-grow relative min-h-0 flex flex-col">
                     <div className="flex-grow relative">
                         <svg ref={svgRef} className="w-full h-full pointer-events-none relative z-10" />
                         
+                        {/* Search Icon Top Right */}
+                        <div className="absolute top-6 right-6 sm:right-10 z-40 flex justify-end transition-all duration-300">
+                            <div className="group relative h-[38px] w-[38px] flex items-center justify-center transition-all duration-300 ease-in-out overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900/80 backdrop-blur-md shadow-xl text-zinc-400 hover:text-white pointer-events-auto cursor-pointer">
+                                <span className="material-symbols-outlined !text-[20px]">search</span>
+                            </div>
+                        </div>
                         
                         {/* Legend Positioning (Matching MusicGraph Legend) */}
                         <div ref={legendContainerRef} className={`absolute z-30 pointer-events-auto flex flex-col ${isCompactMode ? 'bottom-12 sm:bottom-16 left-8 sm:left-10 items-start' : 'top-6 left-1/2 -translate-x-1/2 items-center w-full max-w-[95%]'}`}>
