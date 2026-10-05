@@ -445,90 +445,12 @@ const ExampleMusicGraph: React.FC = () => {
                     <div className="flex items-center gap-2">
                         <h2 className="text-sm sm:text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Spiderweb</h2>
                     </div>
-                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                        <div className="relative flex items-center gap-2">
-                            <div className="relative hidden sm:block">
-                                <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
-                                    type="search" 
-                                    readOnly
-                                    placeholder="Search" 
-                                    value=""
-                                    className="w-24 sm:w-32 md:w-48 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-zinc-300 py-2 pl-4 pr-12 text-sm font-normal focus:outline-none" 
-                                />
-                                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
-                                    <button className="w-8 h-8 flex items-center justify-center rounded-[10px] text-zinc-500 hover:text-white transition-colors leading-none">
-                                        <span className="material-symbols-outlined !text-[18px]">mic</span>
-                                    </button>
-                                </div>
-                            </div>
-                            <button 
-                                className="w-9 h-9 flex flex-shrink-0 items-center justify-center border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none backdrop-blur-sm" 
-                                title="View Roots Breakdown"
-                            >
-                                <span className="material-symbols-outlined !text-[18px]">info</span>
-                            </button>
-                            
-                        </div>
-                    </div>
                 </div>
 
                 <div className="flex-grow relative min-h-0 flex flex-col">
                     <div className="flex-grow relative">
                         <svg ref={svgRef} className="w-full h-full pointer-events-none relative z-10" />
                         
-                        {/* Automated Discovery UI Overlay */}
-                        {showDiscoveryUI && animatingNodePos && (
-                            <div 
-                                className="absolute z-40 pointer-events-none"
-                                style={{ 
-                                    left: animatingNodePos.x, 
-                                    top: animatingNodePos.y,
-                                    transform: 'translate(20px, -50%)' 
-                                }}
-                            >
-                                <motion.div 
-                                    initial={{ opacity: 0, scale: 0, x: -20 }}
-                                    animate={{ opacity: 1, scale: 1, x: 0 }}
-                                    exit={{ opacity: 0, scale: 0, x: -20 }}
-                                    transition={{ type: "spring", stiffness: 400, damping: 25 }}
-                                    className="flex flex-col gap-1.5"
-                                >
-                                    <motion.div 
-                                        animate={isDiscovering ? { 
-                                            scale: [1, 0.9, 1.4, 1.2], 
-                                            backgroundColor: ['#18181b', '#18181b', '#F6E468', '#F6E468'], 
-                                            borderColor: ['#3f3f46', '#3f3f46', '#F6E468', '#F6E468'] 
-                                        } : {}}
-                                        transition={{ duration: 0.5, times: [0, 0.2, 0.5, 1] }}
-                                        className={`w-8 h-8 rounded-full flex items-center justify-center border-2 shadow-lg transition-all ${isDiscovering ? 'text-zinc-950 ring-4 ring-primary/30' : 'bg-zinc-900 border-zinc-700 text-zinc-400'}`}
-                                    >
-                                        <span className="material-symbols-outlined !text-[18px]">add</span>
-                                    </motion.div>
-                                    <div className="w-8 h-8 rounded-full bg-zinc-900 border-2 border-zinc-700 text-zinc-400 flex items-center justify-center shadow-lg">
-                                        <span className="material-symbols-outlined !text-[18px]">remove</span>
-                                    </div>
-                                </motion.div>
-                            </div>
-                        )}
-
-                        {/* Discovering Label Overlay */}
-                        {isDiscovering && animatingNodePos && (
-                             <motion.div 
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="absolute z-40 pointer-events-none flex flex-col items-center gap-1"
-                                style={{ 
-                                    left: animatingNodePos.x + 120, 
-                                    top: animatingNodePos.y + 40,
-                                    transform: 'translate(-50%, -50%)' 
-                                }}
-                             >
-                                <div className="flex items-center gap-2 px-3 py-1 bg-zinc-900/90 border border-primary/30 rounded-full backdrop-blur-sm">
-                                    <span className="material-symbols-outlined !text-[14px] text-primary animate-spin">progress_activity</span>
-                                    <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Discovering...</span>
-                                </div>
-                             </motion.div>
-                        )}
                         
                         {/* Legend Positioning (Matching MusicGraph Legend) */}
                         <div ref={legendContainerRef} className={`absolute z-30 pointer-events-auto flex flex-col ${isCompactMode ? 'bottom-12 sm:bottom-16 left-8 sm:left-10 items-start' : 'top-6 left-1/2 -translate-x-1/2 items-center w-full max-w-[95%]'}`}>
@@ -556,7 +478,7 @@ const ExampleMusicGraph: React.FC = () => {
                                     </button>
                                     
                                     <div
-                                        className={`w-[280px] border border-zinc-700 bg-zinc-900/98 backdrop-blur-xl p-4 shadow-2xl transition-all duration-300 origin-bottom-left absolute bottom-16 left-0 z-50 rounded-2xl pointer-events-auto ${isLegendExpanded ? 'opacity-100 translate-y-0 scale-100 visible' : 'opacity-0 translate-y-4 scale-90 invisible'}`}
+                                        className={`w-[280px] border border-zinc-700 bg-zinc-900/98 backdrop-blur-xl p-4 shadow-2xl transition-all duration-300 origin-bottom-left absolute bottom-16 left-0 z-50 rounded-none pointer-events-auto ${isLegendExpanded ? 'opacity-100 translate-y-0 scale-100 visible' : 'opacity-0 translate-y-4 scale-90 invisible'}`}
                                     >
                                         <div className="grid grid-cols-2 gap-2">
                                             {legendOrder.map(f => (
@@ -578,6 +500,9 @@ const ExampleMusicGraph: React.FC = () => {
 
                         {/* Graph Controls Overlay (Matching MusicGraph Controls) */}
                         <div className="absolute bottom-12 sm:bottom-16 right-8 sm:right-10 flex flex-col gap-3 z-30">
+                            <button className="w-12 h-12 bg-zinc-900/80 border border-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center backdrop-blur-md shadow-xl transition-all active:scale-90 rounded-xl">
+                                <span className="material-symbols-outlined !text-[20px]">search</span>
+                            </button>
                             <button className="w-12 h-12 bg-zinc-900/80 border border-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center backdrop-blur-md shadow-xl transition-all active:scale-90 rounded-xl">
                                 <span className="material-symbols-outlined !text-[20px]">center_focus_strong</span>
                             </button>

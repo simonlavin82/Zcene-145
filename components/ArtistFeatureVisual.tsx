@@ -18,7 +18,7 @@ const ArtistFeatureVisual: React.FC<{ className?: string }> = ({ className }) =>
                 <div className="h-12 flex-shrink-0 border-b border-zinc-600/50 flex items-center justify-between px-4 bg-zinc-900 relative z-[60]">
                     <div className="flex items-center gap-2 overflow-hidden">
                         <h2 className="text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Seeds</h2>
-                        <span className="h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border transition-all duration-500 bg-transparent border-brand-black text-brand-black">
+                        <span className="h-5 w-5 rounded-lg flex items-center justify-center text-[9px] font-semibold border transition-all duration-500 bg-zinc-900 text-white border-white/20">
                             2
                         </span>
                     </div>
@@ -32,7 +32,7 @@ const ArtistFeatureVisual: React.FC<{ className?: string }> = ({ className }) =>
                         <div className="px-4 pt-4 pb-2">
                             <div className="mb-3">
                                 <button className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 active:scale-95 transition-all text-xs font-medium leading-none">
-                                    <span className="material-symbols-outlined !text-[16px]">library_music</span>
+                                    <span className="material-symbols-outlined !text-[16px]">queue_music</span>
                                     Select from Library (142)
                                 </button>
                             </div>
