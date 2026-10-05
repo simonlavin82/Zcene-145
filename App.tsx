@@ -2647,6 +2647,131 @@ const App: React.FC = () => {
     }
   };
 
+  const applyLocalTopologyHit = useCallback(async (
+    searchId: string, 
+    data: any, 
+    artistList: string[], 
+    artistsString: string
+  ) => {
+    const searchIdLower = searchId.toLowerCase();
+    const canonicalId = data?.cacheKey || data?.artistId || searchId;
+    const canonicalIdLower = canonicalId.toLowerCase();
+    
+    let parsedGraph = null;
+    try { parsedGraph = typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData; } catch (e) {}
+
+    const rationaleVal = data.synthesisRationale || parsedGraph.synthesisRationale;
+    if (rationaleVal) parsedGraph.synthesisRationale = rationaleVal;
+    
+    const normalizedGraph = applyHumanCasedLabels(normalizeGraphData(parsedGraph), artistsString);
+    console.log(`[Local Topology Routing] ZERO COST HIT! Search: ${searchId} -> Canonical: ${canonicalId}`);
+    
+    let parsedDetails: any = null;
+    if (data.detailsCache) {
+        try {
+            parsedDetails = parseDetailsCacheSafely(data.detailsCache);
+            const bio = parsedDetails?.summary || parsedDetails?.bio || parsedDetails?.description || parsedDetails?.text || "";
+            if (bio && bio.length > 5) {
+               const detailsPayload = {
+                  summary: bio,
+                  imageUrl: parsedDetails?.imageUrl || parsedDetails?.image || "",
+                  details: {
+                     artist: parsedDetails?.details?.artist || parsedDetails?.artist || parsedDetails?.name || searchId,
+                     genre: parsedDetails?.details?.genre || parsedDetails?.genre || parsedDetails?.genres || "",
+                     origin: parsedDetails?.details?.origin || parsedDetails?.origin || parsedDetails?.location || parsedDetails?.country || "",
+                     founded: parsedDetails?.details?.founded || parsedDetails?.founded || parsedDetails?.formed || parsedDetails?.year || "",
+                     notableArtists: parsedDetails?.details?.notableArtists || parsedDetails?.notableArtists || []
+                  },
+                  members: parsedDetails?.members || [],
+                  links: parsedDetails?.links || [],
+                  discography: parsedDetails?.discography || [],
+                  tourInfo: parsedDetails?.tourInfo || "",
+                  recommendationReason: parsedDetails?.recommendationReason || parsedDetails?.reason || "",
+                  groundingLinks: parsedDetails?.groundingLinks || [],
+                  tourDates: parsedDetails?.tourDates || [],
+                  tourCachedAt: parsedDetails?.tourCachedAt || "",
+                  synthesisRationale: parsedDetails?.synthesisRationale || normalizedGraph.synthesisRationale || undefined
+               };
+                
+               setDetailsCache(prev => {
+                  const updated = new Map(prev);
+                  updated.set(searchIdLower, detailsPayload);
+                  updated.set(searchId, detailsPayload);
+                  updated.set(normalizeArtistId(searchId), detailsPayload);
+                  updated.set(canonicalIdLower, detailsPayload);
+                  updated.set(canonicalId, detailsPayload);
+                  updated.set(normalizeArtistId(canonicalId), detailsPayload);
+                  return updated;
+               });
+            }
+        } catch(e) { }
+    }
+    
+    const primaryNode = normalizedGraph.nodes.find((n: any) => 
+      n.id.toLowerCase() === searchIdLower || 
+      normalizeArtistId(n.id) === normalizeArtistId(searchId) || 
+      isArtistIdMatch(n.id, searchId)
+    );
+    
+    if (primaryNode) {
+        let unwrappedDetails = parsedDetails;
+        if (Array.isArray(unwrappedDetails) && unwrappedDetails.length > 0) {
+            unwrappedDetails = Array.isArray(unwrappedDetails[0]) ? unwrappedDetails[0][1] : unwrappedDetails[0];
+        }
+        const bio = unwrappedDetails?.summary || unwrappedDetails?.bio || unwrappedDetails?.description || unwrappedDetails?.text || primaryNode.bio || primaryNode.summary || "";
+        const hydratedNode = {
+            ...primaryNode,
+            bio,
+            summary: bio,
+            imageUrl: unwrappedDetails?.imageUrl || unwrappedDetails?.image || primaryNode.imageUrl || "",
+            genre: unwrappedDetails?.details?.genre || unwrappedDetails?.genre || unwrappedDetails?.genres || primaryNode.genre || "",
+            origin: unwrappedDetails?.details?.origin || unwrappedDetails?.origin || unwrappedDetails?.location || unwrappedDetails?.country || primaryNode.origin || "",
+            founded: unwrappedDetails?.details?.founded || unwrappedDetails?.founded || unwrappedDetails?.formed || unwrappedDetails?.year || primaryNode.founded || "",
+            isLibrary: true,
+            type: 'artist' as const,
+            group: 0
+        };
+        
+        const nodeIndex = normalizedGraph.nodes.findIndex((n: any) => n.id === hydratedNode.id);
+        if (nodeIndex !== -1) normalizedGraph.nodes[nodeIndex] = hydratedNode;
+        
+        if (!currentProjectIdRef.current || isGuest) {
+          setSelectedNode(hydratedNode);
+          setActiveNodeIds([hydratedNode.id]);
+        }
+    }
+    
+    try { await batchHydrateDetailsCache(normalizedGraph.nodes, normalizedGraph.links); } catch (e) {}
+    artistList.forEach(name => { approvedSeedsRef.current.add(normalizeArtistId(name)); });
+
+    if (currentProjectIdRef.current && user && !isGuest) {
+      const projectPath = `users/${user.uid}/projects/${currentProjectIdRef.current}`;
+      try {
+        const hoistedActiveNodes: string[] = [];
+        if (primaryNode) hoistedActiveNodes.push(primaryNode.id);
+        normalizedGraph.nodes.forEach((n: any) => { if (!hoistedActiveNodes.includes(n.id)) hoistedActiveNodes.push(n.id); });
+
+        await updateDoc(doc(db, projectPath), {
+          graphData: JSON.stringify(normalizedGraph),
+          activeNodes: hoistedActiveNodes,
+          seedArtists: artistsString,
+          detailsCache: JSON.stringify(Array.from(detailsCacheRef.current.entries())),
+          status: 'completed',
+          generationType: 'Direct Hit',
+          updatedAt: serverTimestamp()
+        });
+      } catch (e) { }
+    } else {
+      setGraphData(normalizedGraph);
+      setSeedArtists(artistsString);
+    }
+
+    setIsLoading(false);
+    isFetchingDetailsRef.current = false;
+    isHydratingSessionRef.current = false;
+    if (data?.hasUniqueSpiderweb) showCacheToast();
+  }, [user, isGuest, showCacheToast, setGraphData, setSeedArtists, setSelectedNode, setActiveNodeIds, setDetailsCache]);
+
   const handleGenerateGraph = useCallback(async (
     rawArtists: string,
     isRegeneration: boolean = false,
@@ -2739,8 +2864,7 @@ const App: React.FC = () => {
 
       // 1. Silent Phase: Build PreFlightSeeds for all artists
       let cacheCandidatesPerSeed: any[] = [];
-      let needsCacheUpgrade = false;
-      let hasFullCacheHitForSingle = false;
+      const verdicts: CacheVerdict[] = [];
       let singleCacheDocData = null;
       let singleCacheResolvedSearchId = "";
 
@@ -2765,10 +2889,8 @@ const App: React.FC = () => {
 
           if (cacheDoc.exists()) {
             const data = cacheDoc.data();
-            const validation = validateCacheEntry(data, true);
-            let parsedGraph = null;
-            try { parsedGraph = typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData; } catch (e) {}
-            const hasGraph = parsedGraph && parsedGraph.nodes && parsedGraph.nodes.length > 0;
+            const qualification = qualifyCacheEntry(data, searchId);
+            verdicts.push(qualification.verdict);
             
             // Extract metadata for both full hits and Cache Stubs
             isKnownCacheHit = true;
@@ -2790,14 +2912,9 @@ const App: React.FC = () => {
             if (artistList.length === 1 && !hasActiveFilters) {
                 singleCacheDocData = data;
                 singleCacheResolvedSearchId = (canonicalId && canonicalId.toLowerCase() !== searchIdLower) ? canonicalId : searchId;
-                if (!hasGraph || !validation.isFullyQualified) {
-                    needsCacheUpgrade = true;
-                } else {
-                    hasFullCacheHitForSingle = true;
-                }
-            } else if (!hasGraph || !validation.isFullyQualified) {
-                needsCacheUpgrade = true;
             }
+          } else {
+            verdicts.push('MISS');
           }
 
           // Phase 1 (Strict DB Cache): check disambiguation fallback
@@ -2882,8 +2999,10 @@ const App: React.FC = () => {
       }
 
       // Determine quota requirements
+      const routingDecision = deriveRoutingDecision(verdicts, isLiveSynthesis);
       const requiresLiveSynthesis = isLiveSynthesis || isLiveSynthesisTemp;
-      const hasMisses = cacheCandidatesPerSeed.some(s => !s.isKnownCacheHit);
+      const hasMisses = routingDecision === 'MISS';
+      const needsCacheUpgrade = routingDecision === 'PARTIAL';
       
       let tokenType = 'generation';
       if (requiresLiveSynthesis) tokenType = 'live_synthesis';
@@ -3034,141 +3153,13 @@ const App: React.FC = () => {
         }).catch(e => console.warn(e));
       }
 
-      // 5. Apply Cache Hit for Single Qualified Hits
-      if (hasFullCacheHitForSingle && singleCacheDocData) {
-          const searchId = artistList[0];
-          const searchIdLower = searchId.toLowerCase();
-          const data = singleCacheDocData;
-          const resolvedSearchId = singleCacheResolvedSearchId;
-          
-          let parsedGraph = null;
-          try { parsedGraph = typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData; } catch (e) {}
-
-          const rationaleVal = data.synthesisRationale || parsedGraph.synthesisRationale;
-          if (rationaleVal) parsedGraph.synthesisRationale = rationaleVal;
-          
-          const normalizedGraph = applyHumanCasedLabels(normalizeGraphData(parsedGraph), artists);
-          console.log(`[Front Gate Cache] GOLD STANDARD HIT! Bypassing all generation logic. searchId: ${searchId} -> resolvedId: ${resolvedSearchId}, nodes: ${normalizedGraph.nodes.length}`);
-          
-          let parsedDetails: any = null;
-          if (data.detailsCache) {
-              try {
-                  parsedDetails = parseDetailsCacheSafely(data.detailsCache);
-                  const bio = parsedDetails?.summary || parsedDetails?.bio || parsedDetails?.description || parsedDetails?.text || "";
-                  if (bio && bio.length > 5) {
-                     const detailsPayload = {
-                        summary: bio,
-                        imageUrl: parsedDetails?.imageUrl || parsedDetails?.image || "",
-                        details: {
-                           artist: parsedDetails?.details?.artist || parsedDetails?.artist || parsedDetails?.name || data.seedArtists || data.artistId || searchId,
-                           genre: parsedDetails?.details?.genre || parsedDetails?.genre || parsedDetails?.genres || "",
-                           origin: parsedDetails?.details?.origin || parsedDetails?.origin || parsedDetails?.location || parsedDetails?.country || "",
-                           founded: parsedDetails?.details?.founded || parsedDetails?.founded || parsedDetails?.formed || parsedDetails?.year || "",
-                           notableArtists: parsedDetails?.details?.notableArtists || parsedDetails?.notableArtists || []
-                        },
-                        members: parsedDetails?.members || [],
-                        links: parsedDetails?.links || [],
-                        discography: parsedDetails?.discography || [],
-                        tourInfo: parsedDetails?.tourInfo || "",
-                        recommendationReason: parsedDetails?.recommendationReason || parsedDetails?.reason || "",
-                        groundingLinks: parsedDetails?.groundingLinks || [],
-                        youtubeVideoId: typeof parsedDetails?.youtubeVideoId === 'string' && parsedDetails.youtubeVideoId.trim().length === 11 ? parsedDetails.youtubeVideoId.trim() : undefined,
-                        youtubeSearchQuery: typeof parsedDetails?.youtubeSearchQuery === 'string' && parsedDetails.youtubeSearchQuery.trim().length > 0 ? parsedDetails.youtubeSearchQuery.trim() : undefined,
-                        tourDates: parsedDetails?.tourDates || [],
-                        tourCachedAt: parsedDetails?.tourCachedAt || "",
-                        synthesisRationale: parsedDetails?.synthesisRationale || normalizedGraph.synthesisRationale || undefined
-                     };
-                      
-                      const canonicalId = data?.cacheKey || searchId;
-                      const canonicalIdLower = canonicalId.toLowerCase();
-                      const normalizedCanonicalId = normalizeArtistId(canonicalId);
-                      
-                      setDetailsCache(prev => {
-                        const updated = new Map(prev);
-                        updated.set(searchIdLower, detailsPayload);
-                        updated.set(searchId, detailsPayload);
-                        updated.set(normalizeArtistId(searchId), detailsPayload);
-                        updated.set(canonicalIdLower, detailsPayload);
-                        updated.set(canonicalId, detailsPayload);
-                        updated.set(normalizedCanonicalId, detailsPayload);
-                        if (data?.artistId) {
-                          updated.set(data.artistId.toLowerCase(), detailsPayload);
-                          updated.set(normalizeArtistId(data.artistId), detailsPayload);
-                        }
-                        return updated;
-                      });
-                  }
-              } catch(e) { }
+      // 5. Apply Cache Hit for Single Qualified Hits (Local Routing)
+      if (routingDecision === 'TOPOLOGY_HIT' && artistList.length === 1 && singleCacheDocData) {
+          if (singleCacheResolvedSearchId && singleCacheResolvedSearchId !== artistList[0]) {
+              setSeedArtists(singleCacheResolvedSearchId);
+              artistList.splice(0, artistList.length, singleCacheResolvedSearchId);
           }
-          
-          const primaryNode = normalizedGraph.nodes.find((n: any) => 
-            n.id.toLowerCase() === searchIdLower || 
-            normalizeArtistId(n.id) === normalizeArtistId(searchId) || 
-            isArtistIdMatch(n.id, searchId)
-          ) as any;
-          
-          if (primaryNode) {
-              let unwrappedDetails = parsedDetails;
-              if (Array.isArray(unwrappedDetails) && unwrappedDetails.length > 0) {
-                  unwrappedDetails = Array.isArray(unwrappedDetails[0]) ? unwrappedDetails[0][1] : unwrappedDetails[0];
-              }
-              const bio = unwrappedDetails?.summary || unwrappedDetails?.bio || unwrappedDetails?.description || unwrappedDetails?.text || primaryNode.bio || primaryNode.summary || "";
-              const hydratedNode = {
-                  ...primaryNode,
-                  bio: bio,
-                  summary: bio,
-                  imageUrl: unwrappedDetails?.imageUrl || unwrappedDetails?.image || primaryNode.imageUrl || "",
-                  genre: unwrappedDetails?.details?.genre || unwrappedDetails?.genre || unwrappedDetails?.genres || primaryNode.genre || "",
-                  origin: unwrappedDetails?.details?.origin || unwrappedDetails?.origin || unwrappedDetails?.location || unwrappedDetails?.country || primaryNode.origin || "",
-                  founded: unwrappedDetails?.details?.founded || unwrappedDetails?.founded || unwrappedDetails?.formed || unwrappedDetails?.year || primaryNode.founded || "",
-                  isLibrary: true,
-                  type: 'artist' as const,
-                  group: 0
-              };
-              
-              const nodeIndex = normalizedGraph.nodes.findIndex((n: any) => n.id === hydratedNode.id);
-              if (nodeIndex !== -1) {
-                  normalizedGraph.nodes[nodeIndex] = hydratedNode;
-              }
-              
-              if (!currentProjectIdRef.current || isGuest) {
-                setSelectedNode(hydratedNode);
-                setActiveNodeIds([hydratedNode.id]);
-              }
-          }
-          
-          try { await batchHydrateDetailsCache(normalizedGraph.nodes, normalizedGraph.links); } catch (e) {}
-          
-          artistList.forEach(name => { approvedSeedsRef.current.add(normalizeArtistId(name)); });
-
-          if (currentProjectIdRef.current && user && !isGuest) {
-            const projectPath = `users/${user.uid}/projects/${currentProjectIdRef.current}`;
-            try {
-              const seeds = artists.split('::').map(a => normalizeArtistId(a.trim()));
-              const hoistedActiveNodes: string[] = [];
-              if (primaryNode) hoistedActiveNodes.push(primaryNode.id);
-              normalizedGraph.nodes.forEach((n: any) => { if (isNodeInSeedList(n.id, seeds) && n.id !== primaryNode?.id) hoistedActiveNodes.push(n.id); });
-              normalizedGraph.nodes.forEach((n: any) => { if (!hoistedActiveNodes.includes(n.id)) hoistedActiveNodes.push(n.id); });
-
-              await updateDoc(doc(db, projectPath), {
-                graphData: JSON.stringify(normalizedGraph),
-                activeNodes: hoistedActiveNodes,
-                seedArtists: artists,
-                detailsCache: JSON.stringify(Array.from(detailsCacheRef.current.entries())),
-                status: 'completed',
-                generationType: 'Direct Hit',
-                updatedAt: serverTimestamp()
-              });
-            } catch (e) { }
-          } else {
-            setGraphData(normalizedGraph);
-            setSeedArtists(artists);
-          }
-
-          setIsLoading(false);
-          isFetchingDetailsRef.current = false;
-          isHydratingSessionRef.current = false;
-          if (data?.hasUniqueSpiderweb) showCacheToast();
+          await applyLocalTopologyHit(artistList[0], singleCacheDocData, artistList, artists);
           return;
       }
       
