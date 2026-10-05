@@ -2457,6 +2457,7 @@ const App: React.FC = () => {
     try {
       const newItem: StackItem = {
         id: node.id,
+        displayName: node.label,
         type: node.type || "artist",
         dateSaved: Date.now(),
         link: link || "",

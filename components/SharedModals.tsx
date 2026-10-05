@@ -53,7 +53,7 @@ export const MyStackDialog: React.FC<{
                     </div>
                 ) : (
                     [...stack].sort((a, b) => b.dateSaved - a.dateSaved).map(item => {
-                        const nameToCopy = cleanArtistDisplayName(item.id);
+                        const nameToCopy = item.displayName || cleanArtistDisplayName(item.id);
                         const isCopied = copiedId === item.id;
                         
                         return (
@@ -64,7 +64,7 @@ export const MyStackDialog: React.FC<{
                                     title="Click to copy name"
                                 >
                                     <div className="flex items-center gap-2">
-                                        <h4 className="text-[15px] font-medium text-white truncate leading-none">{nameToCopy}</h4>
+                                        <h4 className="text-[15px] font-medium text-white truncate leading-snug">{nameToCopy}</h4>
                                         {isCopied ? (
                                             <span className="material-symbols-outlined text-primary !text-[14px]">check_circle</span>
                                         ) : (

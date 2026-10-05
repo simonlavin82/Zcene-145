@@ -96,6 +96,7 @@ export interface StackItem {
   link?: string;
   discoveredVia?: string;
   docId?: string;
+  displayName?: string;
 }
 
 /** A lean position reference stored inside a user project's canvasLayout (artist nodes only). */
