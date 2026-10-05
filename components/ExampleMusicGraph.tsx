@@ -333,14 +333,14 @@ const ExampleMusicGraph: React.FC = () => {
                         <svg ref={svgRef} className="w-full h-full pointer-events-none relative z-10" />
                         
                         {/* Search Icon Top Right */}
-                        <div className="absolute top-6 right-8 sm:right-10 z-40 flex justify-end transition-all duration-300 pointer-events-auto">
-                            <button className="w-12 h-12 bg-zinc-900/80 border border-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center backdrop-blur-md shadow-xl transition-all active:scale-90 rounded-xl">
+                        <div className="absolute top-6 right-6 z-40 flex justify-end transition-all duration-300 pointer-events-auto">
+                            <div className="w-[38px] h-[38px] bg-zinc-900/80 border border-zinc-700 text-zinc-400 flex flex-shrink-0 items-center justify-center backdrop-blur-md shadow-xl rounded-xl">
                                 <span className="material-symbols-outlined !text-[20px]">search</span>
-                            </button>
+                            </div>
                         </div>
                         
                         {/* Legend Positioning (Matching MusicGraph Legend) */}
-                        <div ref={legendContainerRef} className={`absolute z-30 pointer-events-auto flex flex-col ${isCompactMode ? 'bottom-12 sm:bottom-16 left-8 sm:left-10 items-start' : 'top-6 left-1/2 -translate-x-1/2 items-center w-full max-w-[95%]'}`}>
+                        <div ref={legendContainerRef} className={`absolute z-30 pointer-events-auto flex flex-col ${isCompactMode ? 'bottom-6 left-6 items-start' : 'top-6 left-1/2 -translate-x-1/2 items-center w-full max-w-[95%]'}`}>
                             {!isCompactMode ? (
                                 <div className="flex flex-wrap justify-center border border-zinc-700 bg-zinc-900/90 backdrop-blur-md px-6 py-3 items-center gap-3 sm:gap-4 shadow-2xl rounded-none">
                                     {legendOrder.map(f => (
@@ -359,7 +359,7 @@ const ExampleMusicGraph: React.FC = () => {
                                 <div className="flex flex-col items-start gap-4 pointer-events-none w-full relative">
                                     <button
                                         onClick={() => setIsLegendExpanded(!isLegendExpanded)}
-                                        className={`bg-zinc-900/80 backdrop-blur-md border border-zinc-600 text-zinc-300 w-14 h-14 flex items-center justify-center shadow-2xl transition-all rounded-xl relative z-40 pointer-events-auto active:scale-95 ${isLegendExpanded ? 'bg-zinc-800 border-primary/50 text-primary' : ''}`}
+                                        className={`w-[38px] h-[38px] bg-zinc-900/80 backdrop-blur-md border border-zinc-700 text-zinc-400 hover:text-white shadow-xl transition-all flex items-center justify-center rounded-xl relative z-40 pointer-events-auto cursor-pointer active:scale-90 ${isLegendExpanded ? 'bg-zinc-800 border-primary/50 text-primary' : ''}`}
                                     >
                                         <span className="material-symbols-outlined !text-[20px]">{isLegendExpanded ? 'close' : 'filter_list'}</span>
                                     </button>
@@ -386,16 +386,16 @@ const ExampleMusicGraph: React.FC = () => {
                         </div>
 
                         {/* Graph Controls Overlay (Matching MusicGraph Controls) */}
-                        <div className="absolute bottom-12 sm:bottom-16 right-8 sm:right-10 flex flex-col gap-3 z-30">
-                            <button className="w-12 h-12 bg-zinc-900/80 border border-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center backdrop-blur-md shadow-xl transition-all active:scale-90 rounded-xl">
+                        <div className="absolute bottom-6 right-6 flex flex-col gap-3 z-30 pointer-events-auto">
+                            <div className="w-[38px] h-[38px] bg-zinc-900/80 border border-zinc-700 text-zinc-400 flex flex-shrink-0 items-center justify-center backdrop-blur-md shadow-xl rounded-xl">
                                 <span className="material-symbols-outlined !text-[20px]">center_focus_strong</span>
-                            </button>
-                            <button className="w-12 h-12 bg-zinc-900/80 border border-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center backdrop-blur-md shadow-xl transition-all active:scale-90 rounded-xl">
+                            </div>
+                            <div className="w-[38px] h-[38px] bg-zinc-900/80 border border-zinc-700 text-zinc-400 flex flex-shrink-0 items-center justify-center backdrop-blur-md shadow-xl rounded-xl">
                                 <span className="material-symbols-outlined !text-[20px]">add</span>
-                            </button>
-                            <button className="w-12 h-12 bg-zinc-900/80 border border-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center backdrop-blur-md shadow-xl transition-all active:scale-90 rounded-xl">
+                            </div>
+                            <div className="w-[38px] h-[38px] bg-zinc-900/80 border border-zinc-700 text-zinc-400 flex flex-shrink-0 items-center justify-center backdrop-blur-md shadow-xl rounded-xl">
                                 <span className="material-symbols-outlined !text-[20px]">remove</span>
-                            </button>
+                            </div>
                         </div>
                     </div>
                 </div>
