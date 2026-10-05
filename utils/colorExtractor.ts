@@ -85,7 +85,7 @@ export const extractDominantColor = async (imageUrl?: string, fallbackName?: str
         // --- Saturation amplification + luminance targeting ---
         // Pixel averaging de-saturates vivid artwork because neutrals dilute the dominant
         // hue. We convert to HSL, amplify saturation (×1.5, capped at 90%), then clamp
-        // luminance to a mid-bright target range (40–65%) so the glow colour is always
+        // luminance to a mid-bright target range (40–65%) so the glow color is always
         // visually legible and character-faithful regardless of image brightness.
         // Greyscale images (s ≈ 0) pass through unchanged, keeping their neutral glow.
         let [h, s, l] = rgbToHsl(r, g, b);

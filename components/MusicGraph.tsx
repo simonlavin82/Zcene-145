@@ -771,7 +771,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     let container = svg.select<SVGGElement>("g.main-container");
     if (container.empty()) {
         svg.selectAll("*").remove(); 
-        // Glow filter removed to maintain true colour fidelity
+        // Glow filter removed to maintain true color fidelity
         container = svg.append("g").attr("class", "main-container");
         container.append("g").attr("class", "link-group").attr("stroke", "#e4e4e7");
         container.append("g").attr("class", "node-group");
@@ -1626,13 +1626,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                         <div className="shrink-0">
                             <p className={`text-sm leading-relaxed font-normal text-zinc-400 m-0${isSmallScreen && !isCardExpanded ? ' line-clamp-4' : ''}`}>
                                 {(() => {
-                                    let cleanedDna = hoveredLink.dna
-                                        ?.replace(/\btechnicolor\b/gi, 'technicolour')
-                                        .replace(/\bcolors\b/gi, 'colours')
-                                        .replace(/\bcolorful\b/gi, 'colourful')
-                                        .replace(/\bcoloring\b/gi, 'colouring')
-                                        .replace(/\bcolorize\b/gi, 'colourise')
-                                        .replace(/\bcolor\b/gi, 'colour');
+                                    let cleanedDna = hoveredLink.dna;
                                     const matchedPrefix = extractFuzzyPrefix(cleanedDna || '', hoveredLink.sourceId || '');
                                     if (matchedPrefix && cleanedDna) {
                                         return (

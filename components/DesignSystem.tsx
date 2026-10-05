@@ -419,7 +419,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
         { id: 'bio-scannability', title: 'Bio Scannability' },
         { id: 'artist-metadata', title: 'Artist Metadata' },
         { id: 'taste-compatibility', title: 'Style Compatibility' },
-        { id: 'colour-palette', title: 'Colour Palette' },
+        { id: 'color-palette', title: 'Color Palette' },
         { id: 'layout-spacing', title: 'Layout & Spacing' },
         { id: 'iconography', title: 'Iconography' },
         { id: 'spiderweb-legends', title: 'Spiderweb Legends' },
@@ -993,9 +993,9 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                         </div>
                     </section>
 
-                    {/* 3. COLOUR PALETTE */}
-                    <section id="colour-palette">
-                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Colour Palette</h2>
+                    {/* 3. COLOR PALETTE */}
+                    <section id="color-palette">
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Color Palette</h2>
                         <div className="space-y-16">
                             <div>
                                 <h3 className="text-xl font-medium text-zinc-200 mb-6">Primary & Brand</h3>
@@ -1043,7 +1043,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="mb-6">
                                     <h3 className="text-xl font-medium text-zinc-200">Zcene Categorical Palette</h3>
                                     <p className="text-sm text-zinc-400 mt-2 leading-relaxed max-w-2xl">
-                                        These vibrant "Style Profile" colours are the universal source of truth for all sequential UI mappings. They are used to dynamically colour Dashboard Crates (to create physical-record visual rhythm) and to assign visual distinction to nodes in the D3 Spiderweb graph.
+                                        These vibrant "Style Profile" colors are the universal source of truth for all sequential UI mappings. They are used to dynamically color Dashboard Crates (to create physical-record visual rhythm) and to assign visual distinction to nodes in the D3 Spiderweb graph.
                                     </p>
                                 </div>
                                 <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
@@ -1395,7 +1395,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                 <li><strong>Relational Contexts:</strong> Uses <code>text-zinc-400 font-normal</code> for structural descriptions and <code>text-primary font-normal</code> for highlighted details.</li>
                                                 <li><strong>Micro-Bio / Editorial Typography:</strong> Bio description text uses <code>text-sm leading-relaxed font-normal text-zinc-400</code> matching the 14px Deep Cuts scale to maximize legibility on dark backgrounds. Rendered as a block-level <code>&lt;p&gt;</code> element so line-height applies correctly.</li>
                                                 <li><strong>Responsive Canvas Pattern:</strong> On desktop (<code>≥ 1024px</code>), the panel floats above (or below if within 140px of the top edge) the hovered node using absolute coordinate tracking. On mobile, it collapses to an absolute canvas-anchored top-drop banner restricted to <code>max-h-[55vh]</code> at <code>top: 0</code>. Internally, it utilizes a unified <code>overflow-y-auto</code> layout wrapper combining both narrative DNA and direct connection lists to ensure uniform, synchronized scrolling.</li>
-                                                <li><strong>Client-Side UK English Sanitisation:</strong> Upstream Firestore description strings are intercepted at the render layer via strict word-boundary regex chains (<code>\b</code> anchors) to enforce UK English spelling variants (e.g. <em>colour</em>, <em>technicolour</em>) before mounting to the DOM.</li>
+                                                <li><strong>Client-Side US English:</strong> Upstream Firestore description strings flow directly, relying on standard US English from the backend.</li>
                                             </ul>
                                         </div>
                                     </div>
@@ -2455,7 +2455,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </span>
                                     </div>
                                     <h4 className="font-medium text-white mb-1">MAPPED / STATUS</h4>
-                                    <p className="text-sm text-zinc-400 leading-relaxed mb-4 flex-grow">Binary mapping state. <strong>Mapped</strong> (accent colour) renders when <code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.graphData</code> is truthy. <strong>Unmapped</strong> (muted) renders otherwise. Table list exposes both states in a column; card header shows mapping status beneath the date.</p>
+                                    <p className="text-sm text-zinc-400 leading-relaxed mb-4 flex-grow">Binary mapping state. <strong>Mapped</strong> (accent color) renders when <code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.graphData</code> is truthy. <strong>Unmapped</strong> (muted) renders otherwise. Table list exposes both states in a column; card header shows mapping status beneath the date.</p>
                                     <div className="space-y-1 mt-auto">
                                         <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block">Mapped: text-zinc-950 bg-accent</p>
                                         <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block mt-1">Unmapped: text-zinc-500 bg-zinc-800/80</p>
@@ -4238,9 +4238,9 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </p>
                                 </div>
                                 <div className="p-6 bg-zinc-900/50 border border-zinc-800 rounded-xl space-y-3 md:col-span-2">
-                                    <h4 className="text-lg font-medium text-white">UK English (Standard)</h4>
+                                    <h4 className="text-lg font-medium text-white">US English (Standard)</h4>
                                     <p className="text-sm text-zinc-400 leading-relaxed">
-                                        Zcene uses UK English grammar and spelling as its default verbal identity. This includes the use of "s" instead of "z" in words like <strong>analysing</strong> or <strong>organising</strong>, and keeping the "u" in words like <strong>colour</strong>. This maintains brand consistency with our technical implementation and visual metaphors.
+                                        Zcene uses US English grammar and spelling as its default verbal identity. This includes the use of "z" instead of "s" in words like <strong>analyzing</strong> or <strong>organizing</strong>, and omitting the "u" in words like <strong>color</strong>. This maintains brand consistency with our technical implementation and visual metaphors.
                                     </p>
                                 </div>
                             </div>

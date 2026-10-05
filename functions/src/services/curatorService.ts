@@ -499,7 +499,7 @@ export const GRAPH_RESPONSE_SCHEMA = {
           },
           group: {
             type: Type.INTEGER,
-            description: "A group identifier for colouring or categorisation, usually based on the initial seed artists."
+            description: "A group identifier for coloring or categorization, usually based on the initial seed artists."
           },
           label: {
             type: Type.STRING,

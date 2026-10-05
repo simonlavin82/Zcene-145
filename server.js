@@ -1133,7 +1133,7 @@ app.use(async (req, res) => {
           let imageUrl = "https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg";
           let description = cleanSeeds.length > 0 
             ? `Explore this Zcene seeded by ${cleanSeeds.join(', ')}. Own music discovery.`
-            : `Explore customised music maps and discover underground artists on Zcene.`;
+            : `Explore customized music maps and discover underground artists on Zcene.`;
 
           // ARCHITECTURE: Deterministic Open Graph Routing
           // Phase 3: Fast path — share document carries its own pre-resolved seed image.

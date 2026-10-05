@@ -71,7 +71,7 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
       className={`group relative border border-transparent hover:border-primary rounded-none p-5 transition-all cursor-pointer flex flex-col justify-between w-full md:w-[350px] h-[180px] shadow-[0_0_40px_rgba(0,0,0,0.7)] ${activeMenuId === project.id ? 'z-50' : 'overflow-hidden z-0'}`}
       style={{
         '--scene-accent': dominantColor,
-        // Blend scene accent toward white for bright legible title colour
+        // Blend scene accent toward white for bright legible title color
         '--scene-accent-title': dominantColor
           ? `color-mix(in oklch, ${dominantColor} 25%, white)`
           : 'white',

@@ -54,7 +54,7 @@ const ArtistManagementMock = () => (
     <div className="space-y-4 max-w-sm mx-auto">
         <div className="relative">
             <div className="w-full bg-zinc-900 border border-zinc-700 py-3 px-4 text-sm text-zinc-500 flex items-center justify-between">
-                <span>Add your favourite artists...</span>
+                <span>Add your favorite artists...</span>
                 <div className="w-6 h-6 rounded-xl bg-primary flex items-center justify-center text-brand-black">
                     <span className="material-symbols-outlined !text-sm font-bold">add</span>
                 </div>
@@ -99,7 +99,7 @@ const DeepCutMock = () => (
             </div>
             <div className="space-y-3">
                 <div className="flex justify-end"><div className="bg-zinc-800 text-sm p-3 rounded-xl text-zinc-300">Tell me about their history.</div></div>
-                <div className="flex justify-start"><div className="bg-zinc-900 border border-zinc-800 text-sm p-3 rounded-xl text-zinc-400 italic">Analysing scene history...</div></div>
+                <div className="flex justify-start"><div className="bg-zinc-900 border border-zinc-800 text-sm p-3 rounded-xl text-zinc-400 italic">Analyzing scene history...</div></div>
             </div>
         </div>
     </div>
@@ -258,7 +258,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
             symbol: d3.symbolStar,
             symbolSize: 400,
             title: 'Artist',
-            description: "Artists suggested by the AI that share some musical DNA with your seeds. Toggle these to find new favourites."
+            description: "Artists suggested by the AI that share some musical DNA with your seeds. Toggle these to find new favorites."
         },
         {
             symbol: d3.symbolDiamond,

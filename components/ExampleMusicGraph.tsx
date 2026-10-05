@@ -230,7 +230,7 @@ const ExampleMusicGraph: React.FC = () => {
 
         const colorScale = d3.scaleOrdinal(zceneCategoricalPalette);
 
-        // Glow filter removed to maintain true colour fidelity
+        // Glow filter removed to maintain true color fidelity
 
         // Manage nodes and links with identity preservation to prevent jumps
         let nodes: Node[];

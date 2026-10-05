@@ -203,7 +203,7 @@ export const GRAPH_RESPONSE_SCHEMA = {
           },
           group: {
             type: Type.INTEGER,
-            description: "A group identifier for colouring or categorisation, usually based on the initial seed artists."
+            description: "A group identifier for coloring or categorization, usually based on the initial seed artists."
           }
         },
         required: ["id", "type", "group"]
@@ -2005,7 +2005,7 @@ export const streamNodeChat = async (
     STRICT CHAT OUTPUT RULES:
     1. WORD LIMIT: Max 50 words per response. Be exceptionally concise.
     2. STRUCTURE: Use only ONE short paragraph.
-    3. LANGUAGE: Use UK English (e.g., 'analysing', 'colour').
+    3. LANGUAGE: Use US English (e.g., 'analyzing', 'color').
     4. NO MARKDOWN: Output ONLY plain text sentences.
     5. NO SYMBOLS: Strictly NO bolding (**), no italics (*), no hashes (#), no dashes (-).
     6. NO OPENERS: Do not say "Hi," "Sure," or "I can explain that." Start with the insight.

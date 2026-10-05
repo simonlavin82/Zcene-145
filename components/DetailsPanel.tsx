@@ -43,7 +43,7 @@ const ZceneEmptyState: React.FC<{ onNavigate: (view: View) => void }> = ({ onNav
             </button>
         </div>
         <div className="mt-3 text-zinc-400 text-sm space-y-4">
-            <p className="text-center px-4">Start with a few of your favourite artists, and Zcene will map how they connect across genres, labels, origins, and scenes.</p>
+            <p className="text-center px-4">Start with a few of your favorite artists, and Zcene will map how they connect across genres, labels, origins, and scenes.</p>
             <div className="text-left bg-zinc-800/30 p-5 rounded-none border border-zinc-700/50 mx-4 text-sm">
                 <p className="font-medium text-zinc-200 mb-2">How it works</p>
                 <ol className="list-decimal list-inside space-y-1 text-zinc-400">
