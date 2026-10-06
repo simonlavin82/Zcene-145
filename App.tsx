@@ -3078,9 +3078,13 @@ const App: React.FC = () => {
       let activeDisambiguationGenres: Record<string, string> = disambiguationGenres || {};
       let hasDisambiguated = false;
 
+      // Only re-route on the first (user-confirmed) pass. On the re-entrant pass
+      // (bypassDisambiguation === true) the seeds are already resolved; re-running
+      // this block would recurse forever because the cache lookup re-populates
+      // predictedOrigin every time (infinite spinner, never reaching TOPOLOGY_HIT).
       for (let i = 0; i < artistList.length; i++) {
         const searchId = artistList[i];
-        if (cacheCandidatesPerSeed.length > 0) {
+        if (!bypassDisambiguation && cacheCandidatesPerSeed.length > 0) {
             const preFlightSeed = cacheCandidatesPerSeed[i];
             const rawCountryName = preFlightSeed.predictedOrigin;
             
@@ -3122,6 +3126,11 @@ const App: React.FC = () => {
               setSeedArtists(singleCacheResolvedSearchId);
               artistList.splice(0, artistList.length, singleCacheResolvedSearchId);
           }
+          // Locks were released after the silent cache phase; re-assert them so
+          // Autosave / ProjectLoader can't race the batch hydration below.
+          isHydratingSessionRef.current = true;
+          isProjectLoadingRef.current = true;
+          setIsLoading(true);
           await applyLocalTopologyHit(artistList[0], singleCacheDocData, artistList, artists);
           isHydratingSessionRef.current = false;
           isProjectLoadingRef.current = false;
