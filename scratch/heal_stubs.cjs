@@ -1,7 +1,8 @@
-const { initializeApp } = require('firebase-admin/app');
+const { initializeApp, cert } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+const serviceAccount = require("../firebase-service-account.json");
 
-initializeApp();
+initializeApp({ credential: cert(serviceAccount) });
 const db = getFirestore();
 
 async function healStubs() {

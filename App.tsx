@@ -87,6 +87,7 @@ const generateGraphDataViaCloudJob = async (
   jobId?: string,
   disambiguationHints?: Record<string, string>,
   disambiguationGenres?: Record<string, string>,
+  originalQueries?: Record<string, string>,
   baseGraph?: GraphData,
   cachedSubgraphsContext?: string,
   isSmartBypass?: boolean,
@@ -110,6 +111,7 @@ const generateGraphDataViaCloudJob = async (
       ...(jobId && { jobId }),
       ...(disambiguationHints && { disambiguationHints }),
       ...(disambiguationGenres && { disambiguationGenres }),
+      ...(originalQueries && { originalQueries }),
       ...(baseGraph && { baseGraph }),
       ...(cachedSubgraphsContext && { cachedSubgraphsContext }),
       ...(isSmartBypass !== undefined && { isSmartBypass }),
@@ -2812,7 +2814,8 @@ const App: React.FC = () => {
     overrideFilters?: DiscoveryFilters,
     disambiguationHints?: Record<string, string>,
     bypassDisambiguation: boolean = false,
-    disambiguationGenres?: Record<string, string>
+    disambiguationGenres?: Record<string, string>,
+    originalQueries?: Record<string, string>
   ) => {
     if (!bypassTokenConfirmation) {
       sessionTokenApprovedRef.current = false;
@@ -3076,6 +3079,7 @@ const App: React.FC = () => {
       let resolvedArtistSeeds = [...artistList];
       let activeDisambiguationHints: Record<string, string> = disambiguationHints || {};
       let activeDisambiguationGenres: Record<string, string> = disambiguationGenres || {};
+      let activeOriginalQueries: Record<string, string> = originalQueries || {};
       let hasDisambiguated = false;
 
       // Only re-route on the first (user-confirmed) pass. On the re-entrant pass
@@ -3096,6 +3100,11 @@ const App: React.FC = () => {
                 resolvedArtistSeeds[i] = seedToUse;
                 activeDisambiguationHints[seedToUse] = rawCountryName;
                 if (preFlightSeed.genre) activeDisambiguationGenres[seedToUse] = preFlightSeed.genre;
+                if (seedToUse !== searchId) {
+                  activeOriginalQueries[seedToUse] = searchId;
+                } else if (preFlightSeed.originalQuery) {
+                  activeOriginalQueries[seedToUse] = preFlightSeed.originalQuery;
+                }
               }
               hasDisambiguated = true;
             }
@@ -3116,7 +3125,7 @@ const App: React.FC = () => {
         const allKnownCacheHits = cacheCandidatesPerSeed.length > 0 && cacheCandidatesPerSeed.every(s => s.isKnownCacheHit);
         const nextSkipCacheLookup = !allKnownCacheHits;
         
-        handleGenerateGraph(newArtistsStr, isRegeneration, graphToEnhance, nextSkipCacheLookup, !isCustomNext || sessionTokenApprovedRef.current, overrideFilters, activeDisambiguationHints, true);
+        handleGenerateGraph(newArtistsStr, isRegeneration, graphToEnhance, nextSkipCacheLookup, !isCustomNext || sessionTokenApprovedRef.current, overrideFilters, activeDisambiguationHints, true, activeDisambiguationGenres, activeOriginalQueries);
         return;
       }
 
@@ -3607,6 +3616,7 @@ const App: React.FC = () => {
                 `job-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
                 activeDisambiguationHints,
                 activeDisambiguationGenres,
+                activeOriginalQueries,
                 parsedGraphData, // Pass the cache's parsed graph as baseGraph
                 undefined, // cachedSubgraphsContext
                 true, // isSmartBypass flag
@@ -3955,6 +3965,7 @@ const App: React.FC = () => {
             undefined,
             activeDisambiguationHints,
             activeDisambiguationGenres,
+            activeOriginalQueries,
             undefined, // baseGraph
             undefined, // cachedSubgraphsContext
             toFetch.length > 1 || hasActiveFilters // isSmartBypass
@@ -4319,6 +4330,7 @@ const App: React.FC = () => {
           jobId,
           activeDisambiguationHints,
           activeDisambiguationGenres,
+          activeOriginalQueries,
           pruned || undefined,          // Base graph context
           computedContext,              // Stringified cached subgraphs context for multi-seed
           undefined,                    // isSmartBypass
