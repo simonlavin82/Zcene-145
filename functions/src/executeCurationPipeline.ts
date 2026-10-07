@@ -166,9 +166,23 @@ export const executeCurationPipeline = onCall({
            }
          }
        }
-     } catch (dedupErr) {
-       console.warn(`[Pipeline Diamond] Seed slug dedup query failed for "${seedNorm}", proceeding with derived ID:`, dedupErr);
-     }
+      } catch (dedupErr) {
+        console.warn(`[Pipeline Diamond] Seed slug dedup query failed for "${seedNorm}", proceeding with derived ID:`, dedupErr);
+      }
+
+      // [Pre-Flight Alias Resolution]
+      const originalQuery = payload.originalQueries && payload.originalQueries[resolvedSeedNorm];
+      if (originalQuery) {
+          const bareNormId = normalizeArtistId(originalQuery);
+          if (bareNormId !== resolvedSeedNorm) {
+              await db.collection("artists").doc(bareNormId).set({
+                  _isStub: true,
+                  redirectTo: resolvedSeedNorm,
+                  cachedAt: FieldValue.serverTimestamp()
+              }, { merge: true });
+              console.log(`[Pipeline Diamond] -> Synchronously minted bare stub forwarder (Frontend Resolved): ${bareNormId} -> ${resolvedSeedNorm}`);
+          }
+      }
 
      let hasGraphData = false;
       try {
@@ -227,36 +241,39 @@ export const executeCurationPipeline = onCall({
         needsProGeneration = true;
         hasCacheMiss = true;
         
-        let validationResult: any = null;
-        if (payload.disambiguationHints && payload.disambiguationHints[normalizeArtistId(seed)]) {
-           const hintGenre = payload.disambiguationGenres && payload.disambiguationGenres[normalizeArtistId(seed)] ? payload.disambiguationGenres[normalizeArtistId(seed)] : "Unknown";
-           const rawId = payload.originalQueries && payload.originalQueries[normalizeArtistId(seed)] ? payload.originalQueries[normalizeArtistId(seed)] : seed;
-           validationResult = { isValid: true, id: rawId, origin: payload.disambiguationHints[normalizeArtistId(seed)], genre: hintGenre };
-        } else {
-           const valResult = await validateSeedOriginBackend(seed);
-           validationResult = valResult;
-           if (valResult.apiUsage) {
-              usageCollector.push(valResult.apiUsage.model, valResult.apiUsage);
-           }
-        }
-        if (validationResult.isValid) {
-           const bareNormId = normalizeArtistId(validationResult.id);
-           let normId = bareNormId;
-           if (validationResult.origin) {
-              const originSlug = extractCountrySlug(validationResult.origin);
-              if (originSlug && originSlug !== 'global' && !normId.endsWith(`-${originSlug}`)) {
-                 normId = `${normId}-${originSlug}`;
-              }
-           }
-           
-           if (normId !== bareNormId) {
-              await db.collection("artists").doc(bareNormId).set({
-                 _isStub: true,
-                 redirectTo: normId,
-                 cachedAt: FieldValue.serverTimestamp()
-              }, { merge: true });
-              console.log(`[Pipeline Diamond] -> Synchronously minted bare stub forwarder: ${bareNormId} -> ${normId}`);
-           }
+         let validationResult: any = null;
+         let resolvedByBackend = false;
+         if (payload.disambiguationHints && payload.disambiguationHints[normalizeArtistId(seed)]) {
+            const hintGenre = payload.disambiguationGenres && payload.disambiguationGenres[normalizeArtistId(seed)] ? payload.disambiguationGenres[normalizeArtistId(seed)] : "Unknown";
+            const rawId = payload.originalQueries && payload.originalQueries[normalizeArtistId(seed)] ? payload.originalQueries[normalizeArtistId(seed)] : seed;
+            validationResult = { isValid: true, id: rawId, origin: payload.disambiguationHints[normalizeArtistId(seed)], genre: hintGenre };
+         } else {
+            const valResult = await validateSeedOriginBackend(seed);
+            validationResult = valResult;
+            resolvedByBackend = true;
+            if (valResult.apiUsage) {
+               usageCollector.push(valResult.apiUsage.model, valResult.apiUsage);
+            }
+         }
+         if (validationResult.isValid) {
+            const bareNormId = normalizeArtistId(validationResult.id);
+            let normId = bareNormId;
+            if (validationResult.origin) {
+               const originSlug = extractCountrySlug(validationResult.origin);
+               if (originSlug && originSlug !== 'global' && !normId.endsWith(`-${originSlug}`)) {
+                  normId = `${normId}-${originSlug}`;
+               }
+            }
+            
+            if (normId !== bareNormId && resolvedByBackend) {
+               await db.collection("artists").doc(bareNormId).set({
+                  _isStub: true,
+                  redirectTo: normId,
+                  cachedAt: FieldValue.serverTimestamp()
+               }, { merge: true });
+               console.log(`[Pipeline Diamond] -> Synchronously minted bare stub forwarder (Backend Resolved): ${bareNormId} -> ${normId}`);
+            }
+
 
            resolvedSeedArray.push({
               id: normId,
