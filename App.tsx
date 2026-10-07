@@ -3094,7 +3094,13 @@ const App: React.FC = () => {
             
             if (rawCountryName) {
               if (preFlightSeed.isKnownCacheHit && preFlightSeed.predictedOrigin === rawCountryName && preFlightSeed.candidateId) {
-                resolvedArtistSeeds[i] = normalizeArtistId(preFlightSeed.candidateId);
+                const resolvedId = normalizeArtistId(preFlightSeed.candidateId);
+                resolvedArtistSeeds[i] = resolvedId;
+                if (resolvedId !== searchId) {
+                  activeOriginalQueries[resolvedId] = searchId;
+                } else if (preFlightSeed.originalQuery) {
+                  activeOriginalQueries[resolvedId] = preFlightSeed.originalQuery;
+                }
               } else {
                 const seedToUse = preFlightSeed.isCorrected && preFlightSeed.correctedQuery ? preFlightSeed.correctedQuery : searchId;
                 resolvedArtistSeeds[i] = seedToUse;
