@@ -151,6 +151,19 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
         catch (dedupErr) {
             console.warn(`[Pipeline Diamond] Seed slug dedup query failed for "${seedNorm}", proceeding with derived ID:`, dedupErr);
         }
+        // [Pre-Flight Alias Resolution]
+        const originalQuery = payload.originalQueries && payload.originalQueries[resolvedSeedNorm];
+        if (originalQuery) {
+            const bareNormId = (0, curatorService_1.normalizeArtistId)(originalQuery);
+            if (bareNormId !== resolvedSeedNorm) {
+                await db.collection("artists").doc(bareNormId).set({
+                    _isStub: true,
+                    redirectTo: resolvedSeedNorm,
+                    cachedAt: firestore_1.FieldValue.serverTimestamp()
+                }, { merge: true });
+                console.log(`[Pipeline Diamond] -> Synchronously minted bare stub forwarder (Frontend Resolved): ${bareNormId} -> ${resolvedSeedNorm}`);
+            }
+        }
         let hasGraphData = false;
         try {
             const cacheDoc = await db.collection("artists").doc(resolvedSeedNorm).get();
@@ -211,13 +224,16 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
             needsProGeneration = true;
             hasCacheMiss = true;
             let validationResult = null;
+            let resolvedByBackend = false;
             if (payload.disambiguationHints && payload.disambiguationHints[(0, curatorService_1.normalizeArtistId)(seed)]) {
                 const hintGenre = payload.disambiguationGenres && payload.disambiguationGenres[(0, curatorService_1.normalizeArtistId)(seed)] ? payload.disambiguationGenres[(0, curatorService_1.normalizeArtistId)(seed)] : "Unknown";
-                validationResult = { isValid: true, id: seed, origin: payload.disambiguationHints[(0, curatorService_1.normalizeArtistId)(seed)], genre: hintGenre };
+                const rawId = payload.originalQueries && payload.originalQueries[(0, curatorService_1.normalizeArtistId)(seed)] ? payload.originalQueries[(0, curatorService_1.normalizeArtistId)(seed)] : seed;
+                validationResult = { isValid: true, id: rawId, origin: payload.disambiguationHints[(0, curatorService_1.normalizeArtistId)(seed)], genre: hintGenre };
             }
             else {
                 const valResult = await (0, curatorService_1.validateSeedOriginBackend)(seed);
                 validationResult = valResult;
+                resolvedByBackend = true;
                 if (valResult.apiUsage) {
                     usageCollector.push(valResult.apiUsage.model, valResult.apiUsage);
                 }
@@ -231,13 +247,13 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
                         normId = `${normId}-${originSlug}`;
                     }
                 }
-                if (normId !== bareNormId) {
+                if (normId !== bareNormId && resolvedByBackend) {
                     await db.collection("artists").doc(bareNormId).set({
                         _isStub: true,
                         redirectTo: normId,
                         cachedAt: firestore_1.FieldValue.serverTimestamp()
                     }, { merge: true });
-                    console.log(`[Pipeline Diamond] -> Synchronously minted bare stub forwarder: ${bareNormId} -> ${normId}`);
+                    console.log(`[Pipeline Diamond] -> Synchronously minted bare stub forwarder (Backend Resolved): ${bareNormId} -> ${normId}`);
                 }
                 resolvedSeedArray.push({
                     id: normId,
@@ -414,6 +430,7 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
                     updatedAt: firestore_1.FieldValue.serverTimestamp(),
                     inputPayload: {
                         ...payload,
+                        artists: resolvedSeedArray.map(s => s.id).join('::'),
                         baseGraph: finalGraph,
                         generationType: determinedGenerationType,
                         foregroundApiUsage: collectedTokens,
