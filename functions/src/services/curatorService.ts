@@ -676,7 +676,7 @@ CRITICAL RULES (non-negotiable):
       contents: prompt,
       config: {
         systemInstruction: "You are a strict music data validator. You do NOT infer intent. If the user input contains a spelling error, return the REAL canonical artist name (e.g. if given 'turstile', return id: 'Turnstile', correctedInput: true). Return ONLY valid JSON matching the schema.",
-        thinking_level: "minimal",
+        thinkingConfig: { thinkingLevel: "minimal" },
         responseMimeType: "application/json",
         responseSchema: SEED_VALIDATION_SCHEMA
       }
@@ -791,7 +791,7 @@ ${JSON.stringify(detailsCacheEntries, null, 2)}`;
         contents: prompt,
         config: {
             systemInstruction,
-            thinking_level: "high",
+            thinkingConfig: { thinkingLevel: "high" },
             responseMimeType: "application/json",
             responseSchema,
         }
@@ -920,7 +920,7 @@ If no missing edges are found, return an empty array [].`;
       config: {
         responseMimeType: "application/json",
         responseSchema,
-        thinking_level: "minimal",
+        thinkingConfig: { thinkingLevel: "minimal" },
       }
     });
 
@@ -1066,7 +1066,7 @@ export const generateGraphDataBackend = async (
         contents: userPrompt,
         config: {
           systemInstruction: finalizedSystemInstruction,
-          thinking_level: "medium",
+          thinkingConfig: { thinkingLevel: "medium" },
           maxOutputTokens: 12000,
           responseMimeType: "application/json",
           responseSchema: dynamicSchema
@@ -1615,7 +1615,7 @@ export const fetchNodeDetailsBackend = async (
           model: currentModel,
           contents: prompt,
           config: {
-            thinking_level: "low"
+            thinkingConfig: { thinkingLevel: "low" }
           }
         }),
         new Promise<any>((_, reject) => setTimeout(() => reject(new Error('AbortError: Timeout exceeded')), 55000))
@@ -1781,7 +1781,7 @@ Return ONLY the 11-character video ID as a plain string. Do not include any JSON
         model: currentModel,
         contents: prompt,
         config: {
-          thinking_level: "minimal",
+          thinkingConfig: { thinkingLevel: "minimal" },
           maxOutputTokens: 200,
         }
       }),
@@ -1996,7 +1996,7 @@ ${JSON.stringify(links)}
       config: {
         responseMimeType: "application/json",
         responseSchema: responseSchema,
-        thinking_level: "minimal",
+        thinkingConfig: { thinkingLevel: "minimal" },
       }
     });
 
