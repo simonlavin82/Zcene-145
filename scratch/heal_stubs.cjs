@@ -1,9 +1,10 @@
-const { initializeApp, applicationDefault } = require("firebase-admin/app");
+const { initializeApp, cert } = require("firebase-admin/app");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 
+const serviceAccount = require("../firebase-service-account.json");
+
 initializeApp({
-    credential: applicationDefault(),
-    projectId: "zcene-production"
+    credential: cert(serviceAccount)
 });
 
 const db = getFirestore();
