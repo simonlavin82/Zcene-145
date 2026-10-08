@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { GraphData, Node, Link, DiscoveryFilters } from "../types";
 import { stripCountrySlug } from "../executeCurationPipeline";
 
@@ -676,7 +676,7 @@ CRITICAL RULES (non-negotiable):
       contents: prompt,
       config: {
         systemInstruction: "You are a strict music data validator. You do NOT infer intent. If the user input contains a spelling error, return the REAL canonical artist name (e.g. if given 'turstile', return id: 'Turnstile', correctedInput: true). Return ONLY valid JSON matching the schema.",
-        thinkingConfig: { thinkingLevel: "minimal" },
+        thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
         responseMimeType: "application/json",
         responseSchema: SEED_VALIDATION_SCHEMA
       }
@@ -791,7 +791,7 @@ ${JSON.stringify(detailsCacheEntries, null, 2)}`;
         contents: prompt,
         config: {
             systemInstruction,
-            thinkingConfig: { thinkingLevel: "high" },
+            thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH },
             responseMimeType: "application/json",
             responseSchema,
         }
@@ -920,7 +920,7 @@ If no missing edges are found, return an empty array [].`;
       config: {
         responseMimeType: "application/json",
         responseSchema,
-        thinkingConfig: { thinkingLevel: "minimal" },
+        thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
       }
     });
 
@@ -1066,7 +1066,7 @@ export const generateGraphDataBackend = async (
         contents: userPrompt,
         config: {
           systemInstruction: finalizedSystemInstruction,
-          thinkingConfig: { thinkingLevel: "medium" },
+          thinkingConfig: { thinkingLevel: ThinkingLevel.MEDIUM },
           maxOutputTokens: 12000,
           responseMimeType: "application/json",
           responseSchema: dynamicSchema
@@ -1615,7 +1615,7 @@ export const fetchNodeDetailsBackend = async (
           model: currentModel,
           contents: prompt,
           config: {
-            thinkingConfig: { thinkingLevel: "low" }
+            thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }
           }
         }),
         new Promise<any>((_, reject) => setTimeout(() => reject(new Error('AbortError: Timeout exceeded')), 55000))
@@ -1781,7 +1781,7 @@ Return ONLY the 11-character video ID as a plain string. Do not include any JSON
         model: currentModel,
         contents: prompt,
         config: {
-          thinkingConfig: { thinkingLevel: "minimal" },
+          thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
           maxOutputTokens: 200,
         }
       }),
@@ -1996,7 +1996,7 @@ ${JSON.stringify(links)}
       config: {
         responseMimeType: "application/json",
         responseSchema: responseSchema,
-        thinkingConfig: { thinkingLevel: "minimal" },
+        thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
       }
     });
 
