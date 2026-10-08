@@ -185,6 +185,7 @@ export interface Project {
   coverImage?: string;
   seedImageUrl?: string;
   generationType?: "Root Generation" | "Partial Generation" | "Direct Hit" | "Complex Generation" | string;
+  apiUsage?: Record<string, any>;
   createdAt?: any;
   updatedAt?: any;
 }

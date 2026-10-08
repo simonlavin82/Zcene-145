@@ -2496,7 +2496,6 @@ const App: React.FC = () => {
       isMagazineViewOpen: false,
       authorId: user?.uid || 'guest',
       status: 'completed',
-      generationType: 'Clone',
       schemaVersion: 2,
       supportsLabelDeepCuts: true,
       createdAt: serverTimestamp(),
@@ -2547,6 +2546,8 @@ const App: React.FC = () => {
     try {
       const docPayload = buildBaseProjectPayload();
       if (!docPayload) throw new Error("Could not build payload");
+      
+      docPayload.generationType = 'Clone';
 
       // For saved projects, we rely on the global cache and don't need to bloat the doc with inline detailsCache
       delete docPayload.detailsCache;
@@ -4910,7 +4911,9 @@ const App: React.FC = () => {
           coverImage: data.coverImage,
           seedImageUrl: data.seedImageUrl,
           activeJobId: data.activeJobId,
-          authorId: data.authorId
+          authorId: data.authorId,
+          generationType: data.generationType,
+          apiUsage: data.apiUsage
         });
       });
       setProjects(projs);
