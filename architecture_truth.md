@@ -44,6 +44,7 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 - **Root Breakdown Persistence:** The "Root Breakdown narrative" MUST be written to the root level of the project document (not nested inside a sub-object), ensuring schema continuity.
 - `synthesisRationale` **MUST** be written explicitly to the **root level** of the global artist cache document (not buried inside stringified layers).
 - **Dynamic Dashboard Integrity:** Dashboard metadata (like the `deepCuts` count) must dynamically match the actual rendered nodes in the graph data, strictly prohibiting static placeholders.
+- **Strict Ledger Payload Parity:** The frontend's `buildBaseProjectPayload` MUST defensively omit `generationType` and `apiUsage` from the payload base to prevent the React autosave hook (`merge: true`) from clobbering the backend's precise token metrics and partial generation statuses with default 'Clone' labels.
 - D3 **Link Objects MUST** be safely serialized back to strings (e.g. `link.source.id`) before caching `graphData`.
 - Column 2 cache-loading MUST safely parse and clone the cache objects to avoid polluting the memory references, and strictly deduplicate loaded node IDs.
 
@@ -87,9 +88,9 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 - **ProjectLoader Guardrails:** The ProjectLoader must strictly bypass Phase 1 interception when a document's status is `curating`. The UI must remain locked and patiently await the backend background worker rather than firing duplicate generative calls.
 - **Identity Lock (`isRegeneration`):** During 'Overwrite Existing' (`isRegeneration = true`), the original project name is strictly write-locked. New deep links or explicit forks derive fresh names natively from the seed strings.
 
-### 17. JIT Stub Fallback
-- **The Frontend/Backend Handshake:** When background hydration times out or fails for a primary seed artist, the backend intercepts this failure and injects a pre-generated JIT stub (`_isStub: true`) from the initial payload rather than writing `null`.
-- **The UI Interception:** The React UI intercepts the selection of any node flagged as `_isStub: true`, executing a Just-In-Time (JIT) API fetch to hydrate the missing details live, and silently merges them into the global cache to self-heal the missing Deep Cut details permanently.
+### 17. Universal Pre-Flight Stub Minting
+- **The Synchronous Pre-Flight:** Bare stubs (`_isStub: true`, `redirectTo: canonical-id`) MUST be minted synchronously in Column 2 (HTTP Fast-Track) before the background worker is triggered. This applies universally to both frontend-resolved partial hits and backend-resolved cache misses.
+- **Local Topology Routing Exemption:** Direct cache hits completely bypass the backend, meaning legacy missing stubs are explicitly not healed during direct cache accesses.
 
 ### 18. Authorization Lifecycle
 - **Rule:** Token/billing authorization state must be strictly scoped to the active generation event. The authorization flag must instantly reset to false on any modal cancellation, API failure, or project unmount to prevent tollbooth bypasses.

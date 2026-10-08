@@ -64,7 +64,7 @@ const ARCHITECTURE_RULES = [
     { id: 14, title: "Atomic Self-Healing", desc: "Graph breakdowns handle atomic self-healing." },
     { id: 15, title: "Complex Cache Bypass", desc: "Multi-seed and filtered queries must strictly bypass the Global Topology Cache." },
     { id: 16, title: "Curation Intercept Guardrails", desc: "ProjectLoader must strictly bypass Phase 1 interception when curating." },
-    { id: 17, title: "JIT Stub Fallback", desc: "Backend injects a JIT stub, React UI intercepts and fetches details live." },
+    { id: 17, title: "Universal Pre-Flight Stub Minting", desc: "Bare stubs (_isStub: true) are minted synchronously before async generation to guarantee pipeline integrity." },
     { id: 18, title: "Authorization Lifecycle", desc: "Token/billing authorization state must be strictly scoped to the active generation event." },
     { id: 19, title: "External Link Security", desc: "Official Website and Bandcamp links must rely on deterministic client-side search templates." },
     { id: 20, title: "Mandatory Disambiguation on Direct Hits", desc: "Green Line MUST NEVER bypass the user confirmation phase." },
@@ -88,6 +88,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                     <div className="text-primary text-[10px] font-mono mb-1 uppercase tracking-tighter">Column 1</div>
                     <div className="text-white font-medium mb-4">React UI</div>
                     <ul className="text-[12px] text-zinc-400 space-y-4">
+                        <li><span className="text-primary font-medium">Local Topology Routing:</span> Direct Hits (perfect cache) completely bypass the backend. Legacy missing stubs are explicitly not healed via this pathway.</li>
                         <li><span className="text-primary font-medium">Front Gate Cache Guard:</span> Bypasses network entirely if a valid, complete cache document exists. Topology Hits MUST explicitly route through the <code>&lt;DisambiguationModal&gt;</code> to verify origin.</li>
                         <li><span className="text-primary font-medium">API Confirmation:</span> <code>&lt;TokenConfirmationModal&gt;</code> intercepts generation to authorize API token spend.</li>
                         <li><span className="text-primary font-medium">Validate Origin:</span> <code>&lt;ConsolidatedValidationModal&gt;</code> confirms the exact canonical seed origin before hitting the pipeline.</li>
@@ -109,6 +110,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                     <div className="text-white font-medium mb-4">HTTP Fast-Track</div>
                     <ul className="text-[12px] text-zinc-400 space-y-4">
                         <li><span className="text-primary font-semibold">Defensive Alias Matching:</span> <code>isNodeInSeedList</code> strictly enforces canonical mapping without naive substrings.</li>
+                        <li><span className="text-primary font-semibold">Synchronous Stub Minting:</span> Alias pointers (<code>_isStub: true</code>) are written instantly before background execution to enforce hydration locks.</li>
                         <li><span className="text-primary font-semibold">Strict Seed Hoisting:</span> Seed nodes anchor the generated relational topology.</li>
                         <li><span className="text-primary font-semibold">Topology Anchor:</span> Saves the baseline graph to Firestore with an unalterable <code>updatedAt</code> stamp.</li>
                     </ul>

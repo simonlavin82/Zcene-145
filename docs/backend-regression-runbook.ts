@@ -26,6 +26,8 @@ npx vitest --ui
 1.  **Root Generation:** Validates cold-start execution on a single seed.
 2.  **Complex Generation (Multi-Seed):** Asserts bridging logic (ensuring the pipeline correctly hallucinates interlocking nodes, e.g., using Rick Rubin to bridge disparate seeds).
 3.  **Partial Generation (Stub Hit):** Ensures existing static data (like a pre-existing "Label" node) is successfully grafted into newly generated topologies.
-4.  **Direct Hit (Cache):** Validates the short-circuit logic successfully returns cached snapshots without triggering the generative loop.
+    *   *Assertion (Backend):* Asserts that the "Pre-Flight Alias Resolution" block successfully writes a bare stub pointer (`_isStub: true`) to Firestore prior to background execution.
+    *   *Assertion (Frontend):* Asserts that the frontend accurately maps the returned `apiUsage` and `generationType`, and that subsequent autosaves (`merge: true`) do not overwrite these fields with 'Clone'.
+4.  **Direct Hit (Cache):** Validates the short-circuit logic successfully returns cached snapshots without triggering the generative loop. Explicitly asserts that Direct Hits bypass the backend entirely and rely on Local Topology Routing (bypassing legacy stub healing).
 5.  **Share Payload Blacklist Mutation:** Asserts that the Universal Serializer generates a 1:1 clone, and that the Ephemeral Blacklist successfully injects a 30-day TTL, strips canvasLayout, and purges rigid coordinates (fx, fy) before generating guest links.
 `;
