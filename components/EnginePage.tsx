@@ -89,10 +89,9 @@ const DiscoveryFlowDiagram: React.FC = () => (
                     <div className="text-primary text-[10px] font-mono mb-1 uppercase tracking-tighter">Column 1</div>
                     <div className="text-white font-medium mb-4">React UI</div>
                     <ul className="text-[12px] text-zinc-400 space-y-4">
-                        <li><span className="text-primary font-medium">Local Topology Routing:</span> Direct Hits (perfect cache) completely bypass the backend. Legacy missing stubs are explicitly not healed via this pathway.</li>
+                        <li><span className="text-primary font-medium">Local Topology Routing:</span> Direct Hits (perfect cache) bypass the backend entirely.</li>
                         <li><span className="text-primary font-medium">Front Gate Cache Guard:</span> Bypasses network entirely if a valid, complete cache document exists. Topology Hits MUST explicitly route through the <code>&lt;DisambiguationModal&gt;</code> to verify origin.</li>
                         <li><span className="text-primary font-medium">API Confirmation:</span> <code>&lt;TokenConfirmationModal&gt;</code> intercepts generation to authorize API token spend.</li>
-                        <li><span className="text-primary font-medium">Validate Origin:</span> <code>&lt;ConsolidatedValidationModal&gt;</code> confirms the exact canonical seed origin before hitting the pipeline.</li>
                         <li><span className="text-primary font-medium">Active Loader Gate:</span> Locks the UI completely to wait for backend processing.</li>
                         <li><span className="text-primary font-medium">Drop Loader & Render Zcene:</span> The loader drops only when the background worker sets project status to 'completed'.</li>
                     </ul>
@@ -110,10 +109,9 @@ const DiscoveryFlowDiagram: React.FC = () => (
                     <div className="text-primary text-[10px] font-mono mb-1 uppercase tracking-tighter">Column 2 (Synchronous)</div>
                     <div className="text-white font-medium mb-4">HTTP Fast-Track</div>
                     <ul className="text-[12px] text-zinc-400 space-y-4">
-                        <li><span className="text-primary font-semibold">Defensive Alias Matching:</span> <code>isNodeInSeedList</code> strictly enforces canonical mapping without naive substrings.</li>
-                        <li><span className="text-primary font-semibold">Synchronous Stub Minting:</span> Alias pointers (<code>_isStub: true</code>) are written instantly before background execution to enforce hydration locks.</li>
-                        <li><span className="text-primary font-semibold">Strict Seed Hoisting:</span> Seed nodes anchor the generated relational topology.</li>
-                        <li><span className="text-primary font-semibold">Topology Anchor:</span> Saves the baseline graph to Firestore with an unalterable <code>updatedAt</code> stamp.</li>
+                        <li><span className="text-primary font-semibold">Validate Origin:</span> Confirms canonical mapping (3.5 Flash / low thinking).</li>
+                        <li><span className="text-primary font-semibold">Pre-Flight Stub Minting:</span> Alias pointers (<code>_isStub: true</code>) are written instantly before background worker trigger.</li>
+                        <li><span className="text-primary font-semibold">Create Topology:</span> Generates the relational graph structure (3.1 Pro / medium thinking).</li>
                     </ul>
                 </div>
             </div>
@@ -129,9 +127,12 @@ const DiscoveryFlowDiagram: React.FC = () => (
                     <div className="text-primary text-[10px] font-mono mb-1 uppercase tracking-tighter">Column 3 (Asynchronous)</div>
                     <div className="text-white font-medium mb-4">Background Worker</div>
                     <ul className="text-[12px] text-zinc-400 space-y-4">
-                        <li><span className="text-primary font-medium">Fail-Fast Media Gatekeeper:</span> Re-hydrates any node missing crucial iTunes/Spotify imagery or biography.</li>
-                        <li><span className="text-primary font-medium">Metadata Hydration:</span> Fetches rich data via Gemini Flash & Google Search, then writes back to cache.</li>
-                        <li><span className="text-primary font-medium">Persist Assets:</span> Writes hydrated nodes using pure canonical IDs. Zcene strictly separates bespoke temporal/genre generation from its canonical global artist library, ensuring absolute data purity.</li>
+                        <li><span className="text-primary font-medium">Update Job:</span> Sets document status to 'curating'.</li>
+                        <li><span className="text-primary font-medium">Hydrate Node Batch:</span> Fetches rich metadata for stubs (low/minimal thinking).</li>
+                        <li><span className="text-primary font-medium">Root Breakdown:</span> Synthesizes the creative narrative (3.1 Pro / high thinking).</li>
+                        <li><span className="text-primary font-medium">Topology Parity:</span> Reconciles narrative citations against physical edges (minimal thinking).</li>
+                        <li><span className="text-primary font-medium">Final Node Positioning:</span> Assigns deterministic layout clustering (minimal thinking).</li>
+                        <li><span className="text-primary font-medium">Persist Assets:</span> Saves the graph, deep cuts, and finalized semantic links to Firestore.</li>
                     </ul>
                 </div>
             </div>
