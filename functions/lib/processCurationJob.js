@@ -1027,6 +1027,15 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                         'detailsCache.synthesisRationale': firestore_2.FieldValue.delete(),
                                         updatedAt: firestore_2.FieldValue.serverTimestamp()
                                     };
+                                    // Fail-safe: If LLM skipped the primary seed in hydration topology, ensure it inherits Tier 1 global asset schema
+                                    if (!canonicalSnap.exists) {
+                                        canonicalUpdate.createdAt = firestore_2.FieldValue.serverTimestamp();
+                                        canonicalUpdate.cacheVersion = 4;
+                                        canonicalUpdate.cacheKey = canonicalSeedId;
+                                        canonicalUpdate.artistId = seedNorm;
+                                        canonicalUpdate.isDeep = true;
+                                        canonicalUpdate.detailsCache = { _isStub: true }; // Minimum required to prevent frontend crashes
+                                    }
                                     let finalRationale = rootBreakdownStr;
                                     // Topology Hydration Check for Stubs
                                     const hasGraph = canonicalData?.graphData && ((typeof canonicalData.graphData === 'string' && canonicalData.graphData.length > 10) ||
