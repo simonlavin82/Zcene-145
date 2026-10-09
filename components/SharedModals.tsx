@@ -205,7 +205,7 @@ export const MyTasteDialog: React.FC<{
   };
 
   return (
-    <ModalBackdrop className="z-[120]" onClick={onClose}>
+    <ModalBackdrop className="z-[2000]" onClick={onClose}>
       <ModalContainer>
         <ModalHeader>
           <div className="flex items-center gap-2">

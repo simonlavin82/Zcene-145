@@ -1624,7 +1624,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     {/* Zone 1: Spiderweb DNA (Narrative First) */}
                     {hoveredLink.dna && (
                         <div className="shrink-0">
-                            <p className={`text-sm leading-relaxed font-normal text-zinc-400 m-0${isSmallScreen && !isCardExpanded ? ' line-clamp-4' : ''}`}>
+                            <p className="text-sm leading-relaxed font-normal text-zinc-400 m-0">
                                 {(() => {
                                     let cleanedDna = hoveredLink.dna;
                                     const matchedPrefix = extractFuzzyPrefix(cleanedDna || '', hoveredLink.sourceId || '');
