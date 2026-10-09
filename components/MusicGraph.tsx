@@ -472,7 +472,11 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
       
       const maxScale = isSmallScreenRef.current ? 0.75 : 1;
       const minScale = 0.15;
-      const k = Math.max(minScale, Math.min(scaleX, scaleY, maxScale));
+      let k = Math.max(minScale, Math.min(scaleX, scaleY, maxScale));
+      
+      if (typeof window !== 'undefined' && window.innerWidth < 768) {
+          k = k * 1.5;
+      }
       
       const tx = width / 2 - cx * k;
       const ty = height / 2 - cy * k;
