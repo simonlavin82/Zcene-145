@@ -142,3 +142,8 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 - **Tier 1: Global Assets (artists & labels):** `createdAt` (Immutable), `updatedAt` (Mutable). No TTL.
 - **Tier 2: Ephemeral Storage (sharedZcenes):** `createdAt` (Immutable), `expireAt` (+30 Days Hard TTL). `updatedAt` is strictly NULL/Removed (read-only snapshots).
 - **Tier 3: Owned Storage (User Projects):** `createdAt` (Immutable), `updatedAt` (Mutable).
+
+### 34. Cognitive Tiering & Orchestration Stability
+- **Rule:** AI generation strictly utilizes the categorical `thinking_level` parameter (minimal to high) to optimize cost-to-quality ratios based on task complexity. Legacy sampling parameters (`temperature`, `top_p`, `top_k`, and `thinking_budget`) are explicitly forbidden in AI orchestration configurations.
+- **Enforcement:** Deterministic extraction tasks (e.g., origin validation, edge reconciliation) are strictly locked to `minimal` or `low`. Creative narrative synthesis (e.g., Root Breakdowns) requires a `high` thinking level.
+- **API Stability:** The background pipeline jobs officially retain the legacy `generateContent` API. Migration to the stateful Interactions API is formally deferred to preserve single-shot execution stability until multi-turn conversational features are scoped.
