@@ -84,7 +84,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
     <div className="w-full py-12 bg-zinc-950/50 rounded-xl border border-zinc-800 mb-8">
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_auto_1fr_auto_1fr_auto_minmax(220px,280px)] items-stretch justify-center gap-3 lg:gap-4 px-2 xl:px-4">
             {/* Column 1: React UI */}
-            <div className="flex flex-col">
+            <div className="flex flex-col flex-1 min-w-0">
                 <div className="px-4 py-5 rounded-xl border border-zinc-700 bg-zinc-900 h-full">
                     <div className="text-primary text-[10px] font-mono mb-1 uppercase tracking-tighter">Column 1</div>
                     <div className="text-white font-medium mb-4">React UI</div>
@@ -104,7 +104,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
             </div>
             
             {/* Column 2: HTTP Fast-Track */}
-            <div className="flex flex-col">
+            <div className="flex flex-col flex-1 min-w-0">
                 <div className="px-4 py-5 rounded-xl border-2 border-primary bg-zinc-900/50 h-full shadow-[0_0_15px_rgba(255,255,255,0.03)] relative">
                     <div className="text-primary text-[10px] font-mono mb-1 uppercase tracking-tighter">Column 2 (Synchronous)</div>
                     <div className="text-white font-medium mb-4">HTTP Fast-Track</div>
@@ -142,7 +142,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
             </div>
 
             {/* Column 3: Background Worker */}
-            <div className="flex flex-col">
+            <div className="flex flex-col flex-1 min-w-0">
                 <div className="px-4 py-5 rounded-xl border border-zinc-700 bg-zinc-900 h-full">
                     <div className="text-primary text-[10px] font-mono mb-1 uppercase tracking-tighter">Column 3 (Asynchronous)</div>
                     <div className="text-white font-medium mb-4">Background Worker</div>
@@ -393,37 +393,7 @@ const AsyncHydrationDiagram: React.FC = () => (
     </div>
 );
 
-const SeedHoistingVisualizer: React.FC = () => (
-    <div className="bg-zinc-900/30 p-8 rounded-xl border border-zinc-700/50 mb-12 flex flex-col md:flex-row gap-8">
-        <div className="flex-1">
-            <h3 className="text-zinc-200 font-medium text-lg mb-6 uppercase tracking-wider text-center">Defensive Alias Matching</h3>
-            <div className="flex flex-col items-center gap-4">
-                <div className="flex gap-2">
-                    <span className="bg-red-500/10 text-red-400 border border-red-500/30 px-3 py-1 rounded text-xs">spaced-united-states</span>
-                    <span className="bg-red-500/10 text-red-400 border border-red-500/30 px-3 py-1 rounded text-xs">spaced-uk</span>
-                </div>
-                <span className="material-symbols-outlined text-zinc-500">arrow_downward</span>
-                <div className="bg-zinc-800 px-4 py-2 border border-zinc-600 rounded font-mono text-zinc-300 text-sm">
-                    isNodeInSeedList()
-                </div>
-                <span className="material-symbols-outlined text-zinc-500">arrow_downward</span>
-                <span className="bg-green-500/10 text-green-400 border border-green-500/30 px-4 py-2 rounded font-bold">spaced</span>
-            </div>
-        </div>
-        <div className="w-px bg-zinc-700/50 hidden md:block"></div>
-        <div className="flex-1">
-            <h3 className="text-zinc-200 font-medium text-lg mb-6 uppercase tracking-wider text-center">Strict Seed Hoisting</h3>
-            <div className="flex flex-col gap-2">
-                <div className="bg-primary/20 border border-primary/50 text-primary p-3 rounded flex items-center justify-between shadow-[0_0_10px_rgba(168,85,247,0.3)]">
-                    <span className="font-bold">0. spaced (Seed)</span>
-                    <span className="material-symbols-outlined text-sm">lock</span>
-                </div>
-                <div className="bg-zinc-800 border border-zinc-700 text-zinc-400 p-3 rounded text-sm">1. buggin (AI Rec)</div>
-                <div className="bg-zinc-800 border border-zinc-700 text-zinc-400 p-3 rounded text-sm">2. turnstile (AI Rec)</div>
-            </div>
-        </div>
-    </div>
-);
+
 
 const DataLifecycleMatrix: React.FC = () => (
     <div className="w-full py-8 px-6 bg-zinc-950/50 rounded-xl border border-zinc-800 mb-12">
@@ -1119,7 +1089,7 @@ the entire dataset, the app evolves existing visual structures.
                         <section id="data-lifecycle" className="pt-8 scroll-mt-24">
                             <DataLifecycleMatrix />
                         </section>
-                        <SeedHoistingVisualizer />
+
                     </section>
 
                     {/* ── VISUALIZATION ENGINE ── */}
