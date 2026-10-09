@@ -151,9 +151,9 @@ const Header: React.FC<HeaderProps> = ({
       e.currentTarget.blur();
     }
   }, [projectName]);
-
   return (
-    <header className={`relative z-[100] flex-shrink-0 flex items-center pointer-events-none transition-all duration-300 ${isMagazineViewOpen ? 'hidden md:block h-0 opacity-0 overflow-hidden' : `${LayoutSizes.topHeader} ${isSmallScreen ? 'border-b border-zinc-700/50' : ''} px-4 sm:px-6 lg:px-8`} ${isMagazineViewOpen ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100'}`}>
+    <>
+      <header className={`relative z-[100] flex-shrink-0 flex items-center pointer-events-none transition-all duration-300 ${isMagazineViewOpen ? 'hidden md:block h-0 opacity-0 overflow-hidden' : `${LayoutSizes.topHeader} ${isSmallScreen ? 'border-b border-zinc-700/50' : ''} px-4 sm:px-6 lg:px-8`} ${isMagazineViewOpen ? 'opacity-0 h-0 overflow-hidden' : 'opacity-100'}`}>
         <div className="flex items-center w-full h-full">
             <div className="flex items-center flex-grow transition-all gap-2">
                 <button 
@@ -480,13 +480,14 @@ const Header: React.FC<HeaderProps> = ({
             </div>
             </div>
         </div>
-        <MyTasteDialog 
-            isOpen={isTasteDialogOpen} 
-            onClose={() => setIsTasteDialogOpen(false)} 
-            taste={localTaste} 
-            onSave={handleSaveTaste} 
-        />
-    </header>
+      </header>
+      <MyTasteDialog 
+          isOpen={isTasteDialogOpen} 
+          onClose={() => setIsTasteDialogOpen(false)} 
+          taste={localTaste} 
+          onSave={handleSaveTaste} 
+      />
+    </>
   );
 };
 
