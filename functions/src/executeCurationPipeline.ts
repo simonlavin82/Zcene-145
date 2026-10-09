@@ -243,10 +243,11 @@ export const executeCurationPipeline = onCall({
         
          let validationResult: any = null;
          let resolvedByBackend = false;
-         if (payload.disambiguationHints && payload.disambiguationHints[normalizeArtistId(seed)]) {
-            const hintGenre = payload.disambiguationGenres && payload.disambiguationGenres[normalizeArtistId(seed)] ? payload.disambiguationGenres[normalizeArtistId(seed)] : "Unknown";
-            const rawId = payload.originalQueries && payload.originalQueries[normalizeArtistId(seed)] ? payload.originalQueries[normalizeArtistId(seed)] : seed;
-            validationResult = { isValid: true, id: rawId, origin: payload.disambiguationHints[normalizeArtistId(seed)], genre: hintGenre };
+         const strippedSeed = stripCountrySlug(normalizeArtistId(seed));
+         if (payload.disambiguationHints && payload.disambiguationHints[strippedSeed]) {
+            const hintGenre = payload.disambiguationGenres && payload.disambiguationGenres[strippedSeed] ? payload.disambiguationGenres[strippedSeed] : "Unknown";
+            const rawId = payload.originalQueries && payload.originalQueries[strippedSeed] ? payload.originalQueries[strippedSeed] : strippedSeed;
+            validationResult = { isValid: true, id: rawId, origin: payload.disambiguationHints[strippedSeed], genre: hintGenre };
          } else {
             const valResult = await validateSeedOriginBackend(seed);
             validationResult = valResult;
@@ -265,13 +266,13 @@ export const executeCurationPipeline = onCall({
                }
             }
             
-            if (normId !== bareNormId && resolvedByBackend) {
+            if (normId !== bareNormId) {
                await db.collection("artists").doc(bareNormId).set({
                   _isStub: true,
                   redirectTo: normId,
                   cachedAt: FieldValue.serverTimestamp()
                }, { merge: true });
-               console.log(`[Pipeline Diamond] -> Synchronously minted bare stub forwarder (Backend Resolved): ${bareNormId} -> ${normId}`);
+               console.log(`[Pipeline Diamond] -> Synchronously minted bare stub forwarder: ${bareNormId} -> ${normId}`);
             }
 
 
