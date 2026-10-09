@@ -242,7 +242,6 @@ export const executeCurationPipeline = onCall({
         hasCacheMiss = true;
         
          let validationResult: any = null;
-         let resolvedByBackend = false;
          const strippedSeed = stripCountrySlug(normalizeArtistId(seed));
          if (payload.disambiguationHints && payload.disambiguationHints[strippedSeed]) {
             const hintGenre = payload.disambiguationGenres && payload.disambiguationGenres[strippedSeed] ? payload.disambiguationGenres[strippedSeed] : "Unknown";
@@ -251,7 +250,6 @@ export const executeCurationPipeline = onCall({
          } else {
             const valResult = await validateSeedOriginBackend(seed);
             validationResult = valResult;
-            resolvedByBackend = true;
             if (valResult.apiUsage) {
                usageCollector.push(valResult.apiUsage.model, valResult.apiUsage);
             }
