@@ -109,9 +109,29 @@ const DiscoveryFlowDiagram: React.FC = () => (
                     <div className="text-primary text-[10px] font-mono mb-1 uppercase tracking-tighter">Column 2 (Synchronous)</div>
                     <div className="text-white font-medium mb-4">HTTP Fast-Track</div>
                     <ul className="text-[12px] text-zinc-400 space-y-4">
-                        <li><span className="text-primary font-semibold">Validate Origin:</span> Confirms canonical mapping (3.5 Flash / low thinking).</li>
-                        <li><span className="text-primary font-semibold">Pre-Flight Stub Minting:</span> Alias pointers (<code>_isStub: true</code>) are written instantly before background worker trigger.</li>
-                        <li><span className="text-primary font-semibold">Create Topology:</span> Generates the relational graph structure (3.1 Pro / medium thinking).</li>
+                        <li>
+                            <span className="text-primary font-semibold">Validate Origin (3.5 Flash) | Thinking_level: minimal</span>
+                            <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500">
+                                <li>Seed origin slug(s) created.</li>
+                                <li>Strips non-standard regional country codes.</li>
+                                <li>Zero Search Grounding (Parametric Only) to reflect the eradication of the Search API for cost savings.</li>
+                            </ul>
+                        </li>
+                        <li>
+                            <span className="text-primary font-semibold">Pre-Flight Alias Resolution & Stub Minting</span>
+                            <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500">
+                                <li>Evaluates originalQueries payload against global cache.</li>
+                                <li>Synchronously writes bare stub pointers (<code>_isStub: true</code>, <code>redirectTo: canonical-id</code>) directly to Firestore BEFORE worker trigger.</li>
+                            </ul>
+                        </li>
+                        <li>
+                            <span className="text-primary font-semibold">Create Topology (3.1 Pro) | Thinking_level: medium</span>
+                            <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500">
+                                <li>Skeleton: Seed, AI Artists, Labels, Genres.</li>
+                                <li>Enforces kebab-case-artist-iso-code format.</li>
+                                <li>Seed Artist Timeout Protection: Drops failing.</li>
+                            </ul>
+                        </li>
                     </ul>
                 </div>
             </div>
@@ -127,12 +147,50 @@ const DiscoveryFlowDiagram: React.FC = () => (
                     <div className="text-primary text-[10px] font-mono mb-1 uppercase tracking-tighter">Column 3 (Asynchronous)</div>
                     <div className="text-white font-medium mb-4">Background Worker</div>
                     <ul className="text-[12px] text-zinc-400 space-y-4">
-                        <li><span className="text-primary font-medium">Update Job:</span> Sets document status to 'curating'.</li>
-                        <li><span className="text-primary font-medium">Hydrate Node Batch:</span> Fetches rich metadata for stubs (low/minimal thinking).</li>
-                        <li><span className="text-primary font-medium">Root Breakdown:</span> Synthesizes the creative narrative (3.1 Pro / high thinking).</li>
-                        <li><span className="text-primary font-medium">Topology Parity:</span> Reconciles narrative citations against physical edges (minimal thinking).</li>
-                        <li><span className="text-primary font-medium">Final Node Positioning:</span> Assigns deterministic layout clustering (minimal thinking).</li>
-                        <li><span className="text-primary font-medium">Persist Assets:</span> Saves the graph, deep cuts, and finalized semantic links to Firestore.</li>
+                        <li>
+                            <span className="text-primary font-medium">Update Job</span>
+                            <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500">
+                                <li>Status remains: 'curating'.</li>
+                            </ul>
+                        </li>
+                        <li>
+                            <span className="text-primary font-medium">Hydrate Node Batch | Thinking_level: low</span>
+                            <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500">
+                                <li>Global Cache Hit: Attaches existing Deep Cut.</li>
+                                <li>Miss: Synthesizes via 3.5 Flash & scraper.</li>
+                                <li>High-Fidelity Cap: Strict limit on gen nodes.</li>
+                                <li>Slug Deduplication actively ignores legacy deep cuts, but injects pre-generated stubs for timed-out Seed Artists.</li>
+                            </ul>
+                        </li>
+                        <li>
+                            <span className="text-primary font-medium">Root Breakdown (3.1 Pro) | Thinking_level: high</span>
+                            <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500">
+                                <li>Synthesizes ecosystem narrative using atmospheric, late-night record curator voice.</li>
+                                <li>Outputs structured JSON containing full markdown, 1-sentence artist/seed hooks, and bi-directional edge context (forwardContext / inverseContext).</li>
+                                <li>Dynamically branches prompt logic: Single-Seed vs. Multi-Seed Co-Anchoring.</li>
+                            </ul>
+                        </li>
+                        <li>
+                            <span className="text-primary font-medium">Topology Parity (3.5 Flash) | Thinking_level: minimal</span>
+                            <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500">
+                                <li>Parses narrative to mechanically inject any missing structural edges into the graph before final positioning.</li>
+                            </ul>
+                        </li>
+                        <li>
+                            <span className="text-primary font-medium">Final Node Positioning (3.5 Flash) | Thinking_level: minimal</span>
+                            <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500">
+                                <li>Evaluates pruned bios and new narrative edges to generate semantic link weights (0.1-1.0).</li>
+                                <li>Graceful Fallback: Injects 0.5 neutral weight on AI failure to preserve UI.</li>
+                            </ul>
+                        </li>
+                        <li>
+                            <span className="text-primary font-medium">Persist Assets</span>
+                            <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500">
+                                <li>Single-Seed: Save Graph + Breakdown + Cuts.</li>
+                                <li>Strict Cache Key Coupling prevents desync.</li>
+                                <li>Link Persistence: Permanently commits evaluated semantic link weights (0.1-1.0) to edge records.</li>
+                            </ul>
+                        </li>
                     </ul>
                 </div>
             </div>
