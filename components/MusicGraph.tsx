@@ -51,28 +51,8 @@ const isSameNodeId = (id1: any, id2: any): boolean => {
   return s1 === s2 || normalizeArtistId(s1) === normalizeArtistId(s2);
 };
 
-const extractFuzzyPrefix = (text: string, targetName: string): string | null => {
-  if (!text || !targetName) return null;
-  const targetNorm = targetName.toLowerCase().replace(/[^a-z0-9]/g, '');
-  if (!targetNorm) return null;
-  
-  let currentNorm = '';
-  for (let i = 0; i < text.length; i++) {
-      const char = text[i];
-      if (/[a-zA-Z0-9]/.test(char)) {
-          currentNorm += char.toLowerCase();
-      }
-      
-      if (currentNorm === targetNorm) {
-          if (i + 1 < text.length && /[a-zA-Z0-9]/.test(text[i + 1])) {
-              return null;
-          }
-          return text.substring(0, i + 1);
-      } else if (!targetNorm.startsWith(currentNorm)) {
-          return null;
-      }
-  }
-  return null;
+const escapeRegExp = (string: string) => {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 };
 
 const computeNodeDepths = (nodes: Node[], links: Link[], seedArtistsOrSet: Set<string> | string[]): Map<string, number> => {
@@ -1626,17 +1606,24 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                         <div className="shrink-0">
                             <p className="text-sm leading-relaxed font-normal text-zinc-400 m-0">
                                 {(() => {
-                                    let cleanedDna = hoveredLink.dna;
-                                    const matchedPrefix = extractFuzzyPrefix(cleanedDna || '', hoveredLink.sourceId || '');
-                                    if (matchedPrefix && cleanedDna) {
-                                        return (
-                                            <>
-                                                <span className="text-primary font-normal">{matchedPrefix}</span>
-                                                {cleanedDna.slice(matchedPrefix.length)}
-                                            </>
-                                        );
-                                    }
-                                    return cleanedDna;
+                                    const cleanedDna = hoveredLink.dna || '';
+                                    const target = hoveredLink.sourceId || '';
+                                    if (!cleanedDna || !target) return cleanedDna;
+
+                                    const regex = new RegExp(`(${escapeRegExp(target)})`, 'gi');
+                                    const parts = cleanedDna.split(regex);
+
+                                    return (
+                                        <>
+                                            {parts.map((part, i) =>
+                                                part.toLowerCase() === target.toLowerCase() ? (
+                                                    <span key={i} className="text-primary font-normal">{part}</span>
+                                                ) : (
+                                                    <React.Fragment key={i}>{part}</React.Fragment>
+                                                )
+                                            )}
+                                        </>
+                                    );
                                 })()}
                             </p>
                         </div>
