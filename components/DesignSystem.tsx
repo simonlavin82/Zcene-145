@@ -2324,10 +2324,10 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             
                             <div className="flex gap-4 mt-4">
                                 <div className="w-24 h-24 rounded-lg bg-gradient-to-br from-zinc-800/40 to-zinc-900/80 border border-white/5 overflow-hidden relative">
-                                    <span className="text-5xl font-black text-white/5 uppercase select-none absolute -bottom-1 -right-0">WOC</span>
+                                    <span className="text-5xl font-black text-white/5 uppercase select-none absolute bottom-0 translate-y-1 -right-1 leading-none">WOC</span>
                                 </div>
                                 <div className="w-24 h-24 rounded-lg bg-gradient-to-br from-zinc-800/40 to-zinc-900/80 border border-white/5 overflow-hidden relative">
-                                    <span className="text-5xl font-black text-white/5 uppercase select-none absolute -bottom-1 -right-0">SS</span>
+                                    <span className="text-5xl font-black text-white/5 uppercase select-none absolute bottom-0 translate-y-1 -right-1 leading-none">SS</span>
                                 </div>
                             </div>
                         </div>
