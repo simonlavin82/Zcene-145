@@ -1127,7 +1127,8 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 </div>
                             )}
 
-                            <div className="relative mx-auto w-fit">
+                            {!isLabelNode && (
+                                <div className="relative mx-auto w-fit">
                                 {imageTier !== 'placeholder' && currentImageUrl ? (
                                     <>
                                         {/* Ambient Glow */}
@@ -1173,7 +1174,8 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                         </span>
                                     </div>
                                 )}
-                            </div>
+                                </div>
+                            )}
 
                             {(() => {
                                 const hasInsight = details.recommendationReason &&
