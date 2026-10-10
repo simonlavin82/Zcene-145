@@ -1681,7 +1681,7 @@ const scrapeImageUrlBackend = async (artistName, type, genre, summary, origin) =
                         'electronic': ['techno', 'house', 'trance', 'dubstep', 'edm', 'dance', 'idm', 'drum and bass', 'jungle'],
                         'rock': ['rock', 'grunge', 'alternative', 'indie', 'post rock'],
                         'metal': ['metal', 'deathcore', 'metalcore', 'death metal', 'black metal', 'doom metal'],
-                        'punk': ['punk', 'emo', 'hardcore', 'pop punk', 'skate punk'],
+                        'punk': ['punk', 'emo', 'hardcore', 'pop punk', 'skate punk', 'rock'],
                         'r b soul': ['funk', 'motown', 'neo soul', 'rnb', 'r b', 'soul'],
                         'pop': ['pop', 'synthpop', 'electropop', 'k pop'],
                         'country': ['country', 'bluegrass', 'americana'],
@@ -1715,7 +1715,10 @@ const scrapeImageUrlBackend = async (artistName, type, genre, summary, origin) =
                             let summaryMatch = false;
                             if (!keywordMatch && !taxonomyMatch && summary) {
                                 const summaryNorm = normalizeGenre(summary);
-                                summaryMatch = itunesWords.some(w => summaryNorm.includes(w));
+                                summaryMatch = itunesWords.some(w => {
+                                    const regex = new RegExp(`\\b${w}\\b`, 'i');
+                                    return regex.test(summaryNorm);
+                                });
                             }
                             return keywordMatch || taxonomyMatch || summaryMatch;
                         });
