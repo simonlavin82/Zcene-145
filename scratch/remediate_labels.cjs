@@ -5,7 +5,6 @@ const serviceAccount = require('../firebase-service-account.json');
 initializeApp({ credential: cert(serviceAccount), projectId: 'zcene-production' });
 const db = getFirestore();
 
-// Utility copied from codebase
 const normalizeArtistId = (name) =>
   name
     .normalize("NFD")
@@ -26,69 +25,40 @@ const normalizeLabelId = (name) => {
 async function run() {
   const isDryRun = !process.argv.includes('--execute');
   console.log(`Starting remediation... (Dry run: ${isDryRun})`);
-  if (isDryRun) console.log('Run with --execute to perform actual writes.');
-
+  
   const labelsSnap = await db.collection('labels').get();
-  console.log(`Found ${labelsSnap.size} labels.`);
+  
+  const idMap = new Map();
+  const deletedIds = new Set();
+  const legacyLabels = [];
 
-  const groups = new Map();
   labelsSnap.docs.forEach(doc => {
     const rawId = doc.id;
     const canonId = normalizeLabelId(rawId);
-    if (!groups.has(canonId)) groups.set(canonId, []);
-    groups.get(canonId).push({ id: rawId, doc });
-  });
-
-  const toMerge = [];
-  groups.forEach((docs, canonId) => {
-    if (docs.length > 1) {
-      toMerge.push({ canonId, docs });
+    if (rawId !== canonId) {
+      idMap.set(rawId, canonId);
+      deletedIds.add(rawId);
+      legacyLabels.push({ rawId, canonId });
     }
   });
 
-  console.log(`Found ${toMerge.length} label groups to merge.`);
+  console.log(`Found ${deletedIds.size} legacy label documents to purge.`);
+  legacyLabels.forEach(l => console.log(`  - ${l.rawId} -> ${l.canonId}`));
 
-  const deletedIds = new Set();
-  const idMap = new Map();
-
-  for (const group of toMerge) {
-    // Sort docs by richest details (detailsCache.details) or oldest createdAt
-    group.docs.sort((a, b) => {
-      const aData = a.doc.data();
-      const bData = b.doc.data();
-      
-      const aRichness = Object.keys(aData.detailsCache?.details || {}).length + ((aData.detailsCache?.details?.notableArtists || []).length);
-      const bRichness = Object.keys(bData.detailsCache?.details || {}).length + ((bData.detailsCache?.details?.notableArtists || []).length);
-      
-      if (aRichness !== bRichness) return bRichness - aRichness; // Descending richness
-      
-      const aTime = aData.createdAt?.toMillis() || 0;
-      const bTime = bData.createdAt?.toMillis() || 0;
-      return aTime - bTime; // Ascending time
-    });
-
-    const primary = group.docs[0];
-    const duplicates = group.docs.slice(1);
-
-    for (const dup of duplicates) {
-      console.log(`Will merge and redirect ${dup.id} -> ${primary.id}`);
-      idMap.set(dup.id, primary.id);
-      deletedIds.add(dup.id);
-    }
-  }
-
-  // Phase 2: Update graphData in projects and sharedZcenes
+  console.log(`\n--- Scanning global 'artists' collection ---`);
+  const artistsSnap = await db.collection('artists').get();
+  
   const processGraphData = (dataStr) => {
     let parsed;
     try {
-      parsed = JSON.parse(dataStr);
+      parsed = typeof dataStr === 'string' ? JSON.parse(dataStr) : dataStr;
     } catch(e) { return null; }
     
     let changed = false;
     
     if (parsed.nodes) {
       for (const node of parsed.nodes) {
-        if (idMap.has(node.id)) {
+        if (node.type === 'label' && idMap.has(node.id)) {
           node.id = idMap.get(node.id);
           changed = true;
         }
@@ -116,60 +86,43 @@ async function run() {
     return null;
   };
 
-  const processCollection = async (query) => {
-    const snap = await query.get();
-    let updated = 0;
-    const batch = db.batch();
-    let batchCount = 0;
-
-    for (const doc of snap.docs) {
-      const data = doc.data();
-      if (data.graphData) {
-         let newData = null;
-         if (typeof data.graphData === 'string') {
-           newData = processGraphData(data.graphData);
-         } else {
-           const str = JSON.stringify(data.graphData);
-           const newStr = processGraphData(str);
-           if (newStr) newData = JSON.parse(newStr);
-         }
-         
-         if (newData) {
-           console.log(`Graph Update required for: ${doc.ref.path}`);
-           if (!isDryRun) {
-             batch.update(doc.ref, { graphData: newData });
-             batchCount++;
-           }
-           updated++;
-         }
-      }
-
-      if (batchCount >= 400) {
-        await batch.commit();
-        batchCount = 0;
-      }
-    }
-    if (batchCount > 0 && !isDryRun) {
-      await batch.commit();
-    }
-    return updated;
-  };
-
-  console.log('\\n--- Phase 2: Updating sharedZcenes ---');
-  const sharedUpdated = await processCollection(db.collection('sharedZcenes'));
+  let updatedArtists = 0;
+  const batch = db.batch();
+  let batchCount = 0;
   
-  console.log('\\n--- Phase 2: Updating user projects ---');
-  const projectsRef = db.collectionGroup('projects');
-  const userProjectsUpdated = await processCollection(projectsRef);
+  const affectedArtists = [];
 
-  console.log(`\\nGraph updates needed: ${sharedUpdated} sharedZcenes, ${userProjectsUpdated} user projects`);
+  for (const doc of artistsSnap.docs) {
+    const data = doc.data();
+    if (data.graphData) {
+      const newData = processGraphData(data.graphData);
+      if (newData) {
+        affectedArtists.push(doc.id);
+        if (!isDryRun) {
+          batch.update(doc.ref, { graphData: newData });
+          batchCount++;
+          if (batchCount >= 400) {
+            await batch.commit();
+            batchCount = 0;
+          }
+        }
+        updatedArtists++;
+      }
+    }
+  }
+  
+  if (batchCount > 0 && !isDryRun) {
+    await batch.commit();
+  }
 
-  // Phase 3: Delete duplicates
+  console.log(`Found ${updatedArtists} artists requiring graph rewiring.`);
+  affectedArtists.forEach(a => console.log(`  - ${a}`));
+
+  console.log('\n--- Phase 3: Deleting Legacy Labels ---');
   let deletedCount = 0;
   const labelBatch = db.batch();
   let labelBatchCount = 0;
 
-  console.log('\\n--- Phase 3: Deleting Duplicate Labels ---');
   for (const dupId of deletedIds) {
     if (!isDryRun) {
       labelBatch.delete(db.collection('labels').doc(dupId));
@@ -186,7 +139,7 @@ async function run() {
   }
   
   console.log(`Deleted ${deletedCount} duplicate labels.`);
-  console.log('\\nRemediation complete.');
+  console.log('\nRemediation complete.');
 }
 
 run().catch(console.error);
