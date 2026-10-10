@@ -10,7 +10,7 @@ import { TokenConfirmationDialog, PROFILE_COLORS, MODAL_PROFILE_COLORS } from '.
 import { SegmentedTextToggle } from './ui/SegmentedTextToggle';
 import { db } from '../services/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
-import { formatSystemTimestamp } from '../utils/formatters';
+import { formatSystemTimestamp, extractInitials } from '../utils/formatters';
 import { Select, InputSizes, LayoutSizes, Button } from './DesignSystem';
 import { Flame, Pin } from 'lucide-react';
 import { useDominantColor } from '../hooks/useDominantColor';
@@ -1127,45 +1127,53 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 </div>
                             )}
 
-                            {imageTier !== 'placeholder' && currentImageUrl && (
-                                <div className="relative mx-auto w-fit">
-                                    {/* Ambient Glow */}
-                                    <div className={`absolute ${isFullScreenMode ? 'inset-[-20%] blur-2xl' : 'inset-[-15%] rounded-full opacity-35 blur-2xl'} transition-colors duration-1000 z-0 pointer-events-none`} style={isFullScreenMode ? { background: 'radial-gradient(ellipse at center, var(--scene-accent, transparent) 0%, transparent 70%)' } : { backgroundColor: 'var(--scene-accent, transparent)' }} />
-                                    <div className={`w-40 h-40 sm:w-44 sm:h-44 flex-shrink-0 mx-auto bg-zinc-900 overflow-hidden relative ring-1 ring-white/10 ring-inset rounded-lg group z-10 ${isFullScreenMode ? 'shadow-[0_48px_120px_0px_rgba(0,0,0,1),0_12px_40px_0px_rgba(0,0,0,0.9)]' : 'shadow-[0_12px_36px_0px_rgba(0,0,0,0.85),0_3px_8px_0px_rgba(0,0,0,0.65)]'}`}>
-                                    {/* Temporary Loading Skeleton while image loads */}
-                                    {!imgLoaded && (
-                                        <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center p-6 text-center bg-zinc-900 overflow-hidden z-10">
-                                            <img 
-                                                src={isLabelNode 
-                                                    ? "https://storage.googleapis.com/zcene-prod-assets/Deep%20Cut%20background.png"
-                                                    : "https://storage.googleapis.com/zcene-prod-assets/Artist%20background.png"
-                                                }
-                                                alt="Background" 
-                                                className="absolute inset-0 w-full h-full object-cover opacity-30 filter blur-sm scale-105 transition-transform duration-1000 group-hover:scale-100" 
-                                            />
-                                            <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-900/60 to-transparent" />
-                                            <div className="relative z-10 flex flex-col items-center justify-center space-y-2">
-                                                <div className="w-12 h-12 rounded-full bg-zinc-800/80 border border-zinc-700/50 flex items-center justify-center backdrop-blur-sm group-hover:border-purple-500/50 transition-colors duration-500">
-                                                    <span className="material-symbols-outlined text-zinc-400 group-hover:text-purple-400 transition-colors duration-500 text-2xl">
-                                                        {isLabelNode ? 'album' : 'music_note'}
-                                                    </span>
+                            <div className="relative mx-auto w-fit">
+                                {imageTier !== 'placeholder' && currentImageUrl ? (
+                                    <>
+                                        {/* Ambient Glow */}
+                                        <div className={`absolute ${isFullScreenMode ? 'inset-[-20%] blur-2xl' : 'inset-[-15%] rounded-full opacity-35 blur-2xl'} transition-colors duration-1000 z-0 pointer-events-none`} style={isFullScreenMode ? { background: 'radial-gradient(ellipse at center, var(--scene-accent, transparent) 0%, transparent 70%)' } : { backgroundColor: 'var(--scene-accent, transparent)' }} />
+                                        <div className={`w-40 h-40 sm:w-44 sm:h-44 flex-shrink-0 mx-auto bg-zinc-900 overflow-hidden relative ring-1 ring-white/10 ring-inset rounded-lg group z-10 ${isFullScreenMode ? 'shadow-[0_48px_120px_0px_rgba(0,0,0,1),0_12px_40px_0px_rgba(0,0,0,0.9)]' : 'shadow-[0_12px_36px_0px_rgba(0,0,0,0.85),0_3px_8px_0px_rgba(0,0,0,0.65)]'}`}>
+                                            {/* Temporary Loading Skeleton while image loads */}
+                                            {!imgLoaded && (
+                                                <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center p-6 text-center bg-zinc-900 overflow-hidden z-10">
+                                                    <img 
+                                                        src={isLabelNode 
+                                                            ? "https://storage.googleapis.com/zcene-prod-assets/Deep%20Cut%20background.png"
+                                                            : "https://storage.googleapis.com/zcene-prod-assets/Artist%20background.png"
+                                                        }
+                                                        alt="Background" 
+                                                        className="absolute inset-0 w-full h-full object-cover opacity-30 filter blur-sm scale-105 transition-transform duration-1000 group-hover:scale-100" 
+                                                    />
+                                                    <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-900/60 to-transparent" />
+                                                    <div className="relative z-10 flex flex-col items-center justify-center space-y-2">
+                                                        <div className="w-12 h-12 rounded-full bg-zinc-800/80 border border-zinc-700/50 flex items-center justify-center backdrop-blur-sm group-hover:border-purple-500/50 transition-colors duration-500">
+                                                            <span className="material-symbols-outlined text-zinc-400 group-hover:text-purple-400 transition-colors duration-500 text-2xl">
+                                                                {isLabelNode ? 'album' : 'music_note'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        </div>
-                                    )}
+                                            )}
 
-                                    {/* Primary / Secondary Image */}
-                                    <img 
-                                        ref={imgRef}
-                                        src={currentImageUrl} 
-                                        alt={getArtistDisplayName(details, node)} 
-                                        className={`relative w-full h-full object-cover block scale-105 group-hover:scale-100 transition-all duration-1000 ${imgLoaded ? 'opacity-100 z-20' : 'opacity-0 z-0'}`}
-                                        onLoad={() => setImgLoaded(true)}
-                                        onError={handleImageError}
-                                    />
+                                            {/* Primary / Secondary Image */}
+                                            <img 
+                                                ref={imgRef}
+                                                src={currentImageUrl} 
+                                                alt={getArtistDisplayName(details, node)} 
+                                                className={`relative w-full h-full object-cover block scale-105 group-hover:scale-100 transition-all duration-1000 ${imgLoaded ? 'opacity-100 z-20' : 'opacity-0 z-0'}`}
+                                                onLoad={() => setImgLoaded(true)}
+                                                onError={handleImageError}
+                                            />
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className={`w-40 h-40 sm:w-44 sm:h-44 flex-shrink-0 mx-auto bg-[#1f1f22] overflow-hidden relative ring-1 ring-white/10 ring-inset rounded-lg z-10 flex items-center justify-center ${isFullScreenMode ? 'shadow-[0_48px_120px_0px_rgba(0,0,0,1),0_12px_40px_0px_rgba(0,0,0,0.9)]' : 'shadow-[0_12px_36px_0px_rgba(0,0,0,0.85),0_3px_8px_0px_rgba(0,0,0,0.65)]'}`}>
+                                        <span className="text-4xl font-bold text-[#52525b] uppercase tracking-widest select-none">
+                                            {extractInitials(getArtistDisplayName(details, node))}
+                                        </span>
                                     </div>
-                                </div>
-                            )}
+                                )}
+                            </div>
 
                             {(() => {
                                 const hasInsight = details.recommendationReason &&
