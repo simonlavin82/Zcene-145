@@ -1654,102 +1654,119 @@ const checkVideoPlayability = async (videoId) => {
     }
 };
 exports.checkVideoPlayability = checkVideoPlayability;
-const scrapeImageUrlBackend = async (artistName, type, genre, summary) => {
+const scrapeImageUrlBackend = async (artistName, type, genre, summary, origin) => {
     // Strategy 1: High-Speed Deterministic iTunes API (Artists Only)
     if (type !== 'label') {
-        try {
-            // Step 1: Search for the exact artist ID to avoid generic name collisions
-            const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(artistName)}&entity=musicArtist&limit=20`;
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 4000);
-            const res = await fetch(itunesUrl, { signal: controller.signal });
-            clearTimeout(timeoutId);
-            if (res.ok) {
-                const data = await res.json();
-                // Normalize names by removing punctuation and spaces for comparison
-                const normName = (name) => (name || "").toLowerCase().replace(/[^a-z0-9]/g, '');
-                const targetNameNorm = normName(artistName);
-                const exactMatches = data.results?.filter((r) => normName(r.artistName) === targetNameNorm) || [];
-                let selectedArtistId = null;
-                // Helper to normalize genre strings: lowercase, remove non-alphanumeric (except spaces), collapse spaces
-                const normalizeGenre = (g) => (g || "").toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
-                const zceneGenreNorm = normalizeGenre(genre);
-                // Taxonomy map for mapping iTunes master genres to broad subgenres
-                const genreTaxonomy = {
-                    'hip hop rap': ['boom bap', 'g funk', 'trap', 'drill', 'crunk', 'grime', 'lo fi', 'hip hop', 'rap', 'east coast', 'west coast', 'hardcore'],
-                    'electronic': ['techno', 'house', 'trance', 'dubstep', 'edm', 'dance', 'idm', 'drum and bass', 'jungle'],
-                    'rock': ['metal', 'punk', 'grunge', 'alternative', 'indie', 'emo', 'hardcore', 'post rock'],
-                    'r b soul': ['funk', 'motown', 'neo soul', 'rnb', 'r b', 'soul'],
-                    'pop': ['pop', 'synthpop', 'electropop', 'k pop'],
-                    'country': ['country', 'bluegrass', 'americana'],
-                    'jazz': ['jazz', 'bebop', 'swing', 'fusion'],
-                };
-                if (exactMatches.length > 0) {
-                    const strictMatches = exactMatches.filter((r) => {
-                        const itunesGenre = r.primaryGenreName || "";
-                        if (!itunesGenre)
-                            return false;
-                        const itunesGenreNorm = normalizeGenre(itunesGenre);
-                        // 1. Core keyword intersection (e.g., both have "hip hop")
-                        const zceneWords = zceneGenreNorm.split(' ').filter(w => w.length > 2);
-                        const itunesWords = itunesGenreNorm.split(' ').filter(w => w.length > 2);
-                        const keywordMatch = zceneWords.some(w => itunesGenreNorm.includes(w)) ||
-                            itunesWords.some(w => zceneGenreNorm.includes(w));
-                        // 2. Taxonomy fallback match
-                        let taxonomyMatch = false;
-                        for (const [masterGenre, subgenres] of Object.entries(genreTaxonomy)) {
-                            const genreFamily = [masterGenre, ...subgenres];
-                            // Check if iTunes genre is anywhere in this family
-                            const itunesInFamily = genreFamily.some(g => itunesGenreNorm.includes(g) || g.includes(itunesGenreNorm));
-                            // Check if Zcene genre is anywhere in this family
-                            const zceneInFamily = genreFamily.some(g => zceneGenreNorm.includes(g) || g.includes(zceneGenreNorm));
-                            if (itunesInFamily && zceneInFamily) {
-                                taxonomyMatch = true;
-                                break;
+        const fetchAndValidate = async (queryName) => {
+            try {
+                // Step 1: Search for the exact artist ID to avoid generic name collisions
+                const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(queryName)}&entity=musicArtist&limit=20`;
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 4000);
+                const res = await fetch(itunesUrl, { signal: controller.signal });
+                clearTimeout(timeoutId);
+                if (res.ok) {
+                    const data = await res.json();
+                    // Normalize names by removing punctuation and spaces for comparison
+                    const normName = (name) => (name || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const targetNameNorm = normName(queryName);
+                    const exactMatches = data.results?.filter((r) => normName(r.artistName) === targetNameNorm) || [];
+                    let selectedArtistId = null;
+                    // Helper to normalize genre strings: lowercase, remove non-alphanumeric (except spaces), collapse spaces
+                    const normalizeGenre = (g) => (g || "").toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\\s+/g, ' ').trim();
+                    const zceneGenreNorm = normalizeGenre(genre);
+                    // Taxonomy map for mapping iTunes master genres to broad subgenres
+                    const genreTaxonomy = {
+                        'hip hop rap': ['boom bap', 'g funk', 'trap', 'drill', 'crunk', 'grime', 'lo fi', 'hip hop', 'rap', 'east coast', 'west coast', 'hardcore hip hop'],
+                        'electronic': ['techno', 'house', 'trance', 'dubstep', 'edm', 'dance', 'idm', 'drum and bass', 'jungle'],
+                        'rock': ['rock', 'grunge', 'alternative', 'indie', 'post rock'],
+                        'metal': ['metal', 'deathcore', 'metalcore', 'death metal', 'black metal', 'doom metal'],
+                        'punk': ['punk', 'emo', 'hardcore', 'pop punk', 'skate punk'],
+                        'r b soul': ['funk', 'motown', 'neo soul', 'rnb', 'r b', 'soul'],
+                        'pop': ['pop', 'synthpop', 'electropop', 'k pop'],
+                        'country': ['country', 'bluegrass', 'americana'],
+                        'jazz': ['jazz', 'bebop', 'swing', 'fusion'],
+                    };
+                    if (exactMatches.length > 0) {
+                        const strictMatches = exactMatches.filter((r) => {
+                            const itunesGenre = r.primaryGenreName || "";
+                            if (!itunesGenre)
+                                return false;
+                            const itunesGenreNorm = normalizeGenre(itunesGenre);
+                            // 1. Core keyword intersection (e.g., both have "hip hop")
+                            const zceneWords = zceneGenreNorm.split(' ').filter(w => w.length > 2);
+                            const itunesWords = itunesGenreNorm.split(' ').filter(w => w.length > 2);
+                            const keywordMatch = zceneWords.some(w => itunesGenreNorm.includes(w)) ||
+                                itunesWords.some(w => zceneGenreNorm.includes(w));
+                            // 2. Taxonomy fallback match
+                            let taxonomyMatch = false;
+                            for (const [masterGenre, subgenres] of Object.entries(genreTaxonomy)) {
+                                const genreFamily = [masterGenre, ...subgenres];
+                                // Check if iTunes genre is anywhere in this family
+                                const itunesInFamily = genreFamily.some(g => itunesGenreNorm.includes(g) || g.includes(itunesGenreNorm));
+                                // Check if Zcene genre is anywhere in this family
+                                const zceneInFamily = genreFamily.some(g => zceneGenreNorm.includes(g) || g.includes(zceneGenreNorm));
+                                if (itunesInFamily && zceneInFamily) {
+                                    taxonomyMatch = true;
+                                    break;
+                                }
                             }
+                            // 3. Summary fallback match (if genre was empty or esoteric)
+                            let summaryMatch = false;
+                            if (!keywordMatch && !taxonomyMatch && summary) {
+                                const summaryNorm = normalizeGenre(summary);
+                                summaryMatch = itunesWords.some(w => summaryNorm.includes(w));
+                            }
+                            return keywordMatch || taxonomyMatch || summaryMatch;
+                        });
+                        if (strictMatches.length > 0) {
+                            selectedArtistId = strictMatches[0].artistId;
                         }
-                        // 3. Summary fallback match (if genre was empty or esoteric)
-                        let summaryMatch = false;
-                        if (!keywordMatch && !taxonomyMatch && summary) {
-                            const summaryNorm = normalizeGenre(summary);
-                            summaryMatch = itunesWords.some(w => summaryNorm.includes(w));
+                        else {
+                            console.warn(`[scrapeImageUrlBackend] iTunes validation blocked for ${queryName}. No strict genre overlap found, aborting.`);
+                            return null;
                         }
-                        return keywordMatch || taxonomyMatch || summaryMatch;
-                    });
-                    if (strictMatches.length > 0) {
-                        selectedArtistId = strictMatches[0].artistId;
                     }
                     else {
-                        console.warn(`[scrapeImageUrlBackend] iTunes validation blocked for ${artistName}. No strict genre overlap found, aborting.`);
-                        return null;
+                        return null; // No exact matches found
                     }
-                }
-                else {
-                    return null; // No exact matches found
-                }
-                if (selectedArtistId) {
-                    // Step 2: Fetch their albums for the high-res artwork using the exact artistId
-                    const albumUrl = `https://itunes.apple.com/lookup?id=${selectedArtistId}&entity=album&limit=1`;
-                    const albumController = new AbortController();
-                    const albumTimeout = setTimeout(() => albumController.abort(), 3000);
-                    const albumRes = await fetch(albumUrl, { signal: albumController.signal });
-                    clearTimeout(albumTimeout);
-                    if (albumRes.ok) {
-                        const albumData = await albumRes.json();
-                        const album = albumData.results?.find((r) => r.wrapperType === 'collection');
-                        if (album && album.artworkUrl100) {
-                            const hiResArtwork = album.artworkUrl100.replace('100x100bb', '600x600bb');
-                            console.log(`[scrapeImageUrlBackend] Deterministic iTunes success for ${artistName}`);
-                            return hiResArtwork;
+                    if (selectedArtistId) {
+                        // Step 2: Fetch their albums for the high-res artwork using the exact artistId
+                        const albumUrl = `https://itunes.apple.com/lookup?id=${selectedArtistId}&entity=album&limit=1`;
+                        const albumController = new AbortController();
+                        const albumTimeout = setTimeout(() => albumController.abort(), 3000);
+                        const albumRes = await fetch(albumUrl, { signal: albumController.signal });
+                        clearTimeout(albumTimeout);
+                        if (albumRes.ok) {
+                            const albumData = await albumRes.json();
+                            const album = albumData.results?.find((r) => r.wrapperType === 'collection');
+                            if (album && album.artworkUrl100) {
+                                const hiResArtwork = album.artworkUrl100.replace('100x100bb', '600x600bb');
+                                console.log(`[scrapeImageUrlBackend] Deterministic iTunes success for ${queryName}`);
+                                return hiResArtwork;
+                            }
                         }
                     }
                 }
             }
-        }
-        catch (itunesErr) {
-            console.warn(`[scrapeImageUrlBackend] iTunes search failed for ${artistName}:`, itunesErr.message);
+            catch (itunesErr) {
+                console.warn(`[scrapeImageUrlBackend] iTunes search failed for ${queryName}:`, itunesErr.message);
+                return null;
+            }
             return null;
+        };
+        let result = await fetchAndValidate(artistName);
+        if (!result && origin && origin.trim() !== '') {
+            let suffix = (0, exports.extractCountrySlug)(origin).toUpperCase();
+            if (suffix === 'GB')
+                suffix = 'UK';
+            if (suffix !== 'GLOBAL') {
+                const fallbackName = `${artistName} ${suffix}`;
+                console.log(`[scrapeImageUrlBackend] Primary query failed. Triggering geographic fallback: ${fallbackName}`);
+                result = await fetchAndValidate(fallbackName);
+            }
         }
+        return result;
     }
     return null;
 };

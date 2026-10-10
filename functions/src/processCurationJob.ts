@@ -685,7 +685,8 @@ export const processCurationJob = onDocumentCreated({
                       attemptName, 
                       'artist',
                       details.details.genre || "",
-                      details.summary || ""
+                      details.summary || "",
+                      details.details.origin
                     );
                     if (scrapedImg) {
                       details.imageUrl = scrapedImg;
