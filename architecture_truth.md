@@ -147,3 +147,6 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 - **Rule:** AI generation strictly utilizes the categorical `thinking_level` parameter (minimal to high) to optimize cost-to-quality ratios based on task complexity. Legacy sampling parameters (`temperature`, `top_p`, `top_k`, and `thinking_budget`) are explicitly forbidden in AI orchestration configurations.
 - **Enforcement:** Deterministic extraction tasks (e.g., origin validation, edge reconciliation) are strictly locked to `minimal` or `low`. Creative narrative synthesis (e.g., Root Breakdowns) requires a `high` thinking level.
 - **API Stability:** The background pipeline jobs officially retain the legacy `generateContent` API. Migration to the stateful Interactions API is formally deferred to preserve single-shot execution stability until multi-turn conversational features are scoped.
+
+### 35. Geographic Asset Disambiguation
+- **Rule:** If the deterministic iTunes scraper fails to validate an image asset due to a multi-artist name collision or missing legal alias, the background worker must parse the node's parametric origin data, append the relevant regional suffix (e.g., ' US', ' UK'), and execute a secondary validation query.

@@ -77,7 +77,8 @@ const ARCHITECTURE_RULES = [
     { id: 27, title: "Multi-Seed Co-Anchoring", desc: "Complex Generations MUST dynamically force the AI to co-anchor the narrative to explore the relationship between all seeds." },
     { id: 28, title: "Canonical Global Caching", desc: "Global caching must use pure canonical IDs. Query filters are barred from document paths to prevent cache fracturing." },
     { id: 29, title: "Universal Payload Serializer", desc: "A Single Source of Truth for generating Zcene payloads. Guarantees 1:1 data parity between Saves, Duplicates, and Shares prior to any ephemeral mutations." },
-    { id: 34, title: "Cognitive Tiering & Orchestration Stability", desc: "AI generation strictly utilizes the thinking_level tier system (minimal to high) to optimize cost-to-quality ratios. Legacy sampling parameters (temperature) are explicitly forbidden." }
+    { id: 34, title: "Cognitive Tiering & Orchestration Stability", desc: "AI generation strictly utilizes the thinking_level tier system (minimal to high) to optimize cost-to-quality ratios. Legacy sampling parameters (temperature) are explicitly forbidden." },
+    { id: 35, title: "Geographic Asset Disambiguation", desc: "If the deterministic iTunes scraper fails to validate an image asset due to a multi-artist name collision or missing legal alias, the background worker must parse the node's parametric origin data, append the relevant regional suffix (e.g., ' US', ' UK'), and execute a secondary validation query." }
 ];
 
 const DiscoveryFlowDiagram: React.FC = () => (
