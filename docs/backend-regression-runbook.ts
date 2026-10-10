@@ -21,6 +21,7 @@ npx vitest --ui
 *   **Firebase-Admin:** Globally mocked to intercept database reads (simulating cache hits/misses) and validate write payloads instantly.
 *   **Static Fixtures:** External Gemini API calls are bypassed. Tests use pre-validated JSON topologies from \`tests/__fixtures__/\` to guarantee deterministic, zero-latency execution.
 *   **Payload Assertions:** Mock validations for Gemini API intercepts MUST assert on the correct \`thinking_level\` parameter (minimal, low, medium, high) and ensure no legacy sampling parameters (temperature, top_p) are present.
+*   **Payload Assertions (Label Integrity):** Mock validations MUST explicitly validate that label IDs have been correctly stripped of suffixes before being written to the mock database.
 
 ## Core Pathways Validated
 

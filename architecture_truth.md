@@ -1,5 +1,7 @@
 # ZCENE ARCHITECTURAL TRUTH & IMMUTABLE LAWS
 
+![Architecture Diagram](./Zcene Architecture V20_4.jpg)
+
 This document defines the absolute, immutable architectural baseline of Zcene. All future development, bug fixes, and AI agent actions MUST strictly adhere to these laws. Legacy paradigms (like naive string matching or bypass assumptions) are strictly forbidden.
 
 ## THE IMMUTABLE ARCHITECTURAL LAWS
@@ -150,3 +152,6 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 
 ### 35. Geographic Asset Disambiguation
 - **Rule:** If the deterministic iTunes scraper fails to validate an image asset due to a multi-artist name collision or missing legal alias, the background worker must parse the node's parametric origin data, append the relevant regional suffix (e.g., ' US', ' UK'), and execute a secondary validation query.
+
+### 36. Label Taxonomy Normalization
+- **Rule:** The extraction pipeline MUST algorithmically strip interchangeable structural suffixes (e.g., -records, -music, -company, -group, -media) from label entities prior to caching. This enforces the Canonical Persistence Mandate by reducing natural LLM variations to a single, pure root ID.
