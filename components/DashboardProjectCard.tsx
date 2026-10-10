@@ -120,7 +120,7 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-zinc-800/40 to-zinc-900/80 relative overflow-hidden">
                  {/* Monogram for missing images */}
-                 <div className="absolute -bottom-6 -right-6 text-white/5 font-black text-8xl uppercase select-none">
+                 <div className="absolute -bottom-2 -right-1 text-white/5 font-black text-8xl uppercase select-none">
                    {extractInitials(displayTitle)}
                  </div>
               </div>
