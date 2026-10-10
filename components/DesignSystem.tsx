@@ -2320,7 +2320,15 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                         
                         <div className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-xl space-y-4 mb-12">
                             <h4 className="text-xs font-semibold text-primary uppercase tracking-widest">Typographic Watermark Fallback</h4>
-                            <p className="text-sm text-zinc-400">Used when a project (Zcene) or artist lacks a valid image. Extracts 1-3 initials and maps them to a subtle, dark gradient with massive, low-opacity text bleeding off the edges to provide texture.</p>
+                            <div className="space-y-3">
+                                <p className="text-sm text-zinc-400">Used when a project (Zcene) or artist lacks a valid image. Extracts 1-3 initials and maps them to a subtle, dark gradient with massive, low-opacity text bleeding off the edges to provide texture.</p>
+                                <div className="bg-black/20 p-3 rounded-lg border border-white/5 space-y-1.5 w-fit">
+                                    <p className="text-xs font-mono text-zinc-500"><span className="text-zinc-300">Background:</span> bg-gradient-to-br from-zinc-800/40 to-zinc-900/80</p>
+                                    <p className="text-xs font-mono text-zinc-500"><span className="text-zinc-300">Typography:</span> text-8xl font-black uppercase</p>
+                                    <p className="text-xs font-mono text-zinc-500"><span className="text-zinc-300">Opacity:</span> text-white/5 (dashboard) / text-white/[0.02] (sidebar)</p>
+                                    <p className="text-xs font-mono text-zinc-500"><span className="text-zinc-300">Alignment:</span> absolute bottom-0 right-0 translate-y-[14%] translate-x-[8%] leading-none</p>
+                                </div>
+                            </div>
                             
                             <div className="flex gap-4 mt-4">
                                 <div className="w-24 h-24 rounded-lg bg-gradient-to-br from-zinc-800/40 to-zinc-900/80 border border-white/5 overflow-hidden relative">
