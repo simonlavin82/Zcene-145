@@ -1667,6 +1667,7 @@ const App: React.FC = () => {
     try {
       const sharePayload = buildBaseProjectPayload();
       if (!sharePayload) throw new Error("Could not build payload");
+      sharePayload.status = 'completed';
 
       // --- Universal Serializer + Blacklist Mutation ---
       applyShareBlacklistMutation(sharePayload);
@@ -2495,7 +2496,6 @@ const App: React.FC = () => {
       lastViewedStackCount,
       isMagazineViewOpen: false,
       authorId: user?.uid || 'guest',
-      status: 'completed',
       schemaVersion: 2,
       supportsLabelDeepCuts: true,
       createdAt: serverTimestamp(),
@@ -2548,6 +2548,7 @@ const App: React.FC = () => {
       if (!docPayload) throw new Error("Could not build payload");
       
       docPayload.generationType = 'Clone';
+      docPayload.status = 'completed';
 
       // For saved projects, we rely on the global cache and don't need to bloat the doc with inline detailsCache
       delete docPayload.detailsCache;
