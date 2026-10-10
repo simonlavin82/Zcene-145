@@ -35,6 +35,12 @@ export const normalizeArtistId = (name: string): string =>
     .replace(/^-+|-+$/g, '')
     .substring(0, 256);
 
+export const normalizeLabelId = (name: string): string => {
+  let id = normalizeArtistId(name);
+  id = id.replace(/-(records|music|company|recording-company|recordings|entertainment|media|group|productions)$/, '');
+  return id;
+};
+
 export const titleCaseArtistId = (id: string): string => {
   if (!id) return '';
   const spacedId = id.replace(/[-_]+/g, ' ').trim();
@@ -201,7 +207,9 @@ export const normalizeGraphData = (graph: GraphData): GraphData => {
     const originalId = applyCanonicalAlias(node.id);
     let normalizedId = originalId.trim();
     
-    if (node.type === 'artist' || node.type === 'label') {
+    if (node.type === 'label') {
+      normalizedId = normalizeLabelId(originalId);
+    } else if (node.type === 'artist') {
       normalizedId = normalizeArtistId(originalId);
     } else {
       normalizedId = normalizedId.toLowerCase();
