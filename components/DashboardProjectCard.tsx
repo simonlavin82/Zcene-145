@@ -95,7 +95,7 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
               {imageUrls[0] && imageUrls[0] !== 'not-found' ? (
                 <img src={imageUrls[0]} alt={displayTitle} className="w-full h-full object-cover object-left" crossOrigin="anonymous" />
               ) : (
-                <div className="w-full h-full" style={{ background: generateDeterministicGradient(seedList[0] || displayTitle) }} />
+                <div className="w-full h-full bg-gradient-to-br from-zinc-800/40 to-zinc-900/80" />
               )}
             </div>
             {/* Right artist: anchored right, cross-fades out across the left half */}
@@ -109,7 +109,7 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
               {imageUrls[1] && imageUrls[1] !== 'not-found' ? (
                 <img src={imageUrls[1]} alt={displayTitle} className="w-full h-full object-cover object-right" crossOrigin="anonymous" />
               ) : (
-                <div className="w-full h-full" style={{ background: generateDeterministicGradient(seedList[1] || displayTitle) }} />
+                <div className="w-full h-full bg-gradient-to-br from-zinc-800/40 to-zinc-900/80" />
               )}
             </div>
           </>
@@ -118,9 +118,9 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
             {imageUrls[0] && imageUrls[0] !== 'not-found' ? (
               <img src={imageUrls[0]} alt={displayTitle} className="w-full h-full object-cover" crossOrigin="anonymous" />
             ) : (
-              <div className="w-full h-full" style={{ background: generateDeterministicGradient(displayTitle) }}>
+              <div className="w-full h-full bg-gradient-to-br from-zinc-800/40 to-zinc-900/80 relative overflow-hidden">
                  {/* Monogram for missing images */}
-                 <div className="absolute top-4 right-4 text-white/20 font-display text-6xl font-bold tracking-tighter uppercase select-none">
+                 <div className="absolute -bottom-6 -right-6 text-white/5 font-black text-8xl uppercase select-none">
                    {extractInitials(displayTitle)}
                  </div>
               </div>

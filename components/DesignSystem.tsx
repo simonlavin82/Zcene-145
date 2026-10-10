@@ -2319,15 +2319,15 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Badges & Tags</h2>
                         
                         <div className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-xl space-y-4 mb-12">
-                            <h4 className="text-xs font-semibold text-primary uppercase tracking-widest">Unified Static Fallback</h4>
-                            <p className="text-sm text-zinc-400">Used when a project (Zcene) or artist lacks a valid image. Extracts 1-3 initials and maps them to a static Console Partition background for minimal visual disruption.</p>
+                            <h4 className="text-xs font-semibold text-primary uppercase tracking-widest">Typographic Watermark Fallback</h4>
+                            <p className="text-sm text-zinc-400">Used when a project (Zcene) or artist lacks a valid image. Extracts 1-3 initials and maps them to a subtle, dark gradient with massive, low-opacity text bleeding off the edges to provide texture.</p>
                             
                             <div className="flex gap-4 mt-4">
-                                <div className="w-16 h-16 rounded-lg flex items-center justify-center bg-[#1f1f22] border border-white/5">
-                                    <span className="text-[#52525b] font-bold text-lg uppercase tracking-widest">WOC</span>
+                                <div className="w-24 h-24 rounded-lg bg-gradient-to-br from-zinc-800/40 to-zinc-900/80 border border-white/5 overflow-hidden relative">
+                                    <span className="text-5xl font-black text-white/5 uppercase select-none absolute -bottom-2 -right-2">WOC</span>
                                 </div>
-                                <div className="w-16 h-16 rounded-lg flex items-center justify-center bg-[#1f1f22] border border-white/5">
-                                    <span className="text-[#52525b] font-bold text-lg uppercase tracking-widest">SS</span>
+                                <div className="w-24 h-24 rounded-lg bg-gradient-to-br from-zinc-800/40 to-zinc-900/80 border border-white/5 overflow-hidden relative">
+                                    <span className="text-5xl font-black text-white/5 uppercase select-none absolute -bottom-2 -right-2">SS</span>
                                 </div>
                             </div>
                         </div>

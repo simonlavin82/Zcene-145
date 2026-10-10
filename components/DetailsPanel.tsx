@@ -1167,8 +1167,8 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                         </div>
                                     </>
                                 ) : (
-                                    <div className={`w-40 h-40 sm:w-44 sm:h-44 flex-shrink-0 mx-auto bg-[#1f1f22] overflow-hidden relative ring-1 ring-white/10 ring-inset rounded-lg z-10 flex items-center justify-center ${isFullScreenMode ? 'shadow-[0_48px_120px_0px_rgba(0,0,0,1),0_12px_40px_0px_rgba(0,0,0,0.9)]' : 'shadow-[0_12px_36px_0px_rgba(0,0,0,0.85),0_3px_8px_0px_rgba(0,0,0,0.65)]'}`}>
-                                        <span className="text-4xl font-bold text-[#52525b] uppercase tracking-widest select-none">
+                                    <div className={`w-40 h-40 sm:w-44 sm:h-44 flex-shrink-0 mx-auto bg-gradient-to-br from-zinc-800/40 to-zinc-900/80 overflow-hidden relative ring-1 ring-white/10 ring-inset rounded-lg z-10 flex items-center justify-center ${isFullScreenMode ? 'shadow-[0_48px_120px_0px_rgba(0,0,0,1),0_12px_40px_0px_rgba(0,0,0,0.9)]' : 'shadow-[0_12px_36px_0px_rgba(0,0,0,0.85),0_3px_8px_0px_rgba(0,0,0,0.65)]'}`}>
+                                        <span className="text-8xl font-black text-white/5 uppercase select-none absolute -bottom-4 -right-4">
                                             {extractInitials(getArtistDisplayName(details, node))}
                                         </span>
                                     </div>
