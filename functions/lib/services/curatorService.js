@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateSemanticLinkWeights = exports.scrapeImageUrlBackend = exports.checkVideoPlayability = exports.scrapeVideoIdBackend = exports.fetchNodeDetailsBackend = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = exports.NODE_DETAILS_SCHEMA = exports.generateGraphDataBackend = exports.reconcileNarrativeEdges = exports.generateRootsBreakdownBackend = exports.validateSeedOriginBackend = exports.SEED_VALIDATION_SCHEMA = exports.GENERATE_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = exports.GRAPH_RESPONSE_SCHEMA = exports.extractCleanJsonString = exports.extractArtistSubGraph = exports.normalizeGraphData = exports.buildCompositeCacheKey = exports.extractCountrySlug = exports.sanitizeImageUrl = exports.extractValidYoutubeId = exports.titleCaseArtistId = exports.normalizeArtistId = exports.applyCanonicalAlias = exports.CANONICAL_ALIASES = void 0;
+exports.generateSemanticLinkWeights = exports.scrapeImageUrlBackend = exports.checkVideoPlayability = exports.scrapeVideoIdBackend = exports.fetchNodeDetailsBackend = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = exports.NODE_DETAILS_SCHEMA = exports.generateGraphDataBackend = exports.reconcileNarrativeEdges = exports.generateRootsBreakdownBackend = exports.validateSeedOriginBackend = exports.SEED_VALIDATION_SCHEMA = exports.GENERATE_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = exports.GRAPH_RESPONSE_SCHEMA = exports.extractCleanJsonString = exports.extractArtistSubGraph = exports.normalizeGraphData = exports.buildCompositeCacheKey = exports.extractCountrySlug = exports.sanitizeImageUrl = exports.extractValidYoutubeId = exports.titleCaseArtistId = exports.normalizeLabelId = exports.normalizeArtistId = exports.applyCanonicalAlias = exports.CANONICAL_ALIASES = void 0;
 const genai_1 = require("@google/genai");
 const executeCurationPipeline_1 = require("../executeCurationPipeline");
 // --- UTILITIES PORTED FROM artistCacheService.ts ---
@@ -24,6 +24,12 @@ const normalizeArtistId = (name) => name
     .replace(/^-+|-+$/g, '')
     .substring(0, 256);
 exports.normalizeArtistId = normalizeArtistId;
+const normalizeLabelId = (name) => {
+    let id = (0, exports.normalizeArtistId)(name);
+    id = id.replace(/-(records|music|company|recording-company|recordings|entertainment|media|group|productions)$/, '');
+    return id;
+};
+exports.normalizeLabelId = normalizeLabelId;
 const titleCaseArtistId = (id) => {
     if (!id)
         return '';
@@ -185,7 +191,10 @@ const normalizeGraphData = (graph) => {
     const normalizedNodes = graph.nodes.map(node => {
         const originalId = (0, exports.applyCanonicalAlias)(node.id);
         let normalizedId = originalId.trim();
-        if (node.type === 'artist' || node.type === 'label') {
+        if (node.type === 'label') {
+            normalizedId = (0, exports.normalizeLabelId)(originalId);
+        }
+        else if (node.type === 'artist') {
             normalizedId = (0, exports.normalizeArtistId)(originalId);
         }
         else {
