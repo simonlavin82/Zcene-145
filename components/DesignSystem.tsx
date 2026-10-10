@@ -2325,17 +2325,17 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="bg-black/20 p-3 rounded-lg border border-white/5 space-y-1.5 w-fit">
                                     <p className="text-xs font-mono text-zinc-500"><span className="text-zinc-300">Background:</span> bg-gradient-to-br from-zinc-800/40 to-zinc-900/80</p>
                                     <p className="text-xs font-mono text-zinc-500"><span className="text-zinc-300">Typography:</span> text-8xl font-black uppercase</p>
-                                    <p className="text-xs font-mono text-zinc-500"><span className="text-zinc-300">Opacity:</span> text-white/5 (dashboard) / text-white/[0.02] (sidebar)</p>
+                                    <p className="text-xs font-mono text-zinc-500"><span className="text-zinc-300">Opacity:</span> text-white/10 (dashboard) / text-white/5 (sidebar)</p>
                                     <p className="text-xs font-mono text-zinc-500"><span className="text-zinc-300">Alignment:</span> absolute bottom-0 right-0 translate-y-[14%] translate-x-[8%] leading-none</p>
                                 </div>
                             </div>
                             
                             <div className="flex gap-4 mt-4">
                                 <div className="w-24 h-24 rounded-lg bg-gradient-to-br from-zinc-800/40 to-zinc-900/80 border border-white/5 overflow-hidden relative">
-                                    <span className="text-5xl font-black text-white/5 uppercase select-none absolute bottom-0 right-0 translate-y-[14%] translate-x-[8%] leading-none">WOC</span>
+                                    <span className="text-5xl font-black text-white/10 uppercase select-none absolute bottom-0 right-0 translate-y-[14%] translate-x-[8%] leading-none">WOC</span>
                                 </div>
                                 <div className="w-24 h-24 rounded-lg bg-gradient-to-br from-zinc-800/40 to-zinc-900/80 border border-white/5 overflow-hidden relative">
-                                    <span className="text-5xl font-black text-white/5 uppercase select-none absolute bottom-0 right-0 translate-y-[14%] translate-x-[8%] leading-none">SS</span>
+                                    <span className="text-5xl font-black text-white/10 uppercase select-none absolute bottom-0 right-0 translate-y-[14%] translate-x-[8%] leading-none">SS</span>
                                 </div>
                             </div>
                         </div>
