@@ -2280,28 +2280,21 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                 <div className="flex-grow flex flex-col min-h-0 h-full overflow-hidden">
                     {!isMagazineViewOpen && filteredAndSortedNodes.length > 0 && (
                         <div className="flex justify-between items-center w-full px-4 py-2 border-b border-zinc-700/50 bg-zinc-900 flex-shrink-0 gap-3">
-                            <div className="flex items-center space-x-3 overflow-hidden flex-1 pr-2">
-                                {filteredAndSortedNodes.length > 1 && (
-                                    <>
-                                        <button 
-                                            onClick={handlePrev} 
-                                            disabled={viewedIndex <= 0}
-                                            className="w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 rounded-xl transition-colors disabled:opacity-20 disabled:pointer-events-none leading-none select-none outline-none focus:outline-none"
-                                        >
-                                            <span className="material-symbols-outlined !text-[18px]">chevron_left</span>
-                                        </button>
-                                        <button 
-                                            onClick={handleNext} 
-                                            disabled={viewedIndex === filteredAndSortedNodes.length - 1}
-                                            className="w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 rounded-xl transition-colors disabled:opacity-20 disabled:pointer-events-none leading-none select-none outline-none focus:outline-none"
-                                        >
-                                            <span className="material-symbols-outlined !text-[18px]">chevron_right</span>
-                                        </button>
-                                        
-                                        <div className="relative flex items-center overflow-hidden flex-1 h-6 min-w-[40px] md:max-w-[240px] lg:max-w-[280px]">
+                            {filteredAndSortedNodes.length > 1 && (
+                                <>
+                                    <button 
+                                        onClick={handlePrev} 
+                                        disabled={viewedIndex <= 0}
+                                        className="w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 rounded-xl transition-colors disabled:opacity-20 disabled:pointer-events-none leading-none select-none outline-none focus:outline-none"
+                                    >
+                                        <span className="material-symbols-outlined !text-[18px]">chevron_left</span>
+                                    </button>
+                                    
+                                    <div className="flex-1 flex justify-center items-center overflow-hidden px-4">
+                                        <div className="relative flex items-center overflow-hidden w-full h-6 max-w-[240px] lg:max-w-[280px]">
                                             <div 
                                                 ref={trackRef}
-                                                className="flex items-center flex-nowrap overflow-x-auto scrollbar-hide [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full h-full px-1"
+                                                className="flex items-center flex-nowrap overflow-x-auto scrollbar-hide [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full h-full px-1 justify-center"
                                             >
                                                 {filteredAndSortedNodes.map((node, i) => {
                                                     const isLoading = loadingNodeIds.has(node.id) || jitLoadingIds.has(normalizeArtistId(node.id));
@@ -2332,9 +2325,17 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                             <div className="absolute left-0 top-0 bottom-0 w-4 bg-gradient-to-r from-zinc-900 to-transparent pointer-events-none" />
                                             <div className="absolute right-0 top-0 bottom-0 w-4 bg-gradient-to-l from-zinc-900 to-transparent pointer-events-none" />
                                         </div>
-                                    </>
-                                )}
-                            </div>
+                                    </div>
+
+                                    <button 
+                                        onClick={handleNext} 
+                                        disabled={viewedIndex === filteredAndSortedNodes.length - 1}
+                                        className="w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 rounded-xl transition-colors disabled:opacity-20 disabled:pointer-events-none leading-none select-none outline-none focus:outline-none"
+                                    >
+                                        <span className="material-symbols-outlined !text-[18px]">chevron_right</span>
+                                    </button>
+                                </>
+                            )}
                         </div>
                     )}
 

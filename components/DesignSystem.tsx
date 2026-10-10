@@ -3272,18 +3272,14 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <h3 className="text-xl font-medium text-zinc-200">Visual Anatomy</h3>
                                     <div className="p-8 bg-zinc-950 rounded-xl border border-zinc-800 flex flex-col items-center justify-center gap-6">
                                         <div className="flex justify-between items-center w-full max-w-sm px-4 py-2 border border-zinc-700/50 bg-zinc-900 rounded-xl gap-3">
-                                            {/* Left-Aligned Cluster */}
-                                            <div className="flex items-center space-x-3 overflow-hidden flex-1 pr-2">
-                                                <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-xl transition-colors">
-                                                    <span className="material-symbols-outlined !text-[18px]">chevron_left</span>
-                                                </button>
-                                                <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-xl transition-colors">
-                                                    <span className="material-symbols-outlined !text-[18px]">chevron_right</span>
-                                                </button>
-                                                
-                                                {/* Dots Track Wrapper */}
-                                                <div className="relative flex items-center overflow-hidden flex-1 h-6 min-w-[40px] max-w-[140px] md:max-w-[200px] lg:max-w-[260px]">
-                                                    <div className="flex items-center flex-nowrap overflow-x-auto scrollbar-hide [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full h-full px-1">
+                                            <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-xl transition-colors">
+                                                <span className="material-symbols-outlined !text-[18px]">chevron_left</span>
+                                            </button>
+                                            
+                                            {/* Dots Track Wrapper */}
+                                            <div className="flex-1 flex justify-center items-center overflow-hidden px-4">
+                                                <div className="relative flex items-center overflow-hidden w-full h-6 max-w-[140px] md:max-w-[200px] lg:max-w-[260px]">
+                                                    <div className="flex items-center justify-center flex-nowrap overflow-x-auto scrollbar-hide [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full h-full px-1">
                                                         <div className="flex items-center justify-center h-full px-[2px] cursor-pointer group">
                                                             <div className="h-1 w-4 bg-primary transition-all rounded-full flex-shrink-0" />
                                                         </div>
@@ -3303,13 +3299,9 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                 </div>
                                             </div>
 
-                                            {/* Right-Aligned Magazine Trigger Mock */}
-                                            <div className="flex gap-2 flex-wrap justify-end">
-                                                <button className="flex items-center gap-1.5 px-3 py-1.5 border border-white bg-white/10 rounded-xl text-white animate-pulse transition-all text-xs font-medium shrink-0 leading-none">
-                                                    <span className="material-symbols-outlined !text-[16px]">auto_stories</span>
-                                                    <span>Magazine</span>
-                                                </button>
-                                            </div>
+                                            <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-xl transition-colors">
+                                                <span className="material-symbols-outlined !text-[18px]">chevron_right</span>
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -3318,7 +3310,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <div className="space-y-4">
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Alignment & Layout</h4>
-                                            <p className="text-sm text-zinc-400">Uses a split-flex row with <strong>flex justify-between items-center w-full px-4 py-2 bg-zinc-900</strong>. Left cluster groups navigation chevrons and indicators; right cluster pins the Magazine toggle.</p>
+                                            <p className="text-sm text-zinc-400">Uses a symmetrical flex layout with <strong>flex justify-between items-center w-full px-4 py-2 bg-zinc-900</strong>. The back arrow sits on the left, the forward arrow on the right, and the dot progression track is centered symmetrically between them.</p>
                                         </div>
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Responsive Clamping & Edge Fade</h4>
@@ -3326,7 +3318,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </div>
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Control Elements</h4>
-                                            <p className="text-sm text-zinc-400">Active indicator: <strong>w-4 bg-primary</strong>. Control buttons use <strong>w-8 h-8</strong> dimensions. The Magazine button utilizes a <strong>tri-state logic (disabled, attention, neutral)</strong>. The 'attention' state uses a primary yellow pulse to guide first-time clicks, shifting permanently to 'neutral' (subtle zinc border) post-interaction for the remainder of the session.</p>
+                                            <p className="text-sm text-zinc-400">Active indicator: <strong>w-4 bg-primary</strong>. Control buttons use <strong>w-8 h-8</strong> dimensions.</p>
                                         </div>
                                     </div>
                                 </div>
