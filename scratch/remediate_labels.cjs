@@ -1,7 +1,8 @@
-const { initializeApp } = require('firebase-admin/app');
+const { initializeApp, cert } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
+const serviceAccount = require('../firebase-service-account.json');
 
-initializeApp({ projectId: 'zcene-production' });
+initializeApp({ credential: cert(serviceAccount), projectId: 'zcene-production' });
 const db = getFirestore();
 
 // Utility copied from codebase
