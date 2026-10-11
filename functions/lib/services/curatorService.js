@@ -587,7 +587,7 @@ exports.SEED_VALIDATION_SCHEMA = {
     properties: {
         id: {
             type: genai_1.Type.STRING,
-            description: "The canonical, correctly-spelled, professional name of the artist. If the input was a typo, return the corrected spelling here."
+            description: "The canonical, correctly-spelled, professional name of the artist. If the input was a typo, return the corrected spelling here. NEVER append geographic acronyms, country names, or regional suffixes (e.g. 'Turnstile', NOT 'Turnstile US')."
         },
         origin: {
             type: genai_1.Type.STRING,
@@ -623,12 +623,13 @@ CRITICAL RULES (non-negotiable):
 1. TYPO CORRECTION (MANDATORY): If the input is an obvious misspelling or transposition of a real artist name (e.g. "turstile" for "Turnstile", "radiohed" for "Radiohead", "nirvanna" for "Nirvana"), you MUST return the correctly-spelled canonical name in the 'id' field and set 'correctedInput' to true. Do NOT return the original typo'd spelling as the id under any circumstances.
 2. REAL ENTITY CHECK: If the entity is a real, recognizable musical artist, band, or label, set 'isValid' to true with full origin and genre.
 3. NOT_FOUND (MANDATORY): If the input cannot be confidently mapped to any known, real musical entity — even after attempting typo correction — set 'isValid' to false. In this case, 'id' should be the original input and 'origin'/'genre' should be empty strings.
-4. Do NOT invent or hallucinate artists. If in doubt, return isValid: false.`;
+4. Do NOT invent or hallucinate artists. If in doubt, return isValid: false.
+5. ZERO GEOGRAPHIC SUFFIX HALLUCINATION (STRICT): NEVER append geographic tags, country names, or regional acronyms (e.g., ' US', ' USA', ' UK', ' Australia') to the 'id' field unless it is legally and officially part of the artist's real-world band name (e.g., 'Darko' must remain 'Darko', NOT 'Darko US'; 'Turnstile' must remain 'Turnstile', NOT 'Turnstile US'). Country of origin belongs exclusively in the 'origin' field.`;
         const response = await ai.models.generateContent({
             model: currentModel,
             contents: prompt,
             config: {
-                systemInstruction: "You are a strict music data validator. You do NOT infer intent. If the user input contains a spelling error, return the REAL canonical artist name (e.g. if given 'turstile', return id: 'Turnstile', correctedInput: true). Return ONLY valid JSON matching the schema.",
+                systemInstruction: "You are a strict music data validator. You do NOT infer intent. If the user input contains a spelling error, return the REAL canonical artist name (e.g. if given 'turstile', return id: 'Turnstile', correctedInput: true). NEVER append geographic acronyms, country names, or regional suffixes (e.g. ' US', ' UK') to the artist's display name or 'id' field — geographic location belongs strictly in the 'origin' field. Return ONLY valid JSON matching the schema.",
                 thinkingConfig: { thinkingLevel: genai_1.ThinkingLevel.MINIMAL },
                 responseMimeType: "application/json",
                 responseSchema: exports.SEED_VALIDATION_SCHEMA
@@ -639,6 +640,17 @@ CRITICAL RULES (non-negotiable):
             throw new Error("Empty validation response");
         const cleanedJsonText = (0, exports.extractCleanJsonString)(jsonText);
         const data = JSON.parse(cleanedJsonText);
+        // Safeguard: Strip accidental hallucinated geographic suffixes if input didn't contain them
+        if (data && data.id && typeof data.id === 'string') {
+            const trimmedId = data.id.trim();
+            if (/^(.*?)\s+(?:US|USA|UK|GB)$/i.test(trimmedId)) {
+                const stripped = trimmedId.replace(/\s+(?:US|USA|UK|GB)$/i, '').trim();
+                if (!/\b(?:US|USA|UK|GB)\b/i.test(artistId)) {
+                    console.warn(`[validateSeedOriginBackend] Stripped hallucinated geographic suffix from id: "${trimmedId}" -> "${stripped}"`);
+                    data.id = stripped;
+                }
+            }
+        }
         let apiUsage = null;
         if (response.usageMetadata) {
             apiUsage = {
@@ -1277,6 +1289,10 @@ exports.NODE_DETAILS_SCHEMA = {
         details: {
             type: genai_1.Type.OBJECT,
             properties: {
+                artist: {
+                    type: genai_1.Type.STRING,
+                    description: "The canonical professional display name of the artist or record label. NEVER append geographic acronyms, country names, or regional suffixes (e.g. 'Turnstile', NOT 'Turnstile US'; 'Drug Church', NOT 'Drug Church US')."
+                },
                 genre: { type: genai_1.Type.STRING },
                 origin: { type: genai_1.Type.STRING },
                 founded: { type: genai_1.Type.STRING },
@@ -1363,6 +1379,7 @@ exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed informatio
       "summary": "A scannable bio using Markdown. MUST follow strict Bio Scannability rules: 1. Chunking/Text Segmentation (Max 2-3 short sentences per paragraph). 2. Semantic Splitting (Group by meaning). 3. Formatting (MUST use a bulleted list for stylistic traits/key elements, and bold key terms).",
       "members": ["Name (Role)", ...],
       "details": {
+        "artist": "Canonical professional display name of the artist or record label (e.g. 'Turnstile', 'Drug Church'). NEVER append geographic acronyms or country tags (NOT 'Turnstile US', NOT 'Drug Church US').",
         "genre": "The primary music genre(s) as a plain string (e.g. 'Hardcore Punk', 'Post-Hardcore', 'Metalcore'). NEVER return the literal string 'Unknown', 'N/A', or leave this empty — if grounding is inconclusive, infer the genre from the bio summary text and the connected scene context provided.",
         "origin": "City, Country format (e.g. 'Baltimore, USA'). NEVER return the literal string 'Unknown', 'N/A', or leave this empty — if grounding is inconclusive, infer the origin from the bio summary text or the band's known regional scene.",
         "founded": "YYYY",
@@ -1667,6 +1684,11 @@ exports.checkVideoPlayability = checkVideoPlayability;
 const scrapeImageUrlBackend = async (artistName, type, genre, summary, origin) => {
     // Strategy 1: High-Speed Deterministic iTunes API (Artists Only)
     if (type !== 'label') {
+        // Defense-in-depth: Ensure artistName is human-readable and clean of country slug artifacts
+        let cleanArtistName = (0, executeCurationPipeline_1.stripCountrySlug)(artistName).trim();
+        if (cleanArtistName.includes('-') && !cleanArtistName.includes(' ')) {
+            cleanArtistName = (0, exports.titleCaseArtistId)(cleanArtistName);
+        }
         const fetchAndValidate = async (queryName) => {
             try {
                 // Step 1: Search for the exact artist ID to avoid generic name collisions
@@ -1683,7 +1705,7 @@ const scrapeImageUrlBackend = async (artistName, type, genre, summary, origin) =
                     const exactMatches = data.results?.filter((r) => normName(r.artistName) === targetNameNorm) || [];
                     let selectedArtistId = null;
                     // Helper to normalize genre strings: lowercase, remove non-alphanumeric (except spaces), collapse spaces
-                    const normalizeGenre = (g) => (g || "").toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\\s+/g, ' ').trim();
+                    const normalizeGenre = (g) => (g || "").toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
                     const zceneGenreNorm = normalizeGenre(genre);
                     // Taxonomy map for mapping iTunes master genres to broad subgenres
                     const genreTaxonomy = {
@@ -1768,13 +1790,13 @@ const scrapeImageUrlBackend = async (artistName, type, genre, summary, origin) =
             }
             return null;
         };
-        let result = await fetchAndValidate(artistName);
+        let result = await fetchAndValidate(cleanArtistName);
         if (!result && origin && origin.trim() !== '') {
             let suffix = (0, exports.extractCountrySlug)(origin).toUpperCase();
             if (suffix === 'GB')
                 suffix = 'UK';
             if (suffix !== 'GLOBAL') {
-                const fallbackName = `${artistName} ${suffix}`;
+                const fallbackName = `${cleanArtistName} ${suffix}`;
                 console.log(`[scrapeImageUrlBackend] Primary query failed. Triggering geographic fallback: ${fallbackName}`);
                 result = await fetchAndValidate(fallbackName);
             }

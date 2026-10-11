@@ -1,14 +1,16 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
-import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { 
   GEMINI_FLASH_MODEL, 
   normalizeArtistId, 
   normalizeLabelId, 
   titleCaseArtistId,
   extractCleanJsonString,
-  scrapeImageUrlBackend
+  scrapeImageUrlBackend,
+  NODE_DETAILS_SCHEMA,
+  FETCH_NODE_DETAILS_PROMPT_TEMPLATE
 } from "./services/curatorService";
 import { stripCountrySlug } from "./executeCurationPipeline";
 
@@ -22,72 +24,6 @@ try {
 } catch (e) {
   // Ignore if already configured
 }
-
-const HEAL_ENTITY_SCHEMA = {
-  type: Type.OBJECT,
-  properties: {
-    summary: {
-      type: Type.STRING,
-      description: "A scannable bio (approx. 100-150 words) using Markdown: short paragraphs (2-3 short sentences), bolding for key terms, and bullet points where appropriate for lists/hallmarks. Written in an authentic, vivid late-night record curator voice focusing on sonic style, scene lineage, and countercultural significance."
-    },
-    recommendationReason: {
-      type: Type.STRING,
-      description: "A 1-2 sentence curator insight explaining why this artist or label matters to their genre and musical era, focusing strictly on intrinsic artistic contributions."
-    },
-    details: {
-      type: Type.OBJECT,
-      properties: {
-        artist: {
-          type: Type.STRING,
-          description: "Canonical professional name of the artist or record label."
-        },
-        genre: {
-          type: Type.STRING,
-          description: "Primary musical genres associated with the artist or label."
-        },
-        origin: {
-          type: Type.STRING,
-          description: "City and/or country of origin (e.g. 'London, UK', 'New York, USA')."
-        },
-        founded: {
-          type: Type.STRING,
-          description: "Year formed or founded (YYYY) or active decade."
-        },
-        notableArtists: {
-          type: Type.ARRAY,
-          items: { type: Type.STRING },
-          description: "Key artists associated with or signed to this label (or peer artists for an artist)."
-        }
-      },
-      required: ["artist", "genre", "origin", "founded"]
-    },
-    discography: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          albumName: { type: Type.STRING },
-          releaseYear: { type: Type.STRING }
-        },
-        required: ["albumName", "releaseYear"]
-      },
-      description: "Notable defining releases or key catalog albums."
-    },
-    links: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          title: { type: Type.STRING },
-          url: { type: Type.STRING }
-        },
-        required: ["title", "url"]
-      },
-      description: "External reference links (e.g., official website, Wikipedia, Discogs search)."
-    }
-  },
-  required: ["summary", "details", "discography"]
-};
 
 export const healOrphanedAsset = onCall({
   secrets: ["GEMINI_API_KEY"],
@@ -146,18 +82,35 @@ export const healOrphanedAsset = onCall({
 
     console.log(`[JIT Healer] Initiating full-parity synthesis for ${entityType}: "${canonicalId}" (raw: "${entityId}") using ${GEMINI_FLASH_MODEL}...`);
 
-    // 2. Synthesize missing entity via Gemini 3.6 Flash (ThinkingLevel.MINIMAL) with Rule 24 late-night curator persona
+    // 2. Synthesize missing entity via Gemini 3.6 Flash (ThinkingLevel.LOW) with exact Column 3 prompt and schema parity
     const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: 60000 } });
-    const prompt = `Synthesize archival profile data for the ${entityType} "${displayName || canonicalId}" (ID: ${canonicalId}${countrySlug ? `, origin country: ${countrySlug}` : ''}). Provide an authentic, insightful late-night curator breakdown with historical context, notable roster/releases, and scene impact.`;
+    const cleanSearchName = displayName || titleCaseArtistId(stripCountrySlug(canonicalId));
+    const currentDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const originHint = countrySlug 
+      ? (countrySlug.toUpperCase() === 'US' ? 'United States' : countrySlug.toUpperCase() === 'GB' ? 'United Kingdom' : countrySlug.toUpperCase()) 
+      : null;
+
+    let prompt = FETCH_NODE_DETAILS_PROMPT_TEMPLATE
+      .replace('{{nodeIdentifier}}', cleanSearchName)
+      .replace('{{nodeType}}', entityType)
+      .replace('{{contextNodes}}', '')
+      .replace(/{{currentDate}}/g, currentDate);
+
+    if (originHint) {
+      prompt = prompt.replace(/{{#if originHint}}[\s\S]*?{{originHint}}[\s\S]*?{{\/if}}/g, 
+          `- **Origin Hint (CRITICAL):** Details for: ${originHint}.`);
+    } else {
+      prompt = prompt.replace(/{{#if originHint}}[\s\S]*?{{\/if}}/g, '');
+    }
 
     const response = await ai.models.generateContent({
       model: GEMINI_FLASH_MODEL,
       contents: prompt,
       config: {
         systemInstruction: "You are a late-night record curator — the kind of person who pulls an obscure 7\" from a crate at 2am and traces exactly why it matters. Your tone is knowledgeable, vivid, and deeply immersed in musical history and counterculture scenes. Return detailed, factual, and scene-accurate profile information for the given musical entity matching the schema. No markdown formatting outside strings. NEGATIVE CONSTRAINT: NEVER use em-dashes (—) or long hyphens for dramatic effect or clause separation. Use standard editorial punctuation.",
-        thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
         responseMimeType: "application/json",
-        responseSchema: HEAL_ENTITY_SCHEMA
+        responseSchema: NODE_DETAILS_SCHEMA
       }
     });
 
@@ -169,15 +122,21 @@ export const healOrphanedAsset = onCall({
     const cleanedJsonText = extractCleanJsonString(jsonText);
     const synthesizedDetails = JSON.parse(cleanedJsonText);
 
-    const cleanTitle = displayName || synthesizedDetails.details?.artist || titleCaseArtistId(canonicalId);
+    if (!synthesizedDetails.details) {
+      synthesizedDetails.details = {};
+    }
 
-    // 3. [Rule 8 & 37] Rich Media Scraping Integration
+    // Guarantee human-readable artist display name in payload
+    const cleanTitle = (synthesizedDetails.details.artist || cleanSearchName).trim();
+    synthesizedDetails.details.artist = cleanTitle;
+
+    // 3. [Rule 8 & 37] Rich Media Scraping Integration with exact Column 3 fuzzy matching parity
     let scrapedImageUrl: string | null = null;
     if (!isLabel) {
       const searchArtistName = cleanTitle;
       const genre = synthesizedDetails.details?.genre || "";
       const summary = synthesizedDetails.summary || "";
-      const origin = synthesizedDetails.details?.origin || countrySlug || "";
+      const origin = synthesizedDetails.details?.origin || (countrySlug ? countrySlug.toUpperCase() : "");
 
       try {
         scrapedImageUrl = await scrapeImageUrlBackend(

@@ -17,71 +17,6 @@ try {
 catch (e) {
     // Ignore if already configured
 }
-const HEAL_ENTITY_SCHEMA = {
-    type: genai_1.Type.OBJECT,
-    properties: {
-        summary: {
-            type: genai_1.Type.STRING,
-            description: "A scannable bio (approx. 100-150 words) using Markdown: short paragraphs (2-3 short sentences), bolding for key terms, and bullet points where appropriate for lists/hallmarks. Written in an authentic, vivid late-night record curator voice focusing on sonic style, scene lineage, and countercultural significance."
-        },
-        recommendationReason: {
-            type: genai_1.Type.STRING,
-            description: "A 1-2 sentence curator insight explaining why this artist or label matters to their genre and musical era, focusing strictly on intrinsic artistic contributions."
-        },
-        details: {
-            type: genai_1.Type.OBJECT,
-            properties: {
-                artist: {
-                    type: genai_1.Type.STRING,
-                    description: "Canonical professional name of the artist or record label."
-                },
-                genre: {
-                    type: genai_1.Type.STRING,
-                    description: "Primary musical genres associated with the artist or label."
-                },
-                origin: {
-                    type: genai_1.Type.STRING,
-                    description: "City and/or country of origin (e.g. 'London, UK', 'New York, USA')."
-                },
-                founded: {
-                    type: genai_1.Type.STRING,
-                    description: "Year formed or founded (YYYY) or active decade."
-                },
-                notableArtists: {
-                    type: genai_1.Type.ARRAY,
-                    items: { type: genai_1.Type.STRING },
-                    description: "Key artists associated with or signed to this label (or peer artists for an artist)."
-                }
-            },
-            required: ["artist", "genre", "origin", "founded"]
-        },
-        discography: {
-            type: genai_1.Type.ARRAY,
-            items: {
-                type: genai_1.Type.OBJECT,
-                properties: {
-                    albumName: { type: genai_1.Type.STRING },
-                    releaseYear: { type: genai_1.Type.STRING }
-                },
-                required: ["albumName", "releaseYear"]
-            },
-            description: "Notable defining releases or key catalog albums."
-        },
-        links: {
-            type: genai_1.Type.ARRAY,
-            items: {
-                type: genai_1.Type.OBJECT,
-                properties: {
-                    title: { type: genai_1.Type.STRING },
-                    url: { type: genai_1.Type.STRING }
-                },
-                required: ["title", "url"]
-            },
-            description: "External reference links (e.g., official website, Wikipedia, Discogs search)."
-        }
-    },
-    required: ["summary", "details", "discography"]
-};
 exports.healOrphanedAsset = (0, https_1.onCall)({
     secrets: ["GEMINI_API_KEY"],
     timeoutSeconds: 60,
@@ -131,17 +66,32 @@ exports.healOrphanedAsset = (0, https_1.onCall)({
             console.log(`[JIT Healer] Existing doc ${collectionName}/${canonicalId} failed qualification gate (isStub: ${isStub}, hasMedia: ${hasValidMedia}). Overwriting with full synthesis...`);
         }
         console.log(`[JIT Healer] Initiating full-parity synthesis for ${entityType}: "${canonicalId}" (raw: "${entityId}") using ${curatorService_1.GEMINI_FLASH_MODEL}...`);
-        // 2. Synthesize missing entity via Gemini 3.6 Flash (ThinkingLevel.MINIMAL) with Rule 24 late-night curator persona
+        // 2. Synthesize missing entity via Gemini 3.6 Flash (ThinkingLevel.LOW) with exact Column 3 prompt and schema parity
         const ai = new genai_1.GoogleGenAI({ apiKey, httpOptions: { timeout: 60000 } });
-        const prompt = `Synthesize archival profile data for the ${entityType} "${displayName || canonicalId}" (ID: ${canonicalId}${countrySlug ? `, origin country: ${countrySlug}` : ''}). Provide an authentic, insightful late-night curator breakdown with historical context, notable roster/releases, and scene impact.`;
+        const cleanSearchName = displayName || (0, curatorService_1.titleCaseArtistId)((0, executeCurationPipeline_1.stripCountrySlug)(canonicalId));
+        const currentDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+        const originHint = countrySlug
+            ? (countrySlug.toUpperCase() === 'US' ? 'United States' : countrySlug.toUpperCase() === 'GB' ? 'United Kingdom' : countrySlug.toUpperCase())
+            : null;
+        let prompt = curatorService_1.FETCH_NODE_DETAILS_PROMPT_TEMPLATE
+            .replace('{{nodeIdentifier}}', cleanSearchName)
+            .replace('{{nodeType}}', entityType)
+            .replace('{{contextNodes}}', '')
+            .replace(/{{currentDate}}/g, currentDate);
+        if (originHint) {
+            prompt = prompt.replace(/{{#if originHint}}[\s\S]*?{{originHint}}[\s\S]*?{{\/if}}/g, `- **Origin Hint (CRITICAL):** Details for: ${originHint}.`);
+        }
+        else {
+            prompt = prompt.replace(/{{#if originHint}}[\s\S]*?{{\/if}}/g, '');
+        }
         const response = await ai.models.generateContent({
             model: curatorService_1.GEMINI_FLASH_MODEL,
             contents: prompt,
             config: {
                 systemInstruction: "You are a late-night record curator — the kind of person who pulls an obscure 7\" from a crate at 2am and traces exactly why it matters. Your tone is knowledgeable, vivid, and deeply immersed in musical history and counterculture scenes. Return detailed, factual, and scene-accurate profile information for the given musical entity matching the schema. No markdown formatting outside strings. NEGATIVE CONSTRAINT: NEVER use em-dashes (—) or long hyphens for dramatic effect or clause separation. Use standard editorial punctuation.",
-                thinkingConfig: { thinkingLevel: genai_1.ThinkingLevel.MINIMAL },
+                thinkingConfig: { thinkingLevel: genai_1.ThinkingLevel.LOW },
                 responseMimeType: "application/json",
-                responseSchema: HEAL_ENTITY_SCHEMA
+                responseSchema: curatorService_1.NODE_DETAILS_SCHEMA
             }
         });
         const jsonText = response.text?.trim() || "";
@@ -150,14 +100,19 @@ exports.healOrphanedAsset = (0, https_1.onCall)({
         }
         const cleanedJsonText = (0, curatorService_1.extractCleanJsonString)(jsonText);
         const synthesizedDetails = JSON.parse(cleanedJsonText);
-        const cleanTitle = displayName || synthesizedDetails.details?.artist || (0, curatorService_1.titleCaseArtistId)(canonicalId);
-        // 3. [Rule 8 & 37] Rich Media Scraping Integration
+        if (!synthesizedDetails.details) {
+            synthesizedDetails.details = {};
+        }
+        // Guarantee human-readable artist display name in payload
+        const cleanTitle = (synthesizedDetails.details.artist || cleanSearchName).trim();
+        synthesizedDetails.details.artist = cleanTitle;
+        // 3. [Rule 8 & 37] Rich Media Scraping Integration with exact Column 3 fuzzy matching parity
         let scrapedImageUrl = null;
         if (!isLabel) {
             const searchArtistName = cleanTitle;
             const genre = synthesizedDetails.details?.genre || "";
             const summary = synthesizedDetails.summary || "";
-            const origin = synthesizedDetails.details?.origin || countrySlug || "";
+            const origin = synthesizedDetails.details?.origin || (countrySlug ? countrySlug.toUpperCase() : "");
             try {
                 scrapedImageUrl = await (0, curatorService_1.scrapeImageUrlBackend)(searchArtistName, 'artist', genre, summary, origin);
             }
