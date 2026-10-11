@@ -994,10 +994,14 @@ const App: React.FC = () => {
   const [currentProjectOwnerId, setCurrentProjectOwnerId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState<string>('');
   const [projectStatus, setProjectStatus] = useState<string | null>(null);
+  const projectStatusRef = useRef<string | null>(null);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const activeJobIdRef = useRef<string | null>(null);
   const [previousWorkspace, setPreviousWorkspace] = useState<{ view: View; projectId: string | null } | null>(null);
   useEffect(() => { currentViewRef.current = currentView; }, [currentView]);
   useEffect(() => { currentProjectIdRef.current = currentProjectId; }, [currentProjectId]);
+  useEffect(() => { projectStatusRef.current = projectStatus; }, [projectStatus]);
+  useEffect(() => { activeJobIdRef.current = activeJobId; }, [activeJobId]);
 
   // One-time startup database migration for 'needtobreathe' collision resolution
   useEffect(() => {
@@ -2437,10 +2441,14 @@ const App: React.FC = () => {
       isArtistIdMatch(n.id, node.id)
     );
 
-    // Gate B (Direct User Interaction on Rendered Nodes):
-    // If the node exists in the rendered graph but is missing from both local detailsCache and global Firestore,
-    // trigger the JIT Healer to synthesize this missing asset on-demand per Rule 37.
-    if (isNodeInGraph && (!globalDoc || !globalDoc.exists() || !globalDoc.data()?.detailsCache)) {
+    // Gate B (Direct User Interaction on Rendered Nodes - Rule 37):
+    // Trigger on-demand JIT healing ONLY if the clicked node is genuinely missing from:
+    // 1. In-memory local cache (detailsCacheRef / cachedDetails)
+    // 2. Global Firestore collection
+    // 3. And curation pipeline is NOT currently active (Generation Kill Switch)
+    const hasValidLocalDetails = cachedDetails && cachedDetails.summary && cachedDetails.summary.trim().length >= 5 && !cachedDetails._isSentinel;
+    const isCurrentlyCurating = projectStatusRef.current === 'curating' || !!activeJobIdRef.current || projectStatus === 'curating' || !!activeJobId;
+    if (isNodeInGraph && !hasValidLocalDetails && (!globalDoc || !globalDoc.exists() || !globalDoc.data()?.detailsCache) && !isCurrentlyCurating) {
       const entityType = node.type === 'label' ? 'label' : 'artist';
       console.log(`[Gate B JIT Healer] Triggering on-demand heal for clicked node: ${disambiguatedCacheId} (${entityType})`);
       triggerAssetHealing(disambiguatedCacheId, entityType).then(result => {
@@ -5081,6 +5089,22 @@ const App: React.FC = () => {
           cacheId = simpleId.endsWith(`-${countryNorm}`) ? simpleId : `${simpleId}-${countryNorm}`;
         }
       }
+
+      // ── GUARDRAIL 1: LOCAL PAYLOAD PRE-CHECK (V22 Architecture) ───────────
+      // If the node's profile is already present in local memory (e.g. delivered
+      // via the project document's detailsCache), it is NOT orphaned.
+      // Bypass the global database probe and NEVER trigger the JIT Healer.
+      const localExisting = detailsCacheRef.current.get(cacheId) ||
+                            detailsCacheRef.current.get(simpleId) ||
+                            detailsCacheRef.current.get(n.id) ||
+                            detailsCacheRef.current.get(n.id.toLowerCase());
+      if (localExisting && localExisting.summary && localExisting.summary.trim().length >= 5 && !localExisting._isSentinel) {
+        results.set(n.id, localExisting);
+        results.set(n.id.toLowerCase(), localExisting);
+        results.set(simpleId, localExisting);
+        if (cacheId !== simpleId) results.set(cacheId, localExisting);
+        return;
+      }
       
       try {
         let snap = await getEntityDocWithRedirect(cacheId, n.type === 'label' ? 'label' : 'artist');
@@ -5107,8 +5131,21 @@ const App: React.FC = () => {
         }
 
         if (!snap.exists()) {
+          // ── GUARDRAIL 2: GENERATION KILL SWITCH (Rule 37 / Node 7 Lock) ─────
+          // Never fire JIT Healing during project curation or while an active curation job is pending.
+          // Column 3 is actively generating and caching these deep cuts.
+          const isCurrentlyCurating = projectStatusRef.current === 'curating' ||
+                                      !!activeJobIdRef.current ||
+                                      projectStatus === 'curating' ||
+                                      !!activeJobId;
+          if (isCurrentlyCurating) {
+            console.log(`[Gate A JIT Healer Guard] Suppressing heal for ${cacheId} — curation pipeline active (curating/job).`);
+            return;
+          }
+
           // Gate A (Post-Generation Eager Batch Hydration):
-          // Trigger JIT Healer ONLY for verified orphaned nodes present in the finalized graph data.
+          // Trigger JIT Healer ONLY for verified orphaned nodes present in finalized graph data
+          // once Column 3 has fully completed and released the lock.
           const entityType = n.type === 'label' ? 'label' : 'artist';
           console.log(`[Gate A JIT Healer] Triggering silent heal for orphaned graph node: ${cacheId} (${entityType})`);
           triggerAssetHealing(cacheId, entityType).then(result => {
