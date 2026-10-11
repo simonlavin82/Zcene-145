@@ -6,6 +6,7 @@ const app_1 = require("firebase-admin/app");
 const firestore_1 = require("firebase-admin/firestore");
 const genai_1 = require("@google/genai");
 const curatorService_1 = require("./services/curatorService");
+const executeCurationPipeline_1 = require("./executeCurationPipeline");
 if ((0, app_1.getApps)().length === 0) {
     (0, app_1.initializeApp)();
 }
@@ -92,10 +93,11 @@ exports.healOrphanedAsset = (0, https_1.onCall)({
     }
     // [Rule 36] Strict Taxonomy Normalization
     let canonicalId = (0, curatorService_1.normalizeArtistId)(entityId);
-    if (entityType === 'label') {
+    const isLabel = entityType === 'label';
+    if (isLabel) {
         canonicalId = (0, curatorService_1.normalizeLabelId)(entityId); // Strips -records, -music, -group, etc.
     }
-    const collectionName = entityType === 'label' ? 'labels' : 'artists';
+    const collectionName = isLabel ? 'labels' : 'artists';
     const docRef = db.collection(collectionName).doc(canonicalId);
     try {
         // 1. Check if canonical doc already exists in Tier 1 storage
@@ -136,18 +138,33 @@ exports.healOrphanedAsset = (0, https_1.onCall)({
         }
         const cleanedJsonText = (0, curatorService_1.extractCleanJsonString)(jsonText);
         const synthesizedDetails = JSON.parse(cleanedJsonText);
-        // 3. Persist single canonical document strictly (No legacy stubs / clean slate per Rule 36)
+        const cleanTitle = displayName || synthesizedDetails.details?.artist || (0, curatorService_1.titleCaseArtistId)(canonicalId);
+        // 3. Persist single canonical document strictly adhering to Tier 1 schema parity
         const canonicalPayload = {
             cacheKey: canonicalId,
-            artistId: canonicalId,
-            name: displayName || synthesizedDetails.details?.artist || (0, curatorService_1.titleCaseArtistId)(canonicalId),
-            detailsCache: JSON.stringify(synthesizedDetails),
+            cacheVersion: 4,
+            seedArtists: cleanTitle,
+            name: cleanTitle,
+            detailsCache: synthesizedDetails, // Native Firestore Map, not stringified JSON
+            graphData: null,
+            filters: null,
+            synthesisRationale: null,
+            isDeep: true,
+            isPrimarySeed: false,
+            hasUniqueSpiderweb: false,
             createdAt: firestore_1.FieldValue.serverTimestamp(),
             updatedAt: firestore_1.FieldValue.serverTimestamp(),
             _healedBy: "JIT_Asset_Healer_V22"
         };
+        // Apply entity-specific root IDs:
+        if (isLabel) {
+            canonicalPayload.labelId = canonicalId; // strictly labelId on labels
+        }
+        else {
+            canonicalPayload.artistId = (0, executeCurationPipeline_1.stripCountrySlug)(canonicalId); // strictly artistId on artists
+        }
         await docRef.set(canonicalPayload, { merge: true });
-        console.log(`[JIT Healer] Successfully healed and persisted Tier 1 asset: ${collectionName}/${canonicalId}`);
+        console.log(`[JIT Healer] Successfully healed and persisted Tier 1 asset with schema parity: ${collectionName}/${canonicalId}`);
         return {
             success: true,
             canonicalId,

@@ -9,6 +9,7 @@ import {
   titleCaseArtistId,
   extractCleanJsonString
 } from "./services/curatorService";
+import { stripCountrySlug } from "./executeCurationPipeline";
 
 if (getApps().length === 0) {
   initializeApp();
@@ -100,11 +101,12 @@ export const healOrphanedAsset = onCall({
 
   // [Rule 36] Strict Taxonomy Normalization
   let canonicalId = normalizeArtistId(entityId);
-  if (entityType === 'label') {
+  const isLabel = entityType === 'label';
+  if (isLabel) {
     canonicalId = normalizeLabelId(entityId); // Strips -records, -music, -group, etc.
   }
 
-  const collectionName = entityType === 'label' ? 'labels' : 'artists';
+  const collectionName = isLabel ? 'labels' : 'artists';
   const docRef = db.collection(collectionName).doc(canonicalId);
 
   try {
@@ -151,19 +153,35 @@ export const healOrphanedAsset = onCall({
     const cleanedJsonText = extractCleanJsonString(jsonText);
     const synthesizedDetails = JSON.parse(cleanedJsonText);
 
-    // 3. Persist single canonical document strictly (No legacy stubs / clean slate per Rule 36)
-    const canonicalPayload = {
+    const cleanTitle = displayName || synthesizedDetails.details?.artist || titleCaseArtistId(canonicalId);
+
+    // 3. Persist single canonical document strictly adhering to Tier 1 schema parity
+    const canonicalPayload: Record<string, any> = {
       cacheKey: canonicalId,
-      artistId: canonicalId,
-      name: displayName || synthesizedDetails.details?.artist || titleCaseArtistId(canonicalId),
-      detailsCache: JSON.stringify(synthesizedDetails),
+      cacheVersion: 4,
+      seedArtists: cleanTitle,
+      name: cleanTitle,
+      detailsCache: synthesizedDetails, // Native Firestore Map, not stringified JSON
+      graphData: null,
+      filters: null,
+      synthesisRationale: null,
+      isDeep: true,
+      isPrimarySeed: false,
+      hasUniqueSpiderweb: false,
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
       _healedBy: "JIT_Asset_Healer_V22"
     };
 
+    // Apply entity-specific root IDs:
+    if (isLabel) {
+      canonicalPayload.labelId = canonicalId; // strictly labelId on labels
+    } else {
+      canonicalPayload.artistId = stripCountrySlug(canonicalId); // strictly artistId on artists
+    }
+
     await docRef.set(canonicalPayload, { merge: true });
-    console.log(`[JIT Healer] Successfully healed and persisted Tier 1 asset: ${collectionName}/${canonicalId}`);
+    console.log(`[JIT Healer] Successfully healed and persisted Tier 1 asset with schema parity: ${collectionName}/${canonicalId}`);
 
     return {
       success: true,
