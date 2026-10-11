@@ -1,4 +1,5 @@
-import { db } from './firebase';
+import { db, functions } from './firebase';
+import { httpsCallable } from 'firebase/functions';
 import {
   doc,
   getDoc,
@@ -9,6 +10,49 @@ import {
   DocumentSnapshot,
 } from 'firebase/firestore';
 import { GraphData, Node, Link, ArtistCacheEntry, DiscoveryFilters, NodeDetails } from '../types';
+
+// ─── JIT ASSET HEALER DEDUPLICATION & COOLDOWN (V22) ──────────────────────────
+const healingInFlight = new Set<string>();
+const healingCooldown = new Map<string, number>(); // 5-minute negative cache cooldown
+
+/**
+ * Triggers lightweight JIT Asset Healing via Cloud Function without blocking UI rendering.
+ */
+export const triggerAssetHealing = async (
+  rawId: string,
+  entityType: 'artist' | 'label',
+  displayName?: string
+): Promise<any | null> => {
+  const normId = entityType === 'label' ? normalizeLabelId(rawId) : normalizeArtistId(rawId);
+  const cacheKey = `${entityType}:${normId}`;
+  const now = Date.now();
+
+  // Deduplication lock: skip if healing is already in-flight
+  if (healingInFlight.has(cacheKey)) return null;
+
+  // Negative cache cooldown: skip if recently failed within 5 minutes
+  const lastFailed = healingCooldown.get(cacheKey);
+  if (lastFailed && now - lastFailed < 300_000) return null;
+
+  healingInFlight.add(cacheKey);
+
+  try {
+    const healCallable = httpsCallable(functions, 'healOrphanedAsset');
+    const result: any = await healCallable({
+      entityId: normId,
+      entityType,
+      displayName: displayName || normId
+    });
+
+    healingInFlight.delete(cacheKey);
+    return result?.data;
+  } catch (err) {
+    healingInFlight.delete(cacheKey);
+    healingCooldown.set(cacheKey, now);
+    console.warn(`[JIT Healer] Background dispatch failed for ${cacheKey}:`, err);
+    return null;
+  }
+};
 
 // ─── UTILITIES ────────────────────────────────────────────────────────────────
 
@@ -1145,6 +1189,24 @@ export const getEntityDocWithRedirect = async (
         }
       }
       
+      // Asynchronous non-blocking JIT Asset Healing trigger (Box 7 -> Column 3)
+      triggerAssetHealing(entityId, entityType as 'artist' | 'label').then(result => {
+        if (result?.success && result?.data) {
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('zcene:asset-healed', {
+              detail: {
+                entityId,
+                canonicalId: result.canonicalId,
+                entityType,
+                payload: result.data
+              }
+            }));
+          }
+        }
+      }).catch(err => {
+        console.warn(`[JIT Healer Trigger Error] ${entityId}:`, err);
+      });
+
       console.warn(`[Proxy Fetch] Expected cache miss for ${entityId}, returning proper miss fallback.`);
       return {
         exists: () => false,

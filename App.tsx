@@ -1527,6 +1527,100 @@ const App: React.FC = () => {
     return () => window.removeEventListener('resize', updateSize);
   }, []);
 
+  // JIT Asset Healer Reactive UI Rehydration (V22)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const handleAssetHealed = (event: Event) => {
+      const customEvent = event as CustomEvent<{
+        entityId: string;
+        canonicalId: string;
+        entityType: 'artist' | 'label';
+        payload: any;
+      }>;
+      const { entityId, canonicalId, payload } = customEvent.detail || {};
+      if (!payload) return;
+
+      console.log(`[JIT Rehydration] Healed asset received: ${entityId} → ${canonicalId}`);
+
+      const bio = payload.summary || payload.bio || "";
+      const genre = payload.details?.genre || "";
+      const origin = payload.details?.origin || "";
+      const founded = payload.details?.founded || "";
+      const artistName = payload.details?.artist || payload.name || entityId;
+      const imageUrl = payload.imageUrl || "";
+
+      const normalizedPayload: NodeDetails = {
+        summary: bio,
+        imageUrl,
+        details: {
+          artist: artistName,
+          genre,
+          origin,
+          founded,
+          notableArtists: payload.details?.notableArtists || []
+        },
+        members: payload.members || [],
+        links: payload.links || [],
+        discography: payload.discography || [],
+        tourInfo: payload.tourInfo || "",
+        recommendationReason: payload.recommendationReason || "",
+        groundingLinks: payload.groundingLinks || [],
+        youtubeVideoId: payload.youtubeVideoId,
+        youtubeSearchQuery: payload.youtubeSearchQuery,
+        synthesisRationale: payload.synthesisRationale || ""
+      };
+
+      // 1. Synchronously update ref cache across all ID variants
+      const keysToRegister = [
+        entityId,
+        entityId.toLowerCase(),
+        canonicalId,
+        canonicalId.toLowerCase(),
+        normalizeArtistId(entityId),
+        normalizeArtistId(canonicalId)
+      ];
+
+      keysToRegister.forEach(k => {
+        detailsCacheRef.current.set(k, normalizedPayload);
+      });
+
+      // 2. Reactively update detailsCache state
+      setDetailsCache(prev => {
+        const next = new Map(prev);
+        keysToRegister.forEach(k => next.set(k, normalizedPayload));
+        return next;
+      });
+
+      // 3. Reactively update selectedNode if user is actively viewing the healed node
+      setSelectedNode(prev => {
+        if (!prev) return prev;
+        const prevNorm = normalizeArtistId(prev.id);
+        const entityNorm = normalizeArtistId(entityId);
+        const canonicalNorm = normalizeArtistId(canonicalId);
+
+        if (prev.id === entityId || prev.id === canonicalId || prevNorm === entityNorm || prevNorm === canonicalNorm) {
+          console.log(`[JIT Rehydration] Live updating selectedNode in DetailsPanel: ${prev.id}`);
+          return {
+            ...prev,
+            bio,
+            summary: bio,
+            genre: genre || prev.genre,
+            origin: origin || prev.origin,
+            founded: founded || prev.founded,
+            name: artistName || prev.name,
+            imageUrl: imageUrl || prev.imageUrl,
+            isLibrary: true
+          };
+        }
+        return prev;
+      });
+    };
+
+    window.addEventListener('zcene:asset-healed', handleAssetHealed);
+    return () => window.removeEventListener('zcene:asset-healed', handleAssetHealed);
+  }, []);
+
   const abortControllerRef = useRef<AbortController | null>(null);
   const lastProcessedSeedsRef = useRef<string | null>(null);
   const isFetchingDetailsRef = useRef<boolean>(false);
