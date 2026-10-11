@@ -856,7 +856,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                     </div>
                                     <div>
                                         <span className="text-zinc-500 block text-[10px] uppercase">Total Cost</span>
-                                        <span className="text-primary font-bold">${jitHeals.reduce((acc, h) => acc + h.costUsd, 0).toFixed(5)}</span>
+                                        <span className="text-red-400 font-bold font-mono">${jitHeals.reduce((acc, h) => acc + h.costUsd, 0).toFixed(5)}</span>
                                     </div>
                                 </div>
                             </div>
@@ -915,7 +915,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                                         <td className="p-3.5 text-xs text-right font-mono text-zinc-400">
                                                             {heal.totalTokens.toLocaleString()}
                                                         </td>
-                                                        <td className="p-3.5 text-xs text-right font-mono text-primary font-bold">
+                                                        <td className="p-3.5 text-xs text-right font-mono text-red-400 font-bold">
                                                             ${heal.costUsd.toFixed(5)}
                                                         </td>
                                                     </tr>

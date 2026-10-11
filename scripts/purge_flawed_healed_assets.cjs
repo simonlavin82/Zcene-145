@@ -15,40 +15,67 @@ const db = getFirestore();
 async function purgeFlawedHealedAssets(dryRun = true) {
   console.log(`\n======================================================`);
   console.log(`Targeted Purge Scan (Mode: ${dryRun ? 'DRY-RUN' : 'LIVE PURGE'})`);
-  console.log(`Query: _healedBy == "JIT_Asset_Healer_V22"`);
+  console.log(`Targets:`);
+  console.log(`  1. _healedBy == "JIT_Asset_Healer_V22"`);
+  console.log(`  2. _isStub == true`);
+  console.log(`  3. Explicit legacy stubs (artists/darko, artists/radiohead)`);
   console.log(`======================================================\n`);
 
   const collections = ['labels', 'artists'];
-  let totalFound = 0;
-  const docsToDelete = [];
+  const docsToDeleteMap = new Map();
 
+  // 1. Scan for _healedBy == "JIT_Asset_Healer_V22"
   for (const collName of collections) {
     const snap = await db.collection(collName)
       .where('_healedBy', '==', 'JIT_Asset_Healer_V22')
       .get();
 
-    console.log(`Checked '${collName}': Found ${snap.size} document(s) tagged for healing.`);
+    console.log(`Checked '${collName}' for _healedBy: Found ${snap.size} document(s).`);
 
     snap.docs.forEach(doc => {
-      totalFound++;
-      const data = doc.data();
-      const isStringified = typeof data.detailsCache === 'string';
-      const hasArtistIdOnLabel = collName === 'labels' && !!data.artistId;
-      const isMissingCacheVersion = data.cacheVersion !== 4;
-
-      console.log(`  - [FLAGGED] ${collName}/${doc.id}`);
-      console.log(`    Disparities: [stringifiedJSON: ${isStringified}, missingCacheVersion: ${isMissingCacheVersion}, artistIdOnLabel: ${hasArtistIdOnLabel}]`);
-
-      docsToDelete.push(doc.ref);
+      console.log(`  - [FLAGGED _healedBy] ${collName}/${doc.id}`);
+      docsToDeleteMap.set(doc.ref.path, doc.ref);
     });
   }
 
-  console.log(`\nScan Complete: ${totalFound} corrupted document(s) identified across Tier 1.`);
+  // 2. Scan for _isStub == true
+  for (const collName of collections) {
+    const snap = await db.collection(collName)
+      .where('_isStub', '==', true)
+      .get();
+
+    console.log(`Checked '${collName}' for _isStub: Found ${snap.size} document(s).`);
+
+    snap.docs.forEach(doc => {
+      console.log(`  - [FLAGGED _isStub] ${collName}/${doc.id}`);
+      docsToDeleteMap.set(doc.ref.path, doc.ref);
+    });
+  }
+
+  // 3. Explicit legacy stubs
+  const explicitDocs = [
+    { coll: 'artists', id: 'darko' },
+    { coll: 'artists', id: 'radiohead' }
+  ];
+
+  for (const item of explicitDocs) {
+    const docRef = db.collection(item.coll).doc(item.id);
+    const snap = await docRef.get();
+    if (snap.exists) {
+      console.log(`  - [FLAGGED explicit] ${item.coll}/${item.id} (exists: true, isStub: ${snap.data()?._isStub})`);
+      docsToDeleteMap.set(docRef.path, docRef);
+    }
+  }
+
+  const totalFound = docsToDeleteMap.size;
+  console.log(`\nScan Complete: ${totalFound} unique document(s) identified for purge.`);
 
   if (totalFound === 0) {
-    console.log(`No corrupted documents found.\n`);
+    console.log(`No matching documents found.\n`);
     return;
   }
+
+  const docsToDelete = Array.from(docsToDeleteMap.values());
 
   if (dryRun) {
     console.log(`\nDRY-RUN ONLY: 0 documents deleted.`);
@@ -56,10 +83,14 @@ async function purgeFlawedHealedAssets(dryRun = true) {
     console.log(`node scripts/purge_flawed_healed_assets.cjs --execute\n`);
   } else {
     console.log(`\nExecuting batch delete for ${docsToDelete.length} document(s)...`);
-    const batch = db.batch();
-    docsToDelete.forEach(ref => batch.delete(ref));
-    await batch.commit();
-    console.log(`SUCCESS: Permanently purged ${docsToDelete.length} corrupted document(s).\n`);
+    // Firestore batch limit is 500
+    for (let i = 0; i < docsToDelete.length; i += 400) {
+      const chunk = docsToDelete.slice(i, i + 400);
+      const batch = db.batch();
+      chunk.forEach(ref => batch.delete(ref));
+      await batch.commit();
+    }
+    console.log(`SUCCESS: Permanently purged ${docsToDelete.length} document(s).\n`);
   }
 }
 

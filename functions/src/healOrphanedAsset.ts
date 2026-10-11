@@ -7,7 +7,8 @@ import {
   normalizeArtistId, 
   normalizeLabelId, 
   titleCaseArtistId,
-  extractCleanJsonString
+  extractCleanJsonString,
+  scrapeImageUrlBackend
 } from "./services/curatorService";
 import { stripCountrySlug } from "./executeCurationPipeline";
 
@@ -27,7 +28,11 @@ const HEAL_ENTITY_SCHEMA = {
   properties: {
     summary: {
       type: Type.STRING,
-      description: "Rich, engaging 2-3 paragraph biography/history of the artist or record label written in a late-night curator voice. Minimum 50 words."
+      description: "A scannable bio (approx. 100-150 words) using Markdown: short paragraphs (2-3 short sentences), bolding for key terms, and bullet points where appropriate for lists/hallmarks. Written in an authentic, vivid late-night record curator voice focusing on sonic style, scene lineage, and countercultural significance."
+    },
+    recommendationReason: {
+      type: Type.STRING,
+      description: "A 1-2 sentence curator insight explaining why this artist or label matters to their genre and musical era, focusing strictly on intrinsic artistic contributions."
     },
     details: {
       type: Type.OBJECT,
@@ -110,27 +115,38 @@ export const healOrphanedAsset = onCall({
   const docRef = db.collection(collectionName).doc(canonicalId);
 
   try {
-    // 1. Check if canonical doc already exists in Tier 1 storage
+    // 1. [Rule 8 & 37] Cache Qualification Gate: Reject and overwrite stubs or incomplete payloads
     const existingSnap = await docRef.get();
     if (existingSnap.exists) {
       const existingData = existingSnap.data();
+      const isStub = existingData?._isStub === true || !!existingData?.redirectTo;
+      let cachedDetails: any = null;
       if (existingData?.detailsCache) {
-        let parsed;
         try {
-          parsed = typeof existingData.detailsCache === 'string'
+          cachedDetails = typeof existingData.detailsCache === 'string'
             ? JSON.parse(existingData.detailsCache)
             : existingData.detailsCache;
         } catch (e) {
-          parsed = existingData.detailsCache;
+          cachedDetails = existingData.detailsCache;
         }
-        console.log(`[JIT Healer] Entity ${collectionName}/${canonicalId} already exists in Firestore. Returning cached record.`);
-        return { success: true, canonicalId, alreadyExisted: true, data: parsed };
       }
+
+      // Rule 8 Qualification Gate: Must have bio > 50 chars, genre, and (for artists) valid non-empty imageUrl
+      const hasSubstantialBio = typeof cachedDetails?.summary === 'string' && cachedDetails.summary.length > 50;
+      const hasGenre = !!cachedDetails?.details?.genre;
+      const hasValidMedia = isLabel || (typeof cachedDetails?.imageUrl === 'string' && cachedDetails.imageUrl.length > 0 && cachedDetails.imageUrl !== 'not-found');
+
+      if (!isStub && hasSubstantialBio && hasGenre && hasValidMedia) {
+        console.log(`[JIT Healer] Complete Tier 1 cache hit for ${collectionName}/${canonicalId}. Bypassing.`);
+        return { success: true, canonicalId, alreadyExisted: true, data: cachedDetails };
+      }
+
+      console.log(`[JIT Healer] Existing doc ${collectionName}/${canonicalId} failed qualification gate (isStub: ${isStub}, hasMedia: ${hasValidMedia}). Overwriting with full synthesis...`);
     }
 
-    console.log(`[JIT Healer] Initiating lightweight synthesis for ${entityType}: "${canonicalId}" (raw: "${entityId}") using ${GEMINI_FLASH_MODEL}...`);
+    console.log(`[JIT Healer] Initiating full-parity synthesis for ${entityType}: "${canonicalId}" (raw: "${entityId}") using ${GEMINI_FLASH_MODEL}...`);
 
-    // 2. Synthesize missing entity via Gemini 3.6 Flash (ThinkingLevel.MINIMAL)
+    // 2. Synthesize missing entity via Gemini 3.6 Flash (ThinkingLevel.MINIMAL) with Rule 24 late-night curator persona
     const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: 60000 } });
     const prompt = `Synthesize archival profile data for the ${entityType} "${displayName || canonicalId}" (ID: ${canonicalId}${countrySlug ? `, origin country: ${countrySlug}` : ''}). Provide an authentic, insightful late-night curator breakdown with historical context, notable roster/releases, and scene impact.`;
 
@@ -138,7 +154,7 @@ export const healOrphanedAsset = onCall({
       model: GEMINI_FLASH_MODEL,
       contents: prompt,
       config: {
-        systemInstruction: "You are a music archivist and late-night record curator. Return detailed, factual, and scene-accurate profile information for the given musical entity matching the schema. No markdown formatting outside strings. Do NOT use em-dashes.",
+        systemInstruction: "You are a late-night record curator — the kind of person who pulls an obscure 7\" from a crate at 2am and traces exactly why it matters. Your tone is knowledgeable, vivid, and deeply immersed in musical history and counterculture scenes. Return detailed, factual, and scene-accurate profile information for the given musical entity matching the schema. No markdown formatting outside strings. NEGATIVE CONSTRAINT: NEVER use em-dashes (—) or long hyphens for dramatic effect or clause separation. Use standard editorial punctuation.",
         thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
         responseMimeType: "application/json",
         responseSchema: HEAL_ENTITY_SCHEMA
@@ -155,13 +171,37 @@ export const healOrphanedAsset = onCall({
 
     const cleanTitle = displayName || synthesizedDetails.details?.artist || titleCaseArtistId(canonicalId);
 
-    // 3. Persist single canonical document strictly adhering to Tier 1 schema parity
+    // 3. [Rule 8 & 37] Rich Media Scraping Integration
+    let scrapedImageUrl: string | null = null;
+    if (!isLabel) {
+      const searchArtistName = cleanTitle;
+      const genre = synthesizedDetails.details?.genre || "";
+      const summary = synthesizedDetails.summary || "";
+      const origin = synthesizedDetails.details?.origin || countrySlug || "";
+
+      try {
+        scrapedImageUrl = await scrapeImageUrlBackend(
+          searchArtistName,
+          'artist',
+          genre,
+          summary,
+          origin
+        );
+      } catch (scrapeErr: any) {
+        console.warn(`[JIT Healer] Image scraper error for "${searchArtistName}":`, scrapeErr.message);
+      }
+      synthesizedDetails.imageUrl = scrapedImageUrl || 'not-found';
+    } else {
+      synthesizedDetails.imageUrl = null;
+    }
+
+    // 4. Persist single canonical document strictly adhering to Tier 1 schema parity
     const canonicalPayload: Record<string, any> = {
       cacheKey: canonicalId,
       cacheVersion: 4,
       seedArtists: cleanTitle,
       name: cleanTitle,
-      detailsCache: synthesizedDetails, // Native Firestore Map, not stringified JSON
+      detailsCache: synthesizedDetails, // Native Firestore Map with scraped imageUrl
       graphData: null,
       filters: null,
       synthesisRationale: null,
@@ -181,7 +221,7 @@ export const healOrphanedAsset = onCall({
     }
 
     await docRef.set(canonicalPayload, { merge: true });
-    console.log(`[JIT Healer] Successfully healed and persisted Tier 1 asset with schema parity: ${collectionName}/${canonicalId}`);
+    console.log(`[JIT Healer] Successfully healed and persisted complete Tier 1 asset with schema parity: ${collectionName}/${canonicalId} (image: ${synthesizedDetails.imageUrl})`);
 
     // 4. Record Telemetry Receipt in Admin Ledger (Phase 3)
     const promptTokens = response.usageMetadata?.promptTokenCount || 0;
