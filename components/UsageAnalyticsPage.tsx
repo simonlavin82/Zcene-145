@@ -3,11 +3,26 @@ import { View, COST_PER_AI_CALL, RADIUS_TOKENS } from '../types';
 import { ZceneLogo } from './Icons';
 import Header from './Header';
 import { db } from '../services/firebase';
-import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, query, orderBy, limit } from 'firebase/firestore';
 import { motion } from 'motion/react';
 import { InfoTooltip } from './ui/InfoTooltip';
 import { AdminViewToggle } from './ui/AdminViewToggle';
 import { cleanArtistDisplayName } from '../services/artistCacheService';
+
+export interface JitHealRecord {
+    id: string;
+    entityId: string;
+    rawEntityId: string;
+    entityType: 'label' | 'artist';
+    displayName: string;
+    callerUid: string;
+    callerEmail: string;
+    totalTokens: number;
+    promptTokens: number;
+    candidatesTokens: number;
+    costUsd: number;
+    timestamp: number;
+}
 
 export interface UserTelemetry {
     email: string;
@@ -542,6 +557,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
     const [expandedRow, setExpandedRow] = useState<string | null>(null);
     const [simulateNormalUser, setSimulateNormalUser] = useState(false);
     const [ledgerData, setLedgerData] = useState<UserTelemetry[]>([]);
+    const [jitHeals, setJitHeals] = useState<JitHealRecord[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -595,6 +611,45 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
             }
             
             setLedgerData(telemetryList);
+
+            // Phase 3: Fetch JIT Auto-Healing Telemetry (Admin View Only)
+            if (isAdmin && !simulateNormalUser) {
+                try {
+                    const healsRef = collection(db, 'adminLedger', 'system', 'jitHeals');
+                    const healsQuery = query(healsRef, orderBy('timestamp', 'desc'), limit(100));
+                    const healsSnap = await getDocs(healsQuery);
+                    const parsedHeals: JitHealRecord[] = healsSnap.docs.map(d => {
+                        const hData = d.data();
+                        let ts = Date.now();
+                        if (hData.timestamp?.toMillis) {
+                            ts = hData.timestamp.toMillis();
+                        } else if (hData.healedAtMs) {
+                            ts = hData.healedAtMs;
+                        } else if (hData.timestamp?.seconds) {
+                            ts = hData.timestamp.seconds * 1000;
+                        }
+                        return {
+                            id: d.id,
+                            entityId: hData.entityId || d.id,
+                            rawEntityId: hData.rawEntityId || hData.entityId || d.id,
+                            entityType: hData.entityType || 'artist',
+                            displayName: hData.displayName || hData.entityId || d.id,
+                            callerUid: hData.callerUid || 'anonymous',
+                            callerEmail: hData.callerEmail || 'guest@zcene.online',
+                            totalTokens: hData.totalTokens || 0,
+                            promptTokens: hData.promptTokens || 0,
+                            candidatesTokens: hData.candidatesTokens || 0,
+                            costUsd: hData.costUsd || 0,
+                            timestamp: ts
+                        };
+                    });
+                    setJitHeals(parsedHeals);
+                } catch (healErr: any) {
+                    console.warn("[UsageAnalyticsPage] Could not query JIT heals collection:", healErr.message);
+                }
+            } else {
+                setJitHeals([]);
+            }
         } catch (err: any) {
             console.error("Error fetching ledger data:", err);
             setError("Failed to query discovery archive: " + (err.message || String(err)));
@@ -773,6 +828,105 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                         expandedRow={expandedRow}
                         toggleRow={toggleRow}
                     />
+
+                    {/* JIT Auto-Healing Telemetry (Phase 3 Admin Exclusive) */}
+                    {!isNormalUserView && (
+                        <div className="space-y-4 pt-6">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-3">
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-xl font-medium text-white">JIT Auto-Healing Telemetry</h3>
+                                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-950/60 border border-emerald-500/40 text-emerald-400">
+                                            Active
+                                        </span>
+                                    </div>
+                                    <p className="text-zinc-500 text-xs mt-1">
+                                        Real-time receipts of missing global assets synthesized on-the-fly via Gemini 3.6 Flash.
+                                    </p>
+                                </div>
+
+                                <div className="flex items-center gap-6 font-mono text-xs">
+                                    <div>
+                                        <span className="text-zinc-500 block text-[10px] uppercase">Healed Assets</span>
+                                        <span className="text-white font-bold">{jitHeals.length}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-zinc-500 block text-[10px] uppercase">Total Tokens</span>
+                                        <span className="text-zinc-300 font-bold">{jitHeals.reduce((acc, h) => acc + h.totalTokens, 0).toLocaleString()}</span>
+                                    </div>
+                                    <div>
+                                        <span className="text-zinc-500 block text-[10px] uppercase">Total Cost</span>
+                                        <span className="text-primary font-bold">${jitHeals.reduce((acc, h) => acc + h.costUsd, 0).toFixed(5)}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="border border-zinc-800 bg-zinc-950/20 overflow-x-auto">
+                                <table className="w-full text-left border-collapse min-w-[700px]">
+                                    <thead>
+                                        <tr className="border-b border-zinc-800 bg-zinc-900/50">
+                                            <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Date</th>
+                                            <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Entity</th>
+                                            <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Type</th>
+                                            <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Triggered By</th>
+                                            <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Tokens</th>
+                                            <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Cost</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {isLoading && jitHeals.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={6} className="p-6 text-center text-zinc-500 text-xs italic">
+                                                    Loading healing receipts...
+                                                </td>
+                                            </tr>
+                                        ) : jitHeals.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={6} className="p-6 text-center text-zinc-500 text-xs italic">
+                                                    No JIT healing events recorded yet.
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            jitHeals.map((heal) => {
+                                                const d = new Date(heal.timestamp);
+                                                const dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ', ' +
+                                                    d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+                                                return (
+                                                    <tr key={heal.id} className="border-b border-zinc-900/60 hover:bg-zinc-900/20 transition-colors">
+                                                        <td className="p-3.5 text-xs text-zinc-400 font-mono">
+                                                            {dateStr}
+                                                        </td>
+                                                        <td className="p-3.5 text-sm text-white font-medium">
+                                                            {heal.displayName}
+                                                            <span className="block text-[11px] font-mono text-zinc-600">{heal.entityId}</span>
+                                                        </td>
+                                                        <td className="p-3.5 text-xs">
+                                                            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
+                                                                heal.entityType === 'label'
+                                                                    ? 'border-teal-500/30 text-teal-400 bg-teal-950/20'
+                                                                    : 'border-purple-500/30 text-purple-400 bg-purple-950/20'
+                                                            }`}>
+                                                                {heal.entityType}
+                                                            </span>
+                                                        </td>
+                                                        <td className="p-3.5 text-xs text-zinc-300">
+                                                            {heal.callerEmail || heal.callerUid}
+                                                        </td>
+                                                        <td className="p-3.5 text-xs text-right font-mono text-zinc-400">
+                                                            {heal.totalTokens.toLocaleString()}
+                                                        </td>
+                                                        <td className="p-3.5 text-xs text-right font-mono text-primary font-bold">
+                                                            ${heal.costUsd.toFixed(5)}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
 
                 </div>
             </main>

@@ -165,6 +165,40 @@ exports.healOrphanedAsset = (0, https_1.onCall)({
         }
         await docRef.set(canonicalPayload, { merge: true });
         console.log(`[JIT Healer] Successfully healed and persisted Tier 1 asset with schema parity: ${collectionName}/${canonicalId}`);
+        // 4. Record Telemetry Receipt in Admin Ledger (Phase 3)
+        const promptTokens = response.usageMetadata?.promptTokenCount || 0;
+        const candidatesTokens = response.usageMetadata?.candidatesTokenCount || 0;
+        const totalTokens = response.usageMetadata?.totalTokenCount || (promptTokens + candidatesTokens);
+        const INPUT_RATE_PER_MILLION = 0.10;
+        const OUTPUT_RATE_PER_MILLION = 0.40;
+        const costUsd = Number(((promptTokens * (INPUT_RATE_PER_MILLION / 1_000_000)) +
+            (candidatesTokens * (OUTPUT_RATE_PER_MILLION / 1_000_000))).toFixed(6));
+        try {
+            const receiptPayload = {
+                timestamp: firestore_1.FieldValue.serverTimestamp(),
+                entityId: canonicalId,
+                rawEntityId: entityId,
+                entityType,
+                displayName: cleanTitle,
+                callerUid: request.auth?.uid || 'anonymous',
+                callerEmail: request.auth?.token?.email || 'guest@zcene.online',
+                model: curatorService_1.GEMINI_FLASH_MODEL,
+                promptTokens,
+                candidatesTokens,
+                totalTokens,
+                costUsd,
+                healedAtMs: Date.now()
+            };
+            await db
+                .collection('adminLedger')
+                .doc('system')
+                .collection('jitHeals')
+                .add(receiptPayload);
+            console.log(`[JIT Healer Telemetry] Recorded receipt for ${canonicalId} (${totalTokens} tokens, $${costUsd})`);
+        }
+        catch (telemetryErr) {
+            console.warn(`[JIT Healer Telemetry] Failed to record receipt for ${canonicalId}:`, telemetryErr.message);
+        }
         return {
             success: true,
             canonicalId,
