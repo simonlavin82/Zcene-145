@@ -640,8 +640,8 @@ export const readArtistCacheMany = async (
       const artistId = normalizeArtistId(name);
       const compositeId = buildCompositeCacheKey(artistId, filters);
       try {
-        // Strict artist-only cache check (allowHealing: true)
-        const snap = await getArtistDocWithRedirect(compositeId, 0, true);
+        // Strict artist-only cache check
+        const snap = await getArtistDocWithRedirect(compositeId);
         if (snap.exists()) {
           const rawData = snap.data() as ArtistCacheEntry;
           // INTEGRITY GATE: skip staging or failed docs — treat as cache miss
@@ -708,8 +708,8 @@ export const readLabelCacheMany = async (
       const labelId = normalizeArtistId(name);
       const compositeId = buildCompositeCacheKey(labelId, filters);
       try {
-        // Strict label-only cache check (allowHealing: true)
-        const snap = await getLabelDocWithRedirect(compositeId, 0, true);
+        // Strict label-only cache check
+        const snap = await getLabelDocWithRedirect(compositeId);
         if (snap.exists()) {
           const rawData = snap.data() as ArtistCacheEntry;
           if (!isCacheDocumentVerified(rawData)) {
@@ -1211,8 +1211,7 @@ export const isCacheExpired = (dataOrTimestamp: any): boolean => {
 export const getEntityDocWithRedirect = async (
   entityId: string,
   entityType = 'artist',
-  depth = 0,
-  allowHealing = true
+  depth = 0
 ): Promise<DocumentSnapshot> => {
   const collName = entityType === 'label' ? 'labels' : 'artists';
   const apiPath = entityType === 'label' ? '/api/label/' : '/api/artist/';
@@ -1248,31 +1247,10 @@ export const getEntityDocWithRedirect = async (
         if (suffixMatch) {
           const bareId = suffixMatch[1];
           console.log(`[Proxy Fetch] Cache miss for ${entityId} — retrying with bare ID: ${bareId}`);
-          return getEntityDocWithRedirect(bareId, entityType, depth + 1, allowHealing);
+          return getEntityDocWithRedirect(bareId, entityType, depth + 1);
         }
       }
       
-      // Asynchronous non-blocking JIT Asset Healing trigger (Box 7 -> Column 3)
-      // Only execute if allowHealing is true (prevent firing inside speculative fallback loops)
-      if (allowHealing) {
-        triggerAssetHealing(entityId, entityType as 'artist' | 'label').then(result => {
-          if (result?.success && result?.data) {
-            if (typeof window !== 'undefined') {
-              window.dispatchEvent(new CustomEvent('zcene:asset-healed', {
-                detail: {
-                  entityId,
-                  canonicalId: result.canonicalId,
-                  entityType,
-                  payload: result.data
-                }
-              }));
-            }
-          }
-        }).catch(err => {
-          console.warn(`[JIT Healer Trigger Error] ${entityId}:`, err);
-        });
-      }
-
       console.warn(`[Proxy Fetch] Expected cache miss for ${entityId}, returning proper miss fallback.`);
       return {
         exists: () => false,
@@ -1292,7 +1270,7 @@ export const getEntityDocWithRedirect = async (
         targetId = match[1];
       }
       console.log(`[Client-Side Redirect Proxy] Redirecting ${entityId} -> ${targetId}`);
-      return getEntityDocWithRedirect(targetId, entityType, depth + 1, allowHealing);
+      return getEntityDocWithRedirect(targetId, entityType, depth + 1);
     }
     
     let canonicalId = entityId;
@@ -1324,24 +1302,21 @@ export const getEntityDocWithRedirect = async (
 
 export const getArtistDocWithRedirect = async (
   artistId: string,
-  depth = 0,
-  allowHealing = true
-): Promise<DocumentSnapshot> => getEntityDocWithRedirect(artistId, 'artist', depth, allowHealing);
+  depth = 0
+): Promise<DocumentSnapshot> => getEntityDocWithRedirect(artistId, 'artist', depth);
 
 export const getLabelDocWithRedirect = async (
   labelId: string,
-  depth = 0,
-  allowHealing = true
-): Promise<DocumentSnapshot> => getEntityDocWithRedirect(labelId, 'label', depth, allowHealing);
+  depth = 0
+): Promise<DocumentSnapshot> => getEntityDocWithRedirect(labelId, 'label', depth);
 
 export const getAnyEntityDocWithRedirect = async (
   entityId: string,
   depth = 0
 ): Promise<DocumentSnapshot> => {
-  // Never fire JIT healing on speculative cross-collection probes
-  let snap = await getArtistDocWithRedirect(entityId, depth, false);
+  let snap = await getArtistDocWithRedirect(entityId, depth);
   if (!snap.exists()) {
-    const labelSnap = await getLabelDocWithRedirect(entityId, depth, false);
+    const labelSnap = await getLabelDocWithRedirect(entityId, depth);
     if (labelSnap.exists()) {
       snap = labelSnap;
     }

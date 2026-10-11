@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { AlertCircle, AlertTriangle, X, CheckCircle2, Key } from 'lucide-react';
 import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project, ArtistCacheEntry, COST_PER_AI_CALL, CanvasNodeRef } from './types';
 import { generateGraphData, fetchNodeDetails, resolveArtistCandidatesViaAI } from './services/geminiService';
-import { normalizeArtistId, readArtistCacheMany, readLabelCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, getEntityDocWithRedirect, getLabelDocWithRedirect, getAnyEntityDocWithRedirect, titleCaseArtistId, cleanArtistDisplayName, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema, stripUndefinedProperties, isNodeInSeedList, extractCountrySlug } from './services/artistCacheService';
+import { normalizeArtistId, readArtistCacheMany, readLabelCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, getEntityDocWithRedirect, getLabelDocWithRedirect, getAnyEntityDocWithRedirect, titleCaseArtistId, cleanArtistDisplayName, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema, stripUndefinedProperties, isNodeInSeedList, extractCountrySlug, triggerAssetHealing } from './services/artistCacheService';
 import { normalizeCountry } from './utils/normalization';
 import { auth, signInWithGoogle, logout, onAuthStateChanged, User, db, functions, handleFirestoreError, OperationType } from './services/firebase';
 import { translateError, translateToast } from './services/errorTranslationLayer';
@@ -2436,6 +2436,30 @@ const App: React.FC = () => {
       normalizeArtistId(n.id) === normalizeArtistId(node.id) || 
       isArtistIdMatch(n.id, node.id)
     );
+
+    // Gate B (Direct User Interaction on Rendered Nodes):
+    // If the node exists in the rendered graph but is missing from both local detailsCache and global Firestore,
+    // trigger the JIT Healer to synthesize this missing asset on-demand per Rule 37.
+    if (isNodeInGraph && (!globalDoc || !globalDoc.exists() || !globalDoc.data()?.detailsCache)) {
+      const entityType = node.type === 'label' ? 'label' : 'artist';
+      console.log(`[Gate B JIT Healer] Triggering on-demand heal for clicked node: ${disambiguatedCacheId} (${entityType})`);
+      triggerAssetHealing(disambiguatedCacheId, entityType).then(result => {
+        if (result?.success && result?.data) {
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('zcene:asset-healed', {
+              detail: {
+                entityId: disambiguatedCacheId,
+                canonicalId: result.canonicalId,
+                entityType,
+                payload: result.data
+              }
+            }));
+          }
+        }
+      }).catch(err => {
+        console.warn(`[Gate B JIT Healer Error] ${disambiguatedCacheId}:`, err);
+      });
+    }
 
     console.log("[DEEP CUT Cache Validity Check]", {
       nodeId: node.id,
@@ -5082,7 +5106,29 @@ const App: React.FC = () => {
           }
         }
 
-        if (!snap.exists()) return;
+        if (!snap.exists()) {
+          // Gate A (Post-Generation Eager Batch Hydration):
+          // Trigger JIT Healer ONLY for verified orphaned nodes present in the finalized graph data.
+          const entityType = n.type === 'label' ? 'label' : 'artist';
+          console.log(`[Gate A JIT Healer] Triggering silent heal for orphaned graph node: ${cacheId} (${entityType})`);
+          triggerAssetHealing(cacheId, entityType).then(result => {
+            if (result?.success && result?.data) {
+              if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('zcene:asset-healed', {
+                  detail: {
+                    entityId: cacheId,
+                    canonicalId: result.canonicalId,
+                    entityType,
+                    payload: result.data
+                  }
+                }));
+              }
+            }
+          }).catch(err => {
+            console.warn(`[Gate A JIT Healer Error] ${cacheId}:`, err);
+          });
+          return;
+        }
 
         const data = snap.data();
         if (!data?.detailsCache) return;

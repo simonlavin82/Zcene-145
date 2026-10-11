@@ -54,8 +54,7 @@ async function purgeFlawedHealedAssets(dryRun = true) {
 
   // 3. Explicit legacy stubs
   const explicitDocs = [
-    { coll: 'artists', id: 'darko' },
-    { coll: 'artists', id: 'radiohead' }
+    { coll: 'artists', id: 'darko' }
   ];
 
   for (const item of explicitDocs) {
