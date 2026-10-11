@@ -145,6 +145,18 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 - **Tier 2: Ephemeral Storage (sharedZcenes):** `createdAt` (Immutable), `expireAt` (+30 Days Hard TTL). `updatedAt` is strictly NULL/Removed (read-only snapshots).
 - **Tier 3: Owned Storage (User Projects):** `createdAt` (Immutable), `updatedAt` (Mutable).
 
+### 30. Strict Hydration Lock
+- **Rule:** Autosave intervals and listeners MUST be suspended via a global lock during generation cycles to prevent race conditions and partial snapshot overwrites.
+
+### 31. Local State Preemption
+- **Rule:** Zero-cost local routing (Direct Hits) must synchronously inject the graph topology into React state before releasing the global lock.
+
+### 32. Validation Circuit Breaker
+- **Rule:** The Phase 3 Validation Modal must act as a hard execution stop/return. Failure or dismissal immediately terminates downstream pipeline execution.
+
+### 33. Payload Completeness
+- **Rule:** Direct Hit local routing must inject both `graphData` and `detailsCache` simultaneously to prevent post-hydration network lookups or blank inspection panels.
+
 ### 34. Cognitive Tiering & Orchestration Stability
 - **Rule:** AI generation strictly utilizes the categorical `thinking_level` parameter (minimal to high) to optimize cost-to-quality ratios based on task complexity. Legacy sampling parameters (`temperature`, `top_p`, `top_k`, and `thinking_budget`) are explicitly forbidden in AI orchestration configurations.
 - **Enforcement:** Deterministic extraction tasks (e.g., origin validation, edge reconciliation) are strictly locked to `minimal` or `low`. Creative narrative synthesis (e.g., Root Breakdowns) requires a `high` thinking level.
