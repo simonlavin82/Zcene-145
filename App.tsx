@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { AlertCircle, AlertTriangle, X, CheckCircle2, Key } from 'lucide-react';
 import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project, ArtistCacheEntry, COST_PER_AI_CALL, CanvasNodeRef } from './types';
 import { generateGraphData, fetchNodeDetails, resolveArtistCandidatesViaAI } from './services/geminiService';
-import { normalizeArtistId, readArtistCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, getEntityDocWithRedirect, getLabelDocWithRedirect, getAnyEntityDocWithRedirect, titleCaseArtistId, cleanArtistDisplayName, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema, stripUndefinedProperties, isNodeInSeedList, extractCountrySlug } from './services/artistCacheService';
+import { normalizeArtistId, readArtistCacheMany, readLabelCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, getEntityDocWithRedirect, getLabelDocWithRedirect, getAnyEntityDocWithRedirect, titleCaseArtistId, cleanArtistDisplayName, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema, stripUndefinedProperties, isNodeInSeedList, extractCountrySlug } from './services/artistCacheService';
 import { normalizeCountry } from './utils/normalization';
 import { auth, signInWithGoogle, logout, onAuthStateChanged, User, db, functions, handleFirestoreError, OperationType } from './services/firebase';
 import { translateError, translateToast } from './services/errorTranslationLayer';
@@ -5467,16 +5467,21 @@ const App: React.FC = () => {
               return true;
             }
 
-            // --- PHASE 1 FORMAT: hydrate from individual per-artist /artists/{id} and /labels/{id} docs ---
-            const allLookupIds = Array.from(new Set([
-              ...(data.artistIds || []),
-              ...(data.labelIds || [])
-            ]));
-            console.log(`[ProjectLoader] Phase 1 format. Hydrating from entity IDs: [${allLookupIds.join(', ')}]`);
-            const { cached, missing } = await readArtistCacheMany(
-              allLookupIds,
-              user?.uid
-            );
+            // --- PHASE 1 FORMAT: type-segregated hydration from individual /artists/{id} and /labels/{id} docs ---
+            const artistLookupIds = Array.from(new Set(data.artistIds || []));
+            const labelLookupIds = Array.from(new Set(data.labelIds || []));
+            console.log(`[ProjectLoader] Phase 1 format. Hydrating segregated entities — Artists: [${artistLookupIds.join(', ')}], Labels: [${labelLookupIds.join(', ')}]`);
+
+            const [artistCacheRes, labelCacheRes] = await Promise.all([
+              artistLookupIds.length > 0 ? readArtistCacheMany(artistLookupIds, user?.uid) : Promise.resolve({ cached: new Map(), missing: [] }),
+              labelLookupIds.length > 0 ? readLabelCacheMany(labelLookupIds, user?.uid) : Promise.resolve({ cached: new Map(), missing: [] })
+            ]);
+
+            const cached = new Map([
+              ...Array.from(artistCacheRes.cached.entries()),
+              ...Array.from(labelCacheRes.cached.entries())
+            ]);
+            const missing = [...artistCacheRes.missing, ...labelCacheRes.missing];
 
             if (!isMounted) return false;
 

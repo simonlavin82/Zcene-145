@@ -640,13 +640,8 @@ export const readArtistCacheMany = async (
       const artistId = normalizeArtistId(name);
       const compositeId = buildCompositeCacheKey(artistId, filters);
       try {
-        let snap = await getArtistDocWithRedirect(compositeId);
-        if (!snap.exists()) {
-          const labelSnap = await getLabelDocWithRedirect(compositeId);
-          if (labelSnap.exists()) {
-            snap = labelSnap;
-          }
-        }
+        // Strict artist-only cache check (allowHealing: true)
+        const snap = await getArtistDocWithRedirect(compositeId, 0, true);
         if (snap.exists()) {
           const rawData = snap.data() as ArtistCacheEntry;
           // INTEGRITY GATE: skip staging or failed docs — treat as cache miss
@@ -675,6 +670,73 @@ export const readArtistCacheMany = async (
         cached.set(name, normalizedEntry);
         cached.set(name.toLowerCase(), normalizedEntry);
         const entityId = normalizedEntry.artistId || (normalizedEntry as any).labelId || normalizedEntry.cacheKey;
+        if (entityId) {
+          cached.set(entityId, normalizedEntry);
+          cached.set(entityId.toLowerCase(), normalizedEntry);
+        }
+      } else {
+        missing.push(name);
+      }
+    }
+  });
+
+  return { cached, missing };
+};
+
+/**
+ * Concurrently reads individual Firestore documents for each requested label.
+ * Returns a split result:
+ *   - `cached`:  Map of labelName → ArtistCacheEntry for every doc that exists
+ *   - `missing`: Array of label names for which no document was found
+ *
+ * Strict label-only cache check, ensuring labels are never checked against the artists collection.
+ */
+export const readLabelCacheMany = async (
+  labelNames: string[],
+  activeUserId?: string | null,
+  filters?: DiscoveryFilters
+): Promise<{ cached: Map<string, ArtistCacheEntry>; missing: string[] }> => {
+  const cached = new Map<string, ArtistCacheEntry>();
+  const missing: string[] = [];
+
+  if (!labelNames || labelNames.length === 0) {
+    return { cached, missing };
+  }
+
+  const results = await Promise.allSettled(
+    labelNames.map(async name => {
+      const labelId = normalizeArtistId(name);
+      const compositeId = buildCompositeCacheKey(labelId, filters);
+      try {
+        // Strict label-only cache check (allowHealing: true)
+        const snap = await getLabelDocWithRedirect(compositeId, 0, true);
+        if (snap.exists()) {
+          const rawData = snap.data() as ArtistCacheEntry;
+          if (!isCacheDocumentVerified(rawData)) {
+            console.log(`[LabelCache] INTEGRITY MISS (not verified): ${compositeId}`);
+            return { name, entry: null };
+          }
+          console.log(`[LabelCache] HIT (Resolved): ${compositeId}`);
+          return { name, entry: rawData };
+        } else {
+          console.log(`[LabelCache] MISS: ${compositeId}`);
+          return { name, entry: null };
+        }
+      } catch (e) {
+        console.warn(`[LabelCache] Read failed for ${compositeId} (non-critical):`, e);
+        return { name, entry: null };
+      }
+    })
+  );
+
+  results.forEach(result => {
+    if (result.status === 'fulfilled' && result.value) {
+      const { name, entry } = result.value;
+      if (entry) {
+        const normalizedEntry = eagerNormalizeCacheEntry(entry);
+        cached.set(name, normalizedEntry);
+        cached.set(name.toLowerCase(), normalizedEntry);
+        const entityId = (normalizedEntry as any).labelId || normalizedEntry.artistId || normalizedEntry.cacheKey;
         if (entityId) {
           cached.set(entityId, normalizedEntry);
           cached.set(entityId.toLowerCase(), normalizedEntry);
@@ -1149,7 +1211,8 @@ export const isCacheExpired = (dataOrTimestamp: any): boolean => {
 export const getEntityDocWithRedirect = async (
   entityId: string,
   entityType = 'artist',
-  depth = 0
+  depth = 0,
+  allowHealing = true
 ): Promise<DocumentSnapshot> => {
   const collName = entityType === 'label' ? 'labels' : 'artists';
   const apiPath = entityType === 'label' ? '/api/label/' : '/api/artist/';
@@ -1185,27 +1248,30 @@ export const getEntityDocWithRedirect = async (
         if (suffixMatch) {
           const bareId = suffixMatch[1];
           console.log(`[Proxy Fetch] Cache miss for ${entityId} — retrying with bare ID: ${bareId}`);
-          return getEntityDocWithRedirect(bareId, entityType, depth + 1);
+          return getEntityDocWithRedirect(bareId, entityType, depth + 1, allowHealing);
         }
       }
       
       // Asynchronous non-blocking JIT Asset Healing trigger (Box 7 -> Column 3)
-      triggerAssetHealing(entityId, entityType as 'artist' | 'label').then(result => {
-        if (result?.success && result?.data) {
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('zcene:asset-healed', {
-              detail: {
-                entityId,
-                canonicalId: result.canonicalId,
-                entityType,
-                payload: result.data
-              }
-            }));
+      // Only execute if allowHealing is true (prevent firing inside speculative fallback loops)
+      if (allowHealing) {
+        triggerAssetHealing(entityId, entityType as 'artist' | 'label').then(result => {
+          if (result?.success && result?.data) {
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('zcene:asset-healed', {
+                detail: {
+                  entityId,
+                  canonicalId: result.canonicalId,
+                  entityType,
+                  payload: result.data
+                }
+              }));
+            }
           }
-        }
-      }).catch(err => {
-        console.warn(`[JIT Healer Trigger Error] ${entityId}:`, err);
-      });
+        }).catch(err => {
+          console.warn(`[JIT Healer Trigger Error] ${entityId}:`, err);
+        });
+      }
 
       console.warn(`[Proxy Fetch] Expected cache miss for ${entityId}, returning proper miss fallback.`);
       return {
@@ -1226,7 +1292,7 @@ export const getEntityDocWithRedirect = async (
         targetId = match[1];
       }
       console.log(`[Client-Side Redirect Proxy] Redirecting ${entityId} -> ${targetId}`);
-      return getEntityDocWithRedirect(targetId, entityType, depth + 1);
+      return getEntityDocWithRedirect(targetId, entityType, depth + 1, allowHealing);
     }
     
     let canonicalId = entityId;
@@ -1258,21 +1324,24 @@ export const getEntityDocWithRedirect = async (
 
 export const getArtistDocWithRedirect = async (
   artistId: string,
-  depth = 0
-): Promise<DocumentSnapshot> => getEntityDocWithRedirect(artistId, 'artist', depth);
+  depth = 0,
+  allowHealing = true
+): Promise<DocumentSnapshot> => getEntityDocWithRedirect(artistId, 'artist', depth, allowHealing);
 
 export const getLabelDocWithRedirect = async (
   labelId: string,
-  depth = 0
-): Promise<DocumentSnapshot> => getEntityDocWithRedirect(labelId, 'label', depth);
+  depth = 0,
+  allowHealing = true
+): Promise<DocumentSnapshot> => getEntityDocWithRedirect(labelId, 'label', depth, allowHealing);
 
 export const getAnyEntityDocWithRedirect = async (
   entityId: string,
   depth = 0
 ): Promise<DocumentSnapshot> => {
-  let snap = await getArtistDocWithRedirect(entityId, depth);
+  // Never fire JIT healing on speculative cross-collection probes
+  let snap = await getArtistDocWithRedirect(entityId, depth, false);
   if (!snap.exists()) {
-    const labelSnap = await getLabelDocWithRedirect(entityId, depth);
+    const labelSnap = await getLabelDocWithRedirect(entityId, depth, false);
     if (labelSnap.exists()) {
       snap = labelSnap;
     }
