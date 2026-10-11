@@ -77,7 +77,7 @@ const ARCHITECTURE_RULES = [
     { id: 27, title: "Multi-Seed Co-Anchoring", desc: "Complex Generations MUST dynamically force the AI to co-anchor the narrative to explore the relationship between all seeds." },
     { id: 28, title: "Canonical Global Caching", desc: "Global caching must use pure canonical IDs. Query filters are barred from document paths to prevent cache fracturing." },
     { id: 29, title: "Universal Payload Serializer", desc: "A Single Source of Truth for generating Zcene payloads. Guarantees 1:1 data parity between Saves, Duplicates, and Shares prior to any ephemeral mutations." },
-    { id: 34, title: "Cognitive Tiering & Orchestration Stability", desc: "AI generation strictly utilizes the thinking_level tier system (minimal to high) to optimize cost-to-quality ratios. Legacy sampling parameters (temperature) are explicitly forbidden." },
+    { id: 34, title: "Cognitive Tiering & Orchestration Stability", desc: "AI generation strictly utilizes the thinking_level tier system (minimal to high) with legacy sampling parameters explicitly forbidden. Discovery Ledger remains pegged to standard list rates ($1.50 / 1M input, $7.50 / 1M output)." },
     { id: 35, title: "Geographic Asset Disambiguation", desc: "If the deterministic iTunes scraper fails to validate an image asset due to a multi-artist name collision or missing legal alias, the background worker must parse the node's parametric origin data, append the relevant regional suffix (e.g., ' US', ' UK'), and execute a secondary validation query." },
     { id: 36, title: "Label Taxonomy Normalization", desc: "The extraction pipeline MUST algorithmically strip interchangeable structural suffixes (e.g., -records, -music, -company, -group, -media) from label entities prior to caching. This enforces the Canonical Persistence Mandate by reducing natural LLM variations to a single, pure root ID." }
 ];
@@ -112,7 +112,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                     <div className="text-white font-medium mb-4">HTTP Fast-Track</div>
                     <ul className="text-[12px] text-zinc-400 space-y-4">
                         <li>
-                            <span className="text-primary font-semibold">Validate Origin (3.5 Flash) | Thinking_level: minimal</span>
+                            <span className="text-primary font-semibold">Validate Origin (3.6 Flash) | Thinking_level: minimal</span>
                             <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500">
                                 <li>Seed origin slug(s) created.</li>
                                 <li>Strips non-standard regional country codes.</li>
@@ -159,7 +159,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                             <span className="text-primary font-medium">Hydrate Node Batch | Thinking_level: low</span>
                             <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500">
                                 <li>Global Cache Hit: Attaches existing Deep Cut.</li>
-                                <li>Miss: Synthesizes via 3.5 Flash & scraper.</li>
+                                <li>Miss: Synthesizes via 3.6 Flash & scraper.</li>
                                 <li>High-Fidelity Cap: Strict limit on gen nodes.</li>
                                 <li>Slug Deduplication actively ignores legacy deep cuts, but injects pre-generated stubs for timed-out Seed Artists.</li>
                             </ul>
@@ -173,13 +173,13 @@ const DiscoveryFlowDiagram: React.FC = () => (
                             </ul>
                         </li>
                         <li>
-                            <span className="text-primary font-medium">Topology Parity (3.5 Flash) | Thinking_level: minimal</span>
+                            <span className="text-primary font-medium">Topology Parity (3.6 Flash) | Thinking_level: minimal</span>
                             <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500">
                                 <li>Parses narrative to mechanically inject any missing structural edges into the graph before final positioning.</li>
                             </ul>
                         </li>
                         <li>
-                            <span className="text-primary font-medium">Final Node Positioning (3.5 Flash) | Thinking_level: minimal</span>
+                            <span className="text-primary font-medium">Final Node Positioning (3.6 Flash) | Thinking_level: minimal</span>
                             <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500">
                                 <li>Evaluates pruned bios and new narrative edges to generate semantic link weights (0.1-1.0).</li>
                                 <li>Graceful Fallback: Injects 0.5 neutral weight on AI failure to preserve UI.</li>

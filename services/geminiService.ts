@@ -820,7 +820,7 @@ export const resolveArtistCandidatesViaAI = async (
     ? window.location.origin + '/api/gemini'
     : 'http://localhost:8080/api/gemini';
 
-  const model = 'gemini-3.5-flash';
+  const model = (typeof process !== 'undefined' && process.env?.GEMINI_FLASH_MODEL) || 'gemini-3.6-flash';
   const targetUrl = `${baseUrl}/v1beta/models/${model}:generateContent`;
 
   const systemInstruction = `You are a music database disambiguation assistant.
@@ -1634,7 +1634,8 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
       }
     };
 
-    const url = `${baseUrl}/v1beta/models/gemini-3.5-flash:generateContent`;
+    const flashModel = (typeof process !== 'undefined' && process.env?.GEMINI_FLASH_MODEL) || 'gemini-3.6-flash';
+    const url = `${baseUrl}/v1beta/models/${flashModel}:generateContent`;
     const password = typeof window !== 'undefined' ? sessionStorage.getItem('zcene_api_password') : null;
     const response = await fetch(url, {
       method: 'POST',

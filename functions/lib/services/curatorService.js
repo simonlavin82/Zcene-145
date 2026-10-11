@@ -1,8 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateSemanticLinkWeights = exports.scrapeImageUrlBackend = exports.checkVideoPlayability = exports.scrapeVideoIdBackend = exports.fetchNodeDetailsBackend = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = exports.NODE_DETAILS_SCHEMA = exports.generateGraphDataBackend = exports.reconcileNarrativeEdges = exports.generateRootsBreakdownBackend = exports.validateSeedOriginBackend = exports.SEED_VALIDATION_SCHEMA = exports.GENERATE_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = exports.GRAPH_RESPONSE_SCHEMA = exports.extractCleanJsonString = exports.extractArtistSubGraph = exports.normalizeGraphData = exports.buildCompositeCacheKey = exports.extractCountrySlug = exports.sanitizeImageUrl = exports.extractValidYoutubeId = exports.titleCaseArtistId = exports.normalizeLabelId = exports.normalizeArtistId = exports.applyCanonicalAlias = exports.CANONICAL_ALIASES = void 0;
+exports.generateSemanticLinkWeights = exports.scrapeImageUrlBackend = exports.checkVideoPlayability = exports.scrapeVideoIdBackend = exports.fetchNodeDetailsBackend = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = exports.NODE_DETAILS_SCHEMA = exports.generateGraphDataBackend = exports.reconcileNarrativeEdges = exports.generateRootsBreakdownBackend = exports.validateSeedOriginBackend = exports.SEED_VALIDATION_SCHEMA = exports.GENERATE_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = exports.GRAPH_RESPONSE_SCHEMA = exports.extractCleanJsonString = exports.extractArtistSubGraph = exports.normalizeGraphData = exports.buildCompositeCacheKey = exports.extractCountrySlug = exports.sanitizeImageUrl = exports.extractValidYoutubeId = exports.titleCaseArtistId = exports.normalizeLabelId = exports.normalizeArtistId = exports.applyCanonicalAlias = exports.CANONICAL_ALIASES = exports.GEMINI_FLASH_MODEL = void 0;
 const genai_1 = require("@google/genai");
 const executeCurationPipeline_1 = require("../executeCurationPipeline");
+exports.GEMINI_FLASH_MODEL = process.env.GEMINI_FLASH_MODEL || "gemini-3.6-flash";
 // --- UTILITIES PORTED FROM artistCacheService.ts ---
 exports.CANONICAL_ALIASES = {
     'lungleg': 'Lung Leg',
@@ -615,7 +616,7 @@ const validateSeedOriginBackend = async (artistId) => {
             throw new Error("GEMINI_API_KEY is not defined in environment secrets.");
         }
         const ai = new genai_1.GoogleGenAI({ apiKey, httpOptions: { timeout: 300000 } });
-        const currentModel = "gemini-3.5-flash"; // Phase 1: Origin Validation uses 3.5 Flash
+        const currentModel = exports.GEMINI_FLASH_MODEL; // Column 2: Origin Validation uses Flash
         const prompt = `Validate this seed artist: "${artistId}".
 
 CRITICAL RULES (non-negotiable):
@@ -761,7 +762,7 @@ exports.generateRootsBreakdownBackend = generateRootsBreakdownBackend;
 const reconcileNarrativeEdges = async (apiKey, narrative, nodes, existingLinks, usageCollector) => {
     if (!narrative || !narrative.trim() || nodes.length === 0)
         return [];
-    const currentModel = "gemini-3.5-flash";
+    const currentModel = exports.GEMINI_FLASH_MODEL;
     const ai = new genai_1.GoogleGenAI({ apiKey, httpOptions: { timeout: 120000 } });
     // Build a deduplicated set of existing edge keys for efficient exclusion
     const existingEdgeSet = new Set(existingLinks.map(l => [l.source, l.target].sort().join('--')));
@@ -1398,7 +1399,7 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint,
         apiKey,
         httpOptions: { timeout: 300000 } // 5 minutes
     });
-    const currentModel = "gemini-3.5-flash";
+    const currentModel = exports.GEMINI_FLASH_MODEL;
     const contextNodes = graphData.links
         .filter(l => (typeof l.source === 'string' ? l.source : l.source.id) === node.id || (typeof l.target === 'string' ? l.target : l.target.id) === node.id)
         .map(l => {
@@ -1615,7 +1616,7 @@ const scrapeVideoIdBackend = async (artistName, artistId) => {
         apiKey,
         httpOptions: { timeout: 300000 } // 5 minutes
     });
-    const currentModel = "gemini-3.5-flash";
+    const currentModel = exports.GEMINI_FLASH_MODEL;
     const prompt = `What is the best official 11-character YouTube video ID for '${artistName}'?
 Return ONLY the 11-character video ID as a plain string. Do not include any JSON, quotes, explanations, markdown, or other text. If you are not highly confident, return "null".`;
     try {
@@ -1784,7 +1785,7 @@ const scrapeImageUrlBackend = async (artistName, type, genre, summary, origin) =
 };
 exports.scrapeImageUrlBackend = scrapeImageUrlBackend;
 const generateSemanticLinkWeights = async (apiKey, detailsCacheEntries, links, usageCollector) => {
-    const currentModel = "gemini-3.5-flash";
+    const currentModel = exports.GEMINI_FLASH_MODEL;
     const ai = new genai_1.GoogleGenAI({ apiKey, httpOptions: { timeout: 300000 } });
     // Map cache to lightweight context
     const evaluationContext = detailsCacheEntries.map(entry => {

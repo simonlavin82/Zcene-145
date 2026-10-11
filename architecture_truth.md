@@ -1,6 +1,6 @@
 # ZCENE ARCHITECTURAL TRUTH & IMMUTABLE LAWS
 
-![Architecture Diagram](./Zcene Architecture V20_4.jpg)
+![Architecture Diagram](./Zcene Architecture V21.jpg)
 
 This document defines the absolute, immutable architectural baseline of Zcene. All future development, bug fixes, and AI agent actions MUST strictly adhere to these laws. Legacy paradigms (like naive string matching or bypass assumptions) are strictly forbidden.
 
@@ -70,7 +70,7 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 - **Rule:** `if (snapData.redirectTo) continue;` is an immutable guard in the slug dedup loop. It must never be removed.
 
 ### 11. Cost-Optimized Parametric Hydration (No Grounding)
-- **Eradication of Google Grounding Surcharge:** Native googleSearch grounding tools MUST remain fully stripped from both the Cloud Run proxy and Firebase Cloud Functions. The architecture relies purely on Gemini 3.5 Flash's parametric memory. This enforcement dropped the real-world cost per 40-node root generation from ~£4.30+ down to an average of ~$0.15 / £0.12 – £0.48.
+- **Eradication of Google Grounding Surcharge:** Native googleSearch grounding tools MUST remain fully stripped from both the Cloud Run proxy and Firebase Cloud Functions. The architecture relies purely on Gemini 3.6 Flash's parametric memory (abstracted via `GEMINI_FLASH_MODEL`). This enforcement dropped the real-world cost per 40-node root generation from ~£4.30+ down to an average of ~$0.15 / £0.12 – £0.48.
 - **Deprecation of external SERP queries:** The legacy `serpService.ts` (Google Custom Search API) has been completely removed to avoid unnecessary third-party API costs ($5 per 1,000 queries), quota limits, and 400 Bad Request errors.
 
 ### 12. Resilient iTunes Artwork Pipeline
@@ -105,14 +105,14 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 - **Enforcement:** The system is strictly forbidden from instantly hydrating the state and bypassing this modal. The Green Line hydration route can only execute after explicit confirmation from the `<DisambiguationModal>`. Legacy components (e.g., `CacheChoiceDialog`) are strictly prohibited.
 ### 21. Locked Semantic Topology & AI Physics Injection
 - **Rule:** D3 node dragging gestures are strictly forbidden. The graph operates as a Locked Semantic Topology to ensure mobile panning remains unobstructed and to preserve the calculated semantic clusters.
-- **Enforcement:** The D3 layout is strictly driven by the 'Final Node Positioning' step via `gemini-3.5-flash`. The AI generates float weights (0.1 to 1.0) using a lean bio payload strategy, which dictate variable link distance, spring rigidity, and collision radii. If the AI model fails or returns an empty array, the pipeline gracefully falls back to injecting a neutral weight of `0.5` across all links to guarantee physics stability.
+- **Enforcement:** The D3 layout is strictly driven by the 'Final Node Positioning' step via `gemini-3.6-flash` (abstracted via `GEMINI_FLASH_MODEL`). The AI generates float weights (0.1 to 1.0) using a lean bio payload strategy, which dictate variable link distance, spring rigidity, and collision radii. If the AI model fails or returns an empty array, the pipeline gracefully falls back to injecting a neutral weight of `0.5` across all links to guarantee physics stability.
 - **Coordinate Memory Sub-Clause (V8):** Once `simulation.on("end")` fires and all nodes are pinned via `fx`/`fy` in memory, the settled artist and label node positions MUST be persisted back to the owned project document (`users/{uid}/projects/{id}`) via a debounced `updateDoc` targeting the `canvasLayout` field only. This is called **Coordinate Memory**. The debounce window is 5 seconds; a dirty-check prevents redundant writes when the layout is unchanged. Coordinate Memory is strictly scoped to authenticated, non-guest, project-owning sessions. The Share Generation and Duplication pathways are explicitly excluded (see Rule 25).
 
 ### 22. (Reserved for future architectural law)
 
 ### 23. Topology Parity Mandate
 - **Rule:** Any stylistic, genre, or scene connection explicitly cited in the Root Breakdown narrative (Step 3.1, `generateRootsBreakdownBackend`) MUST have a corresponding edge entry in `finalGraph.links`.
-- **Enforcement:** A new `reconcileNarrativeEdges()` step (Step 3.2) in Column 3 (`processCurationJob.ts`) runs immediately after the Root Breakdown narrative is generated and before the ID Rewrite Map is applied. It calls `gemini-3.5-flash` with a structured JSON output schema to extract connections explicitly stated in the narrative that are absent from the current graph topology. Missing edges are injected into `finalGraph.links` and canonicalized by the subsequent ID Rewrite pass. The Semantic Link Weights step (Step 3.3) then evaluates all links, including newly reconciled ones.
+- **Enforcement:** A new `reconcileNarrativeEdges()` step (Step 3.2) in Column 3 (`processCurationJob.ts`) runs immediately after the Root Breakdown narrative is generated and before the ID Rewrite Map is applied. It calls `gemini-3.6-flash` (abstracted via `GEMINI_FLASH_MODEL`) with a structured JSON output schema to extract connections explicitly stated in the narrative that are absent from the current graph topology. Missing edges are injected into `finalGraph.links` and canonicalized by the subsequent ID Rewrite pass. The Semantic Link Weights step (Step 3.3) then evaluates all links, including newly reconciled ones.
 - **Deduplication guard:** Before injecting, each candidate edge is checked against the existing link set using the `[source, target].sort().join('--')` key pattern. Duplicate edges are silently discarded.
 - **Orphan safety:** The existing orphan-link pruner downstream automatically discards any reconciled edge whose source or target does not match a valid node ID in `finalGraph.nodes`.
 - **Failure mode:** If the reconciliation call fails or times out, the step is silently skipped via a `try/catch` with a `console.warn`. The pipeline proceeds with the original `finalGraph.links` intact.
@@ -148,6 +148,7 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 ### 34. Cognitive Tiering & Orchestration Stability
 - **Rule:** AI generation strictly utilizes the categorical `thinking_level` parameter (minimal to high) to optimize cost-to-quality ratios based on task complexity. Legacy sampling parameters (`temperature`, `top_p`, `top_k`, and `thinking_budget`) are explicitly forbidden in AI orchestration configurations.
 - **Enforcement:** Deterministic extraction tasks (e.g., origin validation, edge reconciliation) are strictly locked to `minimal` or `low`. Creative narrative synthesis (e.g., Root Breakdowns) requires a `high` thinking level.
+- **Discovery Ledger Rate Pegging:** The Discovery Ledger is permanently pegged to standard non-promotional list rates ($1.50 / 1M input, $7.50 / 1M output) for Gemini 3.6 Flash, strictly ignoring temporary discounts (e.g., 50% promotional pricing) to ensure stable long-term unit cost modeling and billing predictability.
 - **API Stability:** The background pipeline jobs officially retain the legacy `generateContent` API. Migration to the stateful Interactions API is formally deferred to preserve single-shot execution stability until multi-turn conversational features are scoped.
 
 ### 35. Geographic Asset Disambiguation

@@ -12,6 +12,8 @@ export interface UsageCollector {
   push: (model: string, usage: TokenUsage) => void;
 }
 
+export const GEMINI_FLASH_MODEL = process.env.GEMINI_FLASH_MODEL || "gemini-3.6-flash";
+
 // --- UTILITIES PORTED FROM artistCacheService.ts ---
 
 export const CANONICAL_ALIASES: Record<string, string> = {
@@ -669,7 +671,7 @@ export const validateSeedOriginBackend = async (
     }
 
     const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: 300000 } });
-    const currentModel = "gemini-3.5-flash"; // Phase 1: Origin Validation uses 3.5 Flash
+    const currentModel = GEMINI_FLASH_MODEL; // Column 2: Origin Validation uses Flash
 
     const prompt = `Validate this seed artist: "${artistId}".
 
@@ -834,7 +836,7 @@ ${JSON.stringify(detailsCacheEntries, null, 2)}`;
 // Audits the Root Breakdown narrative against the existing graph edges and returns
 // any artist-to-artist connections explicitly cited in the text that are missing from
 // finalGraph.links. Both source and target must exist in the provided node list.
-// Uses gemini-3.5-flash with structured JSON output for deterministic parsing.
+// Uses GEMINI_FLASH_MODEL with structured JSON output for deterministic parsing.
 export interface ReconciliationEdge {
   source: string;  // nodeId exactly as it appears in the node list
   target: string;  // nodeId exactly as it appears in the node list
@@ -851,7 +853,7 @@ export const reconcileNarrativeEdges = async (
 ): Promise<ReconciliationEdge[]> => {
   if (!narrative || !narrative.trim() || nodes.length === 0) return [];
 
-  const currentModel = "gemini-3.5-flash";
+  const currentModel = GEMINI_FLASH_MODEL;
   const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: 120000 } });
 
   // Build a deduplicated set of existing edge keys for efficient exclusion
@@ -1545,7 +1547,7 @@ export const fetchNodeDetailsBackend = async (
     apiKey,
     httpOptions: { timeout: 300000 } // 5 minutes
   });
-  const currentModel = "gemini-3.5-flash";
+  const currentModel = GEMINI_FLASH_MODEL;
 
   const contextNodes = graphData.links
     .filter(l => (typeof l.source === 'string' ? l.source : (l.source as Node).id) === node.id || (typeof l.target === 'string' ? l.target : (l.target as Node).id) === node.id)
@@ -1778,7 +1780,7 @@ export const scrapeVideoIdBackend = async (
     apiKey,
     httpOptions: { timeout: 300000 } // 5 minutes
   });
-  const currentModel = "gemini-3.5-flash";
+  const currentModel = GEMINI_FLASH_MODEL;
 
   const prompt = `What is the best official 11-character YouTube video ID for '${artistName}'?
 Return ONLY the 11-character video ID as a plain string. Do not include any JSON, quotes, explanations, markdown, or other text. If you are not highly confident, return "null".`;
@@ -1975,7 +1977,7 @@ export const generateSemanticLinkWeights = async (
   links: any[],
   usageCollector: UsageCollector
 ): Promise<any[]> => {
-  const currentModel = "gemini-3.5-flash";
+  const currentModel = GEMINI_FLASH_MODEL;
   const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: 300000 } });
 
   // Map cache to lightweight context

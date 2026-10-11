@@ -426,9 +426,10 @@ const calculateTelemetryForUser = (
                         projectExactCost += (u.prompt / 1000000) * 3.50;
                         projectExactCost += ((u.candidates + reasoningTokens) / 1000000) * 10.50;
                     }
-                } else if (model.includes('gemini-3.5-flash') || model.includes('gemini-1.5-flash')) {
+                } else if (model.includes('gemini-3.6-flash') || model.includes('gemini-3.5-flash') || model.includes('gemini-1.5-flash') || model.includes('flash')) {
+                    // Discovery Ledger: Strictly pegged to standard non-promotional rates ($1.50 / 1M input, $7.50 / 1M output)
                     projectExactCost += (u.prompt / 1000000) * 1.50;
-                    projectExactCost += ((u.candidates + reasoningTokens) / 1000000) * 9.00;
+                    projectExactCost += ((u.candidates + reasoningTokens) / 1000000) * 7.50;
                 }
             }
             exactCost += projectExactCost;
