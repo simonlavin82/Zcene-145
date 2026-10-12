@@ -53,7 +53,7 @@ const ARCHITECTURE_RULES = [
     { id: 3, title: "Universal Coordinate Amnesia", desc: "Absolute D3 runtime coordinates MUST be explicitly stripped during generation." },
     { id: 4, title: "Deterministic Open Graph Routing", desc: "A deterministic top-level artist image URL MUST be appended to the root." },
     { id: 5, title: "Schema Role", desc: "synthesisRationale MUST be written to root level of the Firestore artist document." },
-    { id: 6, title: "Defensive Alias Matching", desc: "isNodeInSeedList strictly enforces canonical mapping without naive substrings." },
+    { id: 6, title: "Ambiguous Stub Bypass & Canonical Resolution", desc: "Ambiguous stubs (_isStub: true && isAmbiguous: true) MUST bypass direct cache hit fast-tracking and route directly to Node 4 (<ConsolidatedValidationModal>) to prevent the Direct Hit Trap. isNodeInSeedList strictly enforces canonical mapping without naive substrings." },
     { id: 7, title: "Fail-Fast Media Gatekeeper", desc: "Re-hydrates any node missing crucial iTunes/Spotify imagery or biography." },
     { id: 8, title: "Strict Topology Verification", desc: "Stubs MUST be strictly routed to Generative Topology before async hydration." },
     { id: 9, title: "Canonical Seed Slug Resolution", desc: "All downstream writes MUST target the canonical ID to prevent split-brain." },
@@ -64,7 +64,7 @@ const ARCHITECTURE_RULES = [
     { id: 14, title: "Atomic Self-Healing", desc: "Graph breakdowns handle atomic self-healing." },
     { id: 15, title: "Complex Cache Bypass", desc: "Multi-seed and filtered queries must strictly bypass the Global Topology Cache." },
     { id: 16, title: "Curation Intercept Guardrails", desc: "ProjectLoader must strictly bypass Phase 1 interception when curating." },
-    { id: 17, title: "Universal Pre-Flight Stub Minting", desc: "Bare stubs (_isStub: true) are minted synchronously before async generation to guarantee pipeline integrity." },
+    { id: 17, title: "Universal Pre-Flight Stub Minting", desc: "Bare stubs (_isStub: true, isAmbiguous: boolean, candidates: []) are minted synchronously during Column 1 pre-flight via validateSeedOriginCallable prior to pipeline triggering to guarantee multi-tenant disambiguation." },
     { id: 18, title: "Authorization Lifecycle", desc: "Token/billing authorization state must be strictly scoped to the active generation event." },
     { id: 19, title: "External Link Security", desc: "Official Website and Bandcamp links must rely on deterministic client-side search templates." },
     { id: 20, title: "Mandatory Disambiguation on Direct Hits", desc: "Green Line MUST NEVER bypass the user confirmation phase." },
@@ -83,7 +83,7 @@ const ARCHITECTURE_RULES = [
     { id: 33, title: "Payload Completeness", desc: "Direct Hit local routing must inject both graphData and detailsCache simultaneously." },
     { id: 34, title: "Cognitive Tiering & Orchestration Stability", desc: "AI generation strictly utilizes the thinking_level tier system (minimal to high) with legacy sampling parameters explicitly forbidden. Discovery Ledger remains pegged to standard list rates ($1.50 / 1M input, $7.50 / 1M output)." },
     { id: 36, title: "Label Taxonomy Normalization", desc: "The extraction pipeline MUST algorithmically strip interchangeable structural suffixes (e.g., -records, -music, -company, -group, -media) from label entities prior to caching. This enforces the Canonical Persistence Mandate by reducing natural LLM variations to a single, pure root ID." },
-    { id: 37, title: "JIT Asset Telemetry & Healing", desc: "Missing deep cut assets intercepting 404s trigger Just-In-Time synthesis via 3.6 Flash. Strict verification against local detailsCache, memory dedup locks, global 100-heal circuit breakers, and granular adminLedger telemetry logging." }
+    { id: 37, title: "JIT Asset Telemetry & Healing (404 Parachute ONLY)", desc: "JIT Healer is an emergency parachute strictly triggered ONLY by true 404 misses on inspected nodes during live canvas exploration. Background cron sweeps or automated janitor passes for soft-expired data are strictly forbidden; dataset refreshes remain 100% user-funded on demand." }
 ];
 
 const DiscoveryFlowDiagram: React.FC = () => (
@@ -97,6 +97,15 @@ const DiscoveryFlowDiagram: React.FC = () => (
                     <ul className="text-[12px] text-zinc-400 space-y-4">
                         <li><span className="text-primary font-medium">Local Topology Routing:</span> Direct Hits (perfect cache) bypass the backend entirely.</li>
                         <li><span className="text-primary font-medium">Front Gate Cache Guard:</span> Bypasses network entirely if a valid, complete cache document exists. Topology Hits MUST explicitly route through the <code>&lt;DisambiguationModal&gt;</code> to verify origin.</li>
+                        <li>
+                            <span className="text-primary font-semibold">Flash 3.6 Collision Detection Callable (Pre-Flight Gateway)</span>
+                            <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500">
+                                <li>Calls <code>validateSeedOriginCallable</code> (<code>thinking_level: minimal</code>, Zero Search Grounding / Parametric Only).</li>
+                                <li>Synchronously detects multi-tenant homonyms before generation.</li>
+                                <li>Mints 1-to-many Evolved Stub contracts (<code>_isStub: true, isAmbiguous: true, candidates: [...]</code>).</li>
+                            </ul>
+                        </li>
+                        <li><span className="text-primary font-medium">Confirm Your Artists:</span> <code>&lt;ConsolidatedValidationModal&gt;</code> presents locked cards for unambiguous seeds, radio selection for collisions, and the "Not this artist?" escape hatch.</li>
                         <li><span className="text-primary font-medium">API Confirmation:</span> <code>&lt;TokenConfirmationModal&gt;</code> intercepts generation to authorize API token spend.</li>
                         <li><span className="text-primary font-medium">Active Loader Gate:</span> Locks the UI completely to wait for backend processing.</li>
                         <li><span className="text-primary font-medium">Drop Loader & Render Zcene:</span> The loader drops only when the background worker sets project status to 'completed'.</li>
@@ -116,22 +125,14 @@ const DiscoveryFlowDiagram: React.FC = () => (
                     <div className="text-white font-medium mb-4">HTTP Fast-Track</div>
                     <ul className="text-[12px] text-zinc-400 space-y-4">
                         <li>
-                            <span className="text-primary font-semibold">Validate Origin (3.6 Flash) | Thinking_level: minimal</span>
+                            <span className="text-primary font-semibold">1. Ingest Validated Seed Payload</span>
                             <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500">
-                                <li>Seed origin slug(s) created.</li>
-                                <li>Strips non-standard regional country codes.</li>
-                                <li>Zero Search Grounding (Parametric Only) to reflect the eradication of the Search API for cost savings.</li>
+                                <li>Ingests pre-validated seed preferences (originalQueries, disambiguationHints, disambiguationGenres).</li>
+                                <li>Strips non-standard regional country codes and standardizes seed slugs.</li>
                             </ul>
                         </li>
                         <li>
-                            <span className="text-primary font-semibold">Pre-Flight Alias Resolution & Stub Minting</span>
-                            <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500">
-                                <li>Evaluates originalQueries payload against global cache.</li>
-                                <li>Synchronously writes bare stub pointers (<code>_isStub: true</code>, <code>redirectTo: canonical-id</code>) directly to Firestore BEFORE worker trigger.</li>
-                            </ul>
-                        </li>
-                        <li>
-                            <span className="text-primary font-semibold">Create Topology (3.1 Pro) | Thinking_level: medium</span>
+                            <span className="text-primary font-semibold">2. Create Topology (3.1 Pro) | Thinking_level: medium</span>
                             <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500">
                                 <li>Skeleton: Seed, AI Artists, Labels, Genres.</li>
                                 <li>Enforces kebab-case-artist-iso-code format.</li>
@@ -425,11 +426,11 @@ const DataLifecycleMatrix: React.FC = () => (
                 <div className="space-y-2 text-sm">
                     <div className="flex justify-between border-b border-zinc-800 pb-2"><span className="text-zinc-400">createdAt</span><span className="text-white">Immutable</span></div>
                     <div className="flex justify-between border-b border-zinc-800 pb-2"><span className="text-zinc-400">updatedAt</span><span className="text-green-400">Mutable</span></div>
-                    <div className="flex justify-between border-b border-zinc-800 pb-2"><span className="text-zinc-400">expireAt</span><span className="text-zinc-600">NULL (No TTL)</span></div>
+                    <div className="flex justify-between border-b border-zinc-800 pb-2"><span className="text-zinc-400">expireAt</span><span className="text-yellow-400">Soft-expires at 365 days (Stale)</span></div>
                     <div className="flex justify-between"><span className="text-zinc-400">cachedAt</span><span className="text-red-500 line-through">Eradicated</span></div>
                 </div>
                 <div className="mt-4 text-xs text-zinc-500 leading-relaxed">
-                    Canonical source of truth. Scraped/Generated via Gemini + Google Search.
+                    Canonical source of truth. Soft-expires at 365 days (Stale). Stale nodes are ONLY refreshed when intersected by a user-funded generation. NEVER auto-swept.
                 </div>
             </div>
 

@@ -1,22 +1,27 @@
 # ZCENE ARCHITECTURAL TRUTH & IMMUTABLE LAWS
-
-![Architecture Diagram](./Zcene Architecture V22.jpg)
-
-This document defines the absolute, immutable architectural baseline of Zcene. All future development, bug fixes, and AI agent actions MUST strictly adhere to these laws. Legacy paradigms (like naive string matching or bypass assumptions) are strictly forbidden.
-
+ 
+![Architecture Diagram](./Zcene Architecture V23.jpg)
+ 
+This document defines the absolute, immutable architectural baseline of Zcene (V23). All future development, bug fixes, and AI agent actions MUST strictly adhere to these laws. Legacy paradigms (like naive string matching, bypass assumptions, or single-pointer stubs) are strictly forbidden.
+ 
 ## THE IMMUTABLE ARCHITECTURAL LAWS
-
+ 
 ### 1. Three-Column Flow (The Pipeline)
 The curation pipeline is strictly divided into three distinct execution columns. 
-- **Column 1: React UI (App.tsx / Dashboard.tsx):** Purely presentation. Completely decoupled from heavy LLM orchestration. Locks the UI via the Active Loader Gate and strictly ignores the HTTP 200 OK from Column 2. Only drops the loader when Column 3 sets project status to 'completed'. The frontend flow explicitly enforces these architectural steps to React components:
-  - **Step 2 (Topology Hit):** Explicitly mapped to `<DisambiguationModal>` ("Look What I Found").
-  - **Step 3 (API Confirmation):** Explicitly mapped to `<TokenConfirmationModal>`.
-  - **Step 4 (Validate Origin):** Explicitly mapped to `<ConsolidatedValidationModal>`.
-  - **Step 5 (Active Loader Gate):** LOCKED.
+- **Column 1: React UI (App.tsx / Dashboard.tsx):** Presentation and pre-flight gateway. Completely decoupled from heavy LLM orchestration. Locks the UI via the Active Loader Gate and strictly ignores the HTTP 200 OK from Column 2. Only drops the loader when Column 3 sets project status to 'completed'. The frontend flow explicitly enforces these architectural steps:
+  - **Step 1: Local Topology Routing:** Direct Hits (perfect cache) bypass the network entirely.
+  - **Step 2 (Topology Hit):** Explicitly mapped to `<DisambiguationModal>` ("Look What I Found") to verify origin on cache hits.
+  - **Step 3 (Pre-Flight Gateway & Collision Detection):** Calls `validateSeedOriginCallable` (`3.6 Flash`, `thinking_level: minimal`, Zero Search Grounding / Parametric Only). Detects multi-tenant homonyms (e.g., "Darko US" vs "Darko UK") and synchronously mints 1-to-many Evolved Stub contracts (`_isStub: true, isAmbiguous: true, candidates: [...]`).
+  - **Step 4 (Confirm Your Artists):** Explicitly mapped to `<ConsolidatedValidationModal>`. Presents locked cards for unambiguous seeds, `<DisambiguationRadio>` for collisions, and the "Not this artist?" escape hatch.
+  - **Step 5 (API Confirmation):** Explicitly mapped to `<TokenConfirmationModal>`.
+  - **Step 6 (Active Loader Gate):** LOCKED.
   - **Step 7 (Drop Loader & Render Zcene):** Drops the loader only when Column 3 sets project status to 'completed'.
-- **Column 2: HTTP Fast-Track (executeCurationPipeline.ts):** Synchronous execution layer. Responsible for pre-flight origin slugging (returning conflicts to the user), fast-track cache fallback, generative topology (ensuring Deep Cuts connect back to the seed), generating baseline `seedStubs` on cache misses, and saving the baseline topology to Firestore. Returns immediately while creating the curationJobs doc (with injected `seedStubs`), handing full responsibility to the async worker.
+- **Column 2: HTTP Fast-Track (executeCurationPipeline.ts):** Synchronous execution layer.
+  - **Node 1: Ingest Validated Seed Payload:** Ingests frontend-validated seed preferences (`originalQueries`, `disambiguationHints`, `disambiguationGenres`, `activeSeedNames`). Strips non-standard regional country codes and standardizes seed slugs.
+  - **Node 2: Create Topology (3.1 Pro) | Thinking_level: medium:** Generates skeleton (Seed, AI Artists, Labels, Genres) in kebab-case-artist-iso-code format with timeout protection.
+  - Saves the baseline topology to Firestore and returns HTTP 200 OK while creating the `curationJobs` doc, handing full execution to the async worker.
 - **Column 3: Background Worker (processCurationJob.ts & healOrphanedAsset.ts):** Asynchronous hydration layer. Follows a strict progression: Hydrate Node Batch -> Final Node Positioning -> Root Synthesis (Native JSON Generation schema returning `{ editorialMarkdown, artistSnippets }`) -> Topology Parity (`reconcileNarrativeEdges` - Rule 23) -> Persist Assets. The architecture inherently bypasses any secondary contextual extraction pass. Never writes missing hydration data as 'null'; explicitly falls back to pre-hydrated `seedStubs` for failed primary seeds (JIT Fallback) to prevent database corruption. Writes fully hydrated nodes back to cache.
-  - **Node 36: Just-In-Time (JIT) Asset Healer (3.6 Flash):** Dedicated on-demand micro-worker triggered when a user inspects an orphaned node suffering a 404 cache miss. Bypasses batch queues to synthesize a 100% complete deep cut profile (using the identical Gemini prompt schema, temperature, and iTunes scraping parity), performs atomic write-back to Firestore `artists/{id}` or `labels/{id}`, and records granular token and USD micro-cost receipts directly to `adminLedger/system/jitHeals`. Governed by a platform-wide 100-heal/24h auto-kill circuit breaker and manual admin override.
+  - **Node 36: Just-In-Time (JIT) Asset Healer (3.6 Flash):** Dedicated on-demand micro-worker triggered ONLY when a user inspects an orphaned node suffering a true 404 cache miss. Bypasses batch queues to synthesize a 100% complete deep cut profile, performs atomic write-back to Firestore `artists/{id}` or `labels/{id}`, and records granular token and USD micro-cost receipts directly to `adminLedger/system/jitHeals`. Governed by a platform-wide 100-heal/24h auto-kill circuit breaker and manual admin override. Strictly forbidden from automated background sweeps or soft-expired data healing.
 
 ### 2. Strict Seed Hoisting & Pinning
 Seed nodes must ALWAYS be elevated to the highest priority in the topology.
@@ -35,7 +40,8 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 ### 5. (Deprecated - Lazy/Guest Hydration Fallbacks are Obsolete)
 - Project payloads are now 100% self-contained and atomic. On-demand or lazy hydration is strictly forbidden.
 
-### 6. Defensive Alias Matching via `isNodeInSeedList`
+### 6. Ambiguous Stub Bypass & Canonical Resolution via `isNodeInSeedList`
+- **Ambiguous Stub Bypass:** Any entity document marked as an ambiguous stub (`_isStub: true && isAmbiguous: true`) MUST strictly bypass direct cache hit fast-tracking and route directly to Node 4 (`<ConsolidatedValidationModal>`). This completely eliminates the "Direct Hit Trap" where early users cemented homonyms without multi-tenant choice.
 - **Canonical Alias Resolution:** Bypasses and naive strict string matching are dead. Alias matching must be purely canonical.
 - The `isNodeInSeedList` utility (and its defensive matching equivalents) MUST be used to reliably resolve node identity across the pipeline, ensuring no hallucinated duplicates or orphaned alias fields corrupt the graph.
 
@@ -51,11 +57,12 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 - D3 **Link Objects MUST** be safely serialized back to strings (e.g. `link.source.id`) before caching `graphData`.
 - Column 2 cache-loading MUST safely parse and clone the cache objects to avoid polluting the memory references, and strictly deduplicate loaded node IDs.
 
-### 8. Strict Topology Verification (Stub Routing)
-- The pipeline MUST differentiate between a "Partial Cache Hit" (Stub) and a "Full Cache Hit".
-- A document possessing media and biography data but lacking populated `graphData` topology is an Artist Stub.
-- Column 2 cache-loading MUST explicitly verify the presence of `graphData`. Stubs MUST be strictly routed to Generative Topology (`needsProGeneration = true`) to build the required node map before asynchronous hydration.
-- **The Fast-Track:** Stubs uniquely bypass both the Column 1 Disambiguation Modals and the Column 2 Flash Validation phase, being fast-tracked directly into Generative Topology.
+### 8. Strict Topology Verification (Evolved Stub Routing)
+- The pipeline MUST differentiate between an "Evolved Stub" (`_isStub: true`) and a "Full Cache Hit".
+- An ambiguous stub holds `{ _isStub: true, isAmbiguous: true, redirectTo: null, candidates: [...] }`.
+- A single-pointer stub holds `{ _isStub: true, isAmbiguous: false, redirectTo: canonicalId, candidates: [...] }`.
+- Column 2 cache-loading MUST explicitly verify the presence of populated `graphData`. Stubs lacking graphData MUST be routed to Generative Topology (`needsProGeneration = true`) to build the required node map before asynchronous hydration.
+- **The Fast-Track:** Single unambiguous stubs bypass redundant re-validation and fast-track into Generative Topology, while ambiguous stubs are pre-resolved in Column 1.
 
 ### 9. Canonical Seed Slug Resolution via `resolvedSeedNormMap` & `idRewriteMap` (Split-Brain Prevention)
 - At the **entry point** of `processCurationJob`, before any Phase 1 cache lookup or hydration loop begins, a `resolvedSeedNormMap` MUST be built by querying Firestore for all existing docs whose `artistId` field starts with each seed's base normalised slug.
@@ -64,11 +71,10 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 - **Pre-computed `idRewriteMap` (Topology Standardization):** Before extracting subgraphs (Fix D), the job MUST compile an `idRewriteMap` resolving raw IDs to their canonical forms. The entire unified `finalGraph`'s nodes and edges MUST be rewritten using this map *before* subgraph extraction occurs.
 - The `extractArtistSubGraph` call MUST receive the canonical ID and its result MUST be validated as non-empty before writing. An empty extracted subgraph (`safeExtractedGraph = null`) MUST prevent overwriting a real, populated `graphData` in the canonical document.
 
-### 10. Redirect Pointer Immunity in the Hydration Loop Slug Dedup
-- Fix E remediation creates redirect pointer documents (e.g., `artists/buggin` with `{ redirectTo: "buggin-us" }`) to alias orphaned stubs to their canonical equivalents.
-- The hydration loop's slug deduplication query (which uses an `artistId` range query to find existing canonical docs) MUST explicitly **skip any document that has a `redirectTo` field set**.
-- **Rationale:** Redirect pointer documents share the same `artistId` value as the canonical document and appear in the same Firestore range query. Without this guard, the dedup logic adopts the redirect pointer as the canonical ID, looks up a `detailsCache` that doesn't exist there, falls back to external API hydration, and on timeout skips the entire Firestore write — leaving `graphData` permanently empty on the canonical document.
-- **Rule:** `if (snapData.redirectTo) continue;` is an immutable guard in the slug dedup loop. It must never be removed.
+### 10. Redirect Pointer & Ambiguous Stub Immunity in the Hydration Loop Slug Dedup
+- The hydration loop's slug deduplication query (which uses an `artistId` range query to find existing canonical docs) MUST explicitly **skip any document that has a `redirectTo` field set, is marked with `_isStub: true`, or has `isAmbiguous: true`**.
+- **Rationale:** Stubs and redirect pointers share identical normalized slug prefixes. Without this guard, the dedup logic adopts a stub or redirect pointer as the canonical ID, looks up an empty `detailsCache`, falls back to external API hydration, and on timeout skips the entire Firestore write — leaving `graphData` permanently empty on the canonical document.
+- **Rule:** `if (snapData.redirectTo || snapData._isStub || snapData.isAmbiguous) continue;` is an immutable guard in the slug dedup loop. It must never be removed.
 
 ### 11. Cost-Optimized Parametric Hydration (No Grounding)
 - **Eradication of Google Grounding Surcharge:** Native googleSearch grounding tools MUST remain fully stripped from both the Cloud Run proxy and Firebase Cloud Functions. The architecture relies purely on Gemini 3.6 Flash's parametric memory (abstracted via `GEMINI_FLASH_MODEL`). This enforcement dropped the real-world cost per 40-node root generation from ~£4.30+ down to an average of ~$0.15 / £0.12 – £0.48.
@@ -91,8 +97,9 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 - **ProjectLoader Guardrails:** The ProjectLoader must strictly bypass Phase 1 interception when a document's status is `curating`. The UI must remain locked and patiently await the backend background worker rather than firing duplicate generative calls.
 - **Identity Lock (`isRegeneration`):** During 'Overwrite Existing' (`isRegeneration = true`), the original project name is strictly write-locked. New deep links or explicit forks derive fresh names natively from the seed strings.
 
-### 17. Universal Pre-Flight Stub Minting
-- **The Synchronous Pre-Flight:** Bare stubs (`_isStub: true`, `redirectTo: canonical-id`) MUST be minted synchronously in Column 2 (HTTP Fast-Track) before the background worker is triggered. This applies universally to both frontend-resolved partial hits and backend-resolved cache misses.
+### 17. Universal Pre-Flight Stub Minting (Column 1 Pre-Flight Gateway)
+- **The Synchronous Pre-Flight:** Bare stubs (`_isStub: true, isAmbiguous: boolean, candidates: []`) MUST be minted synchronously in Column 1 during the pre-flight phase via `validateSeedOriginCallable` before the backend generation pipeline is triggered. This applies universally to both frontend-resolved partial hits and backend-resolved cache misses.
+- **Multi-Tenant Disambiguation Contract:** When a collision is detected, the stub holds all potential candidates without prematurely forcing a single `redirectTo` pointer. The user resolves the candidate in Node 4 (`<ConsolidatedValidationModal>`), and the chosen canonical ID is ingested into Column 2.
 - **Local Topology Routing Exemption:** Direct cache hits completely bypass the backend, meaning legacy missing stubs are explicitly not healed during direct cache accesses.
 
 ### 18. Authorization Lifecycle
@@ -140,11 +147,11 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 - **Enforcement:** Query filters (e.g., `after:2019`, `genre:hardcore`) are strictly barred from canonical document paths. This explicitly prevents cache fracturing and phantom cache misses.
 - **Rationale:** Zcene strictly separates bespoke temporal/genre Zcene generation (which lives in ephemeral project topologies) from its canonical global artist library (which must remain a pure, singular source of truth for all users).
 
-### 29. V12 Data Lifecycle Matrix
+### 29. V23 Data Lifecycle Matrix
 - **Rule:** Timestamps strictly conform to the 3-Tier Storage Matrix. `cachedAt` is permanently eradicated.
-- **Tier 1: Global Assets (artists & labels):** `createdAt` (Immutable), `updatedAt` (Mutable). No TTL.
+- **Tier 1: Global Assets (artists & labels):** `createdAt` (Immutable), `updatedAt` (Mutable). Soft-expires at 365 days (Stale). **Stale nodes are ONLY refreshed when intersected by a user-funded generation. NEVER auto-swept.**
 - **Tier 2: Ephemeral Storage (sharedZcenes):** `createdAt` (Immutable), `expireAt` (+30 Days Hard TTL). `updatedAt` is strictly NULL/Removed (read-only snapshots).
-- **Tier 3: Owned Storage (User Projects):** `createdAt` (Immutable), `updatedAt` (Mutable).
+- **Tier 3: Owned Storage (User Projects):** `createdAt` (Immutable), `updatedAt` (Mutable). No TTL.
 
 ### 30. Strict Hydration Lock
 - **Rule:** Autosave intervals and listeners MUST be suspended via a global lock during generation cycles to prevent race conditions and partial snapshot overwrites.
@@ -170,8 +177,9 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 ### 36. Label Taxonomy Normalization
 - **Rule:** The extraction pipeline MUST algorithmically strip interchangeable structural suffixes (e.g., -records, -music, -company, -group, -media) from label entities prior to caching. This enforces the Canonical Persistence Mandate by reducing natural LLM variations to a single, pure root ID.
 
-### 37. JIT Asset Telemetry & Healing
-- **Rule:** When a node inspection encounters a 404 cache miss in `detailsCache`, the frontend triggers `healOrphanedAsset` via a guarded JIT execution path.
+### 37. JIT Asset Telemetry & Healing (404 Emergency Parachute ONLY)
+- **Separation of Powers & Anti-Sweep Law:** The JIT Asset Healer (`healOrphanedAsset`) is strictly an **emergency parachute triggered ONLY by true 404 cache misses** on inspected nodes during live canvas exploration or post-generation eager hydration.
+- **Strict Prohibition of Background Sweeping:** Automated background cron-sweeps, scheduled cloud tasks, or janitorial scanners for soft-expired data are strictly forbidden. Stale datasets (> 365 days) do NOT trigger the JIT Healer. Refreshes of stale data occur strictly when intersected and funded by a natural user-initiated generation.
 - **Enforcement:**
   1. **Local Pre-Check:** The trigger MUST verify against local `detailsCacheRef.current` and generation state before querying the network to prevent redundant invocations.
   2. **In-Flight Memory Lock:** Duplicate requests for the same entity slug MUST be suppressed via an in-flight set lock (`inFlightHealsRef`).
