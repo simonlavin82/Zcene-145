@@ -862,26 +862,44 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                     {/* JIT Auto-Healing Telemetry (Phase 3 Admin Exclusive) */}
                     {!isNormalUserView && (
                         <div className="space-y-4 pt-6">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-3">
+                            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-zinc-800 pb-4">
                                 <div>
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-3">
                                         <h3 className="text-xl font-medium text-white">JIT Auto-Healing Telemetry</h3>
+                                        
+                                        {/* 1. Static Status Badge (Design System: Badges & Tags) */}
+                                        <span 
+                                            className={`text-[10px] font-semibold uppercase tracking-widest px-2 py-0.5 rounded-xl w-fit select-none ${
+                                                isJitEnabled 
+                                                    ? 'bg-emerald-500/20 text-emerald-300' 
+                                                    : 'bg-red-500/20 text-red-300'
+                                            }`}
+                                        >
+                                            {isJitEnabled ? 'ACTIVE' : 'DISABLED'}
+                                        </span>
+
+                                        {/* 2. Standard Toggle Switch (Design System: Standard Toggle Switch) */}
                                         <button
                                             type="button"
                                             onClick={handleToggleJit}
                                             disabled={isTogglingJit}
-                                            title="Click to toggle JIT Auto-Healing globally"
-                                            className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded transition-all cursor-pointer ${
-                                                isJitEnabled
-                                                    ? "bg-emerald-950/60 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-900/60"
-                                                    : "bg-red-950/60 border border-red-500/40 text-red-400 hover:bg-red-900/60"
-                                            }`}
+                                            aria-label="Toggle JIT Auto-Healing status"
+                                            title={isJitEnabled ? "Click to disable JIT Auto-Healing" : "Click to enable JIT Auto-Healing"}
+                                            className="w-10 h-5 rounded-full relative transition-colors bg-zinc-800 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
-                                            {isTogglingJit ? "Updating..." : isJitEnabled ? "Active" : "Disabled"}
+                                            <div 
+                                                className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full transition-transform duration-200 ${
+                                                    isJitEnabled 
+                                                        ? 'translate-x-5 bg-primary' 
+                                                        : 'bg-zinc-400'
+                                                }`} 
+                                            />
                                         </button>
                                     </div>
-                                    <p className="text-zinc-500 text-xs mt-1">
-                                        Real-time receipts of missing global assets synthesized on-the-fly via Gemini 3.6 Flash.
+
+                                    {/* 3. Descriptive Context Block */}
+                                    <p className="text-sm text-zinc-400 mt-2 max-w-3xl leading-relaxed">
+                                        The JIT Healer synthesizes missing database assets on-the-fly via Gemini Flash. To prevent runaway API costs, it is strictly capped at 100 automatic heals per 24 hours (a maximum daily exposure of ~$0.04). If this rolling threshold is breached, JIT Healing will automatically disable. You can use the toggle to manually override and lock the system at any time.
                                     </p>
                                 </div>
 
