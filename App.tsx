@@ -5573,8 +5573,8 @@ const App: React.FC = () => {
             }
 
             // --- PHASE 1 FORMAT: type-segregated hydration from individual /artists/{id} and /labels/{id} docs ---
-            const artistLookupIds = Array.from(new Set(data.artistIds || []));
-            const labelLookupIds = Array.from(new Set(data.labelIds || []));
+            const artistLookupIds: string[] = Array.from(new Set<string>((data.artistIds || []).filter((id: any): id is string => typeof id === 'string')));
+            const labelLookupIds: string[] = Array.from(new Set<string>((data.labelIds || []).filter((id: any): id is string => typeof id === 'string')));
             console.log(`[ProjectLoader] Phase 1 format. Hydrating segregated entities — Artists: [${artistLookupIds.join(', ')}], Labels: [${labelLookupIds.join(', ')}]`);
 
             const [artistCacheRes, labelCacheRes] = await Promise.all([
