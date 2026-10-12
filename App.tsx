@@ -3,7 +3,7 @@ import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { flushSync } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { AlertCircle, AlertTriangle, X, CheckCircle2, Key } from 'lucide-react';
-import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project, ArtistCacheEntry, COST_PER_AI_CALL, CanvasNodeRef } from './types';
+import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project, ArtistCacheEntry, COST_PER_AI_CALL, CanvasNodeRef, DisambiguationCandidateStub } from './types';
 import { generateGraphData, fetchNodeDetails, resolveArtistCandidatesViaAI } from './services/geminiService';
 import { normalizeArtistId, readArtistCacheMany, readLabelCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, getEntityDocWithRedirect, getLabelDocWithRedirect, getAnyEntityDocWithRedirect, titleCaseArtistId, cleanArtistDisplayName, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema, stripUndefinedProperties, isNodeInSeedList, extractCountrySlug, triggerAssetHealing } from './services/artistCacheService';
 import { normalizeCountry } from './utils/normalization';
@@ -1126,7 +1126,7 @@ const App: React.FC = () => {
   const [consolidatedValidationDialog, setConsolidatedValidationDialog] = useState<{
     isOpen: boolean;
     seeds: PreFlightSeed[];
-    onConfirm: () => void;
+    onConfirm: (updatedSeeds?: PreFlightSeed[]) => void;
     onCancel: () => void;
   } | null>(null);
     const [filterGuidanceState, setFilterGuidanceState] = useState<{
@@ -1331,7 +1331,9 @@ const App: React.FC = () => {
         
         if (exactSnap && exactSnap.exists()) {
           const data = exactSnap.data();
-          if (data.redirectTo) {
+          if (data._isStub && (data.isAmbiguous || (Array.isArray(data.candidates) && data.candidates.length > 1))) {
+            snapshotDocs = [exactSnap as any];
+          } else if (data.redirectTo) {
             console.log(`[Disambiguation] Exact match has redirectTo: ${data.redirectTo}. Fetching target.`);
             const targetRef = doc(db, 'artists', data.redirectTo);
             const targetSnap = await getDoc(targetRef);
@@ -1354,8 +1356,27 @@ const App: React.FC = () => {
         if (processedDocs.has(docId)) continue;
         processedDocs.add(docId);
 
-        console.log(`[Disambiguation] Processing doc: ${docId}, redirectTo: ${data.redirectTo}`);
+        console.log(`[Disambiguation] Processing doc: ${docId}, redirectTo: ${data.redirectTo}, isAmbiguous: ${data.isAmbiguous}`);
         
+        // Evolved Stub Candidate unpacking
+        if (data._isStub && (data.isAmbiguous || (Array.isArray(data.candidates) && data.candidates.length > 1))) {
+          if (Array.isArray(data.candidates)) {
+            for (const cand of data.candidates) {
+              const candKey = normalizeArtistId(cand.id);
+              if (!candidatesMap.has(candKey)) {
+                candidatesMap.set(candKey, {
+                  id: cand.id,
+                  label: cleanArtistDisplayName(cand.name || cand.id),
+                  origin: cand.origin || '',
+                  genre: cand.genre || '',
+                  isStub: true
+                });
+              }
+            }
+          }
+          continue;
+        }
+
         if (data.redirectTo && data.redirectTo !== docId && !processedDocs.has(data.redirectTo)) {
           try {
             const targetRef = doc(db, 'artists', data.redirectTo);
@@ -3063,38 +3084,55 @@ const App: React.FC = () => {
             cacheDoc = await getAnyEntityDocWithRedirect(searchIdLower);
           }
 
+          let isAmbiguous = false;
+          let candidates: DisambiguationCandidateStub[] = [];
+          let selectedCandidateId: string | undefined = undefined;
+
           if (cacheDoc.exists()) {
             const data = cacheDoc.data();
-            const qualification = qualifyCacheEntry(data, searchId);
-            verdicts.push(qualification.verdict);
             
-            // Extract metadata for both full hits and Cache Stubs
-            isKnownCacheHit = true;
-            const canonicalId = data?.cacheKey || data?.artistId || cacheDoc.id;
-            candidateId = canonicalId;
-            
-            // Extract origin/genre from detailsCache OR details object
-            let parsedDetails = null;
-            if (data.detailsCache) {
-                try { parsedDetails = parseDetailsCacheSafely(data.detailsCache); } catch(e) {}
-            }
-            let unwrappedDetails = parsedDetails;
-            if (Array.isArray(unwrappedDetails) && unwrappedDetails.length > 0) {
-                unwrappedDetails = Array.isArray(unwrappedDetails[0]) ? unwrappedDetails[0][1] : unwrappedDetails[0];
-            }
-            predictedOrigin = unwrappedDetails?.details?.origin || unwrappedDetails?.origin || unwrappedDetails?.location || unwrappedDetails?.country || data?.details?.origin || "";
-            genre = unwrappedDetails?.details?.genre || unwrappedDetails?.genre || unwrappedDetails?.genres || data?.details?.genre || "";
-            
-            if (artistList.length === 1 && !hasActiveFilters) {
-                singleCacheDocData = data;
-                singleCacheResolvedSearchId = (canonicalId && canonicalId.toLowerCase() !== searchIdLower) ? canonicalId : searchId;
+            if (data?._isStub && (data.isAmbiguous || (Array.isArray(data.candidates) && data.candidates.length > 1))) {
+              console.log(`[Node 2 Cache Check] Intercepted ambiguous stub for "${searchId}" with ${data.candidates?.length || 0} candidates`);
+              isAmbiguous = true;
+              candidates = data.candidates || [];
+              isKnownCacheHit = false;
+              candidateId = candidates.length > 0 ? candidates[0].id : undefined;
+              selectedCandidateId = candidates.length > 0 ? candidates[0].id : undefined;
+              predictedOrigin = candidates.length > 0 ? (candidates[0].origin || '') : '';
+              genre = candidates.length > 0 ? (candidates[0].genre || '') : '';
+              verdicts.push('MISS');
+            } else {
+              const qualification = qualifyCacheEntry(data, searchId);
+              verdicts.push(qualification.verdict);
+              
+              // Extract metadata for both full hits and Cache Stubs
+              isKnownCacheHit = true;
+              const canonicalId = data?.cacheKey || data?.artistId || cacheDoc.id;
+              candidateId = canonicalId;
+              
+              // Extract origin/genre from detailsCache OR details object
+              let parsedDetails = null;
+              if (data.detailsCache) {
+                  try { parsedDetails = parseDetailsCacheSafely(data.detailsCache); } catch(e) {}
+              }
+              let unwrappedDetails = parsedDetails;
+              if (Array.isArray(unwrappedDetails) && unwrappedDetails.length > 0) {
+                  unwrappedDetails = Array.isArray(unwrappedDetails[0]) ? unwrappedDetails[0][1] : unwrappedDetails[0];
+              }
+              predictedOrigin = unwrappedDetails?.details?.origin || unwrappedDetails?.origin || unwrappedDetails?.location || unwrappedDetails?.country || data?.details?.origin || "";
+              genre = unwrappedDetails?.details?.genre || unwrappedDetails?.genre || unwrappedDetails?.genres || data?.details?.genre || "";
+              
+              if (artistList.length === 1 && !hasActiveFilters) {
+                  singleCacheDocData = data;
+                  singleCacheResolvedSearchId = (canonicalId && canonicalId.toLowerCase() !== searchIdLower) ? canonicalId : searchId;
+              }
             }
           } else {
             verdicts.push('MISS');
           }
 
           // Phase 1 (Strict DB Cache): check disambiguation fallback
-          if (!bypassDisambiguation && !isKnownCacheHit) {
+          if (!bypassDisambiguation && !isKnownCacheHit && !isAmbiguous) {
             const cacheCandidates = await searchDisambiguationCandidates(searchId);
             if (cacheCandidates.length > 0) {
               predictedOrigin = cacheCandidates[0].origin || '';
@@ -3114,7 +3152,10 @@ const App: React.FC = () => {
             candidateId,
             isCorrected,
             correctedQuery,
-            originalQuery
+            originalQuery,
+            isAmbiguous,
+            candidates,
+            selectedCandidateId
           };
         }));
       }
@@ -3143,24 +3184,42 @@ const App: React.FC = () => {
 
         for (let s of cacheCandidatesPerSeed) {
           if (!s.isKnownCacheHit) {
+            if (s.isAmbiguous && s.candidates && s.candidates.length > 0) {
+              // Ambiguous candidates already retrieved from database evolved stub
+              continue;
+            }
             try {
               const result = await validate({ seed: s.query, ...(currentPassword && { password: currentPassword }) });
               const data = result.data as any;
               if (data && data.isValid) {
-                s.predictedOrigin = data.origin || '';
-                s.genre = data.genre || '';
+                if (data.hasCollision && Array.isArray(data.candidates) && data.candidates.length > 1) {
+                  s.isAmbiguous = true;
+                  s.candidates = data.candidates;
+                  s.selectedCandidateId = data.candidates[0].id;
+                  s.candidateId = data.candidates[0].id;
+                  s.predictedOrigin = data.candidates[0].origin || '';
+                  s.genre = data.candidates[0].genre || '';
+                } else {
+                  s.predictedOrigin = data.origin || '';
+                  s.genre = data.genre || '';
+                  if (data.candidates && data.candidates.length === 1) {
+                    s.candidateId = data.candidates[0].id;
+                  }
+                }
                 
                 if (data.correctedInput && data.id && data.id !== s.query) {
                   s.isCorrected = true;
                   s.correctedQuery = data.id;
                   s.originalQuery = s.query;
                   
-                  const interceptCandidates = await searchDisambiguationCandidates(data.id);
-                  if (interceptCandidates.length > 0) {
-                    s.predictedOrigin = interceptCandidates[0].origin || s.predictedOrigin;
-                    s.genre = interceptCandidates[0].genre || s.genre;
-                    s.isKnownCacheHit = true;
-                    s.candidateId = interceptCandidates[0].id;
+                  if (!s.isAmbiguous) {
+                    const interceptCandidates = await searchDisambiguationCandidates(data.id);
+                    if (interceptCandidates.length > 0) {
+                      s.predictedOrigin = interceptCandidates[0].origin || s.predictedOrigin;
+                      s.genre = interceptCandidates[0].genre || s.genre;
+                      s.isKnownCacheHit = true;
+                      s.candidateId = interceptCandidates[0].id;
+                    }
                   }
                 }
               }
@@ -3201,7 +3260,15 @@ const App: React.FC = () => {
             setConsolidatedValidationDialog({
               isOpen: true,
               seeds: cacheCandidatesPerSeed,
-              onConfirm: () => { setConsolidatedValidationDialog(null); resolve(true); },
+              onConfirm: (updatedSeeds) => {
+                if (updatedSeeds) {
+                  for (let idx = 0; idx < updatedSeeds.length; idx++) {
+                    cacheCandidatesPerSeed[idx] = updatedSeeds[idx];
+                  }
+                }
+                setConsolidatedValidationDialog(null);
+                resolve(true);
+              },
               onCancel: () => { setConsolidatedValidationDialog(null); resolve(false); }
             });
           });
@@ -3244,7 +3311,20 @@ const App: React.FC = () => {
                 activeSeedNames[normalizeArtistId(cleanDisplayName)] = cleanDisplayName;
               }
 
-              if (preFlightSeed.isKnownCacheHit && preFlightSeed.predictedOrigin === rawCountryName && preFlightSeed.candidateId) {
+              if (preFlightSeed.isAmbiguous && preFlightSeed.selectedCandidateId) {
+                const resolvedId = normalizeArtistId(preFlightSeed.selectedCandidateId);
+                resolvedArtistSeeds[i] = resolvedId;
+                activeSeedNames[resolvedId] = cleanDisplayName;
+                activeSeedNames[normalizeArtistId(searchId)] = cleanDisplayName;
+                activeDisambiguationHints[resolvedId] = rawCountryName;
+                if (preFlightSeed.genre) activeDisambiguationGenres[resolvedId] = preFlightSeed.genre;
+                if (resolvedId !== searchId) {
+                  activeOriginalQueries[resolvedId] = searchId;
+                } else if (preFlightSeed.originalQuery) {
+                  activeOriginalQueries[resolvedId] = preFlightSeed.originalQuery;
+                }
+                hasDisambiguated = true;
+              } else if (preFlightSeed.isKnownCacheHit && preFlightSeed.predictedOrigin === rawCountryName && preFlightSeed.candidateId) {
                 const resolvedId = normalizeArtistId(preFlightSeed.candidateId);
                 resolvedArtistSeeds[i] = resolvedId;
                 activeSeedNames[resolvedId] = cleanDisplayName;
@@ -7883,7 +7963,7 @@ const App: React.FC = () => {
       <ConsolidatedValidationModal
         isOpen={!!consolidatedValidationDialog?.isOpen}
         seeds={consolidatedValidationDialog?.seeds || []}
-        onConfirm={() => consolidatedValidationDialog?.onConfirm()}
+        onConfirm={(updatedSeeds) => consolidatedValidationDialog?.onConfirm(updatedSeeds)}
         onCancel={() => consolidatedValidationDialog?.onCancel()}
       />
 

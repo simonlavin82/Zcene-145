@@ -133,6 +133,11 @@ export interface ArtistCacheEntry {
   filters?: DiscoveryFilters;
   isDeep?: boolean;
   synthesisRationale?: string;
+  // --- Evolved Stub Routing Fields ---
+  _isStub?: boolean;
+  isAmbiguous?: boolean;
+  redirectTo?: string | null;
+  candidates?: DisambiguationCandidateStub[];
   /**
    * DATASET INTEGRITY LOCK — Staging → Verified Protocol.
    *
@@ -154,6 +159,15 @@ export interface ArtistCacheEntry {
   /** ISO timestamp of when the in_progress staging lock was acquired. Used by
    *  isCacheDocumentVerified to detect stale locks from crashed Cloud Functions (>15 min). */
   integrityLockedAt?: string;
+}
+
+export interface DisambiguationCandidateStub {
+  id: string;                    // e.g. "darko-us"
+  name: string;                  // e.g. "Darko US"
+  origin: string;                // e.g. "United States"
+  genre: string;                 // e.g. "Deathcore"
+  disambiguationSnippet?: string;// e.g. "American deathcore project formed in 2020"
+  isVerifiedEntity?: boolean;
 }
 
 export interface Project {

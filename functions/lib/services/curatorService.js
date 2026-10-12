@@ -585,28 +585,69 @@ NEGATIVE CONSTRAINT: NEVER use em-dashes (—) or long hyphens for dramatic effe
 exports.SEED_VALIDATION_SCHEMA = {
     type: genai_1.Type.OBJECT,
     properties: {
-        id: {
-            type: genai_1.Type.STRING,
-            description: "The canonical, correctly-spelled, professional name of the artist. If the input was a typo, return the corrected spelling here. NEVER append geographic acronyms, country names, or regional suffixes (e.g. 'Turnstile', NOT 'Turnstile US')."
-        },
-        origin: {
-            type: genai_1.Type.STRING,
-            description: "The country of origin for the artist (e.g., 'USA', 'UK'). Return an empty string if isValid is false."
-        },
-        genre: {
-            type: genai_1.Type.STRING,
-            description: "The primary genre of the artist. Return an empty string if isValid is false."
-        },
         isValid: {
             type: genai_1.Type.BOOLEAN,
-            description: "True if this is a real, recognized musical entity that can be confidently identified. False if the input cannot be mapped to any known artist."
+            description: "True if this is a real, recognized musical entity (artist, band, or label) that can be confidently identified. False if the input cannot be mapped to any known artist."
         },
         correctedInput: {
             type: genai_1.Type.BOOLEAN,
-            description: "True if the returned 'id' is a spelling correction of the user's original input (e.g. input was 'turstile', id returned is 'Turnstile'). False if the id matches the input exactly (case-insensitive)."
+            description: "True if the primary name returned is a spelling or typo correction of the user's input (e.g. input 'turstile' -> 'Turnstile'). False if exact match (case-insensitive)."
+        },
+        hasCollision: {
+            type: genai_1.Type.BOOLEAN,
+            description: "True ONLY if there are multiple genuine, prominent, distinct musical acts legitimately sharing this exact or near-identical name (e.g. 'Darko' refers to Darko US [Deathcore] and Darko [UK Melodic Punk]). False if there is one predominant, famous, or unambiguous artist (e.g. 'Turnstile', 'Radiohead', 'Nirvana')."
+        },
+        primary: {
+            type: genai_1.Type.OBJECT,
+            description: "The primary or most prominent recognized musical entity.",
+            properties: {
+                id: {
+                    type: genai_1.Type.STRING,
+                    description: "The canonical, professional name of the artist. If the real-world official band name includes a regional tag (e.g. 'Darko US'), include it. Otherwise do NOT add country suffixes."
+                },
+                origin: {
+                    type: genai_1.Type.STRING,
+                    description: "The country of origin for the artist (e.g., 'USA', 'United Kingdom', 'Canada'). Return empty string if isValid is false."
+                },
+                genre: {
+                    type: genai_1.Type.STRING,
+                    description: "The primary genre of the artist (e.g. 'Hardcore Punk', 'Deathcore'). Return empty string if isValid is false."
+                },
+                disambiguationSnippet: {
+                    type: genai_1.Type.STRING,
+                    description: "A concise 1-sentence contextual identifier (e.g. 'American deathcore project featuring Tom Barber and Baby J' or 'Baltimore hardcore punk band formed in 2010')."
+                }
+            },
+            required: ["id", "origin", "genre"]
+        },
+        collisions: {
+            type: genai_1.Type.ARRAY,
+            description: "List of other genuine, prominent, commercially-released musical artists with identical or colliding names. MUST be EMPTY [] unless there are verified, notable acts with published albums.",
+            items: {
+                type: genai_1.Type.OBJECT,
+                properties: {
+                    id: {
+                        type: genai_1.Type.STRING,
+                        description: "The canonical name of the colliding artist."
+                    },
+                    origin: {
+                        type: genai_1.Type.STRING,
+                        description: "Country of origin."
+                    },
+                    genre: {
+                        type: genai_1.Type.STRING,
+                        description: "Primary genre."
+                    },
+                    disambiguationSnippet: {
+                        type: genai_1.Type.STRING,
+                        description: "A concise 1-sentence contextual identifier (e.g. 'English melodic punk rock band from Guildford')."
+                    }
+                },
+                required: ["id", "origin", "genre"]
+            }
         }
     },
-    required: ["id", "origin", "genre", "isValid", "correctedInput"]
+    required: ["isValid", "correctedInput", "hasCollision", "primary", "collisions"]
 };
 // --- CORE CURATOR LOGIC ---
 const validateSeedOriginBackend = async (artistId) => {
@@ -620,16 +661,18 @@ const validateSeedOriginBackend = async (artistId) => {
         const prompt = `Validate this seed artist: "${artistId}".
 
 CRITICAL RULES (non-negotiable):
-1. TYPO CORRECTION (MANDATORY): If the input is an obvious misspelling or transposition of a real artist name (e.g. "turstile" for "Turnstile", "radiohed" for "Radiohead", "nirvanna" for "Nirvana"), you MUST return the correctly-spelled canonical name in the 'id' field and set 'correctedInput' to true. Do NOT return the original typo'd spelling as the id under any circumstances.
-2. REAL ENTITY CHECK: If the entity is a real, recognizable musical artist, band, or label, set 'isValid' to true with full origin and genre.
-3. NOT_FOUND (MANDATORY): If the input cannot be confidently mapped to any known, real musical entity — even after attempting typo correction — set 'isValid' to false. In this case, 'id' should be the original input and 'origin'/'genre' should be empty strings.
-4. Do NOT invent or hallucinate artists. If in doubt, return isValid: false.
-5. ZERO GEOGRAPHIC SUFFIX HALLUCINATION (STRICT): NEVER append geographic tags, country names, or regional acronyms (e.g., ' US', ' USA', ' UK', ' Australia') to the 'id' field unless it is legally and officially part of the artist's real-world band name (e.g., 'Darko' must remain 'Darko', NOT 'Darko US'; 'Turnstile' must remain 'Turnstile', NOT 'Turnstile US'). Country of origin belongs exclusively in the 'origin' field.`;
+1. TYPO CORRECTION (MANDATORY): If the input is an obvious misspelling or transposition of a real artist name (e.g. "turstile" for "Turnstile", "radiohed" for "Radiohead", "nirvanna" for "Nirvana"), return the correctly-spelled canonical name in 'primary.id' and set 'correctedInput' to true. Do NOT return the original typo'd spelling under any circumstances.
+2. STRICT ANTI-HALLUCINATION / NO "PEOPLE-PLEASING" COLLISIONS:
+   - A collision exists ONLY when there are multiple distinct, widely-known, commercially released musical artists that legitimately share this name (e.g. "Darko" -> Darko US [Deathcore] and Darko [UK Melodic Punk]).
+   - DO NOT invent, hallucinate, or scour for obscure local bar bands, unreleased bedroom projects, or minor soundcloud profiles just to be a "people pleaser".
+   - If there is only one predominant, notable, or famous artist (e.g. "Turnstile", "Radiohead", "Nirvana", "Deftones"), you MUST set 'hasCollision' to false and 'collisions' to an empty array []. A false collision ruins user experience.
+3. REAL ENTITY CHECK: If the entity is a real, recognizable musical artist, band, or label, set 'isValid' to true with full origin, genre, and disambiguationSnippet. If completely unrecognizable even after attempting typo correction, set 'isValid' to false. In this case, 'primary.id' should be the original input and 'origin'/'genre' should be empty strings.
+4. ZERO GEOGRAPHIC SUFFIX HALLUCINATION (STRICT): NEVER append geographic tags, country names, or regional acronyms (e.g., ' US', ' USA', ' UK', ' Australia') to 'primary.id' unless it is legally and officially part of the artist's real-world band name (e.g., 'Darko US'). Country of origin belongs exclusively in the 'origin' field.`;
         const response = await ai.models.generateContent({
             model: currentModel,
             contents: prompt,
             config: {
-                systemInstruction: "You are a strict music data validator. You do NOT infer intent. If the user input contains a spelling error, return the REAL canonical artist name (e.g. if given 'turstile', return id: 'Turnstile', correctedInput: true). NEVER append geographic acronyms, country names, or regional suffixes (e.g. ' US', ' UK') to the artist's display name or 'id' field — geographic location belongs strictly in the 'origin' field. Return ONLY valid JSON matching the schema.",
+                systemInstruction: "You are a strict music data validator and collision detector. You do NOT infer intent. If the user input contains a spelling error, return the REAL canonical artist name. Only report collisions when there are multiple genuinely prominent, commercially published artists sharing the name. NEVER invent minor artists. Return ONLY valid JSON matching the schema.",
                 thinkingConfig: { thinkingLevel: genai_1.ThinkingLevel.MINIMAL },
                 responseMimeType: "application/json",
                 responseSchema: exports.SEED_VALIDATION_SCHEMA
@@ -640,14 +683,59 @@ CRITICAL RULES (non-negotiable):
             throw new Error("Empty validation response");
         const cleanedJsonText = (0, exports.extractCleanJsonString)(jsonText);
         const data = JSON.parse(cleanedJsonText);
+        const primary = data.primary || { id: artistId, origin: "", genre: "", disambiguationSnippet: "" };
+        const rawCollisions = Array.isArray(data.collisions) ? data.collisions : [];
         // Safeguard: Strip accidental hallucinated geographic suffixes if input didn't contain them
-        if (data && data.id && typeof data.id === 'string') {
-            const trimmedId = data.id.trim();
+        if (primary.id && typeof primary.id === 'string') {
+            const trimmedId = primary.id.trim();
             if (/^(.*?)\s+(?:US|USA|UK|GB)$/i.test(trimmedId)) {
                 const stripped = trimmedId.replace(/\s+(?:US|USA|UK|GB)$/i, '').trim();
                 if (!/\b(?:US|USA|UK|GB)\b/i.test(artistId)) {
-                    console.warn(`[validateSeedOriginBackend] Stripped hallucinated geographic suffix from id: "${trimmedId}" -> "${stripped}"`);
-                    data.id = stripped;
+                    console.warn(`[validateSeedOriginBackend] Stripped hallucinated geographic suffix from primary.id: "${trimmedId}" -> "${stripped}"`);
+                    primary.id = stripped;
+                }
+            }
+        }
+        const hasCollision = !!(data.isValid && data.hasCollision && rawCollisions.length > 0);
+        const candidates = [];
+        if (data.isValid) {
+            // Build primary candidate
+            let primarySlug = (0, exports.normalizeArtistId)(primary.id);
+            if (hasCollision && primary.origin) {
+                const originSlug = (0, exports.extractCountrySlug)(primary.origin);
+                if (originSlug && originSlug !== 'global' && !primarySlug.endsWith(`-${originSlug}`)) {
+                    primarySlug = `${primarySlug}-${originSlug}`;
+                }
+            }
+            candidates.push({
+                id: primarySlug,
+                name: primary.id,
+                origin: primary.origin || "Unknown",
+                genre: primary.genre || "Unknown",
+                disambiguationSnippet: primary.disambiguationSnippet || ""
+            });
+            // Build collision candidates
+            if (hasCollision) {
+                for (const col of rawCollisions) {
+                    if (col && col.id) {
+                        let colSlug = (0, exports.normalizeArtistId)(col.id);
+                        if (col.origin) {
+                            const originSlug = (0, exports.extractCountrySlug)(col.origin);
+                            if (originSlug && originSlug !== 'global' && !colSlug.endsWith(`-${originSlug}`)) {
+                                colSlug = `${colSlug}-${originSlug}`;
+                            }
+                        }
+                        // Avoid duplicate slugs
+                        if (!candidates.some(c => c.id === colSlug)) {
+                            candidates.push({
+                                id: colSlug,
+                                name: col.id,
+                                origin: col.origin || "Unknown",
+                                genre: col.genre || "Unknown",
+                                disambiguationSnippet: col.disambiguationSnippet || ""
+                            });
+                        }
+                    }
                 }
             }
         }
@@ -660,7 +748,16 @@ CRITICAL RULES (non-negotiable):
                 totalTokenCount: response.usageMetadata.totalTokenCount || 0,
             };
         }
-        return { ...data, apiUsage };
+        return {
+            id: primary.id || artistId,
+            origin: primary.origin || "",
+            genre: primary.genre || "",
+            isValid: !!data.isValid,
+            correctedInput: !!data.correctedInput,
+            hasCollision,
+            candidates,
+            apiUsage
+        };
     }
     catch (err) {
         console.error(`[validateSeedOriginBackend] Failed to validate seed ${artistId}:`, err);

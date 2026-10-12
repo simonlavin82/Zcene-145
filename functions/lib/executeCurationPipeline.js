@@ -73,6 +73,36 @@ exports.validateSeedOriginCallable = (0, https_1.onCall)({
         console.warn(`[validateSeedOriginCallable] Rule 11 BLOCK: Seed "${seed}" returned isValid: false. Rejecting pipeline.`);
         throw new https_1.HttpsError("not-found", `"${seed}" could not be identified as a real musical artist or label. Please check the spelling and try again.`);
     }
+    // Synchronously mint evolved stub in artists collection (Pre-Flight Gateway)
+    try {
+        const bareNormId = (0, curatorService_1.normalizeArtistId)(seed);
+        const stubDocRef = db.collection("artists").doc(bareNormId);
+        const isAmbiguous = !!(validationResult.hasCollision && validationResult.candidates && validationResult.candidates.length > 1);
+        const candidates = validationResult.candidates || [];
+        if (isAmbiguous) {
+            await stubDocRef.set({
+                _isStub: true,
+                isAmbiguous: true,
+                redirectTo: null,
+                candidates,
+                cachedAt: firestore_1.FieldValue.serverTimestamp()
+            }, { merge: true });
+            console.log(`[validateSeedOriginCallable] Minted evolved ambiguous stub for "${bareNormId}" with ${candidates.length} candidates`);
+        }
+        else if (candidates.length === 1 && candidates[0].id !== bareNormId) {
+            await stubDocRef.set({
+                _isStub: true,
+                isAmbiguous: false,
+                redirectTo: candidates[0].id,
+                candidates,
+                cachedAt: firestore_1.FieldValue.serverTimestamp()
+            }, { merge: true });
+            console.log(`[validateSeedOriginCallable] Minted single-hit stub for "${bareNormId}" -> "${candidates[0].id}"`);
+        }
+    }
+    catch (stubErr) {
+        console.warn(`[validateSeedOriginCallable] Failed to synchronously mint stub for "${seed}":`, stubErr);
+    }
     // Log typo corrections so operators can monitor misuse patterns.
     if (validationResult.correctedInput) {
         console.log(`[validateSeedOriginCallable] Typo correction applied: "${seed}" → "${validationResult.id}"`);
@@ -137,6 +167,9 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
                 // Prefer a doc that has graphData (most complete)
                 for (const snap of dedupQuery.docs) {
                     const snapData = snap.data();
+                    // RULE 10 INVARIANT: Skip ALL stubs and redirects
+                    if (snapData.redirectTo || snapData._isStub || snapData.isAmbiguous)
+                        continue;
                     if (snap.id !== seedNorm && snapData.artistId && snapData.artistId.startsWith(seedNorm)) {
                         if (snapData.graphData) {
                             console.log(`[Pipeline Diamond] Slug Dedup: Adopting canonical seed "${snap.id}" over "${seedNorm}"`);
@@ -153,16 +186,25 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
             console.warn(`[Pipeline Diamond] Seed slug dedup query failed for "${seedNorm}", proceeding with derived ID:`, dedupErr);
         }
         // [Pre-Flight Alias Resolution]
-        const originalQuery = payload.originalQueries && payload.originalQueries[resolvedSeedNorm];
+        const originalQuery = payload.originalQueries && (payload.originalQueries[resolvedSeedNorm] || payload.originalQueries[seedNorm]);
         if (originalQuery) {
             const bareNormId = (0, curatorService_1.normalizeArtistId)(originalQuery);
             if (bareNormId !== resolvedSeedNorm) {
-                await db.collection("artists").doc(bareNormId).set({
-                    _isStub: true,
-                    redirectTo: resolvedSeedNorm,
-                    cachedAt: firestore_1.FieldValue.serverTimestamp()
-                }, { merge: true });
-                console.log(`[Pipeline Diamond] -> Synchronously minted bare stub forwarder (Frontend Resolved): ${bareNormId} -> ${resolvedSeedNorm}`);
+                const stubDocRef = db.collection("artists").doc(bareNormId);
+                const stubSnap = await stubDocRef.get();
+                const existingData = stubSnap.exists ? stubSnap.data() : null;
+                if (!existingData?._isStub || !existingData?.isAmbiguous) {
+                    await stubDocRef.set({
+                        _isStub: true,
+                        isAmbiguous: false,
+                        redirectTo: resolvedSeedNorm,
+                        cachedAt: firestore_1.FieldValue.serverTimestamp()
+                    }, { merge: true });
+                    console.log(`[Pipeline Diamond] -> Synchronously minted bare stub forwarder (Frontend Resolved): ${bareNormId} -> ${resolvedSeedNorm}`);
+                }
+                else {
+                    console.log(`[Pipeline Diamond] Preserving ambiguous stub for ${bareNormId} during alias resolution.`);
+                }
             }
         }
         let hasGraphData = false;
@@ -227,10 +269,11 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
             hasCacheMiss = true;
             let validationResult = null;
             const strippedSeed = stripCountrySlug((0, curatorService_1.normalizeArtistId)(seed));
-            if (payload.disambiguationHints && payload.disambiguationHints[strippedSeed]) {
-                const hintGenre = payload.disambiguationGenres && payload.disambiguationGenres[strippedSeed] ? payload.disambiguationGenres[strippedSeed] : "Unknown";
-                const rawId = payload.originalQueries && payload.originalQueries[strippedSeed] ? payload.originalQueries[strippedSeed] : strippedSeed;
-                validationResult = { isValid: true, id: rawId, origin: payload.disambiguationHints[strippedSeed], genre: hintGenre };
+            const hintCountry = (payload.disambiguationHints && (payload.disambiguationHints[seedNorm] || payload.disambiguationHints[strippedSeed])) || null;
+            const hintGenre = (payload.disambiguationGenres && (payload.disambiguationGenres[seedNorm] || payload.disambiguationGenres[strippedSeed])) || "Unknown";
+            const rawId = (payload.originalQueries && (payload.originalQueries[seedNorm] || payload.originalQueries[strippedSeed])) || strippedSeed;
+            if (hintCountry) {
+                validationResult = { isValid: true, id: rawId, origin: hintCountry, genre: hintGenre };
             }
             else {
                 const valResult = await (0, curatorService_1.validateSeedOriginBackend)(seed);
@@ -249,12 +292,27 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
                     }
                 }
                 if (normId !== bareNormId) {
-                    await db.collection("artists").doc(bareNormId).set({
-                        _isStub: true,
-                        redirectTo: normId,
-                        cachedAt: firestore_1.FieldValue.serverTimestamp()
-                    }, { merge: true });
-                    console.log(`[Pipeline Diamond] -> Synchronously minted bare stub forwarder: ${bareNormId} -> ${normId}`);
+                    const stubDocRef = db.collection("artists").doc(bareNormId);
+                    const stubSnap = await stubDocRef.get();
+                    const existingData = stubSnap.exists ? stubSnap.data() : null;
+                    if (!existingData?._isStub || !existingData?.isAmbiguous) {
+                        await stubDocRef.set({
+                            _isStub: true,
+                            isAmbiguous: false,
+                            redirectTo: normId,
+                            candidates: validationResult.candidates || [{
+                                    id: normId,
+                                    name: validationResult.id,
+                                    origin: validationResult.origin || "Unknown",
+                                    genre: validationResult.genre || "Unknown"
+                                }],
+                            cachedAt: firestore_1.FieldValue.serverTimestamp()
+                        }, { merge: true });
+                        console.log(`[Pipeline Diamond] -> Synchronously minted bare stub forwarder: ${bareNormId} -> ${normId}`);
+                    }
+                    else {
+                        console.log(`[Pipeline Diamond] Preserving existing ambiguous stub for ${bareNormId}`);
+                    }
                 }
                 const cleanMissName = seedNamesMap[normId] || seedNamesMap[bareNormId] || seedNamesMap[seedNorm] || seedNamesMap[seed.toLowerCase()] || validationResult.id;
                 resolvedSeedArray.push({

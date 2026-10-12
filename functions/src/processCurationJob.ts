@@ -296,6 +296,8 @@ export const processCurationJob = onDocumentCreated({
             if (!dedupQuery.empty) {
               for (const snap of dedupQuery.docs) {
                 const snapData = snap.data();
+                // RULE 10 INVARIANT: Skip ALL stubs and redirects
+                if (snapData.redirectTo || snapData._isStub || snapData.isAmbiguous) continue;
                 // Prefer the doc with graphData (most complete). If none has graphData,
                 // still adopt the canonical slug ID to keep naming consistent.
                 if (snap.id !== seedNorm && snapData.artistId && snapData.artistId.startsWith(seedNorm)) {
@@ -487,12 +489,9 @@ export const processCurationJob = onDocumentCreated({
                     let bestDocId = artistNormId;
                     for (const snap of existingQuery.docs) {
                       const snapData = snap.data();
-                      // Fix: Skip redirect pointer documents (created by Fix E remediation).
-                      // A doc with redirectTo set is an alias stub, NOT a canonical record.
-                      // Without this guard, artists/buggin (redirectTo: "buggin-us") is
-                      // mistakenly adopted as the canonical ID, starving the hydration loop
-                      // of the real detailsCache in artists/buggin-us. (Law §6)
-                      if (snapData.redirectTo) continue;
+                      // Fix: Skip redirect pointer documents (created by Fix E remediation) and evolved stubs.
+                      // A doc with redirectTo or _isStub set is a routing stub, NOT a canonical record.
+                      if (snapData.redirectTo || snapData._isStub || snapData.isAmbiguous) continue;
                       
                       // Explicitly reject existing documents that end with known hallucinated regional slugs
                       if (snap.id.endsWith('-scotland') || snap.id.endsWith('-wales') || snap.id.endsWith('-northern-ireland') || snap.id.endsWith('-england')) {
@@ -1205,7 +1204,7 @@ export const processCurationJob = onDocumentCreated({
                   finalRationale = rawData.synthesisRationale;
                   console.log(`[Self-Heal] Adopting orphaned synthesisRationale for ${canonicalSeedId} in transaction`);
                 }
-                if (!rawData.redirectTo) {
+                if (!rawData.redirectTo && (!rawData._isStub || !rawData.isAmbiguous)) {
                   transaction.set(rawSeedDocRef, { redirectTo: canonicalSeedId }, { merge: true });
                   console.log(`[Self-Heal] Queued redirectTo for orphaned stub ${seedNorm} -> ${canonicalSeedId}`);
                 }

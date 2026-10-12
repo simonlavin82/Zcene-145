@@ -195,12 +195,23 @@ service cloud.firestore {
                            incoming().seedArtists is string &&
                            incoming().hitCount == 0
                          ) ||
-                         // Redirect pointer creation
+                         // Evolved routing stub creation (unambiguous redirect or ambiguous candidate list)
                          (
-                           incoming().keys().hasAll(['cacheKey', 'artistId', 'redirectTo', 'cacheVersion']) &&
                            incoming().cacheKey == cacheKey &&
-                           incoming().redirectTo is string &&
-                           incoming().redirectTo != ""
+                           (
+                             (
+                               incoming().keys().hasAll(['cacheKey', 'artistId', 'redirectTo', 'cacheVersion']) &&
+                               incoming().redirectTo is string &&
+                               incoming().redirectTo != ""
+                             ) ||
+                             (
+                               ('_isStub' in incoming() && incoming()._isStub == true) &&
+                               (
+                                 ('redirectTo' in incoming() && incoming().redirectTo is string) ||
+                                 ('candidates' in incoming() && incoming().candidates is list)
+                               )
+                             )
+                           )
                          )
                        );
 
@@ -211,7 +222,7 @@ service cloud.firestore {
                        (
                          // Case A: Standard metadata and telemetry updates on qualified cache docs
                          request.resource.data.diff(resource.data).affectedKeys()
-                           .hasOnly(['detailsCache', 'hitCount', 'cachedAt'])
+                           .hasOnly(['detailsCache', 'hitCount', 'cachedAt', 'candidates', '_isStub', 'isAmbiguous', 'redirectTo'])
                        ) || (
                           // Case B: Upgrade a sparse/legacy cache doc (< 2 version or skeleton layout)
                           (
@@ -222,11 +233,20 @@ service cloud.firestore {
                           request.resource.data.diff(resource.data).affectedKeys()
                             .hasOnly(['detailsCache', 'hitCount', 'graphData', 'cacheVersion', 'filters', 'cacheKey', 'artistId', 'seedArtists', 'cachedAt', 'isDeep'])
                        ) || (
-                          // Case C: Convert a legacy/duplicate document to a redirect pointer
-                          incoming().cacheVersion == 2 &&
-                          'redirectTo' in incoming() &&
-                          incoming().redirectTo is string &&
-                          incoming().redirectTo != ""
+                          // Case C: Convert a legacy/duplicate document to an evolved routing stub
+                          (
+                            (
+                              'redirectTo' in incoming() &&
+                              incoming().redirectTo is string &&
+                              incoming().redirectTo != ""
+                            ) ||
+                            (
+                              '_isStub' in incoming() &&
+                              incoming()._isStub == true &&
+                              'candidates' in incoming() &&
+                              incoming().candidates is list
+                            )
+                          )
                        );
 
       // Only admins may delete cache entries (manual invalidation).
@@ -247,21 +267,40 @@ service cloud.firestore {
                            incoming().hitCount == 0
                          ) ||
                          (
-                           incoming().keys().hasAll(['cacheKey', 'redirectTo']) &&
                            incoming().cacheKey == cacheKey &&
-                           incoming().redirectTo is string &&
-                           incoming().redirectTo != ""
+                           (
+                             (
+                               incoming().keys().hasAll(['cacheKey', 'redirectTo']) &&
+                               incoming().redirectTo is string &&
+                               incoming().redirectTo != ""
+                             ) ||
+                             (
+                               ('_isStub' in incoming() && incoming()._isStub == true) &&
+                               (
+                                 ('redirectTo' in incoming() && incoming().redirectTo is string) ||
+                                 ('candidates' in incoming() && incoming().candidates is list)
+                               )
+                             )
+                           )
                          )
                        );
 
       allow update: if isSignedIn() &&
                        (
                          request.resource.data.diff(resource.data).affectedKeys()
-                           .hasOnly(['detailsCache', 'hitCount', 'cachedAt', 'cacheVersion', 'labelId', 'cacheKey', 'isDeep', 'graphData', 'synthesisRationale', 'filters', 'seedArtists', 'redirectTo'])
+                           .hasOnly(['detailsCache', 'hitCount', 'cachedAt', 'cacheVersion', 'labelId', 'cacheKey', 'isDeep', 'graphData', 'synthesisRationale', 'filters', 'seedArtists', 'redirectTo', 'candidates', '_isStub', 'isAmbiguous'])
                        ) || (
-                         'redirectTo' in incoming() &&
-                         incoming().redirectTo is string &&
-                         incoming().redirectTo != ""
+                         (
+                           'redirectTo' in incoming() &&
+                           incoming().redirectTo is string &&
+                           incoming().redirectTo != ""
+                         ) ||
+                         (
+                           '_isStub' in incoming() &&
+                           incoming()._isStub == true &&
+                           'candidates' in incoming() &&
+                           incoming().candidates is list
+                         )
                        );
 
       allow delete: if isAdmin();

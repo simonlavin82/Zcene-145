@@ -50,6 +50,10 @@ exports.healOrphanedAsset = (0, https_1.onCall)({
         const existingSnap = await docRef.get();
         if (existingSnap.exists) {
             const existingData = existingSnap.data();
+            if (existingData?._isStub && existingData?.isAmbiguous) {
+                console.warn(`[JIT Healer] ${collectionName}/${canonicalId} is an ambiguous routing stub. Refusing to synthesize.`);
+                throw new https_1.HttpsError('failed-precondition', `Cannot synthesize ambiguous routing stub: ${canonicalId}`);
+            }
             const isStub = existingData?._isStub === true || !!existingData?.redirectTo;
             let cachedDetails = null;
             if (existingData?.detailsCache) {

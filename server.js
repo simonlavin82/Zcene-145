@@ -485,6 +485,12 @@ async function triggerReSynthesis(artistId, originalData, collectionName = 'arti
     console.error(`[Re-Synthesis] Failed: GEMINI_API_KEY is not defined.`);
     return;
   }
+
+  // Invariant: Never re-synthesize an ambiguous routing stub
+  if (originalData && originalData._isStub && (originalData.isAmbiguous || (Array.isArray(originalData.candidates) && originalData.candidates.length > 1))) {
+    console.log(`[Re-Synthesis] Skipping ambiguous routing stub: ${artistId}`);
+    return;
+  }
   
   // Parse detailsCache
   let details = null;
@@ -734,7 +740,8 @@ async function handleEntityGet(req, res, collectionName = 'artists') {
             .get();
           if (!querySnap.empty) {
             const altData = querySnap.docs[0].data();
-            if (altData && altData.detailsCache) {
+            // Invariant: Do not serve ambiguous routing stubs as fuzzy entity matches
+            if (altData && !altData._isStub && !altData.isAmbiguous && altData.detailsCache) {
               console.log(`[Proxy Fuzzy Fallback] ${entityId} not found — served via artistId query: ${querySnap.docs[0].id}`);
               return res.json(altData);
             }
@@ -749,6 +756,13 @@ async function handleEntityGet(req, res, collectionName = 'artists') {
 
     
     const data = docSnap.data();
+
+    // Evolved Stub Gatekeeper: Return ambiguous stub payload directly so client can disambiguate
+    if (data && data._isStub && (data.isAmbiguous || (Array.isArray(data.candidates) && data.candidates.length > 1))) {
+      console.log(`[Proxy] Returning ambiguous stub without redirecting (${collectionName}): ${entityId}`);
+      res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+      return res.status(200).json(data);
+    }
     
     // Resolve redirect if present (up to 3 redirects)
     if (data && typeof data.redirectTo === 'string' && data.redirectTo.trim().length > 0) {
@@ -948,7 +962,7 @@ If you cannot find a clear YouTube video ID for this artist, return null for the
 
     if (docSnap.exists) {
       docData = docSnap.data();
-      if (docData && typeof docData.redirectTo === 'string' && docData.redirectTo.trim().length > 0) {
+      if (docData && !docData.isAmbiguous && typeof docData.redirectTo === 'string' && docData.redirectTo.trim().length > 0) {
         let currentId = docData.redirectTo.trim();
         let depth = 0;
         while (depth < 3) {
@@ -959,7 +973,7 @@ If you cannot find a clear YouTube video ID for this artist, return null for the
           docRef = canonicalRef;
           docSnap = nextSnap;
           docData = nextSnap.data();
-          if (docData && typeof docData.redirectTo === 'string' && docData.redirectTo.trim().length > 0) {
+          if (docData && !docData.isAmbiguous && typeof docData.redirectTo === 'string' && docData.redirectTo.trim().length > 0) {
             currentId = docData.redirectTo.trim();
             depth++;
           } else {
@@ -972,7 +986,7 @@ If you cannot find a clear YouTube video ID for this artist, return null for the
     if (videoId && videoId.length === 11) {
       console.log(`[Scraper API] Found video ID "${videoId}" for artist "${artistName}". Updating Firestore...`);
 
-      if (docSnap.exists) {
+      if (docSnap.exists && (!docData || (!docData.isAmbiguous && !docData._isStub))) {
         let details = {};
         if (docData && docData.detailsCache) {
           try {

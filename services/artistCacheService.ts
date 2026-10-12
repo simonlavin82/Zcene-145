@@ -1262,7 +1262,9 @@ export const getEntityDocWithRedirect = async (
       } as unknown as DocumentSnapshot;
     }
 
-    if (data && data.redirectTo && depth < 3) {
+    if (data && data._isStub && (data.isAmbiguous || (Array.isArray(data.candidates) && data.candidates.length > 1))) {
+      console.log(`[Client-Side Redirect Proxy] Ambiguous stub detected for ${entityId}, stopping redirect traversal.`);
+    } else if (data && data.redirectTo && depth < 3) {
       let targetId = data.redirectTo.trim();
       const match = targetId.match(/^([a-z0-9\-]+-(?:united-states|united-kingdom|canada|australia|germany|france|sweden|norway|italy|spain|brazil|mexico|japan|south-korea))-.+$/i);
       if (match) {

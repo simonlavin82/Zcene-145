@@ -1,7 +1,7 @@
 import { ModalFooter, ModalContainer, ModalBackdrop, ModalHeader, ModalBody } from './ui/Dialog';
 import { Input } from './DesignSystem';
 import React, { useState, useMemo } from 'react';
-import { StackItem, Node, UserTaste } from '../types';
+import { StackItem, Node, UserTaste, DisambiguationCandidateStub } from '../types';
 import { StackIcon, VisibilityIcon, VisibilityOffIcon } from './Icons';
 import Markdown from 'react-markdown';
 import { isNodeInSeedList, cleanArtistDisplayName } from '../services/artistCacheService';
@@ -1293,25 +1293,126 @@ export interface PreFlightSeed {
   isCorrected?: boolean;
   correctedQuery?: string;
   originalQuery?: string;
+  isAmbiguous?: boolean;
+  candidates?: DisambiguationCandidateStub[];
+  selectedCandidateId?: string;
+}
+
+export interface DisambiguationRadioProps {
+  key?: React.Key;
+  candidate: DisambiguationCandidateStub;
+  isSelected: boolean;
+  onSelect: () => void;
+}
+
+export const DisambiguationRadio: React.FC<DisambiguationRadioProps> = ({ candidate, isSelected, onSelect }) => {
+  return (
+    <div
+      onClick={onSelect}
+      className={`flex items-start gap-3 p-3 rounded-xl border transition-all cursor-pointer ${
+        isSelected
+          ? 'border-amber-500/80 bg-amber-500/10 shadow-[0_0_12px_rgba(245,158,11,0.15)]'
+          : 'border-zinc-800 bg-zinc-900/50 hover:border-zinc-700 hover:bg-zinc-800/40'
+      }`}
+    >
+      <div className="pt-0.5 flex-shrink-0">
+        <div
+          className={`w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${
+            isSelected ? 'border-amber-400 bg-amber-500' : 'border-zinc-600 bg-transparent'
+          }`}
+        >
+          {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-brand-black" />}
+        </div>
+      </div>
+      <div className="flex flex-col flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-white text-sm font-medium truncate">{candidate.name}</span>
+          <span className="text-[10px] text-zinc-300 bg-zinc-800/90 px-2 py-0.5 rounded-md font-normal border border-zinc-700/60">
+            {candidate.origin}{candidate.genre ? ` • ${candidate.genre}` : ''}
+          </span>
+        </div>
+        {candidate.disambiguationSnippet && (
+          <p className="text-[11px] text-zinc-400 font-light mt-1 leading-relaxed">
+            {candidate.disambiguationSnippet}
+          </p>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export interface ConsolidatedValidationModalProps {
   isOpen: boolean;
   seeds: PreFlightSeed[];
-  onConfirm: () => void;
+  onConfirm: (updatedSeeds?: PreFlightSeed[]) => void;
   onCancel: () => void;
 }
 
 export function ConsolidatedValidationModal({ isOpen, seeds, onConfirm, onCancel }: ConsolidatedValidationModalProps) {
+  const [localSeeds, setLocalSeeds] = React.useState<PreFlightSeed[]>(seeds);
+  const [editingSeedId, setEditingSeedId] = React.useState<string | null>(null);
+  const [customOrigin, setCustomOrigin] = React.useState<string>('');
+  const [customGenre, setCustomGenre] = React.useState<string>('');
+
+  React.useEffect(() => {
+    setLocalSeeds(seeds);
+  }, [seeds]);
 
   if (!isOpen) return null;
 
-  const hasInvalidSeeds = seeds.some(seed => !seed.predictedOrigin || seed.predictedOrigin.trim() === '' || seed.predictedOrigin === 'Unknown Origin');
+  const handleSelectCandidate = (seedId: string, candidate: DisambiguationCandidateStub) => {
+    setLocalSeeds(prev => prev.map(s => {
+      if (s.id === seedId) {
+        return {
+          ...s,
+          selectedCandidateId: candidate.id,
+          candidateId: candidate.id,
+          predictedOrigin: candidate.origin,
+          genre: candidate.genre
+        };
+      }
+      return s;
+    }));
+  };
+
+  const handleStartEdit = (seed: PreFlightSeed) => {
+    setEditingSeedId(seed.id);
+    setCustomOrigin(seed.predictedOrigin || '');
+    setCustomGenre(seed.genre || '');
+  };
+
+  const handleSaveEdit = (seedId: string) => {
+    if (!customOrigin.trim()) return;
+    setLocalSeeds(prev => prev.map(s => {
+      if (s.id === seedId) {
+        return {
+          ...s,
+          predictedOrigin: customOrigin.trim(),
+          genre: customGenre.trim() || s.genre,
+          isKnownCacheHit: false, // force fresh pipeline routing
+          candidateId: undefined
+        };
+      }
+      return s;
+    }));
+    setEditingSeedId(null);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingSeedId(null);
+  };
+
+  const hasInvalidSeeds = localSeeds.some(seed => {
+    if (seed.isAmbiguous) {
+      return !seed.selectedCandidateId;
+    }
+    return !seed.predictedOrigin || seed.predictedOrigin.trim() === '' || seed.predictedOrigin === 'Unknown Origin';
+  });
 
   return (
     <ModalBackdrop onClick={onCancel} className="z-[1100]">
-      <ModalContainer data-testid="validation-modal" className="!overflow-visible relative z-[1150]">
-        <form onSubmit={e => { e.preventDefault(); onConfirm(); }} className="flex flex-col w-full" onClick={e => e.stopPropagation()}>
+      <ModalContainer data-testid="validation-modal" className="!overflow-visible relative z-[1150] max-w-lg w-full">
+        <form onSubmit={e => { e.preventDefault(); onConfirm(localSeeds); }} className="flex flex-col w-full" onClick={e => e.stopPropagation()}>
           <ModalHeader>
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-primary !text-[18px]">checklist</span>
@@ -1321,43 +1422,133 @@ export function ConsolidatedValidationModal({ isOpen, seeds, onConfirm, onCancel
               <span className="material-symbols-outlined !text-[18px]">close</span>
             </button>
           </ModalHeader>
-          <ModalBody className="p-5 flex flex-col gap-4 !overflow-visible">
+          <ModalBody className="p-5 flex flex-col gap-4 !overflow-visible max-h-[70vh] overflow-y-auto">
             <p className="text-sm font-light text-zinc-400 leading-relaxed">
-              Please verify the regional origins for your selected artists.
+              Please verify the regional origins and exact acts for your selected artists.
             </p>
             <div className="flex flex-col gap-4">
-              {seeds.map(seed => (
-                <div key={seed.id} className="flex flex-col gap-2 p-3 bg-zinc-900/50 border border-zinc-700/50 rounded-xl">
-                  <div className="flex flex-col">
-                    <div className="flex items-center gap-2">
-                      <span className="text-white font-medium text-base truncate">
-                        {seed.isCorrected && seed.correctedQuery ? seed.correctedQuery : seed.query}
-                      </span>
-                      {seed.isKnownCacheHit && (
-                        <span className="text-[9px] uppercase tracking-wider text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded-full font-semibold">CACHE HIT</span>
+              {localSeeds.map(seed => {
+                const isAmbiguous = !!(seed.isAmbiguous && seed.candidates && seed.candidates.length > 1);
+
+                if (isAmbiguous) {
+                  return (
+                    <div key={seed.id} className="flex flex-col gap-3 p-3.5 bg-amber-950/20 border border-amber-500/40 rounded-xl">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-white font-medium text-base truncate">
+                          {seed.query}
+                        </span>
+                        <span className="text-[10px] uppercase tracking-wider text-amber-400 bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 rounded-full font-semibold whitespace-nowrap">
+                          COLLISION DETECTED
+                        </span>
+                      </div>
+                      <p className="text-xs text-zinc-300 font-light">
+                        Multiple prominent acts share this name. Select your intended artist:
+                      </p>
+                      <div className="flex flex-col gap-2 mt-1">
+                        {seed.candidates!.map(candidate => (
+                          <DisambiguationRadio
+                            key={candidate.id}
+                            candidate={candidate}
+                            isSelected={seed.selectedCandidateId === candidate.id}
+                            onSelect={() => handleSelectCandidate(seed.id, candidate)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+
+                const isEditing = editingSeedId === seed.id;
+
+                return (
+                  <div key={seed.id} className="flex flex-col gap-2 p-3 bg-zinc-900/50 border border-zinc-700/50 rounded-xl">
+                    <div className="flex flex-col">
+                      <div className="flex items-center gap-2">
+                        <span className="text-white font-medium text-base truncate">
+                          {seed.isCorrected && seed.correctedQuery ? seed.correctedQuery : seed.query}
+                        </span>
+                        {seed.isKnownCacheHit && (
+                          <span className="text-[9px] uppercase tracking-wider text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded-full font-semibold">CACHE HIT</span>
+                        )}
+                      </div>
+                      
+                      {!isEditing ? (
+                        <>
+                          <span data-testid="validation-origin-text" className="text-xs text-zinc-400 font-light truncate mt-0.5">
+                            {seed.predictedOrigin || 'Unknown Origin'}{seed.genre ? ` • ${seed.genre}` : ''}
+                          </span>
+                          
+                          {seed.isCorrected && seed.originalQuery && (
+                            <span className="text-[10px] text-amber-500/80 font-medium truncate mt-0.5">
+                              Auto-corrected from "{seed.originalQuery}"
+                            </span>
+                          )}
+
+                          {/* "Not this artist?" Escape Hatch */}
+                          <div className="mt-2 pt-1 border-t border-zinc-800/60 flex items-center justify-between">
+                            <button
+                              type="button"
+                              onClick={() => handleStartEdit(seed)}
+                              className="text-[11px] text-zinc-400 hover:text-amber-400 transition-colors flex items-center gap-1 font-light underline decoration-zinc-700 underline-offset-2"
+                            >
+                              <span className="material-symbols-outlined !text-[13px]">help_outline</span>
+                              Not this artist?
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="mt-2.5 p-2.5 bg-zinc-950/80 border border-zinc-800 rounded-lg flex flex-col gap-2.5">
+                          <p className="text-[11px] text-zinc-400 font-light">
+                            Specify the intended regional origin or country for <strong>{seed.query}</strong>:
+                          </p>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={customOrigin}
+                              onChange={e => setCustomOrigin(e.target.value)}
+                              placeholder="e.g. United Kingdom, Australia, Chicago..."
+                              className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500"
+                            />
+                            <input
+                              type="text"
+                              value={customGenre}
+                              onChange={e => setCustomGenre(e.target.value)}
+                              placeholder="Genre (optional)"
+                              className="w-28 bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500"
+                            />
+                          </div>
+                          <div className="flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={handleCancelEdit}
+                              className="px-2.5 py-1 text-[11px] text-zinc-400 hover:text-white rounded"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSaveEdit(seed.id)}
+                              disabled={!customOrigin.trim()}
+                              className="px-3 py-1 text-[11px] font-medium bg-amber-500 text-brand-black rounded hover:bg-amber-400 disabled:opacity-50"
+                            >
+                              Apply
+                            </button>
+                          </div>
+                        </div>
                       )}
                     </div>
-                    
-                    <span data-testid="validation-origin-text" className="text-xs text-zinc-400 font-light truncate">
-                      {seed.predictedOrigin || 'Unknown Origin'}{seed.genre ? ` • ${seed.genre}` : ''}
-                    </span>
-                    
-                    {seed.isCorrected && seed.originalQuery && (
-                      <span className="text-[10px] text-amber-500/80 font-medium truncate mt-0.5">
-                        Auto-corrected from "{seed.originalQuery}"
-                      </span>
+
+                    {(!seed.predictedOrigin || seed.predictedOrigin.trim() === '') && !isEditing && (
+                      <div className="bg-amber-950/30 border border-amber-900/50 rounded-lg p-2.5 mt-1 flex items-start gap-2">
+                        <span className="material-symbols-outlined text-amber-500 !text-[16px] mt-0.5">warning</span>
+                        <p className="text-xs text-amber-200/90 leading-relaxed">
+                          We couldn't confidently locate this artist. Use "Not this artist?" to specify their region.
+                        </p>
+                      </div>
                     )}
                   </div>
-                  {(!seed.predictedOrigin || seed.predictedOrigin.trim() === '') && (
-                    <div className="bg-amber-950/30 border border-amber-900/50 rounded-lg p-2.5 mt-1 flex items-start gap-2">
-                      <span className="material-symbols-outlined text-amber-500 !text-[16px] mt-0.5">warning</span>
-                      <p className="text-xs text-amber-200/90 leading-relaxed">
-                        We couldn't confidently locate this artist.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           </ModalBody>
           <ModalFooter>
