@@ -26,6 +26,13 @@ exports.healOrphanedAsset = (0, https_1.onCall)({
     if (!entityId || typeof entityId !== 'string') {
         throw new https_1.HttpsError("invalid-argument", "Missing or invalid entityId parameter");
     }
+    // Master Kill Switch: Read global settings from adminLedger/system
+    const systemSettingsRef = db.collection('adminLedger').doc('system');
+    const systemSnap = await systemSettingsRef.get();
+    if (systemSnap.exists && systemSnap.data()?.jitEnabled === false) {
+        console.warn(`[JIT Healer] Blocked by master kill switch: jitEnabled is FALSE`);
+        throw new https_1.HttpsError("unavailable", "JIT Healing is disabled.");
+    }
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
         throw new https_1.HttpsError("failed-precondition", "GEMINI_API_KEY is not defined in environment secrets.");
@@ -64,6 +71,26 @@ exports.healOrphanedAsset = (0, https_1.onCall)({
                 return { success: true, canonicalId, alreadyExisted: true, data: cachedDetails };
             }
             console.log(`[JIT Healer] Existing doc ${collectionName}/${canonicalId} failed qualification gate (isStub: ${isStub}, hasMedia: ${hasValidMedia}). Overwriting with full synthesis...`);
+        }
+        // 2. Global Auto-Kill Circuit Breaker: Count platform-wide receipts logged in rolling 24 hours
+        const twentyFourHoursAgoMs = Date.now() - 24 * 60 * 60 * 1000;
+        const recentHealsSnap = await db
+            .collection('adminLedger')
+            .doc('system')
+            .collection('jitHeals')
+            .where('healedAtMs', '>=', twentyFourHoursAgoMs)
+            .count()
+            .get();
+        const totalRecentHeals = recentHealsSnap.data().count;
+        if (totalRecentHeals >= 100) {
+            console.error(`[JIT Circuit Breaker] TRIP TRIGGERED: ${totalRecentHeals} heals in last 24h (threshold: 100). Auto-disabling JIT...`);
+            await systemSettingsRef.set({
+                jitEnabled: false,
+                disabledReason: `Auto-killed: 24h threshold exceeded (${totalRecentHeals} heals)`,
+                trippedAt: firestore_1.FieldValue.serverTimestamp(),
+                lastTripCount: totalRecentHeals
+            }, { merge: true });
+            throw new https_1.HttpsError("resource-exhausted", "JIT Circuit Breaker tripped: Global limit reached.");
         }
         console.log(`[JIT Healer] Initiating full-parity synthesis for ${entityType}: "${canonicalId}" (raw: "${entityId}") using ${curatorService_1.GEMINI_FLASH_MODEL}...`);
         // 2. Synthesize missing entity via Gemini 3.6 Flash (ThinkingLevel.LOW) with exact Column 3 prompt and schema parity
@@ -192,6 +219,9 @@ exports.healOrphanedAsset = (0, https_1.onCall)({
         };
     }
     catch (error) {
+        if (error instanceof https_1.HttpsError) {
+            throw error;
+        }
         console.error(`[JIT Healer] Error healing entity "${canonicalId}" (${collectionName}):`, error);
         throw new https_1.HttpsError("internal", error.message || "Failed to heal orphaned asset");
     }

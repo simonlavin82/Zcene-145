@@ -2465,7 +2465,18 @@ const App: React.FC = () => {
           }
         }
       }).catch(err => {
-        console.warn(`[Gate B JIT Healer Error] ${disambiguatedCacheId}:`, err);
+        const errMsg = err?.message || String(err);
+        const errCode = err?.code;
+        if (
+          errCode === 'resource-exhausted' || 
+          errMsg.includes('Circuit Breaker') || 
+          errCode === 'unavailable' || 
+          errMsg.includes('disabled')
+        ) {
+          console.warn(`[Gate B JIT Circuit Breaker] On-demand healing blocked for "${disambiguatedCacheId}": ${errMsg}.`);
+        } else {
+          console.warn(`[Gate B JIT Healer Error] ${disambiguatedCacheId}:`, err);
+        }
       });
     }
 
@@ -5162,7 +5173,18 @@ const App: React.FC = () => {
               }
             }
           }).catch(err => {
-            console.warn(`[Gate A JIT Healer Error] ${cacheId}:`, err);
+            const errMsg = err?.message || String(err);
+            const errCode = err?.code;
+            if (
+              errCode === 'resource-exhausted' || 
+              errMsg.includes('Circuit Breaker') || 
+              errCode === 'unavailable' || 
+              errMsg.includes('disabled')
+            ) {
+              console.warn(`[Gate A JIT Circuit Breaker] Auto-healing halted for "${cacheId}": ${errMsg}. Node rendered in standard unhydrated state.`);
+            } else {
+              console.warn(`[Gate A JIT Healer Error] ${cacheId}:`, err);
+            }
           });
           return;
         }

@@ -35,6 +35,14 @@ export const healOrphanedAsset = onCall({
     throw new HttpsError("invalid-argument", "Missing or invalid entityId parameter");
   }
 
+  // Master Kill Switch: Read global settings from adminLedger/system
+  const systemSettingsRef = db.collection('adminLedger').doc('system');
+  const systemSnap = await systemSettingsRef.get();
+  if (systemSnap.exists && systemSnap.data()?.jitEnabled === false) {
+    console.warn(`[JIT Healer] Blocked by master kill switch: jitEnabled is FALSE`);
+    throw new HttpsError("unavailable", "JIT Healing is disabled.");
+  }
+
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new HttpsError("failed-precondition", "GEMINI_API_KEY is not defined in environment secrets.");
@@ -78,6 +86,29 @@ export const healOrphanedAsset = onCall({
       }
 
       console.log(`[JIT Healer] Existing doc ${collectionName}/${canonicalId} failed qualification gate (isStub: ${isStub}, hasMedia: ${hasValidMedia}). Overwriting with full synthesis...`);
+    }
+
+    // 2. Global Auto-Kill Circuit Breaker: Count platform-wide receipts logged in rolling 24 hours
+    const twentyFourHoursAgoMs = Date.now() - 24 * 60 * 60 * 1000;
+    const recentHealsSnap = await db
+      .collection('adminLedger')
+      .doc('system')
+      .collection('jitHeals')
+      .where('healedAtMs', '>=', twentyFourHoursAgoMs)
+      .count()
+      .get();
+
+    const totalRecentHeals = recentHealsSnap.data().count;
+    if (totalRecentHeals >= 100) {
+      console.error(`[JIT Circuit Breaker] TRIP TRIGGERED: ${totalRecentHeals} heals in last 24h (threshold: 100). Auto-disabling JIT...`);
+      await systemSettingsRef.set({
+        jitEnabled: false,
+        disabledReason: `Auto-killed: 24h threshold exceeded (${totalRecentHeals} heals)`,
+        trippedAt: FieldValue.serverTimestamp(),
+        lastTripCount: totalRecentHeals
+      }, { merge: true });
+
+      throw new HttpsError("resource-exhausted", "JIT Circuit Breaker tripped: Global limit reached.");
     }
 
     console.log(`[JIT Healer] Initiating full-parity synthesis for ${entityType}: "${canonicalId}" (raw: "${entityId}") using ${GEMINI_FLASH_MODEL}...`);
@@ -232,6 +263,9 @@ export const healOrphanedAsset = onCall({
     };
 
   } catch (error: any) {
+    if (error instanceof HttpsError) {
+      throw error;
+    }
     console.error(`[JIT Healer] Error healing entity "${canonicalId}" (${collectionName}):`, error);
     throw new HttpsError("internal", error.message || "Failed to heal orphaned asset");
   }

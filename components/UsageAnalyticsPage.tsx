@@ -3,7 +3,7 @@ import { View, COST_PER_AI_CALL, RADIUS_TOKENS } from '../types';
 import { ZceneLogo } from './Icons';
 import Header from './Header';
 import { db } from '../services/firebase';
-import { collection, getDocs, doc, getDoc, query, orderBy, limit } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, setDoc, serverTimestamp, query, orderBy, limit } from 'firebase/firestore';
 import { motion } from 'motion/react';
 import { InfoTooltip } from './ui/InfoTooltip';
 import { AdminViewToggle } from './ui/AdminViewToggle';
@@ -558,6 +558,8 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
     const [simulateNormalUser, setSimulateNormalUser] = useState(false);
     const [ledgerData, setLedgerData] = useState<UserTelemetry[]>([]);
     const [jitHeals, setJitHeals] = useState<JitHealRecord[]>([]);
+    const [isJitEnabled, setIsJitEnabled] = useState<boolean>(true);
+    const [isTogglingJit, setIsTogglingJit] = useState<boolean>(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -615,6 +617,15 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
             // Phase 3: Fetch JIT Auto-Healing Telemetry (Admin View Only)
             if (isAdmin && !simulateNormalUser) {
                 try {
+                    // Fetch global JIT kill switch state from adminLedger/system
+                    const systemSettingsRef = doc(db, 'adminLedger', 'system');
+                    const systemSettingsSnap = await getDoc(systemSettingsRef);
+                    if (systemSettingsSnap.exists() && typeof systemSettingsSnap.data()?.jitEnabled === 'boolean') {
+                        setIsJitEnabled(systemSettingsSnap.data()?.jitEnabled);
+                    } else {
+                        setIsJitEnabled(true);
+                    }
+
                     const healsRef = collection(db, 'adminLedger', 'system', 'jitHeals');
                     const healsQuery = query(healsRef, orderBy('timestamp', 'desc'), limit(100));
                     const healsSnap = await getDocs(healsQuery);
@@ -645,7 +656,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                     });
                     setJitHeals(parsedHeals);
                 } catch (healErr: any) {
-                    console.warn("[UsageAnalyticsPage] Could not query JIT heals collection:", healErr.message);
+                    console.warn("[UsageAnalyticsPage] Could not query JIT heals collection or settings:", healErr.message);
                 }
             } else {
                 setJitHeals([]);
@@ -657,6 +668,25 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
             setIsLoading(false);
         }
     }, [user, isAdmin, simulateNormalUser]);
+
+    const handleToggleJit = async () => {
+        if (!isAdmin || isTogglingJit) return;
+        setIsTogglingJit(true);
+        try {
+            const nextState = !isJitEnabled;
+            const systemSettingsRef = doc(db, 'adminLedger', 'system');
+            await setDoc(systemSettingsRef, {
+                jitEnabled: nextState,
+                updatedAt: serverTimestamp(),
+                updatedBy: user?.email || 'admin'
+            }, { merge: true });
+            setIsJitEnabled(nextState);
+        } catch (err: any) {
+            console.error("[UsageAnalyticsPage] Failed to toggle JIT kill switch:", err);
+        } finally {
+            setIsTogglingJit(false);
+        }
+    };
 
     useEffect(() => {
         if (isActive) {
@@ -836,9 +866,19 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                 <div>
                                     <div className="flex items-center gap-2">
                                         <h3 className="text-xl font-medium text-white">JIT Auto-Healing Telemetry</h3>
-                                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-950/60 border border-emerald-500/40 text-emerald-400">
-                                            Active
-                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={handleToggleJit}
+                                            disabled={isTogglingJit}
+                                            title="Click to toggle JIT Auto-Healing globally"
+                                            className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded transition-all cursor-pointer ${
+                                                isJitEnabled
+                                                    ? "bg-emerald-950/60 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-900/60"
+                                                    : "bg-red-950/60 border border-red-500/40 text-red-400 hover:bg-red-900/60"
+                                            }`}
+                                        >
+                                            {isTogglingJit ? "Updating..." : isJitEnabled ? "Active" : "Disabled"}
+                                        </button>
                                     </div>
                                     <p className="text-zinc-500 text-xs mt-1">
                                         Real-time receipts of missing global assets synthesized on-the-fly via Gemini 3.6 Flash.

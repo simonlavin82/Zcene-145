@@ -50,7 +50,7 @@ export const triggerAssetHealing = async (
     healingInFlight.delete(cacheKey);
     healingCooldown.set(cacheKey, now);
     console.warn(`[JIT Healer] Background dispatch failed for ${cacheKey}:`, err);
-    return null;
+    throw err;
   }
 };
 

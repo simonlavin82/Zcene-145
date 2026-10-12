@@ -290,6 +290,11 @@ service cloud.firestore {
     }
 
     // --- Admin Ledger & Telemetry (Phase 3) ---
+    match /adminLedger/system {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
     match /adminLedger/system/jitHeals/{healId} {
       allow read: if isAdmin();
       allow write: if false; // Exclusively written by Cloud Functions via Firebase Admin SDK
