@@ -82,8 +82,8 @@ const ARCHITECTURE_RULES = [
     { id: 32, title: "Validation Circuit Breaker", desc: "Phase 3 Validation Modal must act as a hard execution stop/return." },
     { id: 33, title: "Payload Completeness", desc: "Direct Hit local routing must inject both graphData and detailsCache simultaneously." },
     { id: 34, title: "Cognitive Tiering & Orchestration Stability", desc: "AI generation strictly utilizes the thinking_level tier system (minimal to high) with legacy sampling parameters explicitly forbidden. Discovery Ledger remains pegged to standard list rates ($1.50 / 1M input, $7.50 / 1M output)." },
-    { id: 35, title: "Geographic Asset Disambiguation", desc: "If the deterministic iTunes scraper fails to validate an image asset due to a multi-artist name collision or missing legal alias, the background worker must parse the node's parametric origin data, append the relevant regional suffix (e.g., ' US', ' UK'), and execute a secondary validation query." },
-    { id: 36, title: "Label Taxonomy Normalization", desc: "The extraction pipeline MUST algorithmically strip interchangeable structural suffixes (e.g., -records, -music, -company, -group, -media) from label entities prior to caching. This enforces the Canonical Persistence Mandate by reducing natural LLM variations to a single, pure root ID." }
+    { id: 36, title: "Label Taxonomy Normalization", desc: "The extraction pipeline MUST algorithmically strip interchangeable structural suffixes (e.g., -records, -music, -company, -group, -media) from label entities prior to caching. This enforces the Canonical Persistence Mandate by reducing natural LLM variations to a single, pure root ID." },
+    { id: 37, title: "JIT Asset Telemetry & Healing", desc: "Missing deep cut assets intercepting 404s trigger Just-In-Time synthesis via 3.6 Flash. Strict verification against local detailsCache, memory dedup locks, global 100-heal circuit breakers, and granular adminLedger telemetry logging." }
 ];
 
 const DiscoveryFlowDiagram: React.FC = () => (
@@ -166,6 +166,16 @@ const DiscoveryFlowDiagram: React.FC = () => (
                                 <li>Miss: Synthesizes via 3.6 Flash & scraper.</li>
                                 <li>High-Fidelity Cap: Strict limit on gen nodes.</li>
                                 <li>Slug Deduplication actively ignores legacy deep cuts, but injects pre-generated stubs for timed-out Seed Artists.</li>
+                            </ul>
+                        </li>
+                        <li>
+                            <span className="text-primary font-medium">Just-In-Time (JIT) Asset Healer (3.6 Flash)</span>
+                            <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500">
+                                <li>Intercepts 404 cache misses on inspected nodes during live canvas exploration.</li>
+                                <li>Full deep cut synthesis & iTunes image scraping with 100% parity to main pipeline.</li>
+                                <li>In-flight memory deduplication suppresses duplicate concurrent trigger requests.</li>
+                                <li>Global 100-heal/24h circuit breaker with Admin toggle kill switch.</li>
+                                <li>Records micro-cost token & USD receipts to adminLedger.</li>
                             </ul>
                         </li>
                         <li>

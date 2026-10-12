@@ -1,6 +1,6 @@
 # ZCENE ARCHITECTURAL TRUTH & IMMUTABLE LAWS
 
-![Architecture Diagram](./Zcene Architecture V21.jpg)
+![Architecture Diagram](./Zcene Architecture V22.jpg)
 
 This document defines the absolute, immutable architectural baseline of Zcene. All future development, bug fixes, and AI agent actions MUST strictly adhere to these laws. Legacy paradigms (like naive string matching or bypass assumptions) are strictly forbidden.
 
@@ -15,7 +15,8 @@ The curation pipeline is strictly divided into three distinct execution columns.
   - **Step 5 (Active Loader Gate):** LOCKED.
   - **Step 7 (Drop Loader & Render Zcene):** Drops the loader only when Column 3 sets project status to 'completed'.
 - **Column 2: HTTP Fast-Track (executeCurationPipeline.ts):** Synchronous execution layer. Responsible for pre-flight origin slugging (returning conflicts to the user), fast-track cache fallback, generative topology (ensuring Deep Cuts connect back to the seed), generating baseline `seedStubs` on cache misses, and saving the baseline topology to Firestore. Returns immediately while creating the curationJobs doc (with injected `seedStubs`), handing full responsibility to the async worker.
-- **Column 3: Background Worker (processCurationJob.ts):** Asynchronous hydration layer. Follows a strict progression: Hydrate Node Batch -> Final Node Positioning -> Root Synthesis (Native JSON Generation schema returning `{ editorialMarkdown, artistSnippets }`) -> Topology Parity (`reconcileNarrativeEdges` - Rule 23) -> Persist Assets. The architecture inherently bypasses any secondary contextual extraction pass. Never writes missing hydration data as 'null'; explicitly falls back to pre-hydrated `seedStubs` for failed primary seeds (JIT Fallback) to prevent database corruption. Writes fully hydrated nodes back to cache.
+- **Column 3: Background Worker (processCurationJob.ts & healOrphanedAsset.ts):** Asynchronous hydration layer. Follows a strict progression: Hydrate Node Batch -> Final Node Positioning -> Root Synthesis (Native JSON Generation schema returning `{ editorialMarkdown, artistSnippets }`) -> Topology Parity (`reconcileNarrativeEdges` - Rule 23) -> Persist Assets. The architecture inherently bypasses any secondary contextual extraction pass. Never writes missing hydration data as 'null'; explicitly falls back to pre-hydrated `seedStubs` for failed primary seeds (JIT Fallback) to prevent database corruption. Writes fully hydrated nodes back to cache.
+  - **Node 36: Just-In-Time (JIT) Asset Healer (3.6 Flash):** Dedicated on-demand micro-worker triggered when a user inspects an orphaned node suffering a 404 cache miss. Bypasses batch queues to synthesize a 100% complete deep cut profile (using the identical Gemini prompt schema, temperature, and iTunes scraping parity), performs atomic write-back to Firestore `artists/{id}` or `labels/{id}`, and records granular token and USD micro-cost receipts directly to `adminLedger/system/jitHeals`. Governed by a platform-wide 100-heal/24h auto-kill circuit breaker and manual admin override.
 
 ### 2. Strict Seed Hoisting & Pinning
 Seed nodes must ALWAYS be elevated to the highest priority in the topology.
@@ -168,3 +169,12 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 
 ### 36. Label Taxonomy Normalization
 - **Rule:** The extraction pipeline MUST algorithmically strip interchangeable structural suffixes (e.g., -records, -music, -company, -group, -media) from label entities prior to caching. This enforces the Canonical Persistence Mandate by reducing natural LLM variations to a single, pure root ID.
+
+### 37. JIT Asset Telemetry & Healing
+- **Rule:** When a node inspection encounters a 404 cache miss in `detailsCache`, the frontend triggers `healOrphanedAsset` via a guarded JIT execution path.
+- **Enforcement:**
+  1. **Local Pre-Check:** The trigger MUST verify against local `detailsCacheRef.current` and generation state before querying the network to prevent redundant invocations.
+  2. **In-Flight Memory Lock:** Duplicate requests for the same entity slug MUST be suppressed via an in-flight set lock (`inFlightHealsRef`).
+  3. **100% Complete Repair:** The healer MUST synthesize a full deep cut profile using identical Gemini schemas, temperature, and iTunes scraping parity, repairing the global Firestore cache permanently.
+  4. **Circuit Breakers & Telemetry:** Execution is strictly gated by the global 100-heal/24h circuit breaker and admin override (`adminLedger/system/settings.jitEnabled`). Every heal records micro-cost token and USD receipts to `adminLedger/system/jitHeals`.
+
