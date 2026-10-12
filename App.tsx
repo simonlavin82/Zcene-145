@@ -94,7 +94,8 @@ const generateGraphDataViaCloudJob = async (
   isSandboxMode?: boolean,
   seedImageUrl?: string,
   confirmTokenUsageHook?: (type: any, cached: any, missing: any, enrichment: any, showBack: any, errorMsg?: string) => Promise<string | false | 'back'>,
-  closeTokenConfirmationHook?: () => void
+  closeTokenConfirmationHook?: () => void,
+  seedNames?: Record<string, string>
 ): Promise<{ graphData: GraphData, activeJobId?: string }> => {
   let success = false;
   let currentError: string | undefined = undefined;
@@ -112,6 +113,7 @@ const generateGraphDataViaCloudJob = async (
       ...(disambiguationHints && { disambiguationHints }),
       ...(disambiguationGenres && { disambiguationGenres }),
       ...(originalQueries && { originalQueries }),
+      ...(seedNames && { seedNames }),
       ...(baseGraph && { baseGraph }),
       ...(cachedSubgraphsContext && { cachedSubgraphsContext }),
       ...(isSmartBypass !== undefined && { isSmartBypass }),
@@ -2954,7 +2956,8 @@ const App: React.FC = () => {
     disambiguationHints?: Record<string, string>,
     bypassDisambiguation: boolean = false,
     disambiguationGenres?: Record<string, string>,
-    originalQueries?: Record<string, string>
+    originalQueries?: Record<string, string>,
+    seedNames?: Record<string, string>
   ) => {
     if (!bypassTokenConfirmation) {
       sessionTokenApprovedRef.current = false;
@@ -3219,6 +3222,7 @@ const App: React.FC = () => {
       let activeDisambiguationHints: Record<string, string> = disambiguationHints || {};
       let activeDisambiguationGenres: Record<string, string> = disambiguationGenres || {};
       let activeOriginalQueries: Record<string, string> = originalQueries || {};
+      let activeSeedNames: Record<string, string> = seedNames ? { ...seedNames } : {};
       let hasDisambiguated = false;
 
       // Only re-route on the first (user-confirmed) pass. On the re-entrant pass
@@ -3232,9 +3236,18 @@ const App: React.FC = () => {
             const rawCountryName = preFlightSeed.predictedOrigin;
             
             if (rawCountryName) {
+              const cleanDisplayName = preFlightSeed.correctedQuery?.trim() || preFlightSeed.query.trim();
+              if (cleanDisplayName) {
+                activeSeedNames[searchId] = cleanDisplayName;
+                activeSeedNames[normalizeArtistId(searchId)] = cleanDisplayName;
+                activeSeedNames[cleanDisplayName.toLowerCase()] = cleanDisplayName;
+                activeSeedNames[normalizeArtistId(cleanDisplayName)] = cleanDisplayName;
+              }
+
               if (preFlightSeed.isKnownCacheHit && preFlightSeed.predictedOrigin === rawCountryName && preFlightSeed.candidateId) {
                 const resolvedId = normalizeArtistId(preFlightSeed.candidateId);
                 resolvedArtistSeeds[i] = resolvedId;
+                activeSeedNames[resolvedId] = cleanDisplayName;
                 if (resolvedId !== searchId) {
                   activeOriginalQueries[resolvedId] = searchId;
                 } else if (preFlightSeed.originalQuery) {
@@ -3243,6 +3256,8 @@ const App: React.FC = () => {
               } else {
                 const seedToUse = preFlightSeed.isCorrected && preFlightSeed.correctedQuery ? preFlightSeed.correctedQuery : searchId;
                 resolvedArtistSeeds[i] = seedToUse;
+                activeSeedNames[seedToUse] = cleanDisplayName;
+                activeSeedNames[normalizeArtistId(seedToUse)] = cleanDisplayName;
                 activeDisambiguationHints[seedToUse] = rawCountryName;
                 if (preFlightSeed.genre) activeDisambiguationGenres[seedToUse] = preFlightSeed.genre;
                 if (seedToUse !== searchId) {
@@ -3270,7 +3285,7 @@ const App: React.FC = () => {
         const allKnownCacheHits = cacheCandidatesPerSeed.length > 0 && cacheCandidatesPerSeed.every(s => s.isKnownCacheHit);
         const nextSkipCacheLookup = !allKnownCacheHits;
         
-        handleGenerateGraph(newArtistsStr, isRegeneration, graphToEnhance, nextSkipCacheLookup, !isCustomNext || sessionTokenApprovedRef.current, overrideFilters, activeDisambiguationHints, true, activeDisambiguationGenres, activeOriginalQueries);
+        handleGenerateGraph(newArtistsStr, isRegeneration, graphToEnhance, nextSkipCacheLookup, !isCustomNext || sessionTokenApprovedRef.current, overrideFilters, activeDisambiguationHints, true, activeDisambiguationGenres, activeOriginalQueries, activeSeedNames);
         return;
       }
 
@@ -3765,7 +3780,11 @@ const App: React.FC = () => {
                 parsedGraphData, // Pass the cache's parsed graph as baseGraph
                 undefined, // cachedSubgraphsContext
                 true, // isSmartBypass flag
-                isSandboxMode
+                isSandboxMode,
+                undefined, // seedImageUrl
+                undefined, // confirmTokenUsageHook
+                undefined, // closeTokenConfirmationHook
+                activeSeedNames
               ).catch(err => {
                  console.warn("[Smart Bypass] Background generation failed:", err);
               });
@@ -4113,7 +4132,12 @@ const App: React.FC = () => {
             activeOriginalQueries,
             undefined, // baseGraph
             undefined, // cachedSubgraphsContext
-            toFetch.length > 1 || hasActiveFilters // isSmartBypass
+            toFetch.length > 1 || hasActiveFilters, // isSmartBypass
+            undefined, // isSandboxMode
+            undefined, // seedImageUrl
+            undefined, // confirmTokenUsageHook
+            undefined, // closeTokenConfirmationHook
+            activeSeedNames
           );
         } else {
           partialGraphPromise = generateGraphData(toFetch.join('::'), pruned, activeDiscoveryFilters, user?.uid, controller?.signal, activeDisambiguationHints, activeDisambiguationGenres);
@@ -4480,7 +4504,10 @@ const App: React.FC = () => {
           computedContext,              // Stringified cached subgraphs context for multi-seed
           undefined,                    // isSmartBypass
           isSandboxMode,                // isSandboxMode
-          seedImageUrl                  // seedImageUrl
+          seedImageUrl,                 // seedImageUrl
+          undefined,                    // confirmTokenUsageHook
+          undefined,                    // closeTokenConfirmationHook
+          activeSeedNames               // seedNames map
         );
       } else {
         const payloadArtists = artistList.map(a => normalizeArtistId(a)).join('::');

@@ -244,6 +244,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 };
             }
             else {
+                const seedNamesMap = inputPayload.seedNames || {};
                 const artistList = inputPayload.artists
                     .split('::')
                     .map((a) => a.trim())
@@ -316,11 +317,16 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     catch (e) {
                         console.warn(`Failed cache lookup for ${seedNorm}`, e);
                     }
+                    const cleanSeedDisplayName = seedNamesMap[canonicalSeedId] ||
+                        seedNamesMap[seedNorm] ||
+                        seedNamesMap[seed.toLowerCase()] ||
+                        seedNamesMap[stripCountrySlug(seedNorm)] ||
+                        stripCountrySlug(seed);
                     if (cachedDetails && cachedDetails.summary && cachedDetails.summary.length > 50 && cachedDetails.details?.genre && cachedDetails.imageUrl) {
                         console.log(`[Phase 1] Cache Hit for seed: ${seed}`);
                         resolvedSeedArray.push({
                             id: seedNorm,
-                            name: seed,
+                            name: cleanSeedDisplayName,
                             origin: cachedDetails.details.origin || "",
                             genre: cachedDetails.details.genre || "",
                             isCacheHit: true
@@ -328,15 +334,17 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     }
                     else {
                         console.log(`[Phase 1] Cache Miss for seed: ${seed}. Routing to Phase 2 (Flash-Lite).`);
-                        // Phase 2: Origin Validation (Flash-Lite)
-                        const validationResult = await (0, curatorService_1.validateSeedOriginBackend)(seed);
+                        // Phase 2: Origin Validation (Flash-Lite) - Pass clean display name to prevent geographic suffix ingestion
+                        const queryForValidation = cleanSeedDisplayName || stripCountrySlug(seed);
+                        const validationResult = await (0, curatorService_1.validateSeedOriginBackend)(queryForValidation);
                         if (validationResult.apiUsage) {
                             usageCollector.push(validationResult.apiUsage.model, validationResult.apiUsage);
                         }
                         if (validationResult.isValid) {
+                            const validatedCleanName = cleanSeedDisplayName || validationResult.id;
                             resolvedSeedArray.push({
                                 id: (0, curatorService_1.normalizeArtistId)(validationResult.id),
-                                name: validationResult.id,
+                                name: validatedCleanName,
                                 origin: validationResult.origin,
                                 genre: validationResult.genre,
                                 isCacheHit: false
@@ -358,33 +366,44 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 // Parse seed artists list (already done above)
                 // Strip regional slugs from the seed artists string to prevent prompt hallucination
                 const cleanSeedArtistsContext = artistList
-                    .map((a) => stripCountrySlug(a))
+                    .map((a) => {
+                    const norm = (0, curatorService_1.normalizeArtistId)(a);
+                    const canonical = resolvedSeedNormMap.get(norm) ?? norm;
+                    return seedNamesMap[canonical] || seedNamesMap[norm] || stripCountrySlug(a);
+                })
                     .join('::');
                 // [Pre-Hydration ID Standardization Removed]
                 // executeCurationPipeline already correctly assigns canonical slugged IDs (e.g. 'buggin-us')
                 // to both the node AND its links. Muting it here prevents disconnected spiderwebs.
                 // 1. ISOLATE INTERACTIVE NODES: Explicitly filter out Structural Hubs (genre, founded, country)
                 // Structural hubs bypass the hydration loop entirely.
-                const recommendedEntities = finalGraph.nodes.filter((n) => n.type === 'artist' || n.type === 'label').map((n) => ({
-                    id: n.id,
-                    name: n.label || n.id,
-                    type: n.type,
-                    origin: n.origin || null
-                }));
+                const recommendedEntities = finalGraph.nodes.filter((n) => n.type === 'artist' || n.type === 'label').map((n) => {
+                    const norm = (0, curatorService_1.normalizeArtistId)(n.id);
+                    const canonical = resolvedSeedNormMap.get(norm) ?? norm;
+                    const cleanName = seedNamesMap[canonical] || seedNamesMap[norm] || seedNamesMap[n.id] || n.label || n.id;
+                    return {
+                        id: n.id,
+                        name: cleanName,
+                        type: n.type,
+                        origin: n.origin || null
+                    };
+                });
                 // CRITICAL FIX: Ensure all seed artists are explicitly placed into the hydration queue.
                 // The architectural design dictates that seeds must go through the gap-filling phase just like deep cuts,
                 // even if the LLM omitted them or modified their IDs in the graph output.
                 for (const seed of artistList) {
                     const seedNorm = (0, curatorService_1.normalizeArtistId)(seed);
+                    const canonicalSeedId = resolvedSeedNormMap.get(seedNorm) ?? seedNorm;
+                    const cleanName = seedNamesMap[canonicalSeedId] || seedNamesMap[seedNorm] || stripCountrySlug(seed);
                     const exists = recommendedEntities.some((e) => isEntitySeedMatch(seedNorm, e.id) || isEntitySeedMatch(seedNorm, e.name));
                     if (!exists) {
                         recommendedEntities.unshift({
-                            id: seed,
-                            name: seed,
+                            id: canonicalSeedId,
+                            name: cleanName,
                             type: 'artist',
                             origin: null
                         });
-                        console.log(`[Curation Backend] Explicitly pushing missing seed artist into gap-filling queue: ${seed}`);
+                        console.log(`[Curation Backend] Explicitly pushing missing seed artist into gap-filling queue: ${seed} (${cleanName})`);
                     }
                 }
                 console.log(`[Curation Backend] [Step 2: Hydration Loop Started] Hydrating details for ${recommendedEntities.length} entities in the graph:`, recommendedEntities.map((e) => `${e.name} (${e.type})`));
@@ -515,11 +534,12 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         let requiresTextHydration = false;
                         let requiresImageScraping = false;
                         let requiresVideoScraping = false;
-                        // Extract clean human-readable name for APIs by stripping known country slugs
-                        // Extract clean human-readable name for APIs by stripping known country slugs
-                        let searchArtistName = stripCountrySlug(rawName);
+                        // Extract clean human-readable name for APIs by prioritizing seedNamesMap, then stripping known country slugs
+                        let searchArtistName = seedNamesMap[artistNormId] ||
+                            seedNamesMap[(0, curatorService_1.normalizeArtistId)(rawName)] ||
+                            stripCountrySlug(rawName);
                         if (details && details.details && details.details.artist && details.details.artist !== rawName) {
-                            searchArtistName = details.details.artist;
+                            searchArtistName = seedNamesMap[artistNormId] || details.details.artist;
                         }
                         if (!details) {
                             requiresTextHydration = true;
@@ -640,7 +660,11 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                     details.imageUrl = 'not-found';
                                 }
                             }
-                            details.details.artist = details.details.artist || searchArtistName;
+                            const finalCleanArtistName = seedNamesMap[artistNormId] ||
+                                seedNamesMap[(0, curatorService_1.normalizeArtistId)(rawName)] ||
+                                details.details.artist ||
+                                searchArtistName;
+                            details.details.artist = finalCleanArtistName;
                             // Note: synthesisRationale is NOT stamped here. The real Root Breakdown is
                             // generated after all hydration completes (Step 4) and written back to the
                             // seed artist doc explicitly. Pre-stamping a stub would pollute the artist
@@ -1305,6 +1329,19 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     }
                 }
                 // Topology already rewritten and deduplicated in the pre-computation block before Step 5.
+                // Final Node Label Lock: Guarantee that seed nodes in the graph carry the clean display name
+                if (finalGraph && finalGraph.nodes && Array.isArray(finalGraph.nodes)) {
+                    finalGraph.nodes.forEach((node) => {
+                        if (node.type === 'artist' || !node.type) {
+                            const nodeNorm = (0, curatorService_1.normalizeArtistId)(node.id);
+                            const canonical = resolvedSeedNormMap.get(nodeNorm) ?? nodeNorm;
+                            const cleanName = seedNamesMap[canonical] || seedNamesMap[nodeNorm] || seedNamesMap[node.id];
+                            if (cleanName) {
+                                node.label = cleanName;
+                            }
+                        }
+                    });
+                }
                 result = {
                     graphData: finalGraph,
                     detailsCache: JSON.stringify(detailsCacheEntries)

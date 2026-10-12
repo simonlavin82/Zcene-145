@@ -114,6 +114,8 @@ export const executeCurationPipeline = onCall({
     .map((a: string) => a.trim())
     .filter(Boolean);
 
+  const seedNamesMap: Record<string, string> = payload.seedNames || {};
+
   console.log(`[Pipeline Diamond] -> Cache Lookup: Checking seeds: ${artistList.join(', ')}`);
   
   const detailsCacheEntries: [string, any][] = [];
@@ -213,11 +215,12 @@ export const executeCurationPipeline = onCall({
       }
       
       if (cachedDetails && cachedDetails.summary && cachedDetails.summary.length > 50 && cachedDetails.details?.genre && cachedDetails.imageUrl) {
+         const cleanHitName = seedNamesMap[resolvedSeedNorm] || seedNamesMap[seedNorm] || seedNamesMap[seed.toLowerCase()] || seed;
          if (hasGraphData) {
             console.log(`[Pipeline Diamond] -> Is Hit? Yes -> Full Data? Yes -> Merge into Canvas: ${seed}`);
             resolvedSeedArray.push({
                id: resolvedSeedNorm,
-               name: seed,
+               name: cleanHitName,
                origin: cachedDetails.details.origin || "",
                genre: cachedDetails.details.genre || "",
                isCacheHit: true
@@ -229,7 +232,7 @@ export const executeCurationPipeline = onCall({
             hasStubHit = true;
             resolvedSeedArray.push({
                id: resolvedSeedNorm,
-               name: seed,
+               name: cleanHitName,
                origin: cachedDetails.details.origin || "",
                genre: cachedDetails.details.genre || "",
                isCacheHit: true
@@ -273,10 +276,11 @@ export const executeCurationPipeline = onCall({
                console.log(`[Pipeline Diamond] -> Synchronously minted bare stub forwarder: ${bareNormId} -> ${normId}`);
             }
 
+           const cleanMissName = seedNamesMap[normId] || seedNamesMap[bareNormId] || seedNamesMap[seedNorm] || seedNamesMap[seed.toLowerCase()] || validationResult.id;
 
            resolvedSeedArray.push({
               id: normId,
-              name: validationResult.id,
+              name: cleanMissName,
               origin: validationResult.origin,
               genre: validationResult.genre,
               isCacheHit: false
@@ -470,6 +474,10 @@ export const executeCurationPipeline = onCall({
           inputPayload: {
              ...payload,
              artists: resolvedSeedArray.map(s => s.id).join('::'),
+             seedNames: {
+               ...seedNamesMap,
+               ...Object.fromEntries(resolvedSeedArray.map(s => [s.id, s.name]))
+             },
              baseGraph: finalGraph,
              generationType: determinedGenerationType,
              foregroundApiUsage: collectedTokens,
