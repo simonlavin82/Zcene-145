@@ -644,7 +644,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             if (requiresImageScraping && searchArtistName && !isLabel) {
                                 try {
                                     let attemptName = searchArtistName;
-                                    const scrapedImg = await (0, curatorService_1.scrapeImageUrlBackend)(attemptName, 'artist', details.details.genre || "", details.summary || "", details.details.origin);
+                                    const scrapedImg = await (0, curatorService_1.scrapeImageUrlBackend)(attemptName, 'artist', details.details.genre || "", details.summary || "", details.details.origin, details.discography || []);
                                     if (scrapedImg) {
                                         details.imageUrl = scrapedImg;
                                     }

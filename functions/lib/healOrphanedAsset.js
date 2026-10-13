@@ -145,7 +145,7 @@ exports.healOrphanedAsset = (0, https_1.onCall)({
             const summary = synthesizedDetails.summary || "";
             const origin = synthesizedDetails.details?.origin || (countrySlug ? countrySlug.toUpperCase() : "");
             try {
-                scrapedImageUrl = await (0, curatorService_1.scrapeImageUrlBackend)(searchArtistName, 'artist', genre, summary, origin);
+                scrapedImageUrl = await (0, curatorService_1.scrapeImageUrlBackend)(searchArtistName, 'artist', genre, summary, origin, synthesizedDetails.discography || []);
             }
             catch (scrapeErr) {
                 console.warn(`[JIT Healer] Image scraper error for "${searchArtistName}":`, scrapeErr.message);

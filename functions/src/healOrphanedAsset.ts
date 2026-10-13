@@ -179,7 +179,8 @@ export const healOrphanedAsset = onCall({
           'artist',
           genre,
           summary,
-          origin
+          origin,
+          synthesizedDetails.discography || []
         );
       } catch (scrapeErr: any) {
         console.warn(`[JIT Healer] Image scraper error for "${searchArtistName}":`, scrapeErr.message);
