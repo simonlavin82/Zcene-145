@@ -784,7 +784,8 @@ CRITICAL RULES (non-negotiable):
     if (data.isValid) {
       // Build primary candidate
       let primarySlug = normalizeArtistId(primary.id);
-      if (hasCollision && primary.origin) {
+      // V25 Root-as-Router Contract & Rule 36: All verified entities with non-global origins resolve to their geographically suffixed ID
+      if (primary.origin) {
         const originSlug = extractCountrySlug(primary.origin);
         if (originSlug && originSlug !== 'global' && !primarySlug.endsWith(`-${originSlug}`)) {
           primarySlug = `${primarySlug}-${originSlug}`;

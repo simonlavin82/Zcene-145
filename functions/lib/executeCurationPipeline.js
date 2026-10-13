@@ -214,9 +214,18 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
         }
         let hasGraphData = false;
         try {
-            const cacheDoc = await db.collection("artists").doc(resolvedSeedNorm).get();
+            let cacheDoc = await db.collection("artists").doc(resolvedSeedNorm).get();
             if (cacheDoc.exists) {
-                const cacheData = cacheDoc.data();
+                let cacheData = cacheDoc.data();
+                // Root-as-Router Traversal (V25): Follow redirectTo from bare stub to canonical suffixed doc
+                if (cacheData && cacheData.redirectTo && cacheData.redirectTo !== resolvedSeedNorm) {
+                    const targetDoc = await db.collection("artists").doc(cacheData.redirectTo).get();
+                    if (targetDoc.exists) {
+                        resolvedSeedNorm = cacheData.redirectTo;
+                        cacheDoc = targetDoc;
+                        cacheData = targetDoc.data();
+                    }
+                }
                 cachedDocsData[resolvedSeedNorm] = cacheData;
                 if (cacheData && cacheData.graphData) {
                     const rawGraph = typeof cacheData.graphData === 'string' ? JSON.parse(cacheData.graphData) : cacheData.graphData;
@@ -287,8 +296,9 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
             if (validationResult.isValid) {
                 const bareNormId = (0, curatorService_1.normalizeArtistId)(validationResult.id);
                 let normId = bareNormId;
-                // Zero Blind Trust (V24): ONLY append geographic slug if this entity has an AI-confirmed collision!
-                if (validationResult.hasCollision && validationResult.origin) {
+                // Root-as-Router Contract (V25 / Rule 36): Bare IDs must be minted exclusively as _isStub: true forwarders.
+                // All verified entities with non-global origins resolve to their geographically suffixed ID.
+                if (validationResult.origin) {
                     const originSlug = (0, curatorService_1.extractCountrySlug)(validationResult.origin);
                     if (originSlug && originSlug !== 'global' && !normId.endsWith(`-${originSlug}`)) {
                         normId = `${normId}-${originSlug}`;

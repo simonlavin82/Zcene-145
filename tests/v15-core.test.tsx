@@ -148,7 +148,7 @@ describe('V15 Core Regression Suite (Integration)', () => {
         hasCollision: false,
         candidates: [
           {
-            id: 'gunmoll',
+            id: 'gunmoll-us',
             name: 'Gunmoll',
             origin: 'Gainesville, Florida, USA',
             genre: 'Melodic Punk Rock',
