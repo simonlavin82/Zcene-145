@@ -42,8 +42,8 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 - A deterministic top-level artist image URL (`seedImageUrl`) MUST be appended directly to the root of the project and shared Zcene payloads at creation.
 - This eliminates secondary proxy lookups during Open Graph generation (`server.js`), guaranteeing reliable album art rendering across external platforms (e.g., WhatsApp).
 
-### 5. (Deprecated - Lazy/Guest Hydration Fallbacks are Obsolete)
-- Project payloads are now 100% self-contained and atomic. On-demand or lazy hydration is strictly forbidden.
+### 5. [Deprecated] Legacy Client-Side Hydration
+- Project payloads are 100% self-contained and atomic. On-demand or lazy guest hydration fallbacks are obsolete and strictly forbidden.
 
 ### 6. Ambiguous Stub Bypass & Canonical Resolution via `isNodeInSeedList`
 - **Ambiguous Stub Bypass:** Any entity document marked as an ambiguous stub (`_isStub: true && isAmbiguous: true`) MUST strictly bypass direct cache hit fast-tracking and route directly to Node 4 (`<ConsolidatedValidationModal>`). This completely eliminates the "Direct Hit Trap" where early users cemented homonyms without multi-tenant choice.
@@ -54,19 +54,17 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 - The cache validation predicate must enforce strict completeness.
 - Nodes lacking crucial media or complete context (e.g., missing imagery, empty biography) are instantly flagged as cache misses by the gatekeeper. 
 
-## CRITICAL SCHEMA RULES FOR CACHE
-- **Root Breakdown Persistence:** The "Root Breakdown narrative" MUST be written to the root level of the project document (not nested inside a sub-object), ensuring schema continuity.
-- `synthesisRationale` **MUST** be written explicitly to the **root level** of the global artist cache document (not buried inside stringified layers).
-- **Dynamic Dashboard Integrity:** Dashboard metadata (like the `deepCuts` count) must dynamically match the actual rendered nodes in the graph data, strictly prohibiting static placeholders.
-- **Strict Ledger Payload Parity:** The frontend's `buildBaseProjectPayload` MUST defensively omit `generationType` and `apiUsage` from the payload base to prevent the React autosave hook (`merge: true`) from clobbering the backend's precise token metrics and partial generation statuses with default 'Clone' labels.
-- D3 **Link Objects MUST** be safely serialized back to strings (e.g. `link.source.id`) before caching `graphData`.
-- Column 2 cache-loading MUST safely parse and clone the cache objects to avoid polluting the memory references, and strictly deduplicate loaded node IDs.
-
-### 8. Strict Topology Verification (Evolved Stub Routing)
+### 8. Strict Topology Verification & Cache Serialization
 - The pipeline MUST differentiate between an "Evolved Stub" (`_isStub: true`) and a "Full Cache Hit".
 - An ambiguous stub holds `{ _isStub: true, isAmbiguous: true, redirectTo: null, candidates: [...] }`.
 - A single-pointer stub holds `{ _isStub: true, isAmbiguous: false, redirectTo: canonicalId, candidates: [...] }`.
-- Column 2 cache-loading MUST explicitly verify the presence of populated `graphData`. Stubs lacking graphData MUST be routed to Generative Topology (`needsProGeneration = true`) to build the required node map before asynchronous hydration.
+- Column 2 cache-loading MUST safely parse and clone cache objects to avoid polluting memory references, strictly deduplicate loaded node IDs, and explicitly verify the presence of populated `graphData`. Stubs lacking graphData MUST route to Generative Topology (`needsProGeneration = true`).
+- **Cache Serialization Invariants:**
+  - D3 **Link Objects MUST** be safely serialized back to pure strings (e.g., `link.source.id`) before caching `graphData`.
+  - `synthesisRationale` **MUST** be written explicitly to the root level of the global artist cache document (not buried inside stringified layers).
+  - The "Root Breakdown narrative" MUST be written to the root level of the project document to ensure schema continuity.
+  - **Dynamic Dashboard Integrity:** Dashboard metadata (e.g., `deepCuts` count) must dynamically match the rendered nodes in the graph data, prohibiting static placeholders.
+  - **Strict Ledger Payload Parity:** The frontend's `buildBaseProjectPayload` MUST defensively omit `generationType` and `apiUsage` from the payload base to prevent the React autosave hook (`merge: true`) from clobbering the backend's precise token metrics and partial generation statuses with default 'Clone' labels.
 - **The Fast-Track:** Single unambiguous stubs bypass redundant re-validation and fast-track into Generative Topology, while ambiguous stubs are pre-resolved in Column 1.
 
 ### 9. Canonical Seed Slug Resolution via `resolvedSeedNormMap` & `idRewriteMap` (Split-Brain Prevention)
@@ -84,8 +82,7 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 ### 11. Validation Reasoning & Escape Hatch Bouncer
 - **Human Confirmation Gate:** Requires human confirmation of seed to prevent costly downstream queries. Unrecognizable entities (`isValid: false`) are hard-blocked at the callable boundary to prevent broken stub minting.
 - **Escape Hatch Bouncer:** When the user exercises the "Not this artist?" escape hatch, parametric verification is strictly enforced via Flash: if no legitimate artist exists matching the specified origin/genre, the attempt is hard-rejected with an inline UI error to prevent database pollution.
-- **Eradication of Google Grounding Surcharge:** Native googleSearch grounding tools MUST remain fully stripped from both the Cloud Run proxy and Firebase Cloud Functions. The architecture relies purely on Gemini 3.6 Flash's parametric memory (abstracted via `GEMINI_FLASH_MODEL`). This enforcement dropped the real-world cost per 40-node root generation from ~£4.30+ down to an average of ~$0.15 / £0.12 – £0.48.
-- **Deprecation of external SERP queries:** The legacy `serpService.ts` (Google Custom Search API) has been completely removed to avoid unnecessary third-party API costs ($5 per 1,000 queries), quota limits, and 400 Bad Request errors.
+- **Zero Search Grounding:** Native googleSearch grounding tools and external SERP queries MUST remain fully stripped from both the Cloud Run proxy and Firebase Cloud Functions. The architecture relies purely on Gemini 3.6 Flash's parametric memory (abstracted via `GEMINI_FLASH_MODEL`), completely eliminating search grounding surcharges and third-party SERP API dependencies.
 
 ### 12. Resilient iTunes Artwork Pipeline
 - **Punctuation-Agnostic Normalization:** The iTunes scraper MUST use the punctuation-agnostic normalization rule (`toLowerCase().replace(/[^a-z0-9]/g, '')`) to resolve strict equality naming edge cases (e.g., "Jay Z" vs "JAY-Z").
@@ -124,7 +121,9 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 - **Enforcement:** The D3 layout is strictly driven by the 'Final Node Positioning' step via `gemini-3.6-flash` (abstracted via `GEMINI_FLASH_MODEL`). The AI generates float weights (0.1 to 1.0) using a lean bio payload strategy, which dictate variable link distance, spring rigidity, and collision radii. If the AI model fails or returns an empty array, the pipeline gracefully falls back to injecting a neutral weight of `0.5` across all links to guarantee physics stability.
 - **Coordinate Memory Sub-Clause (V8):** Once `simulation.on("end")` fires and all nodes are pinned via `fx`/`fy` in memory, the settled artist and label node positions MUST be persisted back to the owned project document (`users/{uid}/projects/{id}`) via a debounced `updateDoc` targeting the `canvasLayout` field only. This is called **Coordinate Memory**. The debounce window is 5 seconds; a dirty-check prevents redundant writes when the layout is unchanged. Coordinate Memory is strictly scoped to authenticated, non-guest, project-owning sessions. The Share Generation and Duplication pathways are explicitly excluded (see Rule 25).
 
-### 22. (Reserved for future architectural law)
+### 22. Deep-Cut Range Targeting
+- **Rule:** The LLM graph generator prompt is explicitly calibrated to aim for a rich spiderweb density (18 to 21 organic related artists).
+- **Enforcement:** The model is granted natural flexibility to scale this density down if a more localized or niche musical scene has fewer genuine connections, strictly prohibiting artificial padding or hallucinated filler nodes just to meet a numerical quota.
 
 ### 23. Topology Parity Mandate
 - **Rule:** Any stylistic, genre, or scene connection explicitly cited in the Root Breakdown narrative (Step 3.1, `generateRootsBreakdownBackend`) MUST have a corresponding edge entry in `finalGraph.links`.
@@ -150,12 +149,16 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 ### 26. Contextual Tooltips
 - **Rule:** Spiderweb node tooltips must prioritize the AI-generated `narrativeSnippet` (epicenter hook) over the encyclopedic `summary` to provide cohesive, web-specific context.
 
+### 27. AI-Led Coordinate Panning
+- **Rule:** Graph coordinates and initial camera viewport centers are dynamically calibrated based on the spatial bounding box of the settled semantic clusters.
+- **Enforcement:** The engine calculates center-of-mass coordinates across active nodes to ensure the visual graph is immediately centered in the viewport upon render, preventing clipping on mobile and widescreen viewports.
+
 ### 28. Canonical Global Caching (Filter Barring)
 - **Rule:** Global entity caching MUST use pure canonical IDs for document paths (`cleanCanonicalId`). 
 - **Enforcement:** Query filters (e.g., `after:2019`, `genre:hardcore`) are strictly barred from canonical document paths. This explicitly prevents cache fracturing and phantom cache misses.
 - **Rationale:** Zcene strictly separates bespoke temporal/genre Zcene generation (which lives in ephemeral project topologies) from its canonical global artist library (which must remain a pure, singular source of truth for all users).
 
-### 29. V23 Data Lifecycle Matrix
+### 29. Data Lifecycle Matrix
 - **Rule:** Timestamps strictly conform to the 3-Tier Storage Matrix. `cachedAt` is permanently eradicated.
 - **Tier 1: Global Assets (artists & labels):** `createdAt` (Immutable), `updatedAt` (Mutable). Soft-expires at 365 days (Stale). **Stale nodes are ONLY refreshed when intersected by a user-funded generation. NEVER auto-swept.**
 - **Tier 2: Ephemeral Storage (sharedZcenes):** `createdAt` (Immutable), `expireAt` (+30 Days Hard TTL). `updatedAt` is strictly NULL/Removed (read-only snapshots).
