@@ -1,8 +1,8 @@
 # ZCENE ARCHITECTURAL TRUTH & IMMUTABLE LAWS
  
-![Architecture Diagram](./Zcene Architecture V23.jpg)
+![Architecture Diagram](./Zcene Architecture V25.jpg)
  
-This document defines the absolute, immutable architectural baseline of Zcene (V23). All future development, bug fixes, and AI agent actions MUST strictly adhere to these laws. Legacy paradigms (like naive string matching, bypass assumptions, or single-pointer stubs) are strictly forbidden.
+This document defines the absolute, immutable architectural baseline of Zcene (V25). All future development, bug fixes, and AI agent actions MUST strictly adhere to these laws. Legacy paradigms (like naive string matching, bypass assumptions, single-pointer stubs, or storing entity payloads under bare IDs) are strictly forbidden.
  
 ## THE IMMUTABLE ARCHITECTURAL LAWS
  
@@ -12,13 +12,18 @@ The curation pipeline is strictly divided into three distinct execution columns.
   - **Step 1: Local Topology Routing:** Direct Hits (perfect cache) bypass the network entirely.
   - **Step 2 (Topology Hit):** Explicitly mapped to `<DisambiguationModal>` ("Look What I Found") to verify origin on cache hits.
   - **Step 3 (Pre-Flight Gateway & Collision Detection):** Calls `validateSeedOriginCallable` (`3.6 Flash`, `thinking_level: minimal`, Zero Search Grounding / Parametric Only). Detects multi-tenant homonyms (e.g., "Darko US" vs "Darko UK") and synchronously mints 1-to-many Evolved Stub contracts (`_isStub: true, isAmbiguous: true, candidates: [...]`).
-  - **Step 4 (Confirm Your Artists):** Explicitly mapped to `<ConsolidatedValidationModal>`. Presents locked cards for unambiguous seeds, `<DisambiguationRadio>` for collisions, and the "Not this artist?" escape hatch.
+  - **Step 4 (Confirm Your Artists & Escape Hatch Re-Query Bouncer):** Explicitly mapped to `<ConsolidatedValidationModal>`. Presents locked cards for unambiguous seeds, `<DisambiguationRadio>` for collisions, and the "Not this artist?" manual escape hatch.
+    - **Escape Hatch Re-Query Bouncer:** If a user specifies custom origin or genre hints and clicks "Apply", the UI enters an active `isVerifying` state and synchronously re-queries `validateSeedOriginCallable` (`3.6 Flash`, `thinking_level: minimal`, Zero Search Grounding / Parametric Only).
+    - **Zero-Pollution Inline Rejection:** If Flash rejects (`isValid: false` or `not-found`), an inline error banner ("No significant artist found matching these criteria") is displayed, the card remains in edit mode, and "Confirm & Generate" remains locked. Zero stubs are written to Firestore during the modal interaction.
+    - **Verified UI Lock:** "Confirm & Generate" remains strictly disabled while any card is verifying or in edit mode, unlocking only after AI verification succeeds.
   - **Step 5 (API Confirmation):** Explicitly mapped to `<TokenConfirmationModal>`.
   - **Step 6 (Active Loader Gate):** LOCKED.
   - **Step 7 (Drop Loader & Render Zcene):** Drops the loader only when Column 3 sets project status to 'completed'.
 - **Column 2: HTTP Fast-Track (executeCurationPipeline.ts):** Synchronous execution layer.
-  - **Node 1: Ingest Validated Seed Payload:** Ingests frontend-validated seed preferences (`originalQueries`, `disambiguationHints`, `disambiguationGenres`, `activeSeedNames`). Strips non-standard regional country codes and standardizes seed slugs.
+  - **Node 1: Ingest Validated Seed Payload & Zero Blind Trust:** Ingests frontend-validated seed preferences (`originalQueries`, `disambiguationHints`, `disambiguationGenres`, `activeSeedNames`). Strips non-standard regional country codes and standardizes seed slugs.
+    - **Zero Blind Trust Mandate:** Column 2 MUST NOT synthesize geographic slugs (e.g., `-jp`) from raw user hints. Stubs and routing targets are minted strictly from validated Flash candidate payloads.
   - **Node 2: Create Topology (3.1 Pro) | Thinking_level: medium:** Generates skeleton (Seed, AI Artists, Labels, Genres) in kebab-case-artist-iso-code format with timeout protection.
+  - **Node 17: Root-as-Router Contract:** Bare IDs (e.g., `'gunmoll'`, `'turnstile'`) MUST be minted exclusively as `_isStub: true` forwarders (`redirectTo: "id-iso"`, `candidates: [...]`). Verified payloads (biography, discography, graphData, image) MUST be stored at geographically suffixed IDs (e.g., `artists/gunmoll-us`). Bare IDs are permanently reserved as routers to future-proof against homonyms and must never hold entity payloads. Cache reads checking bare IDs follow `redirectTo` directly to the suffixed canonical document.
   - Saves the baseline topology to Firestore and returns HTTP 200 OK while creating the `curationJobs` doc, handing full execution to the async worker.
 - **Column 3: Background Worker (processCurationJob.ts & healOrphanedAsset.ts):** Asynchronous hydration layer. Follows a strict progression: Hydrate Node Batch -> Final Node Positioning -> Root Synthesis (Native JSON Generation schema returning `{ editorialMarkdown, artistSnippets }`) -> Topology Parity (`reconcileNarrativeEdges` - Rule 23) -> Persist Assets. The architecture inherently bypasses any secondary contextual extraction pass. Never writes missing hydration data as 'null'; explicitly falls back to pre-hydrated `seedStubs` for failed primary seeds (JIT Fallback) to prevent database corruption. Writes fully hydrated nodes back to cache.
   - **Node 36: Just-In-Time (JIT) Asset Healer (3.6 Flash):** Dedicated on-demand micro-worker triggered ONLY when a user inspects an orphaned node suffering a true 404 cache miss. Bypasses batch queues to synthesize a 100% complete deep cut profile, performs atomic write-back to Firestore `artists/{id}` or `labels/{id}`, and records granular token and USD micro-cost receipts directly to `adminLedger/system/jitHeals`. Governed by a platform-wide 100-heal/24h auto-kill circuit breaker and manual admin override. Strictly forbidden from automated background sweeps or soft-expired data healing.
@@ -76,7 +81,9 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 - **Rationale:** Stubs and redirect pointers share identical normalized slug prefixes. Without this guard, the dedup logic adopts a stub or redirect pointer as the canonical ID, looks up an empty `detailsCache`, falls back to external API hydration, and on timeout skips the entire Firestore write — leaving `graphData` permanently empty on the canonical document.
 - **Rule:** `if (snapData.redirectTo || snapData._isStub || snapData.isAmbiguous) continue;` is an immutable guard in the slug dedup loop. It must never be removed.
 
-### 11. Cost-Optimized Parametric Hydration (No Grounding)
+### 11. Validation Reasoning & Escape Hatch Bouncer
+- **Human Confirmation Gate:** Requires human confirmation of seed to prevent costly downstream queries. Unrecognizable entities (`isValid: false`) are hard-blocked at the callable boundary to prevent broken stub minting.
+- **Escape Hatch Bouncer:** When the user exercises the "Not this artist?" escape hatch, parametric verification is strictly enforced via Flash: if no legitimate artist exists matching the specified origin/genre, the attempt is hard-rejected with an inline UI error to prevent database pollution.
 - **Eradication of Google Grounding Surcharge:** Native googleSearch grounding tools MUST remain fully stripped from both the Cloud Run proxy and Firebase Cloud Functions. The architecture relies purely on Gemini 3.6 Flash's parametric memory (abstracted via `GEMINI_FLASH_MODEL`). This enforcement dropped the real-world cost per 40-node root generation from ~£4.30+ down to an average of ~$0.15 / £0.12 – £0.48.
 - **Deprecation of external SERP queries:** The legacy `serpService.ts` (Google Custom Search API) has been completely removed to avoid unnecessary third-party API costs ($5 per 1,000 queries), quota limits, and 400 Bad Request errors.
 
@@ -97,8 +104,9 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 - **ProjectLoader Guardrails:** The ProjectLoader must strictly bypass Phase 1 interception when a document's status is `curating`. The UI must remain locked and patiently await the backend background worker rather than firing duplicate generative calls.
 - **Identity Lock (`isRegeneration`):** During 'Overwrite Existing' (`isRegeneration = true`), the original project name is strictly write-locked. New deep links or explicit forks derive fresh names natively from the seed strings.
 
-### 17. Universal Pre-Flight Stub Minting (Column 1 Pre-Flight Gateway)
+### 17. Universal Pre-Flight Stub Minting & Zero Blind Trust
 - **The Synchronous Pre-Flight:** Bare stubs (`_isStub: true, isAmbiguous: boolean, candidates: []`) MUST be minted synchronously in Column 1 during the pre-flight phase via `validateSeedOriginCallable` before the backend generation pipeline is triggered. This applies universally to both frontend-resolved partial hits and backend-resolved cache misses.
+- **Zero Blind Trust Mandate:** Pre-flight stubs MUST strictly derive from validated Flash candidate payloads. Minting stubs directly from unverified user strings or un-bouncer-checked escape hatch inputs is strictly prohibited to prevent database pollution.
 - **Multi-Tenant Disambiguation Contract:** When a collision is detected, the stub holds all potential candidates without prematurely forcing a single `redirectTo` pointer. The user resolves the candidate in Node 4 (`<ConsolidatedValidationModal>`), and the chosen canonical ID is ingested into Column 2.
 - **Local Topology Routing Exemption:** Direct cache hits completely bypass the backend, meaning legacy missing stubs are explicitly not healed during direct cache accesses.
 
@@ -174,8 +182,10 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 ### 35. Geographic Asset Disambiguation
 - **Rule:** If the deterministic iTunes scraper fails to validate an image asset due to a multi-artist name collision or missing legal alias, the background worker must parse the node's parametric origin data, append the relevant regional suffix (e.g., ' US', ' UK'), and execute a secondary validation query.
 
-### 36. Label Taxonomy Normalization
-- **Rule:** The extraction pipeline MUST algorithmically strip interchangeable structural suffixes (e.g., -records, -music, -company, -group, -media) from label entities prior to caching. This enforces the Canonical Persistence Mandate by reducing natural LLM variations to a single, pure root ID.
+### 36. Entity Taxonomy Normalization & Root-as-Router Contract
+- **Rule:** The extraction pipeline MUST algorithmically enforce bare root IDs for all global assets. Artists require strict `kebab-case-artist-iso-code` format.
+- **Root-as-Router Contract:** Bare IDs (e.g., `gunmoll`) are strictly reserved as routing stubs (`_isStub: true, redirectTo: "id-iso"`) to future-proof against homonyms and MUST NEVER hold entity payloads. All verified entities, whether seeds or deep cuts, must resolve to their geographically suffixed ID (e.g., `artists/gunmoll-us`). Failed parametric verifications are hard-rejected with inline UI errors to prevent database pollution.
+- **Label Taxonomy Normalization:** The extraction pipeline MUST algorithmically strip interchangeable structural suffixes (e.g., `-records`, `-music`, `-company`, `-group`, `-media`) from label entities prior to caching. This enforces the Canonical Persistence Mandate by reducing natural LLM variations to a single, pure root ID.
 
 ### 37. JIT Asset Telemetry & Healing (404 Emergency Parachute ONLY)
 - **Separation of Powers & Anti-Sweep Law:** The JIT Asset Healer (`healOrphanedAsset`) is strictly an **emergency parachute triggered ONLY by true 404 cache misses** on inspected nodes during live canvas exploration or post-generation eager hydration.

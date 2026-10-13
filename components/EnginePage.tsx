@@ -58,13 +58,13 @@ const ARCHITECTURE_RULES = [
     { id: 8, title: "Strict Topology Verification", desc: "Stubs MUST be strictly routed to Generative Topology before async hydration." },
     { id: 9, title: "Canonical Seed Slug Resolution", desc: "All downstream writes MUST target the canonical ID to prevent split-brain." },
     { id: 10, title: "Redirect Pointer Immunity", desc: "Hydration loop slug dedup MUST explicitly skip any document with a redirectTo field." },
-    { id: 11, title: "Cost-Optimized Parametric Hydration", desc: "Native googleSearch grounding tools MUST remain fully stripped." },
+    { id: 11, title: "Validation Reasoning & Escape Hatch Bouncer", desc: "Requires human confirmation of seed to prevent costly queries. Unrecognizable entities are hard-blocked. Escape hatch inputs undergo strict parametric re-query validation with inline rejection to prevent database pollution." },
     { id: 12, title: "Resilient iTunes Artwork Pipeline", desc: "Punctuation-Agnostic Normalization and Summary Match Fallback." },
     { id: 13, title: "Auth Handoff Preserver", desc: "Stashes ID in session storage to guarantee clone resumes post-auth." },
     { id: 14, title: "Atomic Self-Healing", desc: "Graph breakdowns handle atomic self-healing." },
     { id: 15, title: "Complex Cache Bypass", desc: "Multi-seed and filtered queries must strictly bypass the Global Topology Cache." },
     { id: 16, title: "Curation Intercept Guardrails", desc: "ProjectLoader must strictly bypass Phase 1 interception when curating." },
-    { id: 17, title: "Universal Pre-Flight Stub Minting", desc: "Bare stubs (_isStub: true, isAmbiguous: boolean, candidates: []) are minted synchronously during Column 1 pre-flight via validateSeedOriginCallable prior to pipeline triggering to guarantee multi-tenant disambiguation." },
+    { id: 17, title: "Universal Pre-Flight Stub Minting & Zero Blind Trust", desc: "Bare stubs (_isStub: true, isAmbiguous: boolean, candidates: []) are minted synchronously during Column 1 pre-flight via validateSeedOriginCallable prior to pipeline triggering. Stubs MUST strictly derive from validated Flash candidate payloads; unverified user strings are forbidden." },
     { id: 18, title: "Authorization Lifecycle", desc: "Token/billing authorization state must be strictly scoped to the active generation event." },
     { id: 19, title: "External Link Security", desc: "Official Website and Bandcamp links must rely on deterministic client-side search templates." },
     { id: 20, title: "Mandatory Disambiguation on Direct Hits", desc: "Green Line MUST NEVER bypass the user confirmation phase." },
@@ -82,7 +82,7 @@ const ARCHITECTURE_RULES = [
     { id: 32, title: "Validation Circuit Breaker", desc: "Phase 3 Validation Modal must act as a hard execution stop/return." },
     { id: 33, title: "Payload Completeness", desc: "Direct Hit local routing must inject both graphData and detailsCache simultaneously." },
     { id: 34, title: "Cognitive Tiering & Orchestration Stability", desc: "AI generation strictly utilizes the thinking_level tier system (minimal to high) with legacy sampling parameters explicitly forbidden. Discovery Ledger remains pegged to standard list rates ($1.50 / 1M input, $7.50 / 1M output)." },
-    { id: 36, title: "Label Taxonomy Normalization", desc: "The extraction pipeline MUST algorithmically strip interchangeable structural suffixes (e.g., -records, -music, -company, -group, -media) from label entities prior to caching. This enforces the Canonical Persistence Mandate by reducing natural LLM variations to a single, pure root ID." },
+    { id: 36, title: "Entity Taxonomy Normalization & Root-as-Router", desc: "Bare IDs are strictly reserved as routing stubs to future-proof against homonyms and must never hold entity payloads. All verified entities, whether seeds or deep cuts, must resolve to their geographically suffixed ID (e.g., gunmoll-us)." },
     { id: 37, title: "JIT Asset Telemetry & Healing (404 Parachute ONLY)", desc: "JIT Healer is an emergency parachute strictly triggered ONLY by true 404 misses on inspected nodes during live canvas exploration. Background cron sweeps or automated janitor passes for soft-expired data are strictly forbidden; dataset refreshes remain 100% user-funded on demand." }
 ];
 
@@ -105,7 +105,14 @@ const DiscoveryFlowDiagram: React.FC = () => (
                                 <li>Mints 1-to-many Evolved Stub contracts (<code>_isStub: true, isAmbiguous: true, candidates: [...]</code>).</li>
                             </ul>
                         </li>
-                        <li><span className="text-primary font-medium">Confirm Your Artists:</span> <code>&lt;ConsolidatedValidationModal&gt;</code> presents locked cards for unambiguous seeds, radio selection for collisions, and the "Not this artist?" escape hatch.</li>
+                        <li>
+                            <span className="text-primary font-medium">Confirm Your Artists & Escape Hatch Re-Query Bouncer:</span> <code>&lt;ConsolidatedValidationModal&gt;</code> presents locked cards for unambiguous seeds, radio selection for collisions, and the "Not this artist?" escape hatch.
+                            <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500">
+                                <li><span className="text-zinc-300 font-medium">Re-Query Bouncer:</span> User custom origin/genre hints trigger synchronous Flash 3.6 re-verification (<code>thinking_level: minimal</code>, Zero Search Grounding / Parametric Only).</li>
+                                <li><span className="text-zinc-300 font-medium">Zero-Pollution Inline Rejection:</span> Invalid/unrecognized entities are rejected inline with an error banner; zero unverified stubs are minted.</li>
+                                <li><span className="text-zinc-300 font-medium">Verified UI Lock:</span> Generation remains locked until all cards are cleanly verified or reverted.</li>
+                            </ul>
+                        </li>
                         <li><span className="text-primary font-medium">API Confirmation:</span> <code>&lt;TokenConfirmationModal&gt;</code> intercepts generation to authorize API token spend.</li>
                         <li><span className="text-primary font-medium">Active Loader Gate:</span> Locks the UI completely to wait for backend processing.</li>
                         <li><span className="text-primary font-medium">Drop Loader & Render Zcene:</span> The loader drops only when the background worker sets project status to 'completed'.</li>
@@ -125,10 +132,11 @@ const DiscoveryFlowDiagram: React.FC = () => (
                     <div className="text-white font-medium mb-4">HTTP Fast-Track</div>
                     <ul className="text-[12px] text-zinc-400 space-y-4">
                         <li>
-                            <span className="text-primary font-semibold">1. Ingest Validated Seed Payload</span>
+                            <span className="text-primary font-semibold">1. Ingest Validated Seed Payload & Zero Blind Trust</span>
                             <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500">
                                 <li>Ingests pre-validated seed preferences (originalQueries, disambiguationHints, disambiguationGenres).</li>
                                 <li>Strips non-standard regional country codes and standardizes seed slugs.</li>
+                                <li><span className="text-zinc-300 font-medium">Zero Blind Trust:</span> Rejects blind stub minting; slugs are strictly derived from verified Flash candidate payloads.</li>
                             </ul>
                         </li>
                         <li>
@@ -137,6 +145,14 @@ const DiscoveryFlowDiagram: React.FC = () => (
                                 <li>Skeleton: Seed, AI Artists, Labels, Genres.</li>
                                 <li>Enforces kebab-case-artist-iso-code format.</li>
                                 <li>Seed Artist Timeout Protection: Drops failing.</li>
+                            </ul>
+                        </li>
+                        <li>
+                            <span className="text-primary font-semibold">17. Root-as-Router Contract</span>
+                            <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500">
+                                <li>Bare IDs (e.g., <code>gunmoll</code>) are minted exclusively as <code>_isStub: true</code> forwarders (<code>redirectTo: "id-iso"</code>).</li>
+                                <li>Verified payloads (bio, graph, details) reside strictly at geographically suffixed IDs (<code>artists/gunmoll-us</code>).</li>
+                                <li>Bare IDs are permanently reserved as routers to future-proof against homonyms.</li>
                             </ul>
                         </li>
                     </ul>
@@ -379,7 +395,7 @@ const AsyncHydrationDiagram: React.FC = () => (
                 <div className="bg-primary/20 p-3 rounded-lg border border-primary/50 text-primary w-64 text-center font-bold shadow-[0_0_15px_rgba(168,85,247,0.4)]">
                     HTTP Fast-Track
                     <div className="text-[10px] font-normal mt-2 opacity-80">
-                        Origin Validation: Gemini 3.5 Flash<br/>
+                        Origin Validation: Gemini 3.6 Flash<br/>
                         Topology Creation: Gemini 3.1 Pro
                     </div>
                 </div>
@@ -394,7 +410,7 @@ const AsyncHydrationDiagram: React.FC = () => (
                 <div className="bg-amber-500/20 p-3 rounded-lg border border-amber-500/50 text-amber-500 w-64 text-center font-bold">
                     Background Worker
                     <div className="text-[10px] font-normal mt-2 opacity-80">
-                        Node Positioning: Gemini 3.5 Flash<br/>
+                        Node Positioning: Gemini 3.6 Flash<br/>
                         Root Breakdowns: Gemini 3.1 Pro
                     </div>
                 </div>
@@ -804,7 +820,7 @@ the entire dataset, the app evolves existing visual structures.
      normalized slugs ('isSameNodeId') to resolve raw artist name and selection mismatches.
 
 4. DATA INTEGRITY & PARALLEL HYDRATION PIPELINE:
-   - Temporal Isolation (v4): The prompt architecture strictly enforces period-accurate temporal isolation by excluding explicit token-biasing band examples (e.g., Snapcase) that previously caused generation leakage. Native googleSearch grounding tools and external SERP queries (Google Custom Search API) have been fully stripped from the Cloud Run proxy and Firebase Cloud Functions to eradicate Search Grounding surcharges (dropping cost from ~£4.30+ to ~$0.15 / £0.12 – £0.48 per 40-node generation) and eliminate third-party API dependencies (avoiding $5/1K query costs and 400 Bad Request errors). Entity hydration now relies strictly on Gemini 3.5 Flash's parametric memory.
+   - Temporal Isolation (v4): The prompt architecture strictly enforces period-accurate temporal isolation by excluding explicit token-biasing band examples (e.g., Snapcase) that previously caused generation leakage. Native googleSearch grounding tools and external SERP queries (Google Custom Search API) have been fully stripped from the Cloud Run proxy and Firebase Cloud Functions to eradicate Search Grounding surcharges (dropping cost from ~£4.30+ to ~$0.15 / £0.12 – £0.48 per 40-node generation) and eliminate third-party API dependencies (avoiding $5/1K query costs and 400 Bad Request errors). Entity hydration now relies strictly on Gemini 3.6 Flash's parametric memory.
    - Chunked Concurrent Backend Hydration: Curation details (biographies, genres, origins,
      formed years, member lists, and image URLs) for ALL node types are resolved via a
      chunked Promise.all() execution model on the backend. Nodes are batched into groups
