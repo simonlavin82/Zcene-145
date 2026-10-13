@@ -1,8 +1,14 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { ConsolidatedValidationModal } from '../components/SharedModals';
 import { applyShareBlacklistMutation } from '../App';
+import { httpsCallable } from 'firebase/functions';
+
+vi.mock('firebase/functions', () => ({
+  getFunctions: vi.fn(),
+  httpsCallable: vi.fn(),
+}));
 
 describe('V15 Core Regression Suite (Integration)', () => {
   it('Validation Lockout: Confirm & Generate is disabled for Unknown Origin artist', () => {
@@ -59,6 +65,134 @@ describe('V15 Core Regression Suite (Integration)', () => {
     
     // Assert that the button is enabled
     expect(confirmBtn).not.toBeDisabled();
+  });
+
+  it('Re-Query Bouncer: Blocks unverified escape hatch override when Flash rejects hints, shows inline error, and locks Confirm & Generate', async () => {
+    const mockSeed = [
+      {
+        id: 'gunmoll',
+        query: 'Gunmoll',
+        predictedOrigin: 'Gainesville, Florida, USA',
+        genre: 'Melodic Punk Rock',
+        isKnownCacheHit: false
+      }
+    ];
+
+    const mockCallable = vi.fn().mockRejectedValue(new Error('No culturally significant artist found matching origin "Japan" / genre "Jazz".'));
+    (httpsCallable as any).mockReturnValue(mockCallable);
+
+    render(
+      <ConsolidatedValidationModal 
+        isOpen={true} 
+        seeds={mockSeed} 
+        onConfirm={vi.fn()} 
+        onCancel={vi.fn()} 
+      />
+    );
+
+    // Initial state: button is enabled because Gunmoll had valid origin
+    const confirmBtn = screen.getByTestId('validation-confirm-button');
+    expect(confirmBtn).not.toBeDisabled();
+
+    // User clicks "Not this artist?" escape hatch
+    const notThisArtistBtn = screen.getByText('Not this artist?');
+    fireEvent.click(notThisArtistBtn);
+
+    // In edit mode: Confirm button must be immediately locked
+    expect(confirmBtn).toBeDisabled();
+
+    // User enters fake hints: "Japan" and "Jazz"
+    const originInput = screen.getByPlaceholderText(/United Kingdom, Australia, Chicago/i);
+    const genreInput = screen.getByPlaceholderText(/Genre \(optional\)/i);
+    fireEvent.change(originInput, { target: { value: 'Japan' } });
+    fireEvent.change(genreInput, { target: { value: 'Jazz' } });
+
+    // User clicks "Apply"
+    const applyBtn = screen.getByText('Apply');
+    fireEvent.click(applyBtn);
+
+    // Flash callable should be called with hints
+    expect(mockCallable).toHaveBeenCalledWith({
+      seed: 'Gunmoll',
+      originHint: 'Japan',
+      genreHint: 'Jazz'
+    });
+
+    // Wait for inline error to appear
+    await waitFor(() => {
+      expect(screen.getByTestId('bouncer-error')).toHaveTextContent('No significant artist found matching these criteria');
+    });
+
+    // Confirm & Generate must remain strictly locked
+    expect(confirmBtn).toBeDisabled();
+    expect(confirmBtn).toHaveClass('opacity-50 cursor-not-allowed');
+  });
+
+  it('Re-Query Bouncer: Unlocks Confirm & Generate when Flash verifies valid escape hatch override parameters', async () => {
+    const mockSeed = [
+      {
+        id: 'gunmoll',
+        query: 'Gunmoll',
+        predictedOrigin: 'Unknown Origin',
+        genre: '',
+        isKnownCacheHit: false
+      }
+    ];
+
+    const mockCallable = vi.fn().mockResolvedValue({
+      data: {
+        isValid: true,
+        id: 'Gunmoll',
+        origin: 'Gainesville, Florida, USA',
+        genre: 'Melodic Punk Rock',
+        hasCollision: false,
+        candidates: [
+          {
+            id: 'gunmoll',
+            name: 'Gunmoll',
+            origin: 'Gainesville, Florida, USA',
+            genre: 'Melodic Punk Rock',
+            disambiguationSnippet: 'American melodic punk band from Gainesville'
+          }
+        ]
+      }
+    });
+    (httpsCallable as any).mockReturnValue(mockCallable);
+
+    render(
+      <ConsolidatedValidationModal 
+        isOpen={true} 
+        seeds={mockSeed} 
+        onConfirm={vi.fn()} 
+        onCancel={vi.fn()} 
+      />
+    );
+
+    const confirmBtn = screen.getByTestId('validation-confirm-button');
+    expect(confirmBtn).toBeDisabled(); // Initially Unknown Origin
+
+    // User clicks "Not this artist?" escape hatch
+    const notThisArtistBtn = screen.getByText('Not this artist?');
+    fireEvent.click(notThisArtistBtn);
+
+    // User enters valid hints: "USA" and "Punk Rock"
+    const originInput = screen.getByPlaceholderText(/United Kingdom, Australia, Chicago/i);
+    const genreInput = screen.getByPlaceholderText(/Genre \(optional\)/i);
+    fireEvent.change(originInput, { target: { value: 'USA' } });
+    fireEvent.change(genreInput, { target: { value: 'Punk Rock' } });
+
+    // User clicks "Apply"
+    const applyBtn = screen.getByText('Apply');
+    fireEvent.click(applyBtn);
+
+    // Wait for card to update to confirmed state
+    await waitFor(() => {
+      expect(screen.getByTestId('validation-origin-text')).toHaveTextContent('Gainesville, Florida, USA • Melodic Punk Rock');
+    });
+
+    // Confirm button must now be unlocked!
+    expect(confirmBtn).not.toBeDisabled();
+    expect(confirmBtn).not.toHaveClass('opacity-50 cursor-not-allowed');
   });
 
 

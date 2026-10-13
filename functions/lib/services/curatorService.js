@@ -650,7 +650,7 @@ exports.SEED_VALIDATION_SCHEMA = {
     required: ["isValid", "correctedInput", "hasCollision", "primary", "collisions"]
 };
 // --- CORE CURATOR LOGIC ---
-const validateSeedOriginBackend = async (artistId) => {
+const validateSeedOriginBackend = async (artistId, hints) => {
     try {
         const apiKey = process.env.GEMINI_API_KEY;
         if (!apiKey) {
@@ -658,7 +658,11 @@ const validateSeedOriginBackend = async (artistId) => {
         }
         const ai = new genai_1.GoogleGenAI({ apiKey, httpOptions: { timeout: 300000 } });
         const currentModel = exports.GEMINI_FLASH_MODEL; // Column 2: Origin Validation uses Flash
-        const prompt = `Validate this seed artist: "${artistId}".
+        const hasHints = !!(hints && (hints.originHint?.trim() || hints.genreHint?.trim()));
+        const hintContext = hasHints
+            ? `\nUSER SPECIFICATION / RE-QUERY HINTS: The user explicitly specifies that this artist operates in or originates from: "${hints?.originHint?.trim() || ''}"${hints?.genreHint?.trim() ? ` with genre: "${hints.genreHint.trim()}"` : ''}.`
+            : '';
+        const prompt = `Validate this seed artist: "${artistId}".${hintContext}
 
 CRITICAL RULES (non-negotiable):
 1. TYPO CORRECTION (MANDATORY): If the input is an obvious misspelling or transposition of a real artist name (e.g. "turstile" for "Turnstile", "radiohed" for "Radiohead", "nirvanna" for "Nirvana"), return the correctly-spelled canonical name in 'primary.id' and set 'correctedInput' to true. Do NOT return the original typo'd spelling under any circumstances.
@@ -666,13 +670,19 @@ CRITICAL RULES (non-negotiable):
    - A collision exists ONLY when there are multiple distinct, widely-known, commercially released musical artists that legitimately share this name (e.g. "Darko" -> Darko US [Deathcore] and Darko [UK Melodic Punk]).
    - DO NOT invent, hallucinate, or scour for obscure local bar bands, unreleased bedroom projects, or minor soundcloud profiles just to be a "people pleaser".
    - If there is only one predominant, notable, or famous artist (e.g. "Turnstile", "Radiohead", "Nirvana", "Deftones"), you MUST set 'hasCollision' to false and 'collisions' to an empty array []. A false collision ruins user experience.
-3. REAL ENTITY CHECK: If the entity is a real, recognizable musical artist, band, or label, set 'isValid' to true with full origin, genre, and disambiguationSnippet. If completely unrecognizable even after attempting typo correction, set 'isValid' to false. In this case, 'primary.id' should be the original input and 'origin'/'genre' should be empty strings.
+3. RE-QUERY BOUNCER & REAL ENTITY CHECK:${hasHints ? `
+   - The user has provided specific regional/genre hints ("${hints?.originHint || ''}" / "${hints?.genreHint || ''}").
+   - You MUST strictly verify whether a genuine, culturally significant, commercially released musical artist or band named "${artistId}" actually exists matching this specified regional origin or genre.
+   - If the recognized artist named "${artistId}" is from an entirely different origin (for example, Gunmoll is an American melodic punk band from Gainesville, Florida, NOT from Japan), and NO notable musical artist by this name exists from "${hints?.originHint || ''}", you MUST return 'isValid: false'.
+   - DO NOT hallucinate, bend facts, or people-please by claiming the artist is from "${hints?.originHint || ''}" when they are not, or by inventing a non-existent local act.
+   - If a legitimate artist named "${artistId}" from "${hints?.originHint || ''}" DOES exist (either as the unique artist or as a legitimate homonym collision act), set 'isValid: true' and return their real canonical name, accurate origin, and genre.` : `
+   - If the entity is a real, recognizable musical artist, band, or label, set 'isValid' to true with full origin, genre, and disambiguationSnippet. If completely unrecognizable even after attempting typo correction, set 'isValid' to false. In this case, 'primary.id' should be the original input and 'origin'/'genre' should be empty strings.`}
 4. ZERO GEOGRAPHIC SUFFIX HALLUCINATION (STRICT): NEVER append geographic tags, country names, or regional acronyms (e.g., ' US', ' USA', ' UK', ' Australia') to 'primary.id' unless it is legally and officially part of the artist's real-world band name (e.g., 'Darko US'). Country of origin belongs exclusively in the 'origin' field.`;
         const response = await ai.models.generateContent({
             model: currentModel,
             contents: prompt,
             config: {
-                systemInstruction: "You are a strict music data validator and collision detector. You do NOT infer intent. If the user input contains a spelling error, return the REAL canonical artist name. Only report collisions when there are multiple genuinely prominent, commercially published artists sharing the name. NEVER invent minor artists. Return ONLY valid JSON matching the schema.",
+                systemInstruction: "You are a strict music data validator, collision detector, and anti-hallucination bouncer. You do NOT infer intent or people-please. If the user input contains a spelling error, return the REAL canonical artist name. If the user provides an origin hint, verify whether an artist by that name actually exists from that origin; if not, return isValid: false. Only report collisions when there are multiple genuinely prominent, commercially published artists sharing the name. NEVER invent minor artists. Return ONLY valid JSON matching the schema.",
                 thinkingConfig: { thinkingLevel: genai_1.ThinkingLevel.MINIMAL },
                 responseMimeType: "application/json",
                 responseSchema: exports.SEED_VALIDATION_SCHEMA

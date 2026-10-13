@@ -52,7 +52,7 @@ exports.validateSeedOriginCallable = (0, https_1.onCall)({
     timeoutSeconds: 60,
     memory: "512MiB",
 }, async (request) => {
-    const { seed, password } = request.data;
+    const { seed, originHint, genreHint, password } = request.data;
     if (!seed) {
         throw new https_1.HttpsError("invalid-argument", "Missing seed in payload");
     }
@@ -60,48 +60,53 @@ exports.validateSeedOriginCallable = (0, https_1.onCall)({
     if (expectedPassword && password !== expectedPassword) {
         throw new https_1.HttpsError("unauthenticated", "Invalid or missing API password");
     }
-    const validationResult = await (0, curatorService_1.validateSeedOriginBackend)(seed);
+    const validationResult = await (0, curatorService_1.validateSeedOriginBackend)(seed, { originHint, genreHint });
     // V11.6 Fix 2: Programmatically enforce correctedInput for typos
     if (validationResult.isValid && seed.toLowerCase() !== validationResult.id.toLowerCase()) {
         validationResult.correctedInput = true;
         console.log(`[validateSeedOriginCallable] Case-insensitive mismatch: "${seed}" → "${validationResult.id}"`);
     }
-    // V11.6 Fix 2B (Rule 11): Hard-block the pipeline for unrecognizable entities.
-    // isValid: false means the model could not confidently map the input to any known artist.
+    // V11.6 Fix 2B (Rule 11): Hard-block the pipeline for unrecognizable entities or failed bouncer re-queries.
+    // isValid: false means the model could not confidently map the input to any known artist matching the parameters.
     // Throwing here prevents a broken stub from being minted and the pipeline from executing.
     if (!validationResult.isValid) {
         console.warn(`[validateSeedOriginCallable] Rule 11 BLOCK: Seed "${seed}" returned isValid: false. Rejecting pipeline.`);
-        throw new https_1.HttpsError("not-found", `"${seed}" could not be identified as a real musical artist or label. Please check the spelling and try again.`);
+        throw new https_1.HttpsError("not-found", originHint
+            ? `No culturally significant artist named "${seed}" found matching origin "${originHint}"${genreHint ? ` / genre "${genreHint}"` : ""}.`
+            : `"${seed}" could not be identified as a real musical artist or label. Please check the spelling and try again.`);
     }
     // Synchronously mint evolved stub in artists collection (Pre-Flight Gateway)
-    try {
-        const bareNormId = (0, curatorService_1.normalizeArtistId)(seed);
-        const stubDocRef = db.collection("artists").doc(bareNormId);
-        const isAmbiguous = !!(validationResult.hasCollision && validationResult.candidates && validationResult.candidates.length > 1);
-        const candidates = validationResult.candidates || [];
-        if (isAmbiguous) {
-            await stubDocRef.set({
-                _isStub: true,
-                isAmbiguous: true,
-                redirectTo: null,
-                candidates,
-                cachedAt: firestore_1.FieldValue.serverTimestamp()
-            }, { merge: true });
-            console.log(`[validateSeedOriginCallable] Minted evolved ambiguous stub for "${bareNormId}" with ${candidates.length} candidates`);
+    // Gated: If an originHint is provided (Escape Hatch Re-Query in Column 1), do NOT mint premature stubs before human confirms in Node 4.
+    if (!originHint) {
+        try {
+            const bareNormId = (0, curatorService_1.normalizeArtistId)(seed);
+            const stubDocRef = db.collection("artists").doc(bareNormId);
+            const isAmbiguous = !!(validationResult.hasCollision && validationResult.candidates && validationResult.candidates.length > 1);
+            const candidates = validationResult.candidates || [];
+            if (isAmbiguous) {
+                await stubDocRef.set({
+                    _isStub: true,
+                    isAmbiguous: true,
+                    redirectTo: null,
+                    candidates,
+                    cachedAt: firestore_1.FieldValue.serverTimestamp()
+                }, { merge: true });
+                console.log(`[validateSeedOriginCallable] Minted evolved ambiguous stub for "${bareNormId}" with ${candidates.length} candidates`);
+            }
+            else if (candidates.length === 1 && candidates[0].id !== bareNormId) {
+                await stubDocRef.set({
+                    _isStub: true,
+                    isAmbiguous: false,
+                    redirectTo: candidates[0].id,
+                    candidates,
+                    cachedAt: firestore_1.FieldValue.serverTimestamp()
+                }, { merge: true });
+                console.log(`[validateSeedOriginCallable] Minted single-hit stub for "${bareNormId}" -> "${candidates[0].id}"`);
+            }
         }
-        else if (candidates.length === 1 && candidates[0].id !== bareNormId) {
-            await stubDocRef.set({
-                _isStub: true,
-                isAmbiguous: false,
-                redirectTo: candidates[0].id,
-                candidates,
-                cachedAt: firestore_1.FieldValue.serverTimestamp()
-            }, { merge: true });
-            console.log(`[validateSeedOriginCallable] Minted single-hit stub for "${bareNormId}" -> "${candidates[0].id}"`);
+        catch (stubErr) {
+            console.warn(`[validateSeedOriginCallable] Failed to synchronously mint stub for "${seed}":`, stubErr);
         }
-    }
-    catch (stubErr) {
-        console.warn(`[validateSeedOriginCallable] Failed to synchronously mint stub for "${seed}":`, stubErr);
     }
     // Log typo corrections so operators can monitor misuse patterns.
     if (validationResult.correctedInput) {
@@ -272,20 +277,18 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
             const hintCountry = (payload.disambiguationHints && (payload.disambiguationHints[seedNorm] || payload.disambiguationHints[strippedSeed])) || null;
             const hintGenre = (payload.disambiguationGenres && (payload.disambiguationGenres[seedNorm] || payload.disambiguationGenres[strippedSeed])) || "Unknown";
             const rawId = (payload.originalQueries && (payload.originalQueries[seedNorm] || payload.originalQueries[strippedSeed])) || strippedSeed;
-            if (hintCountry) {
-                validationResult = { isValid: true, id: rawId, origin: hintCountry, genre: hintGenre };
-            }
-            else {
-                const valResult = await (0, curatorService_1.validateSeedOriginBackend)(seed);
-                validationResult = valResult;
-                if (valResult.apiUsage) {
-                    usageCollector.push(valResult.apiUsage.model, valResult.apiUsage);
-                }
+            // Zero Blind Trust (V24): Column 2 MUST NOT synthesize geographic slugs (e.g., -jp) from raw user hints.
+            // Stubs are minted strictly from validated Flash candidate payloads.
+            const valResult = await (0, curatorService_1.validateSeedOriginBackend)(rawId || seed, hintCountry ? { originHint: hintCountry, genreHint: hintGenre } : undefined);
+            validationResult = valResult;
+            if (valResult.apiUsage) {
+                usageCollector.push(valResult.apiUsage.model, valResult.apiUsage);
             }
             if (validationResult.isValid) {
                 const bareNormId = (0, curatorService_1.normalizeArtistId)(validationResult.id);
                 let normId = bareNormId;
-                if (validationResult.origin) {
+                // Zero Blind Trust (V24): ONLY append geographic slug if this entity has an AI-confirmed collision!
+                if (validationResult.hasCollision && validationResult.origin) {
                     const originSlug = (0, curatorService_1.extractCountrySlug)(validationResult.origin);
                     if (originSlug && originSlug !== 'global' && !normId.endsWith(`-${originSlug}`)) {
                         normId = `${normId}-${originSlug}`;

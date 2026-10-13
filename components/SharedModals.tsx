@@ -7,6 +7,8 @@ import Markdown from 'react-markdown';
 import { isNodeInSeedList, cleanArtistDisplayName } from '../services/artistCacheService';
 import { Flame, Waypoints } from 'lucide-react';
 import { formatSystemTimestamp } from '../utils/formatters';
+import { functions } from '../services/firebase';
+import { httpsCallable } from 'firebase/functions';
 
 // --- My Stack Dialog Component ---
 export const MyStackDialog: React.FC<{
@@ -1353,9 +1355,14 @@ export function ConsolidatedValidationModal({ isOpen, seeds, onConfirm, onCancel
   const [editingSeedId, setEditingSeedId] = React.useState<string | null>(null);
   const [customOrigin, setCustomOrigin] = React.useState<string>('');
   const [customGenre, setCustomGenre] = React.useState<string>('');
+  const [isVerifying, setIsVerifying] = React.useState<boolean>(false);
+  const [verificationError, setVerificationError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     setLocalSeeds(seeds);
+    setEditingSeedId(null);
+    setVerificationError(null);
+    setIsVerifying(false);
   }, [seeds]);
 
   if (!isOpen) return null;
@@ -1377,29 +1384,65 @@ export function ConsolidatedValidationModal({ isOpen, seeds, onConfirm, onCancel
 
   const handleStartEdit = (seed: PreFlightSeed) => {
     setEditingSeedId(seed.id);
-    setCustomOrigin(seed.predictedOrigin || '');
+    setCustomOrigin(seed.predictedOrigin && seed.predictedOrigin !== 'Unknown Origin' ? seed.predictedOrigin : '');
     setCustomGenre(seed.genre || '');
-  };
-
-  const handleSaveEdit = (seedId: string) => {
-    if (!customOrigin.trim()) return;
-    setLocalSeeds(prev => prev.map(s => {
-      if (s.id === seedId) {
-        return {
-          ...s,
-          predictedOrigin: customOrigin.trim(),
-          genre: customGenre.trim() || s.genre,
-          isKnownCacheHit: false, // force fresh pipeline routing
-          candidateId: undefined
-        };
-      }
-      return s;
-    }));
-    setEditingSeedId(null);
+    setVerificationError(null);
   };
 
   const handleCancelEdit = () => {
     setEditingSeedId(null);
+    setVerificationError(null);
+  };
+
+  const handleSaveEdit = async (seed: PreFlightSeed) => {
+    if (!customOrigin.trim() || isVerifying) return;
+    setIsVerifying(true);
+    setVerificationError(null);
+
+    try {
+      const currentPassword = sessionStorage.getItem('zcene_api_password') || undefined;
+      const validateCallable = httpsCallable(functions, 'validateSeedOriginCallable');
+      const seedQuery = seed.correctedQuery || seed.query;
+      
+      const response = await validateCallable({
+        seed: seedQuery,
+        originHint: customOrigin.trim(),
+        genreHint: customGenre.trim() || undefined,
+        ...(currentPassword && { password: currentPassword })
+      });
+
+      const data = response.data as any;
+
+      if (data && data.isValid) {
+        setLocalSeeds(prev => prev.map(s => {
+          if (s.id === seed.id) {
+            const hasCollision = !!(data.hasCollision && Array.isArray(data.candidates) && data.candidates.length > 1);
+            return {
+              ...s,
+              predictedOrigin: data.origin || customOrigin.trim(),
+              genre: data.genre || customGenre.trim() || s.genre,
+              isKnownCacheHit: false, // force fresh pipeline routing
+              isAmbiguous: hasCollision,
+              candidates: hasCollision ? data.candidates : undefined,
+              selectedCandidateId: hasCollision ? data.candidates[0].id : undefined,
+              candidateId: data.candidates && data.candidates.length === 1 ? data.candidates[0].id : undefined,
+              isCorrected: data.correctedInput || s.isCorrected,
+              correctedQuery: (data.id && data.id !== seedQuery) ? data.id : s.correctedQuery
+            };
+          }
+          return s;
+        }));
+        setEditingSeedId(null);
+        setVerificationError(null);
+      } else {
+        setVerificationError("No significant artist found matching these criteria");
+      }
+    } catch (err: any) {
+      console.warn("[ConsolidatedValidationModal] Re-query bouncer rejected:", err);
+      setVerificationError("No significant artist found matching these criteria");
+    } finally {
+      setIsVerifying(false);
+    }
   };
 
   const hasInvalidSeeds = localSeeds.some(seed => {
@@ -1408,6 +1451,8 @@ export function ConsolidatedValidationModal({ isOpen, seeds, onConfirm, onCancel
     }
     return !seed.predictedOrigin || seed.predictedOrigin.trim() === '' || seed.predictedOrigin === 'Unknown Origin';
   });
+
+  const isConfirmDisabled = hasInvalidSeeds || !!editingSeedId || isVerifying;
 
   return (
     <ModalBackdrop onClick={onCancel} className="z-[1100]">
@@ -1504,34 +1549,52 @@ export function ConsolidatedValidationModal({ isOpen, seeds, onConfirm, onCancel
                           <div className="flex gap-2">
                             <input
                               type="text"
+                              disabled={isVerifying}
                               value={customOrigin}
                               onChange={e => setCustomOrigin(e.target.value)}
                               placeholder="e.g. United Kingdom, Australia, Chicago..."
-                              className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500"
+                              className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500 disabled:opacity-50"
                             />
                             <input
                               type="text"
+                              disabled={isVerifying}
                               value={customGenre}
                               onChange={e => setCustomGenre(e.target.value)}
                               placeholder="Genre (optional)"
-                              className="w-28 bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500"
+                              className="w-28 bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500 disabled:opacity-50"
                             />
                           </div>
+
+                          {verificationError && (
+                            <div data-testid="bouncer-error" className="flex items-center gap-1.5 text-rose-400 text-xs bg-rose-950/40 border border-rose-800/50 rounded-lg p-2">
+                              <span className="material-symbols-outlined !text-[15px] flex-shrink-0">error</span>
+                              <span>{verificationError}</span>
+                            </div>
+                          )}
+
                           <div className="flex justify-end gap-2">
                             <button
                               type="button"
+                              disabled={isVerifying}
                               onClick={handleCancelEdit}
-                              className="px-2.5 py-1 text-[11px] text-zinc-400 hover:text-white rounded"
+                              className="px-2.5 py-1 text-[11px] text-zinc-400 hover:text-white rounded disabled:opacity-50"
                             >
                               Cancel
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleSaveEdit(seed.id)}
-                              disabled={!customOrigin.trim()}
-                              className="px-3 py-1 text-[11px] font-medium bg-amber-500 text-brand-black rounded hover:bg-amber-400 disabled:opacity-50"
+                              disabled={!customOrigin.trim() || isVerifying}
+                              onClick={() => handleSaveEdit(seed)}
+                              className="px-3 py-1 text-[11px] font-medium bg-amber-500 text-brand-black rounded hover:bg-amber-400 disabled:opacity-50 flex items-center gap-1.5"
                             >
-                              Apply
+                              {isVerifying ? (
+                                <>
+                                  <span className="material-symbols-outlined !text-[12px] animate-spin">progress_activity</span>
+                                  <span>Verifying...</span>
+                                </>
+                              ) : (
+                                <span>Apply</span>
+                              )}
                             </button>
                           </div>
                         </div>
@@ -1555,7 +1618,7 @@ export function ConsolidatedValidationModal({ isOpen, seeds, onConfirm, onCancel
             <button type="button" onClick={onCancel} className="px-4 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent">
               Cancel
             </button>
-            <button data-testid="validation-confirm-button" type="submit" disabled={hasInvalidSeeds} className={`px-6 py-2 bg-white text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all cursor-pointer whitespace-nowrap ${hasInvalidSeeds ? 'opacity-50 cursor-not-allowed' : ''}`}>
+            <button data-testid="validation-confirm-button" type="submit" disabled={isConfirmDisabled} className={`px-6 py-2 bg-white text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all cursor-pointer whitespace-nowrap ${isConfirmDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
               Confirm & Generate
             </button>
           </ModalFooter>
