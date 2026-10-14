@@ -211,8 +211,10 @@ export const extractCountrySlug = (originStr?: string): string => {
     return 'global';
   }
 
-  const parts = originStr.split(',').map(s => s.trim()).filter(Boolean);
-  const rawCountry = parts.length > 0 ? parts[parts.length - 1] : originStr;
+  // Pre-split on '/' to handle multi-origin border towns (e.g. "La Calamine, Belgium / Kelmis, Germany" -> "La Calamine, Belgium")
+  const primaryOrigin = originStr.split('/')[0].trim();
+  const parts = primaryOrigin.split(',').map(s => s.trim()).filter(Boolean);
+  const rawCountry = parts.length > 0 ? parts[parts.length - 1] : primaryOrigin;
   const lowerCountry = rawCountry.toLowerCase().trim();
   
   if (COUNTRY_ISO_MAP[lowerCountry]) {

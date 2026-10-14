@@ -13,15 +13,14 @@
  *   - pure (no Firestore / React / Node APIs).
  *
  * Relaxed Standard (authorised contract):
- *   TOPOLOGY_HIT  → graphData has ≥1 node AND ≥1 edge, AND the seed profile has
+ *   TOPOLOGY_HIT  → graphData has ≥1 node AND ≥1 edge, synthesisRationale has
+ *                   a valid non-empty essay (≥50 chars), AND the seed profile has
  *                   a substantial bio (>50 chars), a genre and an imageUrl.
- *                   Legacy `[Single-Seed Analysis]` rationale stubs do NOT
- *                   disqualify an entry.
- *   USABLE_STALE  → graphData is structurally usable (nodes + edges) but the
- *                   profile is thin (short bio / missing genre / missing image).
+ *   USABLE_STALE  → graphData is structurally usable (nodes + edges + synthesisRationale)
+ *                   but the profile is thin (short bio / missing genre / missing image).
  *                   Option A: still rendered locally for free.
- *   STUB          → Document exists but has no usable topology (or its graph
- *                   explicitly belongs to a different seed).
+ *   STUB          → Document exists but has no usable topology, is missing
+ *                   synthesisRationale, or its graph explicitly belongs to a different seed.
  *   MISS          → No document.
  *
  * Routing rule (V15 Diagram, green dashed "Topology Hit (Cache)" pathway):
@@ -29,8 +28,9 @@
  *   Column 2 (executeCurationPipeline) and Column 3 (worker) MUST NOT be invoked.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.redactSensitive = exports.deriveRoutingDecision = exports.isLocallyRenderable = exports.qualifyCacheEntry = exports.parseGraphField = exports.extractSeedProfile = exports.MIN_BIO_LENGTH = void 0;
+exports.redactSensitive = exports.deriveRoutingDecision = exports.isLocallyRenderable = exports.qualifyCacheEntry = exports.parseGraphField = exports.extractSeedProfile = exports.MIN_RATIONALE_LENGTH = exports.MIN_BIO_LENGTH = void 0;
 exports.MIN_BIO_LENGTH = 50;
+exports.MIN_RATIONALE_LENGTH = 50;
 const simpleNormalize = (value) => (value || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -96,7 +96,7 @@ const qualifyCacheEntry = (data, seedId) => {
         return { verdict: 'MISS', isStructurallyUsable: false, isFullyQualified: false, missing: ['document'] };
     }
     const missing = [];
-    // ── 1. Structural topology ────────────────────────────────────────────────
+    // ── 1. Structural topology & Roots Breakdown ──────────────────────────────
     const graph = (0, exports.parseGraphField)(data.graphData);
     const hasNodes = !!graph && graph.nodes.length > 0;
     const hasEdges = !!graph && graph.links.length > 0;
@@ -104,7 +104,14 @@ const qualifyCacheEntry = (data, seedId) => {
         missing.push('nodes');
     if (!hasEdges)
         missing.push('edges');
-    const isStructurallyUsable = hasNodes && hasEdges;
+    // Architecture V28 Read Gate: Direct Hit strictly requires non-empty synthesisRationale (>= 50 chars)
+    const rawRationale = (typeof data.synthesisRationale === 'string' && data.synthesisRationale) ||
+        (graph && typeof graph.synthesisRationale === 'string' && graph.synthesisRationale) ||
+        '';
+    const hasRationale = typeof rawRationale === 'string' && rawRationale.trim().length >= exports.MIN_RATIONALE_LENGTH;
+    if (!hasRationale)
+        missing.push('synthesisRationale');
+    const isStructurallyUsable = hasNodes && hasEdges && hasRationale;
     // ── 2. Seed profile (bio / genre / image) ─────────────────────────────────
     const profile = (0, exports.extractSeedProfile)(data.detailsCache, seedId || data.artistId || data.cacheKey);
     const bio = profile?.summary || profile?.bio || profile?.description || profile?.text || '';

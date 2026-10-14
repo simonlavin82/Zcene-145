@@ -940,9 +940,12 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             const detailsEntry = detailsCacheEntries.find((entry) => entry[0] === node.id || isEntitySeedMatch(node.id, entry[0]));
                             const meta = detailsEntry?.[1]?.details || {};
                             const rawOrigin = node.origin || meta.origin;
+                            // Architecture V28: Prioritize canonical ISO suffix on node.id (e.g. "nasty-be" -> "be")
+                            const idIsoMatch = typeof node.id === 'string' ? node.id.match(/-([a-z]{2})$/) : null;
+                            const suffixIso = (idIsoMatch && ISO_TO_COUNTRY_MAP[idIsoMatch[1]]) ? idIsoMatch[1] : null;
                             // 1. Country Reconciliation & Injection
-                            if (rawOrigin) {
-                                const canonSlug = (0, curatorService_1.extractCountrySlug)(rawOrigin);
+                            if (suffixIso || rawOrigin) {
+                                const canonSlug = suffixIso || (0, curatorService_1.extractCountrySlug)(rawOrigin);
                                 if (canonSlug !== 'global') {
                                     const canonCountryName = ISO_TO_COUNTRY_MAP[canonSlug] || canonSlug;
                                     const canonCountryId = (0, curatorService_1.normalizeArtistId)(canonCountryName);
@@ -1150,14 +1153,14 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                 let isRequired = false;
                                 for (const n of finalGraph.nodes) {
                                     if (n.type === 'artist' || n.type === 'label') {
-                                        if (n.origin) {
-                                            const canonSlug = (0, curatorService_1.extractCountrySlug)(n.origin);
-                                            if (canonSlug !== 'global') {
-                                                const canonCountryName = ISO_TO_COUNTRY_MAP[canonSlug] || canonSlug;
-                                                if ((0, curatorService_1.normalizeArtistId)(canonCountryName) === node.id) {
-                                                    isRequired = true;
-                                                    break;
-                                                }
+                                        const idIsoMatch = typeof n.id === 'string' ? n.id.match(/-([a-z]{2})$/) : null;
+                                        const suffixIso = (idIsoMatch && ISO_TO_COUNTRY_MAP[idIsoMatch[1]]) ? idIsoMatch[1] : null;
+                                        const canonSlug = suffixIso || (n.origin ? (0, curatorService_1.extractCountrySlug)(n.origin) : 'global');
+                                        if (canonSlug !== 'global') {
+                                            const canonCountryName = ISO_TO_COUNTRY_MAP[canonSlug] || canonSlug;
+                                            if ((0, curatorService_1.normalizeArtistId)(canonCountryName) === node.id) {
+                                                isRequired = true;
+                                                break;
                                             }
                                         }
                                     }
@@ -1221,27 +1224,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                         canonicalUpdate.detailsCache = { _isStub: true }; // Minimum required to prevent frontend crashes
                                     }
                                     let finalRationale = rootBreakdownStr;
-                                    // Topology Hydration Check for Stubs
-                                    const hasGraph = canonicalData?.graphData && ((typeof canonicalData.graphData === 'string' && canonicalData.graphData.length > 10) ||
-                                        (typeof canonicalData.graphData === 'object' && canonicalData.graphData.nodes));
-                                    if (!hasGraph) {
-                                        const finalExtractId = idRewriteMap.get(canonicalSeedId) ?? idRewriteMap.get(seedNorm) ?? canonicalSeedId;
-                                        const rawExtracted = (0, curatorService_1.extractArtistSubGraph)(finalExtractId, finalGraph, artistList);
-                                        if (rawExtracted) {
-                                            const safeExtractedGraph = JSON.parse(JSON.stringify(rawExtracted));
-                                            if (safeExtractedGraph.nodes && safeExtractedGraph.nodes.length > 0) {
-                                                if (safeExtractedGraph.links) {
-                                                    for (const link of safeExtractedGraph.links) {
-                                                        link.source = typeof link.source === 'object' && link.source !== null ? link.source.id : link.source;
-                                                        link.target = typeof link.target === 'object' && link.target !== null ? link.target.id : link.target;
-                                                    }
-                                                }
-                                                canonicalUpdate.graphData = JSON.stringify(safeExtractedGraph);
-                                                console.log(`[Self-Heal] Hydrating graphData for empty stub: ${canonicalSeedId}`);
-                                            }
-                                        }
-                                    }
-                                    // Merge Orphan Data & Redirect
+                                    // Merge Orphan Data & Redirect (adopt orphaned rationale BEFORE evaluating validity)
                                     if (canonicalSeedId !== seedNorm) {
                                         if (rawData) {
                                             if (!finalRationale && rawData.synthesisRationale) {
@@ -1254,13 +1237,55 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                             }
                                         }
                                     }
-                                    if (finalRationale) {
+                                    const hasValidRationale = typeof finalRationale === 'string' && finalRationale.trim().length >= 50;
+                                    // Topology Hydration Check for Stubs
+                                    const hasGraph = canonicalData?.graphData && ((typeof canonicalData.graphData === 'string' && canonicalData.graphData.length > 10) ||
+                                        (typeof canonicalData.graphData === 'object' && canonicalData.graphData.nodes));
+                                    if (hasValidRationale) {
                                         canonicalUpdate.synthesisRationale = finalRationale;
-                                        if (canonicalUpdate.graphData) {
-                                            const parsedGraph = JSON.parse(canonicalUpdate.graphData);
-                                            parsedGraph.synthesisRationale = finalRationale;
-                                            canonicalUpdate.graphData = JSON.stringify(parsedGraph);
+                                        canonicalUpdate.isPrimarySeed = true;
+                                        canonicalUpdate.hasUniqueSpiderweb = true;
+                                        if (!hasGraph) {
+                                            const finalExtractId = idRewriteMap.get(canonicalSeedId) ?? idRewriteMap.get(seedNorm) ?? canonicalSeedId;
+                                            const rawExtracted = (0, curatorService_1.extractArtistSubGraph)(finalExtractId, finalGraph, artistList);
+                                            if (rawExtracted) {
+                                                const safeExtractedGraph = JSON.parse(JSON.stringify(rawExtracted));
+                                                if (safeExtractedGraph.nodes && safeExtractedGraph.nodes.length > 0) {
+                                                    if (safeExtractedGraph.links) {
+                                                        for (const link of safeExtractedGraph.links) {
+                                                            link.source = typeof link.source === 'object' && link.source !== null ? link.source.id : link.source;
+                                                            link.target = typeof link.target === 'object' && link.target !== null ? link.target.id : link.target;
+                                                        }
+                                                    }
+                                                    safeExtractedGraph.synthesisRationale = finalRationale;
+                                                    canonicalUpdate.graphData = JSON.stringify(safeExtractedGraph);
+                                                    console.log(`[Self-Heal] Hydrating graphData for empty stub: ${canonicalSeedId}`);
+                                                }
+                                            }
                                         }
+                                        else {
+                                            // Partial healing: graphData already exists in canonicalData, but synthesisRationale was missing/stale!
+                                            // Update graphData with the newly synthesized rationale so both root and parsed graph are unified!
+                                            try {
+                                                const existingGraph = typeof canonicalData.graphData === 'string'
+                                                    ? JSON.parse(canonicalData.graphData)
+                                                    : JSON.parse(JSON.stringify(canonicalData.graphData));
+                                                if (existingGraph && existingGraph.nodes && existingGraph.nodes.length > 0) {
+                                                    existingGraph.synthesisRationale = finalRationale;
+                                                    canonicalUpdate.graphData = JSON.stringify(existingGraph);
+                                                    console.log(`[Self-Heal] Updated existing graphData with synthesisRationale for ${canonicalSeedId}`);
+                                                }
+                                            }
+                                            catch (parseErr) {
+                                                console.warn(`[Self-Heal] Failed to re-embed synthesisRationale into existing graphData for ${canonicalSeedId}:`, parseErr);
+                                            }
+                                        }
+                                    }
+                                    else {
+                                        // Architecture V28 Write Gate:
+                                        // Block setting hasUniqueSpiderweb: true and do NOT write graphData if synthesisRationale is missing or < 50 chars!
+                                        canonicalUpdate.hasUniqueSpiderweb = false;
+                                        console.warn(`[Self-Heal] Write Gate: Suppressed graphData & hasUniqueSpiderweb for ${canonicalSeedId} due to missing/short synthesisRationale`);
                                     }
                                     transaction.set(canonicalDocRef, canonicalUpdate, { merge: true });
                                 });
@@ -1412,20 +1437,23 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                 }
                             }
                         }
+                        const hasValidRationale = !!(finalGraph.synthesisRationale && typeof finalGraph.synthesisRationale === 'string' && finalGraph.synthesisRationale.trim().length >= 50);
+                        const shouldWriteUniqueSpiderweb = matchingSeedNorm && !isLabel && !isComplexGeneration && hasValidRationale;
+                        const shouldWriteGraphData = safeExtractedGraph && !isComplexGeneration && hasValidRationale;
                         await recDocRef.set({
                             cacheKey: cleanCanonicalId,
                             [idFieldKey]: recNorm,
                             seedArtists: recArtist,
-                            graphData: (safeExtractedGraph && !isComplexGeneration) ? JSON.stringify(safeExtractedGraph) : null,
+                            graphData: shouldWriteGraphData ? JSON.stringify(safeExtractedGraph) : null,
                             detailsCache: finalRecDetails, // Save as structured object!
                             filters: (matchingSeedNorm && !isLabel && !isComplexGeneration) ? inputPayload.filters || null : null,
-                            synthesisRationale: (matchingSeedNorm && finalGraph.synthesisRationale && !isComplexGeneration) ? finalGraph.synthesisRationale : null,
+                            synthesisRationale: (matchingSeedNorm && hasValidRationale && !isComplexGeneration) ? finalGraph.synthesisRationale : null,
                             cacheVersion: 4,
                             createdAt: firestore_2.FieldValue.serverTimestamp(),
                             updatedAt: firestore_2.FieldValue.serverTimestamp(),
                             isDeep: true, // Marked Deep!
                             isPrimarySeed: !!matchingSeedNorm,
-                            hasUniqueSpiderweb: (matchingSeedNorm && !isLabel && !isComplexGeneration) ? true : false,
+                            hasUniqueSpiderweb: shouldWriteUniqueSpiderweb ? true : false,
                             dataIntegrityStatus: matchingSeedNorm ? (recDetails?._isStub ? 'degraded' : 'verified') : undefined,
                         });
                         console.log(`[Curation Backend] Proactively created DEEP entry for recommendation (${collName}): ${cleanCanonicalId}`);
@@ -1474,13 +1502,15 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             updatePayload.isPrimarySeed = true;
                             updatePayload.dataIntegrityStatus = recDetails?._isStub ? 'degraded' : 'verified';
                             if (!isComplexGeneration) {
-                                updatePayload.hasUniqueSpiderweb = !isLabel;
+                                const hasValidRationale = !!(finalGraph.synthesisRationale && typeof finalGraph.synthesisRationale === 'string' && finalGraph.synthesisRationale.trim().length >= 50);
+                                const shouldWriteSpiderweb = !isLabel && hasValidRationale;
+                                updatePayload.hasUniqueSpiderweb = shouldWriteSpiderweb;
                                 if (!isLabel) {
-                                    if (safeExtractedGraph) {
+                                    if (shouldWriteSpiderweb && safeExtractedGraph) {
                                         updatePayload.graphData = JSON.stringify(safeExtractedGraph);
                                     }
                                     updatePayload.filters = inputPayload.filters || null;
-                                    if (finalGraph.synthesisRationale) {
+                                    if (hasValidRationale) {
                                         updatePayload.synthesisRationale = finalGraph.synthesisRationale;
                                     }
                                 }

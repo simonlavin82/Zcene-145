@@ -148,8 +148,10 @@ const extractCountrySlug = (originStr) => {
     if (!originStr || typeof originStr !== 'string' || originStr.trim().length === 0) {
         return 'global';
     }
-    const parts = originStr.split(',').map(s => s.trim()).filter(Boolean);
-    const rawCountry = parts.length > 0 ? parts[parts.length - 1] : originStr;
+    // Pre-split on '/' to handle multi-origin border towns (e.g. "La Calamine, Belgium / Kelmis, Germany" -> "La Calamine, Belgium")
+    const primaryOrigin = originStr.split('/')[0].trim();
+    const parts = primaryOrigin.split(',').map(s => s.trim()).filter(Boolean);
+    const rawCountry = parts.length > 0 ? parts[parts.length - 1] : primaryOrigin;
     const lowerCountry = rawCountry.toLowerCase().trim();
     if (COUNTRY_ISO_MAP[lowerCountry]) {
         return COUNTRY_ISO_MAP[lowerCountry];
@@ -782,12 +784,6 @@ const generateRootsBreakdownBackend = async (artists, detailsCacheEntries, usage
     if (!apiKey) {
         throw new Error("GEMINI_API_KEY is not defined in environment secrets.");
     }
-    const ai = new genai_1.GoogleGenAI({
-        apiKey,
-        httpOptions: { timeout: 300000 } // 5 minutes
-    });
-    // Use pro model for better synthesis
-    const currentModel = "gemini-3.1-pro-preview";
     // Phase C — Verbal Identity (Rule 24): late-night record curator voice.
     // V10: Structured JSON output with integrated hooks.
     const systemInstruction = `You are a late-night record curator — the kind of person who pulls an obscure 7" from a crate at 2am and traces exactly why it matters. Your task is to write a Roots Breakdown: a rich, interconnected narrative that maps the musical DNA between a set of seed artists and the deeper ecosystem they inhabit, AND simultaneously generate specific 1-sentence hooks for the key artists involved.
@@ -842,40 +838,76 @@ ${JSON.stringify(detailsCacheEntries, null, 2)}`;
         },
         required: ["editorialMarkdown", "artistSnippets"]
     };
-    try {
-        const response = await ai.models.generateContent({
-            model: currentModel,
-            contents: prompt,
-            config: {
-                systemInstruction,
-                thinkingConfig: { thinkingLevel: genai_1.ThinkingLevel.HIGH },
-                responseMimeType: "application/json",
-                responseSchema,
-            }
+    const executeSynthesis = async (model, thinkingLevel, timeoutMs) => {
+        const ai = new genai_1.GoogleGenAI({
+            apiKey,
+            httpOptions: { timeout: timeoutMs }
         });
-        if (usageCollector && response.usageMetadata) {
-            usageCollector.push(currentModel, {
-                promptTokenCount: response.usageMetadata.promptTokenCount || 0,
-                candidatesTokenCount: response.usageMetadata.candidatesTokenCount || 0,
-                totalTokenCount: response.usageMetadata.totalTokenCount || 0,
-            });
+        let timer = null;
+        const timeoutPromise = new Promise((_, reject) => {
+            timer = setTimeout(() => {
+                reject(new Error(`Synthesis request timed out after ${timeoutMs}ms for ${model}`));
+            }, timeoutMs);
+            if (typeof timer?.unref === 'function')
+                timer.unref();
+        });
+        try {
+            const response = await Promise.race([
+                ai.models.generateContent({
+                    model,
+                    contents: prompt,
+                    config: {
+                        systemInstruction,
+                        thinkingConfig: { thinkingLevel },
+                        responseMimeType: "application/json",
+                        responseSchema,
+                    }
+                }),
+                timeoutPromise
+            ]);
+            if (timer)
+                clearTimeout(timer);
+            if (usageCollector && response.usageMetadata) {
+                usageCollector.push(model, {
+                    promptTokenCount: response.usageMetadata.promptTokenCount || 0,
+                    candidatesTokenCount: response.usageMetadata.candidatesTokenCount || 0,
+                    totalTokenCount: response.usageMetadata.totalTokenCount || 0,
+                });
+            }
+            const text = response.text;
+            if (!text)
+                return null;
+            const parsed = JSON.parse(text);
+            // V11.6 Fix 1: Unescape literal \n sequences that the structured JSON output mode over-escapes.
+            if (parsed?.editorialMarkdown) {
+                parsed.editorialMarkdown = parsed.editorialMarkdown.replace(/\\n/g, '\n');
+            }
+            return parsed;
         }
-        const text = response.text;
-        if (!text)
-            return null;
-        const parsed = JSON.parse(text);
-        // V11.6 Fix 1: Unescape literal \n sequences that the structured JSON output mode over-escapes.
-        // Gemini packs Markdown into a strict JSON string field and sometimes emits \n as the
-        // two-character sequence backslash-n rather than a true Unicode newline, causing the
-        // frontend to render literal "\n" and "\n*" instead of line breaks and bullet points.
-        if (parsed?.editorialMarkdown) {
-            parsed.editorialMarkdown = parsed.editorialMarkdown.replace(/\\n/g, '\n');
+        finally {
+            if (timer)
+                clearTimeout(timer);
         }
-        return parsed;
+    };
+    try {
+        // Attempt 1: Gemini 3.1 Pro Preview (high thinking) bounded by 90-second timeout
+        return await executeSynthesis("gemini-3.1-pro-preview", genai_1.ThinkingLevel.HIGH, 90000);
     }
-    catch (err) {
-        console.error("[generateRootsBreakdownBackend] Failed to generate roots breakdown:", err);
-        return null;
+    catch (proErr) {
+        console.warn(`[generateRootsBreakdownBackend] 3.1 Pro synthesis failed or timed out (${proErr?.message || proErr}). Engaging instant resilient fallback to ${exports.GEMINI_FLASH_MODEL} (thinking_level: low)...`);
+        try {
+            // Attempt 2: Resilient Fallback - Gemini 3.6 Flash (low thinking) bounded by 45-second timeout
+            const flashResult = await executeSynthesis(exports.GEMINI_FLASH_MODEL, genai_1.ThinkingLevel.LOW, 45000);
+            if (flashResult) {
+                console.log(`[generateRootsBreakdownBackend] Resilient Flash fallback succeeded for roots breakdown (${artists}).`);
+                return flashResult;
+            }
+            return null;
+        }
+        catch (flashErr) {
+            console.error("[generateRootsBreakdownBackend] Both 3.1 Pro and Flash fallback failed to generate roots breakdown:", flashErr);
+            return null;
+        }
     }
 };
 exports.generateRootsBreakdownBackend = generateRootsBreakdownBackend;

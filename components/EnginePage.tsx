@@ -69,8 +69,8 @@ const ARCHITECTURE_RULES = [
     { id: 35, title: "Geographic Asset Disambiguation", desc: "iTunes scraper appends parametric regional suffix (e.g. ' US') if primary query collides." },
     { id: 36, title: "Entity Taxonomy Normalization & Root-as-Router", desc: "Bare IDs reserved as _isStub: true forwarders; verified payloads resolve to suffixed IDs (gunmoll-us)." },
     { id: 37, title: "JIT Asset Telemetry & Healing (404 Parachute ONLY)", desc: "Emergency parachute for inspected 404 cache misses. Zero background sweeps. 100-heal/24h auto-kill." },
-    { id: 38, title: "4-Tier Asset Disambiguation Waterfall", desc: "scrapeImageUrlBackend cascades through Strict Match, Geographic Fallback, and Discography Tie-Breaker (fuzzy prefix/token overlap, +/-1yr correlation, deluxe dedup), rejecting unverified lone wolves." },
-    { id: 39, title: "Deterministic Metadata Projection & Pod Genre Affinity", desc: "Step 4B projects Country (0.2), Founded (0.3), and 2-Tier Pod Genre Affinity (0.8) for all spawned artists before Degree-0 cleanup, preserving weights through Node 5." }
+    { id: 39, title: "Deterministic Metadata Projection & Pod Genre Affinity", desc: "Step 4B projects Country (0.2), Founded (0.3), and 2-Tier Pod Genre Affinity (0.8) for all spawned artists before Degree-0 cleanup, preserving weights through Node 5." },
+    { id: 40, title: "Synthesis Rationale Integrity & Direct Hit Read/Write Gates", desc: "Direct Hits strictly require non-empty synthesisRationale (>= 50 chars). Write Gate blocks cache pollution on Step 3 timeouts; 90s AbortController engages instant 3.6 Flash fallback with ISO-suffix country lock." }
 ];
 
 const DiscoveryFlowDiagram: React.FC = () => (
@@ -177,10 +177,11 @@ const DiscoveryFlowDiagram: React.FC = () => (
                                 </ul>
                             </li>
                             <li>
-                                <span className="text-primary font-medium">Root Breakdown | 3.1 Pro (high)</span>
+                                <span className="text-primary font-medium">Root Breakdown | 3.1 Pro (high) + 90s Flash Fallback</span>
                                 <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500 text-[10px]">
                                     <li>Synthesizes narrative in 2 AM record curator voice.</li>
                                     <li>Outputs structured JSON with markdown, 1-sentence hooks, and bi-directional edge context.</li>
+                                    <li>90s timeout fallback to 3.6 Flash prevents 504 DEADLINE_EXCEEDED errors.</li>
                                 </ul>
                             </li>
                             <li>
@@ -223,7 +224,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                 <div className="p-4 rounded-xl border border-zinc-700 bg-zinc-900/80 h-[560px] flex flex-col">
                     <div className="text-white font-medium text-sm mb-2 sticky top-0 bg-zinc-900 py-1 border-b border-zinc-800 z-10 flex items-center justify-between">
                         <span>Rules Ledger</span>
-                        <span className="text-[10px] font-mono text-primary uppercase">39 Laws</span>
+                        <span className="text-[10px] font-mono text-primary uppercase">40 Laws</span>
                     </div>
                     <div className="space-y-2 pt-2 overflow-y-auto pr-1 flex-1">
                         {ARCHITECTURE_RULES.map(rule => (
