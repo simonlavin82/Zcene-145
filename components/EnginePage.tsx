@@ -40,7 +40,7 @@ const ARCHITECTURE_RULES = [
     { id: 6, title: "Ambiguous Stub Bypass & Canonical Resolution", desc: "Ambiguous stubs (_isStub: true && isAmbiguous: true) MUST bypass direct hits and route to Node 4." },
     { id: 7, title: "Fail-Fast Media Gatekeeper", desc: "Cache validation predicate flags nodes missing crucial imagery or biographies as cache misses." },
     { id: 8, title: "Strict Topology Verification & Cache Serialization", desc: "Stubs lacking graphData MUST route to Generative Topology. D3 links safely serialized to strings." },
-    { id: 9, title: "Canonical Seed Slug Resolution", desc: "resolvedSeedNormMap and idRewriteMap prevent split-brain writes across Firestore documents." },
+    { id: 9, title: "Canonical Seed Slug Resolution & Degree-0 Cleanup", desc: "resolvedSeedNormMap and idRewriteMap prevent split-brain writes. isCountryEndpoint and Degree-0 cleanup prune orphans while protecting connected nodes." },
     { id: 10, title: "Redirect Pointer & Stub Dedup Immunity", desc: "Hydration loop slug dedup MUST skip documents with redirectTo, _isStub, or isAmbiguous." },
     { id: 11, title: "Validation Reasoning & Escape Hatch Bouncer", desc: "Parametric Flash 3.6 re-query bouncer with zero-pollution inline rejection. Zero search grounding." },
     { id: 12, title: "Resilient iTunes Artwork Pipeline", desc: "Punctuation-agnostic normalization and bio summary fallback ensure 100% artwork hydration." },
@@ -69,7 +69,8 @@ const ARCHITECTURE_RULES = [
     { id: 35, title: "Geographic Asset Disambiguation", desc: "iTunes scraper appends parametric regional suffix (e.g. ' US') if primary query collides." },
     { id: 36, title: "Entity Taxonomy Normalization & Root-as-Router", desc: "Bare IDs reserved as _isStub: true forwarders; verified payloads resolve to suffixed IDs (gunmoll-us)." },
     { id: 37, title: "JIT Asset Telemetry & Healing (404 Parachute ONLY)", desc: "Emergency parachute for inspected 404 cache misses. Zero background sweeps. 100-heal/24h auto-kill." },
-    { id: 38, title: "4-Tier Asset Disambiguation Waterfall", desc: "scrapeImageUrlBackend cascades through Strict Match, Geographic Fallback, and Discography Tie-Breaker (<=5 candidates, 2.5s budget), rejecting unverified lone wolves." }
+    { id: 38, title: "4-Tier Asset Disambiguation Waterfall", desc: "scrapeImageUrlBackend cascades through Strict Match, Geographic Fallback, and Discography Tie-Breaker (fuzzy prefix/token overlap, +/-1yr correlation, deluxe dedup), rejecting unverified lone wolves." },
+    { id: 39, title: "Deterministic Metadata Projection & Pod Genre Affinity", desc: "Step 4B projects Country (0.2), Founded (0.3), and 2-Tier Pod Genre Affinity (0.8) for all spawned artists before Degree-0 cleanup, preserving weights through Node 5." }
 ];
 
 const DiscoveryFlowDiagram: React.FC = () => (
@@ -183,15 +184,21 @@ const DiscoveryFlowDiagram: React.FC = () => (
                                 </ul>
                             </li>
                             <li>
-                                <span className="text-primary font-medium">Topology Parity | 3.6 Flash (minimal)</span>
+                                <span className="text-primary font-medium">Step 4A: Topology Parity | 3.6 Flash (minimal)</span>
                                 <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500 text-[10px]">
                                     <li>Injects missing narrative connections into graph edges via <code>reconcileNarrativeEdges</code>.</li>
                                 </ul>
                             </li>
                             <li>
+                                <span className="text-primary font-medium">Step 4B: Deterministic Enrichment & Pod Affinity</span>
+                                <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500 text-[10px]">
+                                    <li>Wires Country, Founded, and 2-Tier Pod Genre nodes for secondary artists before Degree-0 cleanup.</li>
+                                </ul>
+                            </li>
+                            <li>
                                 <span className="text-primary font-medium">Final Node Positioning | 3.6 Flash (minimal)</span>
                                 <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500 text-[10px]">
-                                    <li>Evaluates bios to generate semantic link weights (0.1–1.0) with 0.5 neutral fallback.</li>
+                                    <li>Evaluates bios to generate semantic link weights (0.1–1.0) with Weight Preservation Guard.</li>
                                 </ul>
                             </li>
                             <li>
@@ -216,7 +223,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                 <div className="p-4 rounded-xl border border-zinc-700 bg-zinc-900/80 h-[560px] flex flex-col">
                     <div className="text-white font-medium text-sm mb-2 sticky top-0 bg-zinc-900 py-1 border-b border-zinc-800 z-10 flex items-center justify-between">
                         <span>Rules Ledger</span>
-                        <span className="text-[10px] font-mono text-primary uppercase">38 Laws</span>
+                        <span className="text-[10px] font-mono text-primary uppercase">39 Laws</span>
                     </div>
                     <div className="space-y-2 pt-2 overflow-y-auto pr-1 flex-1">
                         {ARCHITECTURE_RULES.map(rule => (
@@ -391,7 +398,7 @@ const RunbookAccordion: React.FC = () => {
             >
                 <div className="flex items-center gap-3 text-zinc-200 font-medium text-sm uppercase tracking-wider">
                     <Terminal className="w-4 h-4 text-primary" />
-                    V26 Full-Stack Regression Runbook
+                    V27 Full-Stack Regression Runbook
                 </div>
                 {isOpen ? <ChevronDown className="w-4 h-4 text-zinc-400" /> : <ChevronRight className="w-4 h-4 text-zinc-400" />}
             </button>
@@ -546,7 +553,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                             ))}
                         </nav>
                         <div className="mt-6 pt-4 border-t border-zinc-800/60 text-[10px] text-zinc-500 font-mono">
-                            Zcene V26 Blueprint<br/>
+                            Zcene V27 Blueprint<br/>
                             100% Anti-Regression
                         </div>
                     </div>
@@ -558,7 +565,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                     <div className="mb-8 border-b border-zinc-700/60 pb-6">
                         <div className="flex items-center gap-3 mb-2">
                             <h1 className="text-2xl sm:text-3xl font-medium text-white">Engine</h1>
-                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-primary/20 text-primary border border-primary/40">V26 Locked</span>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-primary/20 text-primary border border-primary/40">V27 Locked</span>
                         </div>
                         <p className="text-zinc-400 leading-relaxed text-xs sm:text-sm max-w-3xl">
                             Visual mirror and execution interface for the Zcene curation pipeline. Defines behavioral laws, state orchestration, anti-pollution boundaries, and regression-proof contracts.
@@ -636,7 +643,7 @@ LOCKED SEMANTIC TOPOLOGY (Rule 21):
             <footer className="w-full p-6 text-zinc-400 text-xs z-10 relative bg-neutral-900 flex-shrink-0 border-t border-neutral-800">
                 <div className="container mx-auto text-center">
                     <ZceneLogo className="h-6 w-auto text-primary mx-auto mb-2" />
-                    <p className="text-zinc-600">© 2026 Zcene Admin Console. V26 Programmatic Architecture.</p>
+                    <p className="text-zinc-600">© 2026 Zcene Admin Console. V27 Programmatic Architecture.</p>
                 </div>
             </footer>
         </div>

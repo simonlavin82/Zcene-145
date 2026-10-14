@@ -107,6 +107,24 @@ describe('Rule 38: 4-Tier Asset Disambiguation Waterfall (scrapeImageUrlBackend)
     expect(result).toBeNull();
   });
 
+  it('Tier 3: Gunmoll (Discography Title Resilience) - Disambiguates underground band despite subtitle variation via release-year and token correlation', async () => {
+    const result = await scrapeImageUrlBackend(
+      'Gunmoll',
+      'artist',
+      'Punk Rock',
+      'Gunmoll was an influential melodic punk rock band from Gainesville, Florida.',
+      'Gainesville, Florida, USA',
+      [
+        { albumName: 'Anger Management in $100 Suits', releaseYear: '2001' },
+        { albumName: 'Board of Education', releaseYear: '2003' }
+      ]
+    );
+
+    expect(result).toBeDefined();
+    expect(result).not.toBeNull();
+    expect(result).toMatch(/^https:\/\/.*600x600bb\.jpg$/);
+  });
+
   it('Tier 4: Fabricated Discography - Returns null when discography does not match', async () => {
     const result = await scrapeImageUrlBackend(
       'Spite',
@@ -120,3 +138,4 @@ describe('Rule 38: 4-Tier Asset Disambiguation Waterfall (scrapeImageUrlBackend)
     expect(result).toBeNull();
   });
 });
+

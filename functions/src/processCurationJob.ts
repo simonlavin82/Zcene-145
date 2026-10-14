@@ -1006,55 +1006,232 @@ export const processCurationJob = onDocumentCreated({
         finalGraph.links = Array.from(uniqueLinksMap.values());
       }
 
-      // --- Topological Reconciliation Loop: Fix geographic hallucinated links ---
+      // --- Step 4B: Deterministic Graph Enrichment & Pod Genre Affinity [Rule 39] ---
       if (finalGraph.nodes && finalGraph.links) {
-        // Map to quickly check if a node is a country node
-        const countryNodeMap = new Map<string, any>();
-        finalGraph.nodes.forEach((n: any) => {
-          if (n.type === 'country') {
-            countryNodeMap.set(n.id, n);
-          }
+        // Snapshot existing nodes to avoid concurrent modification issues during injection
+        const existingNodeMap = new Map<string, any>();
+        finalGraph.nodes.forEach((n: any) => existingNodeMap.set(n.id, n));
+
+        // Set to track existing bidirectional links
+        const existingLinkSet = new Set<string>();
+        finalGraph.links.forEach((l: any) => {
+          const s = typeof l.source === 'string' ? l.source : (l.source as any).id;
+          const t = typeof l.target === 'string' ? l.target : (l.target as any).id;
+          existingLinkSet.add(`${s}--${t}`);
+          existingLinkSet.add(`${t}--${s}`);
         });
 
-        finalGraph.nodes.forEach((node: any) => {
-          if (node.type === 'artist' || node.type === 'label') {
-            if (node.origin) {
-              const canonSlug = extractCountrySlug(node.origin);
-              if (canonSlug !== 'global') {
-                const canonCountryName = ISO_TO_COUNTRY_MAP[canonSlug] || canonSlug;
-                const canonCountryId = normalizeArtistId(canonCountryName);
+        // Helper to determine if an endpoint is a country node or country slug
+        const isCountryEndpoint = (id: string): boolean => {
+          const n = existingNodeMap.get(id);
+          if (n?.type === 'country') return true;
+          const lower = id.toLowerCase();
+          return Object.values(ISO_TO_COUNTRY_MAP).some(c => normalizeArtistId(c) === lower) ||
+                 Object.keys(ISO_TO_COUNTRY_MAP).includes(lower);
+        };
 
-                // Reroute links targeting ANY country node from this artist to point to canonCountryId
-                let reroutedAny = false;
-                finalGraph.links.forEach((link: any) => {
-                  const sId = typeof link.source === 'string' ? link.source : (link.source as any).id;
-                  const tId = typeof link.target === 'string' ? link.target : (link.target as any).id;
-                  
-                  if (sId === node.id && countryNodeMap.has(tId) && tId !== canonCountryId) {
-                    // Update link target
-                    if (typeof link.target === 'string') {
-                      link.target = canonCountryId;
-                    } else {
-                      (link.target as any).id = canonCountryId;
-                    }
-                    reroutedAny = true;
-                    console.log(`[Curation Backend] Topological Reconciliation: Rerouted link from "${sId}" to target "${canonCountryId}" (was "${tId}")`);
+        // Snapshot of all artist nodes before in-place node array growth
+        const artistNodesSnapshot = finalGraph.nodes.filter((n: any) => n.type === 'artist');
+
+        artistNodesSnapshot.forEach((node: any) => {
+          // Resolve metadata from detailsCacheEntries or node properties
+          const detailsEntry = detailsCacheEntries.find(
+            (entry: any) => entry[0] === node.id || isEntitySeedMatch(node.id, entry[0])
+          );
+          const meta = detailsEntry?.[1]?.details || {};
+          const rawOrigin = node.origin || meta.origin;
+
+          // 1. Country Reconciliation & Injection
+          if (rawOrigin) {
+            const canonSlug = extractCountrySlug(rawOrigin);
+            if (canonSlug !== 'global') {
+              const canonCountryName = ISO_TO_COUNTRY_MAP[canonSlug] || canonSlug;
+              const canonCountryId = normalizeArtistId(canonCountryName);
+
+              // 1a. Reroute any links targeting non-canonical country endpoints
+              let reroutedToCanon = false;
+              finalGraph.links.forEach((link: any) => {
+                const sId = typeof link.source === 'string' ? link.source : (link.source as any).id;
+                const tId = typeof link.target === 'string' ? link.target : (link.target as any).id;
+                const otherId = sId === node.id ? tId : (tId === node.id ? sId : null);
+
+                if (otherId && isCountryEndpoint(otherId) && otherId !== canonCountryId) {
+                  if (sId === node.id) {
+                    if (typeof link.target === 'string') link.target = canonCountryId;
+                    else (link.target as any).id = canonCountryId;
+                  } else {
+                    if (typeof link.source === 'string') link.source = canonCountryId;
+                    else (link.source as any).id = canonCountryId;
                   }
+                  reroutedToCanon = true;
+                  console.log(`[Curation Backend] Step 4B: Rerouted country link for "${node.id}" from "${otherId}" to canonical "${canonCountryId}"`);
+                }
+              });
+
+              // 1b. Instantiate canonical country node if missing
+              if (!existingNodeMap.has(canonCountryId)) {
+                const newCountryNode = {
+                  id: canonCountryId,
+                  type: 'country',
+                  label: canonCountryName,
+                  group: node.group || 1
+                };
+                finalGraph.nodes.push(newCountryNode);
+                existingNodeMap.set(canonCountryId, newCountryNode);
+                console.log(`[Curation Backend] Step 4B: Injected missing canonical country node "${canonCountryId}" for artist "${node.id}"`);
+              }
+
+              // 1c. If rerouted, ensure existingLinkSet has the updated link key
+              if (reroutedToCanon) {
+                existingLinkSet.add(`${node.id}--${canonCountryId}`);
+                existingLinkSet.add(`${canonCountryId}--${node.id}`);
+              }
+
+              // 1d. Inject country link if missing
+              const hasCanonCountryLink = existingLinkSet.has(`${node.id}--${canonCountryId}`) ||
+                finalGraph.links.some((l: any) => {
+                  const s = typeof l.source === 'string' ? l.source : (l.source as any).id;
+                  const t = typeof l.target === 'string' ? l.target : (l.target as any).id;
+                  return (s === node.id && t === canonCountryId) || (s === canonCountryId && t === node.id);
                 });
 
-                // Instantiate the missing canonical country node if needed
-                if (reroutedAny && !countryNodeMap.has(canonCountryId)) {
-                  const newCountryNode = {
-                    id: canonCountryId,
-                    type: "country",
-                    label: canonCountryName,
-                    group: node.group || 1
-                  };
-                  finalGraph.nodes.push(newCountryNode);
-                  countryNodeMap.set(canonCountryId, newCountryNode); // mark as added
-                  console.log(`[Curation Backend] Topological Reconciliation: Injected missing canonical country node "${canonCountryId}" for artist "${node.id}"`);
-                }
+              if (!hasCanonCountryLink) {
+                finalGraph.links.push({
+                  source: node.id,
+                  target: canonCountryId,
+                  value: 1,
+                  weight: 0.2,
+                  forwardContext: `Formed in ${canonCountryName}`,
+                  inverseContext: `Home country of ${node.label || node.id}`
+                });
+                existingLinkSet.add(`${node.id}--${canonCountryId}`);
+                existingLinkSet.add(`${canonCountryId}--${node.id}`);
+                console.log(`[Curation Backend] Step 4B: Injected missing country link: "${node.id}" -> "${canonCountryId}" (weight: 0.2)`);
               }
+            }
+          }
+
+          // 2. Founded Year Injection
+          const rawFounded = meta.founded ? String(meta.founded) : '';
+          const yearMatch = rawFounded.match(/\b(19\d\d|20\d\d)\b/);
+          if (yearMatch) {
+            const foundedYear = yearMatch[1];
+            const foundedNodeId = foundedYear;
+
+            // Instantiate founded node if missing
+            if (!existingNodeMap.has(foundedNodeId)) {
+              const newFoundedNode = {
+                id: foundedNodeId,
+                type: 'founded',
+                label: foundedYear,
+                group: node.group || 1
+              };
+              finalGraph.nodes.push(newFoundedNode);
+              existingNodeMap.set(foundedNodeId, newFoundedNode);
+              console.log(`[Curation Backend] Step 4B: Injected missing founded node "${foundedNodeId}"`);
+            }
+
+            // Check if artist is already linked to ANY founded node
+            const hasFoundedLink = finalGraph.links.some((l: any) => {
+              const s = typeof l.source === 'string' ? l.source : (l.source as any).id;
+              const t = typeof l.target === 'string' ? l.target : (l.target as any).id;
+              const otherId = s === node.id ? t : (t === node.id ? s : null);
+              if (!otherId) return false;
+              const otherNode = existingNodeMap.get(otherId);
+              return otherNode?.type === 'founded' || /^\d{4}$/.test(otherId);
+            });
+
+            if (!hasFoundedLink) {
+              finalGraph.links.push({
+                source: node.id,
+                target: foundedNodeId,
+                value: 1,
+                weight: 0.3,
+                forwardContext: `Founded in ${foundedYear}`,
+                inverseContext: `Formation year of ${node.label || node.id}`
+              });
+              existingLinkSet.add(`${node.id}--${foundedNodeId}`);
+              existingLinkSet.add(`${foundedNodeId}--${node.id}`);
+              console.log(`[Curation Backend] Step 4B: Injected missing founded link: "${node.id}" -> "${foundedNodeId}" (weight: 0.3)`);
+            }
+          }
+
+          // 3. Contextual Pod Genre Matching (2-Tier)
+          const hasGenreLink = finalGraph.links.some((l: any) => {
+            const s = typeof l.source === 'string' ? l.source : (l.source as any).id;
+            const t = typeof l.target === 'string' ? l.target : (l.target as any).id;
+            const otherId = s === node.id ? t : (t === node.id ? s : null);
+            if (!otherId) return false;
+            const otherNode = existingNodeMap.get(otherId);
+            return otherNode?.type === 'genre';
+          });
+
+          if (!hasGenreLink && meta.genre) {
+            // Split candidate genres by slash or comma
+            const rawGenres = String(meta.genre).split(/[\/,]/).map((g: string) => g.trim()).filter(Boolean);
+            const candidateGenre = rawGenres[0] || 'Alternative';
+
+            // Find existing genre nodes belonging to the same pod group
+            const podGenreNodes = Array.from(existingNodeMap.values()).filter(
+              (n: any) => n.type === 'genre' && (node.group === undefined || n.group === node.group)
+            );
+
+            // Tier 1: Pod Scene Affinity - find existing pod genre sharing root stem/token
+            let targetGenreNode: any = null;
+            const candidateTokens = rawGenres.flatMap((g: string) =>
+              g.toLowerCase().split(/\s+/).filter((w: string) => w.length > 2)
+            );
+
+            for (const pgn of podGenreNodes) {
+              const pgnLabel = (pgn.label || pgn.id).toLowerCase();
+              const pgnTokens = pgnLabel.split(/\s+/).filter((w: string) => w.length > 2);
+              const sharesToken = candidateTokens.some(ct =>
+                pgnTokens.some((pt: string) => ct.includes(pt) || pt.includes(ct))
+              );
+              if (sharesToken) {
+                targetGenreNode = pgn;
+                break;
+              }
+            }
+
+            if (targetGenreNode) {
+              // Wire to existing pod genre
+              finalGraph.links.push({
+                source: node.id,
+                target: targetGenreNode.id,
+                value: 1,
+                weight: 0.8,
+                forwardContext: `Performs ${targetGenreNode.label || targetGenreNode.id}`,
+                inverseContext: `Key sub-genre representing ${node.label || node.id}`
+              });
+              existingLinkSet.add(`${node.id}--${targetGenreNode.id}`);
+              existingLinkSet.add(`${targetGenreNode.id}--${node.id}`);
+              console.log(`[Curation Backend] Step 4B: Pod Genre Affinity wired "${node.id}" to existing genre "${targetGenreNode.id}" (weight: 0.8)`);
+            } else {
+              // Tier 2: Scene Divergence - mint new genre node for this pod
+              const newGenreId = normalizeArtistId(candidateGenre);
+              if (!existingNodeMap.has(newGenreId)) {
+                const newGenreNode = {
+                  id: newGenreId,
+                  type: 'genre',
+                  label: candidateGenre,
+                  group: node.group || 1
+                };
+                finalGraph.nodes.push(newGenreNode);
+                existingNodeMap.set(newGenreId, newGenreNode);
+                console.log(`[Curation Backend] Step 4B: Minted divergent genre node "${newGenreId}" for pod group ${node.group}`);
+              }
+              finalGraph.links.push({
+                source: node.id,
+                target: newGenreId,
+                value: 1,
+                weight: 0.8,
+                forwardContext: `Performs ${candidateGenre}`,
+                inverseContext: `Genre of ${node.label || node.id}`
+              });
+              existingLinkSet.add(`${node.id}--${newGenreId}`);
+              existingLinkSet.add(`${newGenreId}--${node.id}`);
+              console.log(`[Curation Backend] Step 4B: Injected divergent genre link: "${node.id}" -> "${newGenreId}" (weight: 0.8)`);
             }
           }
         });
@@ -1263,7 +1440,7 @@ export const processCurationJob = onDocumentCreated({
             const linkKey = [sId, tId].sort().join('--');
             if (weightMap.has(linkKey)) {
               link.weight = weightMap.get(linkKey);
-            } else {
+            } else if (link.weight === undefined) {
               // Ensure all links have at least a neutral weight
               link.weight = 0.5;
             }
@@ -1272,7 +1449,9 @@ export const processCurationJob = onDocumentCreated({
         } else {
           // Graceful Fallback: Apply default neutral weight to ensure physics engine continuity
           finalGraph.links.forEach((link: any) => {
-            link.weight = 0.5;
+            if (link.weight === undefined) {
+              link.weight = 0.5;
+            }
           });
           console.warn(`[Curation Backend] AI weight generation failed or returned empty. Applied default weight (0.5) to all links.`);
         }
