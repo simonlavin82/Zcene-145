@@ -1150,12 +1150,14 @@ app.use(async (req, res) => {
             : `Explore customized music maps and discover underground artists on Zcene.`;
 
           // ARCHITECTURE: Deterministic Open Graph Routing
-          // Phase 3: Fast path — share document carries its own pre-resolved seed image.
-          // Written by handleShareZcene / handleDashboardShareProject at creation time,
-          // eliminating a secondary Firestore round-trip that could miss on cold-start
-          // or for unhydrated Direct Hit seeds.
-          if (projectData.seedImageUrl) {
-            imageUrl = projectData.seedImageUrl;
+          // Phase 3 & Architecture V29: Fast path — share/project document carries its own pre-resolved seed image.
+          // Written by handleShareZcene / handleDashboardShareProject / processCurationJob at creation time.
+          const resolvedSeedImage = (projectData.seedImageUrls && Array.isArray(projectData.seedImageUrls))
+            ? projectData.seedImageUrls.find(url => url && url !== 'not-found')
+            : projectData.seedImageUrl;
+
+          if (resolvedSeedImage) {
+            imageUrl = resolvedSeedImage;
             console.log(`[OG Injection] Using denormalised seedImageUrl for ${projectId}`);
           } else if (seedList.length > 0) {
             // Legacy fallback: look up artist image from the global artists collection.

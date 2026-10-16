@@ -60,7 +60,7 @@ const ARCHITECTURE_RULES = [
     { id: 26, title: "Contextual Tooltips", desc: "Spiderweb hover tooltips prioritize narrative epicenter hooks over dry encyclopedic summaries." },
     { id: 27, title: "AI-Led Coordinate Panning", desc: "Initial viewport center dynamically calibrated to the spatial bounding box of settled clusters." },
     { id: 28, title: "Canonical Global Caching (Filter Barring)", desc: "Global caching uses pure canonical IDs; query filters are strictly barred from document paths." },
-    { id: 29, title: "Data Lifecycle Matrix", desc: "Strict 3-Tier Storage Matrix: Tier 1 Global (365d stale), Tier 2 Ephemeral (30d TTL), Tier 3 Owned." },
+    { id: 29, title: "Universal Payload Serializer & Card Isolation", desc: "Project saving derives from single source of truth; dashboard cards rely solely on frozen seedImageUrls snapshot, strictly prohibiting global cache visual asset queries." },
     { id: 30, title: "Strict Hydration Lock", desc: "Autosave intervals and listeners suspended via global lock during active generation cycles." },
     { id: 31, title: "Local State Preemption", desc: "Zero-cost local routing synchronously injects graph into React state before releasing the lock." },
     { id: 32, title: "Validation Circuit Breaker", desc: "Validation Modal acts as hard execution stop/return; dismissal terminates downstream pipeline." },

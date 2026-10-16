@@ -2613,7 +2613,21 @@ const App: React.FC = () => {
     activeNodeIds.forEach(id => { if (isNodeInSeedList(id, saveSeedNorms)) hoistedSaveActiveNodes.push(id); });
     activeNodeIds.forEach(id => { if (!isNodeInSeedList(id, saveSeedNorms)) hoistedSaveActiveNodes.push(id); });
 
-    // Seed Image URL Resolution
+    // Architecture V29: Seed Image URLs Resolution (Array for all seeds)
+    const extractedSeedImageUrls: (string | null)[] = seedList.map((seedName: string, idx: number) => {
+      const norm = saveSeedNorms[idx] || normalizeArtistId(seedName);
+      let details = detailsCache.get(norm) || detailsCache.get(seedName.toLowerCase());
+      if (!details) {
+        const fallbackKey = Array.from(detailsCache.keys()).find(k => (k as string).startsWith(norm + '-'));
+        if (fallbackKey) details = detailsCache.get(fallbackKey);
+      }
+      let url = (details as any)?.imageUrl || (details as any)?.details?.imageUrl || null;
+      if (idx === 0 && (!url || url === 'not-found') && sharedSeedImageUrlRef.current) {
+        url = sharedSeedImageUrlRef.current;
+      }
+      return (url && url !== 'not-found' && typeof url === 'string' && url.trim().length > 0) ? url.trim() : null;
+    });
+
     const primarySaveSeedNorm = saveSeedNorms[0] || '';
     let saveImageDetails = null;
     if (primarySaveSeedNorm) {
@@ -2627,10 +2641,7 @@ const App: React.FC = () => {
     }
     
     const actualDisplayName = (saveImageDetails as any)?.name || (saveImageDetails as any)?.details?.name;
-    let resolvedSeedImageUrl: string = (saveImageDetails as any)?.imageUrl || (saveImageDetails as any)?.details?.imageUrl || '';
-    if (!resolvedSeedImageUrl && sharedSeedImageUrlRef.current) {
-      resolvedSeedImageUrl = sharedSeedImageUrlRef.current;
-    }
+    const resolvedSeedImageUrl: string | null = extractedSeedImageUrls.find(u => !!u) || null;
 
     const canvasLayout = graphData.nodes
       .filter((n: any) => n.type === 'artist' || n.type === 'label')
@@ -2665,6 +2676,7 @@ const App: React.FC = () => {
       canvasLayout: JSON.stringify(canvasLayout),
       graphData: JSON.stringify(graphData),
       detailsCache: JSON.stringify(Array.from(detailsCache.entries())),
+      seedImageUrls: extractedSeedImageUrls,
     };
 
     if (currentCacheKey) {
@@ -2928,13 +2940,23 @@ const App: React.FC = () => {
         if (primaryNode) hoistedActiveNodes.push(primaryNode.id);
         normalizedGraph.nodes.forEach((n: any) => { if (!hoistedActiveNodes.includes(n.id)) hoistedActiveNodes.push(n.id); });
 
-        const payload = {
+        const primaryMatchedNode = primaryNode 
+          ? normalizedGraph.nodes.find((n: any) => n.id === primaryNode.id) 
+          : normalizedGraph.nodes[0];
+        const rawNodeImage = (primaryMatchedNode as any)?.imageUrl;
+        const directHitImageUrl = (rawNodeImage && rawNodeImage !== 'not-found' && typeof rawNodeImage === 'string' && rawNodeImage.trim().length > 0)
+          ? rawNodeImage.trim()
+          : null;
+
+        const payload: Record<string, any> = {
           graphData: JSON.stringify(normalizedGraph),
           activeNodes: hoistedActiveNodes,
           seedArtists: artistsString,
           detailsCache: JSON.stringify(Array.from(detailsCacheRef.current.entries())),
           status: 'completed',
           generationType: 'Direct Hit',
+          seedImageUrls: [directHitImageUrl],
+          ...(directHitImageUrl ? { seedImageUrl: directHitImageUrl } : {}),
           updatedAt: serverTimestamp()
         };
 
@@ -5155,6 +5177,7 @@ const App: React.FC = () => {
           status: data.status,
           coverImage: data.coverImage,
           seedImageUrl: data.seedImageUrl,
+          seedImageUrls: data.seedImageUrls,
           activeJobId: data.activeJobId,
           authorId: data.authorId,
           generationType: data.generationType,

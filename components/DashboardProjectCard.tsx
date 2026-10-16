@@ -31,8 +31,8 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
   const displayTitle = cleanArtistDisplayName(project.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene"));
   const isUnmapped = project.status !== 'completed' && project.status !== 'curating' && project.status !== 'pending' && project.status !== 'failed' && !project.seedArtists;
   
-  const imageUrls = useSeedImages(project.seedArtists, project.detailsCache, project.graphData, project.seedImageUrl);
-  const dominantColor = useDominantColor(imageUrls[0] && imageUrls[0] !== 'not-found' ? imageUrls[0] : undefined, displayTitle);
+  const imageUrls = useSeedImages(project.seedArtists, project.detailsCache, project.graphData, project.seedImageUrl, project.seedImageUrls);
+  const dominantColor = useDominantColor(imageUrls[0] || undefined, displayTitle);
 
   // Derive deep cuts count dynamically
   let deepCutsCount = 0;
@@ -80,9 +80,9 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
       } as React.CSSProperties}
     >
       
-      {/* Background Layer: Full-bleed image or deterministic gradient */}
+      {/* Background Layer: Smart Fallback cascade (0 images = monogram, 1 image = full bleed, 2+ images = split card) */}
       <div className="absolute inset-0 z-0 flex">
-        {imageUrls.length > 1 ? (
+        {imageUrls.length >= 2 ? (
           <>
             {/* Left artist: anchored left, cross-fades out across the right half */}
             <div
@@ -92,11 +92,7 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
                 maskImage: 'linear-gradient(to right, black 30%, transparent 75%)',
               }}
             >
-              {imageUrls[0] && imageUrls[0] !== 'not-found' ? (
-                <img src={imageUrls[0]} alt={displayTitle} className="w-full h-full object-cover object-left" crossOrigin="anonymous" />
-              ) : (
-                <div className="w-full h-full bg-gradient-to-br from-zinc-800/40 to-zinc-900/80" />
-              )}
+              <img src={imageUrls[0]} alt={displayTitle} className="w-full h-full object-cover object-left" crossOrigin="anonymous" />
             </div>
             {/* Right artist: anchored right, cross-fades out across the left half */}
             <div
@@ -106,25 +102,19 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
                 maskImage: 'linear-gradient(to left, black 30%, transparent 75%)',
               }}
             >
-              {imageUrls[1] && imageUrls[1] !== 'not-found' ? (
-                <img src={imageUrls[1]} alt={displayTitle} className="w-full h-full object-cover object-right" crossOrigin="anonymous" />
-              ) : (
-                <div className="w-full h-full bg-gradient-to-br from-zinc-800/40 to-zinc-900/80" />
-              )}
+              <img src={imageUrls[1]} alt={displayTitle} className="w-full h-full object-cover object-right" crossOrigin="anonymous" />
             </div>
           </>
-        ) : (
+        ) : imageUrls.length === 1 ? (
           <div className="w-full h-full">
-            {imageUrls[0] && imageUrls[0] !== 'not-found' ? (
-              <img src={imageUrls[0]} alt={displayTitle} className="w-full h-full object-cover" crossOrigin="anonymous" />
-            ) : (
-              <div className="w-full h-full bg-gradient-to-br from-zinc-800/40 to-zinc-900/80 relative overflow-hidden">
-                 {/* Monogram for missing images */}
-                 <div className="absolute bottom-0 right-0 translate-y-[14%] translate-x-[8%] text-white/10 font-black text-8xl uppercase select-none leading-none">
-                   {extractInitials(displayTitle)}
-                 </div>
-              </div>
-            )}
+            <img src={imageUrls[0]} alt={displayTitle} className="w-full h-full object-cover" crossOrigin="anonymous" />
+          </div>
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-zinc-800/40 to-zinc-900/80 relative overflow-hidden">
+             {/* Monogram for missing images */}
+             <div className="absolute bottom-0 right-0 translate-y-[14%] translate-x-[8%] text-white/10 font-black text-8xl uppercase select-none leading-none">
+               {extractInitials(displayTitle)}
+             </div>
           </div>
         )}
       </div>

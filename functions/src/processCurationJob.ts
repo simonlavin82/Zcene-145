@@ -1749,24 +1749,39 @@ export const processCurationJob = onDocumentCreated({
       }
       console.log(`[Curation Backend] [Phase 2B] Hoisted activeNodes: seed at [0]="${hoistedActiveNodes[0]}", total=${hoistedActiveNodes.length}`);
 
-      let extractedSeedImageUrl = null;
+      // Column 3, Node 7 (Architecture V29): Extract and freeze seedImageUrls array from isolated detailsCache snapshot to project root
+      const rawSeedString = inputPayload.seedArtists || inputPayload.artists || '';
+      const seedTokens = rawSeedString.split('::').map((a: string) => a.trim()).filter(Boolean);
+      const extractedSeedImageUrls: (string | null)[] = [];
+      let extractedSeedImageUrl: string | null = null;
+
       try {
         if (result.detailsCache) {
-           const parsedCache = typeof result.detailsCache === 'string' ? JSON.parse(result.detailsCache) : result.detailsCache;
-           const primarySeedId = hoistedActiveNodes[0];
-           if (primarySeedId && Array.isArray(parsedCache)) {
-             const match = parsedCache.find((item: any) => {
+          const parsedCache = typeof result.detailsCache === 'string' ? JSON.parse(result.detailsCache) : result.detailsCache;
+          if (Array.isArray(parsedCache)) {
+            for (const seed of seedTokens) {
+              const seedNorm = normalizeArtistId(seed);
+              const match = parsedCache.find((item: any) => {
                 const key = normalizeArtistId(item[0]);
-                return key === primarySeedId || key.startsWith(primarySeedId + '-') || primarySeedId.startsWith(key + '-');
-             });
-             if (match && match[1]) {
-                extractedSeedImageUrl = match[1].imageUrl || match[1].details?.imageUrl || null;
-             }
-           }
+                return isEntitySeedMatch(seedNorm, key) || key === seedNorm || key.startsWith(seedNorm + '-') || seedNorm.startsWith(key + '-');
+              });
+              let url: string | null = null;
+              if (match && match[1]) {
+                const candidate = match[1].imageUrl || match[1].details?.imageUrl || null;
+                if (candidate && candidate !== 'not-found' && typeof candidate === 'string' && candidate.trim().length > 0) {
+                  url = candidate.trim();
+                }
+              }
+              extractedSeedImageUrls.push(url);
+            }
+          }
         }
       } catch (e) {
-        console.warn(`[Curation Backend] Failed to extract seedImageUrl:`, e);
+        console.warn(`[Curation Backend] Failed to extract seedImageUrls:`, e);
       }
+
+      // Backward compatibility: first valid non-null seed image
+      extractedSeedImageUrl = extractedSeedImageUrls.find(u => !!u) || null;
 
       const mergedApiUsage: Record<string, { prompt: number, candidates: number, total: number }> = {};
       if (inputPayload?.foregroundApiUsage && Object.keys(inputPayload.foregroundApiUsage).length > 0) {
@@ -1801,6 +1816,7 @@ export const processCurationJob = onDocumentCreated({
         activeNodes: hoistedActiveNodes,  // Phase 2B: canonical seed-first ordering
         apiUsage: mergedApiUsage,
         ...(inputPayload?.generationType ? { generationType: inputPayload.generationType } : {}),
+        seedImageUrls: extractedSeedImageUrls,
         ...(extractedSeedImageUrl ? { seedImageUrl: extractedSeedImageUrl } : {})
       });
     }

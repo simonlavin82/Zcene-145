@@ -198,6 +198,7 @@ export interface Project {
   activeJobId?: string | null;
   coverImage?: string;
   seedImageUrl?: string;
+  seedImageUrls?: (string | null)[];
   generationType?: "Root Generation" | "Partial Generation" | "Direct Hit" | "Complex Generation" | string;
   apiUsage?: Record<string, any>;
   createdAt?: any;

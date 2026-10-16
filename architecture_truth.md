@@ -1,8 +1,8 @@
 # ZCENE ARCHITECTURAL TRUTH & IMMUTABLE LAWS
  
-![Architecture Diagram](./Zcene Architecture V25.jpg)
+![Architecture Diagram](./Zcene Architecture V29.jpg)
  
-This document defines the absolute, immutable architectural baseline of Zcene (V25). All future development, bug fixes, and AI agent actions MUST strictly adhere to these laws. Legacy paradigms (like naive string matching, bypass assumptions, single-pointer stubs, or storing entity payloads under bare IDs) are strictly forbidden.
+This document defines the absolute, immutable architectural baseline of Zcene (V29). All future development, bug fixes, and AI agent actions MUST strictly adhere to these laws. Legacy paradigms (like naive string matching, bypass assumptions, single-pointer stubs, or storing entity payloads under bare IDs) are strictly forbidden.
  
 ## THE IMMUTABLE ARCHITECTURAL LAWS
  
@@ -26,6 +26,7 @@ The curation pipeline is strictly divided into three distinct execution columns.
   - **Node 17: Root-as-Router Contract:** Bare IDs (e.g., `'gunmoll'`, `'turnstile'`) MUST be minted exclusively as `_isStub: true` forwarders (`redirectTo: "id-iso"`, `candidates: [...]`). Verified payloads (biography, discography, graphData, image) MUST be stored at geographically suffixed IDs (e.g., `artists/gunmoll-us`). Bare IDs are permanently reserved as routers to future-proof against homonyms and must never hold entity payloads. Cache reads checking bare IDs follow `redirectTo` directly to the suffixed canonical document.
   - Saves the baseline topology to Firestore and returns HTTP 200 OK while creating the `curationJobs` doc, handing full execution to the async worker.
 - **Column 3: Background Worker (processCurationJob.ts & healOrphanedAsset.ts):** Asynchronous hydration layer. Follows a strict progression: Hydrate Node Batch (enforcing the **4-Tier iTunes Waterfall** - Rule 38 with discography tie-breaking) -> Root Synthesis (Native JSON Generation schema returning `{ editorialMarkdown, artistSnippets }`) -> Step 4A Topology Parity (`reconcileNarrativeEdges` - Rule 23) -> Step 4B Deterministic Graph Enrichment & Pod Genre Affinity ([Rule 39]) -> Degree-0 Cleanup (Rule 9) -> Final Node Positioning (Weight Preservation Guard) -> Persist Assets. The architecture inherently bypasses any secondary contextual extraction pass. Never writes missing hydration data as 'null'; explicitly falls back to pre-hydrated `seedStubs` for failed primary seeds (JIT Fallback) to prevent database corruption. Writes fully hydrated nodes back to cache.
+  - **Node 7: Set Project status: 'completed':** Extracts and freezes the `seedImageUrls: (string | null)[]` snapshot array from the isolated `detailsCache` directly to the project root, strictly immunizing dashboard cards from future global cache updates and enforcing seed-only UI fallbacks.
   - **Node 36: Just-In-Time (JIT) Asset Healer (3.6 Flash):** Dedicated on-demand micro-worker triggered ONLY when a user inspects an orphaned node suffering a true 404 cache miss. Bypasses batch queues to synthesize a 100% complete deep cut profile with full **4-Tier iTunes Waterfall** scraping parity (Rule 38), performs atomic write-back to Firestore `artists/{id}` or `labels/{id}`, and records granular token and USD micro-cost receipts directly to `adminLedger/system/jitHeals`. Governed by a platform-wide 100-heal/24h auto-kill circuit breaker and manual admin override. Strictly forbidden from automated background sweeps or soft-expired data healing.
 
 ### 2. Strict Seed Hoisting & Pinning
@@ -159,11 +160,12 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 - **Enforcement:** Query filters (e.g., `after:2019`, `genre:hardcore`) are strictly barred from canonical document paths. This explicitly prevents cache fracturing and phantom cache misses.
 - **Rationale:** Zcene strictly separates bespoke temporal/genre Zcene generation (which lives in ephemeral project topologies) from its canonical global artist library (which must remain a pure, singular source of truth for all users).
 
-### 29. Data Lifecycle Matrix
-- **Rule:** Timestamps strictly conform to the 3-Tier Storage Matrix. `cachedAt` is permanently eradicated.
-- **Tier 1: Global Assets (artists & labels):** `createdAt` (Immutable), `updatedAt` (Mutable). Soft-expires at 365 days (Stale). **Stale nodes are ONLY refreshed when intersected by a user-funded generation. NEVER auto-swept.**
-- **Tier 2: Ephemeral Storage (sharedZcenes):** `createdAt` (Immutable), `expireAt` (+30 Days Hard TTL). `updatedAt` is strictly NULL/Removed (read-only snapshots).
-- **Tier 3: Owned Storage (User Projects):** `createdAt` (Immutable), `updatedAt` (Mutable). No TTL.
+### 29. Universal Payload Serializer
+- **Rule:** Project saving and share generation must strictly derive from a single source of truth to guarantee 1:1 data parity (including curation elements like pinned/styled nodes).
+- **Share Links Blacklist:** Share links apply a post-serialization blacklist to handle ephemeral environment constraints without risking data omission.
+- **Strict Ledger Parity:** `buildBaseProjectPayload` defensively omits `generationType` and `apiUsage` during frontend autosave (`merge: true`) to prevent clobbering background worker token costs and labeling.
+- **Display Name Invariant:** Frontend payload MUST pass a `seedNames` map as the absolute source of truth for display names to prevent backend hallucination.
+- **Dashboard Card & UI Isolation:** Dashboard cards & UI consumers must rely solely on the frozen `seedImageUrls` snapshot. Querying the global artists cache for visual assets on isolated projects is strictly prohibited.
 
 ### 30. Strict Hydration Lock
 - **Rule:** Autosave intervals and listeners MUST be suspended via a global lock during generation cycles to prevent race conditions and partial snapshot overwrites.
