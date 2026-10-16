@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { qualifyCacheEntry, MIN_RATIONALE_LENGTH } from '../../services/cacheQualification';
 import { extractCountrySlug } from '../src/services/curatorService';
 
-describe('Architecture V28: Read/Write Gates & Border-Town Slug Resolution', () => {
+describe('Architecture V29: Read/Write Gates & Border-Town Slug Resolution', () => {
   describe('Phase 1: qualifyCacheEntry (The Read Gate)', () => {
     const validGraph = JSON.stringify({
       nodes: [

@@ -1,5 +1,5 @@
 export const BACKEND_REGRESSION_RUNBOOK = `
-# V28 Regression Suite (Full-Stack)
+# V29 Regression Suite (Full-Stack)
 
 This suite locks down the Zcene generation engine locally without incurring Gemini API costs or requiring the heavy Java Firebase Emulator.
 
@@ -9,8 +9,8 @@ This suite locks down the Zcene generation engine locally without incurring Gemi
 # Run backend pipeline tests
 cd functions && npx vitest run tests/pipeline.test.ts
 
-# Run V28 Read/Write Gate & border-town slug tests
-cd functions && npx vitest run tests/v28-gates.test.ts
+# Run V29 Read/Write Gate & border-town slug tests
+cd functions && npx vitest run tests/v29-gates.test.ts
 
 # Run JIT Asset Healer & circuit breaker tests
 cd functions && npx vitest run tests/healOrphanedAsset.test.ts

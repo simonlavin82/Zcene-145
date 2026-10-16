@@ -940,7 +940,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             const detailsEntry = detailsCacheEntries.find((entry) => entry[0] === node.id || isEntitySeedMatch(node.id, entry[0]));
                             const meta = detailsEntry?.[1]?.details || {};
                             const rawOrigin = node.origin || meta.origin;
-                            // Architecture V28: Prioritize canonical ISO suffix on node.id (e.g. "nasty-be" -> "be")
+                            // Architecture V29: Prioritize canonical ISO suffix on node.id (e.g. "nasty-be" -> "be")
                             const idIsoMatch = typeof node.id === 'string' ? node.id.match(/-([a-z]{2})$/) : null;
                             const suffixIso = (idIsoMatch && ISO_TO_COUNTRY_MAP[idIsoMatch[1]]) ? idIsoMatch[1] : null;
                             // 1. Country Reconciliation & Injection
@@ -1282,7 +1282,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                         }
                                     }
                                     else {
-                                        // Architecture V28 Write Gate:
+                                        // Architecture V29 Write Gate:
                                         // Block setting hasUniqueSpiderweb: true and do NOT write graphData if synthesisRationale is missing or < 50 chars!
                                         canonicalUpdate.hasUniqueSpiderweb = false;
                                         console.warn(`[Self-Heal] Write Gate: Suppressed graphData & hasUniqueSpiderweb for ${canonicalSeedId} due to missing/short synthesisRationale`);

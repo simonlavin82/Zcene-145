@@ -32,45 +32,206 @@ interface SourcePageProps {
 }
 
 const ARCHITECTURE_RULES = [
-    { id: 1, title: "Three-Column Flow", desc: "Pipeline is strictly partitioned into React UI, HTTP Fast-Track, and Background Worker." },
-    { id: 2, title: "Strict Seed Hoisting & Pinning", desc: "Seed nodes must ALWAYS be hoisted and pinned to activeNodes[0] as roots of the network." },
-    { id: 3, title: "Universal Coordinate Amnesia", desc: "Absolute D3 runtime coordinates MUST be stripped during Share and Duplication creation." },
-    { id: 4, title: "Deterministic Open Graph Routing", desc: "Deterministic seedImageUrl appended to root payload to eliminate proxy lookups." },
-    { id: 5, title: "[Deprecated] Client-Side Hydration", desc: "Project payloads are 100% self-contained and atomic. On-demand lazy hydration is obsolete." },
-    { id: 6, title: "Ambiguous Stub Bypass & Canonical Resolution", desc: "Ambiguous stubs (_isStub: true && isAmbiguous: true) MUST bypass direct hits and route to Node 4." },
-    { id: 7, title: "Fail-Fast Media Gatekeeper", desc: "Cache validation predicate flags nodes missing crucial imagery or biographies as cache misses." },
-    { id: 8, title: "Strict Topology Verification & Cache Serialization", desc: "Stubs lacking graphData MUST route to Generative Topology. D3 links safely serialized to strings." },
-    { id: 9, title: "Canonical Seed Slug Resolution & Degree-0 Cleanup", desc: "resolvedSeedNormMap and idRewriteMap prevent split-brain writes. isCountryEndpoint and Degree-0 cleanup prune orphans while protecting connected nodes." },
-    { id: 10, title: "Redirect Pointer & Stub Dedup Immunity", desc: "Hydration loop slug dedup MUST skip documents with redirectTo, _isStub, or isAmbiguous." },
-    { id: 11, title: "Validation Reasoning & Escape Hatch Bouncer", desc: "Parametric Flash 3.6 re-query bouncer with zero-pollution inline rejection. Zero search grounding." },
-    { id: 12, title: "Resilient iTunes Artwork Pipeline", desc: "Punctuation-agnostic normalization and bio summary fallback ensure 100% artwork hydration." },
-    { id: 13, title: "Auth Handoff Preserver", desc: "Stashes pending project ID in session storage to guarantee clone resumes cleanly post-auth." },
-    { id: 14, title: "Atomic Self-Healing", desc: "Graph breakdowns handle atomic self-healing with fuzzy fallbacks mitigating coupling failures." },
-    { id: 15, title: "Complex Cache Bypass", desc: "Multi-seed and filtered queries strictly bypass Front Gate cache and default to Live Synthesis." },
-    { id: 16, title: "Curation Intercept Guardrails", desc: "ProjectLoader ignores snapshots while status is 'curating' to prevent duplicate generative calls." },
-    { id: 17, title: "Universal Pre-Flight Stub Minting & Zero Blind Trust", desc: "Stubs minted synchronously during pre-flight strictly from verified Flash candidate payloads." },
-    { id: 18, title: "Authorization Lifecycle", desc: "Token authorization state is strictly scoped to the active generation event and resets on cancel." },
-    { id: 19, title: "External Link Security", desc: "Official website and Bandcamp links rely on deterministic client-side search templates." },
-    { id: 20, title: "Mandatory Disambiguation on Direct Hits", desc: "Topology hits (Green Line) MUST explicitly route through <DisambiguationModal> to verify origin." },
-    { id: 21, title: "Locked Semantic Topology & AI Physics Injection", desc: "D3 dragging forbidden. Final positioning AI link weights dictate variable distance and rigidity." },
-    { id: 22, title: "Deep-Cut Range Targeting", desc: "LLM calibrated for rich spiderweb density (18–21 nodes) with scene flexibility to avoid filler." },
-    { id: 23, title: "Topology Parity Mandate", desc: "reconcileNarrativeEdges mechanically injects connections stated in narrative missing from links." },
-    { id: 24, title: "Verbal Identity", desc: "Root Breakdown prompt strictly enforces the 2 AM record curator voice and 1-sentence hooks." },
-    { id: 25, title: "Selective Coordinate Amnesia", desc: "Stripping destructure is strictly scoped to /sharedZcenes. Owned projects retain Coordinate Memory." },
-    { id: 26, title: "Contextual Tooltips", desc: "Spiderweb hover tooltips prioritize narrative epicenter hooks over dry encyclopedic summaries." },
-    { id: 27, title: "AI-Led Coordinate Panning", desc: "Initial viewport center dynamically calibrated to the spatial bounding box of settled clusters." },
-    { id: 28, title: "Canonical Global Caching (Filter Barring)", desc: "Global caching uses pure canonical IDs; query filters are strictly barred from document paths." },
-    { id: 29, title: "Universal Payload Serializer & Card Isolation", desc: "Project saving derives from single source of truth; dashboard cards rely solely on frozen seedImageUrls snapshot, strictly prohibiting global cache visual asset queries." },
-    { id: 30, title: "Strict Hydration Lock", desc: "Autosave intervals and listeners suspended via global lock during active generation cycles." },
-    { id: 31, title: "Local State Preemption", desc: "Zero-cost local routing synchronously injects graph into React state before releasing the lock." },
-    { id: 32, title: "Validation Circuit Breaker", desc: "Validation Modal acts as hard execution stop/return; dismissal terminates downstream pipeline." },
-    { id: 33, title: "Payload Completeness", desc: "Direct Hit local routing injects both graphData and detailsCache simultaneously to prevent lookups." },
-    { id: 34, title: "Cognitive Tiering & Orchestration Stability", desc: "AI generation strictly utilizes thinking_level (minimal to high); rates pegged to standard list price." },
-    { id: 35, title: "Geographic Asset Disambiguation", desc: "iTunes scraper appends parametric regional suffix (e.g. ' US') if primary query collides." },
-    { id: 36, title: "Entity Taxonomy Normalization & Root-as-Router", desc: "Bare IDs reserved as _isStub: true forwarders; verified payloads resolve to suffixed IDs (gunmoll-us)." },
-    { id: 37, title: "JIT Asset Telemetry & Healing (404 Parachute ONLY)", desc: "Emergency parachute for inspected 404 cache misses. Zero background sweeps. 100-heal/24h auto-kill." },
-    { id: 39, title: "Deterministic Metadata Projection & Pod Genre Affinity", desc: "Step 4B projects Country (0.2), Founded (0.3), and 2-Tier Pod Genre Affinity (0.8) for all spawned artists before Degree-0 cleanup, preserving weights through Node 5." },
-    { id: 40, title: "Synthesis Rationale Integrity & Direct Hit Read/Write Gates", desc: "Direct Hits strictly require non-empty synthesisRationale (>= 50 chars). Write Gate blocks cache pollution on Step 3 timeouts; 90s AbortController engages instant 3.6 Flash fallback with ISO-suffix country lock." }
+    { 
+        id: 1, 
+        title: "Client-Side ISO Fallback", 
+        desc: "Strips ISO-3166-1 alpha-2 codes (-uk, -gb) to gracefully cascade into bare ID lookups." 
+    },
+    { 
+        id: 2, 
+        title: "Slugging Reasoning", 
+        desc: "Prevents namespace collisions. Enforces ISO mapping via COUNTRY_ISO_MAP (e.g., Scotland → GB)." 
+    },
+    { 
+        id: 3, 
+        title: "Fuzzy Origin Fallback", 
+        desc: "If exact cache misses, server executes fuzzy rescue query on bareId to retrieve canonical doc." 
+    },
+    { 
+        id: 4, 
+        title: "Sanitization Intercept", 
+        desc: "Canonical Alias Dictionary intercepts raw LLM data at normalizeGraphData to correct hallucinations." 
+    },
+    { 
+        id: 5, 
+        title: "Schema Rule", 
+        desc: "synthesisRationale MUST be written to root level of the Firestore artist document, not nested." 
+    },
+    { 
+        id: 6, 
+        title: "Stub Bypass (Fast-Track)", 
+        desc: "Unambiguous stubs bypass validation. Ambiguous stubs (isAmbiguous: true) MUST route to Node 4 for human candidate selection." 
+    },
+    { 
+        id: 7, 
+        title: "State Hydration Rule", 
+        desc: "Ensure detailsObj state explicitly pulls synthesisRationale on mount for both fresh/cached hits." 
+    },
+    { 
+        id: 8, 
+        title: "Grounding / Scraper Logic", 
+        desc: "Search API eradicated; relies on parametric memory. iTunes scraper upgraded for 100% fallback." 
+    },
+    { 
+        id: 9, 
+        title: "Post-Hydration Reconciliation", 
+        desc: "Worker rewrites hallucinated IDs to canonical slugs, reroutes legacy country endpoints ('usa' → 'united-states') via isCountryEndpoint, and prunes Degree-0 ghost nodes." 
+    },
+    { 
+        id: 10, 
+        title: "Guest Hydration Fallback", 
+        desc: "Logged-out guests bypass standard API; UI dynamically runs batchHydrateDetailsCache to fetch metadata." 
+    },
+    { 
+        id: 11, 
+        title: "Validation Reasoning & Escape Hatch Bouncer", 
+        desc: "Requires human confirmation of seed to prevent costly AI pipeline runs on acronyms or typos. The 'Not this artist?' manual escape hatch MUST NOT bypass validation. Any user-injected origin or genre hints must trigger a synchronous Flash 3.6 re-query. Overrides that fail parametric verification are hard-rejected with inline UI errors to prevent database pollution." 
+    },
+    { 
+        id: 12, 
+        title: "Eager Pre-Hydration", 
+        desc: "Strictly preserves eager batch hydration to guarantee 100% data fidelity for tooltips instantly." 
+    },
+    { 
+        id: 13, 
+        title: "Auth Handoff Preserver", 
+        desc: "If a guest clicks 'Save', app stashes ID in session storage to guarantee clone resumes post-auth." 
+    },
+    { 
+        id: 14, 
+        title: "Atomic Self-Healing", 
+        desc: "Graph breakdowns handle atomic self-healing. Fuzzy fallbacks mitigate strict-coupling vulnerabilities." 
+    },
+    { 
+        id: 15, 
+        title: "Complex Cache Bypass", 
+        desc: "Multi-seed and filtered queries must strictly bypass the Global Topology Cache (Front Gate). The engine must default to Live Synthesis to guarantee bespoke graph generation." 
+    },
+    { 
+        id: 16, 
+        title: "Curation Intercept Guardrails", 
+        desc: "ProjectLoader must strictly bypass Phase 1 interception when a document's status is 'curating'. During 'Overwrite Existing' (isRegeneration = true), the original project name is strictly write-locked." 
+    },
+    { 
+        id: 17, 
+        title: "Universal Pre-Flight Stub Minting", 
+        desc: "Pre-flight alias resolution MUST synchronously mint evolved stubs (_isStub: true, isAmbiguous: boolean, candidates: []) to Firestore before background job creation. Stubs MUST ONLY be minted from verified Flash candidate payloads or verified cache hits. Minting stubs directly from unverified raw user strings is strictly prohibited." 
+    },
+    { 
+        id: 18, 
+        title: "Authorization Lifecycle", 
+        desc: "Token/billing authorization state must be strictly scoped to the active generation event. The authorization flag must instantly reset to false on any modal cancellation, API failure, or project unmount to prevent tollbooth bypasses." 
+    },
+    { 
+        id: 19, 
+        title: "External Link Security", 
+        desc: "Official Website and Bandcamp links must rely on deterministic client-side search templates to prevent the AI from hallucinating or routing to malicious squatted domains." 
+    },
+    { 
+        id: 20, 
+        title: "Mandatory Disambiguation on Direct Hits", 
+        desc: "Green Line MUST NEVER bypass the user confirmation phase." 
+    },
+    { 
+        id: 21, 
+        title: "Locked Topology & Coordinate Memory", 
+        desc: "Node positions are strictly derived from AI-evaluated link weights. Direct D3 node dragging is permanently disabled. Settled (fx, fy) coordinates are persisted to the owned project's canvasLayout (5s debounce) to permanently lock orientation." 
+    },
+    { 
+        id: 22, 
+        title: "Deep Cloning Isolation", 
+        desc: "Duplication must execute a deep, disconnected 1:1 clone of the entire project object (including topology, seeds, style profiles, and Deep Cuts). The cloned dataset must operate on a newly minted Project ID and append a copy identifier to the project name to ensure future localized edits never mutate the original canonical document." 
+    },
+    { 
+        id: 23, 
+        title: "Topology Parity Mandate", 
+        desc: "Any connection explicitly cited in the Root Breakdown narrative MUST have a corresponding physical edge in the graph. Mechanically enforced prior to Final Node Positioning." 
+    },
+    { 
+        id: 24, 
+        title: "Verbal Identity", 
+        desc: "The Root Breakdown system prompt must enforce the \"late-night record curator\" voice. Academic language and regional English constraints are strictly prohibited." 
+    },
+    { 
+        id: 25, 
+        title: "Selective Coordinate Amnesia", 
+        desc: "When generating a shared link, fixed coordinates (fx, fy) are intentionally stripped so guests experience a fresh, organic D3 layout. This is a post-serialization mutation strictly applied to ephemeral guest links." 
+    },
+    { 
+        id: 26, 
+        title: "Contextual Tooltips", 
+        desc: "Hover states and tooltips must prioritize native narrative snippets (node.narrativeSnippet) generated during the Root Breakdown over generic database summaries. This ensures tooltips reinforce specific editorial relationships without requiring post-generation extraction. Edge relationships must natively output bi-directional phrasing to prevent frontend verb-flipping." 
+    },
+    { 
+        id: 27, 
+        title: "Multi-Seed Co-Anchoring", 
+        desc: "Complex Generations (multi-seed) MUST dynamically force the AI to co-anchor the narrative. The essay must explore the relationship, contrast, or shared DNA between all seeds, strictly preventing parametric gravity from allowing one famous entity to dominate the story." 
+    },
+    { 
+        id: 28, 
+        title: "Canonical Persistence Mandate", 
+        desc: "Global asset persistence (artists, labels, genres) must exclusively use the pure, canonical ID (e.g., 'spaced-us'). Ephemeral query constraints (e.g., 'after: 2019') belong exclusively to the live Project lifecycle and must never be appended to global cache document keys or DB paths to prevent cache fracturing." 
+    },
+    { 
+        id: 29, 
+        title: "Universal Payload Serializer", 
+        desc: "Project saving and share generation must strictly derive from a single source of truth to guarantee 1:1 data parity (including curation elements like pinned/styled nodes). Share links apply a post-serialization blacklist to handle ephemeral environment constraints without risking data omission. Strict Ledger Parity: buildBaseProjectPayload defensively omits generationType and apiUsage during frontend autosave (merge: true) to prevent clobbering background worker token costs and labeling. Frontend payload MUST pass a seedNames map as the absolute source of truth for display names to prevent backend hallucination. Dashboard cards & UI consumers must rely solely on the frozen seedImageUrls snapshot. Querying the global artists cache for visual assets on isolated projects is strictly prohibited." 
+    },
+    { 
+        id: 30, 
+        title: "Strict Hydration Lock", 
+        desc: "Autosave intervals and database snapshot listeners (e.g., ProjectLoader) MUST be strictly suspended via a global lock (isHydratingSessionRef = true) the moment a seed is submitted, and must remain locked while the Validation Modal is open to prevent partial-state database leaks." 
+    },
+    { 
+        id: 31, 
+        title: "Local State Preemption", 
+        desc: "Zero-cost local routing (applyLocalTopologyHit) must synchronously inject the constructed graph into the local React state (setGraphData) before releasing the Hydration Lock. This guarantees that when background sync resumes, local memory matches database state, preventing destructive overwrites." 
+    },
+    { 
+        id: 32, 
+        title: "Validation Circuit Breaker", 
+        desc: "Triggering the Phase 3 Validation Modal must act as a hard execution stop (return;). Pass 1 must completely terminate when the modal opens to prevent background database minting before the user explicitly confirms." 
+    },
+    { 
+        id: 33, 
+        title: "Payload Completeness", 
+        desc: "Direct Hit local routing must inject both the graphData (topology) AND the detailsCache (metadata) simultaneously. Partial payloads will trigger legacy hydration fallbacks, causing a mass network proxy barrage." 
+    },
+    { 
+        id: 34, 
+        title: "Cognitive Tiering & Orchestration Stability", 
+        desc: "All 7 AI touchpoints strictly operate on categorical thinking_level mapping (minimal to high) via the legacy generateContent API. Flash-tier touchpoints dynamically resolve to GEMINI_FLASH_MODEL (target: gemini-3.6-flash). Custom sampling parameters (temperature, top_p, top_k, thinking_budget) are strictly prohibited. Discovery Ledger accounting is permanently pegged to standard list prices ($1.50/1M input, $7.50/1M output), ignoring promotional discounts to preserve margin integrity. Interactions API migration is deferred until conversational features are scoped." 
+    },
+    { 
+        id: 35, 
+        title: "Geographic Asset Disambiguation", 
+        desc: "If the deterministic iTunes scraper fails to validate an image asset due to a multi-artist name collision or missing legal alias, the background worker must parse the node's parametric origin data, append the relevant regional suffix (e.g., ' US', ' UK'), and execute a secondary validation query." 
+    },
+    { 
+        id: 36, 
+        title: "Entity Taxonomy Normalization", 
+        desc: "The extraction pipeline MUST algorithmically enforce pure root IDs for all global assets. Artists require strict kebab-case-artist-iso-code formatting. To future-proof against homonyms, bare IDs (e.g., 'gunmoll') are strictly reserved as routing stubs and must never hold entity payloads. All verified entities, whether seeds or deep cuts, must resolve to their geographically suffixed ID. Label taxonomy normalizations strip structural suffixes (-records, -music, etc.) down to pure root IDs." 
+    },
+    { 
+        id: 37, 
+        title: "JIT Asset Telemetry & Healing", 
+        desc: "Missing Deep Cuts discovered during eager hydration or direct clicks must first verify against the localized project detailsCache. If a genuine global and local miss occurs, and the project generation is fully completed, trigger a secondary background synthesis to repair the global cache with 100% complete payloads. The healing payload must pass all standard entity taxonomy normalizations. In-flight duplicate triggers MUST be suppressed via a memory dedup lock. The backend must record granular token usage and calculated micro-cost receipts to adminLedger for Admin Discovery Ledger auditing. JIT Healer acts strictly as a 404 emergency parachute for non-existent graph nodes. Stale or soft-expired assets (>365 days) are strictly air-gapped from JIT Healing and require user-subsidized generation runs to refresh. Circuit breaker caps daily exposure at 100 heals/24h." 
+    },
+    { 
+        id: 38, 
+        title: "4-Tier Asset Disambiguation Waterfall", 
+        desc: "Third-party media scraping executes a 4-tier cascade: (1) Strict whole-word taxonomy match (homonyms escalate to Tier 3), (2) Geographic suffix fallback, (3) Resilient Discography Tie-Breaker (exact, substring, or prefix/distinctive-token overlap ± 1yr release correlation; blocks self-titled/generic titles and deduplicates Deluxe editions), (4) Fail-fast rejection to 'not-found'." 
+    },
+    { 
+        id: 39, 
+        title: "Deterministic Metadata Projection & Pod Genre Affinity", 
+        desc: "Prior to Final Node Positioning, the worker deterministically projects verified Country and Founded (YYYY) links from detailsCache onto 100% of artist nodes. Missing genre links resolve via 2-Tier Pod Affinity: wiring artists to their group's existing seed genre node on shared stylistic stems to prevent cross-pod D3 gravity bridges, or minting a divergent subgenre node." 
+    },
+    { 
+        id: 40, 
+        title: "Synthesis Rationale Integrity & Direct Hit Read/Write Gates", 
+        desc: "Direct Hits strictly require a non-empty synthesisRationale (>= 50 chars) at both the Read Gate (qualifyCacheEntry) and Write Gate (Step 5/6 Self-Heal). If Step 3 Root Breakdown exceeds 90s or throws 504, execution immediately fails over to 3.6 Flash (low) so no seed is ever persisted with a null editorial. Step 4B locks canonical ISO artist suffixes (-be) over slash-separated border-town origins." 
+    }
 ];
 
 const DiscoveryFlowDiagram: React.FC = () => (
@@ -399,7 +560,7 @@ const RunbookAccordion: React.FC = () => {
             >
                 <div className="flex items-center gap-3 text-zinc-200 font-medium text-sm uppercase tracking-wider">
                     <Terminal className="w-4 h-4 text-primary" />
-                    V28 Full-Stack Regression Runbook
+                    V29 Full-Stack Regression Runbook
                 </div>
                 {isOpen ? <ChevronDown className="w-4 h-4 text-zinc-400" /> : <ChevronRight className="w-4 h-4 text-zinc-400" />}
             </button>
@@ -554,7 +715,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                             ))}
                         </nav>
                         <div className="mt-6 pt-4 border-t border-zinc-800/60 text-[10px] text-zinc-500 font-mono">
-                            Zcene V28 Blueprint<br/>
+                            Zcene V29 Blueprint<br/>
                             100% Anti-Regression
                         </div>
                     </div>
@@ -566,7 +727,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                     <div className="mb-8 border-b border-zinc-700/60 pb-6">
                         <div className="flex items-center gap-3 mb-2">
                             <h1 className="text-2xl sm:text-3xl font-medium text-white">Engine</h1>
-                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-primary/20 text-primary border border-primary/40">V28 Locked</span>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-primary/20 text-primary border border-primary/40">V29 Locked</span>
                         </div>
                         <p className="text-zinc-400 leading-relaxed text-xs sm:text-sm max-w-3xl">
                             Visual mirror and execution interface for the Zcene curation pipeline. Defines behavioral laws, state orchestration, anti-pollution boundaries, and regression-proof contracts.
@@ -644,7 +805,7 @@ LOCKED SEMANTIC TOPOLOGY (Rule 21):
             <footer className="w-full p-6 text-zinc-400 text-xs z-10 relative bg-neutral-900 flex-shrink-0 border-t border-neutral-800">
                 <div className="container mx-auto text-center">
                     <ZceneLogo className="h-6 w-auto text-primary mx-auto mb-2" />
-                    <p className="text-zinc-600">© 2026 Zcene Admin Console. V28 Programmatic Architecture.</p>
+                    <p className="text-zinc-600">© 2026 Zcene Admin Console. V29 Programmatic Architecture.</p>
                 </div>
             </footer>
         </div>

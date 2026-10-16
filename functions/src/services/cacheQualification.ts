@@ -113,7 +113,7 @@ export const qualifyCacheEntry = (data: any, seedId?: string): CacheQualificatio
   if (!hasNodes) missing.push('nodes');
   if (!hasEdges) missing.push('edges');
 
-  // Architecture V28 Read Gate: Direct Hit strictly requires non-empty synthesisRationale (>= 50 chars)
+  // Architecture V29 Read Gate: Direct Hit strictly requires non-empty synthesisRationale (>= 50 chars)
   const rawRationale = (typeof data.synthesisRationale === 'string' && data.synthesisRationale) ||
     (graph && typeof (graph as any).synthesisRationale === 'string' && (graph as any).synthesisRationale) ||
     '';
