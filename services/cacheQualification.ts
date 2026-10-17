@@ -181,3 +181,143 @@ export const redactSensitive = (value: any, depth: number = 0): any => {
   }
   return out;
 };
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Architecture V30 — 3-Tier Anchor Qualification & Sanitization Contract
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+
+export const V30_ERA_MIN = 1965;
+export const V30_ERA_MAX = 2026;
+
+/**
+ * Sanitizes a user-provided or combobox-created Level 3 Anchor Label string.
+ * Strips control characters, quotes, structural delimiters, and prompt-injection
+ * patterns while preserving valid label display names (capped at 60 chars).
+ */
+export const sanitizeAnchorLabelInput = (raw: unknown): string => {
+  if (typeof raw !== 'string') return '';
+  let cleaned = raw
+    // Strip control chars and prompt-breaking punctuation
+    .replace(/[\r\n\t"`';:{}[\]<>|\\!]/g, ' ')
+    // Strip common prompt injection directives
+    .replace(/\b(ignore\s+(all\s+)?(previous|prior)\s+instructions?|system\s+prompt|you\s+are\s+now|disregard\s+all)\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (cleaned.length > 60) {
+    cleaned = cleaned.substring(0, 60).trim();
+  }
+  return cleaned;
+};
+
+/**
+ * Evaluates whether Level 2 Hard Spatial & Temporal Guardrails are active.
+ * Note: Resting at full outer bounds (1965 and 2026 simultaneously) is treated as unfiltered.
+ * Moving either thumb inward (e.g. 1965-1975 or 1990-2026) is treated as an active Level 2 filter.
+ */
+export const hasActiveTier2Filters = (filters?: any): boolean => {
+  if (!filters || typeof filters !== 'object') return false;
+
+  const afterRaw = filters.foundedAfter !== undefined && filters.foundedAfter !== null && filters.foundedAfter !== ''
+    ? Number(filters.foundedAfter)
+    : undefined;
+  const beforeRaw = filters.foundedBefore !== undefined && filters.foundedBefore !== null && filters.foundedBefore !== ''
+    ? Number(filters.foundedBefore)
+    : undefined;
+
+  const afterNum = (afterRaw !== undefined && !isNaN(afterRaw) && afterRaw > 0) ? afterRaw : undefined;
+  const beforeNum = (beforeRaw !== undefined && !isNaN(beforeRaw) && beforeRaw > 0) ? beforeRaw : undefined;
+
+  const isDefaultFullRange = afterNum === V30_ERA_MIN && beforeNum === V30_ERA_MAX;
+  const hasEra = !isDefaultFullRange && (afterNum !== undefined || beforeNum !== undefined);
+
+  const hasIncOrigins = Array.isArray(filters.includeOrigins) &&
+    filters.includeOrigins.some((s: any) => typeof s === 'string' && s.trim().length > 0);
+  const hasExcOrigins = Array.isArray(filters.excludeOrigins) &&
+    filters.excludeOrigins.some((s: any) => typeof s === 'string' && s.trim().length > 0);
+
+  return hasEra || hasIncOrigins || hasExcOrigins;
+};
+
+/**
+ * Evaluates whether Level 3 Soft Scene Gravity anchors (Canonical Genres or Anchor Labels) are active.
+ */
+export const hasActiveTier3Filters = (filters?: any): boolean => {
+  if (!filters || typeof filters !== 'object') return false;
+
+  const hasGenres = Array.isArray(filters.includeGenres) &&
+    filters.includeGenres.some((s: any) => typeof s === 'string' && s.trim().length > 0);
+  const hasLabels = Array.isArray(filters.anchorLabels) &&
+    filters.anchorLabels.some((s: any) => typeof s === 'string' && sanitizeAnchorLabelInput(s).length > 0);
+
+  return hasGenres || hasLabels;
+};
+
+/**
+ * Single Source of Truth for whether a DiscoveryFilters payload has any active
+ * Level 2 or Level 3 constraints. Immune to the "Empty Array" Complex Generation Trap
+ * (`{ includeGenres: [], anchorLabels: [] }` -> false) and legacy `additionalInstructions`.
+ */
+export const hasActiveDiscoveryFilters = (filters?: any): boolean => {
+  return hasActiveTier2Filters(filters) || hasActiveTier3Filters(filters);
+};
+
+/**
+ * Produces a sanitized, canonical V30 DiscoveryFilters object:
+ * - Strips legacy `additionalInstructions`
+ * - Drops empty arrays
+ * - Normalizes resting outer slider bounds (1965-2026) to undefined
+ * - Swaps inverted year bounds and enforces mutual exclusion on includeOrigins/excludeOrigins
+ * - Sanitizes `anchorLabels` via `sanitizeAnchorLabelInput`
+ */
+export const sanitizeDiscoveryFilters = (filters?: any): Record<string, any> => {
+  if (!filters || typeof filters !== 'object') return {};
+
+  const out: Record<string, any> = {};
+
+  const afterRaw = filters.foundedAfter !== undefined && filters.foundedAfter !== null && filters.foundedAfter !== ''
+    ? Number(filters.foundedAfter)
+    : undefined;
+  const beforeRaw = filters.foundedBefore !== undefined && filters.foundedBefore !== null && filters.foundedBefore !== ''
+    ? Number(filters.foundedBefore)
+    : undefined;
+
+  let afterNum = (afterRaw !== undefined && !isNaN(afterRaw) && afterRaw > 0) ? afterRaw : undefined;
+  let beforeNum = (beforeRaw !== undefined && !isNaN(beforeRaw) && beforeRaw > 0) ? beforeRaw : undefined;
+
+  if (afterNum !== undefined && beforeNum !== undefined && afterNum > beforeNum) {
+    const tmp = afterNum;
+    afterNum = beforeNum;
+    beforeNum = tmp;
+  }
+
+  const isDefaultFullRange = afterNum === V30_ERA_MIN && beforeNum === V30_ERA_MAX;
+  if (!isDefaultFullRange) {
+    if (afterNum !== undefined) out.foundedAfter = afterNum;
+    if (beforeNum !== undefined) out.foundedBefore = beforeNum;
+  }
+
+  if (Array.isArray(filters.includeOrigins)) {
+    const clean = filters.includeOrigins.map((s: any) => typeof s === 'string' ? s.trim() : '').filter(Boolean);
+    if (clean.length > 0) out.includeOrigins = clean;
+  }
+
+  if (!out.includeOrigins && Array.isArray(filters.excludeOrigins)) {
+    const clean = filters.excludeOrigins.map((s: any) => typeof s === 'string' ? s.trim() : '').filter(Boolean);
+    if (clean.length > 0) out.excludeOrigins = clean;
+  }
+
+  if (Array.isArray(filters.includeGenres)) {
+    const clean = filters.includeGenres.map((s: any) => typeof s === 'string' ? s.trim() : '').filter(Boolean);
+    if (clean.length > 0) out.includeGenres = clean;
+  }
+
+  if (Array.isArray(filters.anchorLabels)) {
+    const clean = filters.anchorLabels.map((s: any) => sanitizeAnchorLabelInput(s)).filter(Boolean);
+    if (clean.length > 0) out.anchorLabels = clean;
+  }
+
+  return out;
+};
+

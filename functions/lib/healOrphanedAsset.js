@@ -41,10 +41,19 @@ exports.healOrphanedAsset = (0, https_1.onCall)({
     let canonicalId = (0, curatorService_1.normalizeArtistId)(entityId);
     const isLabel = entityType === 'label';
     if (isLabel) {
-        canonicalId = (0, curatorService_1.normalizeLabelId)(entityId); // Strips -records, -music, -group, etc.
+        canonicalId = (0, curatorService_1.normalizeLabelId)(entityId); // Strips -records, -music, -group, etc. (preserves -media)
+        if (displayName) {
+            const displayNorm = (0, curatorService_1.normalizeLabelId)(displayName);
+            if (displayNorm && (displayNorm === 'century-media' || displayNorm.startsWith(canonicalId + '-'))) {
+                canonicalId = displayNorm;
+            }
+        }
+        if (canonicalId === 'century') {
+            canonicalId = 'century-media';
+        }
     }
     const collectionName = isLabel ? 'labels' : 'artists';
-    const docRef = db.collection(collectionName).doc(canonicalId);
+    let docRef = db.collection(collectionName).doc(canonicalId);
     try {
         // 1. [Rule 8 & 37] Cache Qualification Gate: Reject and overwrite stubs or incomplete payloads
         const existingSnap = await docRef.get();
@@ -137,6 +146,13 @@ exports.healOrphanedAsset = (0, https_1.onCall)({
         // Guarantee human-readable artist display name in payload
         const cleanTitle = (synthesizedDetails.details.artist || cleanSearchName).trim();
         synthesizedDetails.details.artist = cleanTitle;
+        if (isLabel) {
+            const synthesizedLabelId = (0, curatorService_1.normalizeLabelId)(cleanTitle);
+            if (synthesizedLabelId && (canonicalId === 'century' || synthesizedLabelId === 'century-media' || synthesizedLabelId.startsWith(canonicalId + '-'))) {
+                canonicalId = synthesizedLabelId;
+                docRef = db.collection(collectionName).doc(canonicalId);
+            }
+        }
         // 3. [Rule 8 & 37] Rich Media Scraping Integration with exact Column 3 fuzzy matching parity
         let scrapedImageUrl = null;
         if (!isLabel) {

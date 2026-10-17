@@ -3,6 +3,12 @@ import { GraphData, Node, NodeDetails, Link, ChatMessage, DiscoveryFilters } fro
 import { db } from './firebase';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { normalizeArtistId, extractArtistSubGraph, readArtistCacheMany, normalizeGraphData, stripUndefinedProperties, cleanArtistDisplayName } from './artistCacheService';
+import {
+  hasActiveDiscoveryFilters,
+  hasActiveTier2Filters,
+  hasActiveTier3Filters,
+  sanitizeAnchorLabelInput
+} from './cacheQualification';
 
 // --- EXPORTED CONSTANTS FOR SOURCE PAGE VISIBILITY ---
 
@@ -612,14 +618,14 @@ const generateMockGraphData = (artists: string, baseGraph?: GraphData, filters?:
     let foundedYear = preset.founded;
     if (filters?.foundedAfter) {
       const limit = Number(filters.foundedAfter);
-      if (Number(foundedYear) <= limit) {
-        foundedYear = (limit + 1 + Math.floor(Math.random() * 10)).toString();
+      if (Number(foundedYear) < limit) {
+        foundedYear = (limit + Math.floor(Math.random() * 10)).toString();
       }
     }
     if (filters?.foundedBefore) {
       const limit = Number(filters.foundedBefore);
-      if (Number(foundedYear) >= limit) {
-        foundedYear = (limit - 1 - Math.floor(Math.random() * 10)).toString();
+      if (Number(foundedYear) > limit) {
+        foundedYear = (limit - Math.floor(Math.random() * 10)).toString();
       }
     }
 
@@ -635,12 +641,17 @@ const generateMockGraphData = (artists: string, baseGraph?: GraphData, filters?:
       genresToUse[0] = filters.includeGenres[0];
     }
 
+    const labelsToUse = [...preset.labels];
+    if (filters?.anchorLabels && filters.anchorLabels.length > 0) {
+      labelsToUse[0] = filters.anchorLabels[0];
+    }
+
     genresToUse.forEach(g => {
       addNode({ id: g, type: 'genre', group: 1000, label: g });
       addLink(resolvedName, g, 1, "performs style");
     });
 
-    preset.labels.forEach(l => {
+    labelsToUse.forEach(l => {
       addNode({ id: l, type: 'label', group: 2000, label: l });
       addLink(resolvedName, l, 1, "releases music via");
     });
@@ -653,11 +664,11 @@ const generateMockGraphData = (artists: string, baseGraph?: GraphData, filters?:
 
     preset.related.forEach(relName => {
       let relFounded = (Number(foundedYear) + Math.floor(Math.random() * 8) - 4).toString();
-      if (filters?.foundedAfter && Number(relFounded) <= Number(filters.foundedAfter)) {
-        relFounded = (Number(filters.foundedAfter) + 1 + Math.floor(Math.random() * 5)).toString();
+      if (filters?.foundedAfter && Number(relFounded) < Number(filters.foundedAfter)) {
+        relFounded = (Number(filters.foundedAfter) + Math.floor(Math.random() * 5)).toString();
       }
-      if (filters?.foundedBefore && Number(relFounded) >= Number(filters.foundedBefore)) {
-        relFounded = (Number(filters.foundedBefore) - 1 - Math.floor(Math.random() * 5)).toString();
+      if (filters?.foundedBefore && Number(relFounded) > Number(filters.foundedBefore)) {
+        relFounded = (Number(filters.foundedBefore) - Math.floor(Math.random() * 5)).toString();
       }
 
       addNode({ id: relName, type: 'artist', group, label: relName });
@@ -666,7 +677,7 @@ const generateMockGraphData = (artists: string, baseGraph?: GraphData, filters?:
       const relGenre = genresToUse[0];
       addLink(relName, relGenre, 1, "performs style");
 
-      const relLabel = preset.labels[0];
+      const relLabel = labelsToUse[0];
       addLink(relName, relLabel, 1, "releases music via");
 
       addLink(relName, country, 1, "hails from");
@@ -1044,53 +1055,57 @@ export const generateGraphData = async (
           userPrompt = `Generate a music graph for these seed artists: ${artists}.`;
       }
 
-      // Inject Discovery Filters into System Instruction with "Zero-Tolerance" logic
-      if (filters) {
-          let filterRules = "\n\nSTRICT DISCOVERY CONSTRAINTS (ZERO-TOLERANCE):";
-          filterRules += "\nYou are a strict filtering agent. Your primary mission is to obey these filters. Musical relevance is secondary.";
-          
-          if (filters.foundedAfter) {
-              filterRules += `\n- MANDATORY: Every NEW artist you add MUST have been founded AFTER the year ${filters.foundedAfter}.`;
-              filterRules += `\n- FORBIDDEN: Do not include any artists founded in ${filters.foundedAfter} or earlier. This includes all 'classic', 'legendary', or 'pioneer' acts of the genre.`;
-              filterRules += `\n- NO FALLBACK: If you cannot find an artist founded after ${filters.foundedAfter}, DO NOT include a substitute. Return an empty array for that recommendation slot.`;
-              filterRules += `\n- LOGIC: If the seed artist is old (e.g. from the 90s), look for MODERN bands (founded > ${filters.foundedAfter}) that are influenced by them or part of the current 'revival' scene.`;
+      // Inject 3-Tier Anchor System (Architecture V30 / Rule 41) into System Instruction
+      if (hasActiveDiscoveryFilters(filters) && filters) {
+          let filterRules = "\n\n3-TIER ANCHOR HIERARCHY & DISCOVERY CONSTRAINTS (RULE 41):";
+          filterRules += `\n- LEVEL 1 (SACRED SEED IMMUNITY): The seed artists [${artists}] are the sacred genesis of the spiderweb and are 100% IMMUNE to all secondary Era, Origin, Genre, and Label filters.`;
+
+          if (hasActiveTier2Filters(filters)) {
+              filterRules += "\n\n- LEVEL 2 (HARD SPATIAL & TEMPORAL GUARDRAILS — ZERO-TOLERANCE):";
+              filterRules += "\n  Every NEW recommended artist you add MUST strictly obey these hard boundaries. Cross-era and cross-border lineage is explicitly authorized.";
+              if (filters.foundedAfter) {
+                  filterRules += `\n  * MANDATORY ERA FLOOR: Every NEW artist you add MUST have been founded in the year ${filters.foundedAfter} or LATER.`;
+                  filterRules += `\n  * FORBIDDEN: Do not include any new artists founded in ${filters.foundedAfter - 1} or earlier.`;
+              }
+              if (filters.foundedBefore) {
+                  filterRules += `\n  * MANDATORY ERA CEILING: Every NEW artist you add MUST have been founded in the year ${filters.foundedBefore} or EARLIER.`;
+                  filterRules += `\n  * FORBIDDEN: Do not include any new artists founded in ${filters.foundedBefore + 1} or later.`;
+              }
+              if (filters.includeOrigins && filters.includeOrigins.length > 0) {
+                  filterRules += `\n  * ORIGIN MANDATE: Only include new artists from: ${filters.includeOrigins.join(', ')}.`;
+              }
+              if (filters.excludeOrigins && filters.excludeOrigins.length > 0) {
+                  filterRules += `\n  * FORBIDDEN ORIGINS: Strictly exclude all new artists from: ${filters.excludeOrigins.join(', ')}.`;
+              }
           }
 
-          if (filters.foundedBefore) {
-              filterRules += `\n- MANDATORY: Every NEW artist you add MUST have been founded BEFORE the year ${filters.foundedBefore}.`;
-              filterRules += `\n- FORBIDDEN: Do not include any artists founded in ${filters.foundedBefore} or later.`;
-              filterRules += `\n- NO FALLBACK: If you cannot find an artist founded before ${filters.foundedBefore}, DO NOT include a substitute. Return an empty array for that recommendation slot.`;
-          }
-
-          if (filters.includeGenres && filters.includeGenres.length > 0) {
-              filterRules += `\n- GENRE MANDATE: Only include new artists that play/belong to these genres: ${filters.includeGenres.join(', ')}.`;
-          }
-          
-          if (filters.includeOrigins && filters.includeOrigins.length > 0) {
-              filterRules += `\n- ORIGIN MANDATE: Only include new artists from: ${filters.includeOrigins.join(', ')}.`;
-          }
-          
-          if (filters.excludeOrigins && filters.excludeOrigins.length > 0) {
-              filterRules += `\n- FORBIDDEN ORIGINS: Strictly exclude all artists from: ${filters.excludeOrigins.join(', ')}.`;
-          }
-          
-          if (filters.additionalInstructions) {
-              filterRules += `\n- USER DIRECTION: ${filters.additionalInstructions}`;
+          if (hasActiveTier3Filters(filters)) {
+              filterRules += "\n\n- LEVEL 3 (SOFT SCENE GRAVITY & GRACEFUL DEGRADATION — RULE 41):";
+              if (filters.includeGenres && filters.includeGenres.length > 0) {
+                  filterRules += `\n  * CANONICAL GENRE GRAVITY: Strongly prioritize new artists connected to these genres: ${filters.includeGenres.join(', ')}.`;
+              }
+              if (filters.anchorLabels && filters.anchorLabels.length > 0) {
+                  const sanitizedLabels = filters.anchorLabels.map(l => sanitizeAnchorLabelInput(l)).filter(Boolean);
+                  if (sanitizedLabels.length > 0) {
+                      filterRules += `\n  * ANCHOR LABEL GRAVITY: Strongly prioritize new artists released on or connected to these record labels: ${sanitizedLabels.join(', ')}, and include their 'label' node(s) where authentic.`;
+                  }
+              }
+              filterRules += "\n  * GRACEFUL DEGRADATION MANDATE: Level 2 Era and Origin guardrails ALWAYS supersede Level 3 Genre and Label gravity. If a Level 3 genre or record label has zero authentic artists inside the Level 2 Era/Origin window, DO NOT violate Level 2 and DO NOT return an empty graph. Silently bypass the conflicting Level 3 constraint and complete the spiderweb using Level 1 and Level 2.";
           }
 
           filterRules += "\n\nIMPORTANT: Do NOT include any search citations, grounding markers (like [1], [2]), or footnotes in the JSON output. The JSON must be clean and parseable.";
-          filterRules += `\n\n(Note: The seed artists [${artists}] are the ONLY exception. ALL other artists MUST obey these rules or be excluded.)`;
-          filterRules += "\n\nFINAL VERIFICATION: Before generating JSON, audit your list. Ensure all filters are strictly obeyed. If an artist violates any of the rules above, DELETE them from your response.";
+          filterRules += "\n\nFINAL VERIFICATION: Before generating JSON, audit your list. If any new artist violates a Level 2 Era or Origin guardrail above, DELETE them from your response.";
           
           systemInstruction += filterRules;
 
           // Also reinforce in the user prompt
-          let reminder = `\n\nREMINDER: All new artists MUST meet the active filters:`;
-          if (filters.foundedAfter) reminder += ` founded after ${filters.foundedAfter};`;
-          if (filters.foundedBefore) reminder += ` founded before ${filters.foundedBefore};`;
+          let reminder = `\n\nREMINDER: All new artists MUST obey the active 3-Tier Anchors:`;
+          if (filters.foundedAfter) reminder += ` founded in ${filters.foundedAfter} or later;`;
+          if (filters.foundedBefore) reminder += ` founded in ${filters.foundedBefore} or earlier;`;
           if (filters.includeOrigins && filters.includeOrigins.length > 0) reminder += ` origins in ${filters.includeOrigins.join(', ')};`;
           if (filters.excludeOrigins && filters.excludeOrigins.length > 0) reminder += ` origins NOT in ${filters.excludeOrigins.join(', ')};`;
-          if (filters.includeGenres && filters.includeGenres.length > 0) reminder += ` genres in ${filters.includeGenres.join(', ')};`;
+          if (filters.includeGenres && filters.includeGenres.length > 0) reminder += ` soft genre pull ${filters.includeGenres.join(', ')};`;
+          if (filters.anchorLabels && filters.anchorLabels.length > 0) reminder += ` soft label pull ${filters.anchorLabels.map(l => sanitizeAnchorLabelInput(l)).filter(Boolean).join(', ')};`;
           userPrompt += reminder;
       }
 
@@ -1289,7 +1304,38 @@ export const generateGraphData = async (
           rawNodes.forEach(node => {
               if (node.type === 'artist' && !seedArtistIds.has(node.id.toLowerCase())) {
                   const year = artistToYear.get(node.id.toLowerCase());
-                  if (year && year <= threshold) {
+                  if (year !== undefined && year < threshold) {
+                      nodesToRemove.add(node.id);
+                  }
+              }
+          });
+      }
+
+      if (filters?.foundedBefore) {
+          const threshold = Number(filters.foundedBefore);
+          const artistToYear = new Map<string, number>();
+          const nodeMap = new Map(rawNodes.map(n => [n.id, n]));
+
+          rawLinks.forEach(link => {
+              const sourceId = typeof link.source === 'string' ? link.source : (link.source as Node).id;
+              const targetId = typeof link.target === 'string' ? link.target : (link.target as Node).id;
+              
+              const sourceNode = nodeMap.get(sourceId);
+              const targetNode = nodeMap.get(targetId);
+              
+              if (sourceNode?.type === 'artist' && targetNode?.type === 'founded') {
+                  const year = parseInt(targetNode.id);
+                  if (!isNaN(year)) artistToYear.set(sourceId.toLowerCase(), year);
+              } else if (targetNode?.type === 'artist' && sourceNode?.type === 'founded') {
+                  const year = parseInt(sourceNode.id);
+                  if (!isNaN(year)) artistToYear.set(targetId.toLowerCase(), year);
+              }
+          });
+
+          rawNodes.forEach(node => {
+              if (node.type === 'artist' && !seedArtistIds.has(node.id.toLowerCase())) {
+                  const year = artistToYear.get(node.id.toLowerCase());
+                  if (year !== undefined && year > threshold) {
                       nodesToRemove.add(node.id);
                   }
               }

@@ -105,7 +105,7 @@ const ARCHITECTURE_RULES = [
     { 
         id: 15, 
         title: "Complex Cache Bypass", 
-        desc: "Multi-seed and filtered queries must strictly bypass the Global Topology Cache (Front Gate). The engine must default to Live Synthesis to guarantee bespoke graph generation." 
+        desc: "Multi-seed and 3-Tier anchored queries (hasActiveDiscoveryFilters === true) must strictly bypass the Global Topology Cache (Front Gate) and force needsProGeneration = true in Column 2 even if a single seed has cached graphData. Empty filter arrays evaluate to false so unfiltered runs are never misclassified." 
     },
     { 
         id: 16, 
@@ -170,12 +170,12 @@ const ARCHITECTURE_RULES = [
     { 
         id: 28, 
         title: "Canonical Persistence Mandate", 
-        desc: "Global asset persistence (artists, labels, genres) must exclusively use the pure, canonical ID (e.g., 'spaced-us'). Ephemeral query constraints (e.g., 'after: 2019') belong exclusively to the live Project lifecycle and must never be appended to global cache document keys or DB paths to prevent cache fracturing." 
+        desc: "Global asset persistence (artists, labels, genres) must exclusively use the pure, canonical ID (e.g., 'spaced-us', normalizeLabelId). Ephemeral 3-Tier query constraints (after, before, inc_origins, exc_origins, inc_genres, inc_labels) belong exclusively to the live Project lifecycle and must never be appended to global cache document keys or DB paths to prevent cache fracturing." 
     },
     { 
         id: 29, 
         title: "Universal Payload Serializer", 
-        desc: "Project saving and share generation must strictly derive from a single source of truth to guarantee 1:1 data parity (including curation elements like pinned/styled nodes). Share links apply a post-serialization blacklist to handle ephemeral environment constraints without risking data omission. Strict Ledger Parity: buildBaseProjectPayload defensively omits generationType and apiUsage during frontend autosave (merge: true) to prevent clobbering background worker token costs and labeling. Frontend payload MUST pass a seedNames map as the absolute source of truth for display names to prevent backend hallucination. Dashboard cards & UI consumers must rely solely on the frozen seedImageUrls snapshot. Querying the global artists cache for visual assets on isolated projects is strictly prohibited." 
+        desc: "Project saving and share generation must strictly derive from a single source of truth to guarantee 1:1 data parity (including curation elements like pinned/styled nodes). Share links apply a post-serialization blacklist to handle ephemeral environment constraints without risking data omission. Strict Ledger Parity: buildBaseProjectPayload defensively omits generationType, apiUsage, and anchorResolution during frontend autosave (merge: true) to prevent clobbering background worker token costs, labeling, and 3-Tier telemetry. Frontend payload MUST pass a seedNames map as the absolute source of truth for display names to prevent backend hallucination. Dashboard cards & UI consumers must rely solely on the frozen seedImageUrls snapshot." 
     },
     { 
         id: 30, 
@@ -210,7 +210,7 @@ const ARCHITECTURE_RULES = [
     { 
         id: 36, 
         title: "Entity Taxonomy Normalization", 
-        desc: "The extraction pipeline MUST algorithmically enforce pure root IDs for all global assets. Artists require strict kebab-case-artist-iso-code formatting. To future-proof against homonyms, bare IDs (e.g., 'gunmoll') are strictly reserved as routing stubs and must never hold entity payloads. All verified entities, whether seeds or deep cuts, must resolve to their geographically suffixed ID. Label taxonomy normalizations strip structural suffixes (-records, -music, etc.) down to pure root IDs." 
+        desc: "The extraction pipeline MUST algorithmically enforce pure root IDs for all global assets. Artists require strict kebab-case-artist-iso-code formatting. To future-proof against homonyms, bare IDs (e.g., 'gunmoll') are strictly reserved as routing stubs and must never hold entity payloads. All verified entities, whether seeds or deep cuts, must resolve to their geographically suffixed ID. Label taxonomy normalizations (normalizeLabelId) strip structural suffixes (-records, -music, -recordings, -discos, -platen, -label, etc.) down to pure root IDs across hydration, idRewriteMap, labelIds, and Level 3 anchorLabels." 
     },
     { 
         id: 37, 
@@ -231,6 +231,11 @@ const ARCHITECTURE_RULES = [
         id: 40, 
         title: "Synthesis Rationale Integrity & Direct Hit Read/Write Gates", 
         desc: "Direct Hits strictly require a non-empty synthesisRationale (>= 50 chars) at both the Read Gate (qualifyCacheEntry) and Write Gate (Step 5/6 Self-Heal). If Step 3 Root Breakdown exceeds 90s or throws 504, execution immediately fails over to 3.6 Flash (low) so no seed is ever persisted with a null editorial. Step 4B locks canonical ISO artist suffixes (-be) over slash-separated border-town origins." 
+    },
+    { 
+        id: 41, 
+        title: "3-Tier Anchor Hierarchy & Dual-Layer Scene Gravity", 
+        desc: "Enforces a strict 3-Tier Anchor System: Tier 1 (Artist Seeds — Sacred Genesis, immune to secondary filters), Tier 2 (Hard Spatial & Temporal Guardrails: 1965–2026 Era Slider & 22 Canonical Countries with Include/Exclude toggle and cross-era lineage authorization), and Tier 3 (Dual-Layer Scene Gravity: Canonical Genres & Creatable Anchor Labels). Separates Editorial Narrative Context from Topological Truth: Step 2B executes the Level 2 Post-Hydration Boundary Audit BEFORE Step 3 Magazine synthesis so boundary violators are pruned prior to prose generation, while anchorResolution strictly evaluates physical graph nodes with granular partial Tier 3 telemetry (e.g., Genre Applied; Label Bypassed — Narrative Gravity Only)." 
     }
 ];
 
@@ -246,7 +251,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                         <div className="text-white font-medium text-sm mb-3">React UI</div>
                         <ul className="text-[11px] text-zinc-400 space-y-3">
                             <li>
-                                <span className="text-primary font-medium">Local Topology Routing:</span> Direct Hits (perfect cache) bypass the backend entirely.
+                                <span className="text-primary font-medium">Submit Seed(s) + 3-Tier Anchors:</span> Evaluates <code>hasActiveDiscoveryFilters</code> (ignoring empty arrays). Unfiltered single-seed Direct Hits bypass the backend; Multi-Seed / 3-Tier Anchored queries route to Complex Generation.
                             </li>
                             <li>
                                 <span className="text-primary font-medium">Front Gate Cache Guard:</span> Bypasses network if a complete cache doc exists. Topology hits route through <code>&lt;DisambiguationModal&gt;</code> to verify origin.
@@ -286,19 +291,18 @@ const DiscoveryFlowDiagram: React.FC = () => (
                         <div className="text-white font-medium text-sm mb-3">HTTP Fast-Track</div>
                         <ul className="text-[11px] text-zinc-400 space-y-3">
                             <li>
-                                <span className="text-primary font-medium">1. Ingest Validated Seed Payload & Zero Blind Trust</span>
+                                <span className="text-primary font-medium">1. Ingest Validated Payload, Sanitize 3-Tier Anchors & Zero Blind Trust</span>
                                 <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500 text-[10px]">
-                                    <li>Ingests pre-validated seed preferences (originalQueries, disambiguationHints, disambiguationGenres).</li>
-                                    <li>Strips non-standard regional codes and standardizes seed slugs.</li>
+                                    <li>Sanitizes <code>payload.filters</code> via <code>sanitizeDiscoveryFilters</code> (1965–2026 era bounds, mutual origin exclusion, strips <code>additionalInstructions</code>).</li>
+                                    <li>Forces <code>needsProGeneration = true</code> when <code>hasActiveDiscoveryFilters</code> is true.</li>
                                     <li><span className="text-zinc-300">Zero Blind Trust:</span> Rejects blind stub minting; slugs strictly derive from verified Flash candidate payloads.</li>
                                 </ul>
                             </li>
                             <li>
-                                <span className="text-primary font-medium">2. Create Topology (3.1 Pro) | Thinking_level: medium</span>
+                                <span className="text-primary font-medium">2 & 3. Create Topology (3.1 Pro) | 3-Tier Anchor Hierarchy ([Rule 41])</span>
                                 <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500 text-[10px]">
-                                    <li>Generates skeleton: Seed, AI Artists, Labels, Genres.</li>
-                                    <li>Enforces <code>kebab-case-artist-iso-code</code> format.</li>
-                                    <li>Seed Artist Timeout Protection drops failing nodes gracefully.</li>
+                                    <li>Splits prompt into Tier 1 Seed Immunity, Tier 2 Hard Era/Origin Guardrails (cross-era lineage allowed), and Tier 3 Soft Genre/Label Gravity.</li>
+                                    <li>Executes Rule 41 Graceful Degradation fallback retry (Tier 1 + Tier 2) if 0 non-seed artists survive Tier 3.</li>
                                 </ul>
                             </li>
                             <li>
@@ -330,17 +334,23 @@ const DiscoveryFlowDiagram: React.FC = () => (
                         <div className="text-white font-medium text-sm mb-3">Background Worker</div>
                         <ul className="text-[11px] text-zinc-400 space-y-3">
                             <li>
-                                <span className="text-primary font-medium">Hydrate Node Batch | 3.6 Flash (low)</span>
+                                <span className="text-primary font-medium">2. Hydrate Node Batch | 3.6 Flash (low)</span>
                                 <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500 text-[10px]">
-                                    <li>Global Cache Hit: Attaches existing Deep Cut.</li>
-                                    <li>Miss: Synthesizes via 3.6 Flash & iTunes scraper.</li>
+                                    <li>Global Cache Hit: Attaches existing Deep Cut (labels normalized via <code>normalizeLabelId</code>).</li>
+                                    <li>Miss: Synthesizes via 3.6 Flash & 4-Tier iTunes scraper.</li>
                                     <li>Slug deduplication ignores stubs; injects pre-generated seed stubs on timeout.</li>
                                 </ul>
                             </li>
                             <li>
-                                <span className="text-primary font-medium">Root Breakdown | 3.1 Pro (high) + 90s Flash Fallback</span>
+                                <span className="text-primary font-medium">2B. Level 2 Post-Hydration Boundary Audit ([Rule 41])</span>
                                 <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500 text-[10px]">
-                                    <li>Synthesizes narrative in 2 AM record curator voice.</li>
+                                    <li>Audits hydrated non-seed artists against Level 2 Era/Origin guardrails BEFORE Step 3 synthesis, excising boundary violators from both <code>finalGraph</code> and <code>detailsCacheEntries</code>.</li>
+                                </ul>
+                            </li>
+                            <li>
+                                <span className="text-primary font-medium">3. Root Breakdown | 3.1 Pro (high) + 3-Tier Lineage Framing</span>
+                                <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500 text-[10px]">
+                                    <li>Synthesizes narrative in 2 AM record curator voice, weaving active Tier 2 & Tier 3 anchors.</li>
                                     <li>Outputs structured JSON with markdown, 1-sentence hooks, and bi-directional edge context.</li>
                                     <li>90s timeout fallback to 3.6 Flash prevents 504 DEADLINE_EXCEEDED errors.</li>
                                 </ul>
@@ -352,9 +362,9 @@ const DiscoveryFlowDiagram: React.FC = () => (
                                 </ul>
                             </li>
                             <li>
-                                <span className="text-primary font-medium">Step 4B: Deterministic Enrichment & Pod Affinity</span>
+                                <span className="text-primary font-medium">Step 4B: Deterministic Enrichment & Degree-0 Cleanup</span>
                                 <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500 text-[10px]">
-                                    <li>Wires Country, Founded, and 2-Tier Pod Genre nodes for secondary artists before Degree-0 cleanup.</li>
+                                    <li>Wires Country, Founded, and 2-Tier Pod Genre nodes before Degree-0 cleanup and strict physical-node <code>anchorResolution</code> evaluation.</li>
                                 </ul>
                             </li>
                             <li>
@@ -364,7 +374,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                                 </ul>
                             </li>
                             <li>
-                                <span className="text-primary font-medium">Persist Assets & Status:</span> Commits graph, breakdown, and link weights. Updates job status to 'completed'.
+                                <span className="text-primary font-medium">Persist Assets, Status & Telemetry:</span> Commits graph, breakdown, link weights, and <code>anchorResolution</code> telemetry. Updates job status to 'completed'.
                             </li>
                             <li>
                                 <span className="text-primary font-medium">Node 36: JIT Asset Healer (3.6 Flash)</span>
@@ -385,7 +395,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                 <div className="p-4 rounded-xl border border-zinc-700 bg-zinc-900/80 h-[560px] flex flex-col">
                     <div className="text-white font-medium text-sm mb-2 sticky top-0 bg-zinc-900 py-1 border-b border-zinc-800 z-10 flex items-center justify-between">
                         <span>Rules Ledger</span>
-                        <span className="text-[10px] font-mono text-primary uppercase">40 Laws</span>
+                        <span className="text-[10px] font-mono text-primary uppercase">41 Laws</span>
                     </div>
                     <div className="space-y-2 pt-2 overflow-y-auto pr-1 flex-1">
                         {ARCHITECTURE_RULES.map(rule => (
@@ -560,7 +570,7 @@ const RunbookAccordion: React.FC = () => {
             >
                 <div className="flex items-center gap-3 text-zinc-200 font-medium text-sm uppercase tracking-wider">
                     <Terminal className="w-4 h-4 text-primary" />
-                    V29 Full-Stack Regression Runbook
+                    V30 Full-Stack Regression Runbook
                 </div>
                 {isOpen ? <ChevronDown className="w-4 h-4 text-zinc-400" /> : <ChevronRight className="w-4 h-4 text-zinc-400" />}
             </button>
@@ -607,10 +617,10 @@ export const EnginePage: React.FC<SourcePageProps> = ({
         }
     }, [isActive]);
 
-    const CodeBlock: React.FC<{ title: string; content: string }> = ({ title, content }) => (
+    const CodeBlock: React.FC<{ title: string; content: string }> = ({ title: blockTitle, content }) => (
         <div className="rounded-xl border border-zinc-700/50 bg-zinc-900/50 overflow-hidden mb-6">
             <div className="bg-zinc-800/50 px-5 py-3 border-b border-zinc-700/50 flex justify-between items-center">
-                <h4 className="text-zinc-200 font-medium text-xs tracking-wider uppercase">{title}</h4>
+                <h4 className="text-zinc-200 font-medium text-xs tracking-wider uppercase">{blockTitle}</h4>
                 <span className="text-zinc-500 text-[10px] font-mono">Contract / Constants</span>
             </div>
             <div className="p-5 overflow-x-auto">
@@ -715,7 +725,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                             ))}
                         </nav>
                         <div className="mt-6 pt-4 border-t border-zinc-800/60 text-[10px] text-zinc-500 font-mono">
-                            Zcene V29 Blueprint<br/>
+                            Zcene V30 Blueprint<br/>
                             100% Anti-Regression
                         </div>
                     </div>
@@ -727,7 +737,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                     <div className="mb-8 border-b border-zinc-700/60 pb-6">
                         <div className="flex items-center gap-3 mb-2">
                             <h1 className="text-2xl sm:text-3xl font-medium text-white">Engine</h1>
-                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-primary/20 text-primary border border-primary/40">V29 Locked</span>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-primary/20 text-primary border border-primary/40">V30 Locked</span>
                         </div>
                         <p className="text-zinc-400 leading-relaxed text-xs sm:text-sm max-w-3xl">
                             Visual mirror and execution interface for the Zcene curation pipeline. Defines behavioral laws, state orchestration, anti-pollution boundaries, and regression-proof contracts.
@@ -805,7 +815,7 @@ LOCKED SEMANTIC TOPOLOGY (Rule 21):
             <footer className="w-full p-6 text-zinc-400 text-xs z-10 relative bg-neutral-900 flex-shrink-0 border-t border-neutral-800">
                 <div className="container mx-auto text-center">
                     <ZceneLogo className="h-6 w-auto text-primary mx-auto mb-2" />
-                    <p className="text-zinc-600">© 2026 Zcene Admin Console. V29 Programmatic Architecture.</p>
+                    <p className="text-zinc-600">© 2026 Zcene Admin Console. V30 Programmatic Architecture.</p>
                 </div>
             </footer>
         </div>

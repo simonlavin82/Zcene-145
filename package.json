@@ -13,6 +13,7 @@
     "deploy": "npm run build && npm run deploy:hosting && npm run deploy:backend",
     "seed:cache-hit": "node scripts/seed_cache_hit.cjs",
     "seed:cache-miss": "node scripts/seed_cache_miss.cjs",
+    "test": "vitest run tests/v15-core.test.tsx functions/tests/pipeline.test.ts functions/tests/v29-gates.test.ts functions/tests/v30-anchors.test.ts",
     "test:regression": "node scratch/test_pipeline_regression.cjs",
     "test:serve": "concurrently \"node --env-file=.env server.js\" \"vite --mode test\""
   },

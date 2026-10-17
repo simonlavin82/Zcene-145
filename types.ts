@@ -13,6 +13,7 @@ export interface Node {
   label?: string;
   type: 'artist' | 'genre' | 'label' | 'country' | 'founded';
   group: number;
+  origin?: string;
   isLoading?: boolean;
   isPending?: boolean;
   isSeed?: boolean;
@@ -200,19 +201,104 @@ export interface Project {
   seedImageUrl?: string;
   seedImageUrls?: (string | null)[];
   generationType?: "Root Generation" | "Partial Generation" | "Direct Hit" | "Complex Generation" | string;
+  anchorResolution?: AnchorResolutionStatus;
   apiUsage?: Record<string, any>;
   createdAt?: any;
   updatedAt?: any;
 }
 
+export type AnchorResolutionStatus =
+  | "Tier 1 + Tier 2 + Tier 3 (Full Parity)"
+  | "Tier 1 + Tier 2 + Tier 3 (Genre Applied; Label Bypassed — Narrative Gravity Only)"
+  | "Tier 1 + Tier 2 + Tier 3 (Label Applied; Genre Bypassed — Narrative Gravity Only)"
+  | "Tier 1 + Tier 2 Applied (Tier 3 bypassed due to boundary conflict)"
+  | "Tier 1 + Tier 2 Applied"
+  | "Tier 1 + Tier 3 Applied"
+  | "Tier 1 + Tier 3 (Genre Applied; Label Bypassed — Narrative Gravity Only)"
+  | "Tier 1 + Tier 3 (Label Applied; Genre Bypassed — Narrative Gravity Only)"
+  | "Tier 1 Only (Tier 3 bypassed)"
+  | "Tier 1 Only";
+
 export interface DiscoveryFilters {
+  // Level 2: Hard Spatial & Temporal Guardrails
   foundedAfter?: number;
   foundedBefore?: number;
   includeOrigins?: string[];
   excludeOrigins?: string[];
+  // Level 3: Soft Scene Gravity
   includeGenres?: string[];
-  additionalInstructions?: string;
+  anchorLabels?: string[];
 }
+
+export const ERA_MIN_BOUND = 1965;
+export const ERA_MAX_BOUND = 2026;
+
+export const CANONICAL_COUNTRIES_22: readonly string[] = [
+  'United States',
+  'United Kingdom',
+  'Australia',
+  'Canada',
+  'Germany',
+  'France',
+  'Japan',
+  'Sweden',
+  'Italy',
+  'Spain',
+  'Brazil',
+  'Mexico',
+  'Netherlands',
+  'Belgium',
+  'Norway',
+  'Finland',
+  'Denmark',
+  'Ireland',
+  'New Zealand',
+  'Poland',
+  'Austria',
+  'Switzerland',
+] as const;
+
+export const CANONICAL_GENRE_TAXONOMY: Record<string, string[]> = {
+  'Metal': [
+    'Metal', 'Heavy Metal', 'Death Metal', 'Black Metal', 'Doom Metal',
+    'Deathcore', 'Metalcore', 'Mathcore', 'Grindcore', 'Cybergrind',
+    'Powerviolence', 'Sludge', 'Crust', 'Thrash', 'Groove Metal', 'Nu Metal',
+    'Extreme Metal', 'Industrial Metal', 'Progressive Metal'
+  ],
+  'Punk': [
+    'Punk', 'Hardcore', 'Hardcore Punk', 'Post-Hardcore', 'Post-Punk', 'Emo',
+    'Skate Punk', 'Pop Punk', 'Crust Punk', 'D-Beat', 'Anarcho-Punk',
+    'Screamo', 'Melodic Hardcore', 'Beatdown Hardcore'
+  ],
+  'Rock': [
+    'Rock', 'Alternative', 'Indie', 'Grunge', 'Post-Rock',
+    'Garage Rock', 'Psychedelic', 'Noise Rock', 'Hard Rock', 'Space Rock', 'Shoegaze'
+  ],
+  'Hip-Hop / Rap': [
+    'Hip-Hop', 'Rap', 'Boom Bap', 'G-Funk', 'Trap', 'Drill',
+    'Crunk', 'Grime', 'Lo-Fi Hip-Hop', 'East Coast', 'West Coast', 'Hardcore Rap'
+  ],
+  'Electronic': [
+    'Electronic', 'Techno', 'House', 'Trance', 'Dubstep', 'EDM',
+    'Dance', 'IDM', 'Drum and Bass', 'Jungle', 'Ambient', 'Synthwave'
+  ],
+  'R&B / Soul': [
+    'R&B', 'Soul', 'Funk', 'Motown', 'Neo-Soul'
+  ],
+  'Pop': [
+    'Pop', 'Synthpop', 'Electropop', 'K-Pop', 'Indie Pop'
+  ],
+  'Country': [
+    'Country', 'Bluegrass', 'Americana', 'Alt-Country'
+  ],
+  'Jazz': [
+    'Jazz', 'Bebop', 'Swing', 'Fusion', 'Free Jazz'
+  ]
+};
+
+export const CANONICAL_GENRES_FLAT: string[] = Array.from(
+  new Set(Object.values(CANONICAL_GENRE_TAXONOMY).flat())
+);
 
 export interface TasteProfile {
   id: string;
@@ -236,5 +322,6 @@ export const RADIUS_TOKENS = {
   button: "rounded-lg",  // Standard Interactive UI (Clickable utilities)
   toggle: "rounded-xl",  // Segmented Component Selectors
 };
+
 
 

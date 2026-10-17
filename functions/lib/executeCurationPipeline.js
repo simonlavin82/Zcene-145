@@ -6,6 +6,7 @@ const https_1 = require("firebase-functions/v2/https");
 const app_1 = require("firebase-admin/app");
 const firestore_1 = require("firebase-admin/firestore");
 const curatorService_1 = require("./services/curatorService");
+const cacheQualification_1 = require("./services/cacheQualification");
 if ((0, app_1.getApps)().length === 0) {
     (0, app_1.initializeApp)();
 }
@@ -136,7 +137,9 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
         .map((a) => a.trim())
         .filter(Boolean);
     const seedNamesMap = payload.seedNames || {};
-    console.log(`[Pipeline Diamond] -> Cache Lookup: Checking seeds: ${artistList.join(', ')}`);
+    payload.filters = (0, cacheQualification_1.sanitizeDiscoveryFilters)(payload.filters);
+    const hasActiveFilters = (0, cacheQualification_1.hasActiveDiscoveryFilters)(payload.filters);
+    console.log(`[Pipeline Diamond] -> Cache Lookup: Checking seeds: ${artistList.join(', ')} (activeFilters=${hasActiveFilters})`);
     const detailsCacheEntries = [];
     const collectedTokens = {};
     const usageCollector = {
@@ -355,7 +358,7 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
             }
         }
     }
-    if (artistList.length > 1 || payload.intent === 'cache_upgrade') {
+    if (artistList.length > 1 || payload.intent === 'cache_upgrade' || hasActiveFilters) {
         needsProGeneration = true;
     }
     let finalGraph = payload.baseGraph || { nodes: [], links: [] };
@@ -469,7 +472,7 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
     console.log(`[Pipeline Diamond] -> Skipping synchronous hydration (Delegated to processCurationJob)`);
     let curationJobId = null;
     let determinedGenerationType = "Direct Hit";
-    if (artistList.length > 1 || (payload.filters && Object.keys(payload.filters).length > 0)) {
+    if (artistList.length > 1 || hasActiveFilters) {
         determinedGenerationType = "Complex Generation";
     }
     else if (needsProGeneration) {

@@ -23,7 +23,12 @@ export const triggerAssetHealing = async (
   entityType: 'artist' | 'label',
   displayName?: string
 ): Promise<any | null> => {
-  const normId = entityType === 'label' ? normalizeLabelId(rawId) : normalizeArtistId(rawId);
+  let normId = entityType === 'label'
+    ? normalizeLabelId(displayName || rawId)
+    : normalizeArtistId(rawId);
+  if (entityType === 'label' && normId === 'century') {
+    normId = 'century-media';
+  }
   const cacheKey = `${entityType}:${normId}`;
   const now = Date.now();
 
@@ -73,7 +78,8 @@ export const normalizeArtistId = (name: string): string =>
 
 export const normalizeLabelId = (name: string): string => {
   let id = normalizeArtistId(name);
-  id = id.replace(/-(records|music|company|recording-company|recordings|entertainment|media|group|productions)$/, '');
+  id = id.replace(/(?:-(?:records|recordings|music|company|recording-company|entertainment|group|productions|inc|ltd))+$/, '');
+  if (id === 'century') id = 'century-media';
   return id;
 };
 
@@ -133,6 +139,12 @@ export const buildCompositeCacheKey = (artistId: string, filters?: DiscoveryFilt
   if (filters.includeGenres && filters.includeGenres.length > 0) {
     const sorted = [...filters.includeGenres].map(s => s.trim().toLowerCase()).sort();
     parts.push(`inc_genres:${sorted.join(',')}`);
+  }
+  if (filters.anchorLabels && filters.anchorLabels.length > 0) {
+    const sorted = [...filters.anchorLabels].map(s => normalizeLabelId(s)).filter(Boolean).sort();
+    if (sorted.length > 0) {
+      parts.push(`inc_labels:${sorted.join(',')}`);
+    }
   }
   
   if (parts.length === 1) return artistId;
@@ -306,6 +318,18 @@ export const cleanArtistDisplayName = (rawIdOrName?: string | null, graphNodes?:
 };
 
 /**
+ * Normalizes a label display name for UI dropdowns and chips by cleaning routing suffixes
+ * and stripping trailing " Records" / " Recordings" so variants like "Century Media" and
+ * "Century Media Records" collapse into a single "Century Media" entry.
+ */
+export const cleanLabelDisplayName = (rawIdOrName?: string | null, graphNodes?: Node[] | null): string => {
+  const base = cleanArtistDisplayName(rawIdOrName, graphNodes);
+  if (!base) return '';
+  const stripped = base.replace(/\s+(?:records|recordings)$/i, '').trim();
+  return stripped || base;
+};
+
+/**
  * Universal seed matching utility bridging backend curation and frontend graph rendering.
  * Reliably maps disambiguated session routing keys (e.g., buggin-united-states) to short canonical
  * graph node IDs (e.g., buggin) or display titles for correct D3 shape, color, force simulation, and UI drawers.
@@ -362,7 +386,7 @@ export const normalizeGraphData = (graph: GraphData): GraphData => {
     let normalizedId = originalId.trim();
     
     if (node.type === 'label') {
-      normalizedId = normalizeLabelId(originalId);
+      normalizedId = normalizeLabelId(node.label || originalId);
     } else if (node.type === 'artist') {
       normalizedId = normalizeArtistId(originalId);
     } else {

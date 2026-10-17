@@ -7,6 +7,10 @@ import {
   normalizeArtistId,
   extractCountrySlug
 } from "./services/curatorService";
+import {
+  hasActiveDiscoveryFilters,
+  sanitizeDiscoveryFilters
+} from "./services/cacheQualification";
 
 if (getApps().length === 0) {
   initializeApp();
@@ -150,8 +154,10 @@ export const executeCurationPipeline = onCall({
     .filter(Boolean);
 
   const seedNamesMap: Record<string, string> = payload.seedNames || {};
+  payload.filters = sanitizeDiscoveryFilters(payload.filters);
+  const hasActiveFilters = hasActiveDiscoveryFilters(payload.filters);
 
-  console.log(`[Pipeline Diamond] -> Cache Lookup: Checking seeds: ${artistList.join(', ')}`);
+  console.log(`[Pipeline Diamond] -> Cache Lookup: Checking seeds: ${artistList.join(', ')} (activeFilters=${hasActiveFilters})`);
   
   const detailsCacheEntries: [string, any][] = [];
   
@@ -381,7 +387,7 @@ export const executeCurationPipeline = onCall({
      }
   }
   
-  if (artistList.length > 1 || payload.intent === 'cache_upgrade') {
+  if (artistList.length > 1 || payload.intent === 'cache_upgrade' || hasActiveFilters) {
      needsProGeneration = true;
   }
 
@@ -512,7 +518,7 @@ export const executeCurationPipeline = onCall({
   let curationJobId = null;
 
   let determinedGenerationType = "Direct Hit";
-  if (artistList.length > 1 || (payload.filters && Object.keys(payload.filters).length > 0)) {
+  if (artistList.length > 1 || hasActiveFilters) {
      determinedGenerationType = "Complex Generation";
   } else if (needsProGeneration) {
      if (hasStubHit && !hasCacheMiss) {

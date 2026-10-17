@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateSemanticLinkWeights = exports.scrapeImageUrlBackend = exports.checkVideoPlayability = exports.scrapeVideoIdBackend = exports.fetchNodeDetailsBackend = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = exports.NODE_DETAILS_SCHEMA = exports.generateGraphDataBackend = exports.reconcileNarrativeEdges = exports.generateRootsBreakdownBackend = exports.validateSeedOriginBackend = exports.SEED_VALIDATION_SCHEMA = exports.GENERATE_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = exports.GRAPH_RESPONSE_SCHEMA = exports.extractCleanJsonString = exports.extractArtistSubGraph = exports.normalizeGraphData = exports.buildCompositeCacheKey = exports.extractCountrySlug = exports.sanitizeImageUrl = exports.extractValidYoutubeId = exports.titleCaseArtistId = exports.normalizeLabelId = exports.normalizeArtistId = exports.applyCanonicalAlias = exports.CANONICAL_ALIASES = exports.GEMINI_FLASH_MODEL = void 0;
 const genai_1 = require("@google/genai");
 const executeCurationPipeline_1 = require("../executeCurationPipeline");
+const cacheQualification_1 = require("./cacheQualification");
 exports.GEMINI_FLASH_MODEL = process.env.GEMINI_FLASH_MODEL || "gemini-3.6-flash";
 // --- UTILITIES PORTED FROM artistCacheService.ts ---
 exports.CANONICAL_ALIASES = {
@@ -27,7 +28,9 @@ const normalizeArtistId = (name) => name
 exports.normalizeArtistId = normalizeArtistId;
 const normalizeLabelId = (name) => {
     let id = (0, exports.normalizeArtistId)(name);
-    id = id.replace(/-(records|music|company|recording-company|recordings|entertainment|media|group|productions)$/, '');
+    id = id.replace(/(?:-(?:records|recordings|music|company|recording-company|entertainment|group|productions|inc|ltd))+$/, '');
+    if (id === 'century')
+        id = 'century-media';
     return id;
 };
 exports.normalizeLabelId = normalizeLabelId;
@@ -182,6 +185,12 @@ const buildCompositeCacheKey = (artistId, filters) => {
         const sorted = [...filters.includeGenres].map(s => s.trim().toLowerCase()).sort();
         parts.push(`inc_genres:${sorted.join(',')}`);
     }
+    if (filters.anchorLabels && filters.anchorLabels.length > 0) {
+        const sorted = [...filters.anchorLabels].map(s => (0, exports.normalizeLabelId)(s)).filter(Boolean).sort();
+        if (sorted.length > 0) {
+            parts.push(`inc_labels:${sorted.join(',')}`);
+        }
+    }
     if (parts.length === 1)
         return artistId;
     return parts.join('-').replace(/\s+/g, '-').toLowerCase();
@@ -195,7 +204,7 @@ const normalizeGraphData = (graph) => {
         const originalId = (0, exports.applyCanonicalAlias)(node.id);
         let normalizedId = originalId.trim();
         if (node.type === 'label') {
-            normalizedId = (0, exports.normalizeLabelId)(originalId);
+            normalizedId = (0, exports.normalizeLabelId)(node.label || originalId);
         }
         else if (node.type === 'artist') {
             normalizedId = (0, exports.normalizeArtistId)(originalId);
@@ -522,7 +531,7 @@ exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = `I have an existing music 
         2.  DO NOT duplicate any of the existing nodes listed above. When creating links, you MUST reference the existing node IDs if a connection is needed.
         3.  For EACH seed artist in "{{artists}}", if they do not already exist as a node, you MUST add them as an 'artist' node to the 'nodes' array. This is a mandatory requirement. After adding the artist node, attempt to find its primary genre, record label, country of origin, and the year they were formed/founded (YYYY). If you find these details, create nodes for them (if they don't already exist) and link them back to the seed artist. The 'id' for the year node must be the 4-digit year (e.g., "1998") and its type must be 'founded'. If you cannot find some or all of these details, that is acceptable, but the seed artist node itself MUST still be included in the graph.
         4.  In addition, identify and add 8-12 NEW related artists that are musically connected to the seed artists. For these NEW artists, you MUST also identify and create their respective genre, label, country, and especially their 'founded' year nodes (YYYY) to ensure the spiderweb is rich with chronological data. Assign them to the same 'group' as the seed artist they relate to, or a new group if they relate to multiple.
-        5.  TEMPORAL ECOSYSTEM & SCENE AUTHENTICITY RULE (STRICT): You MUST reconstruct the true historical scene and temporal ecosystem of the seed artist(s). Node selection must be strictly restricted to the primary active era, geographic scene, and lived touring ecosystem of the seed(s). For example, if a seed artist was primarily active in a late-1990s scene, you MUST surface their exact period-accurate peers from that specific 1990s era. If the seed is a modern 2020s band, you MUST surface contemporary peers from their current 2020s ecosystem. Do NOT suggest modern algorithmic equivalents for legacy bands, and do NOT pull in historical legacy ancestors for modern bands unless they genuinely shared the same active touring scene. The graph must represent a period-accurate, contemporary snapshot of the artist's specific moment in time.
+        5.  TEMPORAL ECOSYSTEM & SCENE AUTHENTICITY RULE (STRICT): You MUST reconstruct the true historical scene and temporal ecosystem of the seed artist(s). Node selection must be strictly restricted to the primary active era, geographic scene, and lived touring ecosystem of the seed(s). For example, if a seed artist was primarily active in a late-1990s scene, you MUST surface their exact period-accurate peers from that specific 1990s era. If the seed is a modern 2020s band, you MUST surface contemporary peers from their current 2020s ecosystem. Do NOT suggest modern algorithmic equivalents for legacy bands, and do NOT pull in historical legacy ancestors for modern bands unless they genuinely shared the same active touring scene. The graph must represent a period-accurate, contemporary snapshot of the artist's specific moment in time. EXCEPTION (3-TIER ANCHOR OVERRIDE): When explicit Level 2 Era or Country Guardrails are active below, those guardrails take absolute precedence for all NEW recommended artists. In that case, you MUST map cross-era or cross-border lineage, influence, and spiritual succession connecting the sacred seed artist(s) to peers founded within the specified era/origin window, even if the seed artist belongs to a different decade or country.
         6.  It is absolutely critical that each 'founded' node is linked ONLY to the correct artist node who was founded in that year.
         7.  LINK RELATIONSHIP CONTEXT (Dual-Context): Each link in the 'links' array MUST natively output two strings:
             - 'forwardContext': Explains the connection from source to target (e.g. 'discovers and champions', 'is a sub-genre of').
@@ -553,7 +562,7 @@ Follow these rules precisely:
 5.  CRITICAL TOPOLOGY RULE: You MUST create direct links connecting EACH seed artist to the NEW related artists they spawned. Every new artist MUST be connected back to one of the seed artists, either directly or through a chain of artist-to-artist links. DO NOT leave any seed artists or related artists floating or only connected to metadata nodes. While the clusters generated by each seed may remain disjointed from one another, every node within a cluster must be firmly anchored to its respective seed.
 6.  MANDATORY SEED NODES: You MUST ensure an 'artist' node exists for EVERY seed artist listed in {{artists}}. If a seed artist is NOT already present in the cached subgraphs context, you MUST create a new 'artist' node for them, assign a unique 'group' number, and explicitly anchor new artist links to this exact node ID.
 7.  MANDATORY METADATA NODES FOR ALL ARTISTS (MULTI-SEED PARITY MANDATE): For EVERY artist node generated in the graph (both seed artists and newly spawned bridging/recommended artists), you MUST identify and create their respective genre, record label, country of origin, and 4-digit 'founded' year nodes (YYYY) and explicitly wire direct links connecting each artist to their respective country, founded year, label, and genre nodes. No artist may be left without country, founded year, or genre connections.
-8.  TEMPORAL ECOSYSTEM & SCENE AUTHENTICITY RULE (STRICT): You MUST reconstruct the true historical scene and temporal ecosystem of the seed artist(s). Node selection must be strictly restricted to the primary active era, geographic scene, and lived touring ecosystem of the seed(s). For example, if a seed artist was primarily active in a late-1990s scene, you MUST surface their exact period-accurate peers from that specific 1990s era. If the seed is a modern 2020s band, you MUST surface contemporary peers from their current 2020s ecosystem. Do NOT suggest modern algorithmic equivalents for legacy bands, and do NOT pull in historical legacy ancestors for modern bands unless they genuinely shared the same active touring scene. The graph must represent a period-accurate, contemporary snapshot of the artist's specific moment in time.
+8.  TEMPORAL ECOSYSTEM & SCENE AUTHENTICITY RULE (STRICT): You MUST reconstruct the true historical scene and temporal ecosystem of the seed artist(s). Node selection must be strictly restricted to the primary active era, geographic scene, and lived touring ecosystem of the seed(s). For example, if a seed artist was primarily active in a late-1990s scene, you MUST surface their exact period-accurate peers from that specific 1990s era. If the seed is a modern 2020s band, you MUST surface contemporary peers from their current 2020s ecosystem. Do NOT suggest modern algorithmic equivalents for legacy bands, and do NOT pull in historical legacy ancestors for modern bands unless they genuinely shared the same active touring scene. The graph must represent a period-accurate, contemporary snapshot of the artist's specific moment in time. EXCEPTION (3-TIER ANCHOR OVERRIDE): When explicit Level 2 Era or Country Guardrails are active below, those guardrails take absolute precedence for all NEW recommended artists. In that case, you MUST map cross-era or cross-border lineage, influence, and spiritual succession connecting the sacred seed artist(s) to peers founded within the specified era/origin window, even if the seed artist belongs to a different decade or country.
 9.  LINK RELATIONSHIP CONTEXT (Dual-Context): Each link MUST natively output two strings:
     - 'forwardContext': Explains connection from source to target.
     - 'inverseContext': Reverses semantic direction from target to source.
@@ -574,7 +583,7 @@ Follow these rules precisely:
 3.  For each seed artist, find and add nodes for their primary genre, record label, country of origin, and the year they were formed/founded (YYYY). The 'id' for the year node must be the 4-digit year (e.g. "1994") and its type must be 'founded'.
 4.  In addition, find and add 12 to 18 NEW related artists that are musically connected to the seed artists, but you have the flexibility to scale down if the specific musical scene is smaller and fewer genuine connections exist. Do not pad the graph with irrelevant artists just to hit the number. For these NEW artists, you MUST also identify and create their respective genre, label, country, and especially their 'founded' year nodes (YYYY) to ensure the spiderweb is rich with chronological data. ONLY include artists that strictly meet any provided discovery filters. Labels are explicitly EXCLUDED from this cap; generate the natural amount of Label nodes required to accurately connect the generated artists together.
 5.  For all artists (seed and related), create links connecting them to their respective genre, label, country, and founded year nodes. CRITICAL TOPOLOGY RULE: You MUST create direct links connecting the seed artist(s) to the NEW related artists you introduce. Every new artist MUST be connected back to the central spiderweb, either directly to the seed artist, or through a chain of artist-to-artist links. DO NOT leave any artist nodes floating or only connected to metadata nodes. All direct connections of a seed artist should share their 'group' number. Each link MUST include a 'forwardContext' and 'inverseContext' string explaining the bidirectional relationship (e.g., 'releases music on XL Recordings' / 'released by'). Keep the contexts brief.
-6.  TEMPORAL ECOSYSTEM & SCENE AUTHENTICITY RULE (STRICT): You MUST reconstruct the true historical scene and temporal ecosystem of the seed artist(s). Node selection must be strictly restricted to the primary active era, geographic scene, and lived touring ecosystem of the seed(s). For example, if a seed artist was primarily active in a late-1990s scene, you MUST surface their exact period-accurate peers from that specific 1990s era. If the seed is a modern 2020s band, you MUST surface contemporary peers from their current 2020s ecosystem. Do NOT suggest modern algorithmic equivalents for legacy bands, and do NOT pull in historical legacy ancestors for modern bands unless they genuinely shared the same active touring scene. The graph must represent a period-accurate, contemporary snapshot of the artist's specific moment in time.
+6.  TEMPORAL ECOSYSTEM & SCENE AUTHENTICITY RULE (STRICT): You MUST reconstruct the true historical scene and temporal ecosystem of the seed artist(s). Node selection must be strictly restricted to the primary active era, geographic scene, and lived touring ecosystem of the seed(s). For example, if a seed artist was primarily active in a late-1990s scene, you MUST surface their exact period-accurate peers from that specific 1990s era. If the seed is a modern 2020s band, you MUST surface contemporary peers from their current 2020s ecosystem. Do NOT suggest modern algorithmic equivalents for legacy bands, and do NOT pull in historical legacy ancestors for modern bands unless they genuinely shared the same active touring scene. The graph must represent a period-accurate, contemporary snapshot of the artist's specific moment in time. EXCEPTION (3-TIER ANCHOR OVERRIDE): When explicit Level 2 Era or Country Guardrails are active below, those guardrails take absolute precedence for all NEW recommended artists. In that case, you MUST map cross-era or cross-border lineage, influence, and spiritual succession connecting the sacred seed artist(s) to peers founded within the specified era/origin window, even if the seed artist belongs to a different decade or country.
 7.  CRITICAL: Each 'founded' node MUST be linked ONLY to the correct artist who was founded in that year.
 8.  JSON SCHEMA: The output must be a single, valid JSON object with 'nodes' and 'links' arrays matching the schema.
 
@@ -802,13 +811,16 @@ NEGATIVE CONSTRAINT: NEVER use em-dashes (—) or long hyphens for dramatic effe
     const seedList = artists.split('::').map(s => (0, executeCurationPipeline_1.stripCountrySlug)((0, exports.normalizeArtistId)(s)));
     const isMultiSeed = seedList.length > 1;
     let seedAnchorInstruction = '';
-    if (filters && (filters.foundedAfter || filters.foundedBefore || filters.includeGenres)) {
+    if ((0, cacheQualification_1.hasActiveDiscoveryFilters)(filters)) {
         const filterDesc = [
             filters.foundedAfter ? `founded AFTER ${filters.foundedAfter}` : '',
             filters.foundedBefore ? `founded BEFORE ${filters.foundedBefore}` : '',
-            filters.includeGenres?.length ? `within genres: ${filters.includeGenres.join(', ')}` : ''
+            filters.includeOrigins?.length ? `from origins: ${filters.includeOrigins.join(', ')}` : '',
+            filters.excludeOrigins?.length ? `excluding origins: ${filters.excludeOrigins.join(', ')}` : '',
+            filters.includeGenres?.length ? `within genres: ${filters.includeGenres.join(', ')}` : '',
+            filters.anchorLabels?.length ? `anchored around labels: ${filters.anchorLabels.map((l) => (0, cacheQualification_1.sanitizeAnchorLabelInput)(l)).filter(Boolean).join(', ')}` : ''
         ].filter(Boolean).join('; ');
-        seedAnchorInstruction = `\n\nSEED ANCHOR CONSTRAINT (MANDATORY): This ecosystem was generated with an active filter: [${filterDesc}]. Your narrative MUST explicitly frame this filter as the defining thematic lens of the ecosystem. Reference this era or genre constraint as an organizing principle in your opening paragraph. Do NOT write as if this were an unconstrained generation — the filter is a core architectural requirement, not optional context. Failure to acknowledge the filter constraint is a violation of the generation contract.`;
+        seedAnchorInstruction = `\n\nSEED ANCHOR CONSTRAINT (MANDATORY — 3-TIER ANCHOR SYSTEM): This ecosystem was generated with active 3-Tier Anchors: [${filterDesc}]. Your narrative MUST explicitly frame these spatial/temporal guardrails and scene gravity pulls as the defining thematic lens of the ecosystem (including cross-era or cross-border lineage if the seed artist predates or originates outside the target window). Reference this era, origin, genre, or label constraint as an organizing principle in your opening paragraph. Do NOT write as if this were an unconstrained generation — the filter is a core architectural requirement, not optional context. Failure to acknowledge the filter constraint is a violation of the generation contract.`;
     }
     const coAnchorMandate = isMultiSeed ?
         `\n\nCRITICAL CO-ANCHOR MANDATE (Rule 27): This is a multi-seed generation for the following equal anchors: ${artists.replace(/::/g, ', ')}. You MUST treat EVERY seed artist as a co-equal foundational anchor. Do not relegate any seed to a "satellite" status or focus the narrative on just one artist due to their fame. The resulting breakdown must weave them together as co-equal pillars of the ecosystem.${seedAnchorInstruction}` : `\n\nCRITICAL ANCHOR MANDATE (Rule 27):${seedAnchorInstruction}`;
@@ -1016,7 +1028,7 @@ If no missing edges are found, return an empty array [].`;
     }
 };
 exports.reconcileNarrativeEdges = reconcileNarrativeEdges;
-const generateGraphDataBackend = async (artists, filters, cachedSubgraphsContext, baseGraph, disambiguationHints) => {
+const generateGraphDataBackend = async (artists, filters, cachedSubgraphsContext, baseGraph, disambiguationHints, _isTier2FallbackRetry = false) => {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
         throw new Error("GEMINI_API_KEY is not defined in environment secrets.");
@@ -1034,10 +1046,10 @@ const generateGraphDataBackend = async (artists, filters, cachedSubgraphsContext
     // Reinforce schema with dynamic descriptions if filters exist
     const dynamicSchema = JSON.parse(JSON.stringify(exports.GRAPH_RESPONSE_SCHEMA));
     if (filters?.foundedAfter) {
-        dynamicSchema.properties.nodes.description += ` MANDATORY: All NEW artists MUST have been founded AFTER ${filters.foundedAfter}.`;
+        dynamicSchema.properties.nodes.description += ` MANDATORY: All NEW artists MUST have been founded in ${filters.foundedAfter} or LATER.`;
     }
     if (filters?.foundedBefore) {
-        dynamicSchema.properties.nodes.description += ` MANDATORY: All NEW artists MUST have been founded BEFORE ${filters.foundedBefore}.`;
+        dynamicSchema.properties.nodes.description += ` MANDATORY: All NEW artists MUST have been founded in ${filters.foundedBefore} or EARLIER.`;
     }
     if (isMultiSeed) {
         systemInstruction = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE
@@ -1055,44 +1067,61 @@ const generateGraphDataBackend = async (artists, filters, cachedSubgraphsContext
         systemInstruction = exports.GENERATE_GRAPH_PROMPT_TEMPLATE;
         userPrompt = `Generate a music graph for these seed artists: ${artists}.`;
     }
-    // Inject Discovery Filters into System Instruction
-    if (filters && Object.keys(filters).length > 0) {
-        let filterRules = "\n\nSTRICT DISCOVERY CONSTRAINTS (ZERO-TOLERANCE):";
-        filterRules += "\nYou are a strict filtering agent. Your primary mission is to obey these filters. Musical relevance is secondary.";
-        if (filters.foundedAfter) {
-            filterRules += `\n- MANDATORY: Every NEW artist you add MUST have been founded in the year ${filters.foundedAfter} or LATER.`;
-            const forbiddenYear = filters.foundedAfter - 1;
-            filterRules += `\n- FORBIDDEN: Do not include any artists founded in ${forbiddenYear} or earlier.`;
-            filterRules += `\n- NO FALLBACK: If you cannot find an artist founded in ${filters.foundedAfter} or later, DO NOT include a substitute.`;
+    // Inject 3-Tier Anchor System (Architecture V30 / Rule 41) into System Instruction
+    if ((0, cacheQualification_1.hasActiveDiscoveryFilters)(filters) && filters) {
+        let filterRules = "\n\n3-TIER ANCHOR HIERARCHY & DISCOVERY CONSTRAINTS (RULE 41):";
+        filterRules += `\n- LEVEL 1 (SACRED SEED IMMUNITY): The seed artists [${artists}] are the sacred genesis of the spiderweb and are 100% IMMUNE to all secondary Era, Origin, Genre, and Label filters. Always include them and their authentic metadata.`;
+        if ((0, cacheQualification_1.hasActiveTier2Filters)(filters)) {
+            filterRules += "\n\n- LEVEL 2 (HARD SPATIAL & TEMPORAL GUARDRAILS — ZERO-TOLERANCE):";
+            filterRules += "\n  Every NEW recommended artist you add MUST strictly obey these hard boundaries. Cross-era and cross-border lineage is explicitly authorized: if a seed artist predates or originates outside the target window, map their cross-era/cross-border influence, spiritual successors, and musical lineage inside the target window.";
+            if (filters.foundedAfter) {
+                filterRules += `\n  * MANDATORY ERA FLOOR: Every NEW artist you add MUST have been founded in the year ${filters.foundedAfter} or LATER.`;
+                const forbiddenYear = filters.foundedAfter - 1;
+                filterRules += `\n  * FORBIDDEN: Do not include any new artists founded in ${forbiddenYear} or earlier.`;
+            }
+            if (filters.foundedBefore) {
+                filterRules += `\n  * MANDATORY ERA CEILING: Every NEW artist you add MUST have been founded in the year ${filters.foundedBefore} or EARLIER.`;
+                const forbiddenYear = filters.foundedBefore + 1;
+                filterRules += `\n  * FORBIDDEN: Do not include any new artists founded in ${forbiddenYear} or later.`;
+            }
+            if (filters.includeOrigins && filters.includeOrigins.length > 0) {
+                filterRules += `\n  * ORIGIN MANDATE: Only include new artists from: ${filters.includeOrigins.join(', ')}.`;
+            }
+            if (filters.excludeOrigins && filters.excludeOrigins.length > 0) {
+                filterRules += `\n  * FORBIDDEN ORIGINS: Strictly exclude all new artists from: ${filters.excludeOrigins.join(', ')}.`;
+            }
         }
-        if (filters.foundedBefore) {
-            filterRules += `\n- MANDATORY: Every NEW artist you add MUST have been founded in the year ${filters.foundedBefore} or EARLIER.`;
-            const forbiddenYear = filters.foundedBefore + 1;
-            filterRules += `\n- FORBIDDEN: Do not include any artists founded in ${forbiddenYear} or later.`;
-        }
-        if (filters.includeGenres && filters.includeGenres.length > 0) {
-            filterRules += `\n- GENRE MANDATE: Only include new artists that play/belong to these genres: ${filters.includeGenres.join(', ')}.`;
-        }
-        if (filters.includeOrigins && filters.includeOrigins.length > 0) {
-            filterRules += `\n- ORIGIN MANDATE: Only include new artists from: ${filters.includeOrigins.join(', ')}.`;
-        }
-        if (filters.excludeOrigins && filters.excludeOrigins.length > 0) {
-            filterRules += `\n- FORBIDDEN ORIGINS: Strictly exclude all artists from: ${filters.excludeOrigins.join(', ')}.`;
-        }
-        if (filters.additionalInstructions) {
-            filterRules += `\n- USER DIRECTION: ${filters.additionalInstructions}`;
+        if ((0, cacheQualification_1.hasActiveTier3Filters)(filters)) {
+            filterRules += "\n\n- LEVEL 3 (SOFT SCENE GRAVITY & GRACEFUL DEGRADATION — RULE 41):";
+            if (filters.includeGenres && filters.includeGenres.length > 0) {
+                filterRules += `\n  * CANONICAL GENRE GRAVITY: Strongly prioritize new artists connected to these genres: ${filters.includeGenres.join(', ')}.`;
+            }
+            if (filters.anchorLabels && filters.anchorLabels.length > 0) {
+                const sanitizedLabels = filters.anchorLabels.map(l => (0, cacheQualification_1.sanitizeAnchorLabelInput)(l)).filter(Boolean);
+                if (sanitizedLabels.length > 0) {
+                    filterRules += `\n  * ANCHOR LABEL GRAVITY: Strongly prioritize new artists released on or connected to these record labels: ${sanitizedLabels.join(', ')}, and include their 'label' node(s) where authentic.`;
+                }
+            }
+            filterRules += "\n  * GRACEFUL DEGRADATION MANDATE: Level 2 Era and Origin guardrails ALWAYS supersede Level 3 Genre and Label gravity. If a Level 3 genre or record label has zero authentic artists inside the Level 2 Era/Origin window, DO NOT violate Level 2 and DO NOT return an empty graph. Silently bypass the conflicting Level 3 constraint and complete the spiderweb using Level 1 and Level 2.";
         }
         filterRules += "\n\nIMPORTANT: Do NOT include any search citations or footnotes. The JSON must be clean.";
-        filterRules += `\n\n(Note: The seed artists [${artists}] are the ONLY exception. ALL other artists MUST obey these rules.)`;
         filterRules += "\n\nCAPACITY LIMIT: You MUST NOT generate more than 12-15 NEW artist nodes. Including metadata nodes, do not exceed 60 nodes in total. Quality over quantity.";
-        filterRules += "\n\nFINAL VERIFICATION: Audit your list. If an artist violates any rules above, delete them.";
-        filterRules += "\n\nID SANITIZATION (CRITICAL): The `id` string for all nodes in the JSON graph MUST be the exact, canonical ID for the entity. NEVER concatenate, append, or inject any filter strings, era tags, or genre tags onto the `id` field. For example, use `id: 'spaced-us'`, NEVER `id: 'spaced-us-after:2019'`. Failure to follow this rule corrupts the global database.";
+        filterRules += "\n\nFINAL VERIFICATION: Audit your list. If any new artist violates a Level 2 Era or Origin guardrail above, delete them.";
+        filterRules += "\n\nID SANITIZATION (CRITICAL): The `id` string for all nodes in the JSON graph MUST be the exact, canonical ID for the entity. NEVER concatenate, append, or inject any filter strings, era tags, genre tags, or label tags (e.g. `after:`, `before:`, `genre:`, `inc_genres:`, `inc_origins:`, `exc_origins:`, `label:`, `inc_labels:`, `anchor_labels:`) onto the `id` field. For example, use `id: 'spaced-us'`, NEVER `id: 'spaced-us-after:2019'`. Failure to follow this rule corrupts the global database.";
         systemInstruction += filterRules;
-        let reminder = `\n\nREMINDER: All new artists MUST meet the active filters:`;
+        let reminder = `\n\nREMINDER: All new artists MUST obey the active 3-Tier Anchors:`;
         if (filters.foundedAfter)
             reminder += ` founded in ${filters.foundedAfter} or later;`;
         if (filters.foundedBefore)
             reminder += ` founded in ${filters.foundedBefore} or earlier;`;
+        if (filters.includeOrigins?.length)
+            reminder += ` origin in [${filters.includeOrigins.join(', ')}];`;
+        if (filters.excludeOrigins?.length)
+            reminder += ` excluding origins [${filters.excludeOrigins.join(', ')}];`;
+        if (filters.includeGenres?.length)
+            reminder += ` soft genre pull [${filters.includeGenres.join(', ')}];`;
+        if (filters.anchorLabels?.length)
+            reminder += ` soft label pull [${filters.anchorLabels.map(l => (0, cacheQualification_1.sanitizeAnchorLabelInput)(l)).filter(Boolean).join(', ')}];`;
         userPrompt += reminder;
     }
     // [Disambiguation Gate] Inject user-confirmed identity constraint when present.
@@ -1155,8 +1184,17 @@ const generateGraphDataBackend = async (artists, filters, cachedSubgraphsContext
             await new Promise(resolve => setTimeout(resolve, 1000));
         }
     }
-    // --- POST-PROCESSING FILTERING ---
-    const seedArtistIds = new Set(artists.split('::').map(a => a.trim().toLowerCase()));
+    // --- POST-PROCESSING FILTERING (LEVEL 1 IMMUNITY + LEVEL 2 HARD GUARDRAILS) ---
+    const seedRawList = artists.split('::').map(a => a.trim()).filter(Boolean);
+    const seedArtistIds = new Set(seedRawList.map(a => a.toLowerCase()));
+    const seedNormBareSet = new Set(seedRawList.map(a => (0, executeCurationPipeline_1.stripCountrySlug)((0, exports.normalizeArtistId)(a))));
+    const isSeedNode = (nodeId) => {
+        const lower = nodeId.toLowerCase();
+        if (seedArtistIds.has(lower))
+            return true;
+        const normBare = (0, executeCurationPipeline_1.stripCountrySlug)((0, exports.normalizeArtistId)(nodeId));
+        return seedNormBareSet.has(normBare);
+    };
     const nodesToRemove = new Set();
     const rawNodes = Array.isArray(data?.nodes) ? data.nodes.filter(n => n && n.id != null) : [];
     const rawLinks = Array.isArray(data?.links) ? data.links.filter(l => {
@@ -1229,7 +1267,7 @@ const generateGraphDataBackend = async (artists, filters, cachedSubgraphsContext
             }
         });
         rawNodes.forEach(node => {
-            if (node.type === 'artist' && !seedArtistIds.has(node.id.toLowerCase())) {
+            if (node.type === 'artist' && !isSeedNode(node.id)) {
                 const year = artistToYear.get(node.id.toLowerCase());
                 if (year !== undefined && year < threshold) {
                     nodesToRemove.add(node.id);
@@ -1258,10 +1296,46 @@ const generateGraphDataBackend = async (artists, filters, cachedSubgraphsContext
             }
         });
         rawNodes.forEach(node => {
-            if (node.type === 'artist' && !seedArtistIds.has(node.id.toLowerCase())) {
+            if (node.type === 'artist' && !isSeedNode(node.id)) {
                 const year = artistToYear.get(node.id.toLowerCase());
                 if (year !== undefined && year > threshold) {
                     nodesToRemove.add(node.id);
+                }
+            }
+        });
+    }
+    if ((filters?.includeOrigins && filters.includeOrigins.length > 0) || (filters?.excludeOrigins && filters.excludeOrigins.length > 0)) {
+        const includeSlugs = new Set((filters.includeOrigins || []).map(o => (0, exports.extractCountrySlug)(o)).filter(s => s && s !== 'global'));
+        const excludeSlugs = new Set((filters.excludeOrigins || []).map(o => (0, exports.extractCountrySlug)(o)).filter(s => s && s !== 'global'));
+        const artistToCountrySlug = new Map();
+        const nodeMap = new Map(rawNodes.map(n => [n.id, n]));
+        rawLinks.forEach(link => {
+            const sourceId = typeof link.source === 'string' ? link.source : link.source.id;
+            const targetId = typeof link.target === 'string' ? link.target : link.target.id;
+            const sourceNode = nodeMap.get(sourceId);
+            const targetNode = nodeMap.get(targetId);
+            if (sourceNode?.type === 'artist' && targetNode?.type === 'country') {
+                const slug = (0, exports.extractCountrySlug)(targetNode.label || targetNode.id);
+                if (slug && slug !== 'global')
+                    artistToCountrySlug.set(sourceId.toLowerCase(), slug);
+            }
+            else if (targetNode?.type === 'artist' && sourceNode?.type === 'country') {
+                const slug = (0, exports.extractCountrySlug)(sourceNode.label || sourceNode.id);
+                if (slug && slug !== 'global')
+                    artistToCountrySlug.set(targetId.toLowerCase(), slug);
+            }
+        });
+        rawNodes.forEach(node => {
+            if (node.type === 'artist' && !isSeedNode(node.id)) {
+                const explicitSlug = node.origin ? (0, exports.extractCountrySlug)(node.origin) : undefined;
+                const slug = (explicitSlug && explicitSlug !== 'global') ? explicitSlug : artistToCountrySlug.get(node.id.toLowerCase());
+                if (slug && slug !== 'global') {
+                    if (includeSlugs.size > 0 && !includeSlugs.has(slug)) {
+                        nodesToRemove.add(node.id);
+                    }
+                    if (excludeSlugs.size > 0 && excludeSlugs.has(slug)) {
+                        nodesToRemove.add(node.id);
+                    }
                 }
             }
         });
@@ -1296,6 +1370,19 @@ const generateGraphDataBackend = async (artists, filters, cachedSubgraphsContext
         }
     });
     const deduplicatedNodes = Array.from(deduplicatedNodesMap.values());
+    // Rule 41 Graceful Degradation Retry: If 0 non-seed artists survived Level 2 post-processing while Tier 3 was active,
+    // silently bypass Tier 3 and re-run once with Tier 1 + Tier 2 only.
+    const survivingNonSeedArtists = deduplicatedNodes.filter(n => n.type === 'artist' && !isSeedNode(n.id));
+    if (survivingNonSeedArtists.length === 0 && (0, cacheQualification_1.hasActiveTier3Filters)(filters) && !_isTier2FallbackRetry) {
+        console.warn(`[Curation Backend] Rule 41 Graceful Degradation: 0 non-seed artists survived post-processing with Tier 3 active. Retrying with Tier 1 + Tier 2 only.`);
+        const tier2OnlyFilters = {
+            ...(filters?.foundedAfter !== undefined ? { foundedAfter: filters.foundedAfter } : {}),
+            ...(filters?.foundedBefore !== undefined ? { foundedBefore: filters.foundedBefore } : {}),
+            ...(filters?.includeOrigins?.length ? { includeOrigins: filters.includeOrigins } : {}),
+            ...(filters?.excludeOrigins?.length ? { excludeOrigins: filters.excludeOrigins } : {}),
+        };
+        return (0, exports.generateGraphDataBackend)(artists, tier2OnlyFilters, cachedSubgraphsContext, baseGraph, disambiguationHints, true);
+    }
     const validationNodeMap = new Map();
     const allNodesForValidation = [...(baseGraph?.nodes || []), ...deduplicatedNodes];
     for (const node of allNodesForValidation) {

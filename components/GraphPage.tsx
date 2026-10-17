@@ -1,8 +1,10 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { GraphData, Node, ParsedArtist, View, NodeDetails, Link, ChatMessage, StackItem, DiscoveryFilters, UserTaste, CanvasNodeRef } from '../types';
-import { User } from '../services/firebase';
+import { GraphData, Node, ParsedArtist, View, NodeDetails, Link, ChatMessage, StackItem, DiscoveryFilters, UserTaste, CanvasNodeRef, ERA_MIN_BOUND, ERA_MAX_BOUND, CANONICAL_COUNTRIES_22, CANONICAL_GENRE_TAXONOMY, CANONICAL_GENRES_FLAT } from '../types';
+import { User, db } from '../services/firebase';
+import { collection, getDocs, limit, query } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
-import { normalizeArtistId, titleCaseArtistId, cleanArtistDisplayName } from '../services/artistCacheService';
+import { normalizeArtistId, normalizeLabelId, titleCaseArtistId, cleanArtistDisplayName, cleanLabelDisplayName } from '../services/artistCacheService';
+import { hasActiveDiscoveryFilters, sanitizeAnchorLabelInput } from '../services/cacheQualification';
 import HelpPage from './HelpPage';
 import Header from './Header';
 import MusicGraph from './MusicGraph';
@@ -130,26 +132,113 @@ const MIN_GRAPH_WIDTH = 400;
 // --- Components ---
 import { GenerativeRationaleModal, DisambiguationModal, DisambiguationCandidate } from './SharedModals';
 
-
 const DiscoveryFiltersPanel: React.FC<{
   filters: DiscoveryFilters;
   onUpdate: (filters: DiscoveryFilters) => void;
   isGuest?: boolean;
   onAuthRequest?: () => void;
   userTaste?: UserTaste;
-}> = ({ filters, onUpdate, isGuest, onAuthRequest, userTaste }) => {
+  graphNodes?: Node[];
+}> = ({ filters, onUpdate, isGuest, userTaste, graphNodes }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [originMode, setOriginMode] = useState<'include' | 'exclude'>(() =>
+    filters.excludeOrigins && filters.excludeOrigins.length > 0 ? 'exclude' : 'include'
+  );
+  const [originQuery, setOriginQuery] = useState('');
+  const [isOriginDropdownOpen, setIsOriginDropdownOpen] = useState(false);
+
+  const [genreQuery, setGenreQuery] = useState('');
+  const [isGenreDropdownOpen, setIsGenreDropdownOpen] = useState(false);
+
+  const [labelQuery, setLabelQuery] = useState('');
+  const [isLabelDropdownOpen, setIsLabelDropdownOpen] = useState(false);
+  const [cachedLabelNames, setCachedLabelNames] = useState<string[]>([]);
+  const hasLoadedLabelsRef = useRef(false);
+
+  const originContainerRef = useRef<HTMLDivElement>(null);
+  const genreContainerRef = useRef<HTMLDivElement>(null);
+  const labelContainerRef = useRef<HTMLDivElement>(null);
+
+  // Sync originMode if external filters change (e.g. project load or Reset)
+  useEffect(() => {
+    if (filters.excludeOrigins && filters.excludeOrigins.length > 0) {
+      setOriginMode('exclude');
+    } else if (filters.includeOrigins && filters.includeOrigins.length > 0) {
+      setOriginMode('include');
+    }
+  }, [filters.includeOrigins, filters.excludeOrigins]);
+
+  // Load global cached labels strictly from live Firestore /labels collection once when the drawer opens
+  useEffect(() => {
+    if (!isExpanded || hasLoadedLabelsRef.current) return;
+    hasLoadedLabelsRef.current = true;
+    const fetchCachedLabels = async () => {
+      try {
+        const snap = await getDocs(collection(db, 'labels'));
+        const names: string[] = [];
+        snap.forEach(docSnap => {
+          const d = docSnap.data();
+          const rawName = d?.detailsCache?.name || d?.detailsCache?.details?.artist || d?.seedArtists || d?.labelId || d?.artistId || docSnap.id;
+          if (rawName && typeof rawName === 'string') {
+            const display = cleanLabelDisplayName(rawName);
+            if (display) {
+              names.push(display);
+            }
+          }
+        });
+        setCachedLabelNames(names);
+      } catch (err) {
+        // Non-fatal fallback to active graph label nodes
+      }
+    };
+    fetchCachedLabels();
+  }, [isExpanded]);
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (originContainerRef.current && !originContainerRef.current.contains(e.target as globalThis.Node)) {
+        setIsOriginDropdownOpen(false);
+      }
+      if (genreContainerRef.current && !genreContainerRef.current.contains(e.target as globalThis.Node)) {
+        setIsGenreDropdownOpen(false);
+      }
+      if (labelContainerRef.current && !labelContainerRef.current.contains(e.target as globalThis.Node)) {
+        setIsLabelDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const allLabelSuggestions = useMemo(() => {
+    const byNormId = new Map<string, string>();
+    const registerLabel = (raw: string) => {
+      const display = cleanLabelDisplayName(raw);
+      if (!display) return;
+      const normId = normalizeLabelId(display);
+      if (!normId) return;
+      if (!byNormId.has(normId)) {
+        byNormId.set(normId, display);
+      }
+    };
+    cachedLabelNames.forEach(registerLabel);
+    if (Array.isArray(graphNodes)) {
+      graphNodes.forEach(n => {
+        if (n.type === 'label' && (n.label || n.id)) {
+          registerLabel(n.label || n.id);
+        }
+      });
+    }
+    return Array.from(byNormId.values()).sort((a, b) => a.localeCompare(b));
+  }, [cachedLabelNames, graphNodes]);
 
   if (isGuest) {
     return null;
   }
 
-  const updateField = (field: keyof DiscoveryFilters, value: any) => {
-    onUpdate({ ...filters, [field]: value });
-  };
-
   const activeProfiles = Array.isArray(userTaste) ? userTaste.filter(p => p.isActive) : [];
-  const hasTasteData = activeProfiles.length > 0 && activeProfiles.some(p => 
+  const hasTasteData = activeProfiles.length > 0 && activeProfiles.some(p =>
     p.style?.trim() ||
     p.favoriteGenre?.trim() ||
     p.favoriteOrigin?.trim() ||
@@ -168,49 +257,213 @@ const DiscoveryFiltersPanel: React.FC<{
     const origins = new Set<string>();
 
     active.forEach(p => {
-      if (p.eraMin !== null) {
-        minEra = minEra === undefined ? p.eraMin : Math.min(minEra, p.eraMin);
+      if (p.eraMin !== null && p.eraMin !== undefined) {
+        const clamped = Math.max(ERA_MIN_BOUND, Math.min(ERA_MAX_BOUND, p.eraMin));
+        minEra = minEra === undefined ? clamped : Math.min(minEra, clamped);
       }
-      if (p.eraMax !== null) {
-        maxEra = maxEra === undefined ? p.eraMax : Math.max(maxEra, p.eraMax);
+      if (p.eraMax !== null && p.eraMax !== undefined) {
+        const clamped = Math.max(ERA_MIN_BOUND, Math.min(ERA_MAX_BOUND, p.eraMax));
+        maxEra = maxEra === undefined ? clamped : Math.max(maxEra, clamped);
       }
-      if (p.favoriteGenre?.trim()) genres.add(p.favoriteGenre.trim());
-      if (p.favoriteOrigin?.trim()) origins.add(p.favoriteOrigin.trim());
+      if (p.favoriteGenre?.trim()) {
+        const match = CANONICAL_GENRES_FLAT.find(g => g.toLowerCase() === p.favoriteGenre!.trim().toLowerCase());
+        if (match) genres.add(match);
+      }
+      if (p.favoriteOrigin?.trim()) {
+        const match = CANONICAL_COUNTRIES_22.find(c => c.toLowerCase() === p.favoriteOrigin!.trim().toLowerCase());
+        if (match) origins.add(match);
+      }
     });
 
+    const resolvedMin = minEra !== undefined || maxEra !== undefined ? (minEra ?? ERA_MIN_BOUND) : undefined;
+    const resolvedMax = minEra !== undefined || maxEra !== undefined ? (maxEra ?? ERA_MAX_BOUND) : undefined;
+    const isUnfilteredEra = resolvedMin === ERA_MIN_BOUND && resolvedMax === ERA_MAX_BOUND;
+
+    setOriginMode('include');
     onUpdate({
       ...filters,
-      foundedAfter: minEra,
-      foundedBefore: maxEra,
+      foundedAfter: isUnfilteredEra ? undefined : resolvedMin,
+      foundedBefore: isUnfilteredEra ? undefined : resolvedMax,
       includeGenres: genres.size > 0 ? Array.from(genres) : undefined,
       includeOrigins: origins.size > 0 ? Array.from(origins) : undefined,
+      excludeOrigins: undefined,
     });
   };
 
-  const hasActiveFilters = filters.foundedAfter || 
-                          filters.foundedBefore ||
-                          (filters.includeGenres && filters.includeGenres.length > 0) ||
-                          (filters.includeOrigins && filters.includeOrigins.length > 0) || 
-                          (filters.excludeOrigins && filters.excludeOrigins.length > 0) || 
-                          filters.additionalInstructions;
+  // --- Tier 2: Era Range (1965 - 2026) ---
+  const isEraActive = filters.foundedAfter !== undefined || filters.foundedBefore !== undefined;
+  const minEraVal = filters.foundedAfter !== undefined
+    ? Math.max(ERA_MIN_BOUND, Math.min(ERA_MAX_BOUND, Number(filters.foundedAfter)))
+    : ERA_MIN_BOUND;
+  const maxEraVal = filters.foundedBefore !== undefined
+    ? Math.max(ERA_MIN_BOUND, Math.min(ERA_MAX_BOUND, Number(filters.foundedBefore)))
+    : ERA_MAX_BOUND;
+
+  const handleEraRangeChange = (nextMin: number, nextMax: number) => {
+    const clampedMin = Math.max(ERA_MIN_BOUND, Math.min(nextMin, nextMax));
+    const clampedMax = Math.min(ERA_MAX_BOUND, Math.max(nextMin, nextMax));
+
+    // Locked Design Refinement: Unfiltered ONLY when BOTH thumbs rest at outer bounds (1965 and 2026).
+    // Moving either thumb inward passes both foundedAfter and foundedBefore so both bounds are enforced.
+    if (clampedMin === ERA_MIN_BOUND && clampedMax === ERA_MAX_BOUND) {
+      onUpdate({
+        ...filters,
+        foundedAfter: undefined,
+        foundedBefore: undefined,
+      });
+    } else {
+      onUpdate({
+        ...filters,
+        foundedAfter: clampedMin,
+        foundedBefore: clampedMax,
+      });
+    }
+  };
+
+  const handleResetEra = () => {
+    onUpdate({
+      ...filters,
+      foundedAfter: undefined,
+      foundedBefore: undefined,
+    });
+  };
+
+  const eraSpan = ERA_MAX_BOUND - ERA_MIN_BOUND;
+  const minPercent = ((minEraVal - ERA_MIN_BOUND) / eraSpan) * 100;
+  const maxPercent = ((maxEraVal - ERA_MIN_BOUND) / eraSpan) * 100;
+
+  // --- Tier 2: Country Origins (Include | Exclude Toggle + 22-Country Multi-Select) ---
+  const selectedOrigins = originMode === 'include'
+    ? (filters.includeOrigins || [])
+    : (filters.excludeOrigins || []);
+
+  const handleOriginModeToggle = (nextMode: 'include' | 'exclude') => {
+    if (nextMode === originMode) return;
+    const currentList = originMode === 'include'
+      ? (filters.includeOrigins || [])
+      : (filters.excludeOrigins || []);
+    setOriginMode(nextMode);
+    if (nextMode === 'include') {
+      onUpdate({
+        ...filters,
+        includeOrigins: currentList.length > 0 ? currentList : undefined,
+        excludeOrigins: undefined,
+      });
+    } else {
+      onUpdate({
+        ...filters,
+        excludeOrigins: currentList.length > 0 ? currentList : undefined,
+        includeOrigins: undefined,
+      });
+    }
+  };
+
+  const handleAddOrigin = (country: string) => {
+    if (selectedOrigins.includes(country)) return;
+    const next = [...selectedOrigins, country];
+    if (originMode === 'include') {
+      onUpdate({ ...filters, includeOrigins: next, excludeOrigins: undefined });
+    } else {
+      onUpdate({ ...filters, excludeOrigins: next, includeOrigins: undefined });
+    }
+    setOriginQuery('');
+  };
+
+  const handleRemoveOrigin = (country: string) => {
+    const next = selectedOrigins.filter(c => c !== country);
+    if (originMode === 'include') {
+      onUpdate({ ...filters, includeOrigins: next.length > 0 ? next : undefined, excludeOrigins: undefined });
+    } else {
+      onUpdate({ ...filters, excludeOrigins: next.length > 0 ? next : undefined, includeOrigins: undefined });
+    }
+  };
+
+  const filteredCountries = CANONICAL_COUNTRIES_22.filter(c =>
+    !selectedOrigins.includes(c) &&
+    c.toLowerCase().includes(originQuery.trim().toLowerCase())
+  );
+
+  // --- Tier 3: Canonical Genres (Searchable Multi-Select) ---
+  const selectedGenres = filters.includeGenres || [];
+
+  const handleAddGenre = (genre: string) => {
+    if (selectedGenres.includes(genre)) return;
+    onUpdate({ ...filters, includeGenres: [...selectedGenres, genre] });
+    setGenreQuery('');
+  };
+
+  const handleRemoveGenre = (genre: string) => {
+    const next = selectedGenres.filter(g => g !== genre);
+    onUpdate({ ...filters, includeGenres: next.length > 0 ? next : undefined });
+  };
+
+  // --- Tier 3: Anchor Labels (Creatable Combobox) ---
+  const selectedLabels = filters.anchorLabels || [];
+  const sanitizedTypedLabel = sanitizeAnchorLabelInput(labelQuery);
+  const cleanedTypedLabel = cleanLabelDisplayName(sanitizedTypedLabel) || sanitizedTypedLabel;
+
+  const handleAddLabel = (rawLabel: string) => {
+    const sanitized = sanitizeAnchorLabelInput(rawLabel);
+    const clean = cleanLabelDisplayName(sanitized) || sanitized;
+    if (!clean) return;
+    const cleanNorm = normalizeLabelId(clean);
+    if (selectedLabels.some(l => normalizeLabelId(l) === cleanNorm || l.toLowerCase() === clean.toLowerCase())) {
+      setLabelQuery('');
+      return;
+    }
+    onUpdate({ ...filters, anchorLabels: [...selectedLabels, clean] });
+    setLabelQuery('');
+    setIsLabelDropdownOpen(false);
+  };
+
+  const handleRemoveLabel = (label: string) => {
+    const next = selectedLabels.filter(l => l !== label);
+    onUpdate({ ...filters, anchorLabels: next.length > 0 ? next : undefined });
+  };
+
+  const filteredLabelSuggestions = allLabelSuggestions.filter(l => {
+    const lNorm = normalizeLabelId(l);
+    if (selectedLabels.some(sel => normalizeLabelId(sel) === lNorm || sel.toLowerCase() === l.toLowerCase())) {
+      return false;
+    }
+    return l.toLowerCase().includes(sanitizedTypedLabel.toLowerCase()) ||
+      lNorm.includes(normalizeLabelId(sanitizedTypedLabel));
+  }).slice(0, 25);
+
+  const canCreateCustomLabel = cleanedTypedLabel.length > 0 &&
+    !selectedLabels.some(sel => normalizeLabelId(sel) === normalizeLabelId(cleanedTypedLabel) || sel.toLowerCase() === cleanedTypedLabel.toLowerCase()) &&
+    !allLabelSuggestions.some(s => normalizeLabelId(s) === normalizeLabelId(cleanedTypedLabel) || s.toLowerCase() === cleanedTypedLabel.toLowerCase());
+
+  const hasActiveFilters = hasActiveDiscoveryFilters(filters);
+  const activeAnchorCount =
+    (isEraActive ? 1 : 0) +
+    selectedOrigins.length +
+    selectedGenres.length +
+    selectedLabels.length;
 
   return (
     <div className="px-4 mb-2">
       <button
+        type="button"
         onClick={() => setIsExpanded(!isExpanded)}
         className="flex items-center gap-2 text-[10px] font-medium text-zinc-500 hover:text-zinc-300 transition-colors uppercase tracking-widest group"
       >
         <span className={`material-symbols-outlined !text-sm transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
           expand_more
         </span>
-        Anchors
+        <span>Anchors</span>
+        {hasActiveFilters && (
+          <span className="px-1.5 py-0.5 text-[9px] font-mono bg-primary/15 text-primary border border-primary/30 rounded-md leading-none">
+            {activeAnchorCount}
+          </span>
+        )}
         {hasActiveFilters && !isExpanded && (
           <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
         )}
       </button>
 
       {isExpanded && (
-        <div className="mt-3 p-4 rounded-none bg-zinc-800/30 border border-zinc-700/50 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+        <div className="mt-3 p-4 rounded-none bg-zinc-800/30 border border-zinc-700/50 space-y-5 animate-in fade-in slide-in-from-top-2 duration-300">
           {hasTasteData && (
             <button
               type="button"
@@ -220,77 +473,353 @@ const DiscoveryFiltersPanel: React.FC<{
               Apply Style
             </button>
           )}
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-medium text-zinc-500 uppercase tracking-widest block">Founded Era Range (Years)</label>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
+
+          {/* ── TIER 2: SPATIAL & TEMPORAL GUARDRAILS ────────────────────── */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-1.5">
+              <span className="text-[9px] font-mono uppercase tracking-widest text-zinc-400">
+                Hard Guardrails
+              </span>
+            </div>
+
+            {/* 1. Dual-Thumb Era Range Slider (1965 – 2026) */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-medium text-zinc-400 uppercase tracking-widest">
+                  Founded
+                </label>
+                <div className="flex items-center gap-2">
+                  <span className={`text-[11px] font-mono ${isEraActive ? 'text-primary font-semibold' : 'text-zinc-500'}`}>
+                    {isEraActive ? `${minEraVal} – ${maxEraVal}` : `${ERA_MIN_BOUND} – ${ERA_MAX_BOUND}`}
+                  </span>
+                  {isEraActive && (
+                    <button
+                      type="button"
+                      onClick={handleResetEra}
+                      className="text-[9px] font-mono uppercase tracking-wider text-zinc-400 hover:text-white px-1.5 py-0.5 rounded bg-zinc-800/80 hover:bg-zinc-700 transition-colors"
+                      title="Reset Founded range to 1965 – 2026"
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="relative h-6 flex items-center select-none pt-1">
+                <div className="w-full h-1.5 bg-zinc-950 border border-zinc-800 rounded-full relative overflow-hidden">
+                  <div
+                    className={`absolute top-0 bottom-0 rounded-full transition-colors ${isEraActive ? 'bg-primary' : 'bg-zinc-600/50'}`}
+                    style={{ left: `${minPercent}%`, width: `${Math.max(0, maxPercent - minPercent)}%` }}
+                  />
+                </div>
                 <input
-                  type="number"
-                  placeholder="Min Year"
-                  value={filters.foundedAfter || ''}
-                  onChange={(e) => updateField('foundedAfter', e.target.value ? parseInt(e.target.value) : undefined)}
-                  className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  type="range"
+                  min={ERA_MIN_BOUND}
+                  max={ERA_MAX_BOUND}
+                  step={1}
+                  value={minEraVal}
+                  aria-label="Minimum Founded Year"
+                  onChange={(e) => {
+                    const val = Math.min(Number(e.target.value), maxEraVal);
+                    handleEraRangeChange(val, maxEraVal);
+                  }}
+                  className="absolute inset-0 w-full h-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-primary [&::-webkit-slider-thumb]:cursor-grab [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:w-3.5 [&::-moz-range-thumb]:h-3.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-primary [&::-moz-range-thumb]:cursor-grab"
+                  style={{ zIndex: minEraVal > ERA_MAX_BOUND - 5 ? 5 : 3 }}
+                />
+                <input
+                  type="range"
+                  min={ERA_MIN_BOUND}
+                  max={ERA_MAX_BOUND}
+                  step={1}
+                  value={maxEraVal}
+                  aria-label="Maximum Founded Year"
+                  onChange={(e) => {
+                    const val = Math.max(Number(e.target.value), minEraVal);
+                    handleEraRangeChange(minEraVal, val);
+                  }}
+                  className="absolute inset-0 w-full h-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-primary [&::-webkit-slider-thumb]:cursor-grab [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:w-3.5 [&::-moz-range-thumb]:h-3.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-primary [&::-moz-range-thumb]:cursor-grab"
+                  style={{ zIndex: 4 }}
                 />
               </div>
-              <div className="space-y-1">
+              <div className="flex justify-between text-[9px] font-mono text-zinc-600">
+                <span>{ERA_MIN_BOUND}</span>
+                <span>1980</span>
+                <span>1995</span>
+                <span>2010</span>
+                <span>{ERA_MAX_BOUND}</span>
+              </div>
+            </div>
+
+            {/* 2. Origins (Include | Exclude Toggle + 22-Country Multi-Select) */}
+            <div className="space-y-2" ref={originContainerRef}>
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-medium text-zinc-400 uppercase tracking-widest">
+                  Origins
+                </label>
+                <div className="inline-flex rounded-lg bg-zinc-950 p-0.5 border border-zinc-800">
+                  <button
+                    type="button"
+                    onClick={() => handleOriginModeToggle('include')}
+                    className={`px-2 py-0.5 text-[9px] font-mono uppercase tracking-wider rounded-md transition-colors ${
+                      originMode === 'include'
+                        ? 'bg-zinc-800 text-white font-semibold'
+                        : 'text-zinc-500 hover:text-zinc-300'
+                    }`}
+                  >
+                    Include
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOriginModeToggle('exclude')}
+                    className={`px-2 py-0.5 text-[9px] font-mono uppercase tracking-wider rounded-md transition-colors ${
+                      originMode === 'exclude'
+                        ? 'bg-red-950/80 text-red-300 font-semibold'
+                        : 'text-zinc-500 hover:text-zinc-300'
+                    }`}
+                  >
+                    Exclude
+                  </button>
+                </div>
+              </div>
+
+              {selectedOrigins.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedOrigins.map(country => (
+                    <span
+                      key={country}
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-medium border ${
+                        originMode === 'exclude'
+                          ? 'bg-red-950/40 border-red-800/50 text-red-200'
+                          : 'bg-zinc-900 border-zinc-700 text-zinc-200'
+                      }`}
+                    >
+                      {originMode === 'exclude' && <span className="text-red-400 font-mono text-[10px]">−</span>}
+                      {country}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveOrigin(country)}
+                        className="text-zinc-400 hover:text-white ml-0.5 leading-none"
+                        aria-label={`Remove ${country}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <div className="relative">
                 <input
-                  type="number"
-                  placeholder="Max Year"
-                  value={filters.foundedBefore || ''}
-                  onChange={(e) => updateField('foundedBefore', e.target.value ? parseInt(e.target.value) : undefined)}
-                  className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  autoComplete="off"
+                  data-1p-ignore="true"
+                  data-lpignore="true"
+                  type="text"
+                  placeholder="Select origins..."
+                  value={originQuery}
+                  onFocus={() => setIsOriginDropdownOpen(true)}
+                  onChange={(e) => {
+                    setOriginQuery(e.target.value);
+                    setIsOriginDropdownOpen(true);
+                  }}
+                  className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-1.5 text-xs text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
                 />
+                {isOriginDropdownOpen && (
+                  <div className="absolute z-30 mt-1 w-full max-h-44 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-xl py-1">
+                    {filteredCountries.length > 0 ? (
+                      filteredCountries.map(country => (
+                        <button
+                          key={country}
+                          type="button"
+                          onClick={() => handleAddOrigin(country)}
+                          className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors flex items-center justify-between"
+                        >
+                          <span>{country}</span>
+                          <span className="text-[9px] font-mono text-zinc-500">
+                            {originMode === 'include' ? '+ Include' : '− Exclude'}
+                          </span>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-3 py-2 text-[11px] text-zinc-500">No matching canonical countries</div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-medium text-zinc-500 uppercase tracking-widest block">Include Genres</label>
-            <input autoComplete="off" data-1p-ignore="true" data-lpignore="true"
-              type="text"
-              placeholder="e.g. Hardcore Punk, Grunge"
-              value={filters.includeGenres?.join(', ') || ''}
-              onChange={(e) => updateField('includeGenres', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
-              className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
-            />
+          {/* ── TIER 3: SOFT SCENE GRAVITY (Rule 41) ────────────────────── */}
+          <div className="space-y-4 pt-1">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-1.5">
+              <span className="text-[9px] font-mono uppercase tracking-widest text-zinc-400">
+                Scene Gravity
+              </span>
+            </div>
+
+            {/* 3. Genres (Searchable Multi-Select) */}
+            <div className="space-y-2" ref={genreContainerRef}>
+              <label className="text-[10px] font-medium text-zinc-400 uppercase tracking-widest block">
+                Genres
+              </label>
+
+              {selectedGenres.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedGenres.map(genre => (
+                    <span
+                      key={genre}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-medium bg-zinc-900 border border-zinc-700 text-zinc-200"
+                    >
+                      {genre}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveGenre(genre)}
+                        className="text-zinc-400 hover:text-white ml-0.5 leading-none"
+                        aria-label={`Remove ${genre}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <div className="relative">
+                <input
+                  autoComplete="off"
+                  data-1p-ignore="true"
+                  data-lpignore="true"
+                  type="text"
+                  placeholder="Search genres..."
+                  value={genreQuery}
+                  onFocus={() => setIsGenreDropdownOpen(true)}
+                  onChange={(e) => {
+                    setGenreQuery(e.target.value);
+                    setIsGenreDropdownOpen(true);
+                  }}
+                  className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-1.5 text-xs text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+                />
+                {isGenreDropdownOpen && (
+                  <div className="absolute z-30 mt-1 w-full max-h-52 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-xl py-1">
+                    {Object.entries(CANONICAL_GENRE_TAXONOMY).map(([category, genres]) => {
+                      const matches = genres.filter(g =>
+                        !selectedGenres.includes(g) &&
+                        (g.toLowerCase().includes(genreQuery.trim().toLowerCase()) ||
+                         category.toLowerCase().includes(genreQuery.trim().toLowerCase()))
+                      );
+                      if (matches.length === 0) return null;
+                      return (
+                        <div key={category} className="py-1">
+                          <div className="px-3 py-0.5 text-[9px] font-mono uppercase tracking-wider text-zinc-500">
+                            {category}
+                          </div>
+                          {matches.map(genre => (
+                            <button
+                              key={genre}
+                              type="button"
+                              onClick={() => handleAddGenre(genre)}
+                              className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                            >
+                              {genre}
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })}
+                    {CANONICAL_GENRES_FLAT.filter(g =>
+                      !selectedGenres.includes(g) &&
+                      g.toLowerCase().includes(genreQuery.trim().toLowerCase())
+                    ).length === 0 && (
+                      <div className="px-3 py-2 text-[11px] text-zinc-500">No matching canonical genres</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 4. Labels (Creatable Combobox) */}
+            <div className="space-y-2" ref={labelContainerRef}>
+              <label className="text-[10px] font-medium text-zinc-400 uppercase tracking-widest block">
+                Labels
+              </label>
+
+              {selectedLabels.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedLabels.map(label => (
+                    <span
+                      key={label}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-medium bg-zinc-900 border border-zinc-700 text-zinc-200"
+                    >
+                      {label}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveLabel(label)}
+                        className="text-zinc-400 hover:text-white ml-0.5 leading-none"
+                        aria-label={`Remove ${label}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <div className="relative">
+                <input
+                  autoComplete="off"
+                  data-1p-ignore="true"
+                  data-lpignore="true"
+                  type="text"
+                  placeholder="Search or add label..."
+                  value={labelQuery}
+                  onFocus={() => setIsLabelDropdownOpen(true)}
+                  onChange={(e) => {
+                    setLabelQuery(e.target.value);
+                    setIsLabelDropdownOpen(true);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && cleanedTypedLabel) {
+                      e.preventDefault();
+                      handleAddLabel(cleanedTypedLabel);
+                    }
+                  }}
+                  className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-1.5 text-xs text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+                />
+                {isLabelDropdownOpen && (filteredLabelSuggestions.length > 0 || canCreateCustomLabel) && (
+                  <div className="absolute z-30 mt-1 w-full max-h-48 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-xl py-1">
+                    {canCreateCustomLabel && (
+                      <button
+                        type="button"
+                        onClick={() => handleAddLabel(cleanedTypedLabel)}
+                        className="w-full text-left px-3 py-1.5 text-xs text-primary hover:bg-zinc-800 transition-colors flex items-center justify-between border-b border-zinc-800/80"
+                      >
+                        <span>Use custom label &ldquo;{cleanedTypedLabel}&rdquo;</span>
+                        <span className="text-[9px] font-mono uppercase">Enter</span>
+                      </button>
+                    )}
+                    {filteredLabelSuggestions.map(label => (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => handleAddLabel(label)}
+                        className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-medium text-zinc-500 uppercase tracking-widest block">Include Origins</label>
-            <input autoComplete="off" data-1p-ignore="true" data-lpignore="true"
-              type="text"
-              placeholder="e.g. Canada, UK"
-              value={filters.includeOrigins?.join(', ') || ''}
-              onChange={(e) => updateField('includeOrigins', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
-              className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-medium text-zinc-500 uppercase tracking-widest block">Exclude Origins</label>
-            <input autoComplete="off" data-1p-ignore="true" data-lpignore="true"
-              type="text"
-              placeholder="e.g. Australia"
-              value={filters.excludeOrigins?.join(', ') || ''}
-              onChange={(e) => updateField('excludeOrigins', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
-              className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-medium text-zinc-500 uppercase tracking-widest block">Additional Instructions</label>
-            <textarea
-              placeholder="e.g. Only underground artists..."
-              value={filters.additionalInstructions || ''}
-              onChange={(e) => updateField('additionalInstructions', e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all min-h-[60px] resize-none"
-            />
-          </div>
-          
           {hasActiveFilters && (
-            <button 
-              onClick={() => onUpdate({})}
-              className="text-[10px] font-bold text-primary/60 hover:text-primary uppercase tracking-wider transition-colors flex items-center gap-1"
+            <button
+              type="button"
+              onClick={() => {
+                setOriginMode('include');
+                onUpdate({});
+              }}
+              className="text-[10px] font-bold text-primary/60 hover:text-primary uppercase tracking-wider transition-colors flex items-center gap-1 pt-1"
             >
               <span className="material-symbols-outlined !text-xs">restart_alt</span>
               Reset Anchors
@@ -1452,6 +1981,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
             isGuest={isGuest}
             onAuthRequest={() => { user ? onSaveToDashboard?.() : onLogin(); }}
             userTaste={profile?.taste}
+            graphNodes={data?.nodes}
           />
 
           {/* New Inline Action Button: Moving from absolute footer to inline flow */}

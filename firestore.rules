@@ -56,7 +56,7 @@ service cloud.firestore {
 
     function isValidProject(data) {
       return data.keys().hasAll(['name', 'seedArtists']) &&
-             data.keys().size() <= 24 &&
+             data.keys().size() <= 35 &&
              data.name is string && data.name.size() <= 512 &&
              data.seedArtists is string && data.seedArtists.size() <= 10000 &&
              // LEGACY full-blob fields (optional for backward compat)
@@ -73,7 +73,10 @@ service cloud.firestore {
              (!('isMagazineViewOpen' in data) || (data.isMagazineViewOpen is bool)) &&
              (!('authorId' in data) || (data.authorId is string)) &&
              (!('createdAt' in data) || (data.createdAt is timestamp)) &&
-             (!('updatedAt' in data) || (data.updatedAt is timestamp));
+             (!('updatedAt' in data) || (data.updatedAt is timestamp)) &&
+             (!('anchorResolution' in data) || (data.anchorResolution == null || data.anchorResolution is string)) &&
+             (!('generationType' in data) || (data.generationType == null || data.generationType is string)) &&
+             (!('apiUsage' in data) || (data.apiUsage == null || data.apiUsage is map));
     }
 
     function isValidStackItem(data) {
@@ -98,7 +101,8 @@ service cloud.firestore {
              data.activeNodes is list &&
              // NEW lightweight reference fields (optional)
              (!('cacheKey' in data) || (data.cacheKey is string && data.cacheKey.size() <= 512)) &&
-             (!('canvasLayout' in data) || (data.canvasLayout is string));
+             (!('canvasLayout' in data) || (data.canvasLayout is string)) &&
+             (!('anchorResolution' in data) || (data.anchorResolution == null || data.anchorResolution is string));
     }
 
     // --- Core Rules ---

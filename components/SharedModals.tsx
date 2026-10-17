@@ -1253,12 +1253,13 @@ export const FilterGuidanceModal: React.FC<{
             </div>
             
             <div className="space-y-1.5">
-              <label className="text-[10px] font-medium text-zinc-500 uppercase tracking-widest block">Additional Instructions</label>
-              <textarea
-                placeholder="e.g. Only underground artists..."
-                value={filters.additionalInstructions || ''}
-                onChange={(e) => updateField('additionalInstructions', e.target.value)}
-                className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all min-h-[60px] resize-none"
+              <label className="text-[10px] font-medium text-zinc-500 uppercase tracking-widest block">Anchor Labels</label>
+              <input autoComplete="off" data-1p-ignore="true" data-lpignore="true"
+                type="text"
+                placeholder="e.g. Sub Pop, Dischord Records"
+                value={filters.anchorLabels?.join(', ') || ''}
+                onChange={(e) => updateField('anchorLabels', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
               />
             </div>
 

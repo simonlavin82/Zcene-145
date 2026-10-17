@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { AlertCircle, AlertTriangle, X, CheckCircle2, Key } from 'lucide-react';
 import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project, ArtistCacheEntry, COST_PER_AI_CALL, CanvasNodeRef, DisambiguationCandidateStub } from './types';
 import { generateGraphData, fetchNodeDetails, resolveArtistCandidatesViaAI } from './services/geminiService';
-import { normalizeArtistId, readArtistCacheMany, readLabelCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, getEntityDocWithRedirect, getLabelDocWithRedirect, getAnyEntityDocWithRedirect, titleCaseArtistId, cleanArtistDisplayName, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema, stripUndefinedProperties, isNodeInSeedList, extractCountrySlug, triggerAssetHealing } from './services/artistCacheService';
+import { normalizeArtistId, normalizeLabelId, readArtistCacheMany, readLabelCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, getEntityDocWithRedirect, getLabelDocWithRedirect, getAnyEntityDocWithRedirect, titleCaseArtistId, cleanArtistDisplayName, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema, stripUndefinedProperties, isNodeInSeedList, extractCountrySlug, triggerAssetHealing } from './services/artistCacheService';
+import { qualifyCacheEntry, deriveRoutingDecision, CacheVerdict, RoutingDecision, hasActiveDiscoveryFilters, hasActiveTier2Filters, sanitizeDiscoveryFilters } from './services/cacheQualification';
 import { normalizeCountry } from './utils/normalization';
 import { auth, signInWithGoogle, logout, onAuthStateChanged, User, db, functions, handleFirestoreError, OperationType } from './services/firebase';
 import { translateError, translateToast } from './services/errorTranslationLayer';
@@ -421,15 +422,14 @@ const parseCsvData = (csvString: string): ParsedResult => {
 
 const filterGraphByDiscoveryFilters = (data: GraphData, filters: DiscoveryFilters, seedArtists: string): GraphData => {
   if (!data || !data.nodes || !data.links) return data || { nodes: [], links: [] };
-  if (!filters.foundedAfter && !filters.foundedBefore && (!filters.includeOrigins || filters.includeOrigins.length === 0) && (!filters.excludeOrigins || filters.excludeOrigins.length === 0) && (!filters.includeGenres || filters.includeGenres.length === 0)) return data;
+  if (!hasActiveTier2Filters(filters)) return data;
 
   const seedArtistIds = new Set(seedArtists.split('::').map(a => a.trim().toLowerCase()));
   const nodesToRemove = new Set<string>();
 
-  // Map artists to their founded years, origins, and genres from the graph
+  // Map artists to their founded years and origins from the graph
   const artistToYear = new Map<string, number>();
   const artistToOrigins = new Map<string, Set<string>>();
-  const artistToGenres = new Map<string, Set<string>>();
   const nodeMap = new Map(data.nodes.map(n => [n.id, n]));
 
   data.links.forEach(link => {
@@ -446,9 +446,6 @@ const filterGraphByDiscoveryFilters = (data: GraphData, filters: DiscoveryFilter
       } else if (targetNode?.type === 'country') {
         if (!artistToOrigins.has(sourceId.toLowerCase())) artistToOrigins.set(sourceId.toLowerCase(), new Set());
         artistToOrigins.get(sourceId.toLowerCase())!.add(targetNode.id.toLowerCase());
-      } else if (targetNode?.type === 'genre') {
-        if (!artistToGenres.has(sourceId.toLowerCase())) artistToGenres.set(sourceId.toLowerCase(), new Set());
-        artistToGenres.get(sourceId.toLowerCase())!.add(targetNode.id.toLowerCase());
       }
     } else if (targetNode?.type === 'artist') {
       if (sourceNode?.type === 'founded') {
@@ -457,54 +454,36 @@ const filterGraphByDiscoveryFilters = (data: GraphData, filters: DiscoveryFilter
       } else if (sourceNode?.type === 'country') {
         if (!artistToOrigins.has(targetId.toLowerCase())) artistToOrigins.set(targetId.toLowerCase(), new Set());
         artistToOrigins.get(targetId.toLowerCase())!.add(sourceNode.id.toLowerCase());
-      } else if (sourceNode?.type === 'genre') {
-        if (!artistToGenres.has(targetId.toLowerCase())) artistToGenres.set(targetId.toLowerCase(), new Set());
-        artistToGenres.get(targetId.toLowerCase())!.add(sourceNode.id.toLowerCase());
       }
     }
   });
 
   data.nodes.forEach(node => {
     if (node.type === 'artist' && !seedArtistIds.has(node.id.toLowerCase())) {
-      // Year Filter (Min Year)
+      // Level 2 Year Filter (Min Year — inclusive bound)
       if (filters.foundedAfter) {
         const threshold = Number(filters.foundedAfter);
         const year = artistToYear.get(node.id.toLowerCase());
-        if (year && year <= threshold) {
+        if (year !== undefined && year < threshold) {
           nodesToRemove.add(node.id);
           return;
         }
       }
 
-      // Year Filter (Max Year)
+      // Level 2 Year Filter (Max Year — inclusive bound)
       if (filters.foundedBefore) {
         const maxThreshold = Number(filters.foundedBefore);
         const year = artistToYear.get(node.id.toLowerCase());
-        if (year && year >= maxThreshold) {
+        if (year !== undefined && year > maxThreshold) {
           nodesToRemove.add(node.id);
           return;
         }
       }
 
-      // Genre Include Filter
-      if (filters.includeGenres && filters.includeGenres.length > 0) {
-        const genres = artistToGenres.get(node.id.toLowerCase());
-        const allowed = filters.includeGenres.map(g => g.toLowerCase());
-        if (genres) {
-          const hasAllowed = Array.from(genres).some(g => 
-            allowed.some(allowedGenre => g.includes(allowedGenre) || allowedGenre.includes(g))
-          );
-          if (!hasAllowed) {
-            nodesToRemove.add(node.id);
-            return;
-          }
-        } else {
-          nodesToRemove.add(node.id);
-          return;
-        }
-      }
+      // Note (Rule 41): Level 3 includeGenres and anchorLabels are Soft Scene Gravity pulls,
+      // NOT hard deletion gates. Only Level 2 Origin and Era bounds prune non-seed nodes.
 
-      // Origin Include Filter
+      // Level 2 Origin Include Filter
       if (filters.includeOrigins && filters.includeOrigins.length > 0) {
         const origins = artistToOrigins.get(node.id.toLowerCase());
         const allowed = filters.includeOrigins.map(o => o.toLowerCase());
@@ -517,7 +496,7 @@ const filterGraphByDiscoveryFilters = (data: GraphData, filters: DiscoveryFilter
         }
       }
 
-      // Origin Exclude Filter
+      // Level 2 Origin Exclude Filter
       if (filters.excludeOrigins && filters.excludeOrigins.length > 0) {
         const origins = artistToOrigins.get(node.id.toLowerCase());
         const forbidden = filters.excludeOrigins.map(o => o.toLowerCase());
@@ -575,12 +554,12 @@ const areFiltersEqual = (f1?: any, f2?: any): boolean => {
   const clean1 = f1 || {};
   const clean2 = f2 || {};
   
-  const keys = ['foundedAfter', 'foundedBefore', 'additionalInstructions'];
+  const keys = ['foundedAfter', 'foundedBefore'];
   for (const key of keys) {
     if ((clean1[key] ?? '') !== (clean2[key] ?? '')) return false;
   }
   
-  const arrayKeys = ['includeOrigins', 'excludeOrigins', 'includeGenres'];
+  const arrayKeys = ['includeOrigins', 'excludeOrigins', 'includeGenres', 'anchorLabels'];
   for (const key of arrayKeys) {
     const arr1 = Array.isArray(clean1[key]) ? clean1[key] : [];
     const arr2 = Array.isArray(clean2[key]) ? clean2[key] : [];
@@ -943,8 +922,6 @@ const validateRootsBreakdown = (rationale?: string, isSingleArtist: boolean = fa
   return lower.includes('acoustic') && lower.includes('scene') && lower.includes('overlap');
 };
 
-
-import { qualifyCacheEntry, deriveRoutingDecision, CacheVerdict, RoutingDecision } from './services/cacheQualification';
 
 const validateCacheEntry = (data: any, isSingleArtist: boolean = false): CacheValidationResult => {
   const result = qualifyCacheEntry(data);
@@ -2204,7 +2181,7 @@ const App: React.FC = () => {
     // the closure still holds the old empty Map and the lookup returns undefined — causing
     // the Token Quota modal to fire even though the data is already in memory.
     // detailsCacheRef.current is always synchronously up-to-date (synced via useEffect).
-    const simpleId = normalizeArtistId(node.id);
+    const simpleId = node.type === 'label' ? normalizeLabelId(node.label || node.id) : normalizeArtistId(node.id);
     let disambiguatedCacheId = simpleId;
     let connectedCountries: string[] = [];
     if (graphData) {
@@ -2223,7 +2200,7 @@ const App: React.FC = () => {
         .filter((no: any) => no && no.type === 'country')
         .map((no: any) => no.label || no.id);
         
-      if (connectedCountries.length > 0) {
+      if (node.type !== 'label' && connectedCountries.length > 0) {
         const countryNorm = extractCountrySlug(connectedCountries[0]);
         if (countryNorm && countryNorm !== 'global') disambiguatedCacheId = simpleId.endsWith(`-${countryNorm}`) ? simpleId : `${simpleId}-${countryNorm}`;
       }
@@ -2339,7 +2316,7 @@ const App: React.FC = () => {
     // Firestore stores detailsCache as a JSON string — parse it and unwrap any array wrapper layers.
     let globalDoc: any | null = null;
     try {
-        const standardizedId = normalizeArtistId(node.id);
+        const standardizedId = node.type === 'label' ? simpleId : normalizeArtistId(node.id);
         globalDoc = await getEntityDocWithRedirect(disambiguatedCacheId, node.type === 'label' ? 'label' : 'artist');
             
             if (globalDoc.data()?._isStub && disambiguatedCacheId !== standardizedId) {
@@ -2474,7 +2451,7 @@ const App: React.FC = () => {
     if (isNodeInGraph && !hasValidLocalDetails && (!globalDoc || !globalDoc.exists() || !globalDoc.data()?.detailsCache) && !isCurrentlyCurating) {
       const entityType = node.type === 'label' ? 'label' : 'artist';
       console.log(`[Gate B JIT Healer] Triggering on-demand heal for clicked node: ${disambiguatedCacheId} (${entityType})`);
-      triggerAssetHealing(disambiguatedCacheId, entityType).then(result => {
+      triggerAssetHealing(disambiguatedCacheId, entityType, node.label || node.id).then(result => {
         if (result?.success && result?.data) {
           if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('zcene:asset-healed', {
@@ -2652,9 +2629,11 @@ const App: React.FC = () => {
       .map((n: any) => normalizeArtistId(n.id));
     const labelEntityIds = graphData.nodes
       .filter((n: any) => n.type === 'label')
-      .map((n: any) => normalizeArtistId(n.id));
+      .map((n: any) => normalizeLabelId(n.label || n.id));
     const normalizedIds = seedList.map((name: string) => normalizeArtistId(name));
 
+    // Rule 36: Worker-owned telemetry fields (generationType, apiUsage, anchorResolution)
+    // are intentionally omitted from client auto-saves to preserve backend authority.
     const basePayload: Record<string, any> = {
       name: (projectName && projectName !== seedList[0]) 
         ? projectName 
@@ -3014,15 +2993,8 @@ const App: React.FC = () => {
       graphToEnhance = null;
     }
 
-    const activeDiscoveryFilters = overrideFilters || discoveryFilters;
-    const hasActiveFilters = !!(
-      activeDiscoveryFilters.foundedAfter ||
-      activeDiscoveryFilters.foundedBefore ||
-      (activeDiscoveryFilters.includeOrigins && activeDiscoveryFilters.includeOrigins.length > 0) ||
-      (activeDiscoveryFilters.excludeOrigins && activeDiscoveryFilters.excludeOrigins.length > 0) ||
-      (activeDiscoveryFilters.includeGenres && activeDiscoveryFilters.includeGenres.length > 0) ||
-      (activeDiscoveryFilters.additionalInstructions && activeDiscoveryFilters.additionalInstructions.trim().length > 0)
-    );
+    const activeDiscoveryFilters = sanitizeDiscoveryFilters(overrideFilters || discoveryFilters);
+    const hasActiveFilters = hasActiveDiscoveryFilters(activeDiscoveryFilters);
     const isLiveSynthesisTemp = hasActiveFilters || (rawArtists.split('::').map(s => s.trim()).filter(Boolean).length > 1);
     const isSandboxMode = isLiveSynthesisTemp;
 
@@ -3070,14 +3042,7 @@ const App: React.FC = () => {
     }
 
     try {
-      const hasActiveFilters = !!(
-        activeDiscoveryFilters.foundedAfter ||
-        activeDiscoveryFilters.foundedBefore ||
-        (activeDiscoveryFilters.includeOrigins && activeDiscoveryFilters.includeOrigins.length > 0) ||
-        (activeDiscoveryFilters.excludeOrigins && activeDiscoveryFilters.excludeOrigins.length > 0) ||
-        (activeDiscoveryFilters.includeGenres && activeDiscoveryFilters.includeGenres.length > 0) ||
-        (activeDiscoveryFilters.additionalInstructions && activeDiscoveryFilters.additionalInstructions.trim().length > 0)
-      );
+      const hasActiveFilters = hasActiveDiscoveryFilters(activeDiscoveryFilters);
 
       const isLiveSynthesis = hasActiveFilters || artistList.length > 1;
 
@@ -3375,14 +3340,7 @@ const App: React.FC = () => {
 
       if (hasDisambiguated) {
         const newArtistsStr = resolvedArtistSeeds.join('::');
-        const hasActiveFiltersNext = !!(
-          activeDiscoveryFilters.foundedAfter ||
-          activeDiscoveryFilters.foundedBefore ||
-          (activeDiscoveryFilters.includeOrigins && activeDiscoveryFilters.includeOrigins.length > 0) ||
-          (activeDiscoveryFilters.excludeOrigins && activeDiscoveryFilters.excludeOrigins.length > 0) ||
-          (activeDiscoveryFilters.includeGenres && activeDiscoveryFilters.includeGenres.length > 0) ||
-          (activeDiscoveryFilters.additionalInstructions && activeDiscoveryFilters.additionalInstructions.trim().length > 0)
-        );
+        const hasActiveFiltersNext = hasActiveDiscoveryFilters(activeDiscoveryFilters);
         const isCustomNext = resolvedArtistSeeds.length > 1 || hasActiveFiltersNext;
         const allKnownCacheHits = cacheCandidatesPerSeed.length > 0 && cacheCandidatesPerSeed.every(s => s.isKnownCacheHit);
         const nextSkipCacheLookup = !allKnownCacheHits;
@@ -3572,14 +3530,7 @@ const App: React.FC = () => {
     // cached and which are missing — then only call Gemini for the missing ones.
     let fullCacheHit = false;
 
-    const isCustomSpiderweb = artistList.length > 1 || !!(
-      activeDiscoveryFilters.foundedAfter ||
-      activeDiscoveryFilters.foundedBefore ||
-      (activeDiscoveryFilters.includeOrigins && activeDiscoveryFilters.includeOrigins.length > 0) ||
-      (activeDiscoveryFilters.excludeOrigins && activeDiscoveryFilters.excludeOrigins.length > 0) ||
-      (activeDiscoveryFilters.includeGenres && activeDiscoveryFilters.includeGenres.length > 0) ||
-      (activeDiscoveryFilters.additionalInstructions && activeDiscoveryFilters.additionalInstructions.trim().length > 0)
-    );
+    const isCustomSpiderweb = artistList.length > 1 || hasActiveDiscoveryFilters(activeDiscoveryFilters);
 
     try {
       let cached = new Map<string, ArtistCacheEntry>();
@@ -4805,14 +4756,7 @@ const App: React.FC = () => {
             ...healedDetailsCacheRef.current,
             ...detailsCache
           ] as [string, NodeDetails][]);
-          const hasActiveFilters = !!(
-            activeDiscoveryFilters.foundedAfter ||
-            activeDiscoveryFilters.foundedBefore ||
-            (activeDiscoveryFilters.includeOrigins && activeDiscoveryFilters.includeOrigins.length > 0) ||
-            (activeDiscoveryFilters.excludeOrigins && activeDiscoveryFilters.excludeOrigins.length > 0) ||
-            (activeDiscoveryFilters.includeGenres && activeDiscoveryFilters.includeGenres.length > 0) ||
-            (activeDiscoveryFilters.additionalInstructions && activeDiscoveryFilters.additionalInstructions.trim().length > 0)
-          );
+          const hasActiveFilters = hasActiveDiscoveryFilters(activeDiscoveryFilters);
           const isMultiSeed = artists.includes('::');
 
           if (isMultiSeed || hasActiveFilters) {
@@ -5181,7 +5125,8 @@ const App: React.FC = () => {
           activeJobId: data.activeJobId,
           authorId: data.authorId,
           generationType: data.generationType,
-          apiUsage: data.apiUsage
+          apiUsage: data.apiUsage,
+          anchorResolution: data.anchorResolution
         });
       });
       setProjects(projs);
@@ -5205,7 +5150,7 @@ const App: React.FC = () => {
     const results = new Map<string, NodeDetails>();
 
     await Promise.allSettled(artistNodes.map(async (n: any) => {
-      const simpleId = normalizeArtistId(n.id);
+      const simpleId = n.type === 'label' ? normalizeLabelId(n.label || n.id) : normalizeArtistId(n.id);
 
       // Find connected countries in the graph links
       const connectedCountries = links
@@ -5224,7 +5169,7 @@ const App: React.FC = () => {
         .map((no: any) => no.label || no.id);
 
       let cacheId = simpleId;
-      if (connectedCountries.length > 0) {
+      if (n.type !== 'label' && connectedCountries.length > 0) {
         const countryNorm = extractCountrySlug(connectedCountries[0]);
         if (countryNorm && countryNorm !== 'global') {
           cacheId = simpleId.endsWith(`-${countryNorm}`) ? simpleId : `${simpleId}-${countryNorm}`;
@@ -5289,7 +5234,7 @@ const App: React.FC = () => {
           // once Column 3 has fully completed and released the lock.
           const entityType = n.type === 'label' ? 'label' : 'artist';
           console.log(`[Gate A JIT Healer] Triggering silent heal for orphaned graph node: ${cacheId} (${entityType})`);
-          triggerAssetHealing(cacheId, entityType).then(result => {
+          triggerAssetHealing(cacheId, entityType, n.label || n.id).then(result => {
             if (result?.success && result?.data) {
               if (typeof window !== 'undefined') {
                 window.dispatchEvent(new CustomEvent('zcene:asset-healed', {
@@ -5673,14 +5618,7 @@ const App: React.FC = () => {
                 console.warn("Failed to parse incoming discoveryFilters:", e);
               }
             }
-            const hasActiveFiltersIncoming = !!(
-              parsedFilters.foundedAfter ||
-              parsedFilters.foundedBefore ||
-              (parsedFilters.includeOrigins && parsedFilters.includeOrigins.length > 0) ||
-              (parsedFilters.excludeOrigins && parsedFilters.excludeOrigins.length > 0) ||
-              (parsedFilters.includeGenres && parsedFilters.includeGenres.length > 0) ||
-              (parsedFilters.additionalInstructions && parsedFilters.additionalInstructions.trim().length > 0)
-            );
+            const hasActiveFiltersIncoming = hasActiveDiscoveryFilters(parsedFilters);
             const isMultiArtistIncoming = (data.seedArtists && data.seedArtists.includes('::'));
 
             if (isMultiArtistIncoming || hasActiveFiltersIncoming) {
