@@ -19,8 +19,10 @@ catch (e) {
     // Ignore if already set by another function module
 }
 /**
- * Sanity Check: Validate that detailsCache is a structured object matching the schema,
- * and specifically reject raw strings or arrays of entries to prevent database pollution.
+ * Sanity Check (Architecture V31 / Rule 8 & Rule 40):
+ * Validate that detailsCache is a structured object matching the V31 schema,
+ * and specifically reject raw strings, arrays, empty discographies, or prose-fallback stubs
+ * to prevent database pollution.
  */
 function validateArtistDetailsSchema(artistId, details) {
     if (!details) {
@@ -32,28 +34,40 @@ function validateArtistDetailsSchema(artistId, details) {
     if (Array.isArray(details)) {
         throw new Error(`[Schema Sanity Check] detailsCache is an array instead of a structured object for artist: ${artistId}`);
     }
+    // Allow explicit primary-seed emergency JIT stub fallback (Rule 17)
+    if (details._isStub === true) {
+        return;
+    }
     // Verify biography/summary
     const bio = details.summary || details.bio;
-    if (!bio || typeof bio !== 'string' || bio.trim().length < 5) {
-        throw new Error(`[Schema Sanity Check] detailsCache is missing summary for artist: ${artistId}`);
+    if (!bio || typeof bio !== 'string' || bio.trim().length <= 50) {
+        throw new Error(`[Schema Sanity Check] detailsCache is missing or has short summary (<= 50 chars) for artist: ${artistId}`);
     }
     // Verify details object
     if (!details.details || typeof details.details !== 'object') {
         throw new Error(`[Schema Sanity Check] detailsCache.details is missing or invalid for artist: ${artistId}`);
     }
     const { genre, origin, founded } = details.details;
-    if (genre === undefined || genre === null || typeof genre !== 'string') {
+    if (!genre || typeof genre !== 'string' || !genre.trim()) {
         throw new Error(`[Schema Sanity Check] detailsCache.details is missing genre for artist: ${artistId}`);
     }
-    if (origin === undefined || origin === null || typeof origin !== 'string') {
+    if (!origin || typeof origin !== 'string' || !origin.trim()) {
         throw new Error(`[Schema Sanity Check] detailsCache.details is missing origin for artist: ${artistId}`);
     }
-    if (founded === undefined || founded === null || typeof founded !== 'string') {
+    if (!founded || typeof founded !== 'string' || !founded.trim()) {
         throw new Error(`[Schema Sanity Check] detailsCache.details is missing founded year for artist: ${artistId}`);
     }
-    // Verify discography
-    if (!details.discography || !Array.isArray(details.discography)) {
-        throw new Error(`[Schema Sanity Check] detailsCache.discography is missing or not an array for artist: ${artistId}`);
+    // Verify discography (Rule 40: must be a non-empty array >= 1 album for artists)
+    if (!details.discography || !Array.isArray(details.discography) || details.discography.length === 0) {
+        throw new Error(`[Schema Sanity Check / Rule 40] detailsCache.discography is missing or empty ([]) for artist: ${artistId}`);
+    }
+    // Verify recommendationReason (Rule 40: forbid grounding prose fallback)
+    const recReason = String(details.recommendationReason || '').trim();
+    if (!recReason || recReason.toLowerCase().includes('synthesised from live cultural archives')) {
+        throw new Error(`[Schema Sanity Check / Rule 40] detailsCache.recommendationReason is missing or contains forbidden prose fallback for artist: ${artistId}`);
+    }
+    if (!(0, cacheQualification_1.isFullyQualifiedEntityProfile)(details, false)) {
+        throw new Error(`[Schema Sanity Check / Rule 40] detailsCache failed V31 isFullyQualifiedEntityProfile check for artist: ${artistId}`);
     }
 }
 /**
@@ -115,6 +129,7 @@ function sanitizeLabelProfile(details) {
         details: cleanDetails,
         discography: Array.isArray(parsed.discography) ? parsed.discography : [],
         links: Array.isArray(parsed.links) ? parsed.links : [],
+        recommendationReason: parsed.recommendationReason || "",
     };
 }
 /**
@@ -326,7 +341,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         seedNamesMap[seed.toLowerCase()] ||
                         seedNamesMap[stripCountrySlug(seedNorm)] ||
                         stripCountrySlug(seed);
-                    if (cachedDetails && cachedDetails.summary && cachedDetails.summary.length > 50 && cachedDetails.details?.genre && cachedDetails.imageUrl) {
+                    if ((0, cacheQualification_1.isFullyQualifiedEntityProfile)(cachedDetails, false)) {
                         console.log(`[Phase 1] Cache Hit for seed: ${seed}`);
                         resolvedSeedArray.push({
                             id: seedNorm,
@@ -510,22 +525,17 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                                 cachedDetails = Array.isArray(cachedDetails[0]) ? cachedDetails[0][1] : cachedDetails[0];
                                             }
                                         }
-                                        // Universal Cache Validation: A cached document is only a valid hit if it is
-                                        // truly complete — it must have a meaningful summary AND a genre AND an imageUrl.
-                                        // Any entity missing imageUrl or genre is considered a stale stub and must be
-                                        // re-routed through full Gemini hydration and iTunes scraping. This rule applies
-                                        // equally to seeds and deep cuts — no special-case flags needed.
-                                        const isCacheComplete = (cachedDetails &&
-                                            cachedDetails.summary &&
-                                            cachedDetails.summary.length > 50 &&
-                                            cachedDetails.details?.genre &&
-                                            (isLabel || cachedDetails.imageUrl));
+                                        // Architecture V31 (Rule 8 & Rule 40) Universal Cache Validation:
+                                        // A cached document is only a valid hit if it satisfies isFullyQualifiedEntityProfile
+                                        // (summary > 50 chars, genre, origin, founded, non-empty discography >= 1 album for artists,
+                                        // authentic recommendationReason free of prose-fallback text, and non-empty imageUrl).
+                                        const isCacheComplete = (0, cacheQualification_1.isFullyQualifiedEntityProfile)(cachedDetails, isLabel);
                                         if (isCacheComplete) {
                                             details = cachedDetails;
                                             console.log(`[Curation Backend] Direct cache hit (complete) for details of: ${artistNormId}`);
                                         }
                                         else if (cachedDetails) {
-                                            console.log(`[Curation Backend] Cache doc found but incomplete (missing imageUrl or genre) for: ${artistNormId}. Routing to full hydration.`);
+                                            console.log(`[Curation Backend] Cache doc found but failed V31 qualification gate for: ${artistNormId}. Routing to full hydration.`);
                                         }
                                     }
                                 }
@@ -545,25 +555,15 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         if (details && details.details && details.details.artist && details.details.artist !== rawName) {
                             searchArtistName = seedNamesMap[artistNormId] || details.details.artist;
                         }
-                        if (!details) {
-                            requiresTextHydration = true;
-                            requiresImageScraping = true;
-                            requiresVideoScraping = true;
-                        }
-                        else if (details.summary === "Imported from Apple Music library." ||
-                            details.summary.length <= 50 ||
-                            !details.details?.genre ||
-                            details.summary.includes("Mock Bio") ||
-                            (!details.imageUrl && !isLabel)) {
-                            // Stub node (e.g. from frontend library import or test seed) or missing image -> Full Hydration
+                        if (!details || !(0, cacheQualification_1.isFullyQualifiedEntityProfile)(details, isLabel)) {
                             requiresTextHydration = true;
                             requiresImageScraping = true;
                             requiresVideoScraping = true;
                         }
                         else {
                             // Complete canonical cache hit -> STRICT BYPASS
-                            // We do not mutate or re-scrape existing global records.
-                            // However, we MUST check if it's missing assets due to a past failure.
+                            // Note: details.imageUrl is guaranteed non-empty (either https:// or terminal 'not-found'
+                            // after a verified 4-tier discography scrape). We do not mutate or re-scrape existing global records.
                             let isReadOnly = true;
                             if (!details.imageUrl && !isLabel) {
                                 requiresImageScraping = true;
@@ -1592,7 +1592,10 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     // Run Sanity Check — non-fatal: log and skip this recommendation's cache write rather than aborting the entire job
                     try {
                         if (!isLabel && recDetails) {
-                            validateArtistDetailsSchema(recNorm, recDetails);
+                            validateArtistDetailsSchema(recNorm, normalizeDetailsForWrite(recDetails));
+                        }
+                        else if (isLabel && recDetails && !(0, cacheQualification_1.isFullyQualifiedEntityProfile)(recDetails, true)) {
+                            throw new Error(`[Schema Sanity Check / Rule 40] Label detailsCache failed V31 isFullyQualifiedEntityProfile check for label: ${recNorm}`);
                         }
                     }
                     catch (validationErr) {

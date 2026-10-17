@@ -253,7 +253,7 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
         catch (e) {
             console.warn(`Failed cache lookup for ${resolvedSeedNorm}`, e);
         }
-        if (cachedDetails && cachedDetails.summary && cachedDetails.summary.length > 50 && cachedDetails.details?.genre && cachedDetails.imageUrl) {
+        if ((0, cacheQualification_1.isFullyQualifiedEntityProfile)(cachedDetails, false)) {
             const cleanHitName = seedNamesMap[resolvedSeedNorm] || seedNamesMap[seedNorm] || seedNamesMap[seed.toLowerCase()] || seed;
             if (hasGraphData) {
                 console.log(`[Pipeline Diamond] -> Is Hit? Yes -> Full Data? Yes -> Merge into Canvas: ${seed}`);

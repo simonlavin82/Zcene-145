@@ -7,6 +7,7 @@ const firestore_1 = require("firebase-admin/firestore");
 const genai_1 = require("@google/genai");
 const curatorService_1 = require("./services/curatorService");
 const executeCurationPipeline_1 = require("./executeCurationPipeline");
+const cacheQualification_1 = require("./services/cacheQualification");
 if ((0, app_1.getApps)().length === 0) {
     (0, app_1.initializeApp)();
 }
@@ -55,7 +56,7 @@ exports.healOrphanedAsset = (0, https_1.onCall)({
     const collectionName = isLabel ? 'labels' : 'artists';
     let docRef = db.collection(collectionName).doc(canonicalId);
     try {
-        // 1. [Rule 8 & 37] Cache Qualification Gate: Reject and overwrite stubs or incomplete payloads
+        // 1. [Rule 8, 37 & 40] Cache Qualification Gate: Reject and overwrite stubs or prose-fallback payloads
         const existingSnap = await docRef.get();
         if (existingSnap.exists) {
             const existingData = existingSnap.data();
@@ -75,15 +76,11 @@ exports.healOrphanedAsset = (0, https_1.onCall)({
                     cachedDetails = existingData.detailsCache;
                 }
             }
-            // Rule 8 Qualification Gate: Must have bio > 50 chars, genre, and (for artists) valid non-empty imageUrl
-            const hasSubstantialBio = typeof cachedDetails?.summary === 'string' && cachedDetails.summary.length > 50;
-            const hasGenre = !!cachedDetails?.details?.genre;
-            const hasValidMedia = isLabel || (typeof cachedDetails?.imageUrl === 'string' && cachedDetails.imageUrl.length > 0 && cachedDetails.imageUrl !== 'not-found');
-            if (!isStub && hasSubstantialBio && hasGenre && hasValidMedia) {
+            if (!isStub && (0, cacheQualification_1.isFullyQualifiedEntityProfile)(cachedDetails, isLabel)) {
                 console.log(`[JIT Healer] Complete Tier 1 cache hit for ${collectionName}/${canonicalId}. Bypassing.`);
                 return { success: true, canonicalId, alreadyExisted: true, data: cachedDetails };
             }
-            console.log(`[JIT Healer] Existing doc ${collectionName}/${canonicalId} failed qualification gate (isStub: ${isStub}, hasMedia: ${hasValidMedia}). Overwriting with full synthesis...`);
+            console.log(`[JIT Healer] Existing doc ${collectionName}/${canonicalId} failed V31 qualification gate (isStub: ${isStub}). Overwriting with full synthesis...`);
         }
         // 2. Global Auto-Kill Circuit Breaker: Count platform-wide receipts logged in rolling 24 hours
         const twentyFourHoursAgoMs = Date.now() - 24 * 60 * 60 * 1000;
@@ -171,7 +168,11 @@ exports.healOrphanedAsset = (0, https_1.onCall)({
         else {
             synthesizedDetails.imageUrl = null;
         }
-        // 4. Persist single canonical document strictly adhering to Tier 1 schema parity
+        // 4. [Rule 40] Write Gate Guard: verify profile is fully qualified before persisting
+        if (!(0, cacheQualification_1.isFullyQualifiedEntityProfile)(synthesizedDetails, isLabel)) {
+            throw new https_1.HttpsError("internal", `[Rule 40 Write Gate] Synthesized profile for "${cleanTitle}" (${canonicalId}) failed isFullyQualifiedEntityProfile validation.`);
+        }
+        // 5. Persist single canonical document strictly adhering to Tier 1 schema parity
         const canonicalPayload = {
             cacheKey: canonicalId,
             cacheVersion: 4,

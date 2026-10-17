@@ -13,6 +13,7 @@ import {
   FETCH_NODE_DETAILS_PROMPT_TEMPLATE
 } from "./services/curatorService";
 import { stripCountrySlug } from "./executeCurationPipeline";
+import { isFullyQualifiedEntityProfile } from "./services/cacheQualification";
 
 if (getApps().length === 0) {
   initializeApp();
@@ -68,7 +69,7 @@ export const healOrphanedAsset = onCall({
   let docRef = db.collection(collectionName).doc(canonicalId);
 
   try {
-    // 1. [Rule 8 & 37] Cache Qualification Gate: Reject and overwrite stubs or incomplete payloads
+    // 1. [Rule 8, 37 & 40] Cache Qualification Gate: Reject and overwrite stubs or prose-fallback payloads
     const existingSnap = await docRef.get();
     if (existingSnap.exists) {
       const existingData = existingSnap.data();
@@ -88,17 +89,12 @@ export const healOrphanedAsset = onCall({
         }
       }
 
-      // Rule 8 Qualification Gate: Must have bio > 50 chars, genre, and (for artists) valid non-empty imageUrl
-      const hasSubstantialBio = typeof cachedDetails?.summary === 'string' && cachedDetails.summary.length > 50;
-      const hasGenre = !!cachedDetails?.details?.genre;
-      const hasValidMedia = isLabel || (typeof cachedDetails?.imageUrl === 'string' && cachedDetails.imageUrl.length > 0 && cachedDetails.imageUrl !== 'not-found');
-
-      if (!isStub && hasSubstantialBio && hasGenre && hasValidMedia) {
+      if (!isStub && isFullyQualifiedEntityProfile(cachedDetails, isLabel)) {
         console.log(`[JIT Healer] Complete Tier 1 cache hit for ${collectionName}/${canonicalId}. Bypassing.`);
         return { success: true, canonicalId, alreadyExisted: true, data: cachedDetails };
       }
 
-      console.log(`[JIT Healer] Existing doc ${collectionName}/${canonicalId} failed qualification gate (isStub: ${isStub}, hasMedia: ${hasValidMedia}). Overwriting with full synthesis...`);
+      console.log(`[JIT Healer] Existing doc ${collectionName}/${canonicalId} failed V31 qualification gate (isStub: ${isStub}). Overwriting with full synthesis...`);
     }
 
     // 2. Global Auto-Kill Circuit Breaker: Count platform-wide receipts logged in rolling 24 hours
@@ -207,7 +203,12 @@ export const healOrphanedAsset = onCall({
       synthesizedDetails.imageUrl = null;
     }
 
-    // 4. Persist single canonical document strictly adhering to Tier 1 schema parity
+    // 4. [Rule 40] Write Gate Guard: verify profile is fully qualified before persisting
+    if (!isFullyQualifiedEntityProfile(synthesizedDetails, isLabel)) {
+      throw new HttpsError("internal", `[Rule 40 Write Gate] Synthesized profile for "${cleanTitle}" (${canonicalId}) failed isFullyQualifiedEntityProfile validation.`);
+    }
+
+    // 5. Persist single canonical document strictly adhering to Tier 1 schema parity
     const canonicalPayload: Record<string, any> = {
       cacheKey: canonicalId,
       cacheVersion: 4,

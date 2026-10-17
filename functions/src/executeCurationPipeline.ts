@@ -9,6 +9,7 @@ import {
 } from "./services/curatorService";
 import {
   hasActiveDiscoveryFilters,
+  isFullyQualifiedEntityProfile,
   sanitizeDiscoveryFilters
 } from "./services/cacheQualification";
 
@@ -274,7 +275,7 @@ export const executeCurationPipeline = onCall({
          console.warn(`Failed cache lookup for ${resolvedSeedNorm}`, e);
       }
       
-      if (cachedDetails && cachedDetails.summary && cachedDetails.summary.length > 50 && cachedDetails.details?.genre && cachedDetails.imageUrl) {
+      if (isFullyQualifiedEntityProfile(cachedDetails, false)) {
          const cleanHitName = seedNamesMap[resolvedSeedNorm] || seedNamesMap[seedNorm] || seedNamesMap[seed.toLowerCase()] || seed;
          if (hasGraphData) {
             console.log(`[Pipeline Diamond] -> Is Hit? Yes -> Full Data? Yes -> Merge into Canvas: ${seed}`);

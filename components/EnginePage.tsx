@@ -70,7 +70,7 @@ const ARCHITECTURE_RULES = [
     { 
         id: 8, 
         title: "Grounding / Scraper Logic", 
-        desc: "Search API eradicated; relies on parametric memory. iTunes scraper upgraded for 100% fallback." 
+        desc: "Search API & prose fallbacks eradicated; Deep Cut hydration strictly enforces responseMimeType: 'application/json' + NODE_DETAILS_SCHEMA (3x retry). iTunes scraper executes 4-tier waterfall; 'not-found' is a valid terminal monogram state once all 4 tiers run against a valid discography (discography.length > 0)." 
     },
     { 
         id: 9, 
@@ -229,8 +229,8 @@ const ARCHITECTURE_RULES = [
     },
     { 
         id: 40, 
-        title: "Synthesis Rationale Integrity & Direct Hit Read/Write Gates", 
-        desc: "Direct Hits strictly require a non-empty synthesisRationale (>= 50 chars) at both the Read Gate (qualifyCacheEntry) and Write Gate (Step 5/6 Self-Heal). If Step 3 Root Breakdown exceeds 90s or throws 504, execution immediately fails over to 3.6 Flash (low) so no seed is ever persisted with a null editorial. Step 4B locks canonical ISO artist suffixes (-be) over slash-separated border-town origins." 
+        title: "Synthesis Rationale & Deep Cut Integrity (Read/Write Gates)", 
+        desc: "Direct Hits strictly require a non-empty synthesisRationale (>= 50 chars) AND a fully qualified profile (isFullyQualifiedEntityProfile: summary > 50 chars, genre/origin/founded, discography.length > 0, valid imageUrl or terminal 'not-found' monogram, and authentic recommendationReason) at both the Read Gate and Write Gate (Step 6). Prose-fallback stubs ('Synthesised from live cultural archives...') are hard-rejected. If Step 3 Root Breakdown exceeds 90s or throws 504, execution immediately fails over to 3.6 Flash (low). Step 4B locks canonical ISO artist suffixes (-be) over slash-separated border-town origins." 
     },
     { 
         id: 41, 
@@ -334,10 +334,10 @@ const DiscoveryFlowDiagram: React.FC = () => (
                         <div className="text-white font-medium text-sm mb-3">Background Worker</div>
                         <ul className="text-[11px] text-zinc-400 space-y-3">
                             <li>
-                                <span className="text-primary font-medium">2. Hydrate Node Batch | 3.6 Flash (low)</span>
+                                <span className="text-primary font-medium">2. Hydrate Node Batch | 3.6 Flash (low) [Rule 8 & 40]</span>
                                 <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500 text-[10px]">
-                                    <li>Global Cache Hit: Attaches existing Deep Cut (labels normalized via <code>normalizeLabelId</code>).</li>
-                                    <li>Miss: Synthesizes via 3.6 Flash & 4-Tier iTunes scraper.</li>
+                                    <li>Read Gate: Verifies <code>isFullyQualifiedEntityProfile</code> (labels normalized via <code>normalizeLabelId</code>); rejects prose-fallback stubs.</li>
+                                    <li>Miss: Enforces strict <code>responseMimeType: 'application/json'</code> + <code>NODE_DETAILS_SCHEMA</code> (zero prose fallback; 3x retry) & 4-Tier iTunes scraper.</li>
                                     <li>Slug deduplication ignores stubs; injects pre-generated seed stubs on timeout.</li>
                                 </ul>
                             </li>
@@ -374,7 +374,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                                 </ul>
                             </li>
                             <li>
-                                <span className="text-primary font-medium">Persist Assets, Status & Telemetry:</span> Commits graph, breakdown, link weights, and <code>anchorResolution</code> telemetry. Updates job status to 'completed'.
+                                <span className="text-primary font-medium">6. Persist Assets (Dual Write Gate Guard [Rule 40]) & Telemetry:</span> Requires <code>synthesisRationale &gt;= 50</code> chars for seed <code>graphData</code> and <code>isFullyQualifiedEntityProfile</code> (<code>discography.length &gt; 0</code> &amp; authentic <code>recommendationReason</code>) for global <code>/artists</code> Deep Cuts. Updates job status to 'completed'.
                             </li>
                             <li>
                                 <span className="text-primary font-medium">Node 36: JIT Asset Healer (3.6 Flash)</span>
@@ -570,7 +570,7 @@ const RunbookAccordion: React.FC = () => {
             >
                 <div className="flex items-center gap-3 text-zinc-200 font-medium text-sm uppercase tracking-wider">
                     <Terminal className="w-4 h-4 text-primary" />
-                    V30 Full-Stack Regression Runbook
+                    V31 Full-Stack Regression Runbook
                 </div>
                 {isOpen ? <ChevronDown className="w-4 h-4 text-zinc-400" /> : <ChevronRight className="w-4 h-4 text-zinc-400" />}
             </button>
@@ -725,7 +725,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                             ))}
                         </nav>
                         <div className="mt-6 pt-4 border-t border-zinc-800/60 text-[10px] text-zinc-500 font-mono">
-                            Zcene V30 Blueprint<br/>
+                            Zcene V31 Blueprint<br/>
                             100% Anti-Regression
                         </div>
                     </div>
@@ -737,7 +737,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                     <div className="mb-8 border-b border-zinc-700/60 pb-6">
                         <div className="flex items-center gap-3 mb-2">
                             <h1 className="text-2xl sm:text-3xl font-medium text-white">Engine</h1>
-                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-primary/20 text-primary border border-primary/40">V30 Locked</span>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-primary/20 text-primary border border-primary/40">V31 Locked</span>
                         </div>
                         <p className="text-zinc-400 leading-relaxed text-xs sm:text-sm max-w-3xl">
                             Visual mirror and execution interface for the Zcene curation pipeline. Defines behavioral laws, state orchestration, anti-pollution boundaries, and regression-proof contracts.
@@ -815,7 +815,7 @@ LOCKED SEMANTIC TOPOLOGY (Rule 21):
             <footer className="w-full p-6 text-zinc-400 text-xs z-10 relative bg-neutral-900 flex-shrink-0 border-t border-neutral-800">
                 <div className="container mx-auto text-center">
                     <ZceneLogo className="h-6 w-auto text-primary mx-auto mb-2" />
-                    <p className="text-zinc-600">© 2026 Zcene Admin Console. V30 Programmatic Architecture.</p>
+                    <p className="text-zinc-600">© 2026 Zcene Admin Console. V31 Programmatic Architecture.</p>
                 </div>
             </footer>
         </div>

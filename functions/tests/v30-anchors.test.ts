@@ -5,6 +5,8 @@ import {
   hasActiveTier3Filters,
   sanitizeDiscoveryFilters,
   sanitizeAnchorLabelInput,
+  isFullyQualifiedEntityProfile,
+  qualifyCacheEntry,
   V30_ERA_MIN,
   V30_ERA_MAX
 } from '../../services/cacheQualification';
@@ -27,7 +29,7 @@ import {
   normalizeGraphData as frontendNormalizeGraphData
 } from '../../services/artistCacheService';
 
-describe('Architecture V30: 3-Tier Anchor System & Filter Qualification Gates (Rule 41)', () => {
+describe('Architecture V30 & V31: 3-Tier Anchor System & Deep Cut Anti-Pollution Gates (Rule 8, Rule 40, Rule 41)', () => {
   describe('Phase 1: Canonical Registries & Constants', () => {
     it('Enforces strictly bounded era range 1965–2026', () => {
       expect(ERA_MIN_BOUND).toBe(1965);
@@ -176,4 +178,122 @@ describe('Architecture V30: 3-Tier Anchor System & Filter Qualification Gates (R
       expect(' Minor-Threat-us-anchor_labels:dischord-records '.trim().replace(stripRegex, '')).toBe('Minor-Threat-us');
     });
   });
+
+  describe('Phase 4: Architecture V31 Deep Cut Qualification & Anti-Pollution Gates (Rule 8 & Rule 40)', () => {
+    const validArtistProfile = {
+      summary: 'Koyo is a Long Island melodic hardcore band formed in 2020 by members of Typecaste, Hangman, and Rain of Salvation.',
+      details: {
+        artist: 'Koyo',
+        genre: 'Melodic Hardcore / Emo',
+        origin: 'Stony Brook, Long Island, New York, United States',
+        founded: '2020'
+      },
+      discography: [
+        { albumName: 'Would You Miss It?', releaseYear: '2023' },
+        { albumName: 'Drives Out East', releaseYear: '2021' }
+      ],
+      members: [{ name: 'Joey Chiaramonte', role: 'Vocals' }],
+      recommendationReason: 'Carries the Long Island melodic hardcore and Pure Noise Records lineage into the 2020s.',
+      imageUrl: 'https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/koyo.jpg'
+    };
+
+    it('Rejects Category 1 prose-fallback polluted profiles (empty discography and "Synthesised from live cultural archives..." boilerplate)', () => {
+      const pollutedKoyo = {
+        ...validArtistProfile,
+        discography: [],
+        members: [],
+        recommendationReason: 'Synthesised from live cultural archives via Google Search grounding.',
+        imageUrl: 'not-found'
+      };
+      expect(isFullyQualifiedEntityProfile(pollutedKoyo, false)).toBe(false);
+
+      const pollutedYotkWithImage = {
+        ...validArtistProfile,
+        discography: [],
+        recommendationReason: 'Synthesised from live cultural archives via Google Search grounding.',
+        imageUrl: 'https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/yotk.jpg'
+      };
+      expect(isFullyQualifiedEntityProfile(pollutedYotkWithImage, false)).toBe(false);
+    });
+
+    it('Accepts Category 2 valid underground artist profiles where imageUrl is terminal "not-found" AFTER valid discography synthesis', () => {
+      const validUndergroundProfile = {
+        ...validArtistProfile,
+        details: {
+          artist: 'Sayyadina',
+          genre: 'Grindcore',
+          origin: 'Stockholm, Sweden',
+          founded: '2001'
+        },
+        discography: [
+          { albumName: 'Fear Gave Us Wings', releaseYear: '2004' },
+          { albumName: 'Mourning the Unknown', releaseYear: '2006' }
+        ],
+        recommendationReason: 'Essential Stockholm grindcore contemporary sharing members and DIY touring circuits with Nasum.',
+        imageUrl: 'not-found'
+      };
+      expect(isFullyQualifiedEntityProfile(validUndergroundProfile, false)).toBe(true);
+    });
+
+    it('Rejects artist profiles with missing/empty imageUrl or missing founded year', () => {
+      expect(isFullyQualifiedEntityProfile({ ...validArtistProfile, imageUrl: '' }, false)).toBe(false);
+      expect(isFullyQualifiedEntityProfile({ ...validArtistProfile, imageUrl: null }, false)).toBe(false);
+      expect(
+        isFullyQualifiedEntityProfile(
+          { ...validArtistProfile, details: { ...validArtistProfile.details, founded: 'Unknown' } },
+          false
+        )
+      ).toBe(false);
+    });
+
+    it('Accepts valid label profiles without requiring discography or imageUrl while still blocking prose-fallback boilerplate', () => {
+      const validLabel = {
+        summary: 'Pure Noise Records is an American independent record label founded in 2009 by Jake Round in Berkeley, California.',
+        details: {
+          genre: 'Punk / Hardcore / Emo',
+          origin: 'Berkeley, California, United States',
+          founded: '2009',
+          notableArtists: ['Knuckle Puck', 'The Story So Far', 'Koyo', 'Drain']
+        },
+        discography: [],
+        imageUrl: null
+      };
+      expect(isFullyQualifiedEntityProfile(validLabel, true)).toBe(true);
+
+      const prosePollutedLabel = {
+        ...validLabel,
+        recommendationReason: 'Synthesised from live cultural archives via Google Search grounding.'
+      };
+      expect(isFullyQualifiedEntityProfile(prosePollutedLabel, true)).toBe(false);
+    });
+
+    it('Marks qualifyCacheEntry as USABLE_STALE (isFullyQualified: false) if detailsCache has empty discography or prose-fallback reason', () => {
+      const validGraph = JSON.stringify({
+        nodes: [
+          { id: 'koyo-us', type: 'artist', label: 'Koyo' },
+          { id: 'united-states', type: 'country', label: 'United States' }
+        ],
+        links: [{ source: 'koyo-us', target: 'united-states', weight: 0.2 }]
+      });
+      const validRationale = 'Koyo anchors the modern Long Island melodic hardcore wave, bridging 90s post-hardcore emotion with contemporary hardcore urgency.';
+
+      const pollutedDoc = {
+        artistId: 'koyo-us',
+        cacheKey: 'koyo-us',
+        graphData: validGraph,
+        synthesisRationale: validRationale,
+        detailsCache: {
+          ...validArtistProfile,
+          discography: [],
+          recommendationReason: 'Synthesised from live cultural archives via Google Search grounding.'
+        }
+      };
+
+      const res = qualifyCacheEntry(pollutedDoc, 'koyo-us');
+      expect(res.isFullyQualified).toBe(false);
+      expect(res.missing).toContain('discography');
+      expect(res.missing).toContain('recommendationReason');
+    });
+  });
 });
+

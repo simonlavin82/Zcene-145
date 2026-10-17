@@ -1722,48 +1722,7 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
         try {
             details = JSON.parse(repaired) as NodeDetails;
         } catch (repairError) {
-            // [Grounding Prose Fallback] ✦
-            // When Google Search grounding is active the model drops JSON mode and
-            // returns unstructured prose with inline citations. Both JSON.parse and
-            // repairJson fail in this case. If the raw text is a meaningful prose
-            // string (> 40 chars), treat it as the biography and construct a minimal
-            // valid NodeDetails so the queue can write to detailsCache and stop
-            // re-queueing instead of throwing a terminal format exception.
-            const rawProse = sanitizeBioText(cleanedJsonText);
-            // Anti-Leakage Guard: Never treat raw JSON syntax wrappers or CoT reasoning as bio prose!
-            if (rawProse.startsWith('{') || rawProse.startsWith('[') || rawProse.includes('":') || rawProse.includes('": ')) {
-                throw new Error(`Failed to parse AI details JSON (rejected unparsed JSON wrapper in prose fallback).`);
-            }
-            if (rawProse.length > 40) {
-                console.warn(
-                    `[Deep Cut Parse] JSON repair failed — response appears to be grounding prose (${rawProse.length} chars). ` +
-                    `Mapping prose to NodeDetails bio field as graceful fallback.`
-                );
-                
-                // Best effort extraction of other fields from the raw string
-                const genreMatch = cleanedJsonText.match(/["']genre["']\s*:\s*["']([^"']*)["']/i);
-                const originMatch = cleanedJsonText.match(/["']origin["']\s*:\s*["']([^"']*)["']/i);
-                const foundedMatch = cleanedJsonText.match(/["']founded["']\s*:\s*["']([^"']*)["']/i);
-                const tourInfoMatch = cleanedJsonText.match(/["']tourInfo["']\s*:\s*["']([^"']*)["']/i);
-                
-                details = {
-                    summary: rawProse,
-                    details: {
-                        artist: node.label || node.id,
-                        genre: genreMatch ? genreMatch[1] : "",
-                        origin: originMatch ? originMatch[1] : (originHint || ""),
-                        founded: foundedMatch ? foundedMatch[1] : "",
-                        notableArtists: []
-                    },
-                    members: [],
-                    links: [],
-                    discography: [],
-                    tourInfo: tourInfoMatch ? tourInfoMatch[1] : "",
-                    recommendationReason: "Synthesised from live cultural archives via Google Search grounding."
-                };
-            } else {
-                throw new Error(`Failed to parse AI details JSON: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
-            }
+            throw new Error(`Failed to parse AI details JSON (prose fallback forbidden under Rule 40): ${parseError instanceof Error ? parseError.message : String(parseError)}`);
         }
     }
 

@@ -1442,6 +1442,7 @@ export const sanitizeLabelProfile = (details: any): any => {
     details: cleanDetails,
     discography: Array.isArray(parsed.discography) ? parsed.discography : [],
     links: Array.isArray(parsed.links) ? parsed.links : [],
+    recommendationReason: parsed.recommendationReason || "",
   };
 };
 
@@ -1475,8 +1476,8 @@ export const enforceArtistCacheSchema = (payload: any): void => {
       
       // Check for biography or summary
       const bio = parsed.summary || parsed.bio || parsed.description || parsed.text;
-      if (!bio || typeof bio !== 'string' || bio.trim().length < 2) {
-        throw new Error("[Schema Enforcement] detailsCache is missing biography/summary text.");
+      if (!bio || typeof bio !== 'string' || bio.trim().length <= 50) {
+        throw new Error("[Schema Enforcement] detailsCache is missing biography/summary text (>50 chars required).");
       }
       
       // Check details object
@@ -1484,22 +1485,22 @@ export const enforceArtistCacheSchema = (payload: any): void => {
         throw new Error("[Schema Enforcement] detailsCache is missing or has invalid details object.");
       }
       const { genre, origin, founded, notableArtists } = parsed.details;
-      if (genre === undefined || genre === null || typeof genre !== 'string') {
+      if (genre === undefined || genre === null || typeof genre !== 'string' || !genre.trim()) {
         throw new Error("[Schema Enforcement] detailsCache.details is missing genre.");
       }
-      if (origin === undefined || origin === null || typeof origin !== 'string') {
+      if (origin === undefined || origin === null || typeof origin !== 'string' || !origin.trim()) {
         throw new Error("[Schema Enforcement] detailsCache.details is missing origin.");
       }
-      if (founded === undefined || founded === null || typeof founded !== 'string') {
+      if (founded === undefined || founded === null || typeof founded !== 'string' || !founded.trim()) {
         throw new Error("[Schema Enforcement] detailsCache.details is missing founded year.");
       }
       if (notableArtists && !Array.isArray(notableArtists)) {
         throw new Error("[Schema Enforcement] detailsCache.details has invalid notableArtists array.");
       }
 
-      // Check for discography array
-      if (parsed.discography && !Array.isArray(parsed.discography)) {
-        throw new Error("[Schema Enforcement] detailsCache has invalid discography array.");
+      // Check for discography array (Rule 40: must be non-empty for artists)
+      if (!Array.isArray(parsed.discography) || parsed.discography.length === 0) {
+        throw new Error("[Schema Enforcement] detailsCache must have a non-empty discography array.");
       }
       if (Array.isArray(parsed.discography)) {
         for (let i = 0; i < parsed.discography.length; i++) {
@@ -1510,9 +1511,12 @@ export const enforceArtistCacheSchema = (payload: any): void => {
         }
       }
 
-      // Check recommendationReason (allow empty string for primary seeds)
-      if (parsed.recommendationReason === undefined || parsed.recommendationReason === null || typeof parsed.recommendationReason !== 'string') {
+      // Check recommendationReason (Rule 40: reject prose-fallback boilerplate)
+      if (parsed.recommendationReason === undefined || parsed.recommendationReason === null || typeof parsed.recommendationReason !== 'string' || !parsed.recommendationReason.trim()) {
         throw new Error("[Schema Enforcement] detailsCache is missing recommendationReason.");
+      }
+      if (parsed.recommendationReason.toLowerCase().includes('synthesised from live cultural archives')) {
+        throw new Error("[Schema Enforcement] detailsCache contains prose-fallback boilerplate in recommendationReason.");
       }
 
       // Check youtubeSearchQuery (allow empty string)

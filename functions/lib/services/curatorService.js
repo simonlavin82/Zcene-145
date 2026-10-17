@@ -1713,7 +1713,10 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint,
                     model: currentModel,
                     contents: prompt,
                     config: {
-                        thinkingConfig: { thinkingLevel: genai_1.ThinkingLevel.LOW }
+                        systemInstruction: "You are a late-night record curator — the kind of person who pulls an obscure 7\" from a crate at 2am and traces exactly why it matters. Your tone is knowledgeable, vivid, and deeply immersed in musical history and counterculture scenes. Return detailed, factual, and scene-accurate profile information for the given musical entity matching the schema. No markdown formatting outside strings. NEGATIVE CONSTRAINT: NEVER use em-dashes (—) or long hyphens for dramatic effect or clause separation. Use standard editorial punctuation.",
+                        thinkingConfig: { thinkingLevel: genai_1.ThinkingLevel.LOW },
+                        responseMimeType: "application/json",
+                        responseSchema: exports.NODE_DETAILS_SCHEMA
                     }
                 }),
                 new Promise((_, reject) => setTimeout(() => reject(new Error('AbortError: Timeout exceeded')), 55000))
@@ -1731,47 +1734,32 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint,
                 throw new Error("The AI returned an empty response for details.");
             }
             const cleanedJsonText = (0, exports.extractCleanJsonString)(jsonText);
+            let parsedCandidate = null;
             try {
-                details = JSON.parse(cleanedJsonText);
+                parsedCandidate = JSON.parse(cleanedJsonText);
             }
             catch (parseError) {
                 const repaired = repairJson(cleanedJsonText);
                 try {
-                    details = JSON.parse(repaired);
+                    parsedCandidate = JSON.parse(repaired);
                 }
                 catch (repairError) {
-                    const rawProse = sanitizeBioText(cleanedJsonText);
-                    if (rawProse.startsWith('{') || rawProse.startsWith('[') || rawProse.includes('":') || rawProse.includes('": ')) {
-                        throw new Error("Invalid data format from details service (unparsed JSON wrapper).");
-                    }
-                    if (rawProse.length > 40) {
-                        console.warn(`[Backend Deep Cut Parse] JSON repair failed — response appears to be grounding prose (${rawProse.length} chars). ` +
-                            `Mapping prose to NodeDetails bio field as graceful fallback.`);
-                        const genreMatch = cleanedJsonText.match(/["']genre["']\s*:\s*["']([^"']*)["']/i);
-                        const originMatch = cleanedJsonText.match(/["']origin["']\s*:\s*["']([^"']*)["']/i);
-                        const foundedMatch = cleanedJsonText.match(/["']founded["']\s*:\s*["']([^"']*)["']/i);
-                        const tourInfoMatch = cleanedJsonText.match(/["']tourInfo["']\s*:\s*["']([^"']*)["']/i);
-                        details = {
-                            summary: rawProse,
-                            details: {
-                                artist: node.label || node.id,
-                                genre: genreMatch ? genreMatch[1] : "",
-                                origin: originMatch ? originMatch[1] : (originHint || ""),
-                                founded: foundedMatch ? foundedMatch[1] : "",
-                                notableArtists: []
-                            },
-                            members: [],
-                            links: [],
-                            discography: [],
-                            tourInfo: tourInfoMatch ? tourInfoMatch[1] : "",
-                            recommendationReason: "Synthesised from live cultural archives via Google Search grounding."
-                        };
-                    }
-                    else {
-                        throw new Error("Invalid data format from details service.");
-                    }
+                    throw new Error("Invalid data format from details service (JSON parse & repair failed; prose fallback forbidden under Rule 40).");
                 }
             }
+            const isLabelNode = String(node.type || '').toLowerCase() === 'label';
+            const candidateBio = sanitizeBioText(parsedCandidate?.summary || parsedCandidate?.bio || "");
+            const candidateReason = String(parsedCandidate?.recommendationReason || '').trim();
+            const hasValidDiscography = isLabelNode || (Array.isArray(parsedCandidate?.discography) && parsedCandidate.discography.length > 0);
+            if (!candidateBio ||
+                candidateBio.length <= 50 ||
+                !candidateReason ||
+                candidateReason.toLowerCase().includes('synthesised from live cultural archives') ||
+                !hasValidDiscography) {
+                throw new Error(`Invalid data format from details service: incomplete structured payload for ${node.id} ` +
+                    `(bioLen=${candidateBio.length}, hasReason=${!!candidateReason}, discographyLen=${Array.isArray(parsedCandidate?.discography) ? parsedCandidate.discography.length : 0}).`);
+            }
+            details = parsedCandidate;
         }
         catch (error) {
             attempts++;

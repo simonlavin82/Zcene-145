@@ -96,6 +96,72 @@ export const parseGraphField = (graphField: any): { nodes: any[]; links: any[] }
 };
 
 /**
+ * Architecture V31 (Rule 8 & Rule 40) — Unified Entity Profile Qualification Gate.
+ *
+ * Enforces that a cached or newly hydrated entity profile (`detailsCache`) is complete
+ * and free of prose-fallback degradation before being accepted as a Read Hit or written
+ * to global `/artists` or `/labels`:
+ *   1. Valid summary (> 50 chars, no mock/placeholder text).
+ *   2. Non-empty details.genre, details.origin, and details.founded.
+ *   3. Authentic recommendationReason (non-empty for artists, and never containing
+ *      "Synthesised from live cultural archives").
+ *   4. For artists (!isLabel):
+ *      - Array.isArray(profile.discography) && profile.discography.length > 0
+ *      - Non-empty imageUrl string (either a verified https:// URL or the terminal
+ *        "not-found" monogram state after a real 4-tier scrape with a non-empty discography;
+ *        only undefined/null/"" means image scraping has not run).
+ */
+export const isFullyQualifiedEntityProfile = (profile: any, isLabel: boolean = false): boolean => {
+  if (!profile || typeof profile !== 'object' || Array.isArray(profile)) return false;
+  if (profile._isStub === true || profile.redirectTo) return false;
+
+  const bio = String(profile.summary || profile.bio || profile.description || profile.text || '').trim();
+  const bioLower = bio.toLowerCase();
+  const hasValidBio =
+    bio.length > MIN_BIO_LENGTH &&
+    bio !== 'Imported from Apple Music library.' &&
+    !bioLower.includes('sandbox mock') &&
+    !bioLower.includes('mock bio') &&
+    !bioLower.includes('awaiting deep cut analysis');
+  if (!hasValidBio) return false;
+
+  const isInvalidMeta = (val: any): boolean => {
+    if (val === undefined || val === null) return true;
+    const str = (Array.isArray(val) ? val.join(', ') : String(val)).trim().toLowerCase();
+    return str.length === 0 || str === 'unknown' || str === 'n/a' || str === 'none' || str === 'not available';
+  };
+
+  const genreRaw = profile.details?.genre ?? profile.genre;
+  const originRaw = profile.details?.origin ?? profile.origin;
+  const foundedRaw = profile.details?.founded ?? profile.founded;
+  if (isInvalidMeta(genreRaw) || isInvalidMeta(originRaw) || isInvalidMeta(foundedRaw)) {
+    return false;
+  }
+
+  const recReason = String(profile.recommendationReason ?? '').trim();
+  if (recReason.toLowerCase().includes('synthesised from live cultural archives')) {
+    return false;
+  }
+  if (!isLabel && recReason.length === 0) {
+    return false;
+  }
+
+  if (!isLabel) {
+    if (!Array.isArray(profile.discography) || profile.discography.length === 0) {
+      return false;
+    }
+    const imageUrl = typeof profile.imageUrl === 'string'
+      ? profile.imageUrl.trim()
+      : (typeof profile.image === 'string' ? profile.image.trim() : '');
+    if (imageUrl.length === 0) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
+/**
  * Qualifies a raw Firestore `artists/{id}` (or `labels/{id}`) document.
  */
 export const qualifyCacheEntry = (data: any, seedId?: string): CacheQualification => {
@@ -122,28 +188,33 @@ export const qualifyCacheEntry = (data: any, seedId?: string): CacheQualificatio
 
   const isStructurallyUsable = hasNodes && hasEdges && hasRationale;
 
-  // ── 2. Seed profile (bio / genre / image) ─────────────────────────────────
+  // ── 2. Seed profile (bio / genre / image / V31 anti-pollution checks) ─────
   const profile = extractSeedProfile(data.detailsCache, seedId || data.artistId || data.cacheKey);
   const bio = profile?.summary || profile?.bio || profile?.description || profile?.text || '';
   const genreRaw = profile?.details?.genre || profile?.genre || data?.details?.genre || '';
   const genre = Array.isArray(genreRaw) ? genreRaw.join(', ') : genreRaw;
   const imageUrl = profile?.imageUrl || profile?.image || '';
+  const recReason = String(profile?.recommendationReason || '').trim();
+  const isProseFallback = recReason.toLowerCase().includes('synthesised from live cultural archives');
+  const hasEmptyDiscography = Array.isArray(profile?.discography) && profile.discography.length === 0 && !data?.labelId;
 
-  const hasBio = typeof bio === 'string' && bio.trim().length > MIN_BIO_LENGTH && !bio.toLowerCase().includes('sandbox mock');
+  const hasBio = typeof bio === 'string' && bio.trim().length > MIN_BIO_LENGTH && !bio.toLowerCase().includes('sandbox mock') && !isProseFallback;
   const hasGenre = typeof genre === 'string' && genre.trim().length > 0 && genre.trim().toLowerCase() !== 'unknown';
   const hasImage = typeof imageUrl === 'string' && imageUrl.trim().length > 0;
   if (!hasBio) missing.push('bio');
   if (!hasGenre) missing.push('genre');
   if (!hasImage) missing.push('imageUrl');
+  if (isProseFallback) missing.push('recommendationReason');
+  if (hasEmptyDiscography) missing.push('discography');
 
-  const isFullyQualified = isStructurallyUsable && hasBio && hasGenre && hasImage;
+  const isFullyQualified = isStructurallyUsable && hasBio && hasGenre && hasImage && !isProseFallback && !hasEmptyDiscography;
 
   let verdict: CacheVerdict;
   if (isFullyQualified) verdict = 'TOPOLOGY_HIT';
-  else if (isStructurallyUsable) verdict = 'USABLE_STALE';
+  else if (isStructurallyUsable && !isProseFallback && !hasEmptyDiscography) verdict = 'USABLE_STALE';
   else verdict = 'STUB';
 
-  return { verdict, isStructurallyUsable, isFullyQualified, missing };
+  return { verdict, isStructurallyUsable: isStructurallyUsable && !isProseFallback && !hasEmptyDiscography, isFullyQualified, missing };
 };
 
 /** Option A: anything structurally usable is rendered locally at zero cost. */
