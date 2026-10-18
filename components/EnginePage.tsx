@@ -164,8 +164,8 @@ const ARCHITECTURE_RULES = [
     },
     { 
         id: 27, 
-        title: "Multi-Seed Co-Anchoring", 
-        desc: "Complex Generations (multi-seed) MUST dynamically force the AI to co-anchor the narrative. The essay must explore the relationship, contrast, or shared DNA between all seeds, strictly preventing parametric gravity from allowing one famous entity to dominate the story." 
+        title: "Unified Generation DNA & Multi-Seed Co-Anchoring", 
+        desc: "All generation modes share unified prompt DNA and organic target density (~18–26 Deep Cuts). Complex Generations (multi-seed) dynamically co-anchor both the topological spiderweb and the editorial narrative. The graph constructs both The Crossover Bridge (4–6 shared-DNA artists/labels) and Native Ecosystems (3–4 scene peers per seed), targeting 12–16 total artists while labels scale organically based on historical authenticity, eliminating rigid hallucination quotas. Parametric gravity is strictly barred from letting one famous seed dominate." 
     },
     { 
         id: 28, 

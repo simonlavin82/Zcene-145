@@ -21,7 +21,9 @@ import {
   buildCompositeCacheKey,
   normalizeLabelId,
   normalizeArtistId,
-  normalizeGraphData
+  normalizeGraphData,
+  GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE,
+  GENERATE_GRAPH_PROMPT_TEMPLATE
 } from '../src/services/curatorService';
 import {
   cleanLabelDisplayName,
@@ -293,6 +295,31 @@ describe('Architecture V30 & V31: 3-Tier Anchor System & Deep Cut Anti-Pollution
       expect(res.isFullyQualified).toBe(false);
       expect(res.missing).toContain('discography');
       expect(res.missing).toContain('recommendationReason');
+    });
+  });
+
+  describe('Phase 4: Architecture V32 Unified Generation DNA & Multi-Seed Co-Anchoring (Rule 27)', () => {
+    it('Enforces 10 to 14 NEW related artists target in GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE', () => {
+      expect(GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE).toContain('10 to 14 NEW related artists');
+      expect(GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE).toContain('12 to 16 artists');
+    });
+
+    it('Mandates both THE CROSSOVER BRIDGE and NATIVE ECOSYSTEMS in multi-seed generation', () => {
+      expect(GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE).toContain('THE CROSSOVER BRIDGE (4 to 6 artists + shared labels/genres)');
+      expect(GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE).toContain('NATIVE ECOSYSTEMS (3 to 4 distinct scene artists per seed)');
+    });
+
+    it('Explicitly excludes labels from numerical caps across both Single-Seed and Multi-Seed templates', () => {
+      expect(GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE).toContain('Labels are explicitly EXCLUDED from this artist cap');
+      expect(GENERATE_GRAPH_PROMPT_TEMPLATE).toContain('Labels are explicitly EXCLUDED from this cap');
+      expect(GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE).toContain('roughly 18 to 26 total Deep Cuts');
+    });
+
+    it('Preserves shared prompt invariants (canonical naming, no orphaned links, negative constraint on em-dashes)', () => {
+      expect(GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE).toContain('CANONICAL NAMING');
+      expect(GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE).toContain('THERE MUST BE NO ORPHANED LINKS');
+      expect(GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE).toContain('NEGATIVE CONSTRAINT: NEVER use em-dashes');
+      expect(GENERATE_GRAPH_PROMPT_TEMPLATE).toContain('NEGATIVE CONSTRAINT: NEVER use em-dashes');
     });
   });
 });

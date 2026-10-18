@@ -154,9 +154,14 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 ### 26. Contextual Tooltips
 - **Rule:** Spiderweb node tooltips must prioritize the AI-generated `narrativeSnippet` (epicenter hook) over the encyclopedic `summary` to provide cohesive, web-specific context.
 
-### 27. AI-Led Coordinate Panning
-- **Rule:** Graph coordinates and initial camera viewport centers are dynamically calibrated based on the spatial bounding box of the settled semantic clusters.
-- **Enforcement:** The engine calculates center-of-mass coordinates across active nodes to ensure the visual graph is immediately centered in the viewport upon render, preventing clipping on mobile and widescreen viewports.
+### 27. Unified Generation DNA & Multi-Seed Co-Anchoring
+- **Rule:** All generation modes (Single-Seed, Multi-Seed, Single-Seed + Anchors, Multi-Seed + Anchors) share the exact same unified prompt DNA, node taxonomy rules, and organic target density philosophy. Multi-seed generations dynamically co-anchor both the topological spiderweb and the editorial narrative across all seeds, preventing parametric gravity from collapsing into a single famous entity.
+- **Topology Density & Parity Mandate:** Multi-seed topology generation targets 10 to 14 NEW related artists (12 to 16 total artists with seeds). Labels are explicitly excluded from numerical caps and scale organically according to historical authenticity, achieving an overall organic target density of roughly 18 to 26 total Deep Cuts (Artists + Labels), eliminating rigid hallucination quotas.
+- **Dual-Structure Architecture:** When multiple seeds are submitted (`seeds.length > 1`), the prompt commands the model to construct two balanced, complementary layers:
+  1. *The Crossover Bridge (4 to 6 artists + shared labels/genres):* Identifies authentic bands, imprints, and genres that legitimately connect multiple seeds through shared musical DNA, split releases, shared producers, record labels, or lived touring history.
+  2. *Native Ecosystems (3 to 4 distinct scene peers per seed):* Radiates deeply into each seed's authentic regional, temporal, and stylistic ecosystem, giving each seed its own dedicated rabbit hole of 2nd-degree scene contemporaries rather than stopping at superficial connections.
+- **Editorial Co-Anchoring:** The Magazine Roots Breakdown narrative must weave all input seeds as co-equal foundational pillars.
+- **Enforcement:** Enforced in `GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE` across `functions/src/services/curatorService.ts` and `services/geminiService.ts`, and verified during Column 3 hydration.
 
 ### 28. Canonical Global Caching (Filter Barring)
 - **Rule:** Global entity caching (`artists`, `labels`) MUST use pure canonical IDs for document paths (`cleanCanonicalId` / `normalizeLabelId`). 
