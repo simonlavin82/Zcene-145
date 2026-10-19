@@ -322,5 +322,18 @@ describe('Architecture V30 & V31: 3-Tier Anchor System & Deep Cut Anti-Pollution
       expect(GENERATE_GRAPH_PROMPT_TEMPLATE).toContain('NEGATIVE CONSTRAINT: NEVER use em-dashes');
     });
   });
+
+  describe('Phase 5: Architecture V33 Tabula Rasa Topology & Prompt Invariants (Rule 15 & Rule 27)', () => {
+    it('Enforces blank-slate Tabula Rasa prompt framing in GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE', () => {
+      expect(GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE).toContain('from a blank slate (Tabula Rasa)');
+      expect(GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE).not.toContain('We already have cached, independent music graphs');
+      expect(GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE).not.toContain('{{cachedSubgraphsContext}}');
+    });
+
+    it('Enforces canonical metadata node taxonomy without cached subgraph dependency', () => {
+      expect(GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE).toContain('For metadata nodes (genre, label, country, founded), use canonical IDs and types.');
+      expect(GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE).not.toContain('Reuse exact IDs and types for any existing metadata nodes from the cached subgraphs');
+    });
+  });
 });
 

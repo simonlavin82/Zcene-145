@@ -358,13 +358,25 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
             }
         }
     }
-    if (artistList.length > 1 || payload.intent === 'cache_upgrade' || hasActiveFilters) {
+    const isComplexGeneration = artistList.length > 1 || hasActiveFilters;
+    if (isComplexGeneration || payload.intent === 'cache_upgrade') {
         needsProGeneration = true;
     }
-    let finalGraph = payload.baseGraph || { nodes: [], links: [] };
+    // Architecture V33 [Rule 15 / Rule 27] Tabula Rasa Gate:
+    // When isComplexGeneration is true (Multi-Seed or 3-Tier Anchored), strictly bypass
+    // cachedSubgraphsContext and baseGraph merging so Gemini 3.1 Pro creates fresh bespoke
+    // crossover connections from a blank slate without pre-conditioned bias.
+    // Seed identities remain 100% locked via concise origin & genre constraints.
+    let finalGraph = (!isComplexGeneration && payload.baseGraph) ? payload.baseGraph : { nodes: [], links: [] };
     if (needsProGeneration) {
-        console.log(`[Pipeline Diamond] -> 3.1 Pro Topology Generation`);
-        const result = await (0, curatorService_1.generateGraphDataBackend)(payload.artists, payload.filters, payload.cachedSubgraphsContext, payload.baseGraph, payload.disambiguationHints);
+        console.log(`[Pipeline Diamond] -> 3.1 Pro Topology Generation (Tabula Rasa: ${isComplexGeneration})`);
+        const disambiguationHintsForPrompt = { ...(payload.disambiguationHints || {}) };
+        for (const seedItem of resolvedSeedArray) {
+            if (seedItem.origin || seedItem.genre) {
+                disambiguationHintsForPrompt[seedItem.id] = `Artist "${seedItem.name}": Origin "${seedItem.origin || "Unknown"}", Genre "${seedItem.genre || "Unknown"}"`;
+            }
+        }
+        const result = await (0, curatorService_1.generateGraphDataBackend)(payload.artists, payload.filters, isComplexGeneration ? undefined : payload.cachedSubgraphsContext, isComplexGeneration ? undefined : payload.baseGraph, disambiguationHintsForPrompt);
         finalGraph = result.graphData;
         if (result.apiUsage) {
             usageCollector.push(result.apiUsage.model, result.apiUsage);

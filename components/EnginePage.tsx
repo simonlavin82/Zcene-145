@@ -104,8 +104,8 @@ const ARCHITECTURE_RULES = [
     },
     { 
         id: 15, 
-        title: "Complex Cache Bypass", 
-        desc: "Multi-seed and 3-Tier anchored queries (hasActiveDiscoveryFilters === true) must strictly bypass the Global Topology Cache (Front Gate) and force needsProGeneration = true in Column 2 even if a single seed has cached graphData. Empty filter arrays evaluate to false so unfiltered runs are never misclassified." 
+        title: "Complex Cache Bypass & Tabula Rasa Gate", 
+        desc: "Multi-seed and 3-Tier anchored queries (hasActiveDiscoveryFilters === true) must strictly bypass the Global Topology Cache (Front Gate) and force needsProGeneration = true in Column 2. To preserve Tabula Rasa generation, Column 2 strictly bypasses cachedSubgraphsContext and baseGraph merging, ensuring Gemini 3.1 Pro generates fresh bespoke topologies while seed identities remain locked by Column 1 disambiguation hints." 
     },
     { 
         id: 16, 
@@ -165,7 +165,7 @@ const ARCHITECTURE_RULES = [
     { 
         id: 27, 
         title: "Unified Generation DNA & Multi-Seed Co-Anchoring", 
-        desc: "All generation modes share unified prompt DNA and organic target density (~18–26 Deep Cuts). Complex Generations (multi-seed) dynamically co-anchor both the topological spiderweb and the editorial narrative. The graph constructs both The Crossover Bridge (4–6 shared-DNA artists/labels) and Native Ecosystems (3–4 scene peers per seed), targeting 12–16 total artists while labels scale organically based on historical authenticity, eliminating rigid hallucination quotas. Parametric gravity is strictly barred from letting one famous seed dominate." 
+        desc: "All generation modes share unified prompt DNA and organic target density (~18–26 Deep Cuts). Complex Generations operate Tabula Rasa (blank slate), dynamically co-anchor both the topological spiderweb and the editorial narrative across all seeds. The graph constructs both The Crossover Bridge (4–6 shared-DNA artists/labels) and Native Ecosystems (3–4 scene peers per seed), targeting 12–16 total artists while labels scale organically without rigid quotas. All generated Deep Cuts reuse cached global bio/assets in Column 3, achieving $0.00 zero-latency hydration while preserving bespoke multi-seed topology." 
     },
     { 
         id: 28, 

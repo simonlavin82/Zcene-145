@@ -1,8 +1,8 @@
 # ZCENE ARCHITECTURAL TRUTH & IMMUTABLE LAWS
  
-![Architecture Diagram](./Zcene Architecture V31_5.jpg)
+![Architecture Diagram](./Zcene Architecture V33.jpg)
  
-This document defines the absolute, immutable architectural baseline of Zcene (V31.5). All future development, bug fixes, and AI agent actions MUST strictly adhere to these laws. Legacy paradigms (like naive string matching, bypass assumptions, single-pointer stubs, open-ended prompt instruction textareas, prose-fallback stubs, or storing entity payloads under bare IDs) are strictly forbidden.
+This document defines the absolute, immutable architectural baseline of Zcene (V33). All future development, bug fixes, and AI agent actions MUST strictly adhere to these laws. Legacy paradigms (like naive string matching, bypass assumptions, single-pointer stubs, open-ended prompt instruction textareas, prose-fallback stubs, or storing entity payloads under bare IDs) are strictly forbidden.
  
 ## THE IMMUTABLE ARCHITECTURAL LAWS
  
@@ -98,8 +98,9 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 ### 14. Atomic Self-Healing
 - Graph breakdowns handle atomic self-healing. Fuzzy fallbacks mitigate strict-coupling vulnerabilities.
 
-### 15. Complex Cache Bypass & Active Filter Predicate (`hasActiveDiscoveryFilters`)
+### 15. Complex Cache Bypass & Tabula Rasa Gate (`hasActiveDiscoveryFilters`)
 - Multi-seed and 3-Tier anchored queries (`hasActiveDiscoveryFilters(filters) === true`) must strictly bypass the Global Topology Cache (Front Gate) and force `needsProGeneration = true` in Column 2 (`executeCurationPipeline.ts`), even if a single seed already has cached `graphData`.
+- **Tabula Rasa Gate:** For all Complex Generations, Column 2 strictly bypasses `cachedSubgraphsContext` and `baseGraph` canvas merging to guarantee that Gemini 3.1 Pro generates a clean-slate crossover topology without pre-conditioned bias. Seed identities are locked by passing concise 1-line origin and genre constraints (`disambiguationHints`) derived from Column 1 validation.
 - Empty filter arrays (`{ includeGenres: [], anchorLabels: [], includeOrigins: [], excludeOrigins: [] }`) MUST evaluate to `false` via `hasActiveDiscoveryFilters` so unfiltered runs are never misclassified as Complex Generations or blocked from global cache write-back.
 
 ### 16. Curation Intercept Guardrails
@@ -154,12 +155,13 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 ### 26. Contextual Tooltips
 - **Rule:** Spiderweb node tooltips must prioritize the AI-generated `narrativeSnippet` (epicenter hook) over the encyclopedic `summary` to provide cohesive, web-specific context.
 
-### 27. Unified Generation DNA & Multi-Seed Co-Anchoring
-- **Rule:** All generation modes (Single-Seed, Multi-Seed, Single-Seed + Anchors, Multi-Seed + Anchors) share the exact same unified prompt DNA, node taxonomy rules, and organic target density philosophy. Multi-seed generations dynamically co-anchor both the topological spiderweb and the editorial narrative across all seeds, preventing parametric gravity from collapsing into a single famous entity.
+### 27. Unified Generation DNA & Multi-Seed Co-Anchoring (Tabula Rasa & Global Asset Reuse)
+- **Rule:** All generation modes (Single-Seed, Multi-Seed, Single-Seed + Anchors, Multi-Seed + Anchors) share the exact same unified prompt DNA, node taxonomy rules, and organic target density philosophy. Complex Generations operate Tabula Rasa (from a blank slate), dynamically co-anchor both the topological spiderweb and the editorial narrative across all seeds, preventing parametric gravity from collapsing into a single famous entity.
 - **Topology Density & Parity Mandate:** Multi-seed topology generation targets 10 to 14 NEW related artists (12 to 16 total artists with seeds). Labels are explicitly excluded from numerical caps and scale organically according to historical authenticity, achieving an overall organic target density of roughly 18 to 26 total Deep Cuts (Artists + Labels), eliminating rigid hallucination quotas.
 - **Dual-Structure Architecture:** When multiple seeds are submitted (`seeds.length > 1`), the prompt commands the model to construct two balanced, complementary layers:
   1. *The Crossover Bridge (4 to 6 artists + shared labels/genres):* Identifies authentic bands, imprints, and genres that legitimately connect multiple seeds through shared musical DNA, split releases, shared producers, record labels, or lived touring history.
   2. *Native Ecosystems (3 to 4 distinct scene peers per seed):* Radiates deeply into each seed's authentic regional, temporal, and stylistic ecosystem, giving each seed its own dedicated rabbit hole of 2nd-degree scene contemporaries rather than stopping at superficial connections.
+- **Global Bio & Asset Reuse Mandate:** All Deep Cuts generated during Tabula Rasa topology generation reuse existing cached profiles from `/artists` and `/labels` in Column 3 (`processCurationJob.ts`), achieving 100% biography, discography, artwork, and media reuse at $0.00 token cost and zero network latency while preserving bespoke multi-seed topology.
 - **Editorial Co-Anchoring:** The Magazine Roots Breakdown narrative must weave all input seeds as co-equal foundational pillars.
 - **Enforcement:** Enforced in `GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE` across `functions/src/services/curatorService.ts` and `services/geminiService.ts`, and verified during Column 3 hydration.
 

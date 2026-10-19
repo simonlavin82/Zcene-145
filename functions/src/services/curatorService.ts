@@ -595,18 +595,14 @@ export const GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = `I have an existing m
         IMPORTANT: Ensure that any double quotes within string values are properly escaped (e.g., "Artist \\"Name\\""). The final output must be perfectly valid JSON. Do not emit literal '\\n' strings; use standard JSON string encoding for line breaks. Your entire response MUST be ONLY the raw JSON object, without any surrounding text, explanations, or markdown code fences.`;
 
 export const GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = `Given the following list of seed artists: {{artists}}.
-We already have cached, independent music graphs for these seed artists.
-Your task is to perform a true co-equal "melting pot" traversal where all input seeds act as simultaneous structural foundations, avoiding any attention bias toward a single anchor artist. The output must be a single, valid JSON object with keys: 'nodes', and 'links'.
+Your task is to explore the genuine cultural, historical, and musical intersection of these seed artists from a blank slate (Tabula Rasa), performing a true co-equal "melting pot" traversal where all input seeds act as simultaneous structural foundations, avoiding any attention bias toward a single anchor artist. The output must be a single, valid JSON object with keys: 'nodes', and 'links'.
 'nodes' should be an array of objects, each with 'id', 'type', and 'group'. The 'type' can be 'artist', 'genre', 'label', 'country', or 'founded'.
 'links' should be an array of objects, each with 'source', 'target', 'value', 'forwardContext', and 'inverseContext' describing the directional relationship.
-
-The existing, cached nodes and connections are provided below as context:
-{{cachedSubgraphsContext}}
 
 Follow these rules precisely:
 1.  CANONICAL NAMING: For ALL nodes, use the canonical, professional spelling and capitalization as recognized by the music industry. For example, use "Radiohead" even if the seed provided was "radiohead", and "blink-182" with a lowercase 'b' and hyphen if that is its official name.
 2.  MANDATORY SEED NODES (CO-EQUAL ROOTS): You MUST ensure an 'artist' node exists for EVERY seed artist listed in {{artists}}. Assign a unique 'group' number for each seed artist (e.g. 1 for seed 1, 2 for seed 2). Treat every seed as a co-equal foundational anchor. If any seed artist has active filters, do not label them as "[Indirect recommendation]" or isolate them.
-3.  For each seed artist, find and add nodes for their primary genre, record label, country of origin, and the year they were formed/founded (YYYY). The 'id' for the year node must be the 4-digit year (e.g. "1994") and its type must be 'founded'. Reuse exact IDs and types for any existing metadata nodes from the cached subgraphs.
+3.  For each seed artist, find and add nodes for their primary genre, record label, country of origin, and the year they were formed/founded (YYYY). The 'id' for the year node must be the 4-digit year (e.g. "1994") and its type must be 'founded'. For metadata nodes (genre, label, country, founded), use canonical IDs and types.
 4.  TARGET ENTITY DENSITY & DUAL-STRUCTURE TOPOLOGY (RULE 27 — CROSSOVER BRIDGE + NATIVE ECOSYSTEMS):
     In addition, find and add 10 to 14 NEW related artists total across the seeds (bringing the total artist count including seeds to 12 to 16 artists), structured into two complementary layers:
     A. THE CROSSOVER BRIDGE (4 to 6 artists + shared labels/genres): Identify authentic bands, imprints, and genres that legitimately connect multiple seeds through shared musical DNA, split releases, shared producers, record labels, or lived touring history.
@@ -1179,9 +1175,8 @@ export const generateGraphDataBackend = async (
 
   if (isMultiSeed) {
       systemInstruction = GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE
-          .replace('{{cachedSubgraphsContext}}', cachedSubgraphsContext || "No pre-cached graphs available. Generate the topology from scratch.")
           .replace('{{artists}}', artists);
-      userPrompt = `Stitch together the music graphs for these seed artists: ${artists}. Use the provided cached graphs as context.`;
+      userPrompt = `Explore the genuine cultural, historical, and musical intersection of these seed artists: ${artists} from a blank slate. Map their crossover bridge and native scene ecosystems.`;
   } else if (isEnhancement) {
       const existingNodeIds = baseGraph!.nodes.map(n => `"${n.id}" (${n.type})`).join(', ');
       systemInstruction = GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE
@@ -1573,8 +1568,8 @@ export const generateGraphDataBackend = async (
   const finalNodes = Array.isArray(deduplicatedNodes) ? deduplicatedNodes : [];
   let mergedLinks = Array.isArray(validLinks) ? validLinks : [];
   
-  // Explicitly merge baseGraph nodes and links to preserve context
-  if (baseGraph) {
+  // Explicitly merge baseGraph nodes and links to preserve context (Single-Seed enhancement only; strictly bypassed in Tabula Rasa Multi-Seed)
+  if (baseGraph && !isMultiSeed) {
       if (baseGraph.nodes) {
           baseGraph.nodes.forEach(baseNode => {
               const normalizedBaseId = normalizeArtistId(baseNode.id);

@@ -4522,9 +4522,12 @@ const App: React.FC = () => {
         // receives clean textual labels for context. The backend will use 'baseGraph' and 'disambiguationHints'
         // to map generated canonical nodes back to their cache IDs.
         
-        // Ensure we explicitly generate a cachedSubgraphsContext if we have a pruned graph with nodes
+        // Architecture V33 [Rule 15 / Rule 27]: Tabula Rasa Gate.
+        // Complex Generations (Multi-Seed or 3-Tier Anchored) strictly bypass cachedSubgraphsContext
+        // and baseGraph so Gemini 3.1 Pro creates fresh bespoke connections from a blank slate.
+        const isComplexGeneration = (artistList.length > 1) || hasActiveFilters;
         let computedContext = undefined;
-        if (pruned && pruned.nodes && pruned.nodes.length > 0) {
+        if (!isComplexGeneration && pruned && pruned.nodes && pruned.nodes.length > 0) {
           computedContext = pruned.nodes.map(n => `"${n.id}" (${n.type})`).join(', ');
         }
         
@@ -4553,8 +4556,8 @@ const App: React.FC = () => {
           activeDisambiguationHints,
           activeDisambiguationGenres,
           activeOriginalQueries,
-          pruned || undefined,          // Base graph context
-          computedContext,              // Stringified cached subgraphs context for multi-seed
+          (!isComplexGeneration && pruned) ? pruned : undefined,          // Base graph context (suppressed in Tabula Rasa)
+          computedContext,                                                 // Stringified cached subgraphs context (suppressed in Tabula Rasa)
           undefined,                    // isSmartBypass
           isSandboxMode,                // isSandboxMode
           seedImageUrl,                 // seedImageUrl
