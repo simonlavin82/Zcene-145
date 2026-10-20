@@ -28,8 +28,11 @@ import {
 import {
   cleanLabelDisplayName,
   normalizeLabelId as frontendNormalizeLabelId,
-  normalizeGraphData as frontendNormalizeGraphData
+  normalizeGraphData as frontendNormalizeGraphData,
+  stripUndefinedProperties
 } from '../../services/artistCacheService';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
+import { sanitizeUndefinedProperties } from '../src/processCurationJob';
 
 describe('Architecture V30 & V31: 3-Tier Anchor System & Deep Cut Anti-Pollution Gates (Rule 8, Rule 40, Rule 41)', () => {
   describe('Phase 1: Canonical Registries & Constants', () => {
@@ -353,6 +356,68 @@ describe('Architecture V30 & V31: 3-Tier Anchor System & Deep Cut Anti-Pollution
     it('Enforces canonical metadata node taxonomy without cached subgraph dependency', () => {
       expect(GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE).toContain('For metadata nodes (genre, label, country, founded), use canonical IDs and types.');
       expect(GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE).not.toContain('Reuse exact IDs and types for any existing metadata nodes from the cached subgraphs');
+    });
+  });
+
+  describe('Phase 6: Data Lifecycle & Sentinel Preservation (sanitizeUndefinedProperties / updatedAt)', () => {
+    it('Preserves FieldValue.serverTimestamp(), deleteField(), and Timestamp instances without flattening to empty objects', () => {
+      const serverTs = FieldValue.serverTimestamp();
+      const delField = FieldValue.delete();
+      const incrementField = FieldValue.increment(1);
+      const nowTs = Timestamp.now();
+
+      const rawPayload = {
+        artistId: 'indecision',
+        cacheKey: 'indecision-us',
+        detailsCache: {
+          artist: 'Indecision',
+          summary: 'Legendary Brooklyn hardcore band',
+          emptyField: undefined,
+          validNull: null
+        },
+        updatedAt: serverTs,
+        deletedProp: delField,
+        counter: incrementField,
+        createdAt: nowTs,
+        staleUndefined: undefined
+      };
+
+      const sanitized = sanitizeUndefinedProperties(rawPayload);
+
+      // Verify Sentinel preservation
+      expect(sanitized.updatedAt).toBe(serverTs);
+      expect(sanitized.updatedAt instanceof FieldValue).toBe(true);
+      expect(sanitized.deletedProp).toBe(delField);
+      expect(sanitized.deletedProp instanceof FieldValue).toBe(true);
+      expect(sanitized.counter).toBe(incrementField);
+      expect(sanitized.createdAt).toBe(nowTs);
+      expect(sanitized.createdAt instanceof Timestamp).toBe(true);
+
+      // Verify that undefined is stripped and null is preserved
+      expect(sanitized.staleUndefined).toBeUndefined();
+      expect(sanitized.detailsCache.emptyField).toBeUndefined();
+      expect(sanitized.detailsCache.validNull).toBeNull();
+      expect(sanitized.detailsCache.artist).toBe('Indecision');
+    });
+
+    it('Preserves frontend stripUndefinedProperties for Firestore FieldValue and Timestamp instances', () => {
+      const serverTs = FieldValue.serverTimestamp();
+      const nowTs = Timestamp.now();
+
+      const frontendPayload = {
+        cacheKey: 'indecision-us',
+        updatedAt: serverTs,
+        createdAt: nowTs,
+        missing: undefined,
+        retained: 'ok'
+      };
+
+      const stripped = stripUndefinedProperties(frontendPayload as any);
+
+      expect(stripped.updatedAt).toBe(serverTs);
+      expect(stripped.createdAt).toBe(nowTs);
+      expect(stripped.missing).toBeUndefined();
+      expect(stripped.retained).toBe('ok');
     });
   });
 });

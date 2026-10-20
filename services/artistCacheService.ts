@@ -7,6 +7,8 @@ import {
   updateDoc,
   increment,
   serverTimestamp,
+  FieldValue,
+  Timestamp,
   DocumentSnapshot,
 } from 'firebase/firestore';
 import { GraphData, Node, Link, ArtistCacheEntry, DiscoveryFilters, NodeDetails } from '../types';
@@ -94,12 +96,33 @@ export const isArtistIdMatch = (a: string, b: string): boolean => {
 };
 
 /**
+ * Helper to identify Firestore Sentinel values (FieldValue transforms like serverTimestamp(),
+ * deleteField(), increment(), and Timestamp objects) across both Client and Admin SDKs.
+ */
+function isFirestoreSentinel(obj: any): boolean {
+  if (!obj || typeof obj !== 'object') return false;
+  if (obj instanceof FieldValue || obj instanceof Timestamp) return true;
+  const cName = obj.constructor ? obj.constructor.name : '';
+  if (cName.includes('FieldValue') || cName.includes('Timestamp') || cName.includes('Transform')) return true;
+  if (typeof obj.isEqual === 'function' && (obj.methodName || obj._methodName || obj.nanoseconds !== undefined)) return true;
+  return false;
+}
+
+/**
  * Recursively removes any property whose value is strictly `undefined` from an object or array.
  * Required before passing objects to Firestore SDK (`setDoc`, `updateDoc`, `addDoc`) which
  * throws synchronous validation exceptions on `undefined` values.
+ *
+ * CRITICAL (FieldValue / Timestamp Preservation):
+ * Must explicitly preserve Firestore Sentinel values (FieldValue transforms like serverTimestamp(),
+ * deleteField(), increment(), and Timestamp objects). Stripping or traversing them as generic objects
+ * removes their prototype/metadata and flattens them into empty objects ({}), corrupting timestamps into empty maps.
  */
 export const stripUndefinedProperties = <T>(obj: T): T => {
   if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+  if (isFirestoreSentinel(obj)) {
     return obj;
   }
   if (Array.isArray(obj)) {

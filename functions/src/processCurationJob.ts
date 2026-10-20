@@ -97,13 +97,34 @@ function validateArtistDetailsSchema(artistId: string, details: any): void {
 }
 
 /**
+ * Helper to identify Firestore Sentinel values (FieldValue transforms like serverTimestamp(),
+ * deleteField(), increment(), and Timestamp objects) across both Admin and Client SDKs.
+ */
+function isFirestoreSentinel(obj: any): boolean {
+  if (!obj || typeof obj !== 'object') return false;
+  if (obj instanceof FieldValue || obj instanceof Timestamp) return true;
+  const cName = obj.constructor ? obj.constructor.name : '';
+  if (cName.includes('FieldValue') || cName.includes('Timestamp') || cName.includes('Transform')) return true;
+  if (typeof obj.isEqual === 'function' && (obj.methodName || obj._methodName || obj.nanoseconds !== undefined)) return true;
+  return false;
+}
+
+/**
  * Recursively removes any undefined properties from an object to prevent
  * Firestore serialization errors. Note: null values are intentionally preserved —
  * Firestore's Node.js SDK accepts null as a valid stored value, and stripping it
  * would cause fields like imageUrl to be entirely absent from the document.
+ * 
+ * CRITICAL (FieldValue / Timestamp Preservation):
+ * Must explicitly preserve Firestore Sentinel values (FieldValue transforms like serverTimestamp(),
+ * deleteField(), increment(), and Timestamp objects). Stripping or traversing them as generic objects
+ * removes their prototype/metadata and flattens them into empty objects ({}), corrupting timestamps into empty maps.
  */
-function sanitizeUndefinedProperties(obj: any): any {
+export function sanitizeUndefinedProperties(obj: any): any {
   if (obj === null || obj === undefined) return null;
+  if (isFirestoreSentinel(obj)) {
+    return obj;
+  }
   if (Array.isArray(obj)) {
     return obj.map(item => sanitizeUndefinedProperties(item));
   }

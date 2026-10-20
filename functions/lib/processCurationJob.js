@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.processCurationJob = void 0;
+exports.sanitizeUndefinedProperties = sanitizeUndefinedProperties;
 const firestore_1 = require("firebase-functions/v2/firestore");
 const app_1 = require("firebase-admin/app");
 const firestore_2 = require("firebase-admin/firestore");
@@ -71,14 +72,38 @@ function validateArtistDetailsSchema(artistId, details) {
     }
 }
 /**
+ * Helper to identify Firestore Sentinel values (FieldValue transforms like serverTimestamp(),
+ * deleteField(), increment(), and Timestamp objects) across both Admin and Client SDKs.
+ */
+function isFirestoreSentinel(obj) {
+    if (!obj || typeof obj !== 'object')
+        return false;
+    if (obj instanceof firestore_2.FieldValue || obj instanceof firestore_2.Timestamp)
+        return true;
+    const cName = obj.constructor ? obj.constructor.name : '';
+    if (cName.includes('FieldValue') || cName.includes('Timestamp') || cName.includes('Transform'))
+        return true;
+    if (typeof obj.isEqual === 'function' && (obj.methodName || obj._methodName || obj.nanoseconds !== undefined))
+        return true;
+    return false;
+}
+/**
  * Recursively removes any undefined properties from an object to prevent
  * Firestore serialization errors. Note: null values are intentionally preserved —
  * Firestore's Node.js SDK accepts null as a valid stored value, and stripping it
  * would cause fields like imageUrl to be entirely absent from the document.
+ *
+ * CRITICAL (FieldValue / Timestamp Preservation):
+ * Must explicitly preserve Firestore Sentinel values (FieldValue transforms like serverTimestamp(),
+ * deleteField(), increment(), and Timestamp objects). Stripping or traversing them as generic objects
+ * removes their prototype/metadata and flattens them into empty objects ({}), corrupting timestamps into empty maps.
  */
 function sanitizeUndefinedProperties(obj) {
     if (obj === null || obj === undefined)
         return null;
+    if (isFirestoreSentinel(obj)) {
+        return obj;
+    }
     if (Array.isArray(obj)) {
         return obj.map(item => sanitizeUndefinedProperties(item));
     }
