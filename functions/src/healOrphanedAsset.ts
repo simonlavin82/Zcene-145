@@ -94,7 +94,7 @@ export const healOrphanedAsset = onCall({
         return { success: true, canonicalId, alreadyExisted: true, data: cachedDetails };
       }
 
-      console.log(`[JIT Healer] Existing doc ${collectionName}/${canonicalId} failed V31 qualification gate (isStub: ${isStub}). Overwriting with full synthesis...`);
+      console.log(`[JIT Healer] Existing doc ${collectionName}/${canonicalId} failed V33 qualification gate (isStub: ${isStub}). Overwriting with full synthesis...`);
     }
 
     // 2. Global Auto-Kill Circuit Breaker: Count platform-wide receipts logged in rolling 24 hours

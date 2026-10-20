@@ -38,8 +38,8 @@ try {
 }
 
 /**
- * Sanity Check (Architecture V31 / Rule 8 & Rule 40):
- * Validate that detailsCache is a structured object matching the V31 schema,
+ * Sanity Check (Architecture V33 / Rule 8 & Rule 40):
+ * Validate that detailsCache is a structured object matching the V33 schema,
  * and specifically reject raw strings, arrays, empty discographies, or prose-fallback stubs
  * to prevent database pollution.
  */
@@ -92,7 +92,7 @@ function validateArtistDetailsSchema(artistId: string, details: any): void {
   }
 
   if (!isFullyQualifiedEntityProfile(details, false)) {
-    throw new Error(`[Schema Sanity Check / Rule 40] detailsCache failed V31 isFullyQualifiedEntityProfile check for artist: ${artistId}`);
+    throw new Error(`[Schema Sanity Check / Rule 40] detailsCache failed V33 isFullyQualifiedEntityProfile check for artist: ${artistId}`);
   }
 }
 
@@ -602,7 +602,7 @@ export const processCurationJob = onDocumentCreated({
                         }
                       }
                       
-                      // Architecture V31 (Rule 8 & Rule 40) Universal Cache Validation:
+                      // Architecture V33 (Rule 8 & Rule 40) Universal Cache Validation:
                       // A cached document is only a valid hit if it satisfies isFullyQualifiedEntityProfile
                       // (summary > 50 chars, genre, origin, founded, non-empty discography >= 1 album for artists,
                       // authentic recommendationReason free of prose-fallback text, and non-empty imageUrl).
@@ -611,7 +611,7 @@ export const processCurationJob = onDocumentCreated({
                         details = cachedDetails;
                         console.log(`[Curation Backend] Direct cache hit (complete) for details of: ${artistNormId}`);
                       } else if (cachedDetails) {
-                        console.log(`[Curation Backend] Cache doc found but failed V31 qualification gate for: ${artistNormId}. Routing to full hydration.`);
+                        console.log(`[Curation Backend] Cache doc found but failed V33 qualification gate for: ${artistNormId}. Routing to full hydration.`);
                       }
                     }
                   }
@@ -1775,7 +1775,7 @@ export const processCurationJob = onDocumentCreated({
             if (!isLabel && recDetails) {
               validateArtistDetailsSchema(recNorm, normalizeDetailsForWrite(recDetails));
             } else if (isLabel && recDetails && !isFullyQualifiedEntityProfile(recDetails, true)) {
-              throw new Error(`[Schema Sanity Check / Rule 40] Label detailsCache failed V31 isFullyQualifiedEntityProfile check for label: ${recNorm}`);
+              throw new Error(`[Schema Sanity Check / Rule 40] Label detailsCache failed V33 isFullyQualifiedEntityProfile check for label: ${recNorm}`);
             }
           } catch (validationErr: any) {
             console.warn(`[Curation Backend] Recommendation cache write skipped for "${recNorm}" — schema validation failed: ${validationErr.message}`);

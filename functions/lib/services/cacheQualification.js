@@ -89,7 +89,7 @@ const parseGraphField = (graphField) => {
 };
 exports.parseGraphField = parseGraphField;
 /**
- * Architecture V31 (Rule 8 & Rule 40) — Unified Entity Profile Qualification Gate.
+ * Architecture V33 (Rule 8 & Rule 40) — Unified Entity Profile Qualification Gate.
  *
  * Enforces that a cached or newly hydrated entity profile (`detailsCache`) is complete
  * and free of prose-fallback degradation before being accepted as a Read Hit or written
@@ -175,7 +175,7 @@ const qualifyCacheEntry = (data, seedId) => {
     if (!hasRationale)
         missing.push('synthesisRationale');
     const isStructurallyUsable = hasNodes && hasEdges && hasRationale;
-    // ── 2. Seed profile (bio / genre / image / V31 anti-pollution checks) ─────
+    // ── 2. Seed profile (bio / genre / image / V33 anti-pollution checks) ─────
     const profile = (0, exports.extractSeedProfile)(data.detailsCache, seedId || data.artistId || data.cacheKey);
     const bio = profile?.summary || profile?.bio || profile?.description || profile?.text || '';
     const genreRaw = profile?.details?.genre || profile?.genre || data?.details?.genre || '';

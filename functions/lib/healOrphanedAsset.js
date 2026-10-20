@@ -80,7 +80,7 @@ exports.healOrphanedAsset = (0, https_1.onCall)({
                 console.log(`[JIT Healer] Complete Tier 1 cache hit for ${collectionName}/${canonicalId}. Bypassing.`);
                 return { success: true, canonicalId, alreadyExisted: true, data: cachedDetails };
             }
-            console.log(`[JIT Healer] Existing doc ${collectionName}/${canonicalId} failed V31 qualification gate (isStub: ${isStub}). Overwriting with full synthesis...`);
+            console.log(`[JIT Healer] Existing doc ${collectionName}/${canonicalId} failed V33 qualification gate (isStub: ${isStub}). Overwriting with full synthesis...`);
         }
         // 2. Global Auto-Kill Circuit Breaker: Count platform-wide receipts logged in rolling 24 hours
         const twentyFourHoursAgoMs = Date.now() - 24 * 60 * 60 * 1000;

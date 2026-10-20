@@ -247,4 +247,26 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
   2. **Level 2 (Hard Spatial & Temporal Guardrails):** Bounded Era Slider (`1965–2026`, inclusive `<` and `>` year bounds; unfiltered only when both thumbs rest at `1965` and `2026`) and 22 Canonical Countries (`CANONICAL_COUNTRIES_22` with mutually exclusive `Include | Exclude` toggle). Enforced at three gates: Gemini 3.1 Pro prompt rules, Column 2 post-processing (`curatorService.ts`), and Column 3 **Step 2B Post-Hydration Boundary Audit** (`processCurationJob.ts`) prior to Step 3 Magazine synthesis (so boundary violators are excised from both `finalGraph` and `detailsCacheEntries` before prose generation).
   3. **Level 3 (Dual-Layer Scene Gravity & Granular Telemetry):** Canonical Genres (`CANONICAL_GENRE_TAXONOMY`) and Creatable Anchor Labels (`anchorLabels`, normalized via `normalizeLabelId`). Treated strictly as soft gravitational pulls—never hard client or server node-deletion gates. When a Level 3 anchor (such as a 1990s label) has no factual signings among bands founded inside the Level 2 era window, the engine weaves that label as sonic/historical gravity in the Editorial Narrative while refusing to hallucinate false graph edges, and records strict physical-node `anchorResolution` telemetry (`"Tier 1 + Tier 2 + Tier 3 (Full Parity)"`, `"Tier 1 + Tier 2 + Tier 3 (Genre Applied; Label Bypassed — Narrative Gravity Only)"`, `"Tier 1 + Tier 2 + Tier 3 (Label Applied; Genre Bypassed — Narrative Gravity Only)"`, or `"Tier 1 + Tier 2 Applied (Tier 3 bypassed due to boundary conflict)"`).
 
+### 42. Data Lifecycle, 3-Tier Storage Matrix & Strict createdAt TTL Enforcement
+- **Rule:** Zcene enforces a strict 3-Tier Storage Matrix across all Firestore collections. In Tier 1 (Global Assets: `/artists` and `/labels`), the 365-day expiration clock is permanently anchored to `createdAt`. Mutations to `updatedAt` (such as appending a spiderweb, promoting a Deep Cut stub to a Primary Seed during partial generation, or self-healing missing fields) **DO NOT reset the 365-day biographical lifespan**.
+- **3-Tier Storage Matrix Invariants:**
+  1. **Tier 1: Global Assets (`/artists/{id}`, `/labels/{id}`):**
+     - `createdAt`: Immutable (Genesis timestamp).
+     - `updatedAt`: Mutable (Tracks spiderweb attachment, partial generation, or schema migrations).
+     - `expireAt`: Soft-expires 365 days strictly from `createdAt`.
+     - *Lifecycle Rule:* Soft-expires 365 days from `createdAt` strictly. `updatedAt` mutations DO NOT reset the 365-day biographical lifespan. Stale nodes (> 365 days) are ONLY refreshed when intersected and funded by a natural user-initiated generation. Automated background cron-sweeps and janitorial scanners are strictly forbidden (Anti-Sweep Law, Rule 37).
+  2. **Tier 2: Ephemeral Snapshots (`/sharedZcenes/{id}`):**
+     - `createdAt`: Immutable.
+     - `updatedAt`: NULL (Read-Only immutable snapshot).
+     - `expireAt`: +30 Days Hard TTL.
+     - Coordinates stripped (Selective Coordinate Amnesia, Rule 25) to enforce organic guest recalculation.
+  3. **Tier 3: Owned Projects (`users/{uid}/projects/{id}`):**
+     - `createdAt`: Immutable.
+     - `updatedAt`: Mutable (Project autosave).
+     - `expireAt`: NULL (Permanent user storage, no TTL).
+     - Preserves settled positions in `canvasLayout` via Coordinate Memory (Rule 21).
+- **TTL Cache Bouncer (`isCacheExpired`):**
+  - Cache freshness evaluation in `services/artistCacheService.ts` checks `data.createdAt` exclusively. `updatedAt` is completely ignored during cache evaluation.
+  - *Fail-Safe Expiry:* Any document lacking a valid `createdAt` timestamp, or containing a corrupted non-date value, fails safe and evaluates to expired (`true`), forcing live verification when intersected by a curation run.
+
 

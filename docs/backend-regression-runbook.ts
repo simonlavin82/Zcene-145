@@ -1,5 +1,5 @@
 export const BACKEND_REGRESSION_RUNBOOK = `
-# V31 Regression Suite (Full-Stack)
+# V33 Regression Suite (Full-Stack)
 
 This suite locks down the Zcene generation engine locally without incurring Gemini API costs or requiring the heavy Java Firebase Emulator.
 
@@ -12,7 +12,7 @@ cd functions && npx vitest run tests/pipeline.test.ts
 # Run V29 Read/Write Gate & border-town slug tests
 cd functions && npx vitest run tests/v29-gates.test.ts
 
-# Run V30/V31 3-Tier Anchor System, Rule 8, Rule 40 & Rule 41 tests
+# Run V33 3-Tier Anchor System, Rule 8, Rule 40 & Rule 41 tests
 cd functions && npx vitest run tests/v30-anchors.test.ts
 
 # Run JIT Asset Healer & circuit breaker tests
@@ -44,7 +44,7 @@ npx vitest --ui
     *   *Assertion (Escape Hatch Re-Query Bouncer - \`tests/v15-core.test.tsx\`):* Asserts that the Re-Query Bouncer synchronously validates manual "Not this artist?" origin/genre hints via Flash 3.6, hard-blocking unverified inputs (\`isValid: false\`) with an inline UI error banner while locking "Confirm & Generate", and cleanly unlocking upon verified input.
     *   *Assertion (Zero Blind Trust & Root-as-Router Contract):* Asserts that pre-flight resolution synchronously writes Evolved Stub contracts (\`_isStub: true\`, \`isAmbiguous: false\`, \`redirectTo: "id-iso"\`, \`candidates: [...]\`) to Firestore prior to background worker triggering, and ensures bare root IDs never hold entity payloads while verified payloads resolve to geographically suffixed documents (\`artists/{id}-{iso}\`).
     *   *Assertion (Autosave Immunity):* Asserts that the frontend accurately maps returned \`apiUsage\`, \`generationType\`, and \`anchorResolution\`, and that subsequent autosaves (\`merge: true\`) do not overwrite these fields with 'Clone'.
-4.  **Direct Hit (Cache) & V31 Read/Write Gate Qualification:** Validates the short-circuit logic successfully returns cached snapshots without triggering the generative loop, and asserts that \`isFullyQualifiedEntityProfile\` blocks prose-fallback stubs at both the Read Gate and Write Gate while permitting valid terminal \`imageUrl: "not-found"\` monogram profiles (\`discography.length > 0\`).
+4.  **Direct Hit (Cache) & V33 Read/Write Gate Qualification:** Validates the short-circuit logic successfully returns cached snapshots without triggering the generative loop, and asserts that \`isFullyQualifiedEntityProfile\` blocks prose-fallback stubs at both the Read Gate and Write Gate while permitting valid terminal \`imageUrl: "not-found"\` monogram profiles (\`discography.length > 0\`).
 5.  **Share Payload Blacklist Mutation:** Asserts that the Universal Serializer generates a 1:1 clone, and that the Ephemeral Blacklist successfully injects a 30-day TTL, strips canvasLayout, and purges rigid coordinates (fx, fy) before generating guest links.
 6.  **Just-In-Time (JIT) Asset Healing & Circuit Breaker (404 Emergency Parachute ONLY):**
     *   *Simulated 404 Miss:* Asserts that a missing \`detailsCache\` entry triggers \`healOrphanedAsset\` and resolves a valid profile.

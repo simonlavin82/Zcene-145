@@ -1221,16 +1221,48 @@ export const readLegacyArtistCache = async (
 };
 
 /**
- * Checks if the timestamp is older than 365 days (1 year).
- * Accepts an entire document data object or a single timestamp field for legacy compatibility.
+ * Checks if the document's biographical data is older than 365 days (1 year).
+ * 
+ * V33 Data Lifecycle Rule (Rule 42):
+ * Expiration is calculated STRICTLY against `createdAt`.
+ * `updatedAt` mutations (e.g., appending a spiderweb, promoting a stub to a primary seed,
+ * or self-healing missing fields) DO NOT reset the 365-day biographical lifespan.
+ * 
+ * Edge-case safety:
+ * - If a document object lacks a valid `createdAt`, it fails safe and evaluates to expired (`true`).
+ * - Supports Firestore Admin Timestamps (_seconds), Client Timestamps (seconds, toDate()),
+ *   native Date instances, ISO date strings, and numeric epoch milliseconds.
+ * - Accepts direct scalar timestamps for backward compatibility.
  */
 export const isCacheExpired = (dataOrTimestamp: any): boolean => {
   if (!dataOrTimestamp) return true;
-  
-  // Handle full data object with fallback priority
-  const ts = dataOrTimestamp.updatedAt || dataOrTimestamp.createdAt || dataOrTimestamp;
-  
+
+  let ts: any;
+
+  // 1. Distinguish document object vs. scalar timestamp
+  if (typeof dataOrTimestamp === 'object' && dataOrTimestamp !== null && !(dataOrTimestamp instanceof Date)) {
+    if ('createdAt' in dataOrTimestamp) {
+      // Document object: calculate strictly from createdAt; ignore updatedAt completely
+      ts = dataOrTimestamp.createdAt;
+    } else if (
+      typeof dataOrTimestamp.toDate === 'function' ||
+      typeof dataOrTimestamp.seconds === 'number' ||
+      typeof dataOrTimestamp._seconds === 'number'
+    ) {
+      // Direct Firestore Timestamp scalar (backward compatibility)
+      ts = dataOrTimestamp;
+    } else {
+      // Document object missing createdAt -> fail safe expired
+      return true;
+    }
+  } else {
+    // Direct scalar: Date instance, ISO date string, epoch millisecond number
+    ts = dataOrTimestamp;
+  }
+
   if (!ts) return true;
+
+  // 2. Parse timestamp across all supported SDK & runtime variants
   let date: Date;
   if (typeof ts.toDate === 'function') {
     date = ts.toDate();
@@ -1238,16 +1270,23 @@ export const isCacheExpired = (dataOrTimestamp: any): boolean => {
     date = ts;
   } else if (typeof ts === 'string') {
     date = new Date(ts);
-  } else if (ts.seconds) {
+  } else if (typeof ts.seconds === 'number') {
     date = new Date(ts.seconds * 1000);
+  } else if (typeof ts._seconds === 'number') {
+    date = new Date(ts._seconds * 1000);
   } else if (typeof ts === 'number') {
     date = new Date(ts);
-  } else if (ts.nanoseconds && typeof ts.seconds === 'number') {
-    date = new Date(ts.seconds * 1000);
   } else {
+    // Corrupted field (e.g. empty object `{}` from legacy serialization bug)
     return true;
   }
-  
+
+  // 3. Reject invalid dates (e.g. new Date('invalid string'))
+  if (isNaN(date.getTime())) {
+    return true;
+  }
+
+  // 4. Strict 365-day evaluation
   const oneYearMs = 365 * 24 * 60 * 60 * 1000;
   return (Date.now() - date.getTime()) > oneYearMs;
 };

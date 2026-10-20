@@ -29,12 +29,13 @@ import {
   cleanLabelDisplayName,
   normalizeLabelId as frontendNormalizeLabelId,
   normalizeGraphData as frontendNormalizeGraphData,
-  stripUndefinedProperties
+  stripUndefinedProperties,
+  isCacheExpired
 } from '../../services/artistCacheService';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { sanitizeUndefinedProperties } from '../src/processCurationJob';
 
-describe('Architecture V30 & V31: 3-Tier Anchor System & Deep Cut Anti-Pollution Gates (Rule 8, Rule 40, Rule 41)', () => {
+describe('Architecture V33: 3-Tier Anchor System & Deep Cut Anti-Pollution Gates (Rule 8, Rule 40, Rule 41, Rule 42)', () => {
   describe('Phase 1: Canonical Registries & Constants', () => {
     it('Enforces strictly bounded era range 1965–2026', () => {
       expect(ERA_MIN_BOUND).toBe(1965);
@@ -184,7 +185,7 @@ describe('Architecture V30 & V31: 3-Tier Anchor System & Deep Cut Anti-Pollution
     });
   });
 
-  describe('Phase 4: Architecture V31 Deep Cut Qualification & Anti-Pollution Gates (Rule 8 & Rule 40)', () => {
+  describe('Phase 4: Architecture V33 Deep Cut Qualification & Anti-Pollution Gates (Rule 8 & Rule 40)', () => {
     const validArtistProfile = {
       summary: 'Koyo is a Long Island melodic hardcore band formed in 2020 by members of Typecaste, Hangman, and Rain of Salvation.',
       details: {
@@ -418,6 +419,64 @@ describe('Architecture V30 & V31: 3-Tier Anchor System & Deep Cut Anti-Pollution
       expect(stripped.createdAt).toBe(nowTs);
       expect(stripped.missing).toBeUndefined();
       expect(stripped.retained).toBe('ok');
+    });
+  });
+
+  describe('Phase 7: Data Lifecycle & Strict createdAt TTL Enforcement (Rule 42)', () => {
+    const now = Date.now();
+    const fourHundredDaysAgo = new Date(now - 400 * 24 * 60 * 60 * 1000);
+    const tenDaysAgo = new Date(now - 10 * 24 * 60 * 60 * 1000);
+
+    it('Strictly evaluates TTL from createdAt and completely ignores fresh updatedAt', () => {
+      // Deep cut created 400 days ago, promoted to Primary Seed today (updatedAt = now)
+      const promotedOldDoc = {
+        artistId: 'indecision-us',
+        createdAt: fourHundredDaysAgo,
+        updatedAt: new Date(now) // Fresh timestamp
+      };
+
+      // MUST be expired because the biographical data is 400 days old
+      expect(isCacheExpired(promotedOldDoc)).toBe(true);
+    });
+
+    it('Maintains unexpired state when createdAt is fresh, regardless of updatedAt', () => {
+      const freshDoc = {
+        artistId: 'turnstile-us',
+        createdAt: tenDaysAgo,
+        updatedAt: fourHundredDaysAgo // Even if updatedAt was somehow older or undefined
+      };
+
+      expect(isCacheExpired(freshDoc)).toBe(false);
+    });
+
+    it('Fails safe (expired = true) when createdAt is missing, null, or corrupted', () => {
+      expect(isCacheExpired({ artistId: 'no-created-at', updatedAt: new Date(now) })).toBe(true);
+      expect(isCacheExpired({ artistId: 'null-created-at', createdAt: null })).toBe(true);
+      expect(isCacheExpired({ artistId: 'empty-obj-created-at', createdAt: {} })).toBe(true);
+      expect(isCacheExpired({ artistId: 'invalid-string', createdAt: 'not-a-date' })).toBe(true);
+      expect(isCacheExpired(null)).toBe(true);
+      expect(isCacheExpired(undefined)).toBe(true);
+    });
+
+    it('Handles all timestamp formats for createdAt (Firestore Timestamp, Date, ISO string, epoch ms)', () => {
+      const adminTimestamp = Timestamp.fromDate(tenDaysAgo);
+      expect(isCacheExpired({ createdAt: adminTimestamp })).toBe(false);
+      expect(isCacheExpired({ createdAt: tenDaysAgo })).toBe(false);
+      expect(isCacheExpired({ createdAt: tenDaysAgo.toISOString() })).toBe(false);
+      expect(isCacheExpired({ createdAt: tenDaysAgo.getTime() })).toBe(false);
+
+      const expiredTimestamp = Timestamp.fromDate(fourHundredDaysAgo);
+      expect(isCacheExpired({ createdAt: expiredTimestamp })).toBe(true);
+      expect(isCacheExpired({ createdAt: fourHundredDaysAgo })).toBe(true);
+      expect(isCacheExpired({ createdAt: fourHundredDaysAgo.toISOString() })).toBe(true);
+      expect(isCacheExpired({ createdAt: fourHundredDaysAgo.getTime() })).toBe(true);
+    });
+
+    it('Supports backward-compatible scalar timestamp evaluation', () => {
+      expect(isCacheExpired(Timestamp.fromDate(tenDaysAgo))).toBe(false);
+      expect(isCacheExpired(Timestamp.fromDate(fourHundredDaysAgo))).toBe(true);
+      expect(isCacheExpired(tenDaysAgo)).toBe(false);
+      expect(isCacheExpired(fourHundredDaysAgo)).toBe(true);
     });
   });
 });

@@ -20,8 +20,8 @@ catch (e) {
     // Ignore if already set by another function module
 }
 /**
- * Sanity Check (Architecture V31 / Rule 8 & Rule 40):
- * Validate that detailsCache is a structured object matching the V31 schema,
+ * Sanity Check (Architecture V33 / Rule 8 & Rule 40):
+ * Validate that detailsCache is a structured object matching the V33 schema,
  * and specifically reject raw strings, arrays, empty discographies, or prose-fallback stubs
  * to prevent database pollution.
  */
@@ -68,7 +68,7 @@ function validateArtistDetailsSchema(artistId, details) {
         throw new Error(`[Schema Sanity Check / Rule 40] detailsCache.recommendationReason is missing or contains forbidden prose fallback for artist: ${artistId}`);
     }
     if (!(0, cacheQualification_1.isFullyQualifiedEntityProfile)(details, false)) {
-        throw new Error(`[Schema Sanity Check / Rule 40] detailsCache failed V31 isFullyQualifiedEntityProfile check for artist: ${artistId}`);
+        throw new Error(`[Schema Sanity Check / Rule 40] detailsCache failed V33 isFullyQualifiedEntityProfile check for artist: ${artistId}`);
     }
 }
 /**
@@ -550,7 +550,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                                 cachedDetails = Array.isArray(cachedDetails[0]) ? cachedDetails[0][1] : cachedDetails[0];
                                             }
                                         }
-                                        // Architecture V31 (Rule 8 & Rule 40) Universal Cache Validation:
+                                        // Architecture V33 (Rule 8 & Rule 40) Universal Cache Validation:
                                         // A cached document is only a valid hit if it satisfies isFullyQualifiedEntityProfile
                                         // (summary > 50 chars, genre, origin, founded, non-empty discography >= 1 album for artists,
                                         // authentic recommendationReason free of prose-fallback text, and non-empty imageUrl).
@@ -560,7 +560,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                             console.log(`[Curation Backend] Direct cache hit (complete) for details of: ${artistNormId}`);
                                         }
                                         else if (cachedDetails) {
-                                            console.log(`[Curation Backend] Cache doc found but failed V31 qualification gate for: ${artistNormId}. Routing to full hydration.`);
+                                            console.log(`[Curation Backend] Cache doc found but failed V33 qualification gate for: ${artistNormId}. Routing to full hydration.`);
                                         }
                                     }
                                 }
@@ -1620,7 +1620,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             validateArtistDetailsSchema(recNorm, normalizeDetailsForWrite(recDetails));
                         }
                         else if (isLabel && recDetails && !(0, cacheQualification_1.isFullyQualifiedEntityProfile)(recDetails, true)) {
-                            throw new Error(`[Schema Sanity Check / Rule 40] Label detailsCache failed V31 isFullyQualifiedEntityProfile check for label: ${recNorm}`);
+                            throw new Error(`[Schema Sanity Check / Rule 40] Label detailsCache failed V33 isFullyQualifiedEntityProfile check for label: ${recNorm}`);
                         }
                     }
                     catch (validationErr) {
