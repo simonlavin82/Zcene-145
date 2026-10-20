@@ -982,6 +982,8 @@ const App: React.FC = () => {
   useEffect(() => { projectStatusRef.current = projectStatus; }, [projectStatus]);
   useEffect(() => { activeJobIdRef.current = activeJobId; }, [activeJobId]);
 
+  const isCurrentlyCurating = projectStatus === 'curating' || !!activeJobId;
+
   // One-time startup database migration for 'needtobreathe' collision resolution
   useEffect(() => {
     const performNeedtobreatheMigration = async () => {
@@ -2960,6 +2962,7 @@ const App: React.FC = () => {
     
     setGraphData(normalizedGraph);
     setSeedArtists(artistsString);
+    setProjectStatus('completed');
 
     setIsLoading(false);
     isFetchingDetailsRef.current = false;
@@ -3006,6 +3009,7 @@ const App: React.FC = () => {
     isHydratingSessionRef.current = true;
     isProjectLoadingRef.current = true;
     setIsLoading(true);
+    setProjectStatus('curating');
     if (abortControllerRef.current) abortControllerRef.current.abort();
     let controller = new AbortController();
     abortControllerRef.current = controller;
@@ -3147,10 +3151,6 @@ const App: React.FC = () => {
         }));
       }
 
-      setIsLoading(false);
-      isHydratingSessionRef.current = false;
-      isProjectLoadingRef.current = false;
-
       // Phase 1.5: Total Cache Miss Branch (API Lookup with Early Token Gate)
       if (!bypassDisambiguation && !skipCacheLookup && cacheCandidatesPerSeed.some(s => !s.isKnownCacheHit)) {
         // Trigger Password/Token Gate Early for API Authorization
@@ -3160,6 +3160,10 @@ const App: React.FC = () => {
             sessionTokenApprovedRef.current = false;
             setActiveNodeIds(prevActiveNodeIds);
             setSeedArtists(prevSeedArtists);
+            setIsLoading(false);
+            isHydratingSessionRef.current = false;
+            isProjectLoadingRef.current = false;
+            setProjectStatus('idle');
             return;
           }
           sessionTokenApprovedRef.current = true;
@@ -3236,6 +3240,10 @@ const App: React.FC = () => {
             sessionTokenApprovedRef.current = false;
             setActiveNodeIds(prevActiveNodeIds);
             setSeedArtists(prevSeedArtists);
+            setIsLoading(false);
+            isHydratingSessionRef.current = false;
+            isProjectLoadingRef.current = false;
+            setProjectStatus('idle');
             return;
           }
           sessionTokenApprovedRef.current = true;
@@ -3264,6 +3272,10 @@ const App: React.FC = () => {
             sessionTokenApprovedRef.current = false;
             setActiveNodeIds(prevActiveNodeIds);
             setSeedArtists(prevSeedArtists);
+            setIsLoading(false);
+            isHydratingSessionRef.current = false;
+            isProjectLoadingRef.current = false;
+            setProjectStatus('idle');
             return;
           }
       }
@@ -6074,6 +6086,9 @@ const App: React.FC = () => {
       console.log(`[Re-hydration Hook] Project status: failed. Clearing loading state.`);
       setIsLoading(false);
     } else if (!projectStatus || projectStatus === 'idle') {
+      if (isHydratingSessionRef.current || isProjectLoadingRef.current || activeJobIdRef.current || !!consolidatedValidationDialog?.isOpen || !!tokenConfirmation) {
+        return;
+      }
       console.log(`[Re-hydration Hook] Project status: idle/null. Clearing loading state.`);
       setIsLoading(false);
     }
@@ -7629,7 +7644,7 @@ const App: React.FC = () => {
                 
                 handleGenerateGraph(n, false, null);
               }}
-              isLoading={isLoading} isHydrating={isProjectLoadingRef.current}
+              isLoading={isLoading || isCurrentlyCurating} isHydrating={isProjectLoadingRef.current || (isCurrentlyCurating && !!activeJobId)}
               onCancelGeneration={handleCancel} onFileUpload={(f) => {
                 const r = new FileReader(); r.onload = (e) => {
                   const t = e.target?.result as string;
