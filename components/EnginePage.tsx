@@ -165,7 +165,7 @@ const ARCHITECTURE_RULES = [
     { 
         id: 27, 
         title: "Unified Generation DNA & Multi-Seed Co-Anchoring", 
-        desc: "All generation modes share unified prompt DNA and organic target density (~18–26 Deep Cuts). Complex Generations operate Tabula Rasa (blank slate), dynamically co-anchor both the topological spiderweb and the editorial narrative across all seeds. The graph constructs both The Crossover Bridge (4–6 shared-DNA artists/labels) and Native Ecosystems (3–4 scene peers per seed), targeting 12–16 total artists while labels scale organically without rigid quotas. All generated Deep Cuts reuse cached global bio/assets in Column 3, achieving $0.00 zero-latency hydration while preserving bespoke multi-seed topology." 
+        desc: "All generation modes share unified prompt DNA and organic target density (~18–26 Deep Cuts). Complex Generations operate Tabula Rasa (blank slate), dynamically co-anchor both the topological spiderweb and the editorial narrative across all seeds. The graph targets 10 to 16 NEW related artists (12 to 18 total artists with seeds), balancing The Crossover Bridge (5 to 6 shared-DNA artists/labels) with Native Ecosystems (4 to 5 scene peers per seed). In fertile scenes, the model exercises Upper-Bound Ambition (aiming for 13 to 16 new artists) while enforcing a Strict Anti-Filler Valve (stopping at 9–10 if sparse; never padding) to prevent hallucinated padding. All generated Deep Cuts reuse cached global bio/assets in Column 3, achieving $0.00 zero-latency hydration while preserving bespoke multi-seed topology." 
     },
     { 
         id: 28, 

@@ -298,21 +298,41 @@ describe('Architecture V30 & V31: 3-Tier Anchor System & Deep Cut Anti-Pollution
     });
   });
 
-  describe('Phase 4: Architecture V32 Unified Generation DNA & Multi-Seed Co-Anchoring (Rule 27)', () => {
-    it('Enforces 10 to 14 NEW related artists target in GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE', () => {
-      expect(GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE).toContain('10 to 14 NEW related artists');
-      expect(GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE).toContain('12 to 16 artists');
+  describe('Phase 4: Architecture V33.5 Unified Generation DNA & Multi-Seed Co-Anchoring (Rule 27)', () => {
+    it('Enforces 10 to 16 NEW related artists target in GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE', () => {
+      expect(GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE).toContain('10 to 16 NEW related artists');
+      expect(GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE).toContain('12 to 18 artists');
     });
 
-    it('Mandates both THE CROSSOVER BRIDGE and NATIVE ECOSYSTEMS in multi-seed generation', () => {
-      expect(GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE).toContain('THE CROSSOVER BRIDGE (4 to 6 artists + shared labels/genres)');
-      expect(GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE).toContain('NATIVE ECOSYSTEMS (3 to 4 distinct scene artists per seed)');
+    it('Mandates both THE CROSSOVER BRIDGE (5 to 6) and NATIVE ECOSYSTEMS (4 to 5) in multi-seed generation', () => {
+      expect(GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE).toContain('THE CROSSOVER BRIDGE (5 to 6 artists + shared labels/genres)');
+      expect(GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE).toContain('NATIVE ECOSYSTEMS (4 to 5 distinct scene artists per seed)');
+    });
+
+    it('Strictly eliminates "rabbit hole" terminology in favor of professional peer clustering', () => {
+      expect(GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE).not.toContain('rabbit hole');
+      expect(GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE).toContain('cluster of 2nd-degree peers and formative scene contemporaries');
+    });
+
+    it('Enforces UPPER-BOUND AMBITION and STRICT ANTI-FILLER VALVE (9 to 10 if sparse) across both templates', () => {
+      // Multi-seed assertions
+      expect(GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE).toContain('UPPER-BOUND AMBITION & ANTI-LAZINESS DIRECTIVE');
+      expect(GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE).toContain('STRICT ANTI-FILLER VALVE');
+      expect(GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE).toContain('13 to 16 new artists');
+      expect(GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE).toContain('stopping at 9 to 10 new artists if sparse is required; never pad');
+
+      // Single-seed assertions
+      expect(GENERATE_GRAPH_PROMPT_TEMPLATE).toContain('10 to 16 NEW related artists');
+      expect(GENERATE_GRAPH_PROMPT_TEMPLATE).toContain('UPPER-BOUND AMBITION & ANTI-LAZINESS DIRECTIVE');
+      expect(GENERATE_GRAPH_PROMPT_TEMPLATE).toContain('STRICT ANTI-FILLER VALVE');
+      expect(GENERATE_GRAPH_PROMPT_TEMPLATE).toContain('stopping at 9 to 10 new artists if sparse; never pad');
     });
 
     it('Explicitly excludes labels from numerical caps across both Single-Seed and Multi-Seed templates', () => {
       expect(GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE).toContain('Labels are explicitly EXCLUDED from this artist cap');
       expect(GENERATE_GRAPH_PROMPT_TEMPLATE).toContain('Labels are explicitly EXCLUDED from this cap');
       expect(GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE).toContain('roughly 18 to 26 total Deep Cuts');
+      expect(GENERATE_GRAPH_PROMPT_TEMPLATE).toContain('roughly 18 to 26 total Deep Cuts');
     });
 
     it('Preserves shared prompt invariants (canonical naming, no orphaned links, negative constraint on em-dashes)', () => {
