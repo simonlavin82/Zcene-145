@@ -24,6 +24,8 @@ export const LayoutSizes = {
   topHeader: 'h-16', // Restored roomier height for the main project header
   headerBar: 'h-12', // Universal strict standard for all structural panel/control bars
   controlBar: 'h-[38px]', // Exact token alignment for toolbar toggles and dropdown buttons
+  panelRadius: 'rounded-2xl', // Standardized radius for primary layout panels
+  modalRadius: 'rounded-2xl', // Standardized radius for modal containers
 };
 
 // --- Floating Canvas Controls ---
@@ -551,7 +553,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                         <div className="mb-10 border-b border-zinc-700 pb-8">
                             <h1 className="text-3xl font-medium text-white mb-4">Design System</h1>
                             <p className="text-zinc-400 leading-relaxed max-w-3xl text-base">
-                                This style guide documents the layout patterns, visual tokens, and UI components that form the Zcene experience. It is our unified language for blending brutalist structure with premium interaction.
+                                This style guide documents the layout patterns, visual tokens, and UI components that form the Zcene experience. It is our unified language for blending retro underground authenticity with modern, softened architectural geometry and premium interaction.
                                 <br /><br />
                                 <strong className="text-zinc-300 font-medium">Governance Intent:</strong> This is the source of truth for all UI components, interaction patterns, and visual specs. Any proposed changes to layout, spacing, or component behavior must align with these specs to ensure consistency across the Zcene application.
                             </p>
@@ -561,8 +563,8 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             <div className="bg-zinc-900/50 border border-zinc-800 p-8 rounded-xl">
                                 <h3 className="text-xl font-medium text-primary mb-4">Zcene Design Philosophy: Neo-Retro Fusion</h3>
                                 <p className="text-base text-zinc-300 leading-relaxed max-w-4xl">
-                                    The Zcene design system is built on a deliberate tension between <strong>90s Brutalism</strong> and <strong>Modern Premium Interaction</strong>. 
-                                    We embrace the raw, structural honesty of early web aesthetics while layering on the sophisticated, fluid feedback expected of high-end modern applications.
+                                    The Zcene design system is built on a deliberate harmony between <strong>Nostalgic Audio Culture</strong> and <strong>Modern Fluid Architecture</strong>. 
+                                    We embrace the textured depth, high-contrast borders, and technical data typography of early web subcultures while encasing the application in soft, rounded structural containers and fluid interactive feedback.
                                 </p>
                             </div>
 
@@ -570,12 +572,12 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="p-6 bg-zinc-900/30 border border-zinc-800 rounded-xl space-y-4">
                                     <div className="flex items-center gap-3 text-white font-medium">
                                         <span className="material-symbols-outlined text-zinc-500">grid_view</span>
-                                        90s Structural Brutalism
+                                        Softened Retro Structure
                                     </div>
                                     <ul className="space-y-2 text-sm text-zinc-400 list-disc pl-5">
-                                        <li><strong>Hard Edges:</strong> Structural containers, panels, and layout dividers use 0px radius.</li>
-                                        <li><strong>Visible Grids:</strong> Layout structure is celebrated, not hidden.</li>
-                                        <li><strong>Monospace Data:</strong> Technical metadata and system values use monospace fonts.</li>
+                                        <li><strong>Curved Envelopes:</strong> Primary layout panels, modals, and structural containers use a standardized 16px radius (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 rounded font-mono">rounded-2xl</code>), softening the application's silhouette.</li>
+                                        <li><strong>Architectural Grids:</strong> Defined borders and visible panels structure the workspace with purpose and clarity.</li>
+                                        <li><strong>Monospace Metadata:</strong> Technical metadata, taxonomy tags, and coordinate telemetry preserve authentic audio cataloging heritage.</li>
                                     </ul>
                                 </div>
                                 <div className="p-6 bg-zinc-900/30 border border-zinc-800 rounded-xl space-y-4">
@@ -584,18 +586,19 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         Modern Premium Interaction
                                     </div>
                                     <ul className="space-y-2 text-sm text-zinc-400 list-disc pl-5">
-                                        <li><strong>Soft Interaction:</strong> Clickable components and contextual indicators use rounded corners (6px to pill).</li>
-                                        <li><strong>Fluid Typography:</strong> Editorial content scales dynamically using fluid math.</li>
-                                        <li><strong>Atmospheric Depth:</strong> Subtle blurs and glows provide a sense of premium layering.</li>
+                                        <li><strong>Concentric Hierarchy:</strong> Clickable components and inner controls scale smoothly from 8px inner frames to 12px buttons (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 rounded font-mono">rounded-xl</code>) and fluid pills.</li>
+                                        <li><strong>Fluid Typography:</strong> Editorial music biographies and narrative context scale responsively using dynamic type rules.</li>
+                                        <li><strong>Atmospheric Depth:</strong> Subtle backdrop blurs, rich textured fills, and luminous glows establish sophisticated spatial hierarchy.</li>
                                     </ul>
                                 </div>
                             </div>
 
                             <div className="p-8 border border-primary/20 bg-primary/5 rounded-xl">
-                                <h4 className="text-sm font-semibold text-primary uppercase tracking-widest mb-4">Functional Signifiers</h4>
+                                <h4 className="text-sm font-semibold text-primary uppercase tracking-widest mb-4">Concentric Radius Hierarchy</h4>
                                 <p className="text-sm text-zinc-300 leading-relaxed">
-                                    In Zcene, <strong>Border Radius is a functional signifier</strong>. If an element has a hard edge (0px), it is part of the app's structural skeleton. 
-                                    If an element has a rounded edge (6px+), it is an interactive component or a contextual indicator designed to catch the eye and invite engagement.
+                                    In Zcene, <strong>Border Radius establishes spatial and concentric depth rather than a rigid structural-versus-interactive binary</strong>. 
+                                    Large structural containers, dialogs, and primary layout panels adopt generous rounded geometry (16px / <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 rounded font-mono">rounded-2xl</code>) to ground the interface in a soft, premium frame. 
+                                    Nested within, interactive components (buttons, search inputs, filters) utilize tailored inner radii (12px / <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 rounded font-mono">rounded-xl</code> down to 8px / <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 rounded font-mono">rounded-lg</code>) to establish natural concentric harmony—inviting tactile engagement against atmospheric retro textures and monospace data.
                                 </p>
                             </div>
 
@@ -2340,7 +2343,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="p-6 bg-zinc-950 border border-zinc-800 rounded-xl space-y-4">
                                     <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Tactile Specifications</h4>
                                     <p className="text-sm text-zinc-400 leading-relaxed">
-                                        Interactive selector controls use a custom <strong>12px border-radius</strong> (<code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-xl">rounded-xl</code>) outer container — deliberately separating them from our strict <strong>0px brutalist</strong> layout containers. The active icon is highlighted by a flush, morphing solid sliding fill that aligns cleanly with the outer container's border stroke, avoiding internal double-bordering.
+                                        Interactive selector controls use a custom <strong>12px border-radius</strong> (<code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-xl">rounded-xl</code>) outer container — concentric with our softened <strong>16px</strong> structural layout containers. The active icon is highlighted by a flush, morphing solid sliding fill that aligns cleanly with the outer container's border stroke, avoiding internal double-bordering.
                                     </p>
                                     <ul className="text-xs text-zinc-500 space-y-2 list-disc list-outside pl-4">
                                         <li><strong>Icon-only minimalism:</strong> No text labels — identity is communicated purely through the Material Symbol icons (Hub = Organic, Bubble Chart = Cluster, Grid View = Grid, List = Table, Schedule = Recent, Sort By Alpha = Alphabetical).</li>
@@ -3314,7 +3317,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                     <section id="toasts">
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Toasts</h2>
                         <div className="flex justify-center p-12 bg-zinc-950 rounded-xl border border-zinc-800">
-                             <div className="bg-brand-black text-primary px-4 py-3 rounded-none shadow-2xl flex items-center justify-between gap-3 border border-primary/50 w-full max-w-sm">
+                             <div className="bg-brand-black text-primary px-4 py-3 rounded-xl shadow-2xl flex items-center justify-between gap-3 border border-primary/50 w-full max-w-sm">
                                 <div className="flex items-center gap-3">
                                     <span className="material-symbols-outlined !text-[20px]">check_circle</span>
                                     <span className="text-sm font-semibold tracking-tight pr-2">Artist seed registered in the curation queue</span>
@@ -3478,7 +3481,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Dialogs</h2>
                         <div className="space-y-12">
                             <p className="text-base text-zinc-400 leading-relaxed max-w-3xl">
-                                Dialogs utilize a viewport-aware dual-architecture pattern to ensure focus and ergonomics. On mobile viewports, modals render as a fluid, bottom-anchored slide-up sheet with rounded top corners. On desktop viewports, they render as centered, hard-edged containers to signify structural permanence.
+                                Dialogs utilize a viewport-aware responsive architecture. On mobile viewports, modals render as an ergonomic, bottom-anchored slide-up sheet with rounded top corners (rounded-t-2xl). On desktop viewports, they render as centered, smoothly rounded dialogs (rounded-2xl) that float comfortably above the atmospheric backdrop.
                             </p>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                                 <div className="space-y-6">
@@ -3487,7 +3490,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <div>
                                             <h4 className="text-sm font-medium text-zinc-400 mb-3">Desktop (Centered)</h4>
                                             <div className="bg-zinc-900/50 p-4 rounded-lg border border-zinc-800 flex items-center justify-center min-h-[200px]">
-                                                <div className="bg-background-dark border border-zinc-600 rounded-none overflow-hidden relative w-full max-w-[300px]">
+                                                <div className="bg-background-dark border border-zinc-600 rounded-2xl overflow-hidden relative w-full max-w-[300px]">
                                                     <div className="p-3 bg-zinc-900 border-b border-zinc-700 flex justify-between items-center">
                                                         <div className="flex items-center gap-2">
                                                             <span className="material-symbols-outlined text-primary !text-[18px]">info</span>
@@ -3545,7 +3548,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </div>
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Container</h4>
-                                            <p className="text-sm text-zinc-400">Wraps content in <code>&lt;ModalContainer&gt;</code>. Responsive classes automatically toggle <strong>rounded-t-2xl</strong> (mobile) and <strong>rounded-none</strong> (desktop).</p>
+                                            <p className="text-sm text-zinc-400">Wraps content in <code>&lt;ModalContainer&gt;</code>. Responsive classes standardize on <strong>rounded-t-2xl</strong> (mobile) and <strong>rounded-2xl</strong> (desktop) with strict overflow-hidden clipping.</p>
                                         </div>
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Header/Footer</h4>
@@ -3713,7 +3716,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </div>
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Border Radius</h4>
-                                            <p className="text-sm text-zinc-400">Dropdown containers use <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">rounded-xl</code> (12px) as functional interactive signifiers, separating them visually from hard-edged structural panels.</p>
+                                            <p className="text-sm text-zinc-400">Dropdown containers use <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">rounded-xl</code> (12px) as functional interactive signifiers, harmonizing with the surrounding softened structural panels.</p>
                                         </div>
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Typography & Smoothing</h4>
@@ -4258,50 +4261,49 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
 
                     {/* 24. BORDER RADIUS */}
                     <section id="border-radius">
-                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Border Radius</h2>
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Border Radius & Structural Geometry</h2>
                         <div className="space-y-12">
                             <p className="text-base text-zinc-400 leading-relaxed max-w-3xl">
-                                Zcene uses a hybrid border radius system to capture a 90s aesthetic while maintaining a premium interactive experience.
+                                Zcene uses a balanced, 4-tier concentric border radius system that pairs modern softened geometry with raw retro audio texture and monospace telemetry.
                             </p>
                             
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                                <div className="p-6 bg-zinc-900 border border-zinc-700/50 rounded-none flex flex-col gap-4">
-                                    <div className="h-16 w-16 bg-primary rounded-none flex items-center justify-center text-brand-black font-semibold">0px</div>
+                                <div className="p-6 bg-zinc-900 border border-zinc-700/50 rounded-2xl flex flex-col gap-4">
+                                    <div className="h-16 w-16 bg-primary rounded-2xl flex items-center justify-center text-brand-black font-semibold">16px</div>
                                     <div>
-                                        <h4 className="text-sm font-semibold text-white uppercase tracking-widest">Hard (rounded-none)</h4>
-                                        <p className="text-xs text-zinc-500 mt-1">Used for all <strong>Structural Containers</strong> (cards, panels, dialogs) and <strong>Decorative Elements</strong> (icon boxes). This captures the raw, technical 90s Zcene aesthetic.</p>
+                                        <h4 className="text-sm font-semibold text-white uppercase tracking-widest">Structural (rounded-2xl)</h4>
+                                        <p className="text-xs text-zinc-500 mt-1">Used for all <strong>Primary Layout Panels</strong> (Roots, Connections, Deep Cuts), <strong>Dialog Windows</strong>, and <strong>Project Cards</strong>. Encloses the workspace in a soft, modern architectural silhouette.</p>
                                         <ul className="text-[10px] text-zinc-600 mt-2 space-y-1 list-disc pl-3 uppercase tracking-wider font-semibold">
-                                            <li>Main application windows</li>
-                                            <li>Structural dividers and panels</li>
-                                            <li>Decorative icon boxes</li>
-                                            <li>Data grid headers</li>
+                                            <li>Three main layout panel wrappers</li>
+                                            <li>Modal and dialog window containers</li>
+                                            <li>Dashboard project grid cards</li>
+                                            <li>Telemetry and analytics cards</li>
                                         </ul>
                                     </div>
                                 </div>
-                                <div className="p-6 bg-zinc-900 border border-zinc-700/50 rounded-none flex flex-col gap-4">
+                                <div className="p-6 bg-zinc-900 border border-zinc-700/50 rounded-2xl flex flex-col gap-4">
+                                    <div className="h-16 w-16 bg-primary rounded-xl flex items-center justify-center text-brand-black font-semibold">12px</div>
+                                    <div>
+                                        <h4 className="text-sm font-semibold text-white uppercase tracking-widest">Tactile Interactive (rounded-xl)</h4>
+                                        <p className="text-xs text-zinc-500 mt-1">Used for <strong>Clickable Controls</strong> (buttons, inputs, search fields, toggles). Creates concentric visual harmony inside parent containers.</p>
+                                        <ul className="text-[10px] text-zinc-600 mt-2 space-y-1 list-disc pl-3 uppercase tracking-wider font-semibold">
+                                            <li>Primary and secondary action buttons</li>
+                                            <li>Search inputs and form controls</li>
+                                            <li>Canvas floating toolbars & ribbon</li>
+                                            <li>Dropdown menus and tooltips</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                <div className="p-6 bg-zinc-900 border border-zinc-700/50 rounded-2xl flex flex-col gap-4">
                                     <div className="h-16 w-16 bg-primary rounded-lg flex items-center justify-center text-brand-black font-semibold">6px / 8px</div>
                                     <div>
                                         <h4 className="text-sm font-semibold text-white uppercase tracking-widest">Concentric Inner (6px / 8px)</h4>
-                                        <p className="text-xs text-zinc-500 mt-1">Used for custom <strong>Interaction Sets</strong> (inner button frames and sliding indicators) to establish concentric geometry and softer touch indicators.</p>
+                                        <p className="text-xs text-zinc-500 mt-1">Used for custom <strong>Nested Controls</strong> (inner button frames, sliding badges, and item selection indicators) to maintain optical concentric rhythm.</p>
                                         <ul className="text-[10px] text-zinc-600 mt-2 space-y-1 list-disc pl-3 uppercase tracking-wider font-semibold">
-                                            <li>ViewToggle outer container (12px / rounded-xl)</li>
-                                            <li>ViewToggle inner button frames (8px / rounded-lg)</li>
-                                            <li>Concentric nested active badge (6px / rounded-[6px])</li>
-                                            <li>Tactile selection controls</li>
-                                        </ul>
-                                    </div>
-                                </div>
-                                <div className="p-6 bg-zinc-900 border border-zinc-700/50 rounded-none flex flex-col gap-4">
-                                    <div className="h-16 w-16 bg-primary rounded-xl flex items-center justify-center text-brand-black font-semibold">12px</div>
-                                    <div>
-                                        <h4 className="text-sm font-semibold text-white uppercase tracking-widest">Standard (rounded-xl)</h4>
-                                        <p className="text-xs text-zinc-500 mt-1">Used exclusively for <strong>Clickable UI</strong> (buttons, inputs, sliders) and dashboard controls. This ensures a premium, soft-curved feel for interactive elements.</p>
-                                        <ul className="text-[10px] text-zinc-600 mt-2 space-y-1 list-disc pl-3 uppercase tracking-wider font-semibold">
-                                            <li>Dashboard view switcher containers</li>
-                                            <li>Buttons and clickable icons</li>
-                                            <li>Form inputs and textareas</li>
-                                            <li>Interactive list items</li>
-                                            <li>Dropdown menus and tooltips</li>
+                                            <li>ViewToggle inner button frames (8px)</li>
+                                            <li>Sliding active status badges (6px)</li>
+                                            <li>List item hover states (8px)</li>
+                                            <li>Status counters & micro badges</li>
                                         </ul>
                                     </div>
                                 </div>
@@ -4576,7 +4578,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <div className="p-6 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-zinc-500 leading-relaxed">
                                         <h4 className="font-semibold text-zinc-400 uppercase tracking-widest">Specifications</h4>
                                         <p className="mt-2">
-                                            Cards render structural brutalist frames (0px borders via <code>RADIUS_TOKENS.frame</code>) and utilize inline-block triggers to reveal absolute-positioned tooltip overlay details when hovering over the info icons.
+                                            Cards render softened structural frames (rounded-2xl via <code>RADIUS_TOKENS.frame</code>) and utilize inline-block triggers to reveal absolute-positioned tooltip overlay details when hovering over the info icons.
                                         </p>
                                     </div>
                                 </div>

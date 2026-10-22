@@ -1703,7 +1703,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         >
             {!isCompactMode ? (
                 /* Wide canvas: single-row ribbon — flex-nowrap prevents wrapping ever occurring */
-                <div className="flex flex-nowrap justify-center overflow-hidden border border-zinc-700 bg-zinc-900/90 backdrop-blur-md p-3 items-center gap-3 pointer-events-auto shadow-2xl rounded-none">
+                <div className="flex flex-nowrap justify-center overflow-hidden border border-zinc-700 bg-zinc-900/90 backdrop-blur-md p-3 items-center gap-3 pointer-events-auto shadow-2xl rounded-xl">
                     {legendOrder.map(f => (
                         <div
                             key={f}
@@ -1726,7 +1726,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     </button>
 
                     <div
-                        className={`w-[280px] border border-zinc-700 bg-zinc-900/98 backdrop-blur-xl p-4 pointer-events-auto shadow-2xl transition-all duration-300 origin-bottom-left absolute bottom-16 left-0 z-50 ${isLegendExpanded ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-4 scale-90 pointer-events-none invisible'} rounded-none`}
+                        className={`w-[280px] border border-zinc-700 bg-zinc-900/98 backdrop-blur-xl p-4 pointer-events-auto shadow-2xl transition-all duration-300 origin-bottom-left absolute bottom-16 left-0 z-50 ${isLegendExpanded ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-4 scale-90 pointer-events-none invisible'} rounded-2xl`}
                     >
                         <div className="grid grid-cols-2 gap-2">
                             {legendOrder.map(f => (

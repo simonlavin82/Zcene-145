@@ -320,7 +320,7 @@ const ExampleMusicGraph: React.FC = () => {
              {/* Gradient for depth */}
              <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/40 to-transparent z-0"></div>
 
-             <div ref={containerRef} className="absolute inset-0 m-4 sm:m-4 md:m-8 bg-zinc-900 border border-zinc-600/50 shadow-2xl flex flex-col overflow-hidden text-left z-10 rounded-none font-sans">
+             <div ref={containerRef} className="absolute inset-0 m-4 sm:m-4 md:m-8 bg-zinc-900 border border-zinc-600/50 shadow-2xl flex flex-col overflow-hidden text-left z-10 rounded-2xl font-sans">
                 {/* Header (Matching GraphPage Spiderweb Header) */}
                 <div className="h-12 px-4 flex-shrink-0 border-b border-zinc-600/50 flex items-center justify-between overflow-hidden bg-zinc-900 relative z-20">
                     <div className="flex items-center gap-2">
@@ -342,7 +342,7 @@ const ExampleMusicGraph: React.FC = () => {
                         {/* Legend Positioning (Matching MusicGraph Legend) */}
                         <div ref={legendContainerRef} className={`absolute z-30 pointer-events-auto flex flex-col ${isCompactMode ? 'bottom-6 left-6 items-start' : 'top-6 left-1/2 -translate-x-1/2 items-center w-full max-w-[95%]'}`}>
                             {!isCompactMode ? (
-                                <div className="flex flex-wrap justify-center border border-zinc-700 bg-zinc-900/90 backdrop-blur-md px-6 py-3 items-center gap-3 sm:gap-4 shadow-2xl rounded-none">
+                                <div className="flex flex-wrap justify-center border border-zinc-700 bg-zinc-900/90 backdrop-blur-md px-6 py-3 items-center gap-3 sm:gap-4 shadow-2xl rounded-xl">
                                     {legendOrder.map(f => (
                                         <div 
                                             key={f}
@@ -365,7 +365,7 @@ const ExampleMusicGraph: React.FC = () => {
                                     </button>
                                     
                                     <div
-                                        className={`w-[280px] border border-zinc-700 bg-zinc-900/98 backdrop-blur-xl p-4 shadow-2xl transition-all duration-300 origin-bottom-left absolute bottom-16 left-0 z-50 rounded-none pointer-events-auto ${isLegendExpanded ? 'opacity-100 translate-y-0 scale-100 visible' : 'opacity-0 translate-y-4 scale-90 invisible'}`}
+                                        className={`w-[280px] border border-zinc-700 bg-zinc-900/98 backdrop-blur-xl p-4 shadow-2xl transition-all duration-300 origin-bottom-left absolute bottom-16 left-0 z-50 rounded-2xl pointer-events-auto ${isLegendExpanded ? 'opacity-100 translate-y-0 scale-100 visible' : 'opacity-0 translate-y-4 scale-90 invisible'}`}
                                     >
                                         <div className="grid grid-cols-2 gap-2">
                                             {legendOrder.map(f => (

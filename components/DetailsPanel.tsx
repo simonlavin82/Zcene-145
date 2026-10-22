@@ -48,7 +48,7 @@ const ZceneEmptyState: React.FC<{ onNavigate: (view: View) => void }> = ({ onNav
         </div>
         <div className="mt-3 text-zinc-400 text-sm space-y-4">
             <p className="text-center px-4">Start with a few of your favorite artists, and Zcene will map how they connect across genres, labels, origins, and scenes.</p>
-            <div className="text-left bg-zinc-800/30 p-5 rounded-none border border-zinc-700/50 mx-4 text-sm">
+            <div className="text-left bg-zinc-800/30 p-5 rounded-xl border border-zinc-700/50 mx-4 text-sm">
                 <p className="font-medium text-zinc-200 mb-2">How it works</p>
                 <ol className="list-decimal list-inside space-y-1 text-zinc-400">
                     <li>Add 1–5 artists (or import your library).</li>
@@ -1410,7 +1410,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 {isConnectionsOpen && (
                                     <>
                                         {isGuest ? (
-                                    <div className="flex flex-col items-center justify-center text-center p-6 bg-zinc-900/50 rounded-none border border-zinc-800/80">
+                                    <div className="flex flex-col items-center justify-center text-center p-6 bg-zinc-900/50 rounded-xl border border-zinc-800/80">
                                         <span className="material-symbols-outlined !text-4xl text-primary/50 mb-3">lock</span>
                                         <h5 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-200 mb-2">DEEPER CONNECTION</h5>
                                         <p className="text-sm text-zinc-400 leading-relaxed max-w-xs mx-auto mb-4">
@@ -1449,7 +1449,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                             {chatHistory.length === 0 ? null : (
                                             chatHistory.map((msg, i) => (
                                                 <div key={i} className={`flex flex-col group relative ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                                                    <div className={`max-w-[90%] px-4 py-2 text-sm ${msg.role === 'user' ? 'bg-zinc-800 text-zinc-200 border-r-4 border-primary' : 'bg-zinc-900/50 text-zinc-300 border-l-4 border-zinc-600 shadow-sm'} rounded-none`}>
+                                                    <div className={`max-w-[90%] px-4 py-2 text-sm ${msg.role === 'user' ? 'bg-zinc-800 text-zinc-200 border-r-4 border-primary' : 'bg-zinc-900/50 text-zinc-300 border-l-4 border-zinc-600 shadow-sm'} rounded-xl`}>
                                                         {msg.text}
                                                     </div>
                                                     {msg.timestamp && (
@@ -1471,7 +1471,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                         )}
                                         {isChatLoading && (
                                             <div className="flex items-start">
-                                                <div className="bg-zinc-900 border-l-4 border-primary px-4 py-2 flex items-center gap-2 rounded-none">
+                                                <div className="bg-zinc-900 border-l-4 border-primary px-4 py-2 flex items-center gap-2 rounded-xl">
                                                     <div className="flex gap-1">
                                                         <div className="w-1 h-1 bg-primary rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
                                                         <div className="w-1 h-1 bg-primary rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>

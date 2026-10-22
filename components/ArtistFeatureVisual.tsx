@@ -13,7 +13,7 @@ const ArtistFeatureVisual: React.FC<{ className?: string }> = ({ className }) =>
              {/* Gradient for depth */}
              <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/40 to-transparent z-0"></div>
 
-             <div className="w-full h-full md:max-w-xl bg-zinc-900 border border-zinc-600/50 flex flex-col overflow-hidden text-left relative z-10 rounded-none font-sans">
+             <div className="w-full h-full md:max-w-xl bg-zinc-900 border border-zinc-600/50 flex flex-col overflow-hidden text-left relative z-10 rounded-2xl font-sans">
                 {/* Header (Matching App's Panel Header) */}
                 <div className="h-12 flex-shrink-0 border-b border-zinc-600/50 flex items-center justify-between px-4 bg-zinc-900 relative z-[60]">
                     <div className="flex items-center gap-2 overflow-hidden">

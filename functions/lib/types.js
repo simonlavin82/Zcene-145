@@ -77,7 +77,8 @@ exports.CANONICAL_GENRE_TAXONOMY = {
 exports.CANONICAL_GENRES_FLAT = Array.from(new Set(Object.values(exports.CANONICAL_GENRE_TAXONOMY).flat()));
 exports.COST_PER_AI_CALL = 0.0015;
 exports.RADIUS_TOKENS = {
-    frame: "rounded-none", // Structural Brutalist Framing (0px hard borders)
+    frame: "rounded-2xl", // Standardized Structural Container Geometry (Panels, Modals, Cards)
+    modal: "rounded-2xl", // Modal & Dialog Containers
     input: "rounded-xl", // Tactile Interactive Controls (Inputs, drop-downs)
     button: "rounded-lg", // Standard Interactive UI (Clickable utilities)
     toggle: "rounded-xl", // Segmented Component Selectors

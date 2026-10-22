@@ -68,7 +68,7 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
   return (
     <motion.div
       onClick={() => onSelectProject(project.id)}
-      className={`group relative border border-transparent hover:border-primary rounded-none p-5 transition-all cursor-pointer flex flex-col justify-between w-full md:w-[350px] h-[180px] shadow-[0_0_40px_rgba(0,0,0,0.7)] ${activeMenuId === project.id ? 'z-50' : 'overflow-hidden z-0'}`}
+      className={`group relative border border-transparent hover:border-primary rounded-2xl p-5 transition-all cursor-pointer flex flex-col justify-between w-full md:w-[350px] h-[180px] shadow-[0_0_40px_rgba(0,0,0,0.7)] ${activeMenuId === project.id ? 'z-50' : 'overflow-hidden z-0'}`}
       style={{
         '--scene-accent': dominantColor,
         // Blend scene accent toward white for bright legible title color
@@ -81,7 +81,7 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
     >
       
       {/* Background Layer: Smart Fallback cascade (0 images = monogram, 1 image = full bleed, 2+ images = split card) */}
-      <div className="absolute inset-0 z-0 flex">
+      <div className="absolute inset-0 z-0 flex rounded-2xl overflow-hidden">
         {imageUrls.length >= 2 ? (
           <>
             {/* Left artist: anchored left, cross-fades out across the right half */}
@@ -120,7 +120,7 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
       </div>
 
       {/* Uniform scrim: even 55% dark backdrop — artwork shows through evenly with no directional patches */}
-      <div className="absolute inset-0 z-10 bg-zinc-950/55" />
+      <div className="absolute inset-0 z-10 bg-zinc-950/55 rounded-2xl" />
 
       {/* Content Container (z-20) */}
       <div className="relative z-20 flex flex-col h-full justify-between">

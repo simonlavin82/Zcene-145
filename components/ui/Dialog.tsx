@@ -11,7 +11,7 @@ export const ModalBackdrop: React.FC<{ children: React.ReactNode; onClick?: () =
 
 export const ModalContainer: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
   <div 
-    className={`bg-background-dark border-t border-x-0 sm:border border-zinc-600 rounded-t-2xl sm:rounded-none w-full max-w-md max-h-[85vh] sm:max-h-[90vh] shadow-2xl flex flex-col overflow-hidden animate-slide-up-sheet sm:animate-fade-in-down ${className}`}
+    className={`bg-background-dark border-t border-x-0 sm:border border-zinc-600 rounded-t-2xl sm:rounded-2xl w-full max-w-md max-h-[85vh] sm:max-h-[90vh] shadow-2xl flex flex-col overflow-hidden animate-slide-up-sheet sm:animate-fade-in-down ${className}`}
     style={{ animationDuration: '200ms' }}
     onClick={e => e.stopPropagation()}
   >
@@ -20,7 +20,7 @@ export const ModalContainer: React.FC<{ children: React.ReactNode; className?: s
 );
 
 export const ModalHeader: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
-  <header className={`p-3 bg-zinc-900 border-b border-zinc-700 flex justify-between items-center rounded-t-2xl sm:rounded-none ${className}`}>
+  <header className={`p-3 bg-zinc-900 border-b border-zinc-700 flex justify-between items-center rounded-t-2xl sm:rounded-t-2xl ${className}`}>
     {children}
   </header>
 );
@@ -32,7 +32,7 @@ export const ModalBody: React.FC<{ children: React.ReactNode; className?: string
 );
 
 export const ModalFooter: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
-  <footer className={`p-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-3 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2 ${className}`}>
+  <footer className={`p-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-3 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2 sm:rounded-b-2xl ${className}`}>
     {children}
   </footer>
 );

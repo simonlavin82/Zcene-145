@@ -31,7 +31,7 @@ export const CookieConsent: React.FC = () => {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 30, scale: 0.95 }}
           transition={{ duration: 0.3, ease: 'easeOut' }}
-          className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-[380px] z-[9999] bg-zinc-950/95 backdrop-blur-md border border-zinc-800 p-4 shadow-2xl flex flex-col gap-4 font-sans rounded-none"
+          className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-[380px] z-[9999] bg-zinc-950/95 backdrop-blur-md border border-zinc-800 p-4 shadow-2xl flex flex-col gap-4 font-sans rounded-2xl"
         >
           <div className="space-y-1.5">
             <div className="flex items-center gap-2 text-primary font-mono text-[10px] uppercase tracking-widest">

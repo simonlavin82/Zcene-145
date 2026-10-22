@@ -438,7 +438,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 <button 
                   onClick={onCreateProject}
                   disabled={isCreatingProject}
-                  className="group relative bg-zinc-900 border-2 border-dashed border-zinc-700 rounded-none p-5 flex flex-col items-center justify-center gap-3 transition-all h-[180px] w-full md:w-[350px] hover:border-primary/50 disabled:opacity-50 cursor-pointer overflow-hidden"
+                  className="group relative bg-zinc-900 border-2 border-dashed border-zinc-700 rounded-2xl p-5 flex flex-col items-center justify-center gap-3 transition-all h-[180px] w-full md:w-[350px] hover:border-primary/50 disabled:opacity-50 cursor-pointer overflow-hidden"
                 >
                   <div className="w-10 h-10 rounded-full bg-zinc-800 group-hover:bg-white group-hover:text-brand-black flex items-center justify-center text-zinc-550 transition-all relative z-10">
                     {isCreatingProject ? (
@@ -588,7 +588,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             </div>
           ) : (
             /* High-Contrast Tabular List View */
-            <div className="w-full overflow-x-auto border border-zinc-800 bg-zinc-900 rounded-none">
+            <div className="w-full overflow-x-auto border border-zinc-800 bg-zinc-900 rounded-2xl">
               <table className="w-full text-left border-collapse min-w-[640px]">
                 <thead>
                   <tr className="border-b border-zinc-800 text-[10px] text-zinc-400 uppercase tracking-widest font-bold bg-zinc-950">

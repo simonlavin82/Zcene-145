@@ -25,7 +25,7 @@ const defaultOptions: [ToggleOption<any>, ToggleOption<any>] = [
  * ViewToggle Component
  * A 2-way icon-only segmented toggle for switching between 'Organic' and 'Cluster' graph layouts (or Grid/List).
  * Design spec: rounded-xl premium outer container with concentric rounded-lg button frames and rounded-[6px] sliding active badge.
- * Distinct from 0px brutalist layout containers — soft, tactile, intentional.
+ * Concentric with our softened 16px structural layout containers — soft, tactile, intentional.
  */
 const ViewToggle = <T extends string>({ 
   value, 
