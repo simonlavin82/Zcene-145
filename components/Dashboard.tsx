@@ -103,6 +103,9 @@ const Dashboard: React.FC<DashboardProps> = ({
     white: '#f4f4f5',
   };
   const [sortBy, setSortBy] = React.useState<'recent' | 'alphabetical'>('recent');
+  const [searchQuery, setSearchQuery] = React.useState('');
+  const [isSearchExpanded, setIsSearchExpanded] = React.useState(false);
+  const searchInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const handleRenameClick = (project: Project) => {
     const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
@@ -119,10 +122,53 @@ const Dashboard: React.FC<DashboardProps> = ({
       .toUpperCase();
   };
 
+  const filteredProjects = React.useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return projects;
+
+    return projects.filter((project) => {
+      // 1. Check Project Name and Clean Display Title
+      const rawName = (project.name || '').toLowerCase();
+      if (rawName.includes(query)) return true;
+
+      const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
+      const displayTitle = cleanArtistDisplayName(project.name || (seedList.length > 0 ? seedList[0] : "")).toLowerCase();
+      if (displayTitle.includes(query)) return true;
+
+      // 2. Check Seed Artists string
+      if (project.seedArtists && project.seedArtists.toLowerCase().includes(query)) return true;
+
+      // 3. Check Phase 1+ artistIds array if populated
+      if (Array.isArray(project.artistIds) && project.artistIds.some(id => id.toLowerCase().includes(query))) {
+        return true;
+      }
+
+      // 4. Check graphData.nodes for any artist node (node.label or node.id)
+      if (project.graphData) {
+        try {
+          const parsed = typeof project.graphData === 'string' ? JSON.parse(project.graphData) : project.graphData;
+          if (parsed && Array.isArray(parsed.nodes)) {
+            const hasArtistMatch = parsed.nodes.some((node: any) => {
+              if (node.type && node.type !== 'artist') return false;
+              const label = (node.label || '').toLowerCase();
+              const id = (node.id || '').toLowerCase();
+              return label.includes(query) || id.includes(query);
+            });
+            if (hasArtistMatch) return true;
+          }
+        } catch (e) {
+          // Ignore parsing error
+        }
+      }
+
+      return false;
+    });
+  }, [projects, searchQuery]);
+
   const groupedProjects = React.useMemo(() => {
     const groups: Record<string, Project[]> = {};
 
-    projects.forEach((project) => {
+    filteredProjects.forEach((project) => {
       let genresList: string[] = [];
       if (project.graphData) {
         try {
@@ -189,7 +235,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     });
 
     return groups;
-  }, [projects, sortBy]);
+  }, [filteredProjects, sortBy]);
 
   const sortedBucketKeys = React.useMemo(() => {
     const getProjectDisplayTitle = (p: Project) => {
@@ -296,6 +342,59 @@ const Dashboard: React.FC<DashboardProps> = ({
                     { id: 'list', icon: 'list', label: 'List View' }
                   ]}
                 />
+
+                {/* Deep Search Input */}
+                <div 
+                  className={`group relative h-[38px] flex items-center transition-all duration-300 ease-in-out overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900/80 backdrop-blur-md shadow-xl origin-left ${isSearchExpanded ? 'w-56 sm:w-64 focus-within:ring-1 focus-within:ring-primary' : 'w-[38px] cursor-pointer'}`}
+                  onClick={(e) => { 
+                    if (!isSearchExpanded) {
+                      e.stopPropagation(); 
+                      setIsSearchExpanded(true); 
+                      setTimeout(() => searchInputRef.current?.focus(), 50); 
+                    }
+                  }}
+                  title={!isSearchExpanded ? "Find in zcenes..." : undefined}
+                >
+                  <span className={`material-symbols-outlined absolute left-[9px] top-1/2 -translate-y-1/2 transition-colors duration-300 z-10 pointer-events-none ${isSearchExpanded ? 'text-zinc-500 !text-[20px]' : 'text-zinc-400 group-hover:text-white !text-[20px]'}`}>
+                    search
+                  </span>
+                  
+                  <input 
+                    autoComplete="off" 
+                    data-1p-ignore="true" 
+                    data-lpignore="true" 
+                    ref={searchInputRef}
+                    type="search" 
+                    placeholder="Find in zcenes..." 
+                    value={searchQuery} 
+                    onChange={(e) => setSearchQuery(e.target.value)} 
+                    onBlur={() => { if (!searchQuery.trim()) setIsSearchExpanded(false); }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') {
+                        setSearchQuery('');
+                        setIsSearchExpanded(false);
+                        searchInputRef.current?.blur();
+                      }
+                    }}
+                    className={`w-full h-full appearance-none bg-transparent text-white placeholder:text-zinc-500 focus:outline-none transition-opacity duration-300 pl-10 pr-[38px] text-sm ${isSearchExpanded ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} 
+                  />
+                  
+                  <div className={`absolute right-[3px] top-1/2 -translate-y-1/2 flex items-center z-10 transition-opacity duration-300 ${isSearchExpanded ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                    {searchQuery && (
+                      <button 
+                        onMouseDown={(e) => { 
+                          e.preventDefault(); 
+                          setSearchQuery(''); 
+                          searchInputRef.current?.focus(); 
+                        }} 
+                        className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-[10px] text-zinc-400 hover:text-white hover:bg-zinc-800/50 transition-colors leading-none cursor-pointer" 
+                        aria-label="Clear search"
+                      >
+                        <span className="material-symbols-outlined !text-[18px]">close</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* New Zcene Button */}
@@ -353,6 +452,28 @@ const Dashboard: React.FC<DashboardProps> = ({
                   </span>
                 </button>
               </div>
+            </div>
+          ) : filteredProjects.length === 0 ? (
+            <div className="w-full flex flex-col items-center justify-center py-16 px-4 text-center bg-zinc-950/40 border border-dashed border-zinc-800/80 rounded-xl">
+              <div className="w-12 h-12 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500 mb-4">
+                <span className="material-symbols-outlined !text-2xl">search_off</span>
+              </div>
+              <h3 className="text-base font-semibold text-white mb-1">
+                No Zcenes found matching &ldquo;{searchQuery}&rdquo;
+              </h3>
+              <p className="text-sm text-zinc-400 max-w-md mb-6">
+                Try searching for a different project title, seed artist, or node name.
+              </p>
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setIsSearchExpanded(false);
+                }}
+                className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-sm font-medium text-white transition-colors flex items-center gap-2 cursor-pointer"
+              >
+                <span className="material-symbols-outlined !text-[16px]">close</span>
+                Clear Search
+              </button>
             </div>
           ) : view === 'grid' ? (
             <div className="w-full flex flex-wrap gap-x-8 gap-y-10 items-start">
