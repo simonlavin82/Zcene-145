@@ -2374,9 +2374,9 @@ const GraphPage: React.FC<GraphPageProps> = ({
                 </div>
 
 
-                {/* Mobile Floating Pill Navigation */}
+                {/* Mobile Floating Navigation Bar */}
                 <div className={`fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-sm md:hidden transition-all duration-300 ease-in-out ${isMagazineViewOpen ? 'opacity-0 pointer-events-none translate-y-4' : 'opacity-100 pointer-events-auto translate-y-0'}`}>
-                    <nav className="flex items-center justify-between p-1.5 bg-zinc-900/90 backdrop-blur-xl border border-zinc-700/80 rounded-full shadow-[0_12px_36px_rgba(0,0,0,0.6),0_2px_8px_rgba(0,0,0,0.4)]">
+                    <nav className="flex items-center justify-between p-1.5 bg-zinc-900/90 backdrop-blur-xl border border-zinc-700/80 rounded-xl shadow-[0_12px_36px_rgba(0,0,0,0.6),0_2px_8px_rgba(0,0,0,0.4)]">
                         {(['artists', 'spiderweb', 'details'] as MobileTab[]).map(tab => {
                             const isActive = activeTab === tab;
                             const totalDetails = displayBadgeCount;
@@ -2391,7 +2391,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                             updateOnboarding('step5');
                                         }
                                     }}
-                                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-full text-xs font-semibold uppercase tracking-wider transition-all duration-200 select-none cursor-pointer active:scale-95 ${
+                                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all duration-200 select-none cursor-pointer active:scale-95 ${
                                         isActive
                                             ? 'bg-zinc-800 text-primary shadow-sm border border-zinc-700/60'
                                             : 'text-zinc-400 hover:text-zinc-200 border border-transparent'

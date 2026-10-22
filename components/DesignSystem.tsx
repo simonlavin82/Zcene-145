@@ -425,7 +425,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
         { id: 'iconography', title: 'Iconography' },
         { id: 'spiderweb-legends', title: 'Spiderweb Legends' },
         { id: 'spiderweb-controls', title: 'Spiderweb Controls' },
-        { id: 'mobile-navigation', title: 'Mobile Navigation Pill' },
+        { id: 'mobile-navigation', title: 'Mobile Navigation Bar' },
         { id: 'buttons', title: 'Buttons' },
         { id: 'toggles', title: 'Toggles' },
         { id: 'links', title: 'Links' },
@@ -1459,17 +1459,17 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                         </div>
                     </section>
 
-                    {/* MOBILE NAVIGATION PILL */}
+                    {/* MOBILE NAVIGATION BAR */}
                     <section id="mobile-navigation">
-                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Mobile Navigation Pill</h2>
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Mobile Navigation Bar</h2>
                         <p className="text-base text-zinc-300 leading-relaxed max-w-3xl mb-12">
-                            On mobile viewports, global section switching transitions from desktop sidebars to a floating glassmorphism navigation pill. Anchored at the bottom with safe-area support, it provides native-app tactile interaction across <strong>Roots</strong>, <strong>Connections</strong>, and <strong>Deep Cuts</strong> with live numeric counter badges while allowing full-bleed background content to scroll underneath.
+                            On mobile viewports, global section switching transitions from desktop sidebars to a floating glassmorphism navigation bar. Anchored at the bottom with safe-area support, it provides native-app tactile interaction across <strong>Roots</strong>, <strong>Connections</strong>, and <strong>Deep Cuts</strong> with live numeric counter badges while allowing full-bleed background content to scroll underneath.
                         </p>
 
                         <div className="space-y-16 mb-24">
                             {/* Interactive Component Preview */}
                             <div className="p-8 bg-zinc-900/50 rounded-none border border-zinc-800">
-                                <h3 className="text-xl font-medium text-primary mb-4">Interactive Navigation Pill</h3>
+                                <h3 className="text-xl font-medium text-primary mb-4">Interactive Navigation Bar</h3>
                                 <p className="text-sm text-zinc-400 mb-8 max-w-2xl">
                                     Click any tab segment below to test active/inactive state transitions, tactile button depression (<code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">active:scale-95</code>), and status counter badges.
                                 </p>
@@ -1483,9 +1483,9 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <span className="font-mono">z-40 floating elevation</span>
                                     </div>
 
-                                    {/* Floating Pill Preview */}
+                                    {/* Floating Nav Preview */}
                                     <div className="relative z-10 w-full max-w-sm">
-                                        <nav className="flex items-center justify-between p-1.5 bg-zinc-900/90 backdrop-blur-xl border border-zinc-700/80 rounded-full shadow-[0_12px_36px_rgba(0,0,0,0.6),0_2px_8px_rgba(0,0,0,0.4)]">
+                                        <nav className="flex items-center justify-between p-1.5 bg-zinc-900/90 backdrop-blur-xl border border-zinc-700/80 rounded-xl shadow-[0_12px_36px_rgba(0,0,0,0.6),0_2px_8px_rgba(0,0,0,0.4)]">
                                             {(['artists', 'spiderweb', 'details'] as const).map(tab => {
                                                 const isActive = demoMobileNavTab === tab;
                                                 const label = tab === 'details' ? 'Deep Cuts' : tab === 'artists' ? 'Roots' : 'Connections';
@@ -1493,7 +1493,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                     <button
                                                         key={tab}
                                                         onClick={() => setDemoMobileNavTab(tab)}
-                                                        className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-full text-xs font-semibold uppercase tracking-wider transition-all duration-200 select-none cursor-pointer active:scale-95 ${
+                                                        className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all duration-200 select-none cursor-pointer active:scale-95 ${
                                                             isActive
                                                                 ? 'bg-zinc-800 text-primary shadow-sm border border-zinc-700/60'
                                                                 : 'text-zinc-400 hover:text-zinc-200 border border-transparent'
@@ -1519,7 +1519,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
 
                                 <div className="mt-6 flex flex-wrap items-center justify-between gap-4 text-xs text-zinc-500 font-mono">
                                     <span>Active Segment: <strong className="text-primary">{demoMobileNavTab === 'details' ? 'Deep Cuts' : demoMobileNavTab === 'artists' ? 'Roots' : 'Connections'}</strong></span>
-                                    <span>Container: <code>rounded-full w-[calc(100%-2rem)] max-w-sm</code></span>
+                                    <span>Container: <code>rounded-xl w-[calc(100%-2rem)] max-w-sm</code></span>
                                 </div>
                             </div>
 
@@ -1536,7 +1536,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <ul className="space-y-2 text-xs font-mono text-zinc-400 bg-zinc-950 p-4 border border-zinc-800 rounded-lg">
                                         <li><strong className="text-zinc-200">Positioning:</strong> <code className="text-primary">fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2</code></li>
                                         <li><strong className="text-zinc-200">Backdrop:</strong> <code className="text-primary">bg-zinc-900/90 backdrop-blur-xl</code></li>
-                                        <li><strong className="text-zinc-200">Border:</strong> <code className="text-primary">border border-zinc-700/80 rounded-full</code></li>
+                                        <li><strong className="text-zinc-200">Border:</strong> <code className="text-primary">border border-zinc-700/80 rounded-xl</code></li>
                                         <li><strong className="text-zinc-200">Shadow:</strong> <code className="text-primary">shadow-[0_12px_36px_rgba(0,0,0,0.6),0_2px_8px_rgba(0,0,0,0.4)]</code></li>
                                     </ul>
                                 </div>
@@ -1547,7 +1547,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         Segment States & Tactility
                                     </h4>
                                     <p className="text-xs text-zinc-400 leading-relaxed">
-                                        Inner segments are rendered as discrete pill buttons inside the continuous parent shell, delivering instant tactile feedback on touch devices.
+                                        Inner segments are rendered as discrete 12px rounded buttons (<code>rounded-xl</code>) inside the continuous parent shell, adhering strictly to the interactive button design standard.
                                     </p>
                                     <ul className="space-y-2 text-xs font-mono text-zinc-400 bg-zinc-950 p-4 border border-zinc-800 rounded-lg">
                                         <li><strong className="text-zinc-200">Active State:</strong> <code className="text-primary">bg-zinc-800 text-primary shadow-sm border border-zinc-700/60</code></li>
@@ -1565,7 +1565,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <h4 className="text-xs font-semibold uppercase tracking-wider">Vertical Stacking & Clearance Guidelines</h4>
                                 </div>
                                 <p className="text-xs text-zinc-300 leading-relaxed">
-                                    To eliminate visual collisions and prevent accidental mis-taps on mobile viewports, floating overlay CTAs (such as the primary <strong>Magazine</strong> button in the Deep Cuts card view) must be positioned at <code>bottom-[calc(env(safe-area-inset-bottom)+5.75rem)]</code>. This guarantees a safe ~36px vertical clearance above the navigation pill. Scrollable card content must provide matching bottom padding (<code>pb-[calc(env(safe-area-inset-bottom)+9rem)]</code>) so that all text, actions, and media can scroll completely clear of the floating CTA.
+                                    To eliminate visual collisions and prevent accidental mis-taps on mobile viewports, floating overlay CTAs (such as the primary <strong>Magazine</strong> button in the Deep Cuts card view) must be positioned at <code>bottom-[calc(env(safe-area-inset-bottom)+5.75rem)]</code>. This guarantees a safe ~36px vertical clearance above the navigation bar. Scrollable card content must provide matching bottom padding (<code>pb-[calc(env(safe-area-inset-bottom)+9rem)]</code>) so that all text, actions, and media can scroll completely clear of the floating CTA.
                                 </p>
                             </div>
                         </div>
