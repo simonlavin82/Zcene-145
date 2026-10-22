@@ -1236,6 +1236,9 @@ const GraphPage: React.FC<GraphPageProps> = ({
   };
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [isSeedDropdownOpen, setIsSeedDropdownOpen] = useState(false);
+  const [highlightedSeedIndex, setHighlightedSeedIndex] = useState(-1);
+  const seedInputContainerRef = useRef<HTMLDivElement>(null);
   const [isCopied, setIsCopied] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [isSimulationSettling, setIsSimulationSettling] = useState(true);
@@ -1528,9 +1531,20 @@ const GraphPage: React.FC<GraphPageProps> = ({
       setActiveTab('spiderweb');
     }
   }, []);
-  
-  
-  
+
+  // Close seed autocomplete dropdown on outside click
+  useEffect(() => {
+    if (!isSeedDropdownOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (seedInputContainerRef.current && !seedInputContainerRef.current.contains(e.target as globalThis.Node)) {
+        setIsSeedDropdownOpen(false);
+        setHighlightedSeedIndex(-1);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isSeedDropdownOpen]);
+
   useEffect(() => {
     if (isLeftPanelCollapsed) {
         if (leftPanelWidth > COLLAPSED_WIDTH) leftPanelPreCollapseWidth.current = leftPanelWidth;
@@ -1736,7 +1750,87 @@ const GraphPage: React.FC<GraphPageProps> = ({
         return [...prev, ...artistsToAdd.map(name => ({ name, enabled: true }))];
       });
       setSearchTerm('');
+      setIsSeedDropdownOpen(false);
+      setHighlightedSeedIndex(-1);
       if (!onboardingProgress.step1) updateOnboarding('step1');
+    }
+  };
+
+  const matchingLibraryArtists = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    if (!query || !libraryArtists || libraryArtists.length === 0) return [];
+
+    const selectedNorms = new Set(selectedSeedArtists.map(s => normalizeArtistId(s.name)));
+
+    const startsWithMatches: ParsedArtist[] = [];
+    const containsMatches: ParsedArtist[] = [];
+
+    for (const artist of libraryArtists) {
+      if (!artist || !artist.name) continue;
+      const norm = normalizeArtistId(artist.name);
+      if (selectedNorms.has(norm)) continue;
+
+      const lowerName = artist.name.toLowerCase();
+      if (lowerName.startsWith(query)) {
+        startsWithMatches.push(artist);
+      } else if (lowerName.includes(query)) {
+        containsMatches.push(artist);
+      }
+    }
+
+    startsWithMatches.sort((a, b) => a.name.localeCompare(b.name));
+    containsMatches.sort((a, b) => a.name.localeCompare(b.name));
+
+    return [...startsWithMatches, ...containsMatches].slice(0, 15);
+  }, [libraryArtists, searchTerm, selectedSeedArtists]);
+
+  const handleSelectLibraryArtist = (artistName: string) => {
+    const normName = normalizeArtistId(artistName);
+    const isAlreadySelected = selectedSeedArtists.some(a => normalizeArtistId(a.name) === normName);
+    if (isAlreadySelected) {
+      setSearchTerm('');
+      setIsSeedDropdownOpen(false);
+      setHighlightedSeedIndex(-1);
+      return;
+    }
+    if (selectedSeedArtists.length >= MAX_SEED_ARTISTS) {
+      setShowLimitDialog(true);
+      return;
+    }
+    setSelectedSeedArtists(prev => [...prev, { name: artistName, enabled: true }]);
+    setSearchTerm('');
+    setIsSeedDropdownOpen(false);
+    setHighlightedSeedIndex(-1);
+    if (!onboardingProgress.step1) updateOnboarding('step1');
+    artistInputRef.current?.focus();
+  };
+
+  const handleSeedInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!isSeedDropdownOpen) return;
+
+    if (e.key === 'ArrowDown') {
+      if (matchingLibraryArtists.length === 0) return;
+      e.preventDefault();
+      setHighlightedSeedIndex(prev => 
+        prev < matchingLibraryArtists.length - 1 ? prev + 1 : 0
+      );
+    } else if (e.key === 'ArrowUp') {
+      if (matchingLibraryArtists.length === 0) return;
+      e.preventDefault();
+      setHighlightedSeedIndex(prev => 
+        prev > 0 ? prev - 1 : matchingLibraryArtists.length - 1
+      );
+    } else if (e.key === 'Enter') {
+      if (highlightedSeedIndex >= 0 && highlightedSeedIndex < matchingLibraryArtists.length) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleSelectLibraryArtist(matchingLibraryArtists[highlightedSeedIndex].name);
+      }
+      // If highlightedSeedIndex === -1, default form submission handleAddFromSearch handles custom seed
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setIsSeedDropdownOpen(false);
+      setHighlightedSeedIndex(-1);
     }
   };
 
@@ -1931,24 +2025,136 @@ const GraphPage: React.FC<GraphPageProps> = ({
               </div>
             )}
             {!isGuest && (
-              <form onSubmit={handleAddFromSearch} className="relative">
-                  <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" data-testid="seed-input" ref={artistInputRef} onFocus={() => { if (!onboardingProgress.step1) updateOnboarding('step1'); }} type="search" placeholder="Add seed" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-4 pr-12 text-sm font-normal text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all" />
+              <div ref={seedInputContainerRef} className="relative">
+                <form onSubmit={handleAddFromSearch} className="relative">
+                  <input
+                    autoComplete="off"
+                    data-1p-ignore="true"
+                    data-lpignore="true"
+                    data-testid="seed-input"
+                    ref={artistInputRef}
+                    onFocus={() => {
+                      if (!onboardingProgress.step1) updateOnboarding('step1');
+                      if (searchTerm.trim().length > 0 && libraryArtists.length > 0) {
+                        setIsSeedDropdownOpen(true);
+                      }
+                    }}
+                    onKeyDown={handleSeedInputKeyDown}
+                    type="search"
+                    placeholder="Add seed"
+                    value={searchTerm}
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      if (libraryArtists.length > 0) {
+                        setIsSeedDropdownOpen(true);
+                        setHighlightedSeedIndex(-1);
+                      }
+                    }}
+                    role="combobox"
+                    aria-autocomplete="list"
+                    aria-expanded={isSeedDropdownOpen && libraryArtists.length > 0 && searchTerm.trim().length > 0}
+                    aria-controls="seed-autocomplete-list"
+                    className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-4 pr-12 text-sm font-normal text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+                  />
                   <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                      {!searchTerm && (
-                          <button type="button" onClick={() => handleSpeechToText('artists')} className={`w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl transition-colors leading-none ${isListeningForArtists ? 'text-primary animate-pulse' : 'text-zinc-400 hover:text-white'}`} title="Search by voice">
-                            <MicIcon className="!text-[18px]" />
-                          </button>
-                      )}
-                      {searchTerm && (
-                          <button type="button" onClick={() => setSearchTerm('')} className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white transition-colors leading-none" aria-label="Clear search">
-                              <span className="material-symbols-outlined !text-[18px]">close</span>
-                          </button>
-                      )}
-                      <button data-testid="curate-button" type="submit" disabled={!searchTerm.trim()} className={`flex items-center justify-center rounded-xl w-7 h-7 flex-shrink-0 transition-all duration-300 disabled:cursor-not-allowed leading-none ${!searchTerm.trim() ? 'bg-zinc-800 text-zinc-600' : 'bg-white text-brand-black hover:scale-110 active:scale-95'}`} aria-label="Add seeds">
-                          <span className="material-symbols-outlined !text-lg">add</span>
+                    {!searchTerm && (
+                      <button
+                        type="button"
+                        onClick={() => handleSpeechToText('artists')}
+                        className={`w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl transition-colors leading-none ${isListeningForArtists ? 'text-primary animate-pulse' : 'text-zinc-400 hover:text-white'}`}
+                        title="Search by voice"
+                      >
+                        <MicIcon className="!text-[18px]" />
                       </button>
+                    )}
+                    {searchTerm && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSearchTerm('');
+                          setIsSeedDropdownOpen(false);
+                          setHighlightedSeedIndex(-1);
+                        }}
+                        className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white transition-colors leading-none"
+                        aria-label="Clear search"
+                      >
+                        <span className="material-symbols-outlined !text-[18px]">close</span>
+                      </button>
+                    )}
+                    <button
+                      data-testid="curate-button"
+                      type="submit"
+                      disabled={!searchTerm.trim()}
+                      className={`flex items-center justify-center rounded-xl w-7 h-7 flex-shrink-0 transition-all duration-300 disabled:cursor-not-allowed leading-none ${!searchTerm.trim() ? 'bg-zinc-800 text-zinc-600' : 'bg-white text-brand-black hover:scale-110 active:scale-95'}`}
+                      aria-label="Add seeds"
+                    >
+                      <span className="material-symbols-outlined !text-lg">add</span>
+                    </button>
                   </div>
-              </form>
+                </form>
+
+                {/* Inline Library Autocomplete Dropdown */}
+                {isSeedDropdownOpen && libraryArtists.length > 0 && searchTerm.trim().length > 0 && (
+                  <div
+                    id="seed-autocomplete-list"
+                    role="listbox"
+                    className="absolute top-full left-0 right-0 z-40 mt-1 max-h-56 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-2xl py-1"
+                  >
+                    {matchingLibraryArtists.length > 0 ? (
+                      <>
+                        <div className="px-3 py-1 text-[9px] font-mono uppercase tracking-wider text-zinc-500 border-b border-zinc-800/80 mb-0.5 flex items-center justify-between">
+                          <span>Library Artists ({matchingLibraryArtists.length})</span>
+                          <span className="text-[8px] text-zinc-600">↑↓ to navigate · ↵ to select</span>
+                        </div>
+                        {matchingLibraryArtists.map((artist, idx) => {
+                          const isHighlighted = idx === highlightedSeedIndex;
+                          const normalizedId = normalizeArtistId(artist.name);
+                          const artistGenres = artistGenreMap.get(normalizedId) || artistGenreMap.get(artist.name) || artistGenreMap.get(artist.name.trim());
+                          const primaryGenre = artistGenres && artistGenres.size > 0 ? Array.from(artistGenres)[0] : null;
+
+                          return (
+                            <button
+                              key={artist.name}
+                              role="option"
+                              aria-selected={isHighlighted}
+                              type="button"
+                              ref={(el) => {
+                                if (isHighlighted && el) {
+                                  el.scrollIntoView({ block: 'nearest' });
+                                }
+                              }}
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => handleSelectLibraryArtist(artist.name)}
+                              onMouseEnter={() => setHighlightedSeedIndex(idx)}
+                              className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between gap-2 transition-colors ${
+                                isHighlighted
+                                  ? 'bg-zinc-800 text-white'
+                                  : 'text-zinc-300 hover:bg-zinc-800/70 hover:text-white'
+                              }`}
+                            >
+                              <span className="truncate font-medium">{artist.name}</span>
+                              {primaryGenre && (
+                                <span className="text-[10px] text-zinc-500 font-mono flex-shrink-0 uppercase tracking-wider">
+                                  {primaryGenre}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </>
+                    ) : (
+                      <div className="px-3 py-2.5 text-xs text-zinc-400 flex flex-col gap-1">
+                        <div className="text-[11px] text-zinc-400">
+                          No matching artists in your library.
+                        </div>
+                        <div className="text-[10px] text-zinc-500">
+                          Press <kbd className="px-1 py-0.5 rounded bg-zinc-800 text-zinc-300 font-mono text-[9px]">Enter</kbd> or click <span className="text-zinc-300 font-bold">+</span> to add as custom seed.
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
           </div>
           {selectedSeedArtists.length > 0 && (
