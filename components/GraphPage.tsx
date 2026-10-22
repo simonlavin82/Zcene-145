@@ -621,7 +621,7 @@ const DiscoveryFiltersPanel: React.FC<{
                     setOriginQuery(e.target.value);
                     setIsOriginDropdownOpen(true);
                   }}
-                  className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-1.5 text-xs text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+                  className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-sm font-normal text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
                 />
                 {isOriginDropdownOpen && (
                   <div className="absolute z-30 mt-1 w-full max-h-44 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-xl py-1">
@@ -696,7 +696,7 @@ const DiscoveryFiltersPanel: React.FC<{
                     setGenreQuery(e.target.value);
                     setIsGenreDropdownOpen(true);
                   }}
-                  className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-1.5 text-xs text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+                  className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-sm font-normal text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
                 />
                 {isGenreDropdownOpen && (
                   <div className="absolute z-30 mt-1 w-full max-h-52 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-xl py-1">
@@ -782,7 +782,7 @@ const DiscoveryFiltersPanel: React.FC<{
                       handleAddLabel(cleanedTypedLabel);
                     }
                   }}
-                  className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-1.5 text-xs text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+                  className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-sm font-normal text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
                 />
                 {isLabelDropdownOpen && (filteredLabelSuggestions.length > 0 || canCreateCustomLabel) && (
                   <div className="absolute z-30 mt-1 w-full max-h-48 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-xl py-1">
@@ -2041,7 +2041,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                     }}
                     onKeyDown={handleSeedInputKeyDown}
                     type="search"
-                    placeholder="Add seed"
+                    placeholder="Add Artist"
                     value={searchTerm}
                     onChange={(e) => {
                       setSearchTerm(e.target.value);
@@ -2057,16 +2057,6 @@ const GraphPage: React.FC<GraphPageProps> = ({
                     className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-4 pr-12 text-sm font-normal text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
                   />
                   <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                    {!searchTerm && (
-                      <button
-                        type="button"
-                        onClick={() => handleSpeechToText('artists')}
-                        className={`w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl transition-colors leading-none ${isListeningForArtists ? 'text-primary animate-pulse' : 'text-zinc-400 hover:text-white'}`}
-                        title="Search by voice"
-                      >
-                        <MicIcon className="!text-[18px]" />
-                      </button>
-                    )}
                     {searchTerm && (
                       <button
                         type="button"
@@ -2086,7 +2076,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                       type="submit"
                       disabled={!searchTerm.trim()}
                       className={`flex items-center justify-center rounded-xl w-7 h-7 flex-shrink-0 transition-all duration-300 disabled:cursor-not-allowed leading-none ${!searchTerm.trim() ? 'bg-zinc-800 text-zinc-600' : 'bg-white text-brand-black hover:scale-110 active:scale-95'}`}
-                      aria-label="Add seeds"
+                      aria-label="Add artist"
                     >
                       <span className="material-symbols-outlined !text-lg">add</span>
                     </button>

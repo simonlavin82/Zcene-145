@@ -2166,9 +2166,6 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                     className={`w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all ${InputSizes.md.magazineSearch}`}
                                 />
                                 <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
-                                    {!magazineSearchQuery && (
-                                        <button onClick={handleMagazineSpeechToText} className={`flex items-center justify-center transition-colors leading-none ${InputSizes.md.iconBtn} ${isListeningMagazineSearch ? 'text-primary animate-pulse' : 'text-zinc-500 hover:text-white'}`} title="Search by voice"><MicIcon className={InputSizes.md.icon} /></button>
-                                    )}
                                     {magazineSearchQuery && (
                                         <button onClick={() => setMagazineSearchQuery('')} className={`flex items-center justify-center text-zinc-400 hover:text-white transition-colors leading-none ${InputSizes.md.iconBtn}`} aria-label="Clear search"><span className={`material-symbols-outlined ${InputSizes.md.icon}`}>close</span></button>
                                     )}
@@ -2206,9 +2203,6 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 className={`w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all ${InputSizes.md.magazineSearch}`}
                                             />
                                             <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
-                                                {!magazineSearchQuery && (
-                                                    <button onClick={handleMagazineSpeechToText} className={`flex items-center justify-center transition-colors leading-none ${InputSizes.md.iconBtn} ${isListeningMagazineSearch ? 'text-primary animate-pulse' : 'text-zinc-500 hover:text-white'}`} title="Search by voice"><MicIcon className={InputSizes.md.icon} /></button>
-                                                )}
                                                 {magazineSearchQuery && (
                                                     <button onClick={() => setMagazineSearchQuery('')} className={`flex items-center justify-center text-zinc-400 hover:text-white transition-colors leading-none ${InputSizes.md.iconBtn}`} aria-label="Clear search"><span className={`material-symbols-outlined ${InputSizes.md.icon}`}>close</span></button>
                                                 )}
