@@ -2101,13 +2101,8 @@ const GraphPage: React.FC<GraphPageProps> = ({
                     className="absolute top-full left-0 right-0 z-40 mt-1 max-h-56 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-2xl py-1"
                   >
                     {matchingLibraryArtists.length > 0 ? (
-                      <>
-                        <div className="px-3 py-1 text-[9px] font-mono uppercase tracking-wider text-zinc-500 border-b border-zinc-800/80 mb-0.5 flex items-center justify-between">
-                          <span>Library Artists ({matchingLibraryArtists.length})</span>
-                          <span className="text-[8px] text-zinc-600">↑↓ to navigate · ↵ to select</span>
-                        </div>
-                        {matchingLibraryArtists.map((artist, idx) => {
-                          const isHighlighted = idx === highlightedSeedIndex;
+                      matchingLibraryArtists.map((artist, idx) => {
+                        const isHighlighted = idx === highlightedSeedIndex;
                           const normalizedId = normalizeArtistId(artist.name);
                           const artistGenres = artistGenreMap.get(normalizedId) || artistGenreMap.get(artist.name) || artistGenreMap.get(artist.name.trim());
                           const primaryGenre = artistGenres && artistGenres.size > 0 ? Array.from(artistGenres)[0] : null;
@@ -2140,8 +2135,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                               )}
                             </button>
                           );
-                        })}
-                      </>
+                      })
                     ) : (
                       <div className="px-3 py-2.5 text-xs text-zinc-400 flex flex-col gap-1">
                         <div className="text-[11px] text-zinc-400">
