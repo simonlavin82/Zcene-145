@@ -1985,13 +1985,19 @@ const App: React.FC = () => {
   }, [user, showToast]);
 
   const displayProjectName = useMemo(() => {
-    let name = projectName;
-    if (!name && seedArtists) {
-      name = seedArtists.split('::')[0]?.trim();
+    if (projectName && projectName.trim()) {
+      return projectName;
     }
-    if (!name) return 'Untitled Zcene';
-    
-    return cleanArtistDisplayName(name, graphData?.nodes);
+    if (seedArtists) {
+      const seeds = seedArtists.split('::').map(s => s.trim()).filter(Boolean);
+      if (seeds.length > 1) {
+        return seeds.map(s => cleanArtistDisplayName(s, graphData?.nodes)).join(' + ');
+      }
+      if (seeds.length === 1) {
+        return cleanArtistDisplayName(seeds[0], graphData?.nodes);
+      }
+    }
+    return 'Untitled Zcene';
   }, [projectName, seedArtists, graphData]);
 
   useEffect(() => {
@@ -2653,7 +2659,7 @@ const App: React.FC = () => {
     // Rule 36: Worker-owned telemetry fields (generationType, apiUsage, anchorResolution)
     // are intentionally omitted from client auto-saves to preserve backend authority.
     const basePayload: Record<string, any> = {
-      name: (projectName && projectName !== seedList[0]) 
+      name: (projectName && projectName.trim()) 
         ? projectName 
         : (actualDisplayName || (seedArtists ? seedList[0] : 'Untitled Zcene')),
       seedArtists,

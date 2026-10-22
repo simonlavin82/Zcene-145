@@ -284,9 +284,9 @@ export const cleanArtistDisplayName = (rawIdOrName?: string | null, graphNodes?:
   const trimmed = rawIdOrName.trim();
   if (!trimmed) return '';
 
-  // Multi-seed / Composite Bypass: If this is a multi-seed project title (e.g. "Spaced + Buggin"),
-  // return immediately to avoid incorrectly flattening it to a single graph node.
-  if (trimmed.includes(' + ')) return trimmed;
+  // Multi-seed / Composite Bypass: If this is a multi-seed or composite title (e.g. "Spaced + Buggin", "VOD +Will Haven"),
+  // return immediately to avoid incorrectly flattening or stripping country routing suffixes from custom composite names.
+  if (/\+/.test(trimmed)) return trimmed;
 
 
   // 1. Known common country routing suffixes and slugs in display or kebab case
@@ -338,6 +338,30 @@ export const cleanArtistDisplayName = (rawIdOrName?: string | null, graphNodes?:
   }
 
   return cleaned;
+};
+
+/**
+ * Safely resolves a project's display title without stripping technical suffixes
+ * from user-defined titles (preserving symbols, hyphens, and custom descriptors).
+ */
+export const getProjectDisplayTitle = (
+  project?: { name?: string | null; seedArtists?: string | null } | null,
+  graphNodes?: Node[] | null
+): string => {
+  if (!project) return 'Untitled Zcene';
+  if (project.name && project.name.trim()) {
+    return project.name.trim();
+  }
+  if (project.seedArtists) {
+    const seeds = project.seedArtists.split('::').map(s => s.trim()).filter(Boolean);
+    if (seeds.length > 1) {
+      return seeds.map(s => cleanArtistDisplayName(s, graphNodes)).join(' + ');
+    }
+    if (seeds.length === 1) {
+      return cleanArtistDisplayName(seeds[0], graphNodes);
+    }
+  }
+  return 'Untitled Zcene';
 };
 
 /**

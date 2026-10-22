@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Project } from '../types';
-import { cleanArtistDisplayName, isNodeInSeedList } from '../services/artistCacheService';
+import { getProjectDisplayTitle, cleanArtistDisplayName, isNodeInSeedList } from '../services/artistCacheService';
 import { formatSystemTimestamp, generateDeterministicGradient, extractInitials } from '../utils/formatters';
 import { useSeedImages } from '../hooks/useSeedImages';
 import { useDominantColor } from '../hooks/useDominantColor';
@@ -28,7 +28,7 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
   onDuplicateProject
 }) => {
   const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
-  const displayTitle = cleanArtistDisplayName(project.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene"));
+  const displayTitle = getProjectDisplayTitle(project);
   const isUnmapped = project.status !== 'completed' && project.status !== 'curating' && project.status !== 'pending' && project.status !== 'failed' && !project.seedArtists;
   
   const imageUrls = useSeedImages(project.seedArtists, project.detailsCache, project.graphData, project.seedImageUrl, project.seedImageUrls);

@@ -127,12 +127,16 @@ const Header: React.FC<HeaderProps> = ({
   };
 
   const [localName, setLocalName] = React.useState(projectName);
+  const [isFocused, setIsFocused] = React.useState(false);
 
   React.useEffect(() => {
-    setLocalName(projectName);
-  }, [projectName]);
+    if (!isFocused) {
+      setLocalName(projectName);
+    }
+  }, [projectName, isFocused]);
 
   const handleCommit = React.useCallback(() => {
+    setIsFocused(false);
     const trimmed = localName.trim();
     if (trimmed === "") {
       const fallback = "Untitled Zcene";
@@ -147,6 +151,7 @@ const Header: React.FC<HeaderProps> = ({
     if (e.key === 'Enter') {
       e.currentTarget.blur();
     } else if (e.key === 'Escape') {
+      setIsFocused(false);
       setLocalName(projectName);
       e.currentTarget.blur();
     }
@@ -188,6 +193,7 @@ const Header: React.FC<HeaderProps> = ({
                         <input autoComplete="off" data-1p-ignore="true" data-lpignore="true"
                           value={localName}
                           onChange={(e) => setLocalName(e.target.value)}
+                          onFocus={() => setIsFocused(true)}
                           onBlur={handleCommit}
                           onKeyDown={handleKeyDown}
                           placeholder="Untitled Project"

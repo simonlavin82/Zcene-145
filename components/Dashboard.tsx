@@ -4,7 +4,7 @@ import ViewToggle from './ViewToggle';
 import { Project, StackItem, UserTaste } from '../types';
 import { User } from 'firebase/auth';
 import { motion } from 'framer-motion';
-import { normalizeArtistId, cleanArtistDisplayName, isNodeInSeedList } from '../services/artistCacheService';
+import { normalizeArtistId, cleanArtistDisplayName, isNodeInSeedList, getProjectDisplayTitle } from '../services/artistCacheService';
 
 
 import { formatSystemTimestamp, zceneCategoricalPalette, zceneFallbackColor, getContrastTextColor } from '../utils/formatters';
@@ -108,8 +108,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const searchInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const handleRenameClick = (project: Project) => {
-    const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
-    const displayTitle = cleanArtistDisplayName(project.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene"));
+    const displayTitle = getProjectDisplayTitle(project);
     setRenameValue(displayTitle);
     setProjectToRename(project);
   };
@@ -131,8 +130,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       const rawName = (project.name || '').toLowerCase();
       if (rawName.includes(query)) return true;
 
-      const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
-      const displayTitle = cleanArtistDisplayName(project.name || (seedList.length > 0 ? seedList[0] : "")).toLowerCase();
+      const displayTitle = getProjectDisplayTitle(project).toLowerCase();
       if (displayTitle.includes(query)) return true;
 
       // 2. Check Seed Artists string
@@ -195,9 +193,8 @@ const Dashboard: React.FC<DashboardProps> = ({
       groups[bucketKey].push(project);
     });
 
-    const getProjectDisplayTitle = (p: Project) => {
-      const seedList = p.seedArtists ? p.seedArtists.split('::').filter(Boolean) : [];
-      return cleanArtistDisplayName(p.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene")).toLowerCase();
+    const getProjectTitle = (p: Project) => {
+      return getProjectDisplayTitle(p).toLowerCase();
     };
 
     const getProjectTimestamp = (p: Project): number => {
@@ -222,10 +219,10 @@ const Dashboard: React.FC<DashboardProps> = ({
           if (timeB !== timeA) {
             return timeB - timeA;
           }
-          return getProjectDisplayTitle(a).localeCompare(getProjectDisplayTitle(b));
+          return getProjectTitle(a).localeCompare(getProjectTitle(b));
         } else {
-          const titleA = getProjectDisplayTitle(a);
-          const titleB = getProjectDisplayTitle(b);
+          const titleA = getProjectTitle(a);
+          const titleB = getProjectTitle(b);
           if (titleA !== titleB) {
             return titleA.localeCompare(titleB);
           }
@@ -238,9 +235,8 @@ const Dashboard: React.FC<DashboardProps> = ({
   }, [filteredProjects, sortBy]);
 
   const sortedBucketKeys = React.useMemo(() => {
-    const getProjectDisplayTitle = (p: Project) => {
-      const seedList = p.seedArtists ? p.seedArtists.split('::').filter(Boolean) : [];
-      return cleanArtistDisplayName(p.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene")).toLowerCase();
+    const getProjectTitle = (p: Project) => {
+      return getProjectDisplayTitle(p).toLowerCase();
     };
 
     const getProjectTimestamp = (p: Project): number => {
@@ -664,7 +660,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
                       {groupedProjects[bucketKey].map((project, index) => {
                         const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
-                        const displayTitle = cleanArtistDisplayName(project.name || (seedList.length > 0 ? seedList[0] : "Untitled Zcene"));
+                        const displayTitle = getProjectDisplayTitle(project);
                         const formattedDate = formatSystemTimestamp(project.updatedAt);
                         const hasGraphNodes = !!project.graphData && !project.graphData.includes('"nodes":[]');
                         const isMapped = project.status === 'completed';
