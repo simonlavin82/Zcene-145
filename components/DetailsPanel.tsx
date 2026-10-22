@@ -2224,14 +2224,15 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                             </div>
                             {!isSmallScreen && (
                                 <div className="flex items-center gap-0.5 ml-4 shrink-0">
-                                    <button 
+                                    <Button 
+                                        variant="primary"
+                                        size="md"
                                         onClick={() => onMagazineViewToggle(false)}
-                                        className="flex items-center gap-1.5 px-4 py-2 border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 focus:outline-none transition-all duration-200 text-sm font-medium shrink-0 leading-none backdrop-blur-sm"
-                                        title="Exit Magazine View"
+                                        title="Close Magazine View"
                                     >
-                                        <span>Exit Magazine</span>
+                                        <span>Close</span>
                                         <span className="material-symbols-outlined !text-[18px]">close</span>
-                                    </button>
+                                    </Button>
                                 </div>
                             )}
                         </div>
@@ -2518,7 +2519,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                     className="pointer-events-auto shadow-2xl active:scale-95"
                                 >
                                     <span className="material-symbols-outlined !text-[18px]">close</span>
-                                    <span>Exit Magazine</span>
+                                    <span>Close</span>
                                 </Button>
                             )}
                             {!isSmallScreen && <div className="w-12 md:w-16"></div>}
