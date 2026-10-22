@@ -928,7 +928,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
     const panelContent = (
         <>
-            <div className={`flex flex-col min-h-full ${isFullScreenMode ? '' : 'pb-[calc(env(safe-area-inset-bottom)+7.5rem)] sm:pb-20'}`}>
+            <div className={`flex flex-col min-h-full ${isFullScreenMode ? '' : 'pb-[calc(env(safe-area-inset-bottom)+9rem)] sm:pb-20'}`}>
                 {/* 1. Action Icons (Not Sticky) — ref measures its rendered height for the dynamic scroll target */}
                 <div ref={actionIconsRef} className={`pt-3 ${isFullScreenMode ? 'px-0 bg-transparent' : 'px-4 bg-zinc-900'} z-20 flex-shrink-0`}>
                     <div className={`flex items-center justify-end gap-1 flex-shrink-0 ${isFullScreenMode ? 'w-fit ml-auto' : ''}`}>
@@ -2489,7 +2489,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                         )}
 
                         {!isMagazineViewOpen && (
-                            <div className={`absolute ${isSmallScreen ? 'bottom-[calc(env(safe-area-inset-bottom)+4.5rem)]' : 'bottom-6'} left-0 right-0 flex justify-center pointer-events-none z-50`}>
+                            <div className={`absolute ${isSmallScreen ? 'bottom-[calc(env(safe-area-inset-bottom)+5.75rem)]' : 'bottom-6'} left-0 right-0 flex justify-center pointer-events-none z-50`}>
                                 <Button 
                                     variant="primary"
                                     size="md"
@@ -2512,10 +2512,10 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                             
                             {isSmallScreen && (
                                 <Button
-                                    variant="secondary"
+                                    variant="primary"
                                     size="md"
                                     onClick={() => onMagazineViewToggle(false)}
-                                    className="pointer-events-auto shadow-2xl backdrop-blur-md"
+                                    className="pointer-events-auto shadow-2xl active:scale-95"
                                 >
                                     <span className="material-symbols-outlined !text-[18px]">close</span>
                                     <span>Exit Magazine</span>

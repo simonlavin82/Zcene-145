@@ -403,6 +403,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
     const [demoProfileActive, setDemoProfileActive] = useState(false);
     const [demoExpandedRow, setDemoExpandedRow] = useState<string | null>(null);
     const [demoMobileBannerExpanded, setDemoMobileBannerExpanded] = useState(false);
+    const [demoMobileNavTab, setDemoMobileNavTab] = useState<'artists' | 'spiderweb' | 'details'>('spiderweb');
     const [selectedOnboardingStep, setSelectedOnboardingStep] = useState<string>('step1');
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -424,6 +425,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
         { id: 'iconography', title: 'Iconography' },
         { id: 'spiderweb-legends', title: 'Spiderweb Legends' },
         { id: 'spiderweb-controls', title: 'Spiderweb Controls' },
+        { id: 'mobile-navigation', title: 'Mobile Navigation Pill' },
         { id: 'buttons', title: 'Buttons' },
         { id: 'toggles', title: 'Toggles' },
         { id: 'links', title: 'Links' },
@@ -1453,6 +1455,118 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <p className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Selected Variant</p>
                                     <p className="text-sm text-zinc-400">When toggled (e.g. expanding the filter drawer), controls shift to <code>bg-zinc-800 border-primary/50 text-primary</code> to communicate active UI focus.</p>
                                 </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* MOBILE NAVIGATION PILL */}
+                    <section id="mobile-navigation">
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Mobile Navigation Pill</h2>
+                        <p className="text-base text-zinc-300 leading-relaxed max-w-3xl mb-12">
+                            On mobile viewports, global section switching transitions from desktop sidebars to a floating glassmorphism navigation pill. Anchored at the bottom with safe-area support, it provides native-app tactile interaction across <strong>Roots</strong>, <strong>Connections</strong>, and <strong>Deep Cuts</strong> with live numeric counter badges while allowing full-bleed background content to scroll underneath.
+                        </p>
+
+                        <div className="space-y-16 mb-24">
+                            {/* Interactive Component Preview */}
+                            <div className="p-8 bg-zinc-900/50 rounded-none border border-zinc-800">
+                                <h3 className="text-xl font-medium text-primary mb-4">Interactive Navigation Pill</h3>
+                                <p className="text-sm text-zinc-400 mb-8 max-w-2xl">
+                                    Click any tab segment below to test active/inactive state transitions, tactile button depression (<code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">active:scale-95</code>), and status counter badges.
+                                </p>
+
+                                <div className="p-12 bg-zinc-950 border border-zinc-800 flex flex-col items-center justify-center min-h-[220px] relative overflow-hidden bg-[url('https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg')] bg-cover bg-center">
+                                    <div className="absolute inset-0 bg-zinc-900/80 backdrop-blur-sm"></div>
+                                    
+                                    {/* Mock background bleed indicators */}
+                                    <div className="absolute inset-x-8 top-4 flex justify-between items-center opacity-30 text-xs text-zinc-400 select-none pointer-events-none">
+                                        <span>← Content bleeds underneath →</span>
+                                        <span className="font-mono">z-40 floating elevation</span>
+                                    </div>
+
+                                    {/* Floating Pill Preview */}
+                                    <div className="relative z-10 w-full max-w-sm">
+                                        <nav className="flex items-center justify-between p-1.5 bg-zinc-900/90 backdrop-blur-xl border border-zinc-700/80 rounded-full shadow-[0_12px_36px_rgba(0,0,0,0.6),0_2px_8px_rgba(0,0,0,0.4)]">
+                                            {(['artists', 'spiderweb', 'details'] as const).map(tab => {
+                                                const isActive = demoMobileNavTab === tab;
+                                                const label = tab === 'details' ? 'Deep Cuts' : tab === 'artists' ? 'Roots' : 'Connections';
+                                                return (
+                                                    <button
+                                                        key={tab}
+                                                        onClick={() => setDemoMobileNavTab(tab)}
+                                                        className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-full text-xs font-semibold uppercase tracking-wider transition-all duration-200 select-none cursor-pointer active:scale-95 ${
+                                                            isActive
+                                                                ? 'bg-zinc-800 text-primary shadow-sm border border-zinc-700/60'
+                                                                : 'text-zinc-400 hover:text-zinc-200 border border-transparent'
+                                                        }`}
+                                                    >
+                                                        <span className="truncate">{label}</span>
+                                                        {tab === 'artists' && (
+                                                            <span className="h-4.5 min-w-[18px] px-1 rounded-full flex items-center justify-center text-[9px] font-bold border shadow-sm transition-all duration-300 bg-primary/20 text-primary border-primary/40">
+                                                                1
+                                                            </span>
+                                                        )}
+                                                        {tab === 'details' && (
+                                                            <span className="h-4.5 min-w-[18px] px-1 rounded-full flex items-center justify-center text-[9px] font-bold border shadow-sm transition-all duration-300 bg-zinc-900 text-white border-white/20">
+                                                                24
+                                                            </span>
+                                                        )}
+                                                    </button>
+                                                );
+                                            })}
+                                        </nav>
+                                    </div>
+                                </div>
+
+                                <div className="mt-6 flex flex-wrap items-center justify-between gap-4 text-xs text-zinc-500 font-mono">
+                                    <span>Active Segment: <strong className="text-primary">{demoMobileNavTab === 'details' ? 'Deep Cuts' : demoMobileNavTab === 'artists' ? 'Roots' : 'Connections'}</strong></span>
+                                    <span>Container: <code>rounded-full w-[calc(100%-2rem)] max-w-sm</code></span>
+                                </div>
+                            </div>
+
+                            {/* Specifications & Anatomy Grid */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div className="p-6 bg-zinc-900/50 border border-zinc-800 space-y-4">
+                                    <h4 className="text-sm font-semibold text-zinc-200 uppercase tracking-widest flex items-center gap-2">
+                                        <span className="material-symbols-outlined !text-[18px] text-primary">layers</span>
+                                        Glassmorphism Container Shell
+                                    </h4>
+                                    <p className="text-xs text-zinc-400 leading-relaxed">
+                                        The outer shell floats at <code>z-40</code> with safe-area responsive positioning, allowing underlying artist content, canvas nodes, and cards to bleed completely to the bottom edge of the screen.
+                                    </p>
+                                    <ul className="space-y-2 text-xs font-mono text-zinc-400 bg-zinc-950 p-4 border border-zinc-800 rounded-lg">
+                                        <li><strong className="text-zinc-200">Positioning:</strong> <code className="text-primary">fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2</code></li>
+                                        <li><strong className="text-zinc-200">Backdrop:</strong> <code className="text-primary">bg-zinc-900/90 backdrop-blur-xl</code></li>
+                                        <li><strong className="text-zinc-200">Border:</strong> <code className="text-primary">border border-zinc-700/80 rounded-full</code></li>
+                                        <li><strong className="text-zinc-200">Shadow:</strong> <code className="text-primary">shadow-[0_12px_36px_rgba(0,0,0,0.6),0_2px_8px_rgba(0,0,0,0.4)]</code></li>
+                                    </ul>
+                                </div>
+
+                                <div className="p-6 bg-zinc-900/50 border border-zinc-800 space-y-4">
+                                    <h4 className="text-sm font-semibold text-zinc-200 uppercase tracking-widest flex items-center gap-2">
+                                        <span className="material-symbols-outlined !text-[18px] text-primary">touch_app</span>
+                                        Segment States & Tactility
+                                    </h4>
+                                    <p className="text-xs text-zinc-400 leading-relaxed">
+                                        Inner segments are rendered as discrete pill buttons inside the continuous parent shell, delivering instant tactile feedback on touch devices.
+                                    </p>
+                                    <ul className="space-y-2 text-xs font-mono text-zinc-400 bg-zinc-950 p-4 border border-zinc-800 rounded-lg">
+                                        <li><strong className="text-zinc-200">Active State:</strong> <code className="text-primary">bg-zinc-800 text-primary shadow-sm border border-zinc-700/60</code></li>
+                                        <li><strong className="text-zinc-200">Inactive State:</strong> <code className="text-primary">text-zinc-400 hover:text-zinc-200 border border-transparent</code></li>
+                                        <li><strong className="text-zinc-200">Touch Scale:</strong> <code className="text-primary">active:scale-95 transition-all duration-200</code></li>
+                                        <li><strong className="text-zinc-200">Typography:</strong> <code className="text-primary">text-xs font-semibold uppercase tracking-wider</code></li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            {/* Stacking & Clearance Guidelines */}
+                            <div className="p-6 bg-primary/5 border border-primary/20 space-y-3">
+                                <div className="flex items-center gap-2 text-primary">
+                                    <span className="material-symbols-outlined !text-[20px]">architecture</span>
+                                    <h4 className="text-xs font-semibold uppercase tracking-wider">Vertical Stacking & Clearance Guidelines</h4>
+                                </div>
+                                <p className="text-xs text-zinc-300 leading-relaxed">
+                                    To eliminate visual collisions and prevent accidental mis-taps on mobile viewports, floating overlay CTAs (such as the primary <strong>Magazine</strong> button in the Deep Cuts card view) must be positioned at <code>bottom-[calc(env(safe-area-inset-bottom)+5.75rem)]</code>. This guarantees a safe ~36px vertical clearance above the navigation pill. Scrollable card content must provide matching bottom padding (<code>pb-[calc(env(safe-area-inset-bottom)+9rem)]</code>) so that all text, actions, and media can scroll completely clear of the floating CTA.
+                                </p>
                             </div>
                         </div>
                     </section>
