@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateSemanticLinkWeights = exports.scrapeImageUrlBackend = exports.checkVideoPlayability = exports.scrapeVideoIdBackend = exports.fetchNodeDetailsBackend = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = exports.NODE_DETAILS_SCHEMA = exports.generateGraphDataBackend = exports.reconcileNarrativeEdges = exports.generateRootsBreakdownBackend = exports.validateSeedOriginBackend = exports.SEED_VALIDATION_SCHEMA = exports.GENERATE_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = exports.GRAPH_RESPONSE_SCHEMA = exports.extractCleanJsonString = exports.extractArtistSubGraph = exports.normalizeGraphData = exports.buildCompositeCacheKey = exports.extractCountrySlug = exports.sanitizeImageUrl = exports.extractValidYoutubeId = exports.titleCaseArtistId = exports.normalizeLabelId = exports.normalizeArtistId = exports.applyCanonicalAlias = exports.CANONICAL_ALIASES = exports.GEMINI_FLASH_MODEL = void 0;
+exports.generateSemanticLinkWeights = exports.scrapeImageUrlBackend = exports.checkVideoPlayability = exports.scrapeVideoIdBackend = exports.fetchNodeDetailsBackend = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = exports.NODE_DETAILS_SCHEMA = exports.generateGraphDataBackend = exports.reconcileNarrativeEdges = exports.generateRootsBreakdownBackend = exports.validateSeedOriginBackend = exports.SEED_VALIDATION_SCHEMA = exports.GENERATE_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = exports.GRAPH_RESPONSE_SCHEMA = exports.extractCleanJsonString = exports.extractArtistSubGraph = exports.normalizeGraphData = exports.buildCompositeCacheKey = exports.extractCountrySlug = exports.sanitizeImageUrl = exports.extractValidYoutubeId = exports.cleanArtistDisplayName = exports.titleCaseArtistId = exports.normalizeLabelId = exports.normalizeArtistId = exports.applyCanonicalAlias = exports.CANONICAL_ALIASES = exports.GEMINI_FLASH_MODEL = void 0;
 const genai_1 = require("@google/genai");
 const executeCurationPipeline_1 = require("../executeCurationPipeline");
 const cacheQualification_1 = require("./cacheQualification");
@@ -44,6 +44,20 @@ const titleCaseArtistId = (id) => {
         .join(' ');
 };
 exports.titleCaseArtistId = titleCaseArtistId;
+const cleanArtistDisplayName = (name) => {
+    if (!name)
+        return '';
+    let cleaned = name.trim();
+    cleaned = cleaned.replace(/^["']+|["']+$/g, '');
+    // Canonical Stylization Mandate (Rule 36):
+    // Preserve stylized lowercase display names (e.g. "ten56.") synthesized by AI models.
+    // Only convert to title case if the name contains hyphens or underscores (indicating a slug).
+    if (cleaned.includes('-') || cleaned.includes('_')) {
+        cleaned = (0, exports.titleCaseArtistId)(cleaned);
+    }
+    return cleaned;
+};
+exports.cleanArtistDisplayName = cleanArtistDisplayName;
 const extractValidYoutubeId = (rawUrlOrId) => {
     if (!rawUrlOrId || typeof rawUrlOrId !== 'string')
         return undefined;
@@ -216,9 +230,11 @@ const normalizeGraphData = (graph) => {
         idMap.set(originalId, normalizedId);
         idMap.set(originalId.toLowerCase(), normalizedId);
         idMap.set((0, exports.normalizeArtistId)(originalId), normalizedId);
-        let label = node.label ? (0, exports.applyCanonicalAlias)(node.label) : originalId.trim();
-        if (node.type === 'artist' || node.type === 'label') {
-            label = (0, exports.titleCaseArtistId)(label);
+        let label = node.label ? (0, exports.cleanArtistDisplayName)((0, exports.applyCanonicalAlias)(node.label)) : '';
+        if (!label) {
+            label = (node.type === 'artist' || node.type === 'label')
+                ? (0, exports.titleCaseArtistId)(originalId.trim())
+                : originalId.trim();
         }
         return {
             ...node,

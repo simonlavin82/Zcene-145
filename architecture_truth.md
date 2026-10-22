@@ -1,8 +1,8 @@
 # ZCENE ARCHITECTURAL TRUTH & IMMUTABLE LAWS
  
-![Architecture Diagram](./Zcene Architecture V33.jpg)
+![Architecture Diagram](./Zcene Architecture V34.jpg)
  
-This document defines the absolute, immutable architectural baseline of Zcene (V33). All future development, bug fixes, and AI agent actions MUST strictly adhere to these laws. Legacy paradigms (like naive string matching, bypass assumptions, single-pointer stubs, open-ended prompt instruction textareas, prose-fallback stubs, or storing entity payloads under bare IDs) are strictly forbidden.
+This document defines the absolute, immutable architectural baseline of Zcene (V34). All future development, bug fixes, and AI agent actions MUST strictly adhere to these laws. Legacy paradigms (like naive string matching, bypass assumptions, single-pointer stubs, open-ended prompt instruction textareas, prose-fallback stubs, or storing entity payloads under bare IDs) are strictly forbidden.
  
 ## THE IMMUTABLE ARCHITECTURAL LAWS
  
@@ -203,6 +203,7 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 - **Rule:** The extraction pipeline MUST algorithmically enforce bare root IDs for all global assets. Artists require strict `kebab-case-artist-iso-code` format.
 - **Root-as-Router Contract:** Bare IDs (e.g., `gunmoll`) are strictly reserved as routing stubs (`_isStub: true, redirectTo: "id-iso"`) to future-proof against homonyms and MUST NEVER hold entity payloads. All verified entities, whether seeds or deep cuts, must resolve to their geographically suffixed ID (e.g., `artists/gunmoll-us`). Failed parametric verifications are hard-rejected with inline UI errors to prevent database pollution.
 - **Label Taxonomy Normalization:** The extraction and hydration pipeline MUST algorithmically strip interchangeable structural suffixes (e.g., `-records`, `-recordings`, `-music`, `-company`, `-group`, `-entertainment`, `-inc`, `-ltd`) while preserving `-media` in label entities via `normalizeLabelId` across hydration, `idRewriteMap`, `labelIds`, composite cache keys, and Level 3 `anchorLabels`. This enforces the Canonical Persistence Mandate by reducing natural LLM variations (e.g., `"Century Media"` and `"Century Media Records"` -> `"century-media"`) to a single, pure root ID.
+- **Canonical Stylization Mandate:** Canonical stylized display names synthesized by the AI (e.g., intentional lowercase or special characters) must bypass forced Title Case formatters and be preserved as the absolute UI truth.
 
 ### 37. JIT Asset Telemetry & Healing (404 Emergency Parachute ONLY)
 - **Separation of Powers & Anti-Sweep Law:** The JIT Asset Healer (`healOrphanedAsset`) is strictly an **emergency parachute triggered ONLY by true 404 cache misses** (or corrupted profiles failing `isFullyQualifiedEntityProfile`) on inspected nodes during live canvas exploration or post-generation eager hydration.

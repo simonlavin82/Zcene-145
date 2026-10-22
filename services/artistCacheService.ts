@@ -332,8 +332,8 @@ export const cleanArtistDisplayName = (rawIdOrName?: string | null, graphNodes?:
     }
   }
 
-  // If the result is purely lowercase or was kebab case, apply titleCaseArtistId
-  if (cleaned === cleaned.toLowerCase() || cleaned.includes('-') || cleaned.includes('_')) {
+  // If the result contains kebab-case or snake-case slug delimiters, format it
+  if (cleaned.includes('-') || cleaned.includes('_')) {
     return titleCaseArtistId(cleaned);
   }
 
@@ -420,10 +420,7 @@ export const normalizeGraphData = (graph: GraphData): GraphData => {
     idMap.set(originalId.toLowerCase(), normalizedId); // fallback
     idMap.set(normalizeArtistId(originalId), normalizedId); // accent-insensitive fallback
 
-    let label = node.label || originalId.trim();
-    if (node.type === 'artist' || node.type === 'label') {
-      label = titleCaseArtistId(cleanArtistDisplayName(label));
-    }
+    let label = node.label ? cleanArtistDisplayName(node.label) : titleCaseArtistId(cleanArtistDisplayName(originalId.trim()));
 
     return {
       ...node,
@@ -616,7 +613,9 @@ export const eagerNormalizeCacheEntry = (entry: ArtistCacheEntry): ArtistCacheEn
       if (graph && graph.nodes) {
         graph.nodes.forEach((n: any) => {
           if (n.type === 'artist' || n.type === 'label') {
-            n.label = titleCaseArtistId(n.label || n.id);
+            if (!n.label) {
+              n.label = titleCaseArtistId(n.id);
+            }
           }
         });
         entry.graphData = JSON.stringify(graph);
@@ -632,10 +631,12 @@ export const eagerNormalizeCacheEntry = (entry: ArtistCacheEntry): ArtistCacheEn
       const processDetails = (details: any) => {
         if (details) {
           if (details.details) {
-            details.details.artist = titleCaseArtistId(details.details.artist || details.name || "");
+            if (!details.details.artist) {
+              details.details.artist = details.name || "";
+            }
           }
-          if (details.name) {
-            details.name = titleCaseArtistId(details.name);
+          if (!details.name && details.details?.artist) {
+            details.name = details.details.artist;
           }
         }
       };
@@ -1180,7 +1181,9 @@ export const readLegacyArtistCache = async (
         if (graph && graph.nodes) {
           graph.nodes.forEach((n: any) => {
             if (n.type === 'artist' || n.type === 'label') {
-              n.label = titleCaseArtistId(n.label || n.id);
+              if (!n.label) {
+                n.label = titleCaseArtistId(n.id);
+              }
             }
           });
           graphDataStr = JSON.stringify(graph);
@@ -1192,10 +1195,12 @@ export const readLegacyArtistCache = async (
         const processDetails = (details: any) => {
           if (details) {
             if (details.details) {
-              details.details.artist = titleCaseArtistId(details.details.artist || details.name || "");
+              if (!details.details.artist) {
+                details.details.artist = details.name || "";
+              }
             }
-            if (details.name) {
-              details.name = titleCaseArtistId(details.name);
+            if (!details.name && details.details?.artist) {
+              details.name = details.details.artist;
             }
           }
         };

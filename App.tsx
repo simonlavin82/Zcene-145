@@ -4534,7 +4534,7 @@ const App: React.FC = () => {
         // receives clean textual labels for context. The backend will use 'baseGraph' and 'disambiguationHints'
         // to map generated canonical nodes back to their cache IDs.
         
-        // Architecture V33 [Rule 15 / Rule 27]: Tabula Rasa Gate.
+        // Architecture V34 [Rule 15 / Rule 27 / Rule 36]: Tabula Rasa Gate.
         // Complex Generations (Multi-Seed or 3-Tier Anchored) strictly bypass cachedSubgraphsContext
         // and baseGraph so Gemini 3.1 Pro creates fresh bespoke connections from a blank slate.
         const isComplexGeneration = (artistList.length > 1) || hasActiveFilters;
@@ -5562,9 +5562,6 @@ const App: React.FC = () => {
                 } catch (e) { console.warn('[ProjectLoader] canvasLayout parse failed:', e); }
               }
 
-              g.nodes.forEach((n: any) => { n.fx = n.fx ?? null; n.fy = n.fy ?? null; });
-              setGraphData((prev: any) => mergeGraphData(prev, g));
-
               if (data.detailsCache) {
                 try {
                   const newCacheMap = expandDetailsCacheMap(data.detailsCache);
@@ -5576,10 +5573,23 @@ const App: React.FC = () => {
                     newCacheMap.forEach((v, k) => merged.set(k, v));
                     return merged;
                   });
+
+                  // Self-heal node labels with canonical stylized casing from authoritative detailsCache
+                  g.nodes.forEach((node: Node) => {
+                    if (node.type === 'artist' || !node.type) {
+                      const cached = newCacheMap.get(node.id) || newCacheMap.get(normalizeArtistId(node.id));
+                      if (cached?.details?.artist && typeof cached.details.artist === 'string' && cached.details.artist.trim()) {
+                        node.label = cached.details.artist.trim();
+                      }
+                    }
+                  });
                 } catch (e) {
                   console.error("[ProjectLoader] Details cache parse fail", e);
                 }
               }
+
+              g.nodes.forEach((n: any) => { n.fx = n.fx ?? null; n.fy = n.fy ?? null; });
+              setGraphData((prev: any) => mergeGraphData(prev, g));
 
               // ── FIRESTORE-FIRST: batch-load all node biographies before marking load complete
               const isInitialHydration = isProjectLoadingRef.current;

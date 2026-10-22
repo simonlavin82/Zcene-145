@@ -17,9 +17,13 @@ import { useDominantColor } from '../hooks/useDominantColor';
 const SENTINEL_INSIGHT = 'No insight provided.';
 
 export const getArtistDisplayName = (details: any, node: any): string => {
-  const rawArtist = details?.details?.artist || node?.label || node?.id || '';
-  if (!rawArtist) return '';
-  return cleanArtistDisplayName(rawArtist);
+  if (details?.details?.artist && typeof details.details.artist === 'string' && details.details.artist.trim()) {
+    return cleanArtistDisplayName(details.details.artist.trim());
+  }
+  if (node?.label && typeof node.label === 'string' && node.label.trim()) {
+    return cleanArtistDisplayName(node.label.trim());
+  }
+  return cleanArtistDisplayName(node?.id || '');
 };
 
 

@@ -424,7 +424,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 const recommendedEntities = finalGraph.nodes.filter((n) => n.type === 'artist' || n.type === 'label').map((n) => {
                     const norm = (0, curatorService_1.normalizeArtistId)(n.id);
                     const canonical = resolvedSeedNormMap.get(norm) ?? norm;
-                    const cleanName = seedNamesMap[canonical] || seedNamesMap[norm] || seedNamesMap[n.id] || n.label || n.id;
+                    const cleanName = seedNamesMap[canonical] || seedNamesMap[norm] || seedNamesMap[n.id] || (n.label ? (0, curatorService_1.cleanArtistDisplayName)(n.label) : n.id);
                     return {
                         id: n.id,
                         name: cleanName,
@@ -1685,7 +1685,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         await recDocRef.set({
                             cacheKey: cleanCanonicalId,
                             [idFieldKey]: recNorm,
-                            seedArtists: recArtist,
+                            seedArtists: (recDetails?.details?.artist && !isLabel) ? recDetails.details.artist : recArtist,
                             graphData: shouldWriteGraphData ? JSON.stringify(safeExtractedGraph) : null,
                             detailsCache: finalRecDetails, // Save as structured object!
                             filters: (matchingSeedNorm && !isLabel && !isComplexGeneration) ? inputPayload.filters || null : null,

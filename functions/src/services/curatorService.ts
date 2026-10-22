@@ -59,6 +59,19 @@ export const titleCaseArtistId = (id: string): string => {
     .join(' ');
 };
 
+export const cleanArtistDisplayName = (name?: string): string => {
+  if (!name) return '';
+  let cleaned = name.trim();
+  cleaned = cleaned.replace(/^["']+|["']+$/g, '');
+  // Canonical Stylization Mandate (Rule 36):
+  // Preserve stylized lowercase display names (e.g. "ten56.") synthesized by AI models.
+  // Only convert to title case if the name contains hyphens or underscores (indicating a slug).
+  if (cleaned.includes('-') || cleaned.includes('_')) {
+    cleaned = titleCaseArtistId(cleaned);
+  }
+  return cleaned;
+};
+
 export const extractValidYoutubeId = (rawUrlOrId?: string | null): string | undefined => {
   if (!rawUrlOrId || typeof rawUrlOrId !== 'string') return undefined;
   const cleaned = rawUrlOrId.replace(/['"`]/g, '').trim();
@@ -237,9 +250,11 @@ export const normalizeGraphData = (graph: GraphData): GraphData => {
     idMap.set(originalId.toLowerCase(), normalizedId);
     idMap.set(normalizeArtistId(originalId), normalizedId);
 
-    let label = node.label ? applyCanonicalAlias(node.label) : originalId.trim();
-    if (node.type === 'artist' || node.type === 'label') {
-      label = titleCaseArtistId(label);
+    let label = node.label ? cleanArtistDisplayName(applyCanonicalAlias(node.label)) : '';
+    if (!label) {
+      label = (node.type === 'artist' || node.type === 'label')
+        ? titleCaseArtistId(originalId.trim())
+        : originalId.trim();
     }
 
     return {

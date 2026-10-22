@@ -504,10 +504,13 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     });
 
     // Title-case formatter: converts raw id slugs (e.g. "buggin", "hardcore-punk")
-    // to their display form ("Buggin", "Hardcore Punk") for legacy cache docs
+    // to their display form ("Buggin", "Hardcore Punk") only for legacy cache docs
     // where the .label field was not populated at write time.
     const toDisplayLabel = (node: Node): string => {
-        const raw = node.label || String(node.id);
+        if (node.label && typeof node.label === 'string' && node.label.trim()) {
+            return node.label.trim();
+        }
+        const raw = String(node.id || '');
         return raw
             .replace(/-/g, ' ')
             .replace(/\b\w/g, c => c.toUpperCase());
