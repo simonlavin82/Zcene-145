@@ -93,7 +93,7 @@ const ExampleMusicGraph: React.FC = () => {
     }, [isLegendExpanded]);
 
     const legendConfig: Record<string, { label: string; shape: React.ReactNode }> = {
-        seed: { label: 'Seed Artist', shape: <span className="material-symbols-outlined text-[28px]" style={{ color: nodeTypeColorMap.seed, fontVariationSettings: "'FILL' 1" }}>album</span> },
+        seed: { label: 'Root Artist', shape: <span className="material-symbols-outlined text-[28px]" style={{ color: nodeTypeColorMap.seed, fontVariationSettings: "'FILL' 1" }}>album</span> },
         recommended: { label: 'Artist', shape: <span className="material-symbols-outlined text-[28px]" style={{ color: nodeTypeColorMap.ai, fontVariationSettings: "'FILL' 1" }}>equalizer</span> },
         founded: { label: 'Founded', shape: <span className="material-symbols-outlined text-[24px]" style={{ color: nodeTypeColorMap.founded, fontVariationSettings: "'FILL' 1" }}>event</span> },
         label: { label: 'Label', shape: <span className="material-symbols-outlined text-[24px]" style={{ color: nodeTypeColorMap.label, fontVariationSettings: "'FILL' 1" }}>label</span> },
@@ -324,7 +324,7 @@ const ExampleMusicGraph: React.FC = () => {
                 {/* Header (Matching GraphPage Spiderweb Header) */}
                 <div className="h-12 px-4 flex-shrink-0 border-b border-zinc-600/50 flex items-center justify-between overflow-hidden bg-zinc-900 relative z-20">
                     <div className="flex items-center gap-2">
-                        <h2 className="text-sm sm:text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Spiderweb</h2>
+                        <h2 className="text-sm sm:text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Connections</h2>
                     </div>
                 </div>
 

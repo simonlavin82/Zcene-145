@@ -462,7 +462,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 No Zcenes found matching &ldquo;{searchQuery}&rdquo;
               </h3>
               <p className="text-sm text-zinc-400 max-w-md mb-6">
-                Try searching for a different project title, seed artist, or node name.
+                Try searching for a different project title, root artist, or node name.
               </p>
               <button
                 onClick={() => {
@@ -594,7 +594,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                   <tr className="border-b border-zinc-800 text-[10px] text-zinc-400 uppercase tracking-widest font-bold bg-zinc-950">
                     <th className="py-4 px-6 font-semibold">Title</th>
                     <th className="py-4 px-6 font-semibold">Modified Date</th>
-                    <th className="py-4 px-6 font-semibold">Seeds</th>
+                    <th className="py-4 px-6 font-semibold">Roots</th>
                     <th className="py-4 px-6 font-semibold">Artists</th>
                     <th className="py-4 px-6 font-semibold">Labels</th>
                     <th className="py-4 px-6 font-semibold">Deep Cuts</th>
@@ -726,7 +726,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                             <td className={`py-4 px-6 font-normal ${tdClass}`}>
                               {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
                               <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
-                                SEED ARTISTS: {seedList.length}
+                                ROOT ARTISTS: {seedList.length}
                               </span>
                             </td>
                             <td className={`py-4 px-6 font-normal ${tdClass}`}>

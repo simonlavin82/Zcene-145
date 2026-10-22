@@ -842,13 +842,13 @@ const ZceneEmptyState: React.FC<{ onNavigate: (view: View) => void }> = ({ onNav
         </button>
     </div>
     <div className="mt-3 text-zinc-400 text-xs space-y-4">
-        <p className="text-center px-4">Start with a few of your favorite seeds, and Zcene will map how they connect across genres, labels, origins, and scenes.</p>
+        <p className="text-center px-4">Start with a few of your favorite roots, and Zcene will map how they connect across genres, labels, origins, and scenes.</p>
         <div className="text-left bg-zinc-800/30 p-5 rounded-none border border-zinc-700/50 mx-4 text-xs">
             <p className="font-medium text-zinc-200 mb-2">How it works</p>
             <ol className="list-decimal list-inside space-y-1 text-zinc-400">
-                <li>Add 1–5 seeds (or import your library).</li>
+                <li>Add 1–5 roots (or import your library).</li>
                 <li>Create your Zcene.</li>
-                <li>Drag, filter, and explore the spiderweb.</li>
+                <li>Drag, filter, and explore connections.</li>
             </ol>
         </div>
     </div>
@@ -878,13 +878,13 @@ const UpdateInterceptModal: React.FC<{
                 </ModalHeader>
                 <ModalBody>
                     <p className="text-zinc-300 text-sm mb-4">
-                        You are about to generate a new spiderweb. Would you like to fork a new Zcene, or overwrite the existing one?
+                        You are about to generate new connections. Would you like to fork a new Zcene, or overwrite the existing one?
                     </p>
                     <div className="p-3 bg-zinc-900/50 border border-zinc-700/50 rounded-xl hover:bg-zinc-800/50 transition-colors">
                         <Checkbox 
                             checked={confirmOverwrite}
                             onChange={(e) => setConfirmOverwrite(e.target.checked)}
-                            label="I understand that overwriting will replace my current spiderweb."
+                            label="I understand that overwriting will replace my current connections."
                         />
                     </div>
                 </ModalBody>
@@ -2088,7 +2088,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                           No matching artists in your library.
                         </div>
                         <div className="text-[10px] text-zinc-500">
-                          Press <kbd className="px-1 py-0.5 rounded bg-zinc-800 text-zinc-300 font-mono text-[9px]">Enter</kbd> or click <span className="text-zinc-300 font-bold">+</span> to add as custom seed.
+                          Press <kbd className="px-1 py-0.5 rounded bg-zinc-800 text-zinc-300 font-mono text-[9px]">Enter</kbd> or click <span className="text-zinc-300 font-bold">+</span> to add as custom root.
                         </div>
                       </div>
                     )}
@@ -2209,7 +2209,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
   }, [activeTab]);
 
   const legendConfig: Record<FilterKeys, { label: string; shape: React.ReactNode }> = {
-    seed: { label: 'Seed Artist', shape: <span className="material-symbols-outlined text-[28px]" style={{ color: nodeTypeColorMap.seed, fontVariationSettings: "'FILL' 1" }}>album</span> },
+    seed: { label: 'Root Artist', shape: <span className="material-symbols-outlined text-[28px]" style={{ color: nodeTypeColorMap.seed, fontVariationSettings: "'FILL' 1" }}>album</span> },
     recommended: { label: 'Artist', shape: <span className="material-symbols-outlined text-[28px]" style={{ color: nodeTypeColorMap.ai, fontVariationSettings: "'FILL' 1" }}>equalizer</span> },
     founded: { label: 'Founded', shape: <span className="material-symbols-outlined text-[24px]" style={{ color: nodeTypeColorMap.founded, fontVariationSettings: "'FILL' 1" }}>event</span> },
     label: { label: 'Label', shape: <span className="material-symbols-outlined text-[24px]" style={{ color: nodeTypeColorMap.label, fontVariationSettings: "'FILL' 1" }}>label</span> },
@@ -2291,9 +2291,9 @@ const GraphPage: React.FC<GraphPageProps> = ({
             backgroundPosition: 'center'
         }}
     >
-        <OnboardingTooltip isVisible={visibleTooltips.step1} content="Add your seeds to start your Zcene. These are your starting points, you can type them or select from your library." position="bottom" anchorRef={artistInputRef} onDismiss={() => updateOnboarding('step1')} />
+        <OnboardingTooltip isVisible={visibleTooltips.step1} content="Add your roots to start your Zcene. These are your starting points, you can type them or select from your library." position="bottom" anchorRef={artistInputRef} onDismiss={() => updateOnboarding('step1')} />
         <OnboardingTooltip isVisible={visibleTooltips.step2} content="Click here to create your Zcene from your selected artists and see the connections visually." position="top" anchorRef={createZceneBtnRef} onDismiss={() => updateOnboarding('step2')} />
-        <OnboardingTooltip isVisible={visibleTooltips.step3} content="Drag, zoom and toggle node types to focus on what matters most: Seeds, Artists, Genres, Labels, Origins, Founded." position={isSmallScreen ? "top" : "bottom"} anchorRef={isSmallScreen ? mobileLegendAreaRef : desktopLegendAreaRef} onDismiss={() => updateOnboarding('step3')} />
+        <OnboardingTooltip isVisible={visibleTooltips.step3} content="Drag, zoom and toggle node types to focus on what matters most: Roots, Artists, Genres, Labels, Origins, Founded." position={isSmallScreen ? "top" : "bottom"} anchorRef={isSmallScreen ? mobileLegendAreaRef : desktopLegendAreaRef} onDismiss={() => updateOnboarding('step3')} />
         <OnboardingTooltip isVisible={visibleTooltips.step5} content="This is the Deep Cut, explore bios, connections, and insights." position={isSmallScreen ? "bottom" : "left"} anchorRef={isSmallScreen ? deepCutTabRef : detailsCollapseBtnRef} onDismiss={() => updateOnboarding('step5')} />
 
         <input type="file" accept=".csv,.txt,.xml" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
@@ -2354,7 +2354,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
 
         {isSmallScreen ? (
             <>
-                <div className="flex-grow flex-shrink min-h-0 flex flex-col overflow-hidden relative pb-[calc(env(safe-area-inset-bottom)+4rem)]">
+                <div className="flex-grow flex-shrink min-h-0 flex flex-col overflow-hidden relative pb-[calc(env(safe-area-inset-bottom)+4.25rem)]">
                     <div ref={mobileTabContainerRef} className="flex-grow overflow-hidden relative z-10 min-h-0" style={{ overscrollBehaviorY: 'contain' }}>
                         <div className="flex h-full transition-transform duration-300 ease-in-out" style={{ transform: `translateX(-${tabIndex * 100}%)` }}>
                             <div className="w-full flex-shrink-0 flex flex-col min-h-0 overflow-hidden relative">{ArtistsPanelContent}</div>
@@ -2374,21 +2374,37 @@ const GraphPage: React.FC<GraphPageProps> = ({
                 </div>
 
 
-                {/* Mobile Bottom Navigation Tabs */}
-                <div className={`fixed bottom-0 left-0 right-0 z-[100] h-16 bg-zinc-900/80 backdrop-blur-md border-t border-zinc-700/50 pb-[env(safe-area-inset-bottom)] md:hidden ${isMagazineViewOpen ? 'hidden' : ''}`}>
-                    <nav className="flex h-full px-2">
+                {/* Mobile Floating Pill Navigation */}
+                <div className={`fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-sm md:hidden transition-all duration-300 ease-in-out ${isMagazineViewOpen ? 'opacity-0 pointer-events-none translate-y-4' : 'opacity-100 pointer-events-auto translate-y-0'}`}>
+                    <nav className="flex items-center justify-between p-1.5 bg-zinc-900/90 backdrop-blur-xl border border-zinc-700/80 rounded-full shadow-[0_12px_36px_rgba(0,0,0,0.6),0_2px_8px_rgba(0,0,0,0.4)]">
                         {(['artists', 'spiderweb', 'details'] as MobileTab[]).map(tab => {
+                            const isActive = activeTab === tab;
                             const totalDetails = displayBadgeCount;
+                            const label = tab === 'details' ? 'Deep Cuts' : tab === 'artists' ? 'Roots' : 'Connections';
                             return (
-                                <button key={tab} ref={tab === 'details' ? deepCutTabRef : null} onClick={() => { setActiveTab(tab); if (tab === 'details') { if (!onboardingProgress.step5) updateOnboarding('step5'); } }} className={`flex-1 flex items-center justify-center gap-2 text-sm font-medium border-t-2 transition-colors -mt-[1px] ${activeTab === tab ? 'text-primary border-primary' : 'text-zinc-400 border-transparent hover:text-white active:text-white'}`}>
-                                    <span className="uppercase tracking-widest">{tab === 'details' ? 'Deep Cuts' : tab === 'artists' ? 'Seeds' : tab}</span>
+                                <button
+                                    key={tab}
+                                    ref={tab === 'details' ? deepCutTabRef : null}
+                                    onClick={() => {
+                                        setActiveTab(tab);
+                                        if (tab === 'details' && !onboardingProgress.step5) {
+                                            updateOnboarding('step5');
+                                        }
+                                    }}
+                                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-full text-xs font-semibold uppercase tracking-wider transition-all duration-200 select-none cursor-pointer active:scale-95 ${
+                                        isActive
+                                            ? 'bg-zinc-800 text-primary shadow-sm border border-zinc-700/60'
+                                            : 'text-zinc-400 hover:text-zinc-200 border border-transparent'
+                                    }`}
+                                >
+                                    <span className="truncate">{label}</span>
                                     {tab === 'artists' && (
-                                        <span className={`h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border shadow-sm transition-all duration-500 ${artistIndicatorStyles}`}>
+                                        <span className={`h-4.5 min-w-[18px] px-1 rounded-full flex items-center justify-center text-[9px] font-bold border shadow-sm transition-all duration-300 ${artistIndicatorStyles}`}>
                                             {enabledArtistsCount}
                                         </span>
                                     )}
                                     {tab === 'details' && (
-                                        <span className={`h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border shadow-sm transition-all duration-500 ${unreadDetailsCount > 0 ? 'bg-zinc-900 text-white border-white/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>
+                                        <span className={`h-4.5 min-w-[18px] px-1 rounded-full flex items-center justify-center text-[9px] font-bold border shadow-sm transition-all duration-300 ${unreadDetailsCount > 0 ? 'bg-zinc-900 text-white border-white/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>
                                             {totalDetails}
                                         </span>
                                     )}
@@ -2402,13 +2418,13 @@ const GraphPage: React.FC<GraphPageProps> = ({
             <main className={`flex-grow flex flex-row relative min-h-0 gap-4 ${isSmallScreen ? 'px-4' : 'px-6 lg:px-8'} pb-6`}>
                 <aside style={{ width: `${leftPanelWidth}px` }} className={`relative h-full z-50 flex flex-col flex-shrink-0 bg-zinc-900 border border-zinc-600/50 transition-all duration-300 ease-in-out overflow-hidden min-h-0 ${isMagazineViewOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                     {!isLeftPanelCollapsed && (<div onMouseDown={handleMouseDown('left')} className="absolute top-0 right-0 h-full w-2 cursor-col-resize select-none touch-none z-[100] group" aria-label="Resize left panel" role="separator"><div className="w-full h-full bg-transparent group-hover:bg-primary/20 transition-colors"></div></div>)}
-                    <div className={`${LayoutSizes.headerBar} flex-shrink-0 border-b border-zinc-600/50 flex items-center relative z-[60] ${isLeftPanelCollapsed ? 'justify-center px-1' : 'justify-between px-4'}`}>{!isLeftPanelCollapsed && (<div className="flex items-center gap-2 overflow-hidden"><h2 className="text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Seeds</h2><span className={`h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border transition-all duration-500 shadow-sm ${artistIndicatorStyles}`}>{enabledArtistsCount}</span></div>)}<button onClick={handleToggleLeftPanel} className="relative z-[70] w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none pointer-events-auto" title={isLeftPanelCollapsed ? "Expand Panel" : "Collapse Panel"}><span className="material-symbols-outlined !text-[18px]">{isLeftPanelCollapsed ? 'left_panel_open' : 'left_panel_close'}</span></button></div>
+                    <div className={`${LayoutSizes.headerBar} flex-shrink-0 border-b border-zinc-600/50 flex items-center relative z-[60] ${isLeftPanelCollapsed ? 'justify-center px-1' : 'justify-between px-4'}`}>{!isLeftPanelCollapsed && (<div className="flex items-center gap-2 overflow-hidden"><h2 className="text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Roots</h2><span className={`h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border transition-all duration-500 shadow-sm ${artistIndicatorStyles}`}>{enabledArtistsCount}</span></div>)}<button onClick={handleToggleLeftPanel} className="relative z-[70] w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none pointer-events-auto" title={isLeftPanelCollapsed ? "Expand Panel" : "Collapse Panel"}><span className="material-symbols-outlined !text-[18px]">{isLeftPanelCollapsed ? 'left_panel_open' : 'left_panel_close'}</span></button></div>
                     {isLeftPanelCollapsed ? (<div className="flex-grow flex-col items-center justify-between py-6 text-zinc-400"><div className="flex flex-col items-center gap-y-6">{ libraryArtists.length > 0 ? (<button onClick={() => { setIsLibraryDialogOpen(true); if (!onboardingProgress.step1) updateOnboarding('step1'); }} title="Select from Library" className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none"><span className="material-symbols-outlined !text-[18px]">queue_music</span></button>) : (<button onClick={() => { fileInputRef.current?.click(); if (!onboardingProgress.step1) updateOnboarding('step1'); }} title="Import Music Library" className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none"><span className="material-symbols-outlined !text-[18px]">upload</span></button>)}</div><div className="absolute bottom-6 left-1/2 -translate-x-1/2"><button onClick={handleApplyChanges} disabled={!isArtistPending || isLoading || isOverLimit} className="group" title="Update Zcene"><span className={`h-8 w-8 rounded-md flex items-center justify-center text-sm font-bold border-2 transition-all duration-500 ${artistIndicatorStyles} ${enabledArtistsCount === 0 ? 'opacity-100' : 'group-active:scale-95'}`}>{enabledArtistsCount}</span></button></div></div>) : ( <div className="relative flex-1 min-h-0 overflow-hidden flex flex-col">{ArtistsPanelContent}</div> )}
                 </aside>
 
                 <div ref={centerColumnRef} className={`flex-1 min-w-0 flex flex-col gap-4 relative z-10 transition-opacity duration-300 ${isMagazineViewOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                     <div className="flex-1 relative min-h-0 flex flex-col bg-zinc-900 border border-zinc-600/50 overflow-hidden">
-                        <div className={`${LayoutSizes.headerBar} px-4 flex-shrink-0 border-b border-zinc-600/50 flex items-center justify-between overflow-hidden`}><h2 className="text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Spiderweb</h2></div>
+                        <div className={`${LayoutSizes.headerBar} px-4 flex-shrink-0 border-b border-zinc-600/50 flex items-center justify-between overflow-hidden`}><h2 className="text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Connections</h2></div>
                         <div className="flex-grow relative min-h-0" ref={desktopGraphAreaRef}>{(isLoading || isHydrating || (data.nodes.length > 0 && isSimulationSettling)) && (<div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-md z-[90] flex flex-col items-center justify-center gap-4 pointer-events-auto"><LoadingSpinner subtext={loadingSubtext} /></div>)}{isFirstGeneration && !(isLoading || isHydrating || (data.nodes.length > 0 && isSimulationSettling)) && (<div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none"><ZceneEmptyState onNavigate={onNavigate} /></div>)}{data.nodes.length > 0 && (<MusicGraph data={data} libraryArtists={memoizedLibraryArtists} seedArtists={memoizedSeedArtists} onNodeClick={handleNodeClickInternal} selectedNode={selectedNode} peekedNode={peekedNode} isSmallScreen={isSmallScreen} activeFilters={activeFilters} searchQuery={searchQuery} setSearchQuery={setSearchQuery} toggleFilter={toggleFilterInternal} legendConfig={legendConfig} legendOrder={legendOrder} legendRef={desktopLegendAreaRef} onInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onLegendInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} isGuest={isGuest} detailsCache={detailsCache} isActive={isActive} onSimulationComplete={() => setIsSimulationSettling(false)} onCoordinatesSettled={onCoordinatesSettled} />)}</div>
                     </div>
                 </div>

@@ -53,7 +53,7 @@ const ZceneEmptyState: React.FC<{ onNavigate: (view: View) => void }> = ({ onNav
                 <ol className="list-decimal list-inside space-y-1 text-zinc-400">
                     <li>Add 1–5 artists (or import your library).</li>
                     <li>Create your Zcene.</li>
-                    <li>Drag, filter, and explore the spiderweb.</li>
+                    <li>Drag, filter, and explore connections.</li>
                 </ol>
             </div>
         </div>
@@ -1063,7 +1063,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                         ) : isGlobalLoading ? (
                             <div className="flex flex-col items-center justify-center text-center py-12 space-y-8 h-full bg-zinc-900">
                                 <LoadingSpinner 
-                                    steps={["Waiting for the Spiderweb to settle...", "Mapping relationships first...", "Synchronising nodes..."]}
+                                    steps={["Waiting for Connections to settle...", "Mapping relationships first...", "Synchronising nodes..."]}
                                     subtext="Graph mapping takes priority. Details will follow."
                                 />
                             </div>
@@ -2398,7 +2398,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                         <div className="flex flex-col items-center justify-center gap-6">
                                             {isGlobalLoading ? (
                                                 <LoadingSpinner 
-                                                    steps={["Waiting for the Spiderweb to settle...", "Mapping relationships first...", "Synchronising nodes..."]}
+                                                    steps={["Waiting for Connections to settle...", "Mapping relationships first...", "Synchronising nodes..."]}
                                                     subtext="Graph mapping takes priority. Details will follow."
                                                 />
                                             ) : (

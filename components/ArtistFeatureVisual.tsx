@@ -17,7 +17,7 @@ const ArtistFeatureVisual: React.FC<{ className?: string }> = ({ className }) =>
                 {/* Header (Matching App's Panel Header) */}
                 <div className="h-12 flex-shrink-0 border-b border-zinc-600/50 flex items-center justify-between px-4 bg-zinc-900 relative z-[60]">
                     <div className="flex items-center gap-2 overflow-hidden">
-                        <h2 className="text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Seeds</h2>
+                        <h2 className="text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Roots</h2>
                         <span className="h-5 w-5 rounded-lg flex items-center justify-center text-[9px] font-semibold border transition-all duration-500 bg-zinc-900 text-white border-white/20">
                             2
                         </span>
@@ -41,7 +41,7 @@ const ArtistFeatureVisual: React.FC<{ className?: string }> = ({ className }) =>
                                     type="search"
                                     value="The Get Up Kids"
                                     readOnly
-                                    placeholder="Add seeds"
+                                    placeholder="Add roots"
                                     className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-4 pr-12 text-sm font-normal text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
                                 />
                                 <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">

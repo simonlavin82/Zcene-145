@@ -1765,7 +1765,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
                     ref={graphSearchInputRef}
                     type="search" 
-                    placeholder="Find in spiderweb..." 
+                    placeholder="Find in connections..." 
                     value={searchQuery} 
                     onChange={(e) => { setSearchQuery(e.target.value); if (selectedNode) onNodeClick(null); }} 
                     onFocus={() => { if (selectedNode) onNodeClick(null); }} 
