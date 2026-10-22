@@ -9,7 +9,7 @@ import HelpPage from './HelpPage';
 import Header from './Header';
 import MusicGraph from './MusicGraph';
 import { DetailsPanel } from './DetailsPanel';
-import { LoadingSpinner, ZceneAbbreviatedLogo, FaviconLogo, SortControls, LegendSymbol, HelpIcon, MicIcon, Spinner, StackIcon, LibraryIcon } from './Icons';
+import { LoadingSpinner, ZceneAbbreviatedLogo, FaviconLogo, SortControls, LegendSymbol, HelpIcon, Spinner, StackIcon, LibraryIcon } from './Icons';
 import { analyticsService } from '../services/analyticsService';
 import AdSenseUnit from './AdSenseUnit';
 import OnboardingTooltip from './OnboardingTooltip';
@@ -952,7 +952,6 @@ const LibraryDialog: React.FC<{
   artistGenreMap, fileInputRef, onTriggerClear
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [isListening, setIsListening] = useState(false);
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'dateAdded', direction: 'desc' });
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [isGenreOpen, setIsGenreOpen] = useState(false);
@@ -983,40 +982,6 @@ const LibraryDialog: React.FC<{
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isGenreOpen]);
-
-  const handleSpeechToText = () => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert("Speech recognition is not supported in this browser. Try Chrome or Safari.");
-      return;
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'en-US';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-
-    setIsListening(true);
-    recognition.start();
-
-    recognition.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript;
-      setSearchTerm(transcript);
-    };
-
-    recognition.onerror = (event: any) => {
-      if (event.error === 'not-allowed') {
-        alert("Microphone access was denied. Please enable microphone permissions in your browser settings to use speech-to-text.");
-      } else {
-        console.error("Speech recognition error", event.error);
-      }
-      setIsListening(false);
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-    };
-  };
 
   const sortedAndFilteredLibraryArtists = useMemo(() => {
     const sorted = [...libraryArtists].sort((a, b) => {
@@ -1077,17 +1042,8 @@ const LibraryDialog: React.FC<{
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className={`w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none font-normal ${InputSizes.md.magazineSearch}`}
                     />
-                    <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
-                        {!searchTerm && (
-                            <button
-                                onClick={handleSpeechToText}
-                                className={`flex flex-shrink-0 items-center justify-center transition-colors leading-none ${InputSizes.md.iconBtn} ${isListening ? 'text-primary animate-pulse' : 'text-zinc-400 hover:text-white'}`}
-                                title="Search by voice"
-                            >
-                                <MicIcon className={InputSizes.md.icon} />
-                            </button>
-                        )}
-                        {searchTerm && (
+                    {searchTerm && (
+                        <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
                             <button 
                                 onClick={() => setSearchTerm('')} 
                                 className={`flex items-center justify-center text-zinc-400 hover:text-white transition-colors leading-none ${InputSizes.md.iconBtn}`}
@@ -1095,8 +1051,8 @@ const LibraryDialog: React.FC<{
                             >
                                 <span className={`material-symbols-outlined ${InputSizes.md.icon}`}>close</span>
                             </button>
-                        )}
-                    </div>
+                        </div>
+                    )}
                 </div>
                 <div className="flex flex-row items-center justify-between gap-3 w-full">
                     <SortControls sortConfig={sortConfig} onSortChange={handleSortChange} />
@@ -2041,7 +1997,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                     }}
                     onKeyDown={handleSeedInputKeyDown}
                     type="search"
-                    placeholder="Add Artist"
+                    placeholder="Add artist"
                     value={searchTerm}
                     onChange={(e) => {
                       setSearchTerm(e.target.value);
