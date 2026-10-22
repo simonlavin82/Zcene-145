@@ -18,6 +18,7 @@ import HelpPage from './components/HelpPage';
 import GraphPage from './components/GraphPage';
 import HomePage from './components/HomePage';
 import Dashboard from './components/Dashboard';
+import SplashScreen from './components/SplashScreen';
 import { MyStackDialog, TokenConfirmationDialog, DisambiguationCandidate, FilterGuidanceModal, ConsolidatedValidationModal, PreFlightSeed } from './components/SharedModals';
 import { ModalBackdrop, ModalContainer, ModalHeader, ModalFooter, ModalBody } from './components/ui/Dialog';
 
@@ -967,6 +968,20 @@ const App: React.FC = () => {
     window.dispatchEvent(new PopStateEvent('popstate'));
   }, []);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [isProjectsSynced, setIsProjectsSynced] = useState<boolean>(false);
+  const [isSplashMinTimerDone, setIsSplashMinTimerDone] = useState<boolean>(false);
+  const [isNavigatingToDashboard, setIsNavigatingToDashboard] = useState<boolean>(false);
+  const dashboardNavTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsSplashMinTimerDone(true);
+    }, 750);
+    return () => {
+      clearTimeout(timer);
+      if (dashboardNavTimerRef.current) clearTimeout(dashboardNavTimerRef.current);
+    };
+  }, []);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const currentProjectIdRef = useRef<string | null>(null);
   const [isViewingShare, setIsViewingShare] = useState<boolean>(false);
@@ -1664,7 +1679,8 @@ const App: React.FC = () => {
     try {
       await logout();
       setProfile(null);
-
+      setProjects([]);
+      setIsProjectsSynced(false);
     } catch (err) {
       setError(humanizeError(err));
     }
@@ -5112,6 +5128,7 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!user || !isAuthInitialized || !isFirebaseReady) {
       setProjects([]);
+      setIsProjectsSynced(false);
       return;
     }
 
@@ -5145,9 +5162,11 @@ const App: React.FC = () => {
         });
       });
       setProjects(projs);
+      setIsProjectsSynced(true);
       console.log(`[Projects Listener] Synchronized ${projs.length} projects.`);
     }, (err) => {
       console.error("[Projects Listener] Failed to fetch projects:", err);
+      setIsProjectsSynced(true);
     });
 
     return () => unsubscribe();
@@ -6293,6 +6312,13 @@ const App: React.FC = () => {
         if (isDashboardPath) {
           setPreviousWorkspace({ view: View.Dashboard, projectId: null });
           if (currentViewRef.current !== View.Dashboard) {
+            if (currentViewRef.current === View.Home) {
+              setIsNavigatingToDashboard(true);
+              if (dashboardNavTimerRef.current) clearTimeout(dashboardNavTimerRef.current);
+              dashboardNavTimerRef.current = setTimeout(() => {
+                setIsNavigatingToDashboard(false);
+              }, 1500);
+            }
             setCurrentView(View.Dashboard);
             setCurrentProjectId(null);
             setCurrentProjectOwnerId(null);
@@ -7396,6 +7422,13 @@ const App: React.FC = () => {
   }, [activeNodeIds, activeNodes, detailsCache, graphData, seedArtists, selectedNode, urlOriginHint, humanizeError, user, isLoading, incrementDeepCutsOpenedCount, triggerBackgroundRevalidation, loadingNodeIds, isViewingShare]);
 
   const handleViewChange = useCallback((newView: View) => {
+    if (newView === View.Dashboard && currentViewRef.current === View.Home) {
+      setIsNavigatingToDashboard(true);
+      if (dashboardNavTimerRef.current) clearTimeout(dashboardNavTimerRef.current);
+      dashboardNavTimerRef.current = setTimeout(() => {
+        setIsNavigatingToDashboard(false);
+      }, 1500);
+    }
     if (newView === View.Graph) {
       setGraphData(prev => {
         if (!prev) return { nodes: [], links: [] };
@@ -7511,9 +7544,14 @@ const App: React.FC = () => {
     return !areFiltersEqual(discoveryFilters, lastAppliedFilters);
   }, [discoveryFilters, lastAppliedFilters]);
 
+  const showSplashScreen = !isAuthInitialized || !isSplashMinTimerDone || isNavigatingToDashboard || (!!user && currentView === View.Dashboard && !isProjectsSynced);
+
   return (
     <GlobalWall>
     <div className="h-[100dvh] flex flex-col overflow-hidden" key={refreshKey}>
+      <AnimatePresence>
+        {showSplashScreen && <SplashScreen key="zcene-splash-screen" />}
+      </AnimatePresence>
       <AnimatePresence>
         {error && (
           <ErrorOverlay

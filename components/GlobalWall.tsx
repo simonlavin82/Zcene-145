@@ -3,6 +3,8 @@ import { httpsCallable } from 'firebase/functions';
 import { functions } from '../services/firebase';
 import { ZceneLogo, Spinner, VisibilityIcon, VisibilityOffIcon } from './Icons';
 import { Input, Button } from './DesignSystem';
+import SplashScreen from './SplashScreen';
+import { AnimatePresence } from 'motion/react';
 
 // sessionStorage key — intentionally non-descriptive to avoid easy guessing.
 const SESSION_KEY = 'zcene_beta_unlocked';
@@ -110,76 +112,74 @@ const GlobalWallGate: React.FC<GlobalWallProps> = ({ children }) => {
   }
 
   return (
-    <div className="min-h-screen w-full bg-background-dark flex flex-col items-center justify-center px-4">
-      {/* Logo — brand yellow, no opacity dimming */}
-      <ZceneLogo className="text-primary w-28 mb-10" />
+    <>
+      <AnimatePresence>
+        {isLoading && <SplashScreen key="beta-wall-splash" />}
+      </AnimatePresence>
+      <div className="min-h-screen w-full bg-background-dark flex flex-col items-center justify-center px-4">
+        {/* Logo — brand yellow, no opacity dimming */}
+        <ZceneLogo className="text-primary w-28 mb-10" />
 
-      {/* Lock screen card */}
-      <div className="w-full max-w-sm">
-        <h1 className="text-2xl font-light text-zinc-100 tracking-tight mb-2 text-center">
-          Coming Soon
-        </h1>
-        <p className="text-sm text-zinc-500 text-center mb-8 leading-relaxed">
-          Private beta. Enter your access code to continue.
-        </p>
+        {/* Lock screen card */}
+        <div className="w-full max-w-sm">
+          <h1 className="text-2xl font-light text-zinc-100 tracking-tight mb-2 text-center">
+            Coming Soon
+          </h1>
+          <p className="text-sm text-zinc-500 text-center mb-8 leading-relaxed">
+            Private beta. Enter your access code to continue.
+          </p>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-          {/* Official Input component — yellow focus ring, bg-zinc-950, border-zinc-700 */}
-          <div className="relative">
-            <Input autoComplete="off" data-1p-ignore="true" data-lpignore="true"
-              ref={inputRef}
-              id="global-wall-password"
-              type={showPassword ? 'text' : 'password'}
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                if (error) setError(null);
-              }}
-              placeholder="Access code"
-              disabled={isLoading}
-              className="pr-11 disabled:opacity-50 disabled:cursor-not-allowed"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(v => !v)}
-              tabIndex={-1}
-              aria-label={showPassword ? 'Hide password' : 'Show password'}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
-            >
-              {showPassword
-                ? <VisibilityOffIcon className="w-4 h-4" />
-                : <VisibilityIcon className="w-4 h-4" />
-              }
-            </button>
-          </div>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+            {/* Official Input component — yellow focus ring, bg-zinc-950, border-zinc-700 */}
+            <div className="relative">
+              <Input autoComplete="off" data-1p-ignore="true" data-lpignore="true"
+                ref={inputRef}
+                id="global-wall-password"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (error) setError(null);
+                }}
+                placeholder="Access code"
+                disabled={isLoading}
+                className="pr-11 disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(v => !v)}
+                tabIndex={-1}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
+              >
+                {showPassword
+                  ? <VisibilityOffIcon className="w-4 h-4" />
+                  : <VisibilityIcon className="w-4 h-4" />
+                }
+              </button>
+            </div>
 
-          {error && (
-            <p className="text-red-400 text-xs px-1">
-              {error}
-            </p>
-          )}
-
-          {/* Official Button component — canonical primary CTA token */}
-          <Button
-            id="global-wall-submit"
-            type="submit"
-            variant="primary"
-            fullWidth
-            disabled={isLoading || !password.trim()}
-            className="h-[38px]"
-          >
-            {isLoading ? (
-              <>
-                <Spinner size="sm" />
-                Verifying…
-              </>
-            ) : (
-              'Continue'
+            {error && (
+              <p className="text-red-400 text-xs px-1">
+                {error}
+              </p>
             )}
-          </Button>
-        </form>
+
+            {/* Official Button component — canonical primary CTA token */}
+            <Button
+              id="global-wall-submit"
+              type="submit"
+              variant="primary"
+              fullWidth
+              disabled={isLoading || !password.trim()}
+              className="h-[38px]"
+            >
+              {isLoading ? 'Verifying…' : 'Continue'}
+            </Button>
+          </form>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 
