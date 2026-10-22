@@ -1677,7 +1677,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             </div>
         )}
 
-        <div className="absolute bottom-6 right-6 flex flex-col gap-3 z-30">
+        <div className={`absolute ${isSmallScreen ? 'bottom-[calc(env(safe-area-inset-bottom)+4.5rem)] right-4' : 'bottom-6 right-6'} flex flex-col gap-3 z-30`}>
             <button onClick={handleCenter} className={CanvasControlStyles}>
                 <span className="material-symbols-outlined !text-[20px]">center_focus_strong</span>
             </button>
@@ -1697,7 +1697,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             ref={setLegendRef}
             className={`absolute z-30 pointer-events-none flex flex-col ${
                 isCompactMode
-                    ? 'bottom-6 left-6 items-start'
+                    ? `${isSmallScreen ? 'bottom-[calc(env(safe-area-inset-bottom)+4.5rem)] left-4' : 'bottom-6 left-6'} items-start`
                     : 'top-6 left-1/2 -translate-x-1/2 items-center w-full max-w-[95%]'
             }`}
         >

@@ -2131,7 +2131,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
           />
 
           {/* New Inline Action Button: Moving from absolute footer to inline flow */}
-          <div className="px-4 pt-4 pb-12">
+          <div className="px-4 pt-4 pb-[calc(env(safe-area-inset-bottom)+5.5rem)]">
 
 
             {!isGuest ? (
@@ -2354,7 +2354,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
 
         {isSmallScreen ? (
             <>
-                <div className="flex-grow flex-shrink min-h-0 flex flex-col overflow-hidden relative pb-[calc(env(safe-area-inset-bottom)+4.25rem)]">
+                <div className="flex-grow flex-shrink min-h-0 flex flex-col overflow-hidden relative">
                     <div ref={mobileTabContainerRef} className="flex-grow overflow-hidden relative z-10 min-h-0" style={{ overscrollBehaviorY: 'contain' }}>
                         <div className="flex h-full transition-transform duration-300 ease-in-out" style={{ transform: `translateX(-${tabIndex * 100}%)` }}>
                             <div className="w-full flex-shrink-0 flex flex-col min-h-0 overflow-hidden relative">{ArtistsPanelContent}</div>
