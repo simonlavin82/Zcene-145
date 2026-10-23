@@ -661,6 +661,54 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         return { queryChips: chips, connectionPeers };
     }, [node.id, isLabelNode, graphData.links, graphData.nodes]);
 
+    const associatedLabels = useMemo(() => {
+        if (!isArtistNode) return '';
+
+        // 1. Direct metadata fallback check
+        const directLabel = (details?.details as any)?.label || (node as any)?.recordLabel || (node as any)?.labels;
+        if (directLabel) {
+            if (Array.isArray(directLabel)) {
+                const joined = directLabel.filter(Boolean).join(', ');
+                if (joined) return joined;
+            } else if (typeof directLabel === 'string' && directLabel.trim()) {
+                return directLabel.trim();
+            }
+        }
+
+        // 2. Edge traversal in graphData
+        if (!graphData?.links || !graphData?.nodes) return '';
+
+        const labelSet = new Set<string>();
+        const activeId = node.id;
+        const activeNorm = normalizeArtistId(activeId);
+
+        for (const link of graphData.links) {
+            const sourceNode = typeof link.source === 'object'
+                ? link.source
+                : graphData.nodes.find(n => n.id === link.source);
+            const targetNode = typeof link.target === 'object'
+                ? link.target
+                : graphData.nodes.find(n => n.id === link.target);
+
+            if (!sourceNode || !targetNode) continue;
+
+            const isSourceActive = sourceNode.id === activeId || normalizeArtistId(sourceNode.id) === activeNorm;
+            const isTargetActive = targetNode.id === activeId || normalizeArtistId(targetNode.id) === activeNorm;
+
+            if (isSourceActive && targetNode.type === 'label') {
+                const rawName = targetNode.label || targetNode.id;
+                const displayName = cleanArtistDisplayName(rawName, graphData.nodes) || rawName;
+                if (displayName) labelSet.add(displayName);
+            } else if (isTargetActive && sourceNode.type === 'label') {
+                const rawName = sourceNode.label || sourceNode.id;
+                const displayName = cleanArtistDisplayName(rawName, graphData.nodes) || rawName;
+                if (displayName) labelSet.add(displayName);
+            }
+        }
+
+        return Array.from(labelSet).join(', ');
+    }, [isArtistNode, node.id, (details?.details as any)?.label, (node as any)?.recordLabel, (node as any)?.labels, graphData?.links, graphData?.nodes]);
+
     const [isListening, setIsListening] = useState(false);
     const [imageTier, setImageTier] = useState<'source' | 'placeholder'>('source');
     const [imgLoaded, setImgLoaded] = useState(false);
@@ -1213,23 +1261,57 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
 
 
-                            <div className={`grid grid-cols-3 gap-3 sm:gap-6 py-4 border-b border-zinc-800/50`}>
-                                <div>
-                                    <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Genre</h4>
-                                    <p className="text-sm font-normal text-zinc-200">{details.details?.genre || 'Unknown'}</p>
-                                </div>
-                                <div>
-                                    <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Origin</h4>
-                                    <p className="text-sm font-normal text-zinc-200">{details.details?.origin || 'Unknown'}</p>
-                                </div>
-                                {details.details?.founded && (
-                                    <div>
-                                        <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Founded</h4>
-                                        <p className="text-sm font-normal text-zinc-200">{details.details.founded}</p>
+                            {isArtistNode ? (
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-4 sm:gap-x-6 sm:gap-y-4 py-4 border-b border-zinc-800/50">
+                                    <div className="min-w-0">
+                                        <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Label</h4>
+                                        <p className="text-sm font-normal text-zinc-200 break-words leading-snug">
+                                            {associatedLabels || 'Unknown'}
+                                        </p>
                                     </div>
-                                )}
-
-                            </div>
+                                    <div className="min-w-0">
+                                        <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Genre</h4>
+                                        <p className="text-sm font-normal text-zinc-200 break-words leading-snug">
+                                            {details.details?.genre || 'Unknown'}
+                                        </p>
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Origin</h4>
+                                        <p className="text-sm font-normal text-zinc-200 break-words leading-snug">
+                                            {details.details?.origin || 'Unknown'}
+                                        </p>
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Founded</h4>
+                                        <p className="text-sm font-normal text-zinc-200 break-words leading-snug">
+                                            {details.details?.founded || '—'}
+                                        </p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className={`grid grid-cols-3 gap-3 sm:gap-6 py-4 border-b border-zinc-800/50`}>
+                                    <div className="min-w-0">
+                                        <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Genre</h4>
+                                        <p className="text-sm font-normal text-zinc-200 break-words leading-snug">
+                                            {details.details?.genre || 'Unknown'}
+                                        </p>
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Origin</h4>
+                                        <p className="text-sm font-normal text-zinc-200 break-words leading-snug">
+                                            {details.details?.origin || 'Unknown'}
+                                        </p>
+                                    </div>
+                                    {details.details?.founded && (
+                                        <div className="min-w-0">
+                                            <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Founded</h4>
+                                            <p className="text-sm font-normal text-zinc-200 break-words leading-snug">
+                                                {details.details.founded}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
                             <div className="space-y-4">
                                 <h4 className="font-bold text-zinc-500 text-[10px] uppercase tracking-[0.2em]">Bio</h4>
