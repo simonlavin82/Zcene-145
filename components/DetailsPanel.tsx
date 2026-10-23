@@ -1016,7 +1016,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             </div>
                             <div className={`flex flex-wrap items-center gap-2 transition-all duration-300 overflow-hidden ${isHeaderStuck ? 'max-h-0 opacity-0 mt-0' : 'max-h-10 opacity-100 mt-1'}`}>
                                 <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-300 bg-zinc-800/50 px-2 py-0.5 rounded-xl">{node.type}</span>
-                                {isSeedArtist && <span className="text-[10px] font-semibold uppercase tracking-widest bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded-xl">SEED</span>}
+                                {isSeedArtist && <span className="text-[10px] font-semibold uppercase tracking-widest bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded-xl">ROOT</span>}
                                 {isLibraryArtist && <span className="text-[10px] font-semibold uppercase tracking-widest bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-xl">LIBRARY</span>}
                             </div>
                         </div>
@@ -2351,7 +2351,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                             <div className="max-w-[1400px] mx-auto pt-12 md:pt-16 pb-12 mb-8 border-b border-zinc-800/50 transition-opacity duration-500 ease-in-out opacity-100 px-0">
                                 <div className="flex items-center flex-wrap gap-2 gap-y-2 mb-6 animate-in fade-in slide-in-from-bottom-2 duration-700">
                                     <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
-                                        ROOTS: {seedCount}
+                                        ROOT ARTISTS: {seedCount}
                                     </span>
                                     <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
                                         ARTISTS: {aiArtistsCount}

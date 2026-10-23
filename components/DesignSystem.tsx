@@ -2476,9 +2476,9 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             />
                             <BadgeDisplay 
                                 badge={
-                                    <span className="text-[10px] font-semibold uppercase tracking-widest bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded-xl w-fit">SEED</span>
+                                    <span className="text-[10px] font-semibold uppercase tracking-widest bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded-xl w-fit">ROOT</span>
                                 }
-                                title="Seed"
+                                title="Root"
                                 description="Identifies the user's starting point anchor node."
                                 implementation="bg-yellow-500/20 text-yellow-300"
                             />
@@ -2503,17 +2503,17 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
 
                             {/* Token Spec Grid */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                                {/* ROOTS */}
+                                {/* ROOT ARTISTS */}
                                 <div className="flex flex-col p-5 border border-zinc-700/50 rounded-none hover:border-zinc-500 transition-colors bg-zinc-900/20">
                                     <div className="mb-4">
                                         <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
-                                            ROOTS: 3
+                                            ROOT ARTISTS: 3
                                         </span>
                                     </div>
-                                    <h4 className="font-medium text-white mb-1">ROOTS</h4>
-                                    <p className="text-sm text-zinc-400 leading-relaxed mb-4 flex-grow">Count of roots the user manually anchored the Zcene around. Always visible — present even before the graph is mapped.</p>
+                                    <h4 className="font-medium text-white mb-1">ROOT ARTISTS</h4>
+                                    <p className="text-sm text-zinc-400 leading-relaxed mb-4 flex-grow">Count of root artists the user manually anchored the Zcene around. Always visible — present even before the graph is mapped.</p>
                                     <div className="space-y-1 mt-auto">
-                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block">Copy: ROOTS: {'{'}seedList.length{'}'}</p>
+                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block">Copy: ROOT ARTISTS: {'{'}seedList.length{'}'}</p>
                                         <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block mt-1">Style: text-zinc-300 bg-zinc-900/50 rounded-full border-white/10</p>
                                     </div>
                                 </div>
@@ -2592,13 +2592,13 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     All discovery metric badges use a <strong>label-first</strong> syntax — the descriptive label appears before the numeric value, separated by a colon and space. This mirrors the language used in the spiderweb filter legends and creates instant visual alignment across the product.
                                 </p>
                                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-2">
-                                    <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 font-mono text-sm text-primary">"ROOTS: X"</div>
+                                    <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 font-mono text-sm text-primary">"ROOT ARTISTS: X"</div>
                                     <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 font-mono text-sm text-primary">"ARTISTS: X"</div>
                                     <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 font-mono text-sm text-primary">"LABELS: X"</div>
                                     <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 font-mono text-sm text-primary">"DEEP CUTS: X"</div>
                                 </div>
                                 <p className="text-sm text-zinc-50 leading-relaxed max-w-3xl pt-1">
-                                    Because the count is always a plain integer, this format <strong>removes the need for conditional plural string formatting</strong> (e.g. "1 Root" vs "2 Roots"). The label is always singular and the number speaks for itself.
+                                    Because the count is always a plain integer, this format <strong>removes the need for conditional plural string formatting</strong> (e.g. "1 Root Artist" vs "2 Root Artists"). The label is always singular and the number speaks for itself.
                                 </p>
                             </div>
 
@@ -2618,7 +2618,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <code className="text-xs text-zinc-300 font-mono leading-relaxed">className="... whitespace-nowrap"</code>
                                         </div>
                                         <div className="flex gap-1.5 flex-wrap p-3 bg-zinc-900 rounded-lg border border-zinc-800">
-                                            <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-2 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">ROOTS: 3</span>
+                                            <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-2 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">ROOT ARTISTS: 3</span>
                                             <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-2 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">ARTISTS: 24</span>
                                             <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-2 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">DEEP CUTS: 7</span>
                                         </div>
@@ -2636,28 +2636,12 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             </div>
                         </div>
 
-                        {/* ── Genre Compartment System (Modernized) ── */}
+                        {/* ── Genre Compartment Folder Tab System ── */}
                         <div className="mt-16 space-y-8">
                             <div className="border-b border-zinc-800 pb-4">
-                                <div className="flex items-center gap-3">
-                                    <h3 className="text-xl font-medium text-zinc-200">Genre Compartment System (Modernized)</h3>
-                                    <span className="text-[10px] font-mono uppercase tracking-widest text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full font-bold">
-                                        Production
-                                    </span>
-                                </div>
+                                <h3 className="text-xl font-medium text-zinc-200">Genre Compartment Folder Tab System</h3>
                                 <p className="text-sm text-zinc-400 mt-2 leading-relaxed max-w-3xl">
-                                    Used in the dashboard grid view to organize projects into genre-based record crates. Each compartment encapsulates project cards within a softened, symmetrical wrapper and identifies the category through an inline floating genre capsule pill.
-                                </p>
-                            </div>
-
-                            {/* Deprecation Notice */}
-                            <div className="p-5 bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-2">
-                                <div className="flex items-center gap-2 text-amber-400 font-semibold text-xs uppercase tracking-wider">
-                                    <span className="material-symbols-outlined !text-[16px]">warning</span>
-                                    Deprecated: Skeuomorphic Folder Tab Geometry
-                                </div>
-                                <p className="text-xs text-zinc-400 leading-relaxed">
-                                    The legacy skeuomorphic folder tab system (<code className="text-amber-300 font-mono text-[11px]">absolute -top-[22px] left-[-1px]</code> with <code className="text-amber-300 font-mono text-[11px]">rounded-tl-none</code>) has been officially deprecated. It relied on fragile negative margins and 1px border overlays that caused seam clipping artifacts on high-DPI displays, while clashing with our softened <code className="text-primary font-mono text-[11px]">rounded-2xl</code> card geometry. It is superseded by the symmetrical <strong>Softened Compartment Enclosure</strong> with inline floating genre capsule pills.
+                                    Used in the dashboard grid view to organize projects into genre compartments. It employs a skeuomorphic folder-like layout with an index tab aligned on the top-left edge. To maintain the illusion of a continuous folder shell, both the tab and container must use identical solid borders.
                                 </p>
                             </div>
 
@@ -2669,28 +2653,28 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         Visual &amp; Code Configuration
                                     </h4>
                                     <p className="text-sm text-zinc-400 leading-relaxed">
-                                        The modernized compartment removes absolute positioning and negative margins entirely. The category identity sits cleanly inside the top of the container as an interactive, high-contrast <code className="text-xs text-primary font-mono">rounded-full</code> pill badge with an integrated color customizer trigger and live item counter.
+                                        The folder compartment relies on absolute positioning of the index tab relative to the compartment container. The left edge of the tab is offset by <code>left-[-1px]</code>, overlaying and hiding the container's top-left corner border. By enforcing a solid <code>border-zinc-800</code> on both components, the seam merges perfectly.
                                     </p>
                                     <p className="text-sm text-zinc-400 leading-relaxed mt-3">
-                                        To maintain visual balance without excessive void spaces on ultra-wide desktop monitors, compartments use <code className="text-xs text-primary font-mono">w-full md:w-fit max-w-full min-w-0</code>. Card grid columns are mapped responsively (1 column on mobile, 2 columns on <code>md:</code> 768px+, 3 columns on <code>xl:</code> 1280px+) with <code className="text-xs text-primary font-mono">w-full md:w-[350px]</code> card bounds.
+                                        To prevent massive trailing voids on ultra-wide desktop monitors while guaranteeing strict container margins on mobile and tablet screens, crate folders use <code>w-full md:w-fit max-w-full min-w-0</code>. Card grid columns are mapped responsively (1 column on mobile, 2 columns on <code>md:</code> 768px+, 3 columns on <code>xl:</code> 1280px+) with <code>w-full md:w-[360px]</code> card bounds to eliminate edge clipping.
                                     </p>
                                     <div className="space-y-4 pt-2">
                                         <div>
                                             <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Compartment Container Classes</p>
                                             <code className="text-xs font-mono text-primary bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 block overflow-x-auto whitespace-nowrap">
-                                                w-full md:w-fit max-w-full bg-zinc-950/40 rounded-2xl border border-zinc-800/80 p-5 relative min-w-0 transition-colors
-                                            </code>
-                                        </div>
-                                        <div>
-                                            <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Floating Genre Capsule Pill</p>
-                                            <code className="text-xs font-mono text-primary bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-3 block overflow-x-auto whitespace-nowrap">
-                                                inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-mono text-[10px] font-bold uppercase tracking-widest
+                                                w-full md:w-fit max-w-full bg-zinc-950 rounded-tr-xl rounded-b-xl rounded-tl-none border border-zinc-800 p-4 relative min-w-0
                                             </code>
                                         </div>
                                         <div>
                                             <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Card Wrapper Classes</p>
-                                            <code className="text-xs font-mono text-primary bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 block overflow-x-auto whitespace-nowrap">
+                                            <code className="text-xs font-mono text-primary bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-3 block overflow-x-auto whitespace-nowrap">
                                                 grid gap-5 w-full md:w-fit max-w-full (mapped: grid-cols-1 md:grid-cols-2 xl:grid-cols-3)
+                                            </code>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Index Tab Classes</p>
+                                            <code className="text-xs font-mono text-primary bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 block overflow-x-auto whitespace-nowrap">
+                                                w-[160px] bg-zinc-950 border-t border-l border-r border-zinc-800 rounded-t-lg text-[9px] font-mono absolute -top-[22px] left-[-1px] px-3 py-1 h-[22.5px]
                                             </code>
                                         </div>
                                     </div>
@@ -2701,17 +2685,13 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Live Spec Preview</p>
                                     <div className="p-8 bg-zinc-900/30 rounded-xl border border-zinc-800 flex justify-center">
                                         <div 
-                                            className="w-full md:w-fit max-w-full bg-zinc-950/40 rounded-2xl border border-zinc-800/80 p-5 relative"
+                                            className="w-full md:w-fit max-w-full bg-zinc-950 rounded-tr-xl rounded-b-xl rounded-tl-none border border-zinc-800 p-4 relative mt-6"
                                         >
-                                            {/* Modernized Floating Header */}
-                                            <div className="flex items-center justify-between gap-3 mb-4 select-none">
-                                                <div className="flex items-center gap-2.5">
-                                                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-mono text-[10px] font-bold uppercase tracking-widest bg-purple-500 text-white shadow-sm">
-                                                        <span>POP PUNK</span>
-                                                        <span className="material-symbols-outlined !text-[12px] opacity-75">palette</span>
-                                                    </div>
-                                                    <span className="text-[10px] font-mono text-zinc-500 font-medium">1 Zcene</span>
-                                                </div>
+                                            {/* Index Tab */}
+                                            <div className="w-[140px] bg-zinc-950 border-t border-l border-r border-zinc-800 rounded-t-lg text-[9px] font-mono absolute -top-[22px] left-[-1px] px-3 py-1 flex items-center h-[22.5px] z-10 select-none">
+                                                <div className="truncate text-ellipsis whitespace-nowrap uppercase tracking-widest text-zinc-400 font-medium">
+                                                    POP PUNK
+                                                 </div>
                                             </div>
 
                                             {/* Cards inside this parent record crate compartment */}
@@ -2728,7 +2708,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                         </div>
                                                     </div>
                                                     <div className="mt-4 pt-3 border-t border-white/5 flex items-center gap-1.5 flex-wrap">
-                                                        <span className="text-[8px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">ROOTS: 1</span>
+                                                        <span className="text-[8px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">ROOT ARTISTS: 1</span>
                                                         <span className="text-[8px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">ARTISTS: 22</span>
                                                         <span className="text-[8px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">LABELS: 3</span>
                                                         <span className="text-[8px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">DEEP CUTS: 5</span>
@@ -2838,9 +2818,9 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             {/* Card Footer — production badge sequence */}
                                             <div className="mt-3 flex items-center">
                                                 <div className="flex items-center flex-wrap gap-x-1 gap-y-1.5">
-                                                    {/* 1. ROOTS */}
+                                                    {/* 1. ROOT ARTISTS */}
                                                     <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
-                                                        ROOTS: 3
+                                                        ROOT ARTISTS: 3
                                                     </span>
                                                     {/* 2. ARTISTS */}
                                                     <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
@@ -2858,7 +2838,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             </div>
                                         </div>
                                         <p className="text-[10px] text-zinc-500 font-mono mt-2">
-                                            Sequence: ROOTS → ARTISTS → LABELS → DEEP CUTS
+                                            Sequence: ROOT ARTISTS → ARTISTS → LABELS → DEEP CUTS
                                         </p>
                                     </div>
                                 </div>
@@ -2897,10 +2877,10 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                         </div>
                                                     </td>
                                                     <td className="py-4 px-6 text-zinc-400 text-sm font-mono font-normal bg-zinc-900 group-hover:bg-primary/5 transition-colors relative z-10">27/06/2026 • 8:09 am</td>
-                                                    {/* 1. ROOTS */}
+                                                    {/* 1. ROOT ARTISTS */}
                                                     <td className="py-4 px-6 font-normal bg-zinc-900 group-hover:bg-primary/5 transition-colors relative z-10">
                                                         <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
-                                                            ROOTS: 3
+                                                            ROOT ARTISTS: 3
                                                         </span>
                                                     </td>
                                                     {/* 2. ARTISTS */}
@@ -2934,10 +2914,10 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                         </div>
                                                     </td>
                                                     <td className="py-4 px-6 text-zinc-400 text-sm font-mono font-normal bg-zinc-950/40 group-hover:bg-primary/5 transition-colors">New Project</td>
-                                                    {/* 1. ROOTS */}
+                                                    {/* 1. ROOT ARTISTS */}
                                                     <td className="py-4 px-6 font-normal bg-zinc-950/40 group-hover:bg-primary/5 transition-colors">
                                                         <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
-                                                            ROOTS: 1
+                                                            ROOT ARTISTS: 1
                                                         </span>
                                                     </td>
                                                     {/* 2–3: hidden when unmapped */}
