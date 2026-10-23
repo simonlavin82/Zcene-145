@@ -37,7 +37,7 @@ import {
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { sanitizeUndefinedProperties } from '../src/processCurationJob';
 
-describe('Architecture V33: 3-Tier Anchor System & Deep Cut Anti-Pollution Gates (Rule 8, Rule 40, Rule 41, Rule 42)', () => {
+describe('Architecture V35: 3-Tier Anchor System & Deep Cut Anti-Pollution Gates (Rule 8, Rule 40, Rule 41, Rule 42)', () => {
   describe('Phase 1: Canonical Registries & Constants', () => {
     it('Enforces dynamic rolling era horizon (currentYear - 2)', () => {
       const expectedYear = new Date().getFullYear() - 2;
@@ -225,7 +225,7 @@ describe('Architecture V33: 3-Tier Anchor System & Deep Cut Anti-Pollution Gates
     });
   });
 
-  describe('Phase 4: Architecture V33 Deep Cut Qualification & Anti-Pollution Gates (Rule 8 & Rule 40)', () => {
+  describe('Phase 4: Architecture V35 Deep Cut Qualification & Anti-Pollution Gates (Rule 8 & Rule 40)', () => {
     const validArtistProfile = {
       summary: 'Koyo is a Long Island melodic hardcore band formed in 2020 by members of Typecaste, Hangman, and Rain of Salvation.',
       details: {
@@ -342,7 +342,7 @@ describe('Architecture V33: 3-Tier Anchor System & Deep Cut Anti-Pollution Gates
     });
   });
 
-  describe('Phase 4: Architecture V33.5 Unified Generation DNA & Multi-Seed Co-Anchoring (Rule 27)', () => {
+  describe('Phase 4: Architecture V35 Unified Generation DNA & Multi-Seed Co-Anchoring (Rule 27)', () => {
     it('Enforces 10 to 16 NEW related artists target in GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE', () => {
       expect(GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE).toContain('10 to 16 NEW related artists');
       expect(GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE).toContain('12 to 18 artists');
@@ -387,7 +387,7 @@ describe('Architecture V33: 3-Tier Anchor System & Deep Cut Anti-Pollution Gates
     });
   });
 
-  describe('Phase 5: Architecture V33 Tabula Rasa Topology & Prompt Invariants (Rule 15 & Rule 27)', () => {
+  describe('Phase 5: Architecture V35 Tabula Rasa Topology & Prompt Invariants (Rule 15 & Rule 27)', () => {
     it('Enforces blank-slate Tabula Rasa prompt framing in GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE', () => {
       expect(GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE).toContain('from a blank slate (Tabula Rasa)');
       expect(GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE).not.toContain('We already have cached, independent music graphs');
