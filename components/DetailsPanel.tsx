@@ -1974,7 +1974,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         }
     }, [selectedNode, isMagazineViewOpen]);
 
-    const handleSendMessage = async (nodeId: string, message: string, forceLive = false) => {
+    const handleSendMessage = async (nodeId: string, message: string, forceLive = false, apiPassword?: string) => {
         const currentMode = getChatMode(nodeId);
         if (currentMode === 'live' && liveMessageCount >= 3 && !forceLive) {
             setPendingChatMessage({ nodeId, message });
@@ -2012,7 +2012,8 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     graphData,
                     (chunk) => {
                         onUpdateChatHistories(new Map(chatHistories).set(nodeId, [...newHistory, { role: 'model', text: chunk, timestamp: aiTimestamp } as ChatMessage]));
-                    }
+                    },
+                    apiPassword
                 );
 
                 const timeoutPromise = new Promise((_, reject) => 
@@ -2023,9 +2024,16 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
             }
         } catch (err: any) {
             console.error("Chat error:", err);
-            const errorMessage = err?.message?.includes("timed out") 
-                ? "The AI is taking too long to respond. Please try again."
-                : "Failed to get a response. Please try again.";
+            const isPasswordError = err?.message?.includes("password") || err?.message?.includes("401") || err?.status === 401;
+            if (isPasswordError) {
+                // Quota recovery: reset liveMessageCount back to threshold so the TokenConfirmationDialog will prompt again
+                setLiveMessageCount(3);
+            }
+            const errorMessage = isPasswordError
+                ? "Invalid or missing API password. Please verify and try again."
+                : err?.message?.includes("timed out") 
+                    ? "The AI is taking too long to respond. Please try again."
+                    : "Failed to get a response. Please try again.";
             
             onUpdateChatHistories(new Map(chatHistories).set(nodeId, [
                 ...newHistory, 
@@ -2624,9 +2632,16 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                 <TokenConfirmationDialog
                     isOpen={true}
                     onClose={() => setPendingChatMessage(null)}
-                    onConfirm={() => {
+                    onConfirm={(confirmedPassword: string) => {
+                        if (confirmedPassword) {
+                            try {
+                                sessionStorage.setItem('zcene_api_password', confirmedPassword);
+                            } catch (e) {
+                                console.warn('[DetailsPanel] Unable to persist password to sessionStorage:', e);
+                            }
+                        }
                         setLiveMessageCount(0);
-                        handleSendMessage(pendingChatMessage.nodeId, pendingChatMessage.message, true);
+                        handleSendMessage(pendingChatMessage.nodeId, pendingChatMessage.message, true, confirmedPassword);
                         setPendingChatMessage(null);
                     }}
                     type="live_chat_search"

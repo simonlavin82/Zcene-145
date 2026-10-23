@@ -1973,11 +1973,12 @@ export const streamNodeChat = async (
   history: ChatMessage[],
   message: string,
   graphData: GraphData,
-  onChunk: (text: string) => void
+  onChunk: (text: string) => void,
+  apiPassword?: string
 ) => {
     const proxyKey = 'backend-proxy-key';
     const baseUrl = typeof window !== 'undefined' ? window.location.origin + '/api/gemini' : 'http://localhost:8080/api/gemini';
-    const password = typeof window !== 'undefined' ? sessionStorage.getItem('zcene_api_password') : null;
+    const password = apiPassword || (typeof window !== 'undefined' ? sessionStorage.getItem('zcene_api_password') : null);
     const ai = new GoogleGenAI({ 
         apiKey: proxyKey,
         httpOptions: { 

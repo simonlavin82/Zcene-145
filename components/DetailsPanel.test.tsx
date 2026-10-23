@@ -1,6 +1,7 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
-import { NodeDetailsCard } from './DetailsPanel';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { NodeDetailsCard, DetailsPanel } from './DetailsPanel';
+import { streamNodeChat } from '../services/geminiService';
 
 vi.mock('react-markdown', () => ({
   default: (props: any) => <div data-testid="markdown">{props.children}</div>
@@ -281,5 +282,146 @@ describe('DetailsPanel', () => {
 
         expect(await screen.findByText('Label')).toBeInTheDocument();
         expect(screen.getByText('Sub Pop, Epitaph Records')).toBeInTheDocument();
+    });
+
+    it('captures password in TokenConfirmationDialog for Deep Web chat, stores in sessionStorage, and forwards to streamNodeChat', async () => {
+        sessionStorage.clear();
+        (streamNodeChat as any).mockResolvedValueOnce('Mock stream result');
+
+        const mockNode = { id: 'needtobreathe-us', type: 'artist' as const, label: 'Needtobreathe' };
+        const mockDetails = { summary: 'Rock band', details: { artist: 'Needtobreathe' }, links: [] };
+        const detailsCache = new Map([['needtobreathe-us', mockDetails as any]]);
+        const onUpdateChatHistories = vi.fn();
+
+        render(
+            <DetailsPanel 
+                selectedNode={mockNode}
+                activeNodes={[mockNode]}
+                detailsCache={detailsCache}
+                loadingNodeIds={new Set<string>()}
+                onTogglePinNode={vi.fn()}
+                pinnedNodes={new Set<string>()}
+                onRefreshNode={vi.fn()}
+                error={null}
+                systemError={null}
+                graphData={{ nodes: [mockNode], links: [] }}
+                libraryArtists={[]}
+                seedArtists={[]}
+                onAddArtist={vi.fn()}
+                isCollapsed={false}
+                onToggleCollapse={vi.fn()}
+                isSmallScreen={false}
+                onNodeClick={vi.fn()}
+                onNavigate={vi.fn()}
+                isGlobalLoading={false}
+                onCancelGlobalLoading={vi.fn()}
+                unreadCount={0}
+                isActive={true}
+                isMagazineViewOpen={false}
+                onMagazineViewToggle={vi.fn()}
+                chatHistories={new Map()}
+                onUpdateChatHistories={onUpdateChatHistories}
+                onAddToStack={vi.fn()}
+            />
+        );
+
+        // Switch to Deep Web mode
+        const deepWebToggle = screen.getByText('Deep Web');
+        fireEvent.click(deepWebToggle);
+
+        // Type query in chat input
+        const chatInput = screen.getByPlaceholderText('Consult Zcene AI...');
+        fireEvent.change(chatInput, { target: { value: 'what is their latest release?' } });
+
+        // Click Send button to submit
+        const sendBtn = screen.getByTitle('Send');
+        fireEvent.click(sendBtn);
+
+        // Verify TokenConfirmationDialog opens and captures password
+        const passwordInput = await screen.findByTestId('token-password-input');
+        fireEvent.change(passwordInput, { target: { value: 'test-api-secret' } });
+
+        // Click Confirm
+        const confirmBtn = screen.getByTestId('token-authorize-button');
+        fireEvent.click(confirmBtn);
+
+        // Verify sessionStorage was set
+        expect(sessionStorage.getItem('zcene_api_password')).toBe('test-api-secret');
+
+        // Verify streamNodeChat was called with the apiPassword argument
+        await waitFor(() => {
+            expect(streamNodeChat).toHaveBeenCalledWith(
+                expect.objectContaining({ id: 'needtobreathe-us' }),
+                expect.any(Array),
+                'what is their latest release?',
+                expect.anything(),
+                expect.any(Function),
+                'test-api-secret'
+            );
+        });
+    });
+
+    it('resets liveMessageCount quota on 401/password authentication rejection and displays auth error', async () => {
+        sessionStorage.clear();
+        (streamNodeChat as any).mockRejectedValueOnce(new Error('Invalid or missing API password'));
+
+        const mockNode = { id: 'needtobreathe-us', type: 'artist' as const, label: 'Needtobreathe' };
+        const mockDetails = { summary: 'Rock band', details: { artist: 'Needtobreathe' }, links: [] };
+        const detailsCache = new Map([['needtobreathe-us', mockDetails as any]]);
+        const onUpdateChatHistories = vi.fn();
+
+        render(
+            <DetailsPanel 
+                selectedNode={mockNode}
+                activeNodes={[mockNode]}
+                detailsCache={detailsCache}
+                loadingNodeIds={new Set<string>()}
+                onTogglePinNode={vi.fn()}
+                pinnedNodes={new Set<string>()}
+                onRefreshNode={vi.fn()}
+                error={null}
+                systemError={null}
+                graphData={{ nodes: [mockNode], links: [] }}
+                libraryArtists={[]}
+                seedArtists={[]}
+                onAddArtist={vi.fn()}
+                isCollapsed={false}
+                onToggleCollapse={vi.fn()}
+                isSmallScreen={false}
+                onNodeClick={vi.fn()}
+                onNavigate={vi.fn()}
+                isGlobalLoading={false}
+                onCancelGlobalLoading={vi.fn()}
+                unreadCount={0}
+                isActive={true}
+                isMagazineViewOpen={false}
+                onMagazineViewToggle={vi.fn()}
+                chatHistories={new Map()}
+                onUpdateChatHistories={onUpdateChatHistories}
+                onAddToStack={vi.fn()}
+            />
+        );
+
+        // Switch to Deep Web mode
+        fireEvent.click(screen.getByText('Deep Web'));
+
+        // Type query in chat input
+        const chatInput = screen.getByPlaceholderText('Consult Zcene AI...');
+        fireEvent.change(chatInput, { target: { value: 'what is their latest release?' } });
+        fireEvent.click(screen.getByTitle('Send'));
+
+        // Fill password in modal and confirm
+        const passwordInput = await screen.findByTestId('token-password-input');
+        fireEvent.change(passwordInput, { target: { value: 'bad-password' } });
+        fireEvent.click(screen.getByTestId('token-authorize-button'));
+
+        // Wait for error handling
+        await waitFor(() => {
+            expect(onUpdateChatHistories).toHaveBeenCalledTimes(2);
+            const lastCallArgs = onUpdateChatHistories.mock.calls[1][0];
+            const messages = lastCallArgs.get('needtobreathe-us');
+            const lastMessage = messages[messages.length - 1];
+            expect(lastMessage.text).toContain('Invalid or missing API password');
+        });
     });
 });
