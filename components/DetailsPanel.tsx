@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import Markdown from 'react-markdown';
 import { Node, NodeDetails, GraphData, View, ChatMessage, StackItem, UserTaste, TasteProfile, COST_PER_AI_CALL } from '../types';
 import { streamNodeChat, streamLocalHeuristicChat, fetchNodeDetails } from '../services/geminiService';
-import { normalizeArtistId, titleCaseArtistId, cleanArtistDisplayName, isNodeInSeedList, getArtistDocWithRedirect, enforceArtistCacheSchema, isArtistIdMatch } from '../services/artistCacheService';
+import { normalizeArtistId, titleCaseArtistId, cleanArtistDisplayName, cleanLabelDisplayName, isNodeInSeedList, getArtistDocWithRedirect, enforceArtistCacheSchema, isArtistIdMatch } from '../services/artistCacheService';
 import { analyticsService } from '../services/analyticsService';
 import { Spinner, HelpIcon, MicIcon, LoadingSpinner, DETAIL_THINKING_STEPS, StackIcon, BandcampIcon } from './Icons';
 import { TokenConfirmationDialog, PROFILE_COLORS, MODAL_PROFILE_COLORS } from './SharedModals';
@@ -17,6 +17,12 @@ import { useDominantColor } from '../hooks/useDominantColor';
 const SENTINEL_INSIGHT = 'No insight provided.';
 
 export const getArtistDisplayName = (details: any, node: any): string => {
+  if (node?.type === 'label') {
+    const raw = (node?.label && typeof node.label === 'string' && node.label.trim())
+      ? node.label.trim()
+      : (node?.id || '');
+    return cleanLabelDisplayName(raw);
+  }
   if (details?.details?.artist && typeof details.details.artist === 'string' && details.details.artist.trim()) {
     return cleanArtistDisplayName(details.details.artist.trim());
   }
@@ -668,10 +674,10 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         const directLabel = (details?.details as any)?.label || (node as any)?.recordLabel || (node as any)?.labels;
         if (directLabel) {
             if (Array.isArray(directLabel)) {
-                const joined = directLabel.filter(Boolean).join(', ');
+                const joined = directLabel.filter(Boolean).map(l => cleanLabelDisplayName(l)).filter(Boolean).join(', ');
                 if (joined) return joined;
             } else if (typeof directLabel === 'string' && directLabel.trim()) {
-                return directLabel.trim();
+                return cleanLabelDisplayName(directLabel.trim());
             }
         }
 
@@ -697,11 +703,11 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
             if (isSourceActive && targetNode.type === 'label') {
                 const rawName = targetNode.label || targetNode.id;
-                const displayName = cleanArtistDisplayName(rawName, graphData.nodes) || rawName;
+                const displayName = cleanLabelDisplayName(rawName, graphData.nodes) || rawName;
                 if (displayName) labelSet.add(displayName);
             } else if (isTargetActive && sourceNode.type === 'label') {
                 const rawName = sourceNode.label || sourceNode.id;
-                const displayName = cleanArtistDisplayName(rawName, graphData.nodes) || rawName;
+                const displayName = cleanLabelDisplayName(rawName, graphData.nodes) || rawName;
                 if (displayName) labelSet.add(displayName);
             }
         }
@@ -2394,7 +2400,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                             ref={isActive ? activeDotRef : null} 
                                                             onClick={() => { setViewedIndex(i); onNodeClick(node, true); }}
                                                             className="flex items-center justify-center h-full px-[2px] cursor-pointer group"
-                                                            title={`${cleanArtistDisplayName(node.label || node.id)}${isLoading ? ' (Generating...)' : ''}`}
+                                                            title={`${node.type === 'label' ? cleanLabelDisplayName(node.label || node.id) : cleanArtistDisplayName(node.label || node.id)}${isLoading ? ' (Generating...)' : ''}`}
                                                         >
                                                             <div 
                                                                 className={`transition-all flex-shrink-0 rounded-full ${

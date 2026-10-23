@@ -24,6 +24,7 @@ import {
   normalizeLabelId,
   normalizeArtistId,
   normalizeGraphData,
+  cleanLabelDisplayName as backendCleanLabelDisplayName,
   GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE,
   GENERATE_GRAPH_PROMPT_TEMPLATE
 } from '../src/services/curatorService';
@@ -186,6 +187,14 @@ describe('Architecture V35: 3-Tier Anchor System & Deep Cut Anti-Pollution Gates
       expect(cleanLabelDisplayName('Century Media')).toBe('Century Media');
       expect(cleanLabelDisplayName('Century Media Records')).toBe('Century Media');
       expect(cleanLabelDisplayName('century-media-records')).toBe('Century Media');
+      expect(cleanLabelDisplayName('atlantic')).toBe('Atlantic');
+      expect(cleanLabelDisplayName('sparrow')).toBe('Sparrow');
+      expect(cleanLabelDisplayName('Atlantic Records')).toBe('Atlantic');
+      expect(cleanLabelDisplayName('sparrow-records')).toBe('Sparrow');
+      expect(backendCleanLabelDisplayName('atlantic')).toBe('Atlantic');
+      expect(backendCleanLabelDisplayName('sparrow')).toBe('Sparrow');
+      expect(backendCleanLabelDisplayName('Atlantic Records')).toBe('Atlantic');
+      expect(backendCleanLabelDisplayName('sparrow-records')).toBe('Sparrow');
       expect(normalizeArtistId('Dischord Records')).toBe('dischord-records');
     });
 

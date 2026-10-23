@@ -6,7 +6,7 @@ import { GraphData, Node, Link, GraphSettings, NodeDetails, CanvasNodeRef } from
 import { LegendSymbol } from './Icons';
 import { CanvasControlStyles, InputSizes, Button } from './DesignSystem';
 import { zceneCategoricalPalette, zceneFallbackColor, nodeTypeColorMap } from '../utils/formatters';
-import { normalizeArtistId, isNodeInSeedList } from '../services/artistCacheService';
+import { normalizeArtistId, isNodeInSeedList, cleanLabelDisplayName } from '../services/artistCacheService';
 
 type FilterKeys = 'genre' | 'label' | 'country' | 'founded' | 'seed' | 'recommended';
 
@@ -507,6 +507,9 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     // to their display form ("Buggin", "Hardcore Punk") only for legacy cache docs
     // where the .label field was not populated at write time.
     const toDisplayLabel = (node: Node): string => {
+        if (node.type === 'label') {
+            return cleanLabelDisplayName(node.label || node.id);
+        }
         if (node.label && typeof node.label === 'string' && node.label.trim()) {
             return node.label.trim();
         }

@@ -365,15 +365,34 @@ export const getProjectDisplayTitle = (
 };
 
 /**
- * Normalizes a label display name for UI dropdowns and chips by cleaning routing suffixes
- * and stripping trailing " Records" / " Recordings" so variants like "Century Media" and
- * "Century Media Records" collapse into a single "Century Media" entry.
+ * Normalizes a label display name for UI dropdowns, chips, inspector, and graph canvas
+ * by cleaning routing suffixes, stripping trailing structural suffixes like "Records" / "Recordings",
+ * and guaranteeing proper title casing for database slugs (e.g., "atlantic" -> "Atlantic", "sparrow" -> "Sparrow").
  */
 export const cleanLabelDisplayName = (rawIdOrName?: string | null, graphNodes?: Node[] | null): string => {
-  const base = cleanArtistDisplayName(rawIdOrName, graphNodes);
+  if (!rawIdOrName || typeof rawIdOrName !== 'string') return '';
+  const trimmed = rawIdOrName.trim();
+  if (!trimmed) return '';
+
+  const base = cleanArtistDisplayName(trimmed, graphNodes);
   if (!base) return '';
-  const stripped = base.replace(/\s+(?:records|recordings)$/i, '').trim();
-  return stripped || base;
+
+  const stripped = base
+    .replace(/(?:[-_\s]+(?:records|recordings))+$/i, '')
+    .trim();
+
+  const candidate = stripped || base;
+
+  // Guarantee title casing for lowercase database IDs / slugs (e.g. "atlantic" -> "Atlantic")
+  if (/^[a-z0-9\s-_]+$/.test(candidate) && !/[A-Z]/.test(candidate)) {
+    return titleCaseArtistId(candidate);
+  }
+
+  if (candidate.includes('-') || candidate.includes('_')) {
+    return titleCaseArtistId(candidate);
+  }
+
+  return candidate;
 };
 
 /**
@@ -444,7 +463,12 @@ export const normalizeGraphData = (graph: GraphData): GraphData => {
     idMap.set(originalId.toLowerCase(), normalizedId); // fallback
     idMap.set(normalizeArtistId(originalId), normalizedId); // accent-insensitive fallback
 
-    let label = node.label ? cleanArtistDisplayName(node.label) : titleCaseArtistId(cleanArtistDisplayName(originalId.trim()));
+    let label: string;
+    if (node.type === 'label') {
+      label = cleanLabelDisplayName(node.label || originalId, graph.nodes);
+    } else {
+      label = node.label ? cleanArtistDisplayName(node.label) : titleCaseArtistId(cleanArtistDisplayName(originalId.trim()));
+    }
 
     return {
       ...node,

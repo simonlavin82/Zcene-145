@@ -72,6 +72,35 @@ export const cleanArtistDisplayName = (name?: string): string => {
   return cleaned;
 };
 
+/**
+ * Normalizes a label display name by stripping trailing structural suffixes
+ * like "Records" / "Recordings" and guaranteeing title casing for database slugs.
+ */
+export const cleanLabelDisplayName = (rawIdOrName?: string | null): string => {
+  if (!rawIdOrName || typeof rawIdOrName !== 'string') return '';
+  const trimmed = rawIdOrName.trim();
+  if (!trimmed) return '';
+
+  const base = cleanArtistDisplayName(applyCanonicalAlias(trimmed));
+  if (!base) return '';
+
+  const stripped = base
+    .replace(/(?:[-_\s]+(?:records|recordings))+$/i, '')
+    .trim();
+
+  const candidate = stripped || base;
+
+  if (/^[a-z0-9\s-_]+$/.test(candidate) && !/[A-Z]/.test(candidate)) {
+    return titleCaseArtistId(candidate);
+  }
+
+  if (candidate.includes('-') || candidate.includes('_')) {
+    return titleCaseArtistId(candidate);
+  }
+
+  return candidate;
+};
+
 export const extractValidYoutubeId = (rawUrlOrId?: string | null): string | undefined => {
   if (!rawUrlOrId || typeof rawUrlOrId !== 'string') return undefined;
   const cleaned = rawUrlOrId.replace(/['"`]/g, '').trim();
@@ -250,11 +279,16 @@ export const normalizeGraphData = (graph: GraphData): GraphData => {
     idMap.set(originalId.toLowerCase(), normalizedId);
     idMap.set(normalizeArtistId(originalId), normalizedId);
 
-    let label = node.label ? cleanArtistDisplayName(applyCanonicalAlias(node.label)) : '';
-    if (!label) {
-      label = (node.type === 'artist' || node.type === 'label')
-        ? titleCaseArtistId(originalId.trim())
-        : originalId.trim();
+    let label = '';
+    if (node.type === 'label') {
+      label = cleanLabelDisplayName(node.label || originalId);
+    } else {
+      label = node.label ? cleanArtistDisplayName(applyCanonicalAlias(node.label)) : '';
+      if (!label) {
+        label = node.type === 'artist'
+          ? titleCaseArtistId(originalId.trim())
+          : originalId.trim();
+      }
     }
 
     return {

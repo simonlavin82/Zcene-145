@@ -15,7 +15,8 @@ import {
   validateSeedOriginBackend,
   extractCountrySlug,
   generateSemanticLinkWeights,
-  cleanArtistDisplayName
+  cleanArtistDisplayName,
+  cleanLabelDisplayName
 } from "./services/curatorService";
 import {
   hasActiveDiscoveryFilters,
@@ -468,7 +469,9 @@ export const processCurationJob = onDocumentCreated({
         ).map((n: any) => {
           const norm = normalizeArtistId(n.id);
           const canonical = resolvedSeedNormMap.get(norm) ?? norm;
-          const cleanName = seedNamesMap[canonical] || seedNamesMap[norm] || seedNamesMap[n.id] || (n.label ? cleanArtistDisplayName(n.label) : n.id);
+          const cleanName = n.type === 'label'
+            ? cleanLabelDisplayName(n.label || n.id)
+            : (seedNamesMap[canonical] || seedNamesMap[norm] || seedNamesMap[n.id] || (n.label ? cleanArtistDisplayName(n.label) : n.id));
           return {
             id: n.id,
             name: cleanName,

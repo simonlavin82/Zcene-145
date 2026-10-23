@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateSemanticLinkWeights = exports.scrapeImageUrlBackend = exports.checkVideoPlayability = exports.scrapeVideoIdBackend = exports.fetchNodeDetailsBackend = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = exports.NODE_DETAILS_SCHEMA = exports.generateGraphDataBackend = exports.reconcileNarrativeEdges = exports.generateRootsBreakdownBackend = exports.validateSeedOriginBackend = exports.SEED_VALIDATION_SCHEMA = exports.GENERATE_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = exports.GRAPH_RESPONSE_SCHEMA = exports.extractCleanJsonString = exports.extractArtistSubGraph = exports.normalizeGraphData = exports.buildCompositeCacheKey = exports.extractCountrySlug = exports.sanitizeImageUrl = exports.extractValidYoutubeId = exports.cleanArtistDisplayName = exports.titleCaseArtistId = exports.normalizeLabelId = exports.normalizeArtistId = exports.applyCanonicalAlias = exports.CANONICAL_ALIASES = exports.GEMINI_FLASH_MODEL = void 0;
+exports.generateSemanticLinkWeights = exports.scrapeImageUrlBackend = exports.checkVideoPlayability = exports.scrapeVideoIdBackend = exports.fetchNodeDetailsBackend = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = exports.NODE_DETAILS_SCHEMA = exports.generateGraphDataBackend = exports.reconcileNarrativeEdges = exports.generateRootsBreakdownBackend = exports.validateSeedOriginBackend = exports.SEED_VALIDATION_SCHEMA = exports.GENERATE_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = exports.GRAPH_RESPONSE_SCHEMA = exports.extractCleanJsonString = exports.extractArtistSubGraph = exports.normalizeGraphData = exports.buildCompositeCacheKey = exports.extractCountrySlug = exports.sanitizeImageUrl = exports.extractValidYoutubeId = exports.cleanLabelDisplayName = exports.cleanArtistDisplayName = exports.titleCaseArtistId = exports.normalizeLabelId = exports.normalizeArtistId = exports.applyCanonicalAlias = exports.CANONICAL_ALIASES = exports.GEMINI_FLASH_MODEL = void 0;
 const genai_1 = require("@google/genai");
 const executeCurationPipeline_1 = require("../executeCurationPipeline");
 const cacheQualification_1 = require("./cacheQualification");
@@ -58,6 +58,32 @@ const cleanArtistDisplayName = (name) => {
     return cleaned;
 };
 exports.cleanArtistDisplayName = cleanArtistDisplayName;
+/**
+ * Normalizes a label display name by stripping trailing structural suffixes
+ * like "Records" / "Recordings" and guaranteeing title casing for database slugs.
+ */
+const cleanLabelDisplayName = (rawIdOrName) => {
+    if (!rawIdOrName || typeof rawIdOrName !== 'string')
+        return '';
+    const trimmed = rawIdOrName.trim();
+    if (!trimmed)
+        return '';
+    const base = (0, exports.cleanArtistDisplayName)((0, exports.applyCanonicalAlias)(trimmed));
+    if (!base)
+        return '';
+    const stripped = base
+        .replace(/(?:[-_\s]+(?:records|recordings))+$/i, '')
+        .trim();
+    const candidate = stripped || base;
+    if (/^[a-z0-9\s-_]+$/.test(candidate) && !/[A-Z]/.test(candidate)) {
+        return (0, exports.titleCaseArtistId)(candidate);
+    }
+    if (candidate.includes('-') || candidate.includes('_')) {
+        return (0, exports.titleCaseArtistId)(candidate);
+    }
+    return candidate;
+};
+exports.cleanLabelDisplayName = cleanLabelDisplayName;
 const extractValidYoutubeId = (rawUrlOrId) => {
     if (!rawUrlOrId || typeof rawUrlOrId !== 'string')
         return undefined;
@@ -230,11 +256,17 @@ const normalizeGraphData = (graph) => {
         idMap.set(originalId, normalizedId);
         idMap.set(originalId.toLowerCase(), normalizedId);
         idMap.set((0, exports.normalizeArtistId)(originalId), normalizedId);
-        let label = node.label ? (0, exports.cleanArtistDisplayName)((0, exports.applyCanonicalAlias)(node.label)) : '';
-        if (!label) {
-            label = (node.type === 'artist' || node.type === 'label')
-                ? (0, exports.titleCaseArtistId)(originalId.trim())
-                : originalId.trim();
+        let label = '';
+        if (node.type === 'label') {
+            label = (0, exports.cleanLabelDisplayName)(node.label || originalId);
+        }
+        else {
+            label = node.label ? (0, exports.cleanArtistDisplayName)((0, exports.applyCanonicalAlias)(node.label)) : '';
+            if (!label) {
+                label = node.type === 'artist'
+                    ? (0, exports.titleCaseArtistId)(originalId.trim())
+                    : originalId.trim();
+            }
         }
         return {
             ...node,

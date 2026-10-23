@@ -15,15 +15,20 @@ vi.mock('../services/geminiService', () => ({
   streamLocalHeuristicChat: vi.fn(),
   fetchNodeDetails: vi.fn(),
 }));
-vi.mock('../services/artistCacheService', () => ({
-  normalizeArtistId: (id: string) => id,
-  titleCaseArtistId: (id: string) => id,
-  cleanArtistDisplayName: (id: string) => id,
-  isNodeInSeedList: () => false,
-  getArtistDocWithRedirect: vi.fn(),
-  enforceArtistCacheSchema: vi.fn(),
-  isArtistIdMatch: () => false,
-}));
+vi.mock('../services/artistCacheService', async (importOriginal) => {
+  const actual: any = await importOriginal();
+  return {
+    ...actual,
+    normalizeArtistId: (id: string) => id,
+    titleCaseArtistId: (id: string) => id,
+    cleanArtistDisplayName: (id: string) => id,
+    cleanLabelDisplayName: actual.cleanLabelDisplayName,
+    isNodeInSeedList: () => false,
+    getArtistDocWithRedirect: vi.fn(),
+    enforceArtistCacheSchema: vi.fn(),
+    isArtistIdMatch: () => false,
+  };
+});
 vi.mock('../services/analyticsService', () => ({
   analyticsService: { track: vi.fn() }
 }));
@@ -123,7 +128,7 @@ describe('DetailsPanel', () => {
 
         // Verify LABEL heading and associated label value extracted via edge traversal
         expect(await screen.findByText('Label')).toBeInTheDocument();
-        expect(screen.getByText('Essential Records')).toBeInTheDocument();
+        expect(screen.getByText('Essential')).toBeInTheDocument();
 
         // Verify other 3 cells
         expect(screen.getByText('Genre')).toBeInTheDocument();
@@ -281,7 +286,7 @@ describe('DetailsPanel', () => {
         );
 
         expect(await screen.findByText('Label')).toBeInTheDocument();
-        expect(screen.getByText('Sub Pop, Epitaph Records')).toBeInTheDocument();
+        expect(screen.getByText('Sub Pop, Epitaph')).toBeInTheDocument();
     });
 
     it('captures password in TokenConfirmationDialog for Deep Web chat, stores in sessionStorage, and forwards to streamNodeChat', async () => {
