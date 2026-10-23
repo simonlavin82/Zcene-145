@@ -28,7 +28,7 @@
  *   Column 2 (executeCurationPipeline) and Column 3 (worker) MUST NOT be invoked.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sanitizeDiscoveryFilters = exports.hasActiveDiscoveryFilters = exports.hasActiveTier3Filters = exports.hasActiveTier2Filters = exports.sanitizeAnchorLabelInput = exports.V30_ERA_MAX = exports.V30_ERA_MIN = exports.redactSensitive = exports.deriveRoutingDecision = exports.isLocallyRenderable = exports.qualifyCacheEntry = exports.isFullyQualifiedEntityProfile = exports.parseGraphField = exports.extractSeedProfile = exports.MIN_RATIONALE_LENGTH = exports.MIN_BIO_LENGTH = void 0;
+exports.sanitizeDiscoveryFilters = exports.hasActiveDiscoveryFilters = exports.hasActiveTier3Filters = exports.hasActiveTier2Filters = exports.sanitizeAnchorLabelInput = exports.V30_ERA_MAX = exports.getDynamicEraMax = exports.SCENE_MATURITY_BUFFER_YEARS = exports.V30_ERA_MIN = exports.redactSensitive = exports.deriveRoutingDecision = exports.isLocallyRenderable = exports.qualifyCacheEntry = exports.isFullyQualifiedEntityProfile = exports.parseGraphField = exports.extractSeedProfile = exports.MIN_RATIONALE_LENGTH = exports.MIN_BIO_LENGTH = void 0;
 exports.MIN_BIO_LENGTH = 50;
 exports.MIN_RATIONALE_LENGTH = 50;
 const simpleNormalize = (value) => (value || '')
@@ -246,7 +246,16 @@ exports.redactSensitive = redactSensitive;
  * ─────────────────────────────────────────────────────────────────────────────
  */
 exports.V30_ERA_MIN = 1965;
-exports.V30_ERA_MAX = 2026;
+/**
+ * Rolling Scene Maturity Buffer (N - 2):
+ * Dynamically calculates the upper founded era bound based on the current calendar year.
+ */
+exports.SCENE_MATURITY_BUFFER_YEARS = 2;
+const getDynamicEraMax = (now = new Date()) => {
+    return now.getFullYear() - exports.SCENE_MATURITY_BUFFER_YEARS;
+};
+exports.getDynamicEraMax = getDynamicEraMax;
+exports.V30_ERA_MAX = (0, exports.getDynamicEraMax)();
 /**
  * Sanitizes a user-provided or combobox-created Level 3 Anchor Label string.
  * Strips control characters, quotes, structural delimiters, and prompt-injection
@@ -270,8 +279,13 @@ const sanitizeAnchorLabelInput = (raw) => {
 exports.sanitizeAnchorLabelInput = sanitizeAnchorLabelInput;
 /**
  * Evaluates whether Level 2 Hard Spatial & Temporal Guardrails are active.
- * Note: Resting at full outer bounds (1965 and 2026 simultaneously) is treated as unfiltered.
- * Moving either thumb inward (e.g. 1965-1975 or 1990-2026) is treated as an active Level 2 filter.
+ * Note: Resting at full outer bounds (<= 1965 and >= dynamic horizon simultaneously) is treated as unfiltered.
+ * Moving either thumb inward (e.g. 1965-1975 or 1990-2024) is treated as an active Level 2 filter.
+ *
+ * Horizon Normalization:
+ * Any `foundedBefore >= V30_ERA_MAX` is resting at the rolling maturity horizon (unfiltered ceiling).
+ * Any `foundedAfter <= V30_ERA_MIN` is resting at the historical floor (unfiltered floor).
+ * This eliminates the "New Year's Day Cache Invalidation" trap and neutralizes legacy stored 2026 data.
  */
 const hasActiveTier2Filters = (filters) => {
     if (!filters || typeof filters !== 'object')
@@ -284,8 +298,11 @@ const hasActiveTier2Filters = (filters) => {
         : undefined;
     const afterNum = (afterRaw !== undefined && !isNaN(afterRaw) && afterRaw > 0) ? afterRaw : undefined;
     const beforeNum = (beforeRaw !== undefined && !isNaN(beforeRaw) && beforeRaw > 0) ? beforeRaw : undefined;
-    const isDefaultFullRange = afterNum === exports.V30_ERA_MIN && beforeNum === exports.V30_ERA_MAX;
-    const hasEra = !isDefaultFullRange && (afterNum !== undefined || beforeNum !== undefined);
+    // An upper bound at or above the active horizon is resting at max (unfiltered upper bound)
+    const isUpperResting = beforeNum === undefined || beforeNum >= exports.V30_ERA_MAX;
+    // A lower bound at or below V30_ERA_MIN is resting at min (unfiltered lower bound)
+    const isLowerResting = afterNum === undefined || afterNum <= exports.V30_ERA_MIN;
+    const hasEra = !(isUpperResting && isLowerResting);
     const hasIncOrigins = Array.isArray(filters.includeOrigins) &&
         filters.includeOrigins.some((s) => typeof s === 'string' && s.trim().length > 0);
     const hasExcOrigins = Array.isArray(filters.excludeOrigins) &&
@@ -319,7 +336,7 @@ exports.hasActiveDiscoveryFilters = hasActiveDiscoveryFilters;
  * Produces a sanitized, canonical V30 DiscoveryFilters object:
  * - Strips legacy `additionalInstructions`
  * - Drops empty arrays
- * - Normalizes resting outer slider bounds (1965-2026) to undefined
+ * - Normalizes resting outer slider bounds (<= 1965 or >= V30_ERA_MAX) to undefined
  * - Swaps inverted year bounds and enforces mutual exclusion on includeOrigins/excludeOrigins
  * - Sanitizes `anchorLabels` via `sanitizeAnchorLabelInput`
  */
@@ -340,13 +357,19 @@ const sanitizeDiscoveryFilters = (filters) => {
         afterNum = beforeNum;
         beforeNum = tmp;
     }
-    const isDefaultFullRange = afterNum === exports.V30_ERA_MIN && beforeNum === exports.V30_ERA_MAX;
-    if (!isDefaultFullRange) {
-        if (afterNum !== undefined)
-            out.foundedAfter = afterNum;
-        if (beforeNum !== undefined)
-            out.foundedBefore = beforeNum;
+    // Horizon Normalization:
+    // Any beforeNum >= V30_ERA_MAX rests at the rolling horizon -> normalize to undefined.
+    // Any afterNum <= V30_ERA_MIN rests at the historical origin -> normalize to undefined.
+    if (beforeNum !== undefined && beforeNum >= exports.V30_ERA_MAX) {
+        beforeNum = undefined;
     }
+    if (afterNum !== undefined && afterNum <= exports.V30_ERA_MIN) {
+        afterNum = undefined;
+    }
+    if (afterNum !== undefined)
+        out.foundedAfter = afterNum;
+    if (beforeNum !== undefined)
+        out.foundedBefore = beforeNum;
     if (Array.isArray(filters.includeOrigins)) {
         const clean = filters.includeOrigins.map((s) => typeof s === 'string' ? s.trim() : '').filter(Boolean);
         if (clean.length > 0)

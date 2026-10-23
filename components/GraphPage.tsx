@@ -275,27 +275,27 @@ const DiscoveryFiltersPanel: React.FC<{
       }
     });
 
-    const resolvedMin = minEra !== undefined || maxEra !== undefined ? (minEra ?? ERA_MIN_BOUND) : undefined;
-    const resolvedMax = minEra !== undefined || maxEra !== undefined ? (maxEra ?? ERA_MAX_BOUND) : undefined;
-    const isUnfilteredEra = resolvedMin === ERA_MIN_BOUND && resolvedMax === ERA_MAX_BOUND;
+    const resolvedMin = minEra !== undefined && minEra > ERA_MIN_BOUND ? minEra : undefined;
+    const resolvedMax = maxEra !== undefined && maxEra < ERA_MAX_BOUND ? maxEra : undefined;
 
     setOriginMode('include');
     onUpdate({
       ...filters,
-      foundedAfter: isUnfilteredEra ? undefined : resolvedMin,
-      foundedBefore: isUnfilteredEra ? undefined : resolvedMax,
+      foundedAfter: resolvedMin,
+      foundedBefore: resolvedMax,
       includeGenres: genres.size > 0 ? Array.from(genres) : undefined,
       includeOrigins: origins.size > 0 ? Array.from(origins) : undefined,
       excludeOrigins: undefined,
     });
   };
 
-  // --- Tier 2: Era Range (1965 - 2026) ---
-  const isEraActive = filters.foundedAfter !== undefined || filters.foundedBefore !== undefined;
+  // --- Tier 2: Era Range (1965 – Dynamic Rolling Horizon ERA_MAX_BOUND) ---
+  const isEraActive = (filters.foundedAfter !== undefined && Number(filters.foundedAfter) > ERA_MIN_BOUND) ||
+                      (filters.foundedBefore !== undefined && Number(filters.foundedBefore) < ERA_MAX_BOUND);
   const minEraVal = filters.foundedAfter !== undefined
     ? Math.max(ERA_MIN_BOUND, Math.min(ERA_MAX_BOUND, Number(filters.foundedAfter)))
     : ERA_MIN_BOUND;
-  const maxEraVal = filters.foundedBefore !== undefined
+  const maxEraVal = (filters.foundedBefore !== undefined && Number(filters.foundedBefore) < ERA_MAX_BOUND)
     ? Math.max(ERA_MIN_BOUND, Math.min(ERA_MAX_BOUND, Number(filters.foundedBefore)))
     : ERA_MAX_BOUND;
 
@@ -303,21 +303,17 @@ const DiscoveryFiltersPanel: React.FC<{
     const clampedMin = Math.max(ERA_MIN_BOUND, Math.min(nextMin, nextMax));
     const clampedMax = Math.min(ERA_MAX_BOUND, Math.max(nextMin, nextMax));
 
-    // Locked Design Refinement: Unfiltered ONLY when BOTH thumbs rest at outer bounds (1965 and 2026).
-    // Moving either thumb inward passes both foundedAfter and foundedBefore so both bounds are enforced.
-    if (clampedMin === ERA_MIN_BOUND && clampedMax === ERA_MAX_BOUND) {
-      onUpdate({
-        ...filters,
-        foundedAfter: undefined,
-        foundedBefore: undefined,
-      });
-    } else {
-      onUpdate({
-        ...filters,
-        foundedAfter: clampedMin,
-        foundedBefore: clampedMax,
-      });
-    }
+    // Horizon Normalization:
+    // If the right thumb rests at or above ERA_MAX_BOUND, omit foundedBefore (unbounded upper horizon).
+    // If the left thumb rests at or below ERA_MIN_BOUND, omit foundedAfter (unbounded lower bound).
+    const nextFoundedAfter = clampedMin > ERA_MIN_BOUND ? clampedMin : undefined;
+    const nextFoundedBefore = clampedMax < ERA_MAX_BOUND ? clampedMax : undefined;
+
+    onUpdate({
+      ...filters,
+      foundedAfter: nextFoundedAfter,
+      foundedBefore: nextFoundedBefore,
+    });
   };
 
   const handleResetEra = () => {
@@ -482,7 +478,7 @@ const DiscoveryFiltersPanel: React.FC<{
               </span>
             </div>
 
-            {/* 1. Dual-Thumb Era Range Slider (1965 – 2026) */}
+            {/* 1. Dual-Thumb Era Range Slider (1965 – Dynamic Horizon) */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-[10px] font-medium text-zinc-400 uppercase tracking-widest">
@@ -497,7 +493,7 @@ const DiscoveryFiltersPanel: React.FC<{
                       type="button"
                       onClick={handleResetEra}
                       className="text-[9px] font-mono uppercase tracking-wider text-zinc-400 hover:text-white px-1.5 py-0.5 rounded bg-zinc-800/80 hover:bg-zinc-700 transition-colors"
-                      title="Reset Founded range to 1965 – 2026"
+                      title={`Reset Founded range to ${ERA_MIN_BOUND} – ${ERA_MAX_BOUND}`}
                     >
                       Reset
                     </button>

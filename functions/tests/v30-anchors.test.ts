@@ -8,7 +8,9 @@ import {
   isFullyQualifiedEntityProfile,
   qualifyCacheEntry,
   V30_ERA_MIN,
-  V30_ERA_MAX
+  V30_ERA_MAX,
+  SCENE_MATURITY_BUFFER_YEARS,
+  getDynamicEraMax
 } from '../../services/cacheQualification';
 import {
   ERA_MIN_BOUND,
@@ -37,11 +39,18 @@ import { sanitizeUndefinedProperties } from '../src/processCurationJob';
 
 describe('Architecture V33: 3-Tier Anchor System & Deep Cut Anti-Pollution Gates (Rule 8, Rule 40, Rule 41, Rule 42)', () => {
   describe('Phase 1: Canonical Registries & Constants', () => {
-    it('Enforces strictly bounded era range 1965–2026', () => {
+    it('Enforces dynamic rolling era horizon (currentYear - 2)', () => {
+      const expectedYear = new Date().getFullYear() - 2;
       expect(ERA_MIN_BOUND).toBe(1965);
-      expect(ERA_MAX_BOUND).toBe(2026);
       expect(V30_ERA_MIN).toBe(1965);
-      expect(V30_ERA_MAX).toBe(2026);
+      expect(ERA_MAX_BOUND).toBe(expectedYear);
+      expect(V30_ERA_MAX).toBe(expectedYear);
+      expect(SCENE_MATURITY_BUFFER_YEARS).toBe(2);
+
+      // Verify time-machine behavior across years
+      expect(getDynamicEraMax(new Date('2026-10-23'))).toBe(2024);
+      expect(getDynamicEraMax(new Date('2027-01-01'))).toBe(2025);
+      expect(getDynamicEraMax(new Date('2028-12-31'))).toBe(2026);
     });
 
     it('Exports exactly 22 canonical countries', () => {
@@ -119,7 +128,38 @@ describe('Architecture V33: 3-Tier Anchor System & Deep Cut Anti-Pollution Gates
         foundedBefore: 1990
       });
       expect(inverted.foundedAfter).toBe(1990);
-      expect(inverted.foundedBefore).toBe(2026 >= 2010 ? 2010 : 2026);
+      expect(inverted.foundedBefore).toBe(2010);
+    });
+
+    it('Neutralizes legacy 2026 data and resting horizon bounds (immune to New Year rollover)', () => {
+      // Legacy stored 2026 bound should be treated as unfiltered upper horizon
+      const legacySaved = { foundedAfter: 1965, foundedBefore: 2026 };
+      expect(hasActiveTier2Filters(legacySaved)).toBe(false);
+      expect(hasActiveDiscoveryFilters(legacySaved)).toBe(false);
+
+      // Resting at current active horizon is treated as unfiltered
+      const currentResting = { foundedAfter: 1965, foundedBefore: V30_ERA_MAX };
+      expect(hasActiveTier2Filters(currentResting)).toBe(false);
+      expect(hasActiveDiscoveryFilters(currentResting)).toBe(false);
+
+      // Sanitize strips resting bounds completely
+      expect(sanitizeDiscoveryFilters(legacySaved)).toEqual({});
+      expect(sanitizeDiscoveryFilters(currentResting)).toEqual({});
+
+      // When floor is customized but ceiling rests at horizon, only floor is preserved
+      const customFloorOnly = { foundedAfter: 1990, foundedBefore: V30_ERA_MAX };
+      expect(hasActiveTier2Filters(customFloorOnly)).toBe(true);
+      expect(sanitizeDiscoveryFilters(customFloorOnly)).toEqual({ foundedAfter: 1990 });
+
+      // Legacy 2026 with custom floor preserves only the custom floor
+      const customFloorLegacy2026 = { foundedAfter: 1990, foundedBefore: 2026 };
+      expect(hasActiveTier2Filters(customFloorLegacy2026)).toBe(true);
+      expect(sanitizeDiscoveryFilters(customFloorLegacy2026)).toEqual({ foundedAfter: 1990 });
+
+      // When ceiling is genuinely customized beneath horizon, it is preserved
+      const customCeilingOnly = { foundedAfter: 1965, foundedBefore: 2010 };
+      expect(hasActiveTier2Filters(customCeilingOnly)).toBe(true);
+      expect(sanitizeDiscoveryFilters(customCeilingOnly)).toEqual({ foundedBefore: 2010 });
     });
   });
 

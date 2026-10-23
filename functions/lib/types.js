@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.RADIUS_TOKENS = exports.COST_PER_AI_CALL = exports.CANONICAL_GENRES_FLAT = exports.CANONICAL_GENRE_TAXONOMY = exports.CANONICAL_COUNTRIES_22 = exports.ERA_MAX_BOUND = exports.ERA_MIN_BOUND = exports.View = void 0;
+exports.RADIUS_TOKENS = exports.COST_PER_AI_CALL = exports.CANONICAL_GENRES_FLAT = exports.CANONICAL_GENRE_TAXONOMY = exports.CANONICAL_COUNTRIES_22 = exports.ERA_MAX_BOUND = exports.getDynamicEraMax = exports.SCENE_MATURITY_BUFFER_YEARS = exports.ERA_MIN_BOUND = exports.View = void 0;
 var View;
 (function (View) {
     View["Home"] = "home";
@@ -12,7 +12,18 @@ var View;
     View["Analytics"] = "analytics";
 })(View || (exports.View = View = {}));
 exports.ERA_MIN_BOUND = 1965;
-exports.ERA_MAX_BOUND = 2026;
+/**
+ * Rolling Scene Maturity Buffer (N - 2):
+ * Emerging bands formed in the most recent 1-2 years lack mature scene footprint,
+ * iTunes/YouTube hydration metadata, and parametric LLM representation.
+ * The horizon rolls forward automatically with the calendar year (e.g. 2024 in 2026, 2025 in 2027).
+ */
+exports.SCENE_MATURITY_BUFFER_YEARS = 2;
+const getDynamicEraMax = (now = new Date()) => {
+    return now.getFullYear() - exports.SCENE_MATURITY_BUFFER_YEARS;
+};
+exports.getDynamicEraMax = getDynamicEraMax;
+exports.ERA_MAX_BOUND = (0, exports.getDynamicEraMax)();
 exports.CANONICAL_COUNTRIES_22 = [
     'United States',
     'United Kingdom',

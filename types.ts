@@ -231,7 +231,20 @@ export interface DiscoveryFilters {
 }
 
 export const ERA_MIN_BOUND = 1965;
-export const ERA_MAX_BOUND = 2026;
+
+/**
+ * Rolling Scene Maturity Buffer (N - 2):
+ * Emerging bands formed in the most recent 1-2 years lack mature scene footprint,
+ * iTunes/YouTube hydration metadata, and parametric LLM representation.
+ * The horizon rolls forward automatically with the calendar year (e.g. 2024 in 2026, 2025 in 2027).
+ */
+export const SCENE_MATURITY_BUFFER_YEARS = 2;
+
+export const getDynamicEraMax = (now: Date = new Date()): number => {
+  return now.getFullYear() - SCENE_MATURITY_BUFFER_YEARS;
+};
+
+export const ERA_MAX_BOUND = getDynamicEraMax();
 
 export const CANONICAL_COUNTRIES_22: readonly string[] = [
   'United States',
