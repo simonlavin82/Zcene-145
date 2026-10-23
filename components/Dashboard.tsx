@@ -421,13 +421,12 @@ const Dashboard: React.FC<DashboardProps> = ({
           </div>
 
           {projects.length === 0 ? (
-            <div className="w-full md:w-fit max-w-full bg-zinc-950/40 rounded-tr-xl rounded-b-xl rounded-tl-none border border-dashed border-zinc-800/80 p-4 relative flex-shrink-0 min-w-0">
-              {/* Folder Tab Header */}
-              <div className="w-[160px] bg-zinc-950/60 border-t border-l border-r border-dashed border-zinc-800/80 rounded-t-lg text-[9px] font-mono absolute -top-[22px] left-[-1px] px-3 py-1 flex items-center h-[22.5px] z-10 select-none">
-                <div className="truncate text-ellipsis whitespace-nowrap uppercase tracking-widest text-zinc-400 font-medium flex items-center gap-1.5">
+            <div className="w-full md:w-fit max-w-full bg-zinc-950/40 rounded-2xl border border-dashed border-zinc-800/80 p-5 relative flex-shrink-0 min-w-0">
+              <div className="flex items-center gap-2 mb-4 select-none">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-mono text-[10px] font-bold uppercase tracking-widest bg-zinc-900 text-zinc-400 border border-zinc-800">
                   <span className="material-symbols-outlined !text-[12px] text-primary">add</span>
                   NEW ZCENE
-                </div>
+                </span>
               </div>
 
               <div className="grid grid-cols-1 gap-5 w-full md:w-fit max-w-full">
@@ -491,43 +490,47 @@ const Dashboard: React.FC<DashboardProps> = ({
                 return (
                   <div 
                     key={bucketKey} 
-                    className={`w-full md:w-fit max-w-full rounded-tr-xl rounded-b-xl rounded-tl-none border border-zinc-800 p-4 relative flex-shrink-0 min-w-0 ${openColorPopover === bucketKey ? 'z-50' : 'z-0'}`}
+                    className={`w-full md:w-fit max-w-full rounded-2xl border border-zinc-800/80 p-5 relative flex-shrink-0 min-w-0 transition-colors ${openColorPopover === bucketKey ? 'z-50' : 'z-0'}`}
                     style={{
-                      backgroundColor: crateColor.toLowerCase() === '#18181b' ? `${crateColor}26` : `${crateColor}33`
+                      backgroundColor: crateColor.toLowerCase() === '#18181b' ? `${crateColor}1f` : `${crateColor}26`
                     }}
                   >
-                    {/* Unified Folder Index Tab */}
-                    <div 
-                      className={`group w-[160px] border-t border-l border-r border-zinc-800 rounded-t-lg text-[9px] font-mono absolute -top-[22px] left-[-1px] pl-3 pr-1.5 py-1 flex items-center justify-between h-[22.5px] select-none ${openColorPopover === bucketKey ? 'z-[60]' : 'z-10'} ${!isUnassigned && isSmallScreen ? 'cursor-pointer' : ''}`}
-                      style={{
-                        backgroundColor: crateColor
-                      }}
-                      onClick={(e) => {
-                        if (!isUnassigned && isSmallScreen) {
-                          e.stopPropagation();
-                          setOpenColorPopover(openColorPopover === bucketKey ? null : bucketKey);
-                        }
-                      }}
-                    >
-                      <div 
-                        className="truncate text-ellipsis whitespace-nowrap uppercase tracking-widest font-bold"
-                        style={{ color: crateTextColor }}
-                      >
-                        {bucketKey}
-                      </div>
-
-                      {/* Trigger Icon */}
-                      {!isUnassigned && (
-                        <div className="hidden md:group-hover:flex items-center">
-                          <button onClick={(e) => { e.stopPropagation(); setOpenColorPopover(openColorPopover === bucketKey ? null : bucketKey); }} className="flex items-center opacity-70 hover:opacity-100 transition-opacity" style={{ color: crateTextColor }}>
-                            <span className="material-symbols-outlined !text-[15px]">more_horiz</span>
-                          </button>
+                    {/* Modernized Floating Genre Header */}
+                    <div className="flex items-center justify-between gap-3 mb-4 select-none relative">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        {/* Genre Capsule Pill */}
+                        <div 
+                          className={`group/pill inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-mono text-[10px] font-bold uppercase tracking-widest transition-transform ${!isUnassigned ? 'cursor-pointer hover:scale-[1.02]' : ''}`}
+                          style={{
+                            backgroundColor: crateColor,
+                            color: crateTextColor
+                          }}
+                          onClick={(e) => {
+                            if (!isUnassigned) {
+                              e.stopPropagation();
+                              setOpenColorPopover(openColorPopover === bucketKey ? null : bucketKey);
+                            }
+                          }}
+                          title={!isUnassigned ? `Customize ${bucketKey} color` : undefined}
+                        >
+                          <span className="truncate max-w-[150px] sm:max-w-[220px]">{bucketKey}</span>
+                          {!isUnassigned && (
+                            <span className="material-symbols-outlined !text-[13px] opacity-70 group-hover/pill:opacity-100 transition-opacity">palette</span>
+                          )}
                         </div>
-                      )}
+
+                        {/* Project Count */}
+                        <span className="text-[10px] font-mono text-zinc-400 font-medium">
+                          {count} {count === 1 ? 'Zcene' : 'Zcenes'}
+                        </span>
+                      </div>
 
                       {/* Popover UI */}
                       {openColorPopover === bucketKey && (
-                        <div className="absolute top-full right-0 mt-1 p-2 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl z-50 flex gap-2" onClick={(e) => e.stopPropagation()}>
+                        <div 
+                          className="absolute top-full left-0 mt-2 p-2 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl z-50 flex gap-2" 
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           {PROFILE_COLORS.map(color => (
                             <button
                               key={color.name}
@@ -535,7 +538,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                                  onUpdateCrateColor?.(bucketKey, colorHexMap[color.name]);
                                  setOpenColorPopover(null);
                               }}
-                              className={`w-4 h-4 rounded-full transition-transform ${color.class} hover:scale-110`}
+                              className={`w-4 h-4 rounded-full transition-transform ${color.class} hover:scale-125`}
+                              aria-label={`Select ${color.name} color`}
                             />
                           ))}
                         </div>
@@ -557,17 +561,17 @@ const Dashboard: React.FC<DashboardProps> = ({
                           onDuplicateProject={onDuplicateProject}
                         />
                       ))}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
               
               {/* Standalone Add New Crate Folder (Simplified) */}
               <div className="w-full md:w-fit max-w-full relative flex-shrink-0 min-w-0 self-stretch flex items-stretch">
                 <button 
                   onClick={onCreateProject}
                   disabled={isCreatingProject}
-                  className="group relative bg-zinc-950/40 border-2 border-dashed border-zinc-800/80 rounded-xl p-5 flex flex-col items-center justify-center gap-3 transition-all h-[212px] w-full md:w-[382px] hover:border-primary/50 disabled:opacity-50 cursor-pointer overflow-hidden"
+                  className="group relative bg-zinc-950/40 border-2 border-dashed border-zinc-800/80 rounded-2xl p-5 flex flex-col items-center justify-center gap-3 transition-all h-[212px] w-full md:w-[382px] hover:border-primary/50 disabled:opacity-50 cursor-pointer overflow-hidden"
                 >
                   <div className="w-10 h-10 rounded-full bg-zinc-900 group-hover:bg-white group-hover:text-brand-black flex items-center justify-center text-zinc-550 transition-all relative z-10">
                     {isCreatingProject ? (
@@ -606,42 +610,44 @@ const Dashboard: React.FC<DashboardProps> = ({
                     const crateTextColor = getContrastTextColor(crateColor);
                     
                     return (
-                    <React.Fragment key={bucketKey}>
-                      {/* Unified Folder Tab Divider Row */}
-                      <tr className="select-none pointer-events-none bg-zinc-900">
-                        <td colSpan={7} className="pt-6 pb-0 px-6 align-bottom bg-zinc-900 border-none">
-                          {/* The Folder Tab */}
-                          <div 
-                            className={`group w-[140px] sm:w-[160px] border-t border-l border-r border-zinc-800 rounded-t-lg pl-3 pr-1.5 py-1.5 font-mono tracking-widest text-[9px] sm:text-[10px] uppercase font-bold relative -mb-[1px] flex items-center justify-between pointer-events-auto ${openColorPopover === bucketKey ? 'z-[60]' : 'z-0'} ${!isUnassigned && isSmallScreen ? 'cursor-pointer' : ''}`}
-                            style={{
-                              backgroundColor: crateColor
-                            }}
-                            onClick={(e) => {
-                              if (!isUnassigned && isSmallScreen) {
-                                e.stopPropagation();
-                                setOpenColorPopover(openColorPopover === bucketKey ? null : bucketKey);
-                              }
-                            }}
-                          >
+                      <React.Fragment key={bucketKey}>
+                        {/* Modernized Category Divider Row */}
+                        <tr className="select-none bg-zinc-950/70 border-t border-b border-zinc-800/80">
+                        <td colSpan={8} className="py-3 px-6">
+                          <div className="relative flex items-center gap-3">
+                            {/* Genre Capsule Pill */}
                             <div 
-                              className="truncate text-ellipsis whitespace-nowrap"
-                              style={{ color: crateTextColor }}
+                              className={`group/pill inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-mono text-[9px] sm:text-[10px] font-bold uppercase tracking-widest transition-transform ${!isUnassigned ? 'cursor-pointer hover:scale-[1.02]' : ''}`}
+                              style={{
+                                backgroundColor: crateColor,
+                                color: crateTextColor
+                              }}
+                              onClick={(e) => {
+                                if (!isUnassigned) {
+                                  e.stopPropagation();
+                                  setOpenColorPopover(openColorPopover === bucketKey ? null : bucketKey);
+                                }
+                              }}
+                              title={!isUnassigned ? `Customize ${bucketKey} color` : undefined}
                             >
-                              {bucketKey}
+                              <span className="truncate max-w-[160px] sm:max-w-[240px]">{bucketKey}</span>
+                              {!isUnassigned && (
+                                <span className="material-symbols-outlined !text-[12px] opacity-70 group-hover/pill:opacity-100 transition-opacity">palette</span>
+                              )}
                             </div>
-                            
-                            {/* Trigger Icon */}
-                            {!isUnassigned && (
-                              <div className="hidden md:group-hover:flex items-center pointer-events-auto">
-                                <button onClick={(e) => { e.stopPropagation(); setOpenColorPopover(openColorPopover === bucketKey ? null : bucketKey); }} className="flex items-center opacity-70 hover:opacity-100 transition-opacity -my-1" style={{ color: crateTextColor }}>
-                                  <span className="material-symbols-outlined !text-[15px]">more_horiz</span>
-                                </button>
-                              </div>
-                            )}
+
+                            <div className="h-[1px] bg-zinc-800/80 flex-1" />
+
+                            <span className="text-[10px] font-mono text-zinc-500 font-medium">
+                              {groupedProjects[bucketKey].length} {groupedProjects[bucketKey].length === 1 ? 'Zcene' : 'Zcenes'}
+                            </span>
 
                             {/* Popover UI */}
                             {openColorPopover === bucketKey && (
-                              <div className="absolute top-full left-0 sm:left-auto sm:right-0 mt-1 p-2 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl z-50 flex gap-2 pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+                              <div 
+                                className="absolute top-full left-0 mt-2 p-2 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl z-50 flex gap-2" 
+                                onClick={(e) => e.stopPropagation()}
+                              >
                                 {PROFILE_COLORS.map(color => (
                                   <button
                                     key={color.name}
@@ -649,7 +655,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                                        onUpdateCrateColor?.(bucketKey, colorHexMap[color.name]);
                                        setOpenColorPopover(null);
                                     }}
-                                    className={`w-4 h-4 rounded-full transition-transform ${color.class} hover:scale-110`}
+                                    className={`w-4 h-4 rounded-full transition-transform ${color.class} hover:scale-125`}
+                                    aria-label={`Select ${color.name} color`}
                                   />
                                 ))}
                               </div>
@@ -721,31 +728,31 @@ const Dashboard: React.FC<DashboardProps> = ({
                             </td>
                             <td className={`py-4 px-6 font-normal ${tdClass}`}>
                               {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
-                              <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
-                                ROOT ARTISTS: {seedList.length}
+                              <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
+                                ROOTS: {seedList.length}
                               </span>
                             </td>
                             <td className={`py-4 px-6 font-normal ${tdClass}`}>
                               {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
-                              <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                              <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
                                 ARTISTS: {recommendedCount}
                               </span>
                             </td>
                             <td className={`py-4 px-6 font-normal ${tdClass}`}>
                               {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
                               {labelCount > 0 ? (
-                                <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                                <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
                                   LABELS: {labelCount}
                                 </span>
                               ) : (
-                                <span className="text-[10px] uppercase tracking-widest text-zinc-600 font-bold px-2.5 py-0.5 bg-zinc-900 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                                <span className="text-[10px] uppercase tracking-widest text-zinc-600 font-bold px-2.5 py-0.5 bg-zinc-900 rounded-full border border-white/5 font-mono whitespace-nowrap">
                                   -
                                 </span>
                               )}
                             </td>
                             <td className={`py-4 px-6 font-normal ${tdClass}`}>
                               {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
-                              <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                              <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
                                 DEEP CUTS: {deepCutsCount}
                               </span>
                             </td>
