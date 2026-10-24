@@ -1,13 +1,19 @@
 import { ModalFooter, ModalContainer, ModalBackdrop, ModalHeader, ModalBody } from './ui/Dialog';
 import { Input } from './DesignSystem';
-import React, { useState, useMemo } from 'react';
-import { StackItem, Node, UserTaste, DisambiguationCandidateStub, ERA_MIN_BOUND, ERA_MAX_BOUND } from '../types';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { 
+  StackItem, Node, UserTaste, DisambiguationCandidateStub, 
+  ERA_MIN_BOUND, ERA_MAX_BOUND, 
+  CANONICAL_COUNTRIES_22, CANONICAL_GENRE_TAXONOMY, CANONICAL_GENRES_FLAT 
+} from '../types';
 import { StackIcon, VisibilityIcon, VisibilityOffIcon } from './Icons';
 import Markdown from 'react-markdown';
-import { isNodeInSeedList, cleanArtistDisplayName } from '../services/artistCacheService';
+import { isNodeInSeedList, cleanArtistDisplayName, cleanLabelDisplayName, normalizeLabelId } from '../services/artistCacheService';
+import { sanitizeAnchorLabelInput } from '../services/cacheQualification';
 import { Flame, Waypoints } from 'lucide-react';
 import { formatSystemTimestamp } from '../utils/formatters';
-import { functions } from '../services/firebase';
+import { db, functions } from '../services/firebase';
+import { collection, getDocs } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 
 // --- My Stack Dialog Component ---
@@ -124,6 +130,16 @@ export const PROFILE_COLORS = [
 
 export const MODAL_PROFILE_COLORS = PROFILE_COLORS.filter(c => c.name !== 'black' && c.name !== 'white');
 
+export const STYLE_ERA_MAX = new Date().getFullYear();
+
+const DEFAULT_POPULAR_LABELS = [
+  '4AD', 'Atlantic', 'Blue Note', 'Century Media', 'Columbia', 'Deathwish Inc.',
+  'Def Jam', 'Dischord', 'Domino', 'Elektra', 'Epitaph', 'Factory Records',
+  'Fueled by Ramen', 'Geffen', 'Island', 'Jagjaguwar', 'Matador', 'Merge Records',
+  'Motown', 'Mute', 'Nuclear Blast', 'Polydor', 'Rise Records', 'Rough Trade',
+  'Sargent House', 'Sire', 'Sparrow', 'Sub Pop', 'Tooth & Nail', 'Virgin', 'Warp', 'XL Recordings'
+];
+
 export const MyTasteDialog: React.FC<{
   isOpen: boolean;
   onClose: () => void;
@@ -133,6 +149,71 @@ export const MyTasteDialog: React.FC<{
   const [profiles, setProfiles] = useState<UserTaste>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  const [isLabelOpen, setIsLabelOpen] = useState(false);
+  const [isGenreOpen, setIsGenreOpen] = useState(false);
+  const [isOriginOpen, setIsOriginOpen] = useState(false);
+  const [cachedLabelNames, setCachedLabelNames] = useState<string[]>(DEFAULT_POPULAR_LABELS);
+  const hasLoadedLabelsRef = useRef(false);
+
+  const labelContainerRef = useRef<HTMLDivElement>(null);
+  const genreContainerRef = useRef<HTMLDivElement>(null);
+  const originContainerRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (labelContainerRef.current && !labelContainerRef.current.contains(e.target as globalThis.Node)) {
+        setIsLabelOpen(false);
+      }
+      if (genreContainerRef.current && !genreContainerRef.current.contains(e.target as globalThis.Node)) {
+        setIsGenreOpen(false);
+      }
+      if (originContainerRef.current && !originContainerRef.current.contains(e.target as globalThis.Node)) {
+        setIsOriginOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Fetch Firestore labels on open
+  useEffect(() => {
+    if (!isOpen || hasLoadedLabelsRef.current) return;
+    hasLoadedLabelsRef.current = true;
+    const fetchCachedLabels = async () => {
+      try {
+        const snap = await getDocs(collection(db, 'labels'));
+        const names: string[] = [];
+        snap.forEach(docSnap => {
+          const d = docSnap.data();
+          const rawName = d?.detailsCache?.name || d?.detailsCache?.details?.artist || d?.seedArtists || d?.labelId || d?.artistId || docSnap.id;
+          if (rawName && typeof rawName === 'string') {
+            const display = cleanLabelDisplayName(rawName);
+            if (display) {
+              names.push(display);
+            }
+          }
+        });
+        if (names.length > 0) {
+          const byNorm = new Map<string, string>();
+          [...DEFAULT_POPULAR_LABELS, ...names].forEach(l => {
+            const display = cleanLabelDisplayName(l);
+            if (display) {
+              const norm = normalizeLabelId(display);
+              if (norm && !byNorm.has(norm)) {
+                byNorm.set(norm, display);
+              }
+            }
+          });
+          setCachedLabelNames(Array.from(byNorm.values()).sort((a, b) => a.localeCompare(b)));
+        }
+      } catch (err) {
+        // Non-fatal fallback to default popular labels
+      }
+    };
+    fetchCachedLabels();
+  }, [isOpen]);
 
   // Sync state if taste changes
   React.useEffect(() => {
@@ -299,26 +380,132 @@ export const MyTasteDialog: React.FC<{
               
               <hr className="border-zinc-800" />
 
-              <div className="space-y-1.5">
+              <div className="space-y-1.5" ref={labelContainerRef}>
                 <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Label</label>
-                <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
-                  type="text" 
-                  placeholder="e.g. Sub Pop, 4AD, Domino"
-                  value={activeProfile.favoriteLabel ?? ''}
-                  onChange={(e) => updateProfile('favoriteLabel', e.target.value)}
-                  className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
-                />
+                <div className="relative">
+                  <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
+                    type="text" 
+                    placeholder="Search or add label (e.g. Sub Pop, 4AD, Atlantic)..."
+                    value={activeProfile.favoriteLabel ?? ''}
+                    onFocus={() => setIsLabelOpen(true)}
+                    onChange={(e) => {
+                      updateProfile('favoriteLabel', e.target.value);
+                      setIsLabelOpen(true);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const raw = activeProfile.favoriteLabel ?? '';
+                        const sanitized = sanitizeAnchorLabelInput(raw);
+                        const clean = cleanLabelDisplayName(sanitized) || sanitized;
+                        if (clean) {
+                          e.preventDefault();
+                          updateProfile('favoriteLabel', clean);
+                          setIsLabelOpen(false);
+                        }
+                      }
+                    }}
+                    className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
+                  />
+                  {isLabelOpen && (() => {
+                    const rawTyped = activeProfile.favoriteLabel ?? '';
+                    const sanitizedTyped = sanitizeAnchorLabelInput(rawTyped);
+                    const cleanedTyped = cleanLabelDisplayName(sanitizedTyped) || sanitizedTyped;
+                    const filteredLabels = cachedLabelNames.filter(l => {
+                      const lNorm = normalizeLabelId(l);
+                      return l.toLowerCase().includes(sanitizedTyped.toLowerCase()) ||
+                        lNorm.includes(normalizeLabelId(sanitizedTyped));
+                    }).slice(0, 25);
+                    const canCreateCustom = cleanedTyped.length > 0 &&
+                      !cachedLabelNames.some(sel => normalizeLabelId(sel) === normalizeLabelId(cleanedTyped) || sel.toLowerCase() === cleanedTyped.toLowerCase());
+
+                    if (filteredLabels.length === 0 && !canCreateCustom) return null;
+
+                    return (
+                      <div className="absolute z-30 mt-1 w-full max-h-48 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-xl py-1">
+                        {canCreateCustom && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              updateProfile('favoriteLabel', cleanedTyped);
+                              setIsLabelOpen(false);
+                            }}
+                            className="w-full text-left px-3 py-1.5 text-xs text-primary hover:bg-zinc-800 transition-colors flex items-center justify-between border-b border-zinc-800/80"
+                          >
+                            <span>Use custom label &ldquo;{cleanedTyped}&rdquo;</span>
+                            <span className="text-[9px] font-mono uppercase">Enter</span>
+                          </button>
+                        )}
+                        {filteredLabels.map(label => (
+                          <button
+                            key={label}
+                            type="button"
+                            onClick={() => {
+                              updateProfile('favoriteLabel', label);
+                              setIsLabelOpen(false);
+                            }}
+                            className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
               </div>
 
-              <div className="space-y-1.5">
+              <div className="space-y-1.5" ref={genreContainerRef}>
                 <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Genre</label>
-                <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
-                  type="text" 
-                  placeholder="e.g. Hardcore Punk"
-                  value={activeProfile.favoriteGenre}
-                  onChange={(e) => updateProfile('favoriteGenre', e.target.value)}
-                  className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
-                />
+                <div className="relative">
+                  <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
+                    type="text" 
+                    placeholder="Search or enter genre (e.g. Hardcore Punk, Alternative Rock)..."
+                    value={activeProfile.favoriteGenre}
+                    onFocus={() => setIsGenreOpen(true)}
+                    onChange={(e) => {
+                      updateProfile('favoriteGenre', e.target.value);
+                      setIsGenreOpen(true);
+                    }}
+                    className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
+                  />
+                  {isGenreOpen && (
+                    <div className="absolute z-30 mt-1 w-full max-h-52 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-xl py-1">
+                      {Object.entries(CANONICAL_GENRE_TAXONOMY).map(([category, genres]) => {
+                        const q = (activeProfile.favoriteGenre || '').trim().toLowerCase();
+                        const matches = genres.filter(g =>
+                          g.toLowerCase().includes(q) ||
+                          category.toLowerCase().includes(q)
+                        );
+                        if (matches.length === 0) return null;
+                        return (
+                          <div key={category} className="py-1">
+                            <div className="px-3 py-0.5 text-[9px] font-mono uppercase tracking-wider text-zinc-500">
+                              {category}
+                            </div>
+                            {matches.map(genre => (
+                              <button
+                                key={genre}
+                                type="button"
+                                onClick={() => {
+                                  updateProfile('favoriteGenre', genre);
+                                  setIsGenreOpen(false);
+                                }}
+                                className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                              >
+                                {genre}
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      })}
+                      {CANONICAL_GENRES_FLAT.filter(g =>
+                        g.toLowerCase().includes((activeProfile.favoriteGenre || '').trim().toLowerCase())
+                      ).length === 0 && (
+                        <div className="px-3 py-2 text-[11px] text-zinc-500">No matching canonical genres</div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-1.5">
@@ -332,30 +519,63 @@ export const MyTasteDialog: React.FC<{
                 />
               </div>
 
-              <div className="space-y-1.5">
+              <div className="space-y-1.5" ref={originContainerRef}>
                 <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Origin</label>
-                <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
-                  type="text" 
-                  placeholder="e.g. Baltimore"
-                  value={activeProfile.favoriteOrigin}
-                  onChange={(e) => updateProfile('favoriteOrigin', e.target.value)}
-                  className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
-                />
+                <div className="relative">
+                  <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
+                    type="text" 
+                    placeholder="Search country or enter origin (e.g. United States, Baltimore)..."
+                    value={activeProfile.favoriteOrigin}
+                    onFocus={() => setIsOriginOpen(true)}
+                    onChange={(e) => {
+                      updateProfile('favoriteOrigin', e.target.value);
+                      setIsOriginOpen(true);
+                    }}
+                    className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
+                  />
+                  {isOriginOpen && (() => {
+                    const q = (activeProfile.favoriteOrigin || '').trim().toLowerCase();
+                    const filtered = CANONICAL_COUNTRIES_22.filter(c =>
+                      c.toLowerCase().includes(q)
+                    );
+                    return (
+                      <div className="absolute z-30 mt-1 w-full max-h-44 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-xl py-1">
+                        {filtered.length > 0 ? (
+                          filtered.map(country => (
+                            <button
+                              key={country}
+                              type="button"
+                              onClick={() => {
+                                updateProfile('favoriteOrigin', country);
+                                setIsOriginOpen(false);
+                              }}
+                              className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors flex items-center justify-between"
+                            >
+                              <span>{country}</span>
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-3 py-2 text-[11px] text-zinc-500">No matching canonical countries (custom origin will be used)</div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
               </div>
 
               {(() => {
                 const minEraVal = activeProfile.eraMin !== null && activeProfile.eraMin !== undefined ? activeProfile.eraMin : ERA_MIN_BOUND;
-                const maxEraVal = activeProfile.eraMax !== null && activeProfile.eraMax !== undefined ? activeProfile.eraMax : ERA_MAX_BOUND;
+                const maxEraVal = activeProfile.eraMax !== null && activeProfile.eraMax !== undefined ? activeProfile.eraMax : STYLE_ERA_MAX;
                 const isEraActive = activeProfile.eraMin !== null || activeProfile.eraMax !== null;
-                const eraSpan = ERA_MAX_BOUND - ERA_MIN_BOUND;
+                const eraSpan = STYLE_ERA_MAX - ERA_MIN_BOUND;
                 const minPercent = ((minEraVal - ERA_MIN_BOUND) / eraSpan) * 100;
                 const maxPercent = ((maxEraVal - ERA_MIN_BOUND) / eraSpan) * 100;
 
                 const handleEraRangeChange = (nextMin: number, nextMax: number) => {
                   const clampedMin = Math.max(ERA_MIN_BOUND, Math.min(nextMin, nextMax));
-                  const clampedMax = Math.min(ERA_MAX_BOUND, Math.max(nextMin, nextMax));
+                  const clampedMax = Math.min(STYLE_ERA_MAX, Math.max(nextMin, nextMax));
                   updateProfile('eraMin', clampedMin > ERA_MIN_BOUND ? clampedMin : null);
-                  updateProfile('eraMax', clampedMax < ERA_MAX_BOUND ? clampedMax : null);
+                  updateProfile('eraMax', clampedMax < STYLE_ERA_MAX ? clampedMax : null);
                 };
 
                 const handleResetEra = () => {
@@ -371,14 +591,14 @@ export const MyTasteDialog: React.FC<{
                       </label>
                       <div className="flex items-center gap-2">
                         <span className={`text-[11px] font-mono ${isEraActive ? 'text-primary font-semibold' : 'text-zinc-500'}`}>
-                          {isEraActive ? `${minEraVal} – ${maxEraVal}` : `${ERA_MIN_BOUND} – ${ERA_MAX_BOUND}`}
+                          {isEraActive ? `${minEraVal} – ${maxEraVal}` : `${ERA_MIN_BOUND} – ${STYLE_ERA_MAX}`}
                         </span>
                         {isEraActive && (
                           <button
                             type="button"
                             onClick={handleResetEra}
                             className="text-[9px] font-mono uppercase tracking-wider text-zinc-400 hover:text-white px-1.5 py-0.5 rounded bg-zinc-800/80 hover:bg-zinc-700 transition-colors"
-                            title={`Reset Founded range to ${ERA_MIN_BOUND} – ${ERA_MAX_BOUND}`}
+                            title={`Reset Founded range to ${ERA_MIN_BOUND} – ${STYLE_ERA_MAX}`}
                           >
                             Reset
                           </button>
@@ -396,7 +616,7 @@ export const MyTasteDialog: React.FC<{
                       <input
                         type="range"
                         min={ERA_MIN_BOUND}
-                        max={ERA_MAX_BOUND}
+                        max={STYLE_ERA_MAX}
                         step={1}
                         value={minEraVal}
                         aria-label="Minimum Founded Year"
@@ -405,12 +625,12 @@ export const MyTasteDialog: React.FC<{
                           handleEraRangeChange(val, maxEraVal);
                         }}
                         className="absolute inset-0 w-full h-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-primary [&::-webkit-slider-thumb]:cursor-grab [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:w-3.5 [&::-moz-range-thumb]:h-3.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-primary [&::-moz-range-thumb]:cursor-grab"
-                        style={{ zIndex: minEraVal > ERA_MAX_BOUND - 5 ? 5 : 3 }}
+                        style={{ zIndex: minEraVal > STYLE_ERA_MAX - 5 ? 5 : 3 }}
                       />
                       <input
                         type="range"
                         min={ERA_MIN_BOUND}
-                        max={ERA_MAX_BOUND}
+                        max={STYLE_ERA_MAX}
                         step={1}
                         value={maxEraVal}
                         aria-label="Maximum Founded Year"
@@ -427,7 +647,7 @@ export const MyTasteDialog: React.FC<{
                       <span>1980</span>
                       <span>1995</span>
                       <span>2010</span>
-                      <span>{ERA_MAX_BOUND}</span>
+                      <span>{STYLE_ERA_MAX}</span>
                     </div>
                   </div>
                 );

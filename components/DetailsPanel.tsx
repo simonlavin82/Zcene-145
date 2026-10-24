@@ -403,7 +403,7 @@ const ProfileRow: React.FC<ProfileRowProps> = ({ data, colorHex, isSmallScreen, 
                         idx === 0
                             ? 'left-0 translate-x-0 text-left'
                             : idx === 4
-                            ? 'right-5 left-auto translate-x-0 text-right'
+                            ? 'right-0 left-auto translate-x-0 text-right'
                             : 'left-1/2 -translate-x-1/2 text-center';
 
                     return (
@@ -416,13 +416,13 @@ const ProfileRow: React.FC<ProfileRowProps> = ({ data, colorHex, isSmallScreen, 
                                 isSmallScreen ? (
                                     // Mobile: persistent inline label — visible only when row is expanded
                                     isExpanded ? (
-                                        <div className={`absolute bottom-full mb-1 ${positionClass} max-w-[80px] sm:max-w-[100px] bg-zinc-800 text-white text-[10px] px-2 py-1 rounded pointer-events-none z-50 truncate`}>
+                                        <div className={`absolute bottom-full mb-1 ${positionClass} max-w-[80px] sm:max-w-[100px] bg-zinc-800 text-white text-[10px] px-2 py-1 rounded pointer-events-none z-[70] truncate`}>
                                             {c.value}
                                         </div>
                                     ) : null
                                 ) : (
                                     // Desktop: hover tooltip
-                                    <div className={`opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full mb-1 ${positionClass} max-w-[80px] sm:max-w-[100px] bg-zinc-800 text-white text-[10px] px-2 py-1 rounded pointer-events-none z-50 truncate`}>
+                                    <div className={`opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full mb-1 ${positionClass} max-w-[80px] sm:max-w-[100px] bg-zinc-800 text-white text-[10px] px-2 py-1 rounded pointer-events-none z-[70] truncate`}>
                                         {c.value}
                                     </div>
                                 )
