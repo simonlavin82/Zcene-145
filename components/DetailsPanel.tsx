@@ -629,8 +629,29 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     }, [isFullScreenMode]);
     // Tracks which profile row is expanded on mobile — only one at a time.
     const [expandedProfileId, setExpandedProfileId] = useState<string | null>(null);
+    const styleBarContainerRef = useRef<HTMLDivElement>(null);
+
     // Reset expanded row when navigating to a different artist card.
     useEffect(() => { setExpandedProfileId(null); }, [node.id]);
+
+    // Close expanded style breakdown when tapping or clicking outside
+    useEffect(() => {
+        if (!expandedProfileId) return;
+
+        const handleClickOutside = (event: PointerEvent | MouseEvent | TouchEvent) => {
+            if (
+                styleBarContainerRef.current &&
+                !styleBarContainerRef.current.contains(event.target as globalThis.Node)
+            ) {
+                setExpandedProfileId(null);
+            }
+        };
+
+        document.addEventListener('pointerdown', handleClickOutside, true);
+        return () => {
+            document.removeEventListener('pointerdown', handleClickOutside, true);
+        };
+    }, [expandedProfileId]);
     
     const { queryChips, connectionPeers } = useMemo(() => {
         const chips = isLabelNode ? [
@@ -1145,7 +1166,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                         <div className={`space-y-6 text-zinc-300 ${isFullScreenMode ? 'pb-6' : 'pb-16'}`}>
                             {/* Compatibility Meter (Hidden for Labels) */}
                             {!isLabelNode && activeTasteProfilesData.length > 0 && (
-                                <div className="flex flex-col gap-2 w-full -mt-1.5">
+                                <div ref={styleBarContainerRef} className="flex flex-col gap-2 w-full -mt-1.5">
 
                                         <div className="flex flex-col gap-2">
 

@@ -429,4 +429,77 @@ describe('DetailsPanel', () => {
             expect(lastMessage.text).toContain('Invalid or missing API password');
         });
     });
+
+    it('expands mobile style breakdown when tapped and collapses on click/pointerdown outside', async () => {
+        const mockNode = { id: 'needtobreathe-us', type: 'artist', label: 'NEEDTOBREATHE' };
+        const mockDetails = {
+            summary: 'American rock band.',
+            details: {
+                artist: 'NEEDTOBREATHE',
+                genre: 'Alternative Rock',
+                origin: 'Seneca, South Carolina',
+                founded: '2001'
+            },
+            links: []
+        };
+        const mockUserTaste = [
+            {
+                id: 'taste-1',
+                name: 'Rock',
+                isActive: true,
+                color: 'purple',
+                favoriteGenre: 'Alternative Rock',
+                style: 'Southern Rock',
+                favoriteOrigin: 'Seneca, South Carolina',
+                eraMin: 2001,
+                eraMax: null
+            }
+        ];
+
+        render(
+            <div>
+                <div data-testid="outside-element">Outside Area</div>
+                <NodeDetailsCard
+                    node={mockNode as any}
+                    details={mockDetails as any}
+                    isLoading={false}
+                    isGlobalLoading={false}
+                    graphData={{ nodes: [mockNode], links: [] } as any}
+                    libraryArtists={[]}
+                    seedArtists={[]}
+                    onAddArtist={() => {}}
+                    isSmallScreen={true}
+                    onNodeClick={() => {}}
+                    onNavigate={() => {}}
+                    chatHistory={[]}
+                    onSendMessage={() => {}}
+                    isChatLoading={false}
+                    chatMode="instant"
+                    onChatModeChange={() => {}}
+                    liveMessageCount={0}
+                    userTaste={mockUserTaste as any}
+                />
+            </div>
+        );
+
+        // Initially on mobile view, criteria tooltip (e.g. '2001+') is not rendered
+        expect(screen.queryByText('2001+')).not.toBeInTheDocument();
+
+        // Tap the style breakdown bar to expand
+        const styleBar = screen.getByLabelText('Rock style breakdown');
+        fireEvent.click(styleBar);
+
+        // Tooltip label '2001+' should now be rendered
+        expect(await screen.findByText('2001+')).toBeInTheDocument();
+
+        // Tap outside element
+        const outsideElement = screen.getByTestId('outside-element');
+        fireEvent.pointerDown(outsideElement);
+
+        // Tooltip should be collapsed/removed
+        await waitFor(() => {
+            expect(screen.queryByText('2001+')).not.toBeInTheDocument();
+        });
+    });
 });
+
