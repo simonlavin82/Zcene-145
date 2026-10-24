@@ -501,7 +501,7 @@ const DiscoveryFiltersPanel: React.FC<{
                 </div>
               </div>
 
-              <div className="relative h-6 flex items-center select-none pt-1">
+              <div className="relative h-6 flex items-center select-none">
                 <div className="w-full h-1.5 bg-zinc-950 border border-zinc-800 rounded-full relative overflow-hidden">
                   <div
                     className={`absolute top-0 bottom-0 rounded-full transition-colors ${isEraActive ? 'bg-primary' : 'bg-zinc-600/50'}`}

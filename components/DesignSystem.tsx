@@ -304,7 +304,7 @@ const DualThumbRangeSliderDemo: React.FC = () => {
           )}
         </div>
       </div>
-      <div className="relative h-6 flex items-center select-none pt-1">
+      <div className="relative h-6 flex items-center select-none">
         <div className="w-full h-1.5 bg-zinc-950 border border-zinc-800 rounded-full relative overflow-hidden">
           <div
             className={`absolute top-0 bottom-0 rounded-full transition-colors ${isActive ? 'bg-primary' : 'bg-zinc-600/50'}`}
@@ -3298,50 +3298,24 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Sliders</h2>
                         <div className="space-y-12">
                             <p className="text-base text-zinc-400 leading-relaxed max-w-3xl">
-                                Range controls allow users to tune discrete parameters such as connection density in Preferences, as well as bounded temporal intervals (Founded Year Ranges) in the Roots Anchors panel and Style Profiles modal.
+                                Range controls allow users to tune bounded temporal intervals (Founded Year Ranges) in the Roots Anchors panel and Style Profiles modal with real-time bidirectional constraint handling.
                             </p>
                             
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                                 <div className="space-y-6">
-                                    <h3 className="text-xl font-medium text-zinc-200">Standard Range Component</h3>
-                                    <div className="p-8 bg-zinc-900/50 border border-zinc-800 space-y-6">
-                                        <div className="space-y-3">
-                                            <div className="flex justify-between items-center">
-                                                <label className="text-sm font-medium text-zinc-200">Connection Distance</label>
-                                                <span className="text-xs font-mono text-primary bg-primary/10 px-2 py-0.5 rounded-xl">3.0x</span>
-                                            </div>
-                                            <input
-                                                type="range"
-                                                min="1"
-                                                max="5"
-                                                step="0.1"
-                                                defaultValue="3"
-                                                className="w-full h-2 bg-zinc-700 rounded-xl appearance-none cursor-pointer accent-primary hover:accent-primary/80"
-                                            />
-                                            <div className="flex justify-between text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
-                                                <span>Tight</span>
-                                                <span>Loose</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <h3 className="text-xl font-medium text-zinc-200 pt-4">Dual-Thumb Range Component</h3>
+                                    <h3 className="text-xl font-medium text-zinc-200">Dual-Thumb Range Component</h3>
                                     <DualThumbRangeSliderDemo />
                                 </div>
                                 <div className="space-y-6">
                                     <h3 className="text-xl font-medium text-zinc-200">Visual Specification</h3>
                                     <div className="space-y-6">
                                         <div className="space-y-1">
-                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Single Slider Track</h4>
-                                            <p className="text-sm text-zinc-400">Uses <strong className="text-zinc-200">bg-zinc-700</strong> with a height of <strong className="text-zinc-200">8px</strong> (<code>h-2</code>). Ends are <strong className="text-zinc-200">rounded-xl</strong>. Value feedback via primary highlight.</p>
-                                        </div>
-                                        <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Dual-Thumb Track &amp; Highlight</h4>
                                             <p className="text-sm text-zinc-400">Uses <strong className="text-zinc-200">bg-zinc-950</strong> container with <strong className="text-zinc-200">border border-zinc-800</strong> at a height of <strong className="text-zinc-200">6px</strong> (<code>h-1.5</code>). Active sub-range is highlighted with <strong className="text-primary font-mono">bg-primary</strong>, falling back to <strong className="text-zinc-400 font-mono">bg-zinc-600/50</strong> when idle.</p>
                                         </div>
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Solid Yellow Thumbs</h4>
-                                            <p className="text-sm text-zinc-400">Both WebKit and Gecko thumbs use a solid <strong className="text-primary font-mono">bg-primary</strong> fill without borders (<code>w-3.5 h-3.5 rounded-full shadow-md cursor-grab</code>). Eliminates harsh multi-stroke artifacts.</p>
+                                            <p className="text-sm text-zinc-400">Both WebKit and Gecko thumbs use a solid <strong className="text-primary font-mono">bg-primary</strong> fill without borders (<code>w-3.5 h-3.5 rounded-full shadow-md cursor-grab</code>). Concentrically centered on the track.</p>
                                         </div>
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Stacking &amp; Z-Index Layering</h4>

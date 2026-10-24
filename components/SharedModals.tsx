@@ -235,11 +235,18 @@ export const MyTasteDialog: React.FC<{
   const activeProfile = profiles.find(p => p.id === activeTabId) || null;
   const activeProfileIndex = profiles.findIndex(p => p.id === activeTabId);
 
-  const updateProfile = (field: any, value: any) => {
-    if (activeProfileIndex === -1) return;
-    const newProfiles = [...profiles];
-    newProfiles[activeProfileIndex] = { ...newProfiles[activeProfileIndex], [field]: value };
-    setProfiles(newProfiles);
+  const updateProfile = (fieldOrUpdates: any, value?: any) => {
+    setProfiles(prev => {
+      const idx = prev.findIndex(p => p.id === activeTabId);
+      if (idx === -1) return prev;
+      const next = [...prev];
+      if (typeof fieldOrUpdates === 'object' && fieldOrUpdates !== null) {
+        next[idx] = { ...next[idx], ...fieldOrUpdates };
+      } else {
+        next[idx] = { ...next[idx], [fieldOrUpdates]: value };
+      }
+      return next;
+    });
   };
 
   const handleAddProfile = () => {
@@ -574,13 +581,14 @@ export const MyTasteDialog: React.FC<{
                 const handleEraRangeChange = (nextMin: number, nextMax: number) => {
                   const clampedMin = Math.max(ERA_MIN_BOUND, Math.min(nextMin, nextMax));
                   const clampedMax = Math.min(STYLE_ERA_MAX, Math.max(nextMin, nextMax));
-                  updateProfile('eraMin', clampedMin > ERA_MIN_BOUND ? clampedMin : null);
-                  updateProfile('eraMax', clampedMax < STYLE_ERA_MAX ? clampedMax : null);
+                  updateProfile({
+                    eraMin: clampedMin > ERA_MIN_BOUND ? clampedMin : null,
+                    eraMax: clampedMax < STYLE_ERA_MAX ? clampedMax : null
+                  });
                 };
 
                 const handleResetEra = () => {
-                  updateProfile('eraMin', null);
-                  updateProfile('eraMax', null);
+                  updateProfile({ eraMin: null, eraMax: null });
                 };
 
                 return (
@@ -606,7 +614,7 @@ export const MyTasteDialog: React.FC<{
                       </div>
                     </div>
 
-                    <div className="relative h-6 flex items-center select-none pt-1">
+                    <div className="relative h-6 flex items-center select-none">
                       <div className="w-full h-1.5 bg-zinc-950 border border-zinc-800 rounded-full relative overflow-hidden">
                         <div
                           className={`absolute top-0 bottom-0 rounded-full transition-colors ${isEraActive ? 'bg-primary' : 'bg-zinc-600/50'}`}
