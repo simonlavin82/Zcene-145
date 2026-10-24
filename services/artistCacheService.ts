@@ -23,7 +23,9 @@ const healingCooldown = new Map<string, number>(); // 5-minute negative cache co
 export const triggerAssetHealing = async (
   rawId: string,
   entityType: 'artist' | 'label',
-  displayName?: string
+  displayName?: string,
+  projectId?: string | null,
+  projectName?: string | null
 ): Promise<any | null> => {
   let normId = entityType === 'label'
     ? normalizeLabelId(displayName || rawId)
@@ -48,7 +50,9 @@ export const triggerAssetHealing = async (
     const result: any = await healCallable({
       entityId: normId,
       entityType,
-      displayName: displayName || normId
+      displayName: displayName || normId,
+      ...(projectId ? { projectId } : {}),
+      ...(projectName ? { projectName } : {})
     });
 
     healingInFlight.delete(cacheKey);

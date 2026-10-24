@@ -2475,7 +2475,9 @@ const App: React.FC = () => {
     if (isNodeInGraph && !hasValidLocalDetails && (!globalDoc || !globalDoc.exists() || !globalDoc.data()?.detailsCache) && !isCurrentlyCurating) {
       const entityType = node.type === 'label' ? 'label' : 'artist';
       console.log(`[Gate B JIT Healer] Triggering on-demand heal for clicked node: ${disambiguatedCacheId} (${entityType})`);
-      triggerAssetHealing(disambiguatedCacheId, entityType, node.label || node.id).then(result => {
+      const activeProjectId = currentProjectIdRef.current || currentProjectId || null;
+      const activeProjectName = projectNameRef.current || displayProjectName || projectName || null;
+      triggerAssetHealing(disambiguatedCacheId, entityType, node.label || node.id, activeProjectId, activeProjectName).then(result => {
         if (result?.success && result?.data) {
           if (typeof window !== 'undefined') {
             window.dispatchEvent(new CustomEvent('zcene:asset-healed', {
@@ -5274,7 +5276,9 @@ const App: React.FC = () => {
           // once Column 3 has fully completed and released the lock.
           const entityType = n.type === 'label' ? 'label' : 'artist';
           console.log(`[Gate A JIT Healer] Triggering silent heal for orphaned graph node: ${cacheId} (${entityType})`);
-          triggerAssetHealing(cacheId, entityType, n.label || n.id).then(result => {
+          const activeProjectId = currentProjectIdRef.current || currentProjectId || null;
+          const activeProjectName = projectNameRef.current || displayProjectName || projectName || null;
+          triggerAssetHealing(cacheId, entityType, n.label || n.id, activeProjectId, activeProjectName).then(result => {
             if (result?.success && result?.data) {
               if (typeof window !== 'undefined') {
                 window.dispatchEvent(new CustomEvent('zcene:asset-healed', {

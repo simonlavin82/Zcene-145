@@ -31,7 +31,7 @@ export const healOrphanedAsset = onCall({
   timeoutSeconds: 60,
   memory: "512MiB",
 }, async (request) => {
-  const { entityId, entityType = 'artist', displayName, countrySlug } = request.data || {};
+  const { entityId, entityType = 'artist', displayName, countrySlug, projectId, projectName } = request.data || {};
   if (!entityId || typeof entityId !== 'string') {
     throw new HttpsError("invalid-argument", "Missing or invalid entityId parameter");
   }
@@ -259,6 +259,8 @@ export const healOrphanedAsset = onCall({
         displayName: cleanTitle,
         callerUid: request.auth?.uid || 'anonymous',
         callerEmail: request.auth?.token?.email || 'guest@zcene.online',
+        projectId: typeof projectId === 'string' && projectId.trim() ? projectId.trim() : null,
+        projectName: typeof projectName === 'string' && projectName.trim() ? projectName.trim() : null,
         model: GEMINI_FLASH_MODEL,
         promptTokens,
         candidatesTokens,

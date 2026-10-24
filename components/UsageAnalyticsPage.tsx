@@ -17,6 +17,8 @@ export interface JitHealRecord {
     displayName: string;
     callerUid: string;
     callerEmail: string;
+    projectId?: string | null;
+    projectName?: string | null;
     totalTokens: number;
     promptTokens: number;
     candidatesTokens: number;
@@ -647,6 +649,8 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                             displayName: hData.displayName || hData.entityId || d.id,
                             callerUid: hData.callerUid || 'anonymous',
                             callerEmail: hData.callerEmail || 'guest@zcene.online',
+                            projectId: hData.projectId || null,
+                            projectName: hData.projectName || null,
                             totalTokens: hData.totalTokens || 0,
                             promptTokens: hData.promptTokens || 0,
                             candidatesTokens: hData.candidatesTokens || 0,
@@ -968,7 +972,28 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                                             </span>
                                                         </td>
                                                         <td className="p-3.5 text-xs text-zinc-300">
-                                                            {heal.callerEmail || heal.callerUid}
+                                                            <span className="font-medium text-zinc-200 block truncate max-w-[220px]" title={heal.callerEmail || heal.callerUid}>
+                                                                {heal.callerEmail || heal.callerUid}
+                                                            </span>
+                                                            {heal.projectName ? (
+                                                                <span 
+                                                                    className="block text-[11px] text-zinc-400 font-medium mt-0.5 truncate max-w-[220px]" 
+                                                                    title={heal.projectId ? `${heal.projectName} (${heal.projectId})` : heal.projectName}
+                                                                >
+                                                                    {heal.projectName}
+                                                                </span>
+                                                            ) : heal.projectId ? (
+                                                                <span 
+                                                                    className="block text-[11px] font-mono text-zinc-500 mt-0.5 truncate max-w-[220px]" 
+                                                                    title={heal.projectId}
+                                                                >
+                                                                    {heal.projectId}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="block text-[11px] font-mono text-zinc-600 mt-0.5 select-none">
+                                                                    —
+                                                                </span>
+                                                            )}
                                                         </td>
                                                         <td className="p-3.5 text-xs text-right font-mono text-zinc-400">
                                                             {heal.totalTokens.toLocaleString()}
