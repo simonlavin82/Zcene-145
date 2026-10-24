@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.RADIUS_TOKENS = exports.COST_PER_AI_CALL = exports.CANONICAL_GENRES_FLAT = exports.CANONICAL_GENRE_TAXONOMY = exports.CANONICAL_COUNTRIES_22 = exports.ERA_MAX_BOUND = exports.getDynamicEraMax = exports.SCENE_MATURITY_BUFFER_YEARS = exports.ERA_MIN_BOUND = exports.View = void 0;
+exports.RADIUS_TOKENS = exports.COST_PER_AI_CALL = exports.CANONICAL_STYLES_FLAT = exports.CANONICAL_STYLE_TAXONOMY = exports.CANONICAL_GENRES_FLAT = exports.CANONICAL_GENRE_TAXONOMY = exports.CANONICAL_COUNTRIES_22 = exports.ERA_MAX_BOUND = exports.getDynamicEraMax = exports.SCENE_MATURITY_BUFFER_YEARS = exports.ERA_MIN_BOUND = exports.View = void 0;
 var View;
 (function (View) {
     View["Home"] = "home";
@@ -86,6 +86,33 @@ exports.CANONICAL_GENRE_TAXONOMY = {
     ]
 };
 exports.CANONICAL_GENRES_FLAT = Array.from(new Set(Object.values(exports.CANONICAL_GENRE_TAXONOMY).flat()));
+exports.CANONICAL_STYLE_TAXONOMY = {
+    'Sonics & Dynamics': [
+        'Melodic', 'Heavy', 'Aggressive', 'Atmospheric', 'Ambient', 'Dissonant',
+        'Minimalist', 'Maximalist', 'Driving', 'Groove-Heavy', 'Sludgy', 'Distorted',
+        'Clean', 'Acoustic', 'Unplugged'
+    ],
+    'Production & Aesthetics': [
+        'Lo-Fi', 'Hi-Fi', 'Wall of Sound', 'Fuzz', 'Reverb-Drenched', 'Raw',
+        'Polished', 'DIY', 'Synthesized', 'Sample-Heavy', 'Analog', 'Bedroom'
+    ],
+    'Composition & Structure': [
+        'Progressive', 'Math', 'Experimental', 'Polyrhythmic', 'Drone',
+        'Improvisational', 'Avant-Garde', 'Loop-Based', 'Technical', 'Spoken-Word',
+        'Riff-Driven', 'Virtuosic'
+    ],
+    'Vibe & Emotion': [
+        'Anthemic', 'Introspective', 'Melancholic', 'Uplifting', 'Aggro',
+        'Ethereal', 'Brooding', 'Cathartic', 'Earnest', 'Cinematic',
+        'Nostalgic', 'Energetic', 'Moody'
+    ],
+    'Scene & Era Modifiers': [
+        'Midwest', 'Revival', 'Old School', 'Modern', 'First-Wave',
+        'Second-Wave', 'Post-', 'Proto-', 'Contemporary', 'Traditional',
+        'Underground', 'Mainstream'
+    ]
+};
+exports.CANONICAL_STYLES_FLAT = Array.from(new Set(Object.values(exports.CANONICAL_STYLE_TAXONOMY).flat()));
 exports.COST_PER_AI_CALL = 0.0015;
 exports.RADIUS_TOKENS = {
     frame: "rounded-2xl", // Standardized Structural Container Geometry (Panels, Modals, Cards)

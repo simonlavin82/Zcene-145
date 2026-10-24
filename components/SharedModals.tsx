@@ -4,7 +4,8 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   StackItem, Node, UserTaste, DisambiguationCandidateStub, 
   ERA_MIN_BOUND, ERA_MAX_BOUND, 
-  CANONICAL_COUNTRIES_22, CANONICAL_GENRE_TAXONOMY, CANONICAL_GENRES_FLAT 
+  CANONICAL_COUNTRIES_22, CANONICAL_GENRE_TAXONOMY, CANONICAL_GENRES_FLAT,
+  CANONICAL_STYLE_TAXONOMY, CANONICAL_STYLES_FLAT 
 } from '../types';
 import { StackIcon, VisibilityIcon, VisibilityOffIcon } from './Icons';
 import Markdown from 'react-markdown';
@@ -152,12 +153,14 @@ export const MyTasteDialog: React.FC<{
 
   const [isLabelOpen, setIsLabelOpen] = useState(false);
   const [isGenreOpen, setIsGenreOpen] = useState(false);
+  const [isStyleOpen, setIsStyleOpen] = useState(false);
   const [isOriginOpen, setIsOriginOpen] = useState(false);
   const [cachedLabelNames, setCachedLabelNames] = useState<string[]>(DEFAULT_POPULAR_LABELS);
   const hasLoadedLabelsRef = useRef(false);
 
   const labelContainerRef = useRef<HTMLDivElement>(null);
   const genreContainerRef = useRef<HTMLDivElement>(null);
+  const styleContainerRef = useRef<HTMLDivElement>(null);
   const originContainerRef = useRef<HTMLDivElement>(null);
 
   // Close dropdowns on outside click
@@ -168,6 +171,9 @@ export const MyTasteDialog: React.FC<{
       }
       if (genreContainerRef.current && !genreContainerRef.current.contains(e.target as globalThis.Node)) {
         setIsGenreOpen(false);
+      }
+      if (styleContainerRef.current && !styleContainerRef.current.contains(e.target as globalThis.Node)) {
+        setIsStyleOpen(false);
       }
       if (originContainerRef.current && !originContainerRef.current.contains(e.target as globalThis.Node)) {
         setIsOriginOpen(false);
@@ -515,15 +521,58 @@ export const MyTasteDialog: React.FC<{
                 </div>
               </div>
 
-              <div className="space-y-1.5">
+              <div className="space-y-1.5" ref={styleContainerRef}>
                 <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Style</label>
-                <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
-                  type="text" 
-                  placeholder="e.g. melodic, post"
-                  value={activeProfile.style}
-                  onChange={(e) => updateProfile('style', e.target.value)}
-                  className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
-                />
+                <div className="relative">
+                  <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
+                    type="text" 
+                    placeholder="Search or enter style (e.g. Melodic, Lo-Fi, Math)..."
+                    value={activeProfile.style}
+                    onFocus={() => setIsStyleOpen(true)}
+                    onChange={(e) => {
+                      updateProfile('style', e.target.value);
+                      setIsStyleOpen(true);
+                    }}
+                    className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
+                  />
+                  {isStyleOpen && (
+                    <div className="absolute z-30 mt-1 w-full max-h-52 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-xl py-1">
+                      {Object.entries(CANONICAL_STYLE_TAXONOMY).map(([category, styles]) => {
+                        const q = (activeProfile.style || '').trim().toLowerCase();
+                        const matches = styles.filter(s =>
+                          s.toLowerCase().includes(q) ||
+                          category.toLowerCase().includes(q)
+                        );
+                        if (matches.length === 0) return null;
+                        return (
+                          <div key={category} className="py-1">
+                            <div className="px-3 py-0.5 text-[9px] font-mono uppercase tracking-wider text-zinc-500">
+                              {category}
+                            </div>
+                            {matches.map(style => (
+                              <button
+                                key={style}
+                                type="button"
+                                onClick={() => {
+                                  updateProfile('style', style);
+                                  setIsStyleOpen(false);
+                                }}
+                                className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                              >
+                                {style}
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      })}
+                      {CANONICAL_STYLES_FLAT.filter(s =>
+                        s.toLowerCase().includes((activeProfile.style || '').trim().toLowerCase())
+                      ).length === 0 && (
+                        <div className="px-3 py-2 text-[11px] text-zinc-500">No matching canonical styles</div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-1.5" ref={originContainerRef}>

@@ -815,14 +815,21 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
             // 3. Match Style
             if (styleActive) {
-                const styleKeywords = profile.style.split(/[\s,]+/).filter(k => k.trim().length > 0).map(k => k.toLowerCase().trim());
+                const rawStyle = (profile.style || '').trim().toLowerCase();
                 const genre = (details?.details?.genre || '').toLowerCase();
                 const bio = (details?.summary || '').toLowerCase();
                 const deepCutDesc = (details?.recommendationReason || '').toLowerCase();
 
-                styleMatched = styleKeywords.some(keyword => 
-                    genre.includes(keyword) || bio.includes(keyword) || deepCutDesc.includes(keyword)
-                );
+                // Evaluate exact-phrase match first to prevent false-positives from multi-word styles (e.g. "Dream Pop", "Wall of Sound")
+                if (rawStyle.length > 0 && (genre.includes(rawStyle) || bio.includes(rawStyle) || deepCutDesc.includes(rawStyle))) {
+                    styleMatched = true;
+                } else if (rawStyle.includes(',')) {
+                    // Secondary fallback for legacy comma-separated entries (e.g. "melodic, post")
+                    const styleTokens = rawStyle.split(',').map(k => k.trim()).filter(k => k.length > 0);
+                    styleMatched = styleTokens.some(token => 
+                        genre.includes(token) || bio.includes(token) || deepCutDesc.includes(token)
+                    );
+                }
             }
 
             // 4. Match Favorite Origin

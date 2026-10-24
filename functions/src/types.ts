@@ -313,6 +313,37 @@ export const CANONICAL_GENRES_FLAT: string[] = Array.from(
   new Set(Object.values(CANONICAL_GENRE_TAXONOMY).flat())
 );
 
+export const CANONICAL_STYLE_TAXONOMY: Record<string, string[]> = {
+  'Sonics & Dynamics': [
+    'Melodic', 'Heavy', 'Aggressive', 'Atmospheric', 'Ambient', 'Dissonant',
+    'Minimalist', 'Maximalist', 'Driving', 'Groove-Heavy', 'Sludgy', 'Distorted',
+    'Clean', 'Acoustic', 'Unplugged'
+  ],
+  'Production & Aesthetics': [
+    'Lo-Fi', 'Hi-Fi', 'Wall of Sound', 'Fuzz', 'Reverb-Drenched', 'Raw',
+    'Polished', 'DIY', 'Synthesized', 'Sample-Heavy', 'Analog', 'Bedroom'
+  ],
+  'Composition & Structure': [
+    'Progressive', 'Math', 'Experimental', 'Polyrhythmic', 'Drone',
+    'Improvisational', 'Avant-Garde', 'Loop-Based', 'Technical', 'Spoken-Word',
+    'Riff-Driven', 'Virtuosic'
+  ],
+  'Vibe & Emotion': [
+    'Anthemic', 'Introspective', 'Melancholic', 'Uplifting', 'Aggro',
+    'Ethereal', 'Brooding', 'Cathartic', 'Earnest', 'Cinematic',
+    'Nostalgic', 'Energetic', 'Moody'
+  ],
+  'Scene & Era Modifiers': [
+    'Midwest', 'Revival', 'Old School', 'Modern', 'First-Wave',
+    'Second-Wave', 'Post-', 'Proto-', 'Contemporary', 'Traditional',
+    'Underground', 'Mainstream'
+  ]
+};
+
+export const CANONICAL_STYLES_FLAT: string[] = Array.from(
+  new Set(Object.values(CANONICAL_STYLE_TAXONOMY).flat())
+);
+
 export interface TasteProfile {
   id: string;
   name: string;
