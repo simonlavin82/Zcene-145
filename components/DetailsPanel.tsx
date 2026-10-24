@@ -347,7 +347,7 @@ const ProfileRow: React.FC<ProfileRowProps> = ({ data, colorHex, isSmallScreen, 
             {/* Header: profile name | hits count | remove button */}
             <div className="flex justify-between items-center text-[10px]">
                 <span className="text-zinc-300 font-medium">{data.profile.name}</span>
-                <div className="flex items-center">
+                <div className="flex items-center relative z-[60]">
                     <span className="font-mono font-bold" style={{ color: colorHex }}>
                         {data.matches}/{data.totalActive} Hits
                     </span>
@@ -359,7 +359,7 @@ const ProfileRow: React.FC<ProfileRowProps> = ({ data, colorHex, isSmallScreen, 
                             const newTaste = userTaste.filter(p => p.id !== data.profile.id);
                             onUpdateTasteProfile?.(newTaste);
                         }}
-                        className={`flex flex-shrink-0 items-center justify-center transition-all text-zinc-500 hover:text-white rounded-full hover:bg-zinc-800 ${
+                        className={`flex flex-shrink-0 items-center justify-center transition-all text-zinc-500 hover:text-white rounded-full hover:bg-zinc-800 relative z-[60] ${
                             isSmallScreen
                                 ? (isExpanded ? 'w-4 h-4 ml-1.5 opacity-100' : 'w-0 h-4 ml-0 opacity-0 pointer-events-none overflow-hidden')
                                 : 'w-0 h-4 ml-0 opacity-0 group-hover:w-4 group-hover:h-4 group-hover:ml-1.5 group-hover:opacity-100 overflow-hidden'
@@ -372,7 +372,7 @@ const ProfileRow: React.FC<ProfileRowProps> = ({ data, colorHex, isSmallScreen, 
             </div>
             {/* Bar grid: tappable on mobile to reveal criterion labels */}
             <div
-                className={`grid grid-cols-4 gap-1.5 w-full relative ${
+                className={`grid grid-cols-5 gap-1.5 w-full relative ${
                     isSmallScreen ? 'cursor-pointer' : 'group'
                 }`}
                 onClick={isSmallScreen ? onToggle : undefined}
@@ -402,8 +402,8 @@ const ProfileRow: React.FC<ProfileRowProps> = ({ data, colorHex, isSmallScreen, 
                     const positionClass =
                         idx === 0
                             ? 'left-0 translate-x-0 text-left'
-                            : idx === 3
-                            ? 'right-0 left-auto translate-x-0 text-right'
+                            : idx === 4
+                            ? 'right-5 left-auto translate-x-0 text-right'
                             : 'left-1/2 -translate-x-1/2 text-center';
 
                     return (
@@ -416,13 +416,13 @@ const ProfileRow: React.FC<ProfileRowProps> = ({ data, colorHex, isSmallScreen, 
                                 isSmallScreen ? (
                                     // Mobile: persistent inline label — visible only when row is expanded
                                     isExpanded ? (
-                                        <div className={`absolute bottom-full mb-1 ${positionClass} max-w-[100px] sm:max-w-[120px] bg-zinc-800 text-white text-[10px] px-2 py-1 rounded pointer-events-none z-50 truncate`}>
+                                        <div className={`absolute bottom-full mb-1 ${positionClass} max-w-[80px] sm:max-w-[100px] bg-zinc-800 text-white text-[10px] px-2 py-1 rounded pointer-events-none z-50 truncate`}>
                                             {c.value}
                                         </div>
                                     ) : null
                                 ) : (
                                     // Desktop: hover tooltip
-                                    <div className={`opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full mb-1 ${positionClass} max-w-[100px] sm:max-w-[120px] bg-zinc-800 text-white text-[10px] px-2 py-1 rounded pointer-events-none z-50 truncate`}>
+                                    <div className={`opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full mb-1 ${positionClass} max-w-[80px] sm:max-w-[100px] bg-zinc-800 text-white text-[10px] px-2 py-1 rounded pointer-events-none z-50 truncate`}>
                                         {c.value}
                                     </div>
                                 )
@@ -492,6 +492,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
             name: profileName || `Profile ${currentTaste.length + 1}`,
             color: MODAL_PROFILE_COLORS[currentTaste.length % MODAL_PROFILE_COLORS.length].name,
             isActive: true,
+            favoriteLabel: (associatedLabels ? associatedLabels.split(',')[0].trim() : '') || '',
             favoriteGenre: genre,
             style: style,
             favoriteOrigin: origin,
@@ -784,26 +785,35 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         const activeProfiles = userTaste.filter(p => p.isActive);
         
         return activeProfiles.map(profile => {
+            const favLabelActive = !!profile.favoriteLabel?.trim();
             const favGenreActive = !!profile.favoriteGenre?.trim();
             const styleActive = !!profile.style?.trim();
             const favOriginActive = !!profile.favoriteOrigin?.trim();
             const eraActive = profile.eraMin !== null || profile.eraMax !== null;
 
-            const hasTasteData = favGenreActive || styleActive || favOriginActive || eraActive;
+            const hasTasteData = favLabelActive || favGenreActive || styleActive || favOriginActive || eraActive;
 
+            let favLabelMatched = false;
             let favGenreMatched = false;
             let styleMatched = false;
             let favOriginMatched = false;
             let eraMatched = false;
 
-            // 1. Match Favorite Genre
+            // 1. Match Favorite Label
+            if (favLabelActive) {
+                const favLabel = profile.favoriteLabel.toLowerCase().trim();
+                const labelString = (associatedLabels || (details?.details as any)?.label || '').toLowerCase().trim();
+                favLabelMatched = !!labelString && (labelString.includes(favLabel) || favLabel.includes(labelString));
+            }
+
+            // 2. Match Favorite Genre
             if (favGenreActive) {
                 const favGenre = profile.favoriteGenre.toLowerCase().trim();
                 const genre = (details?.details?.genre || '').toLowerCase().trim();
                 favGenreMatched = !!genre && (genre.includes(favGenre) || favGenre.includes(genre));
             }
 
-            // 2. Match Style
+            // 3. Match Style
             if (styleActive) {
                 const styleKeywords = profile.style.split(/[\s,]+/).filter(k => k.trim().length > 0).map(k => k.toLowerCase().trim());
                 const genre = (details?.details?.genre || '').toLowerCase();
@@ -815,14 +825,14 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                 );
             }
 
-            // 3. Match Favorite Origin
+            // 4. Match Favorite Origin
             if (favOriginActive) {
                 const favOrigin = profile.favoriteOrigin.toLowerCase().trim();
                 const origin = (details?.details?.origin || '').toLowerCase().trim();
                 favOriginMatched = !!origin && (origin.includes(favOrigin) || favOrigin.includes(origin));
             }
 
-            // 4. Match Era Range
+            // 5. Match Founded Year Range
             if (eraActive) {
                 const foundedStr = details?.details?.founded || '';
                 if (foundedStr) {
@@ -851,14 +861,15 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
             }
 
             const criteria = [
-                { id: 'genre', name: 'Genre', active: favGenreActive, matched: favGenreMatched, value: profile.favoriteGenre },
-                { id: 'style', name: 'Style', active: styleActive, matched: styleMatched, value: profile.style },
-                { id: 'origin', name: 'Origin', active: favOriginActive, matched: favOriginMatched, value: profile.favoriteOrigin },
-                { id: 'era', name: 'Era', active: eraActive, matched: eraMatched, value: (profile.eraMin !== null && profile.eraMax !== null) ? `${profile.eraMin} - ${profile.eraMax}` : (profile.eraMin !== null ? `${profile.eraMin}+` : (profile.eraMax !== null ? `Until ${profile.eraMax}` : '')) }
+                { id: 'label', name: 'Label', active: favLabelActive, matched: favLabelMatched, value: profile.favoriteLabel || '' },
+                { id: 'genre', name: 'Genre', active: favGenreActive, matched: favGenreMatched, value: profile.favoriteGenre || '' },
+                { id: 'style', name: 'Style', active: styleActive, matched: styleMatched, value: profile.style || '' },
+                { id: 'origin', name: 'Origin', active: favOriginActive, matched: favOriginMatched, value: profile.favoriteOrigin || '' },
+                { id: 'founded', name: 'Founded', active: eraActive, matched: eraMatched, value: (profile.eraMin !== null && profile.eraMax !== null) ? `${profile.eraMin} – ${profile.eraMax}` : (profile.eraMin !== null ? `${profile.eraMin}+` : (profile.eraMax !== null ? `Until ${profile.eraMax}` : '')) }
             ];
 
-            const totalActive = (favGenreActive ? 1 : 0) + (styleActive ? 1 : 0) + (favOriginActive ? 1 : 0) + (eraActive ? 1 : 0);
-            const matches = (favGenreMatched ? 1 : 0) + (styleMatched ? 1 : 0) + (favOriginMatched ? 1 : 0) + (eraMatched ? 1 : 0);
+            const totalActive = (favLabelActive ? 1 : 0) + (favGenreActive ? 1 : 0) + (styleActive ? 1 : 0) + (favOriginActive ? 1 : 0) + (eraActive ? 1 : 0);
+            const matches = (favLabelMatched ? 1 : 0) + (favGenreMatched ? 1 : 0) + (styleMatched ? 1 : 0) + (favOriginMatched ? 1 : 0) + (eraMatched ? 1 : 0);
 
             return {
                 profile,
@@ -868,7 +879,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                 criteria
             };
         });
-    }, [userTaste, details, node.id, node.label]);
+    }, [userTaste, details, node.id, node.label, associatedLabels]);
 
 
 
@@ -1203,11 +1214,12 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                 );
                                             })}
                                             {/* Single Master Header for Sub-labels */}
-                                            <div className="grid grid-cols-4 gap-1.5 w-full text-[8px] font-mono tracking-widest uppercase select-none text-zinc-500 mt-0">
+                                            <div className="grid grid-cols-5 gap-1.5 w-full text-[8px] font-mono tracking-widest uppercase select-none text-zinc-500 mt-0">
+                                                <span className="text-center truncate">LABEL</span>
                                                 <span className="text-center truncate">GENRE</span>
                                                 <span className="text-center truncate">STYLE</span>
                                                 <span className="text-center truncate">ORIGIN</span>
-                                                <span className="text-center truncate">ERA</span>
+                                                <span className="text-center truncate">FOUNDED</span>
                                             </div>
                                         </div>
                                 </div>

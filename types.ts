@@ -318,6 +318,7 @@ export interface TasteProfile {
   name: string;
   color: string;
   isActive: boolean;
+  favoriteLabel?: string;
   favoriteGenre: string;
   style: string;
   favoriteOrigin: string;

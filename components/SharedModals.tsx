@@ -1,7 +1,7 @@
 import { ModalFooter, ModalContainer, ModalBackdrop, ModalHeader, ModalBody } from './ui/Dialog';
 import { Input } from './DesignSystem';
 import React, { useState, useMemo } from 'react';
-import { StackItem, Node, UserTaste, DisambiguationCandidateStub } from '../types';
+import { StackItem, Node, UserTaste, DisambiguationCandidateStub, ERA_MIN_BOUND, ERA_MAX_BOUND } from '../types';
 import { StackIcon, VisibilityIcon, VisibilityOffIcon } from './Icons';
 import Markdown from 'react-markdown';
 import { isNodeInSeedList, cleanArtistDisplayName } from '../services/artistCacheService';
@@ -168,6 +168,7 @@ export const MyTasteDialog: React.FC<{
       name: `Profile ${profiles.length + 1}`,
       color: MODAL_PROFILE_COLORS[profiles.length % MODAL_PROFILE_COLORS.length].name,
       isActive: true,
+      favoriteLabel: '',
       favoriteGenre: '',
       style: '',
       favoriteOrigin: '',
@@ -299,6 +300,17 @@ export const MyTasteDialog: React.FC<{
               <hr className="border-zinc-800" />
 
               <div className="space-y-1.5">
+                <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Label</label>
+                <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
+                  type="text" 
+                  placeholder="e.g. Sub Pop, 4AD, Domino"
+                  value={activeProfile.favoriteLabel ?? ''}
+                  onChange={(e) => updateProfile('favoriteLabel', e.target.value)}
+                  className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
+                />
+              </div>
+
+              <div className="space-y-1.5">
                 <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Genre</label>
                 <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
                   type="text" 
@@ -331,29 +343,95 @@ export const MyTasteDialog: React.FC<{
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Era Range (Min / Max Year)</label>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <input 
-                      type="number" 
-                      placeholder="Min Year"
-                      value={activeProfile.eraMin ?? ''}
-                      onChange={(e) => updateProfile('eraMin', e.target.value ? parseInt(e.target.value) : null)}
-                      className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
-                    />
+              {(() => {
+                const minEraVal = activeProfile.eraMin !== null && activeProfile.eraMin !== undefined ? activeProfile.eraMin : ERA_MIN_BOUND;
+                const maxEraVal = activeProfile.eraMax !== null && activeProfile.eraMax !== undefined ? activeProfile.eraMax : ERA_MAX_BOUND;
+                const isEraActive = activeProfile.eraMin !== null || activeProfile.eraMax !== null;
+                const eraSpan = ERA_MAX_BOUND - ERA_MIN_BOUND;
+                const minPercent = ((minEraVal - ERA_MIN_BOUND) / eraSpan) * 100;
+                const maxPercent = ((maxEraVal - ERA_MIN_BOUND) / eraSpan) * 100;
+
+                const handleEraRangeChange = (nextMin: number, nextMax: number) => {
+                  const clampedMin = Math.max(ERA_MIN_BOUND, Math.min(nextMin, nextMax));
+                  const clampedMax = Math.min(ERA_MAX_BOUND, Math.max(nextMin, nextMax));
+                  updateProfile('eraMin', clampedMin > ERA_MIN_BOUND ? clampedMin : null);
+                  updateProfile('eraMax', clampedMax < ERA_MAX_BOUND ? clampedMax : null);
+                };
+
+                const handleResetEra = () => {
+                  updateProfile('eraMin', null);
+                  updateProfile('eraMax', null);
+                };
+
+                return (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">
+                        Founded Range
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[11px] font-mono ${isEraActive ? 'text-primary font-semibold' : 'text-zinc-500'}`}>
+                          {isEraActive ? `${minEraVal} – ${maxEraVal}` : `${ERA_MIN_BOUND} – ${ERA_MAX_BOUND}`}
+                        </span>
+                        {isEraActive && (
+                          <button
+                            type="button"
+                            onClick={handleResetEra}
+                            className="text-[9px] font-mono uppercase tracking-wider text-zinc-400 hover:text-white px-1.5 py-0.5 rounded bg-zinc-800/80 hover:bg-zinc-700 transition-colors"
+                            title={`Reset Founded range to ${ERA_MIN_BOUND} – ${ERA_MAX_BOUND}`}
+                          >
+                            Reset
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="relative h-6 flex items-center select-none pt-1">
+                      <div className="w-full h-1.5 bg-zinc-950 border border-zinc-800 rounded-full relative overflow-hidden">
+                        <div
+                          className={`absolute top-0 bottom-0 rounded-full transition-colors ${isEraActive ? 'bg-primary' : 'bg-zinc-600/50'}`}
+                          style={{ left: `${minPercent}%`, width: `${Math.max(0, maxPercent - minPercent)}%` }}
+                        />
+                      </div>
+                      <input
+                        type="range"
+                        min={ERA_MIN_BOUND}
+                        max={ERA_MAX_BOUND}
+                        step={1}
+                        value={minEraVal}
+                        aria-label="Minimum Founded Year"
+                        onChange={(e) => {
+                          const val = Math.min(Number(e.target.value), maxEraVal);
+                          handleEraRangeChange(val, maxEraVal);
+                        }}
+                        className="absolute inset-0 w-full h-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-primary [&::-webkit-slider-thumb]:cursor-grab [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:w-3.5 [&::-moz-range-thumb]:h-3.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-primary [&::-moz-range-thumb]:cursor-grab"
+                        style={{ zIndex: minEraVal > ERA_MAX_BOUND - 5 ? 5 : 3 }}
+                      />
+                      <input
+                        type="range"
+                        min={ERA_MIN_BOUND}
+                        max={ERA_MAX_BOUND}
+                        step={1}
+                        value={maxEraVal}
+                        aria-label="Maximum Founded Year"
+                        onChange={(e) => {
+                          const val = Math.max(Number(e.target.value), minEraVal);
+                          handleEraRangeChange(minEraVal, val);
+                        }}
+                        className="absolute inset-0 w-full h-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-primary [&::-webkit-slider-thumb]:cursor-grab [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:w-3.5 [&::-moz-range-thumb]:h-3.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-primary [&::-moz-range-thumb]:cursor-grab"
+                        style={{ zIndex: 4 }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-[9px] font-mono text-zinc-600">
+                      <span>{ERA_MIN_BOUND}</span>
+                      <span>1980</span>
+                      <span>1995</span>
+                      <span>2010</span>
+                      <span>{ERA_MAX_BOUND}</span>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <input 
-                      type="number" 
-                      placeholder="Max Year"
-                      value={activeProfile.eraMax ?? ''}
-                      onChange={(e) => updateProfile('eraMax', e.target.value ? parseInt(e.target.value) : null)}
-                      className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
-                    />
-                  </div>
-                </div>
-              </div>
+                );
+              })()}
             </>
           )}
         </div>
