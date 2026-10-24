@@ -403,7 +403,7 @@ const ProfileRow: React.FC<ProfileRowProps> = ({ data, colorHex, isSmallScreen, 
                         idx === 0
                             ? 'left-0 translate-x-0 text-left'
                             : idx === 4
-                            ? 'right-0 left-auto translate-x-0 text-right'
+                            ? 'right-8 left-auto translate-x-0 text-right'
                             : 'left-1/2 -translate-x-1/2 text-center';
 
                     return (

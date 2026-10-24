@@ -269,6 +269,82 @@ const PasswordInputDemo: React.FC = () => {
   );
 };
 
+const DualThumbRangeSliderDemo: React.FC = () => {
+  const [minVal, setMinVal] = useState(1989);
+  const [maxVal, setMaxVal] = useState(2024);
+  const minBound = 1965;
+  const maxBound = 2026;
+  const span = maxBound - minBound;
+  const minPercent = ((minVal - minBound) / span) * 100;
+  const maxPercent = ((maxVal - minBound) / span) * 100;
+  const isActive = minVal !== minBound || maxVal !== maxBound;
+
+  const handleReset = () => {
+    setMinVal(minBound);
+    setMaxVal(maxBound);
+  };
+
+  return (
+    <div className="p-8 bg-zinc-900/50 border border-zinc-800 space-y-4">
+      <div className="flex justify-between items-center">
+        <label className="text-sm font-medium text-zinc-200">Founded Era Filter</label>
+        <div className="flex items-center gap-2">
+          <span className={`text-xs font-mono px-2 py-0.5 rounded-xl ${isActive ? 'text-primary bg-primary/10 font-semibold' : 'text-zinc-500 bg-zinc-800'}`}>
+            {minVal} – {maxVal}
+          </span>
+          {isActive && (
+            <button
+              type="button"
+              onClick={handleReset}
+              className="text-[9px] font-mono uppercase tracking-wider text-zinc-400 hover:text-white px-1.5 py-0.5 rounded bg-zinc-800/80 hover:bg-zinc-700 transition-colors"
+              title="Reset Founded range"
+            >
+              Reset
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="relative h-6 flex items-center select-none pt-1">
+        <div className="w-full h-1.5 bg-zinc-950 border border-zinc-800 rounded-full relative overflow-hidden">
+          <div
+            className={`absolute top-0 bottom-0 rounded-full transition-colors ${isActive ? 'bg-primary' : 'bg-zinc-600/50'}`}
+            style={{ left: `${minPercent}%`, width: `${Math.max(0, maxPercent - minPercent)}%` }}
+          />
+        </div>
+        <input
+          type="range"
+          min={minBound}
+          max={maxBound}
+          step={1}
+          value={minVal}
+          aria-label="Minimum Founded Year"
+          onChange={e => setMinVal(Math.min(Number(e.target.value), maxVal))}
+          className="absolute inset-0 w-full h-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-grab [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:w-3.5 [&::-moz-range-thumb]:h-3.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:cursor-grab"
+          style={{ zIndex: minVal > maxBound - 5 ? 5 : 3 }}
+        />
+        <input
+          type="range"
+          min={minBound}
+          max={maxBound}
+          step={1}
+          value={maxVal}
+          aria-label="Maximum Founded Year"
+          onChange={e => setMaxVal(Math.max(Number(e.target.value), minVal))}
+          className="absolute inset-0 w-full h-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-grab [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:w-3.5 [&::-moz-range-thumb]:h-3.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:cursor-grab"
+          style={{ zIndex: 4 }}
+        />
+      </div>
+      <div className="flex justify-between text-[9px] font-mono text-zinc-600">
+        <span>1965</span>
+        <span>1980</span>
+        <span>1995</span>
+        <span>2010</span>
+        <span>2026</span>
+      </div>
+    </div>
+  );
+};
+
 
 
 interface TypographyScaleRowProps {
@@ -3222,7 +3298,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Sliders</h2>
                         <div className="space-y-12">
                             <p className="text-base text-zinc-400 leading-relaxed max-w-3xl">
-                                Range controls are used within the Spiderweb Preferences dialog to allow users to tune the visualization density and node scaling.
+                                Range controls allow users to tune discrete parameters such as connection density in Preferences, as well as bounded temporal intervals (Founded Year Ranges) in the Roots Anchors panel and Style Profiles modal.
                             </p>
                             
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
@@ -3248,21 +3324,28 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             </div>
                                         </div>
                                     </div>
+
+                                    <h3 className="text-xl font-medium text-zinc-200 pt-4">Dual-Thumb Range Component</h3>
+                                    <DualThumbRangeSliderDemo />
                                 </div>
                                 <div className="space-y-6">
                                     <h3 className="text-xl font-medium text-zinc-200">Visual Specification</h3>
-                                    <div className="space-y-4">
+                                    <div className="space-y-6">
                                         <div className="space-y-1">
-                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Track (Tokens)</h4>
-                                            <p className="text-sm text-zinc-400">Uses <strong>bg-zinc-700</strong> with a height of <strong>8px</strong> (h-2). Ends are <strong>rounded-xl</strong>. Value feedback via primary highlight.</p>
+                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Single Slider Track</h4>
+                                            <p className="text-sm text-zinc-400">Uses <strong className="text-zinc-200">bg-zinc-700</strong> with a height of <strong className="text-zinc-200">8px</strong> (<code>h-2</code>). Ends are <strong className="text-zinc-200">rounded-xl</strong>. Value feedback via primary highlight.</p>
                                         </div>
                                         <div className="space-y-1">
-                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Thumb (Tokens)</h4>
-                                            <p className="text-sm text-zinc-400">Powered by <strong>accent-primary</strong>. Uses system-native range handler for maximum responsiveness and low latency physics tuning.</p>
+                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Dual-Thumb Track &amp; Highlight</h4>
+                                            <p className="text-sm text-zinc-400">Uses <strong className="text-zinc-200">bg-zinc-950</strong> container with <strong className="text-zinc-200">border border-zinc-800</strong> at a height of <strong className="text-zinc-200">6px</strong> (<code>h-1.5</code>). Active sub-range is highlighted with <strong className="text-primary font-mono">bg-primary</strong>, falling back to <strong className="text-zinc-400 font-mono">bg-zinc-600/50</strong> when idle.</p>
                                         </div>
                                         <div className="space-y-1">
-                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Focus States</h4>
-                                            <p className="text-sm text-zinc-400">Active state applies <strong>hover:accent-primary/80</strong>. Legend caps use <strong>zinc-500</strong> for secondary labels.</p>
+                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Solid Yellow Thumbs</h4>
+                                            <p className="text-sm text-zinc-400">Both WebKit and Gecko thumbs use a solid <strong className="text-primary font-mono">bg-primary</strong> fill without borders (<code>w-3.5 h-3.5 rounded-full shadow-md cursor-grab</code>). Eliminates harsh multi-stroke artifacts.</p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Stacking &amp; Z-Index Layering</h4>
+                                            <p className="text-sm text-zinc-400">To prevent thumb entrapment at the upper bound, the minimum thumb dynamically elevates its stacking order (<code>style=&#123;&#123; zIndex: minVal &gt; maxBound - 5 ? 5 : 3 &#125;&#125;</code>) while the maximum thumb resides at <code>z-[4]</code>.</p>
                                         </div>
                                     </div>
                                 </div>
