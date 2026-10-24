@@ -733,7 +733,9 @@ const applyHumanCasedLabels = (graph: GraphData, seedsStr: string): GraphData =>
       const norm = normalizeArtistId(n.id);
       const rawSeed = originalSeedMap.get(norm);
       if (rawSeed) {
-        return { ...n, label: rawSeed };
+        const cleaned = cleanArtistDisplayName(rawSeed, graph.nodes);
+        const formatted = isPurelyLowercase(cleaned) ? toTitleCase(cleaned) : cleaned;
+        return { ...n, label: formatted };
       }
     }
     return n;
@@ -798,15 +800,22 @@ const isPurelyLowercase = (str: any): boolean => {
 const getNodeLabel = (node: Node, seedList: string[], detailsCache?: Map<string, NodeDetails>): string => {
   if (node.type === 'artist') {
     const normId = normalizeArtistId(node.id);
-    const seedMatch = seedList.find(s => normalizeArtistId(s) === normId);
-    if (seedMatch) return cleanArtistDisplayName(seedMatch);
-
+    // 1. Authoritative curated casing from Firestore detailsCache (Priority 1)
     if (detailsCache) {
       const cached = detailsCache.get(node.id) || 
                      detailsCache.get(node.id.toLowerCase()) || 
                      detailsCache.get(normId);
       const cachedName = cached?.details?.artist;
-      if (cachedName) return cachedName;
+      if (cachedName && typeof cachedName === 'string' && cachedName.trim()) {
+        return cachedName.trim();
+      }
+    }
+
+    // 2. Explicit seed match from user input / seed list with title-casing guard
+    const seedMatch = seedList.find(s => normalizeArtistId(s) === normId);
+    if (seedMatch) {
+      const cleaned = cleanArtistDisplayName(seedMatch, [node]);
+      return isPurelyLowercase(cleaned) ? toTitleCase(cleaned) : cleaned;
     }
   }
 
@@ -5445,6 +5454,8 @@ const App: React.FC = () => {
         setChatHistories(new Map());
         setCurrentCacheKey(null);
         setCurrentProjectOwnerId(null);
+        setSelectedNode(null);
+        hasAutoSelectedRef.current = null;
       }
       return;
     }
@@ -5880,6 +5891,29 @@ const App: React.FC = () => {
           }
         }
 
+        // Deterministic seed selection for Deep Cut routing on project load
+        if (hydratedNodes.length > 0) {
+          const searchParams = new URLSearchParams(window.location.search);
+          const urlSelected = searchParams.get('selected');
+          if (!urlSelected && hasAutoSelectedRef.current !== currentProjectId) {
+            const seedIds = (data.seedArtists ? data.seedArtists.split('::') : [...(data.artistIds || []), ...(data.labelIds || [])])
+              .map((s: string) => normalizeArtistId(s.trim()))
+              .filter(Boolean);
+            const primaryActiveId = (data.activeNodes && Array.isArray(data.activeNodes) && data.activeNodes.length > 0)
+              ? data.activeNodes[0]
+              : null;
+            const seedNode = primaryActiveId
+              ? hydratedNodes.find((n: any) => n.id === primaryActiveId || normalizeArtistId(n.id) === normalizeArtistId(primaryActiveId) || isArtistIdMatch(n.id, primaryActiveId))
+              : null;
+            const fallbackSeedNode = seedNode || hydratedNodes.find((n: any) => seedIds.includes(normalizeArtistId(n.id))) || hydratedNodes[0];
+            if (fallbackSeedNode) {
+              console.log(`[ProjectLoader] Auto-selecting primary seed node on initial load:`, fallbackSeedNode.id);
+              hasAutoSelectedRef.current = currentProjectId;
+              setSelectedNode(fallbackSeedNode);
+            }
+          }
+        }
+
         // Cache completeness check — scoped to seed artists only (not peer-band nodes).
         // Peer bands may have shallow/incomplete docs; only the user's seeded artists
         // should gate the toast. This mirrors the validation scope used by
@@ -6100,20 +6134,20 @@ const App: React.FC = () => {
         setIsLoading(false);
 
         // Auto-hydrate the Deep Cut panel on load if nothing is selected
-        /*
-        if (!selectedNode && hasAutoSelectedRef.current !== currentProjectId) {
+        const searchParams = new URLSearchParams(window.location.search);
+        const urlSelected = searchParams.get('selected');
+        if (!urlSelected && (!selectedNode || hasAutoSelectedRef.current !== currentProjectId)) {
           hasAutoSelectedRef.current = currentProjectId;
-          const seedList = (seedArtists || '').split('::').map(s => s.trim());
+          const seedList = (seedArtists || '').split('::').map(s => s.trim()).filter(Boolean);
           const firstSeedNode = graphData.nodes.find(n => 
             (n.type === 'artist' || n.type === 'label') && isNodeInSeedList(n.id, seedList)
           );
           const defaultNode = firstSeedNode || graphData.nodes.find(n => n.type === 'artist' || n.type === 'label');
           if (defaultNode) {
             console.log(`[Re-hydration Hook] Auto-selecting seed node for hydration:`, defaultNode.id);
-            handleNodeClick(defaultNode);
+            setSelectedNode(defaultNode);
           }
         }
-        */
       } else {
         console.log(`[Re-hydration Hook] Project status is completed but local graphData state is empty. Falling back to curation loading state.`);
         setIsLoading(true);
@@ -6332,6 +6366,8 @@ const App: React.FC = () => {
             setCurrentView(View.Dashboard);
             setCurrentProjectId(null);
             setCurrentProjectOwnerId(null);
+            setSelectedNode(null);
+            hasAutoSelectedRef.current = null;
           }
         } else if (isProjectPath || projectIdFromQuery) {
           let projectId = projectIdFromQuery;
@@ -6353,6 +6389,8 @@ const App: React.FC = () => {
                 setDetailsCache(new Map());
                 setChatHistories(new Map());
                 setCurrentCacheKey(null);
+                setSelectedNode(null);
+                hasAutoSelectedRef.current = null;
                 
                 const localProj = projects.find(p => p.id === projectId);
                 if (localProj) {
@@ -7446,6 +7484,10 @@ const App: React.FC = () => {
       dashboardNavTimerRef.current = setTimeout(() => {
         setIsNavigatingToDashboard(false);
       }, 1500);
+    }
+    if (newView !== View.Graph) {
+      setSelectedNode(null);
+      hasAutoSelectedRef.current = null;
     }
     if (newView === View.Graph) {
       setGraphData(prev => {

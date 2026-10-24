@@ -341,6 +341,11 @@ export const cleanArtistDisplayName = (rawIdOrName?: string | null, graphNodes?:
     return titleCaseArtistId(cleaned);
   }
 
+  // If a country routing suffix was stripped or the string is purely lowercase, title-case it so raw slugs do not leak
+  if (cleaned !== trimmed || (cleaned === cleaned.toLowerCase() && /[a-z]/.test(cleaned))) {
+    return titleCaseArtistId(cleaned);
+  }
+
   return cleaned;
 };
 
