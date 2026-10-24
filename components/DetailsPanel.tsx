@@ -347,7 +347,7 @@ const ProfileRow: React.FC<ProfileRowProps> = ({ data, colorHex, isSmallScreen, 
             {/* Header: profile name | hits count | remove button */}
             <div className="flex justify-between items-center text-[10px]">
                 <span className="text-zinc-300 font-medium">{data.profile.name}</span>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center">
                     <span className="font-mono font-bold" style={{ color: colorHex }}>
                         {data.matches}/{data.totalActive} Hits
                     </span>
@@ -359,10 +359,10 @@ const ProfileRow: React.FC<ProfileRowProps> = ({ data, colorHex, isSmallScreen, 
                             const newTaste = userTaste.filter(p => p.id !== data.profile.id);
                             onUpdateTasteProfile?.(newTaste);
                         }}
-                        className={`w-4 h-4 flex flex-shrink-0 items-center justify-center transition-opacity text-zinc-500 hover:text-white rounded-full hover:bg-zinc-800 ${
+                        className={`flex flex-shrink-0 items-center justify-center transition-all text-zinc-500 hover:text-white rounded-full hover:bg-zinc-800 ${
                             isSmallScreen
-                                ? (isExpanded ? 'opacity-100' : 'opacity-0 pointer-events-none')
-                                : 'opacity-0 group-hover:opacity-100'
+                                ? (isExpanded ? 'w-4 h-4 ml-1.5 opacity-100' : 'w-0 h-4 ml-0 opacity-0 pointer-events-none overflow-hidden')
+                                : 'w-0 h-4 ml-0 opacity-0 group-hover:w-4 group-hover:h-4 group-hover:ml-1.5 group-hover:opacity-100 overflow-hidden'
                         }`}
                         title="Remove Profile"
                     >
@@ -380,7 +380,7 @@ const ProfileRow: React.FC<ProfileRowProps> = ({ data, colorHex, isSmallScreen, 
                 aria-expanded={isSmallScreen ? isExpanded : undefined}
                 aria-label={isSmallScreen ? `${data.profile.name} style breakdown` : undefined}
             >
-                {data.criteria.map((c) => {
+                {data.criteria.map((c, idx) => {
                     const isActive = c.active;
                     const isMatched = c.matched;
                     let bgStyle: React.CSSProperties = {};
@@ -399,6 +399,13 @@ const ProfileRow: React.FC<ProfileRowProps> = ({ data, colorHex, isSmallScreen, 
                         borderStyle = { borderColor: '#52525b', borderStyle: 'dashed' };
                     }
 
+                    const positionClass =
+                        idx === 0
+                            ? 'left-0 translate-x-0 text-left'
+                            : idx === 3
+                            ? 'right-0 left-auto translate-x-0 text-right'
+                            : 'left-1/2 -translate-x-1/2 text-center';
+
                     return (
                         <div
                             key={c.id}
@@ -409,13 +416,13 @@ const ProfileRow: React.FC<ProfileRowProps> = ({ data, colorHex, isSmallScreen, 
                                 isSmallScreen ? (
                                     // Mobile: persistent inline label — visible only when row is expanded
                                     isExpanded ? (
-                                        <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 w-max max-w-[150px] bg-zinc-800 text-white text-[10px] px-2 py-1 rounded pointer-events-none z-50 text-center truncate">
+                                        <div className={`absolute bottom-full mb-1 ${positionClass} max-w-[100px] sm:max-w-[120px] bg-zinc-800 text-white text-[10px] px-2 py-1 rounded pointer-events-none z-50 truncate`}>
                                             {c.value}
                                         </div>
                                     ) : null
                                 ) : (
-                                    // Desktop: hover tooltip (unchanged)
-                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full mb-1 left-1/2 -translate-x-1/2 w-max max-w-[150px] bg-zinc-800 text-white text-[10px] px-2 py-1 rounded pointer-events-none z-50 text-center truncate">
+                                    // Desktop: hover tooltip
+                                    <div className={`opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full mb-1 ${positionClass} max-w-[100px] sm:max-w-[120px] bg-zinc-800 text-white text-[10px] px-2 py-1 rounded pointer-events-none z-50 truncate`}>
                                         {c.value}
                                     </div>
                                 )
@@ -1196,11 +1203,11 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                 );
                                             })}
                                             {/* Single Master Header for Sub-labels */}
-                                            <div className="flex justify-between text-[8px] font-mono tracking-widest uppercase select-none text-zinc-500 mt-0">
-                                                <span>GENRE</span>
-                                                <span>STYLE</span>
-                                                <span>ORIGIN</span>
-                                                <span>ERA</span>
+                                            <div className="grid grid-cols-4 gap-1.5 w-full text-[8px] font-mono tracking-widest uppercase select-none text-zinc-500 mt-0">
+                                                <span className="text-center truncate">GENRE</span>
+                                                <span className="text-center truncate">STYLE</span>
+                                                <span className="text-center truncate">ORIGIN</span>
+                                                <span className="text-center truncate">ERA</span>
                                             </div>
                                         </div>
                                 </div>
