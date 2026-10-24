@@ -6863,8 +6863,8 @@ const App: React.FC = () => {
             .map((no: any) => no.label || no.id);
             
           if (connectedCountries.length > 0) {
-            const countryNorm = normalizeArtistId(connectedCountries[0]);
-            if (countryNorm) disambiguatedCacheId = simpleId.endsWith(`-${countryNorm}`) ? simpleId : `${simpleId}-${countryNorm}`;
+            const countryNorm = extractCountrySlug(connectedCountries[0]);
+            if (countryNorm && countryNorm !== 'global') disambiguatedCacheId = simpleId.endsWith(`-${countryNorm}`) ? simpleId : `${simpleId}-${countryNorm}`;
           }
         }
 
@@ -6947,8 +6947,8 @@ const App: React.FC = () => {
 
           let disambiguatedCacheId = simpleId;
           if (connectedCountries.length > 0) {
-            const countryNorm = normalizeArtistId(connectedCountries[0]);
-            if (countryNorm) disambiguatedCacheId = simpleId.endsWith(`-${countryNorm}`) ? simpleId : `${simpleId}-${countryNorm}`;
+            const countryNorm = extractCountrySlug(connectedCountries[0]);
+            if (countryNorm && countryNorm !== 'global') disambiguatedCacheId = simpleId.endsWith(`-${countryNorm}`) ? simpleId : `${simpleId}-${countryNorm}`;
           }
 
           const cachedVal = detailsCache.get(disambiguatedCacheId) || detailsCache.get(node.id) || detailsCache.get(node.id.toLowerCase());
@@ -7061,6 +7061,10 @@ const App: React.FC = () => {
                                   tourInfo,
                                   recommendationReason,
                                   groundingLinks,
+                                  youtubeVideoId: parsed.youtubeVideoId || null,
+                                  youtubeSearchQuery: typeof parsed.youtubeSearchQuery === 'string' && parsed.youtubeSearchQuery.trim()
+                                    ? parsed.youtubeSearchQuery.trim()
+                                    : `${artistName} ${genre} official music video`.trim(),
                                   synthesisRationale: data.synthesisRationale || parsed.synthesisRationale || ""
                                 };
                                console.log("[Global Cache] Fallback successful for:", node.id);
@@ -7188,8 +7192,8 @@ const App: React.FC = () => {
                       : (details.details?.origin ? [details.details.origin] : []);
                     let canonicalId = canonicalNameFromDetails ? normalizeArtistId(canonicalNameFromDetails) : simpleId;
                     if (freshCountries.length > 0) {
-                      const countryNorm = normalizeArtistId(freshCountries[0]);
-                      if (countryNorm) canonicalId = canonicalId.endsWith(`-${countryNorm}`) ? canonicalId : `${canonicalId}-${countryNorm}`;
+                      const countryNorm = extractCountrySlug(freshCountries[0]);
+                      if (countryNorm && countryNorm !== 'global') canonicalId = canonicalId.endsWith(`-${countryNorm}`) ? canonicalId : `${canonicalId}-${countryNorm}`;
                     }
                     const isAlias = canonicalId !== cacheId;
 
@@ -7269,7 +7273,11 @@ const App: React.FC = () => {
                                     discography: parsed.discography || [],
                                     tourInfo: parsed.tourInfo || "",
                                     recommendationReason: parsed.recommendationReason || "",
-                                    groundingLinks: parsed.groundingLinks || []
+                                    groundingLinks: parsed.groundingLinks || [],
+                                    youtubeVideoId: parsed.youtubeVideoId || null,
+                                    youtubeSearchQuery: typeof parsed.youtubeSearchQuery === 'string' && parsed.youtubeSearchQuery.trim()
+                                      ? parsed.youtubeSearchQuery.trim()
+                                      : `${parsed.details?.artist || ''} ${parsed.details?.genre || ''} official music video`.trim()
                                   };
                                   details = fallbackDetails;
                                   console.log(`[Reconciliation] Merging detailsCache from legacy base doc.`);

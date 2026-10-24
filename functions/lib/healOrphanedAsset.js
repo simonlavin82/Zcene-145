@@ -143,6 +143,14 @@ exports.healOrphanedAsset = (0, https_1.onCall)({
         // Guarantee human-readable artist display name in payload
         const cleanTitle = (synthesizedDetails.details.artist || cleanSearchName).trim();
         synthesizedDetails.details.artist = cleanTitle;
+        // Guarantee youtubeSearchQuery meets schema enforcement requirements
+        if (!synthesizedDetails.youtubeSearchQuery || typeof synthesizedDetails.youtubeSearchQuery !== 'string' || !synthesizedDetails.youtubeSearchQuery.trim()) {
+            const genre = synthesizedDetails.details?.genre || "";
+            synthesizedDetails.youtubeSearchQuery = `${cleanTitle} ${genre} official music video`.trim();
+        }
+        else {
+            synthesizedDetails.youtubeSearchQuery = synthesizedDetails.youtubeSearchQuery.trim();
+        }
         if (isLabel) {
             const synthesizedLabelId = (0, curatorService_1.normalizeLabelId)(cleanTitle);
             if (synthesizedLabelId && (canonicalId === 'century' || synthesizedLabelId === 'century-media' || synthesizedLabelId.startsWith(canonicalId + '-'))) {

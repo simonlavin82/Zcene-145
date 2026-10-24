@@ -1873,7 +1873,7 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint,
         imageUrl: (0, exports.sanitizeImageUrl)(details.imageUrl, sanitizeString),
         youtubeSearchQuery: typeof details.youtubeSearchQuery === 'string' && details.youtubeSearchQuery.trim().length > 0
             ? sanitizeString(details.youtubeSearchQuery.trim())
-            : undefined,
+            : `${details.details?.artist || details.artist || ''} ${details.details?.genre || details.genre || ''} official music video`.trim(),
     };
     if (!hydratedDetails.details)
         hydratedDetails.details = {};

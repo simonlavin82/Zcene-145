@@ -1798,6 +1798,10 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
 
     if (typeof details.youtubeSearchQuery === 'string' && details.youtubeSearchQuery.trim().length > 0) {
         hydratedDetails.youtubeSearchQuery = sanitizeString(details.youtubeSearchQuery.trim());
+    } else {
+        const artist = hydratedDetails.details?.artist || details.details?.artist || (details as any).artist || '';
+        const genre = hydratedDetails.details?.genre || details.details?.genre || (details as any).genre || '';
+        hydratedDetails.youtubeSearchQuery = `${artist} ${genre} official music video`.trim();
     }
 
     if (!hydratedDetails.details) hydratedDetails.details = {};
