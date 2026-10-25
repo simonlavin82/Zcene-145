@@ -18,6 +18,7 @@ describe('Architecture V29: Read/Write Gates & Border-Town Slug Resolution', () 
       summary: 'Nasty is a prominent Belgian beatdown hardcore band formed in La Calamine in 2004.',
       details: {
         genre: 'Beatdown Hardcore',
+        style: 'Heavy',
         origin: 'La Calamine, Belgium / Kelmis, Germany'
       },
       imageUrl: 'https://example.com/nasty.jpg'
@@ -93,7 +94,7 @@ describe('Architecture V29: Read/Write Gates & Border-Town Slug Resolution', () 
         synthesisRationale: null, // absent at root, present inside graphData
         detailsCache: {
           summary: 'Nasum was an influential grindcore band from Örebro, Sweden.',
-          details: { genre: 'Grindcore' },
+          details: { genre: 'Grindcore', style: 'Blast Beat' },
           imageUrl: 'https://example.com/nasum.jpg'
         }
       };
@@ -112,7 +113,7 @@ describe('Architecture V29: Read/Write Gates & Border-Town Slug Resolution', () 
         synthesisRationale: validRationale,
         detailsCache: {
           summary: 'Thin bio',
-          details: { genre: 'Hardcore' },
+          details: { genre: 'Hardcore', style: 'Heavy' },
           imageUrl: 'https://example.com/nasty.jpg'
         }
       };

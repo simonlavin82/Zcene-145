@@ -128,7 +128,7 @@ exports.healOrphanedAsset = (0, https_1.onCall)({
                 systemInstruction: "You are a late-night record curator — the kind of person who pulls an obscure 7\" from a crate at 2am and traces exactly why it matters. Your tone is knowledgeable, vivid, and deeply immersed in musical history and counterculture scenes. Return detailed, factual, and scene-accurate profile information for the given musical entity matching the schema. No markdown formatting outside strings. NEGATIVE CONSTRAINT: NEVER use em-dashes (—) or long hyphens for dramatic effect or clause separation. Use standard editorial punctuation.",
                 thinkingConfig: { thinkingLevel: genai_1.ThinkingLevel.LOW },
                 responseMimeType: "application/json",
-                responseSchema: curatorService_1.NODE_DETAILS_SCHEMA
+                responseSchema: (0, curatorService_1.getNodeDetailsSchema)(entityType)
             }
         });
         const jsonText = response.text?.trim() || "";
@@ -143,6 +143,12 @@ exports.healOrphanedAsset = (0, https_1.onCall)({
         // Guarantee human-readable artist display name in payload
         const cleanTitle = (synthesizedDetails.details.artist || cleanSearchName).trim();
         synthesizedDetails.details.artist = cleanTitle;
+        if (isLabel) {
+            delete synthesizedDetails.details.style;
+        }
+        else {
+            synthesizedDetails.details.style = (synthesizedDetails.details.style || '').trim();
+        }
         // Guarantee youtubeSearchQuery meets schema enforcement requirements
         if (!synthesizedDetails.youtubeSearchQuery || typeof synthesizedDetails.youtubeSearchQuery !== 'string' || !synthesizedDetails.youtubeSearchQuery.trim()) {
             const genre = synthesizedDetails.details?.genre || "";

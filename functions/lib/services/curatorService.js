@@ -1,7 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateSemanticLinkWeights = exports.scrapeImageUrlBackend = exports.checkVideoPlayability = exports.scrapeVideoIdBackend = exports.fetchNodeDetailsBackend = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = exports.NODE_DETAILS_SCHEMA = exports.generateGraphDataBackend = exports.reconcileNarrativeEdges = exports.generateRootsBreakdownBackend = exports.validateSeedOriginBackend = exports.SEED_VALIDATION_SCHEMA = exports.GENERATE_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = exports.GRAPH_RESPONSE_SCHEMA = exports.extractCleanJsonString = exports.extractArtistSubGraph = exports.normalizeGraphData = exports.buildCompositeCacheKey = exports.extractCountrySlug = exports.sanitizeImageUrl = exports.extractValidYoutubeId = exports.cleanLabelDisplayName = exports.cleanArtistDisplayName = exports.titleCaseArtistId = exports.normalizeLabelId = exports.normalizeArtistId = exports.applyCanonicalAlias = exports.CANONICAL_ALIASES = exports.GEMINI_FLASH_MODEL = void 0;
+exports.generateSemanticLinkWeights = exports.scrapeImageUrlBackend = exports.checkVideoPlayability = exports.scrapeVideoIdBackend = exports.fetchNodeDetailsBackend = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = exports.NODE_DETAILS_SCHEMA = exports.getNodeDetailsSchema = exports.LABEL_NODE_DETAILS_SCHEMA = exports.ARTIST_NODE_DETAILS_SCHEMA = exports.generateGraphDataBackend = exports.reconcileNarrativeEdges = exports.generateRootsBreakdownBackend = exports.validateSeedOriginBackend = exports.SEED_VALIDATION_SCHEMA = exports.GENERATE_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = exports.GRAPH_RESPONSE_SCHEMA = exports.extractCleanJsonString = exports.extractArtistSubGraph = exports.normalizeGraphData = exports.buildCompositeCacheKey = exports.extractCountrySlug = exports.sanitizeImageUrl = exports.extractValidYoutubeId = exports.cleanLabelDisplayName = exports.cleanArtistDisplayName = exports.titleCaseArtistId = exports.normalizeLabelId = exports.normalizeArtistId = exports.applyCanonicalAlias = exports.CANONICAL_ALIASES = exports.GEMINI_FLASH_MODEL = void 0;
 const genai_1 = require("@google/genai");
+const types_1 = require("../types");
 const executeCurationPipeline_1 = require("../executeCurationPipeline");
 const cacheQualification_1 = require("./cacheQualification");
 exports.GEMINI_FLASH_MODEL = process.env.GEMINI_FLASH_MODEL || "gemini-3.6-flash";
@@ -1550,7 +1551,7 @@ const generateGraphDataBackend = async (artists, filters, cachedSubgraphsContext
 };
 exports.generateGraphDataBackend = generateGraphDataBackend;
 // --- NODE DETAILS SCHEMAS & PROMPTS ---
-exports.NODE_DETAILS_SCHEMA = {
+exports.ARTIST_NODE_DETAILS_SCHEMA = {
     type: genai_1.Type.OBJECT,
     properties: {
         summary: {
@@ -1571,9 +1572,14 @@ exports.NODE_DETAILS_SCHEMA = {
             properties: {
                 artist: {
                     type: genai_1.Type.STRING,
-                    description: "The canonical professional display name of the artist or record label. NEVER append geographic acronyms, country names, or regional suffixes (e.g. 'Turnstile', NOT 'Turnstile US'; 'Drug Church', NOT 'Drug Church US')."
+                    description: "The canonical professional display name of the artist. NEVER append geographic acronyms, country names, or regional suffixes (e.g. 'Turnstile', NOT 'Turnstile US'; 'Drug Church', NOT 'Drug Church US')."
                 },
                 genre: { type: genai_1.Type.STRING },
+                style: {
+                    type: genai_1.Type.STRING,
+                    enum: types_1.CANONICAL_STYLES_FLAT,
+                    description: "The single primary musical style trait describing the artist's sonic identity, strictly chosen from the canonical taxonomy."
+                },
                 origin: { type: genai_1.Type.STRING },
                 founded: { type: genai_1.Type.STRING },
                 notableArtists: {
@@ -1581,7 +1587,7 @@ exports.NODE_DETAILS_SCHEMA = {
                     items: { type: genai_1.Type.STRING }
                 }
             },
-            required: ["genre", "origin", "founded", "notableArtists"]
+            required: ["genre", "style", "origin", "founded", "notableArtists"]
         },
         links: {
             type: genai_1.Type.ARRAY,
@@ -1626,6 +1632,88 @@ exports.NODE_DETAILS_SCHEMA = {
     },
     required: ["summary", "details", "discography", "recommendationReason", "youtubeSearchQuery"]
 };
+exports.LABEL_NODE_DETAILS_SCHEMA = {
+    type: genai_1.Type.OBJECT,
+    properties: {
+        summary: {
+            type: genai_1.Type.STRING,
+            description: "A scannable bio (approx. 100 words) using Markdown: short paragraphs, bolding for key terms, and bullet points for lists. Focus on significance and catalogue."
+        },
+        imageUrl: {
+            type: genai_1.Type.STRING,
+            description: "A direct HTTPS image URL representing the record label, extracted from authoritative biographical context."
+        },
+        members: {
+            type: genai_1.Type.ARRAY,
+            items: { type: genai_1.Type.STRING },
+            description: "Key founders, executives, or notable personnel."
+        },
+        details: {
+            type: genai_1.Type.OBJECT,
+            properties: {
+                artist: {
+                    type: genai_1.Type.STRING,
+                    description: "The canonical professional display name of the record label. NEVER append geographic acronyms, country names, or regional suffixes."
+                },
+                genre: { type: genai_1.Type.STRING },
+                origin: { type: genai_1.Type.STRING },
+                founded: { type: genai_1.Type.STRING },
+                notableArtists: {
+                    type: genai_1.Type.ARRAY,
+                    items: { type: genai_1.Type.STRING }
+                }
+            },
+            required: ["genre", "origin", "founded", "notableArtists"]
+        },
+        links: {
+            type: genai_1.Type.ARRAY,
+            description: "Wikipedia link MUST be index 0 if found. Do NOT include Official Website or Bandcamp entries.",
+            items: {
+                type: genai_1.Type.OBJECT,
+                properties: {
+                    site: { type: genai_1.Type.STRING },
+                    url: {
+                        type: genai_1.Type.STRING,
+                        nullable: true,
+                        description: "The verified, active URL. MUST be null if the URL cannot be confirmed."
+                    }
+                },
+                required: ["site"]
+            }
+        },
+        discography: {
+            type: genai_1.Type.ARRAY,
+            items: {
+                type: genai_1.Type.OBJECT,
+                properties: {
+                    albumName: { type: genai_1.Type.STRING },
+                    releaseYear: { type: genai_1.Type.STRING }
+                },
+                required: ["albumName", "releaseYear"]
+            }
+        },
+        recommendationReason: {
+            type: genai_1.Type.STRING,
+            description: "Curator insight on the label's cultural impact."
+        },
+        youtubeVideoId: {
+            type: genai_1.Type.STRING,
+            nullable: true,
+            description: "Nullable for labels."
+        },
+        youtubeSearchQuery: {
+            type: genai_1.Type.STRING,
+            description: "A guaranteed-non-null search query string."
+        }
+    },
+    required: ["summary", "details", "discography", "recommendationReason", "youtubeSearchQuery"]
+};
+const getNodeDetailsSchema = (nodeType) => {
+    const isLabel = String(nodeType || '').toLowerCase() === 'label';
+    return isLabel ? exports.LABEL_NODE_DETAILS_SCHEMA : exports.ARTIST_NODE_DETAILS_SCHEMA;
+};
+exports.getNodeDetailsSchema = getNodeDetailsSchema;
+exports.NODE_DETAILS_SCHEMA = exports.ARTIST_NODE_DETAILS_SCHEMA;
 exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed information for the music entity: "{{nodeIdentifier}}" (type: {{nodeType}}).
     
     Context:
@@ -1654,6 +1742,10 @@ exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed informatio
     2. Do NOT include markdown code fences (do NOT wrap the response in \`\`\`json ... \`\`\`). Output raw JSON directly.
     3. Do NOT include any inline search citations, footnote markers (such as [1], [4, 9, 11], [cite: 20]), or source references anywhere in the text or JSON fields. Ensure all string values are plain text or markdown bold/bullets only, with absolutely no citation brackets or array-style citations.
     
+    STYLE SPECIFICATION (STRICT ZERO-HALLUCINATION ENUM RULE):
+    - For ARTISTS: You MUST include the "style" property inside "details". It is MANDATORY and MUST be exactly one of the canonical taxonomy values enforced by your schema (e.g. Melodic, Heavy, Aggressive, Atmospheric, Ambient, Lo-Fi, Hi-Fi, Progressive, Math, Experimental, Fast-Paced, Midwest, Modern, Post-, Underground, etc.).
+    - For RECORD LABELS: Omit "style" completely from "details". Record labels represent curatorial entities and do not possess an acoustic style.
+
     Your task is to generate a JSON object matching this structure precisely:
     {
       "summary": "A scannable bio using Markdown. MUST follow strict Bio Scannability rules: 1. Chunking/Text Segmentation (Max 2-3 short sentences per paragraph). 2. Semantic Splitting (Group by meaning). 3. Formatting (MUST use a bulleted list for stylistic traits/key elements, and bold key terms).",
@@ -1661,6 +1753,7 @@ exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed informatio
       "details": {
         "artist": "Canonical professional display name of the artist or record label (e.g. 'Turnstile', 'Drug Church'). NEVER append geographic acronyms or country tags (NOT 'Turnstile US', NOT 'Drug Church US').",
         "genre": "The primary music genre(s) as a plain string (e.g. 'Hardcore Punk', 'Post-Hardcore', 'Metalcore'). NEVER return the literal string 'Unknown', 'N/A', or leave this empty — if grounding is inconclusive, infer the genre from the bio summary text and the connected scene context provided.",
+        "style": "[ARTISTS ONLY] Exactly one canonical style trait from the schema enum. OMIT THIS KEY FOR RECORD LABELS.",
         "origin": "City, Country format (e.g. 'Baltimore, USA'). NEVER return the literal string 'Unknown', 'N/A', or leave this empty — if grounding is inconclusive, infer the origin from the bio summary text or the band's known regional scene.",
         "founded": "YYYY",
         "notableArtists": ["Artist Name", ...]
@@ -1769,7 +1862,7 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint,
                         systemInstruction: "You are a late-night record curator — the kind of person who pulls an obscure 7\" from a crate at 2am and traces exactly why it matters. Your tone is knowledgeable, vivid, and deeply immersed in musical history and counterculture scenes. Return detailed, factual, and scene-accurate profile information for the given musical entity matching the schema. No markdown formatting outside strings. NEGATIVE CONSTRAINT: NEVER use em-dashes (—) or long hyphens for dramatic effect or clause separation. Use standard editorial punctuation.",
                         thinkingConfig: { thinkingLevel: genai_1.ThinkingLevel.LOW },
                         responseMimeType: "application/json",
-                        responseSchema: exports.NODE_DETAILS_SCHEMA
+                        responseSchema: (0, exports.getNodeDetailsSchema)(node.type)
                     }
                 }),
                 new Promise((_, reject) => setTimeout(() => reject(new Error('AbortError: Timeout exceeded')), 55000))
@@ -1846,6 +1939,7 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint,
         summary: sanitizeBioText(details.summary || "No summary available (AI response was truncated)."),
         details: (() => {
             const d = details.details || {};
+            const isLabelNode = String(node.type || '').toLowerCase() === 'label';
             const sanitizeMetaField = (val) => {
                 if (!val)
                     return "";
@@ -1854,13 +1948,20 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint,
                     return "";
                 return sanitizeString(val);
             };
-            return {
+            const cleanedDetails = {
                 ...d,
                 genre: sanitizeMetaField(d.genre),
                 origin: sanitizeMetaField(d.origin),
                 founded: sanitizeString(d.founded),
                 notableArtists: (d.notableArtists || []).map(sanitizeString)
             };
+            if (isLabelNode) {
+                delete cleanedDetails.style;
+            }
+            else {
+                cleanedDetails.style = sanitizeMetaField(d.style);
+            }
+            return cleanedDetails;
         })(),
         links: sanitisedLinks,
         discography: (details.discography || []).map((album) => ({

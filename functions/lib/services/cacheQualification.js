@@ -138,6 +138,10 @@ const isFullyQualifiedEntityProfile = (profile, isLabel = false) => {
         return false;
     }
     if (!isLabel) {
+        const styleRaw = profile.details?.style ?? profile.style;
+        if (isInvalidMeta(styleRaw)) {
+            return false;
+        }
         if (!Array.isArray(profile.discography) || profile.discography.length === 0) {
             return false;
         }
@@ -175,29 +179,35 @@ const qualifyCacheEntry = (data, seedId) => {
     if (!hasRationale)
         missing.push('synthesisRationale');
     const isStructurallyUsable = hasNodes && hasEdges && hasRationale;
-    // ── 2. Seed profile (bio / genre / image / V33 anti-pollution checks) ─────
+    // ── 2. Seed profile (bio / genre / style / image / V33 anti-pollution checks) ─────
     const profile = (0, exports.extractSeedProfile)(data.detailsCache, seedId || data.artistId || data.cacheKey);
+    const isLabel = !!data?.labelId;
     const bio = profile?.summary || profile?.bio || profile?.description || profile?.text || '';
     const genreRaw = profile?.details?.genre || profile?.genre || data?.details?.genre || '';
     const genre = Array.isArray(genreRaw) ? genreRaw.join(', ') : genreRaw;
+    const styleRaw = profile?.details?.style || profile?.style || data?.details?.style || '';
+    const style = Array.isArray(styleRaw) ? styleRaw.join(', ') : styleRaw;
     const imageUrl = profile?.imageUrl || profile?.image || '';
     const recReason = String(profile?.recommendationReason || '').trim();
     const isProseFallback = recReason.toLowerCase().includes('synthesised from live cultural archives');
-    const hasEmptyDiscography = Array.isArray(profile?.discography) && profile.discography.length === 0 && !data?.labelId;
+    const hasEmptyDiscography = Array.isArray(profile?.discography) && profile.discography.length === 0 && !isLabel;
     const hasBio = typeof bio === 'string' && bio.trim().length > exports.MIN_BIO_LENGTH && !bio.toLowerCase().includes('sandbox mock') && !isProseFallback;
     const hasGenre = typeof genre === 'string' && genre.trim().length > 0 && genre.trim().toLowerCase() !== 'unknown';
+    const hasStyle = isLabel || (typeof style === 'string' && style.trim().length > 0 && style.trim().toLowerCase() !== 'unknown');
     const hasImage = typeof imageUrl === 'string' && imageUrl.trim().length > 0;
     if (!hasBio)
         missing.push('bio');
     if (!hasGenre)
         missing.push('genre');
+    if (!hasStyle)
+        missing.push('style');
     if (!hasImage)
         missing.push('imageUrl');
     if (isProseFallback)
         missing.push('recommendationReason');
     if (hasEmptyDiscography)
         missing.push('discography');
-    const isFullyQualified = isStructurallyUsable && hasBio && hasGenre && hasImage && !isProseFallback && !hasEmptyDiscography;
+    const isFullyQualified = isStructurallyUsable && hasBio && hasGenre && hasStyle && hasImage && !isProseFallback && !hasEmptyDiscography;
     let verdict;
     if (isFullyQualified)
         verdict = 'TOPOLOGY_HIT';

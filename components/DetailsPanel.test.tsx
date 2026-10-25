@@ -80,12 +80,13 @@ describe('DetailsPanel', () => {
         expect(officialLink).toHaveAttribute('href', 'https://www.google.com/search?q=Static%20Dress+official+website');
     });
 
-    it('renders a 2x2 grid displaying LABEL, GENRE, ORIGIN, and FOUNDED for an artist node with an associated label', async () => {
+    it('renders a 2-row layout displaying Label, Genre, Style, Origin, and Founded for an artist node with an associated label', async () => {
         const mockNode = { id: 'tenth-avenue-north', type: 'artist', label: 'Tenth Avenue North' };
         const mockDetails = { 
             summary: 'Tenth Avenue North was an American contemporary Christian band formed in West Palm Beach.', 
             details: { 
                 genre: 'Contemporary Christian Music, Christian Rock', 
+                style: 'Melodic Hardcore',
                 origin: 'West Palm Beach, Florida, USA',
                 founded: '2000'
             },
@@ -126,20 +127,22 @@ describe('DetailsPanel', () => {
             />
         );
 
-        // Verify LABEL heading and associated label value extracted via edge traversal
+        // Verify Row 1: Label and Genre
         expect(await screen.findByText('Label')).toBeInTheDocument();
         expect(screen.getByText('Essential')).toBeInTheDocument();
-
-        // Verify other 3 cells
         expect(screen.getByText('Genre')).toBeInTheDocument();
         expect(screen.getByText('Contemporary Christian Music, Christian Rock')).toBeInTheDocument();
+
+        // Verify Row 2: Style, Origin, and Founded
+        expect(screen.getByText('Style')).toBeInTheDocument();
+        expect(screen.getByText('Melodic Hardcore')).toBeInTheDocument();
         expect(screen.getByText('Origin')).toBeInTheDocument();
         expect(screen.getByText('West Palm Beach, Florida, USA')).toBeInTheDocument();
         expect(screen.getByText('Founded')).toBeInTheDocument();
         expect(screen.getByText('2000')).toBeInTheDocument();
     });
 
-    it('renders robust fallbacks (Unknown for LABEL, — for FOUNDED) when an artist has no mapped label or founded year', async () => {
+    it('renders robust fallbacks (Unknown for LABEL, — for STYLE and FOUNDED) when an artist has no mapped label, style, or founded year', async () => {
         const mockNode = { id: 'indie-band', type: 'artist', label: 'Indie Band' };
         const mockDetails = { 
             summary: 'An independent DIY artist who released music independently without a record label.', 
@@ -181,10 +184,12 @@ describe('DetailsPanel', () => {
 
         expect(await screen.findByText('Label')).toBeInTheDocument();
         expect(screen.getByText('Unknown')).toBeInTheDocument();
-        expect(screen.getByText('—')).toBeInTheDocument();
+        expect(screen.getByText('Style')).toBeInTheDocument();
+        const dashes = screen.getAllByText('—');
+        expect(dashes.length).toBeGreaterThanOrEqual(2);
     });
 
-    it('preserves the 3-column row layout and does NOT render LABEL when the active node is a label', async () => {
+    it('preserves the 3-column row layout and does NOT render LABEL or STYLE when the active node is a label', async () => {
         const mockNode = { id: 'essential-records', type: 'label', label: 'Essential Records' };
         const mockDetails = { 
             summary: 'Essential Records was an influential American Christian music record label founded in 1992.', 
@@ -225,8 +230,9 @@ describe('DetailsPanel', () => {
             />
         );
 
-        // Label node should NOT display a LABEL field
+        // Label node should NOT display Label or Style fields
         expect(screen.queryByText('Label')).not.toBeInTheDocument();
+        expect(screen.queryByText('Style')).not.toBeInTheDocument();
 
         // Label node MUST display the existing 3-column values: Genre, Origin, Founded
         expect(await screen.findByText('Genre')).toBeInTheDocument();

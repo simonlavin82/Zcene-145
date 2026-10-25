@@ -463,17 +463,19 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         const rawGenreStr = details?.details?.genre || '';
         const genreArray = rawGenreStr.split(',').map(s => s.trim()).filter(Boolean);
         const genre = genreArray.length > 0 ? genreArray[0] : '';
-        let style = '';
+        let style = details?.details?.style || '';
 
-        if (genreArray.length > 1) {
-            style = genreArray[1];
-        } else if (genreArray.length === 1 && details.summary) {
-            const keywords = ["melodic", "post", "experimental", "heavy", "progressive", "raw", "ambient", "pop"];
-            const summaryLower = details.summary.toLowerCase();
-            for (const keyword of keywords) {
-                if (summaryLower.includes(keyword)) {
-                    style = keyword.charAt(0).toUpperCase() + keyword.slice(1);
-                    break;
+        if (!style) {
+            if (genreArray.length > 1) {
+                style = genreArray[1];
+            } else if (genreArray.length === 1 && details.summary) {
+                const keywords = ["melodic", "post", "experimental", "heavy", "progressive", "raw", "ambient", "pop"];
+                const summaryLower = details.summary.toLowerCase();
+                for (const keyword of keywords) {
+                    if (summaryLower.includes(keyword)) {
+                        style = keyword.charAt(0).toUpperCase() + keyword.slice(1);
+                        break;
+                    }
                 }
             }
         }
@@ -816,18 +818,27 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
             // 3. Match Style
             if (styleActive) {
                 const rawStyle = (profile.style || '').trim().toLowerCase();
+                const nodeStyle = (details?.details?.style || '').toLowerCase().trim();
                 const genre = (details?.details?.genre || '').toLowerCase();
                 const bio = (details?.summary || '').toLowerCase();
                 const deepCutDesc = (details?.recommendationReason || '').toLowerCase();
 
                 // Evaluate exact-phrase match first to prevent false-positives from multi-word styles (e.g. "Dream Pop", "Wall of Sound")
-                if (rawStyle.length > 0 && (genre.includes(rawStyle) || bio.includes(rawStyle) || deepCutDesc.includes(rawStyle))) {
+                if (rawStyle.length > 0 && (
+                    (nodeStyle.length > 0 && (nodeStyle.includes(rawStyle) || rawStyle.includes(nodeStyle))) ||
+                    genre.includes(rawStyle) ||
+                    bio.includes(rawStyle) ||
+                    deepCutDesc.includes(rawStyle)
+                )) {
                     styleMatched = true;
                 } else if (rawStyle.includes(',')) {
                     // Secondary fallback for legacy comma-separated entries (e.g. "melodic, post")
                     const styleTokens = rawStyle.split(',').map(k => k.trim()).filter(k => k.length > 0);
                     styleMatched = styleTokens.some(token => 
-                        genre.includes(token) || bio.includes(token) || deepCutDesc.includes(token)
+                        (nodeStyle.length > 0 && nodeStyle.includes(token)) ||
+                        genre.includes(token) ||
+                        bio.includes(token) ||
+                        deepCutDesc.includes(token)
                     );
                 }
             }
@@ -1315,13 +1326,44 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
 
                             {isArtistNode ? (
-                                <div className="grid grid-cols-2 gap-x-4 gap-y-4 sm:gap-x-6 sm:gap-y-4 py-4 border-b border-zinc-800/50">
-                                    <div className="min-w-0">
-                                        <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Label</h4>
-                                        <p className="text-sm font-normal text-zinc-200 break-words leading-snug">
-                                            {associatedLabels || 'Unknown'}
-                                        </p>
+                                <div className="space-y-4 py-4 border-b border-zinc-800/50">
+                                    <div className="grid grid-cols-2 gap-x-4 sm:gap-x-6">
+                                        <div className="min-w-0">
+                                            <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Label</h4>
+                                            <p className="text-sm font-normal text-zinc-200 break-words leading-snug">
+                                                {associatedLabels || 'Unknown'}
+                                            </p>
+                                        </div>
+                                        <div className="min-w-0">
+                                            <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Genre</h4>
+                                            <p className="text-sm font-normal text-zinc-200 break-words leading-snug">
+                                                {details.details?.genre || 'Unknown'}
+                                            </p>
+                                        </div>
                                     </div>
+                                    <div className="grid grid-cols-3 gap-3 sm:gap-6">
+                                        <div className="min-w-0">
+                                            <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Style</h4>
+                                            <p className="text-sm font-normal text-zinc-200 break-words leading-snug">
+                                                {details.details?.style || '—'}
+                                            </p>
+                                        </div>
+                                        <div className="min-w-0">
+                                            <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Origin</h4>
+                                            <p className="text-sm font-normal text-zinc-200 break-words leading-snug">
+                                                {details.details?.origin || 'Unknown'}
+                                            </p>
+                                        </div>
+                                        <div className="min-w-0">
+                                            <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Founded</h4>
+                                            <p className="text-sm font-normal text-zinc-200 break-words leading-snug">
+                                                {details.details?.founded || '—'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-3 gap-3 sm:gap-6 py-4 border-b border-zinc-800/50">
                                     <div className="min-w-0">
                                         <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Genre</h4>
                                         <p className="text-sm font-normal text-zinc-200 break-words leading-snug">
@@ -1340,29 +1382,6 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                             {details.details?.founded || '—'}
                                         </p>
                                     </div>
-                                </div>
-                            ) : (
-                                <div className={`grid grid-cols-3 gap-3 sm:gap-6 py-4 border-b border-zinc-800/50`}>
-                                    <div className="min-w-0">
-                                        <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Genre</h4>
-                                        <p className="text-sm font-normal text-zinc-200 break-words leading-snug">
-                                            {details.details?.genre || 'Unknown'}
-                                        </p>
-                                    </div>
-                                    <div className="min-w-0">
-                                        <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Origin</h4>
-                                        <p className="text-sm font-normal text-zinc-200 break-words leading-snug">
-                                            {details.details?.origin || 'Unknown'}
-                                        </p>
-                                    </div>
-                                    {details.details?.founded && (
-                                        <div className="min-w-0">
-                                            <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Founded</h4>
-                                            <p className="text-sm font-normal text-zinc-200 break-words leading-snug">
-                                                {details.details.founded}
-                                            </p>
-                                        </div>
-                                    )}
                                 </div>
                             )}
 

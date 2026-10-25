@@ -54,6 +54,7 @@ export interface NodeDetails {
   imageUrl?: string;
   details: {
     genre?: string;
+    style?: string;
     origin?: string;
     artist?: string;
     founded?: string;

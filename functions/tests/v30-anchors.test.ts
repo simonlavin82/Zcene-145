@@ -240,6 +240,7 @@ describe('Architecture V35: 3-Tier Anchor System & Deep Cut Anti-Pollution Gates
       details: {
         artist: 'Koyo',
         genre: 'Melodic Hardcore / Emo',
+        style: 'Melodic',
         origin: 'Stony Brook, Long Island, New York, United States',
         founded: '2020'
       },
@@ -277,6 +278,7 @@ describe('Architecture V35: 3-Tier Anchor System & Deep Cut Anti-Pollution Gates
         details: {
           artist: 'Sayyadina',
           genre: 'Grindcore',
+          style: 'Sludgy',
           origin: 'Stockholm, Sweden',
           founded: '2001'
         },
@@ -290,12 +292,30 @@ describe('Architecture V35: 3-Tier Anchor System & Deep Cut Anti-Pollution Gates
       expect(isFullyQualifiedEntityProfile(validUndergroundProfile, false)).toBe(true);
     });
 
-    it('Rejects artist profiles with missing/empty imageUrl or missing founded year', () => {
+    it('Rejects artist profiles with missing/empty imageUrl, missing founded year, or missing style', () => {
       expect(isFullyQualifiedEntityProfile({ ...validArtistProfile, imageUrl: '' }, false)).toBe(false);
       expect(isFullyQualifiedEntityProfile({ ...validArtistProfile, imageUrl: null }, false)).toBe(false);
       expect(
         isFullyQualifiedEntityProfile(
           { ...validArtistProfile, details: { ...validArtistProfile.details, founded: 'Unknown' } },
+          false
+        )
+      ).toBe(false);
+      expect(
+        isFullyQualifiedEntityProfile(
+          { ...validArtistProfile, details: { ...validArtistProfile.details, style: '' } },
+          false
+        )
+      ).toBe(false);
+      expect(
+        isFullyQualifiedEntityProfile(
+          { ...validArtistProfile, details: { ...validArtistProfile.details, style: 'Unknown' } },
+          false
+        )
+      ).toBe(false);
+      expect(
+        isFullyQualifiedEntityProfile(
+          { ...validArtistProfile, details: { ...validArtistProfile.details, style: undefined } },
           false
         )
       ).toBe(false);

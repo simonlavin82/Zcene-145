@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type, GenerateContentResponse, ThinkingLevel } from "@google/genai";
-import { GraphData, Node, NodeDetails, Link, ChatMessage, DiscoveryFilters } from "../types";
+import { GraphData, Node, NodeDetails, Link, ChatMessage, DiscoveryFilters, CANONICAL_STYLES_FLAT } from "../types";
 import { db } from './firebase';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { normalizeArtistId, extractArtistSubGraph, readArtistCacheMany, normalizeGraphData, stripUndefinedProperties, cleanArtistDisplayName } from './artistCacheService';
@@ -249,7 +249,7 @@ export const GRAPH_RESPONSE_SCHEMA = {
   required: ["nodes", "links"]
 };
 
-export const NODE_DETAILS_SCHEMA = {
+export const ARTIST_NODE_DETAILS_SCHEMA = {
   type: Type.OBJECT,
   properties: {
     summary: {
@@ -269,6 +269,11 @@ export const NODE_DETAILS_SCHEMA = {
       type: Type.OBJECT,
       properties: {
         genre: { type: Type.STRING },
+        style: {
+          type: Type.STRING,
+          enum: CANONICAL_STYLES_FLAT,
+          description: "The single primary musical style trait describing the artist's sonic identity, strictly chosen from the canonical taxonomy."
+        },
         origin: { type: Type.STRING },
         founded: { type: Type.STRING },
         notableArtists: {
@@ -276,7 +281,7 @@ export const NODE_DETAILS_SCHEMA = {
           items: { type: Type.STRING }
         }
       },
-      required: ["genre", "origin", "founded", "notableArtists"]
+      required: ["genre", "style", "origin", "founded", "notableArtists"]
     },
 
     discography: {
@@ -306,6 +311,71 @@ export const NODE_DETAILS_SCHEMA = {
   },
   required: ["summary", "details", "discography", "recommendationReason", "youtubeSearchQuery"]
 };
+
+export const LABEL_NODE_DETAILS_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    summary: {
+      type: Type.STRING,
+      description: "A scannable bio (approx. 100 words) using Markdown: short paragraphs, bolding for key terms, and bullet points for lists. Focus on significance and catalogue."
+    },
+    imageUrl: {
+      type: Type.STRING,
+      description: "A direct HTTPS image URL representing the record label, extracted from authoritative biographical context."
+    },
+    members: {
+      type: Type.ARRAY,
+      items: { type: Type.STRING },
+      description: "Key founders, executives, or notable personnel."
+    },
+    details: {
+      type: Type.OBJECT,
+      properties: {
+        genre: { type: Type.STRING },
+        origin: { type: Type.STRING },
+        founded: { type: Type.STRING },
+        notableArtists: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING }
+        }
+      },
+      required: ["genre", "origin", "founded", "notableArtists"]
+    },
+
+    discography: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          albumName: { type: Type.STRING },
+          releaseYear: { type: Type.STRING }
+        },
+        required: ["albumName", "releaseYear"]
+      }
+    },
+    recommendationReason: {
+      type: Type.STRING,
+      description: "Curator insight on the label's cultural impact."
+    },
+    youtubeVideoId: {
+      type: Type.STRING,
+      nullable: true,
+      description: "Nullable for labels."
+    },
+    youtubeSearchQuery: {
+      type: Type.STRING,
+      description: "A guaranteed-non-null search query string."
+    }
+  },
+  required: ["summary", "details", "discography", "recommendationReason", "youtubeSearchQuery"]
+};
+
+export const getNodeDetailsSchema = (nodeType?: string) => {
+  const isLabel = String(nodeType || '').toLowerCase() === 'label';
+  return isLabel ? LABEL_NODE_DETAILS_SCHEMA : ARTIST_NODE_DETAILS_SCHEMA;
+};
+
+export const NODE_DETAILS_SCHEMA = ARTIST_NODE_DETAILS_SCHEMA;
 
 export const GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = `I have an existing music graph. The user wants to enhance it by adding connections for these seed artists: {{artists}}.
 

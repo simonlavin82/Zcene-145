@@ -1608,9 +1608,12 @@ export const enforceArtistCacheSchema = (payload: any): void => {
       if (!parsed.details || typeof parsed.details !== 'object') {
         throw new Error("[Schema Enforcement] detailsCache is missing or has invalid details object.");
       }
-      const { genre, origin, founded, notableArtists } = parsed.details;
+      const { genre, origin, founded, style, notableArtists } = parsed.details;
       if (genre === undefined || genre === null || typeof genre !== 'string' || !genre.trim()) {
         throw new Error("[Schema Enforcement] detailsCache.details is missing genre.");
+      }
+      if (style === undefined || style === null || typeof style !== 'string' || !style.trim()) {
+        throw new Error("[Schema Enforcement] detailsCache.details is missing style.");
       }
       if (origin === undefined || origin === null || typeof origin !== 'string' || !origin.trim()) {
         throw new Error("[Schema Enforcement] detailsCache.details is missing origin.");
