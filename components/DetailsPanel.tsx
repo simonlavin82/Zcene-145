@@ -1326,44 +1326,45 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
 
                             {isArtistNode ? (
-                                <div className="space-y-4 py-4 border-b border-zinc-800/50">
-                                    <div className="grid grid-cols-2 gap-x-4 sm:gap-x-6">
-                                        <div className="min-w-0">
-                                            <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Label</h4>
-                                            <p className="text-sm font-normal text-zinc-200 break-words leading-snug">
-                                                {associatedLabels || 'Unknown'}
-                                            </p>
-                                        </div>
-                                        <div className="min-w-0">
-                                            <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Genre</h4>
-                                            <p className="text-sm font-normal text-zinc-200 break-words leading-snug">
-                                                {details.details?.genre || 'Unknown'}
-                                            </p>
-                                        </div>
+                                <div className="grid grid-cols-3 gap-x-4 gap-y-4 py-4 border-b border-zinc-800/50">
+                                    {/* Row 1: Label | Genre | Style */}
+                                    <div className="min-w-0">
+                                        <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Label</h4>
+                                        <p className="text-sm font-normal text-zinc-200 break-words leading-snug">
+                                            {associatedLabels || 'Unknown'}
+                                        </p>
                                     </div>
-                                    <div className="grid grid-cols-3 gap-3 sm:gap-6">
-                                        <div className="min-w-0">
-                                            <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Style</h4>
-                                            <p className="text-sm font-normal text-zinc-200 break-words leading-snug">
-                                                {details.details?.style || '—'}
-                                            </p>
-                                        </div>
-                                        <div className="min-w-0">
-                                            <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Origin</h4>
-                                            <p className="text-sm font-normal text-zinc-200 break-words leading-snug">
-                                                {details.details?.origin || 'Unknown'}
-                                            </p>
-                                        </div>
-                                        <div className="min-w-0">
-                                            <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Founded</h4>
-                                            <p className="text-sm font-normal text-zinc-200 break-words leading-snug">
-                                                {details.details?.founded || '—'}
-                                            </p>
-                                        </div>
+                                    <div className="min-w-0">
+                                        <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Genre</h4>
+                                        <p className="text-sm font-normal text-zinc-200 break-words leading-snug">
+                                            {details.details?.genre || 'Unknown'}
+                                        </p>
                                     </div>
+                                    <div className="min-w-0">
+                                        <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Style</h4>
+                                        <p className="text-sm font-normal text-zinc-200 break-words leading-snug">
+                                            {details.details?.style || '—'}
+                                        </p>
+                                    </div>
+
+                                    {/* Row 2: Origin | Founded | (Empty <div>) */}
+                                    <div className="min-w-0">
+                                        <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Origin</h4>
+                                        <p className="text-sm font-normal text-zinc-200 break-words leading-snug">
+                                            {details.details?.origin || 'Unknown'}
+                                        </p>
+                                    </div>
+                                    <div className="min-w-0">
+                                        <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Founded</h4>
+                                        <p className="text-sm font-normal text-zinc-200 break-words leading-snug">
+                                            {details.details?.founded || '—'}
+                                        </p>
+                                    </div>
+                                    <div className="min-w-0" aria-hidden="true" />
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-3 gap-3 sm:gap-6 py-4 border-b border-zinc-800/50">
+                                <div className="grid grid-cols-3 gap-x-4 py-4 border-b border-zinc-800/50">
+                                    {/* Row 1: Genre | Origin | Founded */}
                                     <div className="min-w-0">
                                         <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Genre</h4>
                                         <p className="text-sm font-normal text-zinc-200 break-words leading-snug">

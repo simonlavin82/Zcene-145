@@ -137,5 +137,24 @@ describe('Rule 38: 4-Tier Asset Disambiguation Waterfall (scrapeImageUrlBackend)
 
     expect(result).toBeNull();
   });
+
+  it('Tier 3: Spaced (Genre Affinity Tie-Breaker) - Resolves Buffalo hardcore band despite homonym hip-hop candidate matching single title', async () => {
+    const result = await scrapeImageUrlBackend(
+      'Spaced',
+      'artist',
+      'Hardcore Punk',
+      'Spaced pulls apart traditional hardcore aggression and stitches it back together with bright, psychedelic modulation.',
+      'Buffalo, New York, USA',
+      [
+        { albumName: 'Spaced (Demo)', releaseYear: '2019' },
+        { albumName: 'Spaced Out', releaseYear: '2022' },
+        { albumName: 'This Is All We Ever Get', releaseYear: '2024' }
+      ]
+    );
+
+    expect(result).toBeDefined();
+    expect(result).not.toBeNull();
+    expect(result).toMatch(/^https:\/\/.*600x600bb\.jpg$/);
+  });
 });
 

@@ -127,15 +127,15 @@ describe('DetailsPanel', () => {
             />
         );
 
-        // Verify Row 1: Label and Genre
+        // Verify Row 1: Label, Genre, and Style
         expect(await screen.findByText('Label')).toBeInTheDocument();
         expect(screen.getByText('Essential')).toBeInTheDocument();
         expect(screen.getByText('Genre')).toBeInTheDocument();
         expect(screen.getByText('Contemporary Christian Music, Christian Rock')).toBeInTheDocument();
-
-        // Verify Row 2: Style, Origin, and Founded
         expect(screen.getByText('Style')).toBeInTheDocument();
         expect(screen.getByText('Melodic Hardcore')).toBeInTheDocument();
+
+        // Verify Row 2: Origin, Founded
         expect(screen.getByText('Origin')).toBeInTheDocument();
         expect(screen.getByText('West Palm Beach, Florida, USA')).toBeInTheDocument();
         expect(screen.getByText('Founded')).toBeInTheDocument();

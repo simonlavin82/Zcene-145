@@ -2310,6 +2310,12 @@ const normalizeAlbumTitle = (title: string): string => {
     .trim();
 };
 
+const hasQualifyingDescriptor = (title: string): boolean => {
+  return /\b(demo|demos|ep|live|single|session|sessions|split|tape)\b/i.test(title) ||
+         /\([^\)]*(demo|ep|live|split|single)[^\)]*\)/i.test(title) ||
+         /\[[^\]]*(demo|ep|live|split|single)[^\]]*\]/i.test(title);
+};
+
 const titlesMatchFuzzy = (
   itunesTitle: string,
   zceneTitle: string,
@@ -2323,13 +2329,17 @@ const titlesMatchFuzzy = (
   // 1. Exact normalized match
   if (normItunes === normZcene) return true;
 
-  // 2. Substring containment (minimum 8 characters to prevent spurious collisions)
-  if (normItunes.length >= 8 && normZcene.length >= 8) {
-    if (normItunes.includes(normZcene) || normZcene.includes(normItunes)) return true;
-  }
-
-  // Release year correlation check (within +/- 1 year)
+  // Release year correlation checks
+  const exactYearMatch = (itunesYear && zceneYear) ? itunesYear === zceneYear : false;
   const yearMatch = (itunesYear && zceneYear) ? Math.abs(itunesYear - zceneYear) <= 1 : false;
+
+  // 2. Substring containment (minimum 8 characters to prevent spurious collisions)
+  // If release years exist on both sides, require yearMatch to prevent cross-era collisions
+  if (normItunes.length >= 8 && normZcene.length >= 8) {
+    if (!itunesYear || !zceneYear || yearMatch) {
+      if (normItunes.includes(normZcene) || normZcene.includes(normItunes)) return true;
+    }
+  }
 
   // 3. Prefix match: minimum 10 chars, or 6 chars if supported by release year correlation
   const minPrefixLen = yearMatch ? 6 : 10;
@@ -2338,12 +2348,14 @@ const titlesMatchFuzzy = (
     if (normItunes.slice(0, pLen) === normZcene.slice(0, pLen)) return true;
   }
 
-  // 4. Distinctive token overlap
+  // 4. Distinctive token overlap: strictly requires exact release-year match to prevent homonym album collisions
   const itunesTokens = extractDistinctiveTokens(itunesTitle);
   const zceneTokens = extractDistinctiveTokens(zceneTitle);
   const sharedTokens = itunesTokens.filter(t => zceneTokens.includes(t));
-  if (sharedTokens.length >= 2) return true;
-  if (sharedTokens.length >= 1 && yearMatch && sharedTokens.some(t => t.length >= 6)) return true;
+  if (exactYearMatch) {
+    if (sharedTokens.length >= 2) return true;
+    if (sharedTokens.length >= 1 && sharedTokens.some(t => t.length >= 6)) return true;
+  }
 
   return false;
 };
@@ -2422,7 +2434,8 @@ const verifyCandidateDiscography = async (
     const norm = normalizeAlbumTitle(raw);
     if (norm.length < 3) continue;
     if (GENERIC_ALBUM_TITLES.has(raw.toLowerCase().trim())) continue;
-    if (norm === normArtist) continue; // Exclude self-titled albums from sole proof
+    // Exclude bare self-titled albums from sole proof, but preserve qualified releases like (Demo) or [EP]
+    if (norm === normArtist && !hasQualifyingDescriptor(raw)) continue;
     const parsedYear = item.releaseYear ? parseInt(item.releaseYear, 10) : undefined;
     validZceneAlbums.push({
       raw,
@@ -2456,7 +2469,8 @@ const verifyCandidateDiscography = async (
           const normItunes = normalizeAlbumTitle(albTitle);
           if (normItunes.length < 3) continue;
           if (GENERIC_ALBUM_TITLES.has(albTitle.toLowerCase().trim())) continue;
-          if (normItunes === normArtist) continue; // Exclude self-titled albums on candidate side
+          // Exclude bare self-titled albums on candidate side, but preserve qualified releases like (Demo) or [EP]
+          if (normItunes === normArtist && !hasQualifyingDescriptor(albTitle)) continue;
 
           const albYear = alb.releaseDate ? new Date(alb.releaseDate).getFullYear() : undefined;
 
@@ -2633,20 +2647,56 @@ export const scrapeImageUrlBackend = async (
       }
     }
 
+    let finalWinner: CandidateVerification | null = null;
+
     if (verifiedWinners.length === 1) {
-      const winner = verifiedWinners[0];
-      let artwork = winner.bestArtwork;
-      if (!artwork) {
-        artwork = await fetchArtistArtwork(winner.candidate.artistId);
-      }
-      if (artwork) {
-        console.log(`[scrapeImageUrlBackend] [Tier 3 Hit] "${cleanArtistName}" (iTunes ID: ${winner.candidate.artistId}) verified via ${winner.matchCount} album matches: [${winner.matchedTitles.map(t => `"${t}"`).join(', ')}]`);
-        return artwork;
-      }
+      finalWinner = verifiedWinners[0];
     } else if (verifiedWinners.length > 1) {
-      console.warn(`[scrapeImageUrlBackend] [Tier 3 Ambiguity] "${cleanArtistName}" has ${verifiedWinners.length} candidates matching discography. Aborting to prevent homonym pollution.`);
+      // Tier 3 Genre Tie-Breaker: Filter verified winners by genre affinity to eliminate homonyms (e.g. Hip-Hop vs Hardcore Punk)
+      const genreMatchedWinners = verifiedWinners.filter(w =>
+        evaluateGenreMatch(w.candidate.primaryGenreName, genre, summary)
+      );
+
+      if (genreMatchedWinners.length === 1) {
+        finalWinner = genreMatchedWinners[0];
+        console.log(`[scrapeImageUrlBackend] [Tier 3 Tie-Breaker Hit] "${cleanArtistName}" resolved among ${verifiedWinners.length} candidates via strict genre affinity. Winner iTunes ID: ${finalWinner.candidate.artistId} ('${finalWinner.candidate.primaryGenreName}')`);
+      } else if (genreMatchedWinners.length > 1) {
+        // Score remaining candidates: matchCount takes precedence (x10), then genre exactness (+5)
+        const scored = genreMatchedWinners.map(w => {
+          let score = w.matchCount * 10;
+          const itunesGenre = (w.candidate.primaryGenreName || '').toLowerCase().trim();
+          const targetGenre = (genre || '').toLowerCase().trim();
+          if (itunesGenre && targetGenre && (itunesGenre.includes(targetGenre) || targetGenre.includes(itunesGenre))) {
+            score += 5;
+          }
+          return { winner: w, score };
+        });
+
+        scored.sort((a, b) => b.score - a.score);
+
+        // Promote the winner if a clear leader exists (strictly higher score than runner-up)
+        if (scored[0].score > scored[1].score) {
+          finalWinner = scored[0].winner;
+          console.log(`[scrapeImageUrlBackend] [Tier 3 Score Winner] "${cleanArtistName}" resolved with score ${scored[0].score} vs runner-up ${scored[1].score}. Winner iTunes ID: ${finalWinner.candidate.artistId}`);
+        } else {
+          console.warn(`[scrapeImageUrlBackend] [Tier 3 Ambiguity] "${cleanArtistName}" has ${genreMatchedWinners.length} genre-matched candidates with tied score (${scored[0].score}). Aborting to prevent homonym pollution.`);
+        }
+      } else {
+        console.warn(`[scrapeImageUrlBackend] [Tier 3 Ambiguity] "${cleanArtistName}" has ${verifiedWinners.length} candidates matching discography, but 0 matched genre taxonomy ('${genre}'). Aborting to prevent homonym pollution.`);
+      }
     } else {
       console.warn(`[scrapeImageUrlBackend] [Tier 3 Miss] "${cleanArtistName}": 0 candidates matched discography.`);
+    }
+
+    if (finalWinner) {
+      let artwork = finalWinner.bestArtwork;
+      if (!artwork) {
+        artwork = await fetchArtistArtwork(finalWinner.candidate.artistId);
+      }
+      if (artwork) {
+        console.log(`[scrapeImageUrlBackend] [Tier 3 Hit] "${cleanArtistName}" (iTunes ID: ${finalWinner.candidate.artistId}) verified via ${finalWinner.matchCount} album matches: [${finalWinner.matchedTitles.map(t => `"${t}"`).join(', ')}]`);
+        return artwork;
+      }
     }
   }
 
