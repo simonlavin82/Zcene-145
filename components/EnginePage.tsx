@@ -70,7 +70,7 @@ const ARCHITECTURE_RULES = [
     { 
         id: 8, 
         title: "Grounding / Scraper Logic", 
-        desc: "Search API & prose fallbacks eradicated; Deep Cut hydration strictly enforces responseMimeType: 'application/json' + NODE_DETAILS_SCHEMA (3x retry). iTunes scraper executes 4-tier waterfall; 'not-found' is a valid terminal monogram state once all 4 tiers run against a valid discography (discography.length > 0)." 
+        desc: "Search API & prose fallbacks eradicated; Deep Cut hydration strictly enforces responseMimeType: 'application/json' and NODE_DETAILS_SCHEMA with strict enum decoding for Artists (omitted for Labels) across a 3x retry loop. iTunes scraper executes a 4-tier waterfall where missing or fuzzy titles enforce exact release-year constraints, and Tier 3 strict homonym collisions are resolved via taxonomy genre-affinity scoring; 'not-found' is a valid terminal monogram state once all 4 tiers run against a valid discography (discography.length > 0)." 
     },
     { 
         id: 9, 
@@ -225,17 +225,22 @@ const ARCHITECTURE_RULES = [
     { 
         id: 39, 
         title: "Deterministic Metadata Projection & Pod Genre Affinity", 
-        desc: "Prior to Final Node Positioning, the worker deterministically projects verified Country and Founded (YYYY) links from detailsCache onto 100% of artist nodes. Missing genre links resolve via 2-Tier Pod Affinity: wiring artists to their group's existing seed genre node on shared stylistic stems to prevent cross-pod D3 gravity bridges, or minting a divergent subgenre node." 
+        desc: "Prior to Final Node Positioning, the worker deterministically projects verified Country and Founded (YYYY) links onto 100% of artist nodes, while ensuring canonical Style metadata is projected directly from detailsCache. Missing genre links resolve via 2-Tier Pod Affinity: wiring artists to their group's existing seed genre node on shared stylistic stems to prevent cross-pod D3 gravity bridges, or minting a divergent subgenre node." 
     },
     { 
         id: 40, 
         title: "Synthesis Rationale & Deep Cut Integrity (Read/Write Gates)", 
-        desc: "Direct Hits strictly require a non-empty synthesisRationale (>= 50 chars) AND a fully qualified profile (isFullyQualifiedEntityProfile: summary > 50 chars, genre/origin/founded, discography.length > 0, valid imageUrl or terminal 'not-found' monogram, and authentic recommendationReason) at both the Read Gate and Write Gate (Step 6). Prose-fallback stubs ('Synthesised from live cultural archives...') are hard-rejected. If Step 3 Root Breakdown exceeds 90s or throws 504, execution immediately fails over to 3.6 Flash (low). Step 4B locks canonical ISO artist suffixes (-be) over slash-separated border-town origins." 
+        desc: "Direct Hits strictly require a non-empty synthesisRationale (>= 50 chars) AND a fully qualified profile (isFullyQualifiedEntityProfile: summary > 50 chars, genre/origin/founded, canonical style for artists, discography.length > 0, valid imageUrl or terminal 'not-found' monogram, and authentic recommendationReason) at both the Read Gate and Write Gate (Step 6). Prose-fallback stubs ('Synthesised from live cultural archives...') are hard-rejected. If Step 3 Root Breakdown exceeds 90s or throws 504, execution immediately fails over to 3.6 Flash (low). Step 4B locks canonical ISO artist suffixes (-be) over slash-separated border-town origins." 
     },
     { 
         id: 41, 
         title: "3-Tier Anchor Hierarchy & Dual-Layer Scene Gravity", 
         desc: "Enforces a strict 3-Tier Anchor System: Tier 1 (Artist Seeds — Sacred Genesis, immune to secondary filters), Tier 2 (Hard Spatial & Temporal Guardrails: 1965 to N-2 (Current Year - 2) Era Slider & 22 Canonical Countries with Include/Exclude toggle and cross-era lineage authorization), and Tier 3 (Dual-Layer Scene Gravity: Canonical Genres & Creatable Anchor Labels). Separates Editorial Narrative Context from Topological Truth: Step 2B executes the Level 2 Post-Hydration Boundary Audit BEFORE Step 3 Magazine synthesis so boundary violators are pruned prior to prose generation, while anchorResolution strictly evaluates physical graph nodes with granular partial Tier 3 telemetry (e.g., Genre Applied; Label Bypassed — Narrative Gravity Only)." 
+    },
+    { 
+        id: 42, 
+        title: "Data Lifecycle, 3-Tier Storage Matrix & Strict createdAt TTL Enforcement", 
+        desc: "Enforces a strict 3-tier storage matrix: Tier 1 (Global Assets /artists & /labels: soft-expires 365 days strictly from immutable createdAt; updatedAt mutations do not reset clock; anti-sweep law prohibits automated cron-sweeps), Tier 2 (Ephemeral Snapshots /sharedZcenes: immutable, 30-day hard TTL, coordinates stripped), and Tier 3 (Owned Projects: permanent user storage, Coordinate Memory preserves settled positions)." 
     }
 ];
 
@@ -395,7 +400,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                 <div className="p-4 rounded-xl border border-zinc-700 bg-zinc-900/80 h-[560px] flex flex-col">
                     <div className="text-white font-medium text-sm mb-2 sticky top-0 bg-zinc-900 py-1 border-b border-zinc-800 z-10 flex items-center justify-between">
                         <span>Rules Ledger</span>
-                        <span className="text-[10px] font-mono text-primary uppercase">41 Laws</span>
+                        <span className="text-[10px] font-mono text-primary uppercase">42 Laws</span>
                     </div>
                     <div className="space-y-2 pt-2 overflow-y-auto pr-1 flex-1">
                         {ARCHITECTURE_RULES.map(rule => (
@@ -570,7 +575,7 @@ const RunbookAccordion: React.FC = () => {
             >
                 <div className="flex items-center gap-3 text-zinc-200 font-medium text-sm uppercase tracking-wider">
                     <Terminal className="w-4 h-4 text-primary" />
-                    V35 Full-Stack Regression Runbook
+                    V36 Full-Stack Regression Runbook
                 </div>
                 {isOpen ? <ChevronDown className="w-4 h-4 text-zinc-400" /> : <ChevronRight className="w-4 h-4 text-zinc-400" />}
             </button>
