@@ -2261,9 +2261,30 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         }
     }, [selectedNode, filteredAndSortedNodes]);
 
-    const viewedNodeDetails = viewedNode ? detailsCache.get(viewedNode.id) : null;
+    const viewedNodeDetails = viewedNode 
+        ? (detailsCache.get(viewedNode.id) || detailsCache.get(viewedNode.id.toLowerCase()) || detailsCache.get(normalizeArtistId(viewedNode.id)) || null)
+        : null;
     const viewedNodeImageUrl = viewedNodeDetails?.imageUrl || (viewedNodeDetails?.details as any)?.imageUrl || undefined;
     const dominantColor = useDominantColor(viewedNodeImageUrl, viewedNode?.label || viewedNode?.id || '');
+
+    const isProfileGenuinelyDisplayed = useMemo(() => {
+        if (isGlobalLoading || systemError || !viewedNode || filteredAndSortedNodes.length === 0) {
+            return false;
+        }
+
+        const normId = normalizeArtistId(viewedNode.id);
+        const isNodeLoading = loadingNodeIds.has(viewedNode.id) || jitLoadingIds.has(normId);
+        if (isNodeLoading) return false;
+
+        const isMetadata = viewedNode.type === 'genre' || viewedNode.type === 'origin' || viewedNode.type === 'founded';
+        if (isMetadata) return true;
+
+        const details = detailsCache.get(viewedNode.id) || 
+                        detailsCache.get(viewedNode.id.toLowerCase()) || 
+                        detailsCache.get(normId);
+
+        return !!(details && details.summary && details.summary.trim().length > 0 && !details._isSentinel);
+    }, [isGlobalLoading, systemError, viewedNode, filteredAndSortedNodes.length, loadingNodeIds, jitLoadingIds, detailsCache]);
 
     const backgroundLoadingCount = useMemo(() => {
         let count = loadingNodeIds.size;
@@ -2652,7 +2673,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                             </div>
                         )}
 
-                        {!isMagazineViewOpen && (
+                        {!isMagazineViewOpen && isProfileGenuinelyDisplayed && (
                             <div className={`absolute ${isSmallScreen ? 'bottom-[calc(env(safe-area-inset-bottom)+5.75rem)]' : 'bottom-6'} left-0 right-0 flex justify-center pointer-events-none z-50`}>
                                 <Button 
                                     variant="primary"

@@ -507,5 +507,60 @@ describe('DetailsPanel', () => {
             expect(screen.queryByText('2001+')).not.toBeInTheDocument();
         });
     });
+
+    describe('Magazine button conditional visibility', () => {
+        const mockNode = { id: 'spaced-us', type: 'artist' as const, label: 'Spaced' };
+        const mockDetails = { summary: 'Hardcore punk band from Buffalo, NY', details: { artist: 'Spaced' }, links: [] };
+        const defaultProps = {
+            selectedNode: mockNode,
+            activeNodes: [mockNode],
+            detailsCache: new Map([['spaced-us', mockDetails as any]]),
+            loadingNodeIds: new Set<string>(),
+            onTogglePinNode: vi.fn(),
+            pinnedNodes: new Set<string>(),
+            onRefreshNode: vi.fn(),
+            error: null,
+            systemError: null,
+            graphData: { nodes: [mockNode], links: [] },
+            libraryArtists: [],
+            seedArtists: ['Spaced'],
+            onAddArtist: vi.fn(),
+            isCollapsed: false,
+            onToggleCollapse: vi.fn(),
+            isSmallScreen: false,
+            onNodeClick: vi.fn(),
+            onNavigate: vi.fn(),
+            isGlobalLoading: false,
+            onCancelGlobalLoading: vi.fn(),
+            unreadCount: 0,
+            isActive: true,
+            isMagazineViewOpen: false,
+            onMagazineViewToggle: vi.fn(),
+            chatHistories: new Map(),
+            onUpdateChatHistories: vi.fn(),
+            onAddToStack: vi.fn(),
+        };
+
+        it('suppresses Magazine button while isGlobalLoading is true (initial synthesis / graph mapping)', () => {
+            render(<DetailsPanel {...defaultProps} isGlobalLoading={true} />);
+            expect(screen.queryByRole('button', { name: /magazine/i })).not.toBeInTheDocument();
+        });
+
+        it('suppresses Magazine button when activeNodes is empty', () => {
+            render(<DetailsPanel {...defaultProps} activeNodes={[]} selectedNode={null} />);
+            expect(screen.queryByRole('button', { name: /magazine/i })).not.toBeInTheDocument();
+        });
+
+        it('suppresses Magazine button while the active profile details are loading', () => {
+            render(<DetailsPanel {...defaultProps} loadingNodeIds={new Set(['spaced-us'])} />);
+            expect(screen.queryByRole('button', { name: /magazine/i })).not.toBeInTheDocument();
+        });
+
+        it('renders Magazine button when graph mapping is complete and active profile is displayed', () => {
+            render(<DetailsPanel {...defaultProps} />);
+            expect(screen.getByRole('button', { name: /magazine/i })).toBeInTheDocument();
+        });
+    });
 });
+
 
