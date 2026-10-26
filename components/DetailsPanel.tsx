@@ -463,7 +463,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         const rawGenreStr = details?.details?.genre || '';
         const genreArray = rawGenreStr.split(',').map(s => s.trim()).filter(Boolean);
         const genre = genreArray.length > 0 ? genreArray[0] : '';
-        let style = details?.details?.style || '';
+        let style = details?.details?.style || (details as any)?.style || '';
 
         if (!style) {
             if (genreArray.length > 1) {
@@ -818,7 +818,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
             // 3. Match Style
             if (styleActive) {
                 const rawStyle = (profile.style || '').trim().toLowerCase();
-                const nodeStyle = (details?.details?.style || '').toLowerCase().trim();
+                const nodeStyle = (details?.details?.style || (details as any)?.style || '').toLowerCase().trim();
                 const genre = (details?.details?.genre || '').toLowerCase();
                 const bio = (details?.summary || '').toLowerCase();
                 const deepCutDesc = (details?.recommendationReason || '').toLowerCase();
@@ -1343,7 +1343,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     <div className="min-w-0">
                                         <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Style</h4>
                                         <p className="text-sm font-normal text-zinc-200 break-words leading-snug">
-                                            {details.details?.style || '—'}
+                                            {details.details?.style || (details as any)?.style || '—'}
                                         </p>
                                     </div>
 
@@ -2154,6 +2154,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                 return (
                     getArtistDisplayName(details, node).toLowerCase().includes(query) ||
                     details?.details?.genre?.toLowerCase().includes(query) ||
+                    (details?.details?.style || (details as any)?.style || '').toLowerCase().includes(query) ||
                     details?.details?.origin?.toLowerCase().includes(query) ||
                     details?.summary?.toLowerCase().includes(query)
                 );

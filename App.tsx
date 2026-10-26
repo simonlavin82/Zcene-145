@@ -1575,6 +1575,7 @@ const App: React.FC = () => {
 
       const bio = payload.summary || payload.bio || "";
       const genre = payload.details?.genre || "";
+      const style = payload.details?.style || (payload as any).style || "";
       const origin = payload.details?.origin || "";
       const founded = payload.details?.founded || "";
       const artistName = payload.details?.artist || payload.name || entityId;
@@ -1586,6 +1587,7 @@ const App: React.FC = () => {
         details: {
           artist: artistName,
           genre,
+          style,
           origin,
           founded,
           notableArtists: payload.details?.notableArtists || []
@@ -2374,6 +2376,7 @@ const App: React.FC = () => {
                 const bio = parsed?.summary || parsed?.bio || parsed?.description || parsed?.text || "";
                 const imageUrl = parsed?.imageUrl || parsed?.image || "";
                 const genre = parsed?.details?.genre || parsed?.genre || parsed?.genres || "";
+                const style = parsed?.details?.style || parsed?.style || "";
                 const origin = parsed?.details?.origin || parsed?.origin || parsed?.location || parsed?.country || "";
                 const founded = parsed?.details?.founded || parsed?.founded || parsed?.formed || parsed?.year || "";
                 const artistName = parsed?.details?.artist || parsed?.artist || parsed?.name || data.seedArtists || data.artistId || titleCaseArtistId(node.id);
@@ -2401,6 +2404,7 @@ const App: React.FC = () => {
                     details: {
                         artist: artistName,
                         genre,
+                        style,
                         origin,
                         founded,
                         notableArtists
@@ -2868,6 +2872,7 @@ const App: React.FC = () => {
                   details: {
                      artist: parsedDetails?.details?.artist || parsedDetails?.artist || parsedDetails?.name || searchId,
                      genre: parsedDetails?.details?.genre || parsedDetails?.genre || parsedDetails?.genres || "",
+                     style: parsedDetails?.details?.style || parsedDetails?.style || "",
                      origin: parsedDetails?.details?.origin || parsedDetails?.origin || parsedDetails?.location || parsedDetails?.country || "",
                      founded: parsedDetails?.details?.founded || parsedDetails?.founded || parsedDetails?.formed || parsedDetails?.year || "",
                      notableArtists: parsedDetails?.details?.notableArtists || parsedDetails?.notableArtists || []
@@ -3486,6 +3491,7 @@ const App: React.FC = () => {
                     imageUrl: parsedData?.imageUrl || parsedData?.image || "",
                     details: {
                       genre: parsedData?.details?.genre || parsedData?.genre || "",
+                      style: parsedData?.details?.style || parsedData?.style || "",
                       origin: parsedData?.details?.origin || parsedData?.origin || "",
                       founded: parsedData?.details?.founded || parsedData?.founded || "",
                       artist: parsedData?.details?.artist || entry.seedArtists || key,
@@ -3784,6 +3790,7 @@ const App: React.FC = () => {
                   if (!entryBio || entryBio.length < 5) return;
 
                   const entryGenre = parsedData?.details?.genre || parsedData?.genre || parsedData?.genres || "";
+                  const entryStyle = parsedData?.details?.style || parsedData?.style || "";
                   const entryOrigin = parsedData?.details?.origin || parsedData?.origin || parsedData?.location || parsedData?.country || "";
                   const entryFounded = parsedData?.details?.founded || parsedData?.founded || parsedData?.formed || parsedData?.year || "";
                   const entryArtistName = parsedData?.details?.artist || parsedData?.artist || parsedData?.name || cachedEntry.seedArtists || cachedEntry.artistId || key;
@@ -3793,6 +3800,7 @@ const App: React.FC = () => {
                     imageUrl: parsedData?.imageUrl || parsedData?.image || "",
                     details: {
                       genre: entryGenre,
+                      style: entryStyle,
                       origin: entryOrigin,
                       founded: entryFounded,
                       artist: entryArtistName,
@@ -4082,6 +4090,7 @@ const App: React.FC = () => {
                 if (!entryBio || entryBio.length < 5) return;
 
                 const entryGenre = parsedData?.details?.genre || parsedData?.genre || parsedData?.genres || "";
+                const entryStyle = parsedData?.details?.style || parsedData?.style || "";
                 const entryOrigin = parsedData?.details?.origin || parsedData?.origin || parsedData?.location || parsedData?.country || "";
                 const entryFounded = parsedData?.details?.founded || parsedData?.founded || parsedData?.formed || parsedData?.year || "";
                 const entryArtistName = parsedData?.details?.artist || parsedData?.artist || parsedData?.name || cachedEntry.seedArtists || cachedEntry.artistId || key;
@@ -4093,6 +4102,7 @@ const App: React.FC = () => {
                   imageUrl: parsedData?.imageUrl || parsedData?.image || "",
                   details: {
                     genre: entryGenre,
+                    style: entryStyle,
                     origin: entryOrigin,
                     founded: entryFounded,
                     artist: entryArtistName,
@@ -4297,7 +4307,7 @@ const App: React.FC = () => {
               }
 
               if (!details.details) {
-                details.details = { genre: "", origin: "", founded: "", notableArtists: [] };
+                details.details = { genre: "", style: "", origin: "", founded: "", notableArtists: [] };
               }
               details.details.artist = details.details.artist || seedName;
               if (!details.synthesisRationale) {
@@ -4767,7 +4777,7 @@ const App: React.FC = () => {
             }
 
             if (!details.details) {
-              details.details = { genre: "", origin: "", founded: "", notableArtists: [] };
+              details.details = { genre: "", style: "", origin: "", founded: "", notableArtists: [] };
             }
             details.details.artist = details.details.artist || seedLabel;
             if (!details.synthesisRationale) {
@@ -5235,7 +5245,8 @@ const App: React.FC = () => {
                             detailsCacheRef.current.get(simpleId) ||
                             detailsCacheRef.current.get(n.id) ||
                             detailsCacheRef.current.get(n.id.toLowerCase());
-      if (localExisting && localExisting.summary && localExisting.summary.trim().length >= 5 && !localExisting._isSentinel) {
+      const hasValidStyle = n.type === 'label' || !!(localExisting?.details?.style || (localExisting as any)?.style);
+      if (localExisting && localExisting.summary && localExisting.summary.trim().length >= 5 && !localExisting._isSentinel && hasValidStyle) {
         results.set(n.id, localExisting);
         results.set(n.id.toLowerCase(), localExisting);
         results.set(simpleId, localExisting);
@@ -5326,6 +5337,7 @@ const App: React.FC = () => {
         const bio = parsed?.summary || parsed?.bio || parsed?.description || parsed?.text || '';
         const imageUrl = parsed?.imageUrl || parsed?.image || '';
         const genre = parsed?.details?.genre || parsed?.genre || parsed?.genres || '';
+        const style = parsed?.details?.style || parsed?.style || '';
         const origin = parsed?.details?.origin || parsed?.origin || parsed?.location || parsed?.country || '';
         const founded = parsed?.details?.founded || parsed?.founded || parsed?.formed || parsed?.year || '';
         // Fix C: Heal all-lowercase legacy artist names in-place — avoids quality gate firing on
@@ -5355,7 +5367,7 @@ const App: React.FC = () => {
         const payload: NodeDetails = {
           summary: bio,
           imageUrl,
-          details: { artist: artistName, genre, origin, founded, notableArtists },
+          details: { artist: artistName, genre, style, origin, founded, notableArtists },
           members,
           links,
           discography,
@@ -5402,7 +5414,11 @@ const App: React.FC = () => {
             ...existing,
             imageUrl: v.imageUrl || existing.imageUrl || '',
             youtubeVideoId: v.youtubeVideoId || existing.youtubeVideoId,
-            details: existing.details || v.details
+            details: {
+              ...(v.details || {}),
+              ...(existing.details || {}),
+              style: existing.details?.style || v.details?.style || ''
+            }
           });
           return;
         }
@@ -5426,7 +5442,11 @@ const App: React.FC = () => {
               ...existing,
               imageUrl: v.imageUrl || existing.imageUrl || '',
               youtubeVideoId: v.youtubeVideoId || existing.youtubeVideoId,
-              details: existing.details || v.details
+              details: {
+                ...(v.details || {}),
+                ...(existing.details || {}),
+                style: existing.details?.style || v.details?.style || ''
+              }
             });
             return;
           }
@@ -7070,6 +7090,7 @@ const App: React.FC = () => {
                                const bio = parsed.summary || parsed.bio || parsed.description || parsed.text || "";
                                const imageUrl = parsed.imageUrl || parsed.image || "";
                                const genre = parsed.details?.genre || parsed.genre || parsed.genres || "";
+                               const style = parsed.details?.style || parsed.style || "";
                                const origin = parsed.details?.origin || parsed.origin || parsed.location || parsed.country || "";
                                const founded = parsed.details?.founded || parsed.founded || parsed.formed || parsed.year || "";
                                const artistName = parsed.details?.artist || parsed.artist || parsed.name || data.seedArtists || data.artistId || node.id;
@@ -7089,6 +7110,7 @@ const App: React.FC = () => {
                                   details: {
                                       artist: artistName,
                                       genre,
+                                      style,
                                       origin,
                                       founded,
                                       notableArtists
@@ -7181,7 +7203,7 @@ const App: React.FC = () => {
 
                 if (details) {
                   if (!details.details) {
-                    details.details = { genre: "", origin: "", founded: "", notableArtists: [] };
+                    details.details = { genre: "", style: "", origin: "", founded: "", notableArtists: [] };
                   }
                   details.details.artist = details.details.artist || node.label || titleCaseArtistId(node.id);
                   if (!details.synthesisRationale) {
@@ -7305,7 +7327,7 @@ const App: React.FC = () => {
                                   fallbackDetails = {
                                     summary: parsed.summary || parsed.bio || "",
                                     imageUrl: parsed.imageUrl || "",
-                                    details: parsed.details || { genre: "", origin: "", founded: "", notableArtists: [] },
+                                    details: parsed.details || { genre: "", style: "", origin: "", founded: "", notableArtists: [] },
                                     members: parsed.members || [],
                                     links: parsed.links || [],
                                     discography: parsed.discography || [],
@@ -7430,7 +7452,7 @@ const App: React.FC = () => {
                   // because the filter never becomes satisfied after a parse or network failure.
                   const sentinelEntry = {
                     summary: `Archival slot offline for ${node.label || node.id}. Re-evaluate node to re-establish curation.`,
-                    details: { genre: "", origin: "", founded: "", notableArtists: [] },
+                    details: { genre: "", style: "", origin: "", founded: "", notableArtists: [] },
                     links: [],
                     discography: [],
                     members: [],

@@ -189,6 +189,91 @@ describe('DetailsPanel', () => {
         expect(dashes.length).toBeGreaterThanOrEqual(2);
     });
 
+    it('renders canonical STYLE from details.details.style (e.g. Aggressive) and from top-level style fallback', async () => {
+        const mockNode = { id: 'spaced-us', type: 'artist', label: 'Spaced' };
+        const mockDetailsWithNestedStyle = { 
+            summary: 'Hardcore punk band from Buffalo, NY.', 
+            details: { 
+                genre: 'Hardcore Punk',
+                style: 'Aggressive',
+                origin: 'Buffalo, NY',
+                founded: '2019'
+            },
+            links: []
+        };
+        const mockGraphData = {
+            nodes: [{ id: 'spaced-us', type: 'artist', label: 'Spaced' }],
+            links: []
+        };
+
+        const { rerender } = render(
+            <NodeDetailsCard 
+                node={mockNode as any}
+                details={mockDetailsWithNestedStyle as any}
+                isLoading={false}
+                isGlobalLoading={false}
+                graphData={mockGraphData as any}
+                libraryArtists={[]}
+                seedArtists={[]}
+                onAddArtist={() => {}}
+                isSmallScreen={false}
+                onTogglePin={() => {}}
+                isPinned={false}
+                onNodeClick={() => {}}
+                onNavigate={() => {}}
+                chatHistory={[]}
+                onSendMessage={() => {}}
+                isChatLoading={false}
+                chatMode="instant"
+                onChatModeChange={() => {}}
+                liveMessageCount={0}
+                onAddToStack={() => {}}
+            />
+        );
+
+        expect(await screen.findByText('Style')).toBeInTheDocument();
+        expect(screen.getByText('Aggressive')).toBeInTheDocument();
+
+        // Also verify top-level style fallback when details.details.style is undefined
+        const mockDetailsWithTopLevelStyle = {
+            summary: 'Hardcore punk band from Buffalo, NY.',
+            style: 'Groove-Heavy',
+            details: {
+                genre: 'Hardcore Punk',
+                origin: 'Buffalo, NY',
+                founded: '2019'
+            },
+            links: []
+        };
+
+        rerender(
+            <NodeDetailsCard 
+                node={mockNode as any}
+                details={mockDetailsWithTopLevelStyle as any}
+                isLoading={false}
+                isGlobalLoading={false}
+                graphData={mockGraphData as any}
+                libraryArtists={[]}
+                seedArtists={[]}
+                onAddArtist={() => {}}
+                isSmallScreen={false}
+                onTogglePin={() => {}}
+                isPinned={false}
+                onNodeClick={() => {}}
+                onNavigate={() => {}}
+                chatHistory={[]}
+                onSendMessage={() => {}}
+                isChatLoading={false}
+                chatMode="instant"
+                onChatModeChange={() => {}}
+                liveMessageCount={0}
+                onAddToStack={() => {}}
+            />
+        );
+
+        expect(screen.getByText('Groove-Heavy')).toBeInTheDocument();
+    });
+
     it('preserves the 3-column row layout and does NOT render LABEL or STYLE when the active node is a label', async () => {
         const mockNode = { id: 'essential-records', type: 'label', label: 'Essential Records' };
         const mockDetails = { 
