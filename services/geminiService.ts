@@ -286,11 +286,18 @@ export const ARTIST_NODE_DETAILS_SCHEMA = {
 
     discography: {
       type: Type.ARRAY,
+      description: "Array of official, verified studio albums or EPs. If you do not have factual, exact knowledge of the artist's real releases, return an empty array []. NEVER invent, guess, or extrapolate plausible-sounding album titles.",
       items: {
         type: Type.OBJECT,
         properties: {
-          albumName: { type: Type.STRING },
-          releaseYear: { type: Type.STRING }
+          albumName: {
+            type: Type.STRING,
+            description: "The authentic, exact release title as officially issued. Do NOT guess or alter."
+          },
+          releaseYear: {
+            type: Type.STRING,
+            description: "4-digit release year (YYYY)."
+          }
         },
         required: ["albumName", "releaseYear"]
       }
@@ -569,6 +576,11 @@ export const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed infor
     - ZERO HALLUCINATION (MANDATORY): You must only return a youtubeVideoId if you can extract the exact 11-character ID from a YouTube watch URL (e.g., youtube.com/watch?v=...) present in your Google Search results. If you do not see the exact URL or video ID in the search results, set youtubeVideoId to null. NEVER guess or hallucinate a video ID under any circumstances.
     - AMBIGUITY RESOLUTION (CRITICAL): For entities with common or ambiguous names (such as "Missing Link"), you MUST combine the entity name with its Connected Network (e.g., its genre, label, or the Seed Artist) in your search query to prevent entity collisions. For example, search "Missing Link hardcore punk band" or "Missing Link Triple B Records" instead of just "Missing Link band".
 
+    DISCOGRAPHY GROUNDING & ZERO-HALLUCINATION RULE (CRITICAL):
+    - Only include real, officially released studio albums, EPs, or qualifying demos that exist in authoritative discographies.
+    - If you do not possess verified, exact historical knowledge of the artist's releases, you MUST return an empty array: "discography": [].
+    - ABSOLUTELY FORBIDDEN: NEVER invent, fabricate, guess, or extrapolate plausible album titles based on the band's location, lyrics, song titles, or genre clichés (e.g. NEVER invent regional titles like 'To Live and Die in New England' for a Massachusetts hardcore band).
+    - An empty array [] is 100% compliant, fully valid, and strictly preferred over any unverified, approximate, or hallucinated titles.
 
     CURATOR TONE & VARIETY (CRITICAL):
     - BREVITY: Max 25 words. Use exactly ONE snappy, high-impact sentence.

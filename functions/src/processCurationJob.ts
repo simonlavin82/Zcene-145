@@ -732,11 +732,11 @@ export const processCurationJob = onDocumentCreated({
                   details.details = { genre: "", origin: "", founded: "", notableArtists: [] };
                 }
 
-                // 4. Scrape dedicated Image URL (Artists Only)
+                // 4. Scrape dedicated Image URL & Reconcile Discography (Artists Only, Rule 38)
                 if (requiresImageScraping && searchArtistName && !isLabel) {
                   try {
                     let attemptName = searchArtistName;
-                    const scrapedImg = await scrapeImageUrlBackend(
+                    const scrapeResult = await scrapeImageUrlBackend(
                       attemptName, 
                       'artist',
                       details.details.genre || "",
@@ -744,17 +744,21 @@ export const processCurationJob = onDocumentCreated({
                       details.details.origin,
                       details.discography || []
                     );
-                    if (scrapedImg) {
-                      details.imageUrl = scrapedImg;
+                    if (scrapeResult && scrapeResult.imageUrl) {
+                      details.imageUrl = scrapeResult.imageUrl;
+                      if (Array.isArray(scrapeResult.reconciledDiscography)) {
+                        details.discography = scrapeResult.reconciledDiscography;
+                      }
                     } else {
-                      // ⚠️ STRICT FAIL-FAST RULE: No deterministic fallback images.
-                      console.warn(`[Image Scraper] No image found for ${searchArtistName}.`);
+                      // ⚠️ STRICT FAIL-FAST RULE & TIER 4 QUARANTINE (Rule 38):
+                      console.warn(`[Image Scraper / Rule 38] No verified image for ${searchArtistName}. Setting not-found and quarantining discography to [].`);
                       details.imageUrl = 'not-found';
+                      details.discography = [];
                     }
                   } catch (e) {
-                    // ⚠️ STRICT FAIL-FAST RULE: Catch API timeouts instantly.
-                    console.warn(`[Image Scraper] Timeout/Error for ${searchArtistName}. Enforcing fail-fast rule.`);
+                    console.warn(`[Image Scraper / Rule 38] Timeout/Error for ${searchArtistName}. Enforcing fail-fast quarantine.`);
                     details.imageUrl = 'not-found';
+                    details.discography = [];
                   }
                 }
 

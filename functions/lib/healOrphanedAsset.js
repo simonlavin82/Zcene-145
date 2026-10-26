@@ -164,20 +164,31 @@ exports.healOrphanedAsset = (0, https_1.onCall)({
                 docRef = db.collection(collectionName).doc(canonicalId);
             }
         }
-        // 3. [Rule 8 & 37] Rich Media Scraping Integration with exact Column 3 fuzzy matching parity
-        let scrapedImageUrl = null;
+        // 3. [Rule 8, 37 & 38] Rich Media Scraping Integration & iTunes Discography Reconciliation
         if (!isLabel) {
             const searchArtistName = cleanTitle;
             const genre = synthesizedDetails.details?.genre || "";
             const summary = synthesizedDetails.summary || "";
             const origin = synthesizedDetails.details?.origin || (countrySlug ? countrySlug.toUpperCase() : "");
             try {
-                scrapedImageUrl = await (0, curatorService_1.scrapeImageUrlBackend)(searchArtistName, 'artist', genre, summary, origin, synthesizedDetails.discography || []);
+                const scrapeResult = await (0, curatorService_1.scrapeImageUrlBackend)(searchArtistName, 'artist', genre, summary, origin, synthesizedDetails.discography || []);
+                if (scrapeResult && scrapeResult.imageUrl) {
+                    synthesizedDetails.imageUrl = scrapeResult.imageUrl;
+                    if (Array.isArray(scrapeResult.reconciledDiscography)) {
+                        synthesizedDetails.discography = scrapeResult.reconciledDiscography;
+                    }
+                }
+                else {
+                    // Tier 4 Reject & Discography Quarantine (Rule 38)
+                    synthesizedDetails.imageUrl = 'not-found';
+                    synthesizedDetails.discography = [];
+                }
             }
             catch (scrapeErr) {
                 console.warn(`[JIT Healer] Image scraper error for "${searchArtistName}":`, scrapeErr.message);
+                synthesizedDetails.imageUrl = 'not-found';
+                synthesizedDetails.discography = [];
             }
-            synthesizedDetails.imageUrl = scrapedImageUrl || 'not-found';
         }
         else {
             synthesizedDetails.imageUrl = null;

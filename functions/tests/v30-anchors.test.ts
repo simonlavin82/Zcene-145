@@ -342,7 +342,7 @@ describe('Architecture V35: 3-Tier Anchor System & Deep Cut Anti-Pollution Gates
       expect(isFullyQualifiedEntityProfile(prosePollutedLabel, true)).toBe(false);
     });
 
-    it('Marks qualifyCacheEntry as USABLE_STALE (isFullyQualified: false) if detailsCache has empty discography or prose-fallback reason', () => {
+    it('Marks qualifyCacheEntry as USABLE_STALE (isFullyQualified: false) if detailsCache has invalid non-array discography or prose-fallback reason (V37 Rule 40)', () => {
       const validGraph = JSON.stringify({
         nodes: [
           { id: 'koyo-us', type: 'artist', label: 'Koyo' },
@@ -359,7 +359,7 @@ describe('Architecture V35: 3-Tier Anchor System & Deep Cut Anti-Pollution Gates
         synthesisRationale: validRationale,
         detailsCache: {
           ...validArtistProfile,
-          discography: [],
+          discography: null, // V37: non-array/null is invalid, while [] is allowed
           recommendationReason: 'Synthesised from live cultural archives via Google Search grounding.'
         }
       };
@@ -368,6 +368,34 @@ describe('Architecture V35: 3-Tier Anchor System & Deep Cut Anti-Pollution Gates
       expect(res.isFullyQualified).toBe(false);
       expect(res.missing).toContain('discography');
       expect(res.missing).toContain('recommendationReason');
+    });
+
+    it('Accepts empty discography array [] as fully qualified under V37 Rule 40 for honest underground artists', () => {
+      const validGraph = JSON.stringify({
+        nodes: [
+          { id: 'koyo-us', type: 'artist', label: 'Koyo' },
+          { id: 'united-states', type: 'country', label: 'United States' }
+        ],
+        links: [{ source: 'koyo-us', target: 'united-states', weight: 0.2 }]
+      });
+      const validRationale = 'Koyo anchors the modern Long Island melodic hardcore wave, bridging 90s post-hardcore emotion with contemporary hardcore urgency.';
+
+      const undergroundDoc = {
+        artistId: 'koyo-us',
+        cacheKey: 'koyo-us',
+        graphData: validGraph,
+        synthesisRationale: validRationale,
+        detailsCache: {
+          ...validArtistProfile,
+          discography: [], // V37 allows honest empty array
+          imageUrl: 'not-found'
+        }
+      };
+
+      const res = qualifyCacheEntry(undergroundDoc, 'koyo-us');
+      expect(res.isFullyQualified).toBe(true);
+      expect(res.verdict).toBe('TOPOLOGY_HIT');
+      expect(res.missing).not.toContain('discography');
     });
   });
 

@@ -70,7 +70,7 @@ const ARCHITECTURE_RULES = [
     { 
         id: 8, 
         title: "Grounding / Scraper Logic", 
-        desc: "Search API & prose fallbacks eradicated; Deep Cut hydration strictly enforces responseMimeType: 'application/json' and NODE_DETAILS_SCHEMA with strict enum decoding for Artists (omitted for Labels) across a 3x retry loop. iTunes scraper executes a 4-tier waterfall where missing or fuzzy titles enforce exact release-year constraints, and Tier 3 strict homonym collisions are resolved via taxonomy genre-affinity scoring; 'not-found' is a valid terminal monogram state once all 4 tiers run against a valid discography (discography.length > 0)." 
+        desc: "Search API & prose fallbacks eradicated; Deep Cut hydration strictly enforces responseMimeType: 'application/json' and NODE_DETAILS_SCHEMA with strict enum decoding for Artists (omitted for Labels) across a 3x retry loop. Zero-hallucination discography grounding explicitly permits honest empty arrays [] for underground artists, forbids fabricating album titles, and mandates authentic release years. 4-Tier iTunes scraper executes with Tier 1 taxonomic distance candidate scoring, exact release-year constraints for fuzzy matches, candidate discography reconciliation against authentic iTunes releases (reconcileDiscographyWithITunes), and Tier 4 fail-fast reject/terminal quarantine setting imageUrl: 'not-found' and discography: [] for unverified artists while strictly exempting label entities." 
     },
     { 
         id: 9, 
@@ -220,7 +220,7 @@ const ARCHITECTURE_RULES = [
     { 
         id: 38, 
         title: "4-Tier Asset Disambiguation Waterfall", 
-        desc: "Third-party media scraping executes a 4-tier cascade: (1) Strict whole-word taxonomy match (homonyms escalate to Tier 3), (2) Geographic suffix fallback, (3) Resilient Discography Tie-Breaker (exact, substring, or prefix/distinctive-token overlap ± 1yr release correlation; blocks self-titled/generic titles and deduplicates Deluxe editions), (4) Fail-fast rejection to 'not-found'." 
+        desc: "Third-party media scraping executes a 4-tier cascade: (1) Strict whole-word taxonomy match with genre-distance candidate scoring (promotes candidate if score >= 8 vs runner-up <= 4; reconciles discography), (2) Geographic suffix fallback, (3) Resilient Discography Tie-Breaker with exact release-year constraints, genre-affinity scoring, and iTunes discography reconciliation, (4) Tier 4 Fail-Fast Reject / Terminal Quarantine: unverified artists receive imageUrl: 'not-found' and discography: []. Label entities strictly bypass image scraping and retain catalog releases." 
     },
     { 
         id: 39, 
@@ -230,7 +230,7 @@ const ARCHITECTURE_RULES = [
     { 
         id: 40, 
         title: "Synthesis Rationale & Deep Cut Integrity (Read/Write Gates)", 
-        desc: "Direct Hits strictly require a non-empty synthesisRationale (>= 50 chars) AND a fully qualified profile (isFullyQualifiedEntityProfile: summary > 50 chars, genre/origin/founded, canonical style for artists, discography.length > 0, valid imageUrl or terminal 'not-found' monogram, and authentic recommendationReason) at both the Read Gate and Write Gate (Step 6). Prose-fallback stubs ('Synthesised from live cultural archives...') are hard-rejected. If Step 3 Root Breakdown exceeds 90s or throws 504, execution immediately fails over to 3.6 Flash (low). Step 4B locks canonical ISO artist suffixes (-be) over slash-separated border-town origins." 
+        desc: "Direct Hits strictly require a non-empty synthesisRationale (>= 50 chars) AND a fully qualified profile (isFullyQualifiedEntityProfile: summary > 50 chars, genre/origin/founded, canonical style for artists, Array.isArray(profile.discography) where honest empty arrays [] are accepted for unindexed underground artists and non-arrays/null are rejected, valid imageUrl or terminal 'not-found' monogram, and authentic recommendationReason) at both the Read Gate and Write Gate (Step 6). Prose-fallback stubs ('Synthesised from live cultural archives...') are hard-rejected. If Step 3 Root Breakdown exceeds 90s or throws 504, execution immediately fails over to 3.6 Flash (low). Step 4B locks canonical ISO artist suffixes (-be) over slash-separated border-town origins." 
     },
     { 
         id: 41, 
@@ -575,7 +575,7 @@ const RunbookAccordion: React.FC = () => {
             >
                 <div className="flex items-center gap-3 text-zinc-200 font-medium text-sm uppercase tracking-wider">
                     <Terminal className="w-4 h-4 text-primary" />
-                    V36 Full-Stack Regression Runbook
+                    V37 Full-Stack Regression Runbook
                 </div>
                 {isOpen ? <ChevronDown className="w-4 h-4 text-zinc-400" /> : <ChevronRight className="w-4 h-4 text-zinc-400" />}
             </button>

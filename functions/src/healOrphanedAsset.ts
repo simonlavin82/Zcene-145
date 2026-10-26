@@ -192,8 +192,7 @@ export const healOrphanedAsset = onCall({
       }
     }
 
-    // 3. [Rule 8 & 37] Rich Media Scraping Integration with exact Column 3 fuzzy matching parity
-    let scrapedImageUrl: string | null = null;
+    // 3. [Rule 8, 37 & 38] Rich Media Scraping Integration & iTunes Discography Reconciliation
     if (!isLabel) {
       const searchArtistName = cleanTitle;
       const genre = synthesizedDetails.details?.genre || "";
@@ -201,7 +200,7 @@ export const healOrphanedAsset = onCall({
       const origin = synthesizedDetails.details?.origin || (countrySlug ? countrySlug.toUpperCase() : "");
 
       try {
-        scrapedImageUrl = await scrapeImageUrlBackend(
+        const scrapeResult = await scrapeImageUrlBackend(
           searchArtistName,
           'artist',
           genre,
@@ -209,10 +208,21 @@ export const healOrphanedAsset = onCall({
           origin,
           synthesizedDetails.discography || []
         );
+        if (scrapeResult && scrapeResult.imageUrl) {
+          synthesizedDetails.imageUrl = scrapeResult.imageUrl;
+          if (Array.isArray(scrapeResult.reconciledDiscography)) {
+            synthesizedDetails.discography = scrapeResult.reconciledDiscography;
+          }
+        } else {
+          // Tier 4 Reject & Discography Quarantine (Rule 38)
+          synthesizedDetails.imageUrl = 'not-found';
+          synthesizedDetails.discography = [];
+        }
       } catch (scrapeErr: any) {
         console.warn(`[JIT Healer] Image scraper error for "${searchArtistName}":`, scrapeErr.message);
+        synthesizedDetails.imageUrl = 'not-found';
+        synthesizedDetails.discography = [];
       }
-      synthesizedDetails.imageUrl = scrapedImageUrl || 'not-found';
     } else {
       synthesizedDetails.imageUrl = null;
     }

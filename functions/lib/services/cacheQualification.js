@@ -99,9 +99,9 @@ exports.parseGraphField = parseGraphField;
  *   3. Authentic recommendationReason (non-empty for artists, and never containing
  *      "Synthesised from live cultural archives").
  *   4. For artists (!isLabel):
- *      - Array.isArray(profile.discography) && profile.discography.length > 0
+ *      - Array.isArray(profile.discography) (honest empty arrays [] are fully qualified for unindexed underground artists)
  *      - Non-empty imageUrl string (either a verified https:// URL or the terminal
- *        "not-found" monogram state after a real 4-tier scrape with a non-empty discography;
+ *        "not-found" monogram state after a real 4-tier scrape;
  *        only undefined/null/"" means image scraping has not run).
  */
 const isFullyQualifiedEntityProfile = (profile, isLabel = false) => {
@@ -142,7 +142,7 @@ const isFullyQualifiedEntityProfile = (profile, isLabel = false) => {
         if (isInvalidMeta(styleRaw)) {
             return false;
         }
-        if (!Array.isArray(profile.discography) || profile.discography.length === 0) {
+        if (!Array.isArray(profile.discography)) {
             return false;
         }
         const imageUrl = typeof profile.imageUrl === 'string'
@@ -190,7 +190,7 @@ const qualifyCacheEntry = (data, seedId) => {
     const imageUrl = profile?.imageUrl || profile?.image || '';
     const recReason = String(profile?.recommendationReason || '').trim();
     const isProseFallback = recReason.toLowerCase().includes('synthesised from live cultural archives');
-    const hasEmptyDiscography = Array.isArray(profile?.discography) && profile.discography.length === 0 && !isLabel;
+    const hasInvalidDiscography = !isLabel && profile?.discography !== undefined && !Array.isArray(profile.discography);
     const hasBio = typeof bio === 'string' && bio.trim().length > exports.MIN_BIO_LENGTH && !bio.toLowerCase().includes('sandbox mock') && !isProseFallback;
     const hasGenre = typeof genre === 'string' && genre.trim().length > 0 && genre.trim().toLowerCase() !== 'unknown';
     const hasStyle = isLabel || (typeof style === 'string' && style.trim().length > 0 && style.trim().toLowerCase() !== 'unknown');
@@ -205,17 +205,17 @@ const qualifyCacheEntry = (data, seedId) => {
         missing.push('imageUrl');
     if (isProseFallback)
         missing.push('recommendationReason');
-    if (hasEmptyDiscography)
+    if (hasInvalidDiscography)
         missing.push('discography');
-    const isFullyQualified = isStructurallyUsable && hasBio && hasGenre && hasStyle && hasImage && !isProseFallback && !hasEmptyDiscography;
+    const isFullyQualified = isStructurallyUsable && hasBio && hasGenre && hasStyle && hasImage && !isProseFallback && !hasInvalidDiscography;
     let verdict;
     if (isFullyQualified)
         verdict = 'TOPOLOGY_HIT';
-    else if (isStructurallyUsable && !isProseFallback && !hasEmptyDiscography)
+    else if (isStructurallyUsable && !isProseFallback && !hasInvalidDiscography)
         verdict = 'USABLE_STALE';
     else
         verdict = 'STUB';
-    return { verdict, isStructurallyUsable: isStructurallyUsable && !isProseFallback && !hasEmptyDiscography, isFullyQualified, missing };
+    return { verdict, isStructurallyUsable: isStructurallyUsable && !isProseFallback && !hasInvalidDiscography, isFullyQualified, missing };
 };
 exports.qualifyCacheEntry = qualifyCacheEntry;
 /** Option A: anything structurally usable is rendered locally at zero cost. */

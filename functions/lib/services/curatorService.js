@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateSemanticLinkWeights = exports.scrapeImageUrlBackend = exports.checkVideoPlayability = exports.scrapeVideoIdBackend = exports.fetchNodeDetailsBackend = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = exports.NODE_DETAILS_SCHEMA = exports.getNodeDetailsSchema = exports.LABEL_NODE_DETAILS_SCHEMA = exports.ARTIST_NODE_DETAILS_SCHEMA = exports.generateGraphDataBackend = exports.reconcileNarrativeEdges = exports.generateRootsBreakdownBackend = exports.validateSeedOriginBackend = exports.SEED_VALIDATION_SCHEMA = exports.GENERATE_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = exports.GRAPH_RESPONSE_SCHEMA = exports.extractCleanJsonString = exports.extractArtistSubGraph = exports.normalizeGraphData = exports.buildCompositeCacheKey = exports.extractCountrySlug = exports.sanitizeImageUrl = exports.extractValidYoutubeId = exports.cleanLabelDisplayName = exports.cleanArtistDisplayName = exports.titleCaseArtistId = exports.normalizeLabelId = exports.normalizeArtistId = exports.applyCanonicalAlias = exports.CANONICAL_ALIASES = exports.GEMINI_FLASH_MODEL = void 0;
+exports.generateSemanticLinkWeights = exports.scrapeImageUrlBackend = exports.reconcileDiscographyWithITunes = exports.cleanCollectionTitle = exports.fetchArtistArtwork = exports.fetchArtistCollections = exports.evaluateGenreDistanceScore = exports.checkVideoPlayability = exports.scrapeVideoIdBackend = exports.fetchNodeDetailsBackend = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = exports.NODE_DETAILS_SCHEMA = exports.getNodeDetailsSchema = exports.LABEL_NODE_DETAILS_SCHEMA = exports.ARTIST_NODE_DETAILS_SCHEMA = exports.generateGraphDataBackend = exports.reconcileNarrativeEdges = exports.generateRootsBreakdownBackend = exports.validateSeedOriginBackend = exports.SEED_VALIDATION_SCHEMA = exports.GENERATE_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = exports.GRAPH_RESPONSE_SCHEMA = exports.extractCleanJsonString = exports.extractArtistSubGraph = exports.normalizeGraphData = exports.buildCompositeCacheKey = exports.extractCountrySlug = exports.sanitizeImageUrl = exports.extractValidYoutubeId = exports.cleanLabelDisplayName = exports.cleanArtistDisplayName = exports.titleCaseArtistId = exports.normalizeLabelId = exports.normalizeArtistId = exports.applyCanonicalAlias = exports.CANONICAL_ALIASES = exports.GEMINI_FLASH_MODEL = void 0;
 const genai_1 = require("@google/genai");
 const types_1 = require("../types");
 const executeCurationPipeline_1 = require("../executeCurationPipeline");
@@ -1607,11 +1607,18 @@ exports.ARTIST_NODE_DETAILS_SCHEMA = {
         },
         discography: {
             type: genai_1.Type.ARRAY,
+            description: "Array of official, verified studio albums or EPs. If you do not have factual, exact knowledge of the artist's real releases, return an empty array []. NEVER invent, guess, or extrapolate plausible-sounding album titles.",
             items: {
                 type: genai_1.Type.OBJECT,
                 properties: {
-                    albumName: { type: genai_1.Type.STRING },
-                    releaseYear: { type: genai_1.Type.STRING }
+                    albumName: {
+                        type: genai_1.Type.STRING,
+                        description: "The authentic, exact release title as officially issued. Do NOT guess or alter."
+                    },
+                    releaseYear: {
+                        type: genai_1.Type.STRING,
+                        description: "4-digit release year (YYYY)."
+                    }
                 },
                 required: ["albumName", "releaseYear"]
             }
@@ -1777,6 +1784,12 @@ exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed informatio
     - NEGATIVE SHORTS CONSTRAINT: DO NOT parse or return video hashes derived from search queries matching vertical formats or the '/shorts/' route structure. Prioritize landscape video IDs with durations longer than 2 minutes.
     - ZERO HALLUCINATION (MANDATORY): You must only return a youtubeVideoId if you can extract the exact 11-character ID from a YouTube watch URL (e.g., youtube.com/watch?v=...) present in your EXTERNAL SEARCH CONTEXT. If you do not see the exact URL or video ID in the context, set youtubeVideoId to null. NEVER guess or hallucinate a video ID under any circumstances.
 
+    DISCOGRAPHY GROUNDING & ZERO-HALLUCINATION RULE (CRITICAL):
+    - Only include real, officially released studio albums, EPs, or qualifying demos that exist in authoritative discographies.
+    - If you do not possess verified, exact historical knowledge of the artist's releases, you MUST return an empty array: "discography": [].
+    - ABSOLUTELY FORBIDDEN: NEVER invent, fabricate, guess, or extrapolate plausible album titles based on the band's location, lyrics, song titles, or genre clichés (e.g. NEVER invent regional titles like 'To Live and Die in New England' for a Massachusetts hardcore band).
+    - An empty array [] is 100% compliant, fully valid, and strictly preferred over any unverified, approximate, or hallucinated titles.
+
     WIKIPEDIA ORDERING RULE (MANDATORY):
     If a Wikipedia link is found, it MUST be the very first item (index 0) in the links array.`;
 // --- DETAILS HYDRATION MODULES ---
@@ -1896,7 +1909,7 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint,
             const isLabelNode = String(node.type || '').toLowerCase() === 'label';
             const candidateBio = sanitizeBioText(parsedCandidate?.summary || parsedCandidate?.bio || "");
             const candidateReason = String(parsedCandidate?.recommendationReason || '').trim();
-            const hasValidDiscography = isLabelNode || (Array.isArray(parsedCandidate?.discography) && parsedCandidate.discography.length > 0);
+            const hasValidDiscography = isLabelNode || Array.isArray(parsedCandidate?.discography);
             if (!candidateBio ||
                 candidateBio.length <= 50 ||
                 !candidateReason ||
@@ -2188,30 +2201,169 @@ const evaluateGenreMatch = (itunesGenreRaw, zceneGenreRaw, summaryRaw) => {
     }
     return false;
 };
-const fetchArtistArtwork = async (artistId) => {
+const evaluateGenreDistanceScore = (itunesGenreRaw, zceneGenreRaw, summaryRaw) => {
+    const normalizeGenre = (g) => (g || "").toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+    const itunesGenre = normalizeGenre(itunesGenreRaw);
+    const zceneGenre = normalizeGenre(zceneGenreRaw);
+    if (!itunesGenre)
+        return 0;
+    // 1. Direct equality
+    if (itunesGenre === zceneGenre)
+        return 10;
+    // 2. Direct core keyword intersection (e.g. "hardcore punk" contains "punk")
+    const zceneWords = zceneGenre.split(' ').filter(w => w.length > 2);
+    const itunesWords = itunesGenre.split(' ').filter(w => w.length > 2);
+    const keywordMatch = zceneWords.some(w => containsWord(itunesGenre, w)) ||
+        itunesWords.some(w => containsWord(zceneGenre, w));
+    if (keywordMatch)
+        return 8;
+    // 3. Taxonomy family intersection (bridge)
+    for (const [_, subgenres] of Object.entries(GENRE_TAXONOMY)) {
+        const itunesInFamily = subgenres.some(token => containsWord(itunesGenre, token));
+        const zceneInFamily = subgenres.some(token => containsWord(zceneGenre, token));
+        if (itunesInFamily && zceneInFamily) {
+            return 3;
+        }
+    }
+    // 4. Summary fallback
+    if (summaryRaw) {
+        const summaryNorm = normalizeGenre(summaryRaw);
+        const summaryMatch = itunesWords.some(w => containsWord(summaryNorm, w));
+        if (summaryMatch)
+            return 2;
+    }
+    return 0;
+};
+exports.evaluateGenreDistanceScore = evaluateGenreDistanceScore;
+const fetchArtistCollections = async (artistId) => {
     try {
-        const albumUrl = `https://itunes.apple.com/lookup?id=${artistId}&entity=album&limit=1`;
-        const albumController = new AbortController();
-        const albumTimeout = setTimeout(() => albumController.abort(), 2500);
+        const lookupUrl = `https://itunes.apple.com/lookup?id=${artistId}&entity=album&limit=200`;
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 2500);
         try {
-            const albumRes = await fetch(albumUrl, { signal: albumController.signal });
-            if (albumRes.ok) {
-                const albumData = await albumRes.json();
-                const album = albumData.results?.find((r) => r.wrapperType === 'collection');
-                if (album && album.artworkUrl100) {
-                    return album.artworkUrl100.replace('100x100bb', '600x600bb');
+            const res = await fetch(lookupUrl, { signal: controller.signal });
+            if (res.ok) {
+                const data = await res.json();
+                const albums = (data.results || []).filter((r) => r.wrapperType === 'collection' && String(r.artistId) === String(artistId));
+                let artwork = null;
+                for (const alb of albums) {
+                    if (alb.artworkUrl100) {
+                        artwork = alb.artworkUrl100.replace('100x100bb', '600x600bb');
+                        break;
+                    }
                 }
+                return { artwork, albums };
             }
         }
         finally {
-            clearTimeout(albumTimeout);
+            clearTimeout(timeout);
         }
     }
     catch (err) {
-        // Graceful fallback to null
+        // Graceful fallback
     }
-    return null;
+    return { artwork: null, albums: [] };
 };
+exports.fetchArtistCollections = fetchArtistCollections;
+const fetchArtistArtwork = async (artistId) => {
+    const result = await (0, exports.fetchArtistCollections)(artistId);
+    return result.artwork;
+};
+exports.fetchArtistArtwork = fetchArtistArtwork;
+const cleanCollectionTitle = (title) => {
+    if (!title)
+        return "";
+    return title
+        .replace(/\s*-\s*(ep|single|album|live|remastered|deluxe\s+edition|deluxe|expanded\s+edition)$/i, '')
+        .replace(/\s*\((ep|single|album|live|remastered|deluxe\s+edition|deluxe|expanded\s+edition)\)$/i, '')
+        .replace(/\s*\[(ep|single|album|live|remastered|deluxe\s+edition|deluxe|expanded\s+edition)\]$/i, '')
+        .trim();
+};
+exports.cleanCollectionTitle = cleanCollectionTitle;
+const reconcileDiscographyWithITunes = (llmDiscography, itunesAlbums, cleanArtistName) => {
+    if (!Array.isArray(itunesAlbums) || itunesAlbums.length === 0) {
+        return llmDiscography || [];
+    }
+    const normArtist = (cleanArtistName || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+    const validItunesCollections = [];
+    const seenNorms = new Set();
+    for (const alb of itunesAlbums) {
+        if (alb.wrapperType !== 'collection')
+            continue;
+        const rawTitle = alb.collectionName || '';
+        if (!rawTitle)
+            continue;
+        const cleanTitle = (0, exports.cleanCollectionTitle)(rawTitle);
+        const normTitle = normalizeAlbumTitle(rawTitle);
+        if (normTitle.length < 2)
+            continue;
+        if (GENERIC_ALBUM_TITLES.has(cleanTitle.toLowerCase().trim()))
+            continue;
+        if (normTitle === normArtist && !hasQualifyingDescriptor(rawTitle))
+            continue;
+        if (seenNorms.has(normTitle))
+            continue;
+        seenNorms.add(normTitle);
+        const year = alb.releaseDate ? String(new Date(alb.releaseDate).getFullYear()) : undefined;
+        validItunesCollections.push({
+            rawTitle,
+            cleanTitle,
+            normTitle,
+            year,
+            trackCount: alb.trackCount || 0,
+            releaseDate: alb.releaseDate
+        });
+    }
+    const reconciled = [];
+    const matchedItunesNorms = new Set();
+    if (Array.isArray(llmDiscography)) {
+        for (const item of llmDiscography) {
+            if (!item || !item.albumName)
+                continue;
+            const zceneYear = item.releaseYear ? parseInt(item.releaseYear, 10) : undefined;
+            let matchedItunes = null;
+            for (const itunesAlb of validItunesCollections) {
+                const itunesYear = itunesAlb.year ? parseInt(itunesAlb.year, 10) : undefined;
+                if (titlesMatchFuzzy(itunesAlb.rawTitle, item.albumName, itunesYear, zceneYear)) {
+                    matchedItunes = itunesAlb;
+                    break;
+                }
+            }
+            if (matchedItunes) {
+                reconciled.push({
+                    albumName: matchedItunes.cleanTitle || matchedItunes.rawTitle,
+                    releaseYear: matchedItunes.year || item.releaseYear || ''
+                });
+                matchedItunesNorms.add(matchedItunes.normTitle);
+            }
+            else {
+                console.warn(`[reconcileDiscographyWithITunes] Dropping unverified hallucinated album "${item.albumName}" (${item.releaseYear}) for ${cleanArtistName}.`);
+            }
+        }
+    }
+    // Backfill from authentic iTunes collections if empty or if fewer than 2 releases verified
+    if (reconciled.length < 2 && validItunesCollections.length > 0) {
+        validItunesCollections.sort((a, b) => {
+            const dateA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
+            const dateB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
+            return dateA - dateB;
+        });
+        for (const alb of validItunesCollections) {
+            if (reconciled.length >= 3)
+                break;
+            if (!matchedItunesNorms.has(alb.normTitle)) {
+                reconciled.push({
+                    albumName: alb.cleanTitle || alb.rawTitle,
+                    releaseYear: alb.year || ''
+                });
+                matchedItunesNorms.add(alb.normTitle);
+            }
+        }
+        console.log(`[reconcileDiscographyWithITunes] Reconciled/Backfilled ${reconciled.length} verified collections from iTunes for ${cleanArtistName}: [${reconciled.map(r => `"${r.albumName}"`).join(', ')}]`);
+    }
+    return reconciled;
+};
+exports.reconcileDiscographyWithITunes = reconcileDiscographyWithITunes;
 const verifyCandidateDiscography = async (candidate, cleanArtistName, discography) => {
     const normArtist = (cleanArtistName || "").toLowerCase().replace(/[^a-z0-9]/g, '');
     const validZceneAlbums = [];
@@ -2222,7 +2374,6 @@ const verifyCandidateDiscography = async (candidate, cleanArtistName, discograph
             continue;
         if (GENERIC_ALBUM_TITLES.has(raw.toLowerCase().trim()))
             continue;
-        // Exclude bare self-titled albums from sole proof, but preserve qualified releases like (Demo) or [EP]
         if (norm === normArtist && !hasQualifyingDescriptor(raw))
             continue;
         const parsedYear = item.releaseYear ? parseInt(item.releaseYear, 10) : undefined;
@@ -2233,7 +2384,7 @@ const verifyCandidateDiscography = async (candidate, cleanArtistName, discograph
         });
     }
     if (validZceneAlbums.length === 0) {
-        return { candidate, matchCount: 0, matchedTitles: [], bestArtwork: null };
+        return { candidate, matchCount: 0, matchedTitles: [], bestArtwork: null, albums: [] };
     }
     try {
         const lookupUrl = `https://itunes.apple.com/lookup?id=${candidate.artistId}&entity=album&limit=200`;
@@ -2244,7 +2395,6 @@ const verifyCandidateDiscography = async (candidate, cleanArtistName, discograph
             if (res.ok) {
                 const data = await res.json();
                 const albums = (data.results || []).filter((r) => r.wrapperType === 'collection' && String(r.artistId) === String(candidate.artistId));
-                // Deduplicate matched albums by unique Zcene title to prevent Deluxe/Remaster inflation
                 const matchedZceneTitles = new Set();
                 let bestArtwork = null;
                 for (const alb of albums) {
@@ -2254,7 +2404,6 @@ const verifyCandidateDiscography = async (candidate, cleanArtistName, discograph
                         continue;
                     if (GENERIC_ALBUM_TITLES.has(albTitle.toLowerCase().trim()))
                         continue;
-                    // Exclude bare self-titled albums on candidate side, but preserve qualified releases like (Demo) or [EP]
                     if (normItunes === normArtist && !hasQualifyingDescriptor(albTitle))
                         continue;
                     const albYear = alb.releaseDate ? new Date(alb.releaseDate).getFullYear() : undefined;
@@ -2273,7 +2422,8 @@ const verifyCandidateDiscography = async (candidate, cleanArtistName, discograph
                     candidate,
                     matchCount: uniqueMatches.length,
                     matchedTitles: uniqueMatches,
-                    bestArtwork
+                    bestArtwork,
+                    albums
                 };
             }
         }
@@ -2284,27 +2434,24 @@ const verifyCandidateDiscography = async (candidate, cleanArtistName, discograph
     catch (err) {
         // Graceful fallback to 0 matches
     }
-    return { candidate, matchCount: 0, matchedTitles: [], bestArtwork: null };
+    return { candidate, matchCount: 0, matchedTitles: [], bestArtwork: null, albums: [] };
 };
 const isQualifyingMatch = (verification) => {
     if (verification.matchCount === 0)
         return false;
-    // Multi-word (>=2 words) or >=8 chars title qualifies on 1 match
     const hasStrongTitle = verification.matchedTitles.some(title => {
         const words = title.trim().split(/\s+/);
         return words.length >= 2 || title.length >= 8;
     });
     if (hasStrongTitle)
         return true;
-    // Otherwise require at least 2 distinct matched titles
     return verification.matchCount >= 2;
 };
 const scrapeImageUrlBackend = async (artistName, type, genre, summary, origin, discography) => {
     // Strategy: High-Speed Deterministic iTunes API (Artists Only)
     if (type === 'label') {
-        return null;
+        return { imageUrl: null, reconciledDiscography: discography || [] };
     }
-    // Defense-in-depth: Ensure artistName is human-readable and clean of country slug artifacts
     let cleanArtistName = (0, executeCurationPipeline_1.stripCountrySlug)(artistName).trim();
     if (cleanArtistName.includes('-') && !cleanArtistName.includes(' ')) {
         cleanArtistName = (0, exports.titleCaseArtistId)(cleanArtistName);
@@ -2335,13 +2482,32 @@ const scrapeImageUrlBackend = async (artistName, type, genre, summary, origin, d
         const strictMatches = baseExactMatches.filter(r => evaluateGenreMatch(r.primaryGenreName, genre, summary));
         if (strictMatches.length === 1) {
             const winner = strictMatches[0];
-            const artwork = await fetchArtistArtwork(winner.artistId);
+            const { artwork, albums } = await (0, exports.fetchArtistCollections)(winner.artistId);
             if (artwork) {
+                const reconciled = (0, exports.reconcileDiscographyWithITunes)(discography || [], albums, cleanArtistName);
                 console.log(`[scrapeImageUrlBackend] [Tier 1 Hit] "${cleanArtistName}" verified via strict taxonomy overlap. (iTunes ID: ${winner.artistId}, Genre: '${winner.primaryGenreName}')`);
-                return artwork;
+                return { imageUrl: artwork, reconciledDiscography: reconciled };
             }
         }
         else if (strictMatches.length > 1) {
+            // Tier 1 Genre-Distance Scoring (Rule 38)
+            const scoredCandidates = strictMatches.map(c => ({
+                candidate: c,
+                score: (0, exports.evaluateGenreDistanceScore)(c.primaryGenreName, genre, summary)
+            }));
+            scoredCandidates.sort((a, b) => b.score - a.score);
+            const top = scoredCandidates[0];
+            const runnerUp = scoredCandidates[1];
+            // If top candidate has direct taxonomy match (>= 8) and runner-up is distant bridge (<= 4)
+            if (top.score >= 8 && runnerUp.score <= 4) {
+                const winner = top.candidate;
+                const { artwork, albums } = await (0, exports.fetchArtistCollections)(winner.artistId);
+                if (artwork) {
+                    const reconciled = (0, exports.reconcileDiscographyWithITunes)(discography || [], albums, cleanArtistName);
+                    console.log(`[scrapeImageUrlBackend] [Tier 1 Genre-Distance Hit] "${cleanArtistName}" resolved among ${strictMatches.length} candidates via taxonomic distance (Score: ${top.score} vs ${runnerUp.score}). Winner iTunes ID: ${winner.artistId} ('${winner.primaryGenreName}')`);
+                    return { imageUrl: artwork, reconciledDiscography: reconciled };
+                }
+            }
             console.warn(`[scrapeImageUrlBackend] [Tier 1 Ambiguity] "${cleanArtistName}" has ${strictMatches.length} candidates matching taxonomy [${strictMatches.map(m => `'${m.primaryGenreName}'#${m.artistId}`).join(', ')}]. Escalating to Tier 3.`);
         }
         else {
@@ -2379,10 +2545,11 @@ const scrapeImageUrlBackend = async (artistName, type, genre, summary, origin, d
                 const geoStrictMatches = geoExactMatches.filter(r => evaluateGenreMatch(r.primaryGenreName, genre, summary));
                 if (geoStrictMatches.length === 1) {
                     const winner = geoStrictMatches[0];
-                    const artwork = await fetchArtistArtwork(winner.artistId);
+                    const { artwork, albums } = await (0, exports.fetchArtistCollections)(winner.artistId);
                     if (artwork) {
+                        const reconciled = (0, exports.reconcileDiscographyWithITunes)(discography || [], albums, cleanArtistName);
                         console.log(`[scrapeImageUrlBackend] [Tier 2 Hit] "${cleanArtistName}" verified via geographic fallback "${fallbackName}". (iTunes ID: ${winner.artistId}, Genre: '${winner.primaryGenreName}')`);
-                        return artwork;
+                        return { imageUrl: artwork, reconciledDiscography: reconciled };
                     }
                 }
             }
@@ -2392,23 +2559,19 @@ const scrapeImageUrlBackend = async (artistName, type, genre, summary, origin, d
         }
     }
     // --- Tier 3: Discography Tie-Breaker & Verification ---
-    // Combine all exact candidates, deduplicated by artistId
     const allCandidatesMap = new Map();
     for (const c of [...baseExactMatches, ...geoExactMatches]) {
         allCandidatesMap.set(String(c.artistId), c);
     }
     const allCandidates = Array.from(allCandidatesMap.values());
     if (allCandidates.length > 0 && discography && discography.length > 0) {
-        // Sort candidates: taxonomy-matching candidates first
         allCandidates.sort((a, b) => {
             const aMatch = evaluateGenreMatch(a.primaryGenreName, genre, summary) ? 1 : 0;
             const bMatch = evaluateGenreMatch(b.primaryGenreName, genre, summary) ? 1 : 0;
             return bMatch - aMatch;
         });
-        // Cap to top 5 candidates to guarantee zero Cloud Function timeout risk
         const cappedCandidates = allCandidates.slice(0, 5);
         console.log(`[scrapeImageUrlBackend] [Tier 3 Escalation] "${cleanArtistName}": Evaluating ${cappedCandidates.length} candidate(s) against ${discography.length} known album(s).`);
-        // Bounded parallel lookup via Promise.allSettled (max 2500ms total latency)
         const verificationResults = await Promise.allSettled(cappedCandidates.map(cand => verifyCandidateDiscography(cand, cleanArtistName, discography)));
         const verifiedWinners = [];
         for (const res of verificationResults) {
@@ -2421,14 +2584,12 @@ const scrapeImageUrlBackend = async (artistName, type, genre, summary, origin, d
             finalWinner = verifiedWinners[0];
         }
         else if (verifiedWinners.length > 1) {
-            // Tier 3 Genre Tie-Breaker: Filter verified winners by genre affinity to eliminate homonyms (e.g. Hip-Hop vs Hardcore Punk)
             const genreMatchedWinners = verifiedWinners.filter(w => evaluateGenreMatch(w.candidate.primaryGenreName, genre, summary));
             if (genreMatchedWinners.length === 1) {
                 finalWinner = genreMatchedWinners[0];
                 console.log(`[scrapeImageUrlBackend] [Tier 3 Tie-Breaker Hit] "${cleanArtistName}" resolved among ${verifiedWinners.length} candidates via strict genre affinity. Winner iTunes ID: ${finalWinner.candidate.artistId} ('${finalWinner.candidate.primaryGenreName}')`);
             }
             else if (genreMatchedWinners.length > 1) {
-                // Score remaining candidates: matchCount takes precedence (x10), then genre exactness (+5)
                 const scored = genreMatchedWinners.map(w => {
                     let score = w.matchCount * 10;
                     const itunesGenre = (w.candidate.primaryGenreName || '').toLowerCase().trim();
@@ -2439,7 +2600,6 @@ const scrapeImageUrlBackend = async (artistName, type, genre, summary, origin, d
                     return { winner: w, score };
                 });
                 scored.sort((a, b) => b.score - a.score);
-                // Promote the winner if a clear leader exists (strictly higher score than runner-up)
                 if (scored[0].score > scored[1].score) {
                     finalWinner = scored[0].winner;
                     console.log(`[scrapeImageUrlBackend] [Tier 3 Score Winner] "${cleanArtistName}" resolved with score ${scored[0].score} vs runner-up ${scored[1].score}. Winner iTunes ID: ${finalWinner.candidate.artistId}`);
@@ -2457,18 +2617,24 @@ const scrapeImageUrlBackend = async (artistName, type, genre, summary, origin, d
         }
         if (finalWinner) {
             let artwork = finalWinner.bestArtwork;
-            if (!artwork) {
-                artwork = await fetchArtistArtwork(finalWinner.candidate.artistId);
+            let albums = finalWinner.albums || [];
+            if (!artwork || albums.length === 0) {
+                const fetched = await (0, exports.fetchArtistCollections)(finalWinner.candidate.artistId);
+                if (!artwork)
+                    artwork = fetched.artwork;
+                if (albums.length === 0)
+                    albums = fetched.albums;
             }
             if (artwork) {
+                const reconciled = (0, exports.reconcileDiscographyWithITunes)(discography || [], albums, cleanArtistName);
                 console.log(`[scrapeImageUrlBackend] [Tier 3 Hit] "${cleanArtistName}" (iTunes ID: ${finalWinner.candidate.artistId}) verified via ${finalWinner.matchCount} album matches: [${finalWinner.matchedTitles.map(t => `"${t}"`).join(', ')}]`);
-                return artwork;
+                return { imageUrl: artwork, reconciledDiscography: reconciled };
             }
         }
     }
-    // --- Tier 4: Reject Unverified Lone Wolves / Fail-Fast ---
-    console.warn(`[scrapeImageUrlBackend] [Tier 4 Reject] "${cleanArtistName}" failed all verification tiers. Rejecting unverified asset. Returning not-found.`);
-    return null;
+    // --- Tier 4: Reject Unverified Lone Wolves / Fail-Fast (Rule 38 Discography Purge) ---
+    console.warn(`[scrapeImageUrlBackend] [Tier 4 Reject] "${cleanArtistName}" failed all verification tiers. Rejecting unverified asset. Returning not-found and purging discography.`);
+    return { imageUrl: null, reconciledDiscography: [] };
 };
 exports.scrapeImageUrlBackend = scrapeImageUrlBackend;
 const generateSemanticLinkWeights = async (apiKey, detailsCacheEntries, links, usageCollector) => {
