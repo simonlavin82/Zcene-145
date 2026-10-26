@@ -3,6 +3,7 @@ import { createProxyMiddleware } from 'http-proxy-middleware';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import sharp from 'sharp';
 import admin from 'firebase-admin';
 import { getFirestore } from 'firebase-admin/firestore';
 
@@ -1096,7 +1097,167 @@ function formatArtistName(name) {
   return clean.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ').trim();
 }
 
-// Fallback for SPA (React Router)
+// --- DYNAMIC SPA TEMPLATE & OPEN GRAPH COMPOSER ---
+
+let cachedIndexHtml = null;
+let cachedIndexHtmlTime = 0;
+const HTML_CACHE_TTL_MS = 60 * 1000; // 60s cache to stay in sync with Firebase Hosting CDN
+
+async function getIndexHtmlTemplate() {
+  const indexPath = path.join(__dirname, 'dist', 'index.html');
+
+  if (cachedIndexHtml && (Date.now() - cachedIndexHtmlTime < HTML_CACHE_TTL_MS)) {
+    return cachedIndexHtml;
+  }
+
+  // Attempt to fetch fresh index.html from Firebase Hosting CDN to eliminate bundle hash desynchronization
+  try {
+    const liveResp = await fetch('https://zcene-production.web.app/index.html', {
+      signal: AbortSignal.timeout(3000),
+      headers: { 'Cache-Control': 'no-cache' }
+    });
+    if (liveResp.ok) {
+      const text = await liveResp.text();
+      if (text && text.includes('<div id="root">')) {
+        cachedIndexHtml = text;
+        cachedIndexHtmlTime = Date.now();
+        console.log('[SPA Handler] Successfully synchronized index.html with live Firebase Hosting CDN.');
+        return text;
+      }
+    }
+  } catch (fetchErr) {
+    console.warn('[SPA Handler] Live index.html fetch failed (falling back to disk):', fetchErr.message);
+  }
+
+  // Fallback to local container disk copy
+  try {
+    const diskText = fs.readFileSync(indexPath, 'utf8');
+    cachedIndexHtml = diskText;
+    cachedIndexHtmlTime = Date.now();
+    return diskText;
+  } catch (fsErr) {
+    console.error('[SPA Handler] Failed to read dist/index.html from disk:', fsErr);
+    throw fsErr;
+  }
+}
+
+// In-memory cache for composed OG images (URL pair -> { buffer, timestamp })
+const ogImageCache = new Map();
+const OG_IMAGE_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+async function composeSplitOgImage(url1, url2) {
+  const cacheKey = `${url1}:::${url2}`;
+  const cached = ogImageCache.get(cacheKey);
+  if (cached && (Date.now() - cached.timestamp < OG_IMAGE_CACHE_TTL_MS)) {
+    return cached.buffer;
+  }
+
+  const width = 1200;
+  const height = 630;
+
+  const fetchBuffer = async (url) => {
+    const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
+    if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${url}`);
+    return Buffer.from(await res.arrayBuffer());
+  };
+
+  const [buf1, buf2] = await Promise.all([
+    fetchBuffer(url1),
+    fetchBuffer(url2)
+  ]);
+
+  const [img1Buffer, img2Buffer] = await Promise.all([
+    sharp(buf1).resize(width, height, { fit: 'cover', position: 'left' }).toBuffer(),
+    sharp(buf2).resize(width, height, { fit: 'cover', position: 'right' }).toBuffer()
+  ]);
+
+  const base64Img1 = `data:image/jpeg;base64,${img1Buffer.toString('base64')}`;
+  const base64Img2 = `data:image/jpeg;base64,${img2Buffer.toString('base64')}`;
+
+  // Mirror DashboardProjectCard.tsx split mask & scrim layout
+  const svgComposite = `
+  <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="mask-left-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="30%" stop-color="#ffffff" stop-opacity="1" />
+        <stop offset="75%" stop-color="#ffffff" stop-opacity="0" />
+      </linearGradient>
+      <mask id="mask-left">
+        <rect width="${width}" height="${height}" fill="url(#mask-left-grad)" />
+      </mask>
+
+      <linearGradient id="mask-right-grad" x1="100%" y1="0%" x2="0%" y2="0%">
+        <stop offset="30%" stop-color="#ffffff" stop-opacity="1" />
+        <stop offset="75%" stop-color="#ffffff" stop-opacity="0" />
+      </linearGradient>
+      <mask id="mask-right">
+        <rect width="${width}" height="${height}" fill="url(#mask-right-grad)" />
+      </mask>
+    </defs>
+
+    <!-- Base background (zinc-950) -->
+    <rect width="${width}" height="${height}" fill="#09090b" />
+
+    <!-- Left artist with 30%-75% cross-fade mask -->
+    <image href="${base64Img1}" width="${width}" height="${height}" preserveAspectRatio="xMinYMid slice" mask="url(#mask-left)" />
+
+    <!-- Right artist with 30%-75% cross-fade mask -->
+    <image href="${base64Img2}" width="${width}" height="${height}" preserveAspectRatio="xMaxYMid slice" mask="url(#mask-right)" />
+
+    <!-- Uniform Scrim: rgba(9, 9, 11, 0.55) -->
+    <rect width="${width}" height="${height}" fill="#09090b" fill-opacity="0.55" />
+  </svg>
+  `;
+
+  const outputBuffer = await sharp(Buffer.from(svgComposite))
+    .jpeg({ quality: 90 })
+    .toBuffer();
+
+  ogImageCache.set(cacheKey, { buffer: outputBuffer, timestamp: Date.now() });
+  return outputBuffer;
+}
+
+// Dedicated endpoint serving 2-artist split composite images for multi-seed OG tags
+app.get('/api/og/card/:id', async (req, res) => {
+  const projectId = req.params.id;
+  try {
+    let projectSnap = await db.collection('sharedZcenes').doc(projectId).get();
+    if (!projectSnap.exists) {
+      projectSnap = await db.collection('projects').doc(projectId).get();
+    }
+    if (!projectSnap.exists) {
+      return res.redirect(302, "https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg");
+    }
+
+    const projectData = projectSnap.data();
+    const validSeedImages = (projectData.seedImageUrls && Array.isArray(projectData.seedImageUrls))
+      ? projectData.seedImageUrls.filter(url => url && typeof url === 'string' && url.trim().length > 0 && url !== 'not-found')
+      : (projectData.seedImageUrl && projectData.seedImageUrl !== 'not-found' ? [projectData.seedImageUrl] : []);
+
+    if (validSeedImages.length >= 2) {
+      try {
+        const compositeJpeg = await composeSplitOgImage(validSeedImages[0], validSeedImages[1]);
+        res.set({
+          'Content-Type': 'image/jpeg',
+          'Cache-Control': 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400'
+        });
+        return res.send(compositeJpeg);
+      } catch (composeErr) {
+        console.error(`[OG Composer] Failed to compose split image for ${projectId}:`, composeErr);
+        return res.redirect(302, validSeedImages[0]);
+      }
+    } else if (validSeedImages.length === 1) {
+      return res.redirect(302, validSeedImages[0]);
+    } else {
+      return res.redirect(302, "https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg");
+    }
+  } catch (err) {
+    console.error(`[OG Composer Error]`, err);
+    return res.redirect(302, "https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg");
+  }
+});
+
+// Fallback for SPA (React Router) with Dynamic Open Graph Metadata Injection
 app.use(async (req, res) => {
   const indexPath = path.join(__dirname, 'dist', 'index.html');
   
@@ -1106,7 +1267,7 @@ app.use(async (req, res) => {
   }
 
   try {
-    let html = fs.readFileSync(indexPath, 'utf8');
+    let html = await getIndexHtmlTemplate();
 
     // Force absolute paths for Vite assets to prevent relative routing failures on nested paths
     html = html.split('src="assets/').join('src="/assets/');
@@ -1139,31 +1300,36 @@ app.use(async (req, res) => {
           const cleanSeeds = seedList.map(formatArtistName);
           
           let title = projectData.name || (cleanSeeds.length > 0 ? `${cleanSeeds[0]} - Zcene` : "Untitled Zcene");
-          // Ensure custom project names are properly capitalized if they are simple strings
           if (projectData.name) {
             title = projectData.name;
           }
           
           let imageUrl = "https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg";
+          let imageWidth = 1200;
+          let imageHeight = 630;
           let description = cleanSeeds.length > 0 
             ? `Explore this Zcene seeded by ${cleanSeeds.join(', ')}. Own music discovery.`
             : `Explore customized music maps and discover underground artists on Zcene.`;
 
-          // ARCHITECTURE: Deterministic Open Graph Routing
-          // Phase 3 & Architecture V29: Fast path — share/project document carries its own pre-resolved seed image.
-          // Written by handleShareZcene / handleDashboardShareProject / processCurationJob at creation time.
-          const resolvedSeedImage = (projectData.seedImageUrls && Array.isArray(projectData.seedImageUrls))
-            ? projectData.seedImageUrls.find(url => url && url !== 'not-found')
-            : projectData.seedImageUrl;
+          // ARCHITECTURE: Deterministic Open Graph Routing (Multi-Seed Aware)
+          const validSeedImages = (projectData.seedImageUrls && Array.isArray(projectData.seedImageUrls))
+            ? projectData.seedImageUrls.filter(url => url && typeof url === 'string' && url.trim().length > 0 && url !== 'not-found')
+            : (projectData.seedImageUrl && projectData.seedImageUrl !== 'not-found' ? [projectData.seedImageUrl] : []);
 
-          if (resolvedSeedImage) {
-            imageUrl = resolvedSeedImage;
-            console.log(`[OG Injection] Using denormalised seedImageUrl for ${projectId}`);
+          if (validSeedImages.length >= 2) {
+            // Multi-seed split composer route (mirrors DashboardProjectCard 2-artist split)
+            imageUrl = `https://zcene.online/api/og/card/${projectId}`;
+            imageWidth = 1200;
+            imageHeight = 630;
+            console.log(`[OG Injection] Routing multi-seed sharing for ${projectId} to split-image composer (${validSeedImages.length} seeds)`);
+          } else if (validSeedImages.length === 1) {
+            imageUrl = validSeedImages[0];
+            imageWidth = 600;
+            imageHeight = 600;
+            console.log(`[OG Injection] Using single seedImageUrl for ${projectId}`);
           } else if (seedList.length > 0) {
             // Legacy fallback: look up artist image from the global artists collection.
-            // Retained for shares created before Phase 3 landed.
             const primarySeedId = normalizeArtistId(seedList[0]);
-            
             try {
               const artistSnap = await db.collection('artists').doc(primarySeedId).get();
               if (artistSnap.exists) {
@@ -1172,6 +1338,8 @@ app.use(async (req, res) => {
                   const parsedDetails = typeof artistData.detailsCache === 'string' ? JSON.parse(artistData.detailsCache) : artistData.detailsCache;
                   if (parsedDetails.imageUrl) {
                     imageUrl = parsedDetails.imageUrl;
+                    imageWidth = 600;
+                    imageHeight = 600;
                     console.log(`[OG Injection] Legacy fallback: resolved image from artists/${primarySeedId}`);
                   }
                 }
@@ -1186,8 +1354,8 @@ app.use(async (req, res) => {
     <meta property="og:title" content="${title.replace(/"/g, '&quot;')}" />
     <meta property="og:description" content="${description.replace(/"/g, '&quot;')}" />
     <meta property="og:image" content="${imageUrl}" />
-    <meta property="og:image:width" content="600" />
-    <meta property="og:image:height" content="600" />
+    <meta property="og:image:width" content="${imageWidth}" />
+    <meta property="og:image:height" content="${imageHeight}" />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="${title.replace(/"/g, '&quot;')}" />

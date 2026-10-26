@@ -1839,21 +1839,25 @@ const App: React.FC = () => {
   const handleDashboardShareProject = useCallback(async (project: Project) => {
     if (!user) return;
     try {
-      // Phase 3 (dashboard share path): Resolve seedImageUrl from the project's detailsCache
-      // so the Cloud Run OG proxy can serve album art without a secondary Firestore lookup.
+      // Phase 3 & Architecture V29 (dashboard share path): Resolve seedImageUrls array
+      // so the Cloud Run OG proxy can compose multi-seed album art without secondary lookups.
       let dashboardSeedImageUrl = '';
+      let dashboardSeedImageUrls: (string | null)[] = [];
       if (project.seedArtists) {
         const dashboardSeeds = project.seedArtists.split('::').map((s: string) => s.trim()).filter(Boolean);
         if (dashboardSeeds.length > 0) {
-          const primarySeedNorm = normalizeArtistId(dashboardSeeds[0]);
-          // Try to resolve from the project's own detailsCache blob
           if (project.detailsCache) {
             try {
               const dashCacheMap = expandDetailsCacheMap(project.detailsCache);
-              const seedEntry = dashCacheMap.get(primarySeedNorm) || dashCacheMap.get(dashboardSeeds[0].toLowerCase());
-              dashboardSeedImageUrl = (seedEntry as any)?.imageUrl || '';
+              dashboardSeedImageUrls = dashboardSeeds.map((seedName: string) => {
+                const norm = normalizeArtistId(seedName);
+                const seedEntry = dashCacheMap.get(norm) || dashCacheMap.get(seedName.toLowerCase());
+                const url = (seedEntry as any)?.imageUrl || (seedEntry as any)?.details?.imageUrl || null;
+                return (url && url !== 'not-found') ? url : null;
+              });
+              dashboardSeedImageUrl = dashboardSeedImageUrls.find(u => !!u) || '';
             } catch (e) {
-              console.warn('[Dashboard Share] Failed to parse project detailsCache for seedImageUrl:', e);
+              console.warn('[Dashboard Share] Failed to parse project detailsCache for seedImageUrls:', e);
             }
           }
         }
@@ -1887,8 +1891,11 @@ const App: React.FC = () => {
       delete sharePayload.id; // Exclude the local ID
       delete sharePayload.updatedAt; // Tier 2 Shared Zcenes are read-only, no updatedAt
 
-      // Phase 3: Append seedImageUrl if resolved
-      if (dashboardSeedImageUrl) {
+      // Phase 3: Append seedImageUrl & seedImageUrls if resolved
+      if (!sharePayload.seedImageUrls && dashboardSeedImageUrls.length > 0) {
+        sharePayload.seedImageUrls = dashboardSeedImageUrls;
+      }
+      if (dashboardSeedImageUrl && !sharePayload.seedImageUrl) {
         sharePayload.seedImageUrl = dashboardSeedImageUrl;
       }
 

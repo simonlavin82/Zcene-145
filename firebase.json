@@ -73,6 +73,13 @@
         }
       },
       {
+        "source": "/api/og/**",
+        "run": {
+          "serviceId": "zcene-backend-proxy",
+          "region": "us-central1"
+        }
+      },
+      {
         "source": "/app**",
         "run": {
           "serviceId": "zcene-backend-proxy",
