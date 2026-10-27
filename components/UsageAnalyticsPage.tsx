@@ -8,6 +8,8 @@ import { motion } from 'motion/react';
 import { InfoTooltip } from './ui/InfoTooltip';
 import { AdminViewToggle } from './ui/AdminViewToggle';
 import { cleanArtistDisplayName } from '../services/artistCacheService';
+import { TOP_UP_TIER_LIST, TokenTopUpTierId } from '../shared/tokenEconomy';
+import { TokenTransaction } from '../types';
 
 export interface JitHealRecord {
     id: string;
@@ -51,6 +53,9 @@ export interface UserTelemetry {
     };
     exactCost: number;
     hasExactCost: boolean;
+    tokenBalance: number;
+    lifetimeTokensPurchased: number;
+    lifetimeTokensSpent: number;
     projects: ProjectTelemetry[];
 }
 
@@ -58,6 +63,9 @@ export interface ProjectTelemetry {
     id: string;
     seedArtist: string;
     generationType: string;
+    userFacingScope: string;
+    tokensSpent: number;
+    hasRecordedTokens: boolean;
     cost: number;
     isEstimate: boolean;
     createdAt: number;
@@ -148,6 +156,7 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
                 <thead>
                     <tr className="border-b border-zinc-800 bg-zinc-900/50">
                         <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Author</th>
+                        <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-center">Wallet</th>
                         <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-center">Projects</th>
                         <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-center">Actions</th>
                         <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-center">Cache Recall</th>
@@ -159,7 +168,7 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
                 <tbody>
                     {isLoading && filteredLedger.length === 0 ? (
                         <tr>
-                            <td colSpan={7} className="p-8 text-center text-zinc-500 text-sm italic">
+                            <td colSpan={8} className="p-8 text-center text-zinc-500 text-sm italic">
                                 <div className="flex items-center justify-center gap-3">
                                     <span className="material-symbols-outlined animate-spin text-primary text-sm">progress_activity</span>
                                     Querying discovery archive...
@@ -168,7 +177,7 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
                         </tr>
                     ) : filteredLedger.length === 0 ? (
                         <tr>
-                            <td colSpan={7} className="p-8 text-center text-zinc-500 text-sm italic">
+                            <td colSpan={8} className="p-8 text-center text-zinc-500 text-sm italic">
                                 No Author records found in the discovery archive.
                             </td>
                         </tr>
@@ -190,6 +199,9 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
                                     >
                                         <td className="p-4">
                                             <span className="font-medium text-white">{user.email}</span>
+                                        </td>
+                                        <td className="p-4 text-center font-mono text-primary font-semibold">
+                                            {user.tokenBalance}T
                                         </td>
                                         <td className="p-4 text-center font-mono">{user.projectsCount}</td>
                                         <td className="p-4 text-center font-mono" title={`Create: ${user.actionTriggers.createCount} | Update: ${user.actionTriggers.updateCount}`}>
@@ -215,7 +227,7 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
                                     </tr>
                                     {isExpanded && (
                                          <tr className="bg-zinc-900/10 border-b border-zinc-900">
-                                             <td colSpan={7} className="p-6">
+                                             <td colSpan={8} className="p-6">
                                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-sm">
                                                      
                                                      {/* Left Column: Action & Onboarding Details */}
@@ -302,6 +314,7 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
                                                                          <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Project / Seed</th>
                                                                          <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Date</th>
                                                                          <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Generation Type</th>
+                                                                         <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Tokens</th>
                                                                          <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Cost</th>
                                                                      </tr>
                                                                  </thead>
@@ -314,6 +327,9 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
                                                                                  <td className="p-3 text-xs text-zinc-300 font-medium">{proj.seedArtist}</td>
                                                                                  <td className="p-3 text-xs text-zinc-400 whitespace-nowrap">{dateStr}</td>
                                                                                  <td className="p-3 text-xs text-zinc-400">{proj.generationType}</td>
+                                                                                 <td className="p-3 text-xs text-right font-mono text-zinc-300">
+                                                                                     {proj.hasRecordedTokens ? `${proj.tokensSpent}T` : '—'}
+                                                                                 </td>
                                                                                  <td className={`p-3 text-xs text-right font-mono ${isZeroCost ? 'text-primary/80' : 'text-red-400/80'}`}>
                                                                                      {proj.isEstimate ? '~' : ''}${proj.cost.toFixed(4)}
                                                                                  </td>
@@ -361,7 +377,29 @@ interface UsageAnalyticsPageProps {
     onRestartWalkthrough?: () => void;
     onClose?: () => void;
     onNavigateMenu?: (path: string) => void;
+    profile?: any;
 }
+
+const formatTxTypeBadge = (type: string): { label: string; style: string } => {
+    switch (type) {
+        case 'topup_simulated':
+        case 'top_up_simulated':
+            return { label: 'Top-Up', style: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' };
+        case 'refund_pipeline_error':
+        case 'refund_error':
+            return { label: 'Auto-Refund', style: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' };
+        case 'spend_preflight_lookup':
+        case 'spend_preflight':
+        case 'spend_escape_hatch':
+            return { label: 'Artist Lookup', style: 'bg-amber-500/15 text-amber-300 border-amber-500/30' };
+        case 'spend_deep_web':
+            return { label: 'Deep Connections', style: 'bg-sky-500/15 text-sky-300 border-sky-500/30' };
+        case 'spend_direct_hit':
+        case 'spend_live_synthesis':
+        default:
+            return { label: 'Zcene Curation', style: 'bg-primary/15 text-primary border-primary/30' };
+    }
+};
 
 // Fixed unit cost constant for calculations (e.g. $0.0015 per live API request)
 
@@ -369,7 +407,12 @@ const calculateTelemetryForUser = (
     email: string,
     onboardingProgress: any,
     projectDocs: any[],
-    deepCutsOpened?: number
+    deepCutsOpened?: number,
+    walletData?: {
+        tokenBalance?: number;
+        lifetimeTokensPurchased?: number;
+        lifetimeTokensSpent?: number;
+    }
 ): UserTelemetry => {
     let totalUpdates = 0;
     let totalLiveQueries = 0;
@@ -456,6 +499,7 @@ const calculateTelemetryForUser = (
         let generationType = pData.generationType;
         let cost = 0;
         let isEstimate = false;
+        const hasFilters = !!(pData.discoveryFilters && pData.discoveryFilters !== '{}');
 
         if (generationType) {
             if (generationType === "Direct Hit" || generationType === "Clone") {
@@ -469,7 +513,7 @@ const calculateTelemetryForUser = (
         } else {
             // Legacy Fallback Logic
             generationType = "Direct Hit";
-            if (seeds.length > 1 || (pData.discoveryFilters && pData.discoveryFilters !== "{}")) {
+            if (seeds.length > 1 || hasFilters) {
                 generationType = "Complex Generation";
             } else if (hasProCall || (!projectHasExactCost && activeCount > projectLiveQueries)) {
                 generationType = (activeCount > 1) ? "Root Generation" : "Direct Hit";
@@ -485,6 +529,21 @@ const calculateTelemetryForUser = (
             }
         }
 
+        const hasRecordedTokens = typeof pData.tokensSpent === 'number';
+        const tokensSpent = hasRecordedTokens
+            ? Math.max(0, Math.floor(Number(pData.tokensSpent) || 0))
+            : generationType === 'Clone'
+                ? 0
+                : 0;
+
+        // Rule 43: Redact backend cache status from Standard User view
+        const userFacingScope =
+            generationType === 'Clone'
+                ? 'Saved Shared Zcene'
+                : generationType === 'Complex Generation' || seeds.length > 1 || hasFilters
+                    ? 'Complex Zcene'
+                    : 'Single-Seed Zcene';
+
         let createdAt = 0;
         if (pData.createdAt) {
             createdAt = typeof pData.createdAt.toMillis === 'function' ? pData.createdAt.toMillis() : (pData.createdAt.seconds ? pData.createdAt.seconds * 1000 : Date.now());
@@ -494,6 +553,9 @@ const calculateTelemetryForUser = (
             id: pDoc.id,
             seedArtist: displayTitle,
             generationType,
+            userFacingScope,
+            tokensSpent,
+            hasRecordedTokens,
             cost,
             isEstimate,
             createdAt
@@ -519,7 +581,7 @@ const calculateTelemetryForUser = (
         },
         artistSearches: {
             globalCount,
-            topSearches: sortedSearches.slice(0, 4) // Show top 4 like mock data
+            topSearches: sortedSearches.slice(0, 4)
         },
         cacheEfficiency: {
             liveQueries: totalLiveQueries,
@@ -529,6 +591,9 @@ const calculateTelemetryForUser = (
         onboardingProgress: onboardingProgress || {},
         exactCost,
         hasExactCost,
+        tokenBalance: Math.max(0, Math.floor(Number(walletData?.tokenBalance) || 0)),
+        lifetimeTokensPurchased: Math.max(0, Math.floor(Number(walletData?.lifetimeTokensPurchased) || 0)),
+        lifetimeTokensSpent: Math.max(0, Math.floor(Number(walletData?.lifetimeTokensSpent) || 0)),
         projects
     };
 };
@@ -553,12 +618,14 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
     setIsMenuOpen,
     onRestartWalkthrough,
     onClose,
-    onNavigateMenu
+    onNavigateMenu,
+    profile
 }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [expandedRow, setExpandedRow] = useState<string | null>(null);
     const [simulateNormalUser, setSimulateNormalUser] = useState(false);
     const [ledgerData, setLedgerData] = useState<UserTelemetry[]>([]);
+    const [tokenTransactions, setTokenTransactions] = useState<TokenTransaction[]>([]);
     const [jitHeals, setJitHeals] = useState<JitHealRecord[]>([]);
     const [isJitEnabled, setIsJitEnabled] = useState<boolean>(true);
     const [isTogglingJit, setIsTogglingJit] = useState<boolean>(false);
@@ -570,6 +637,12 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
 
     // Compute if we are displaying in restricted Normal User Mode
     const isNormalUserView = !isAdmin || simulateNormalUser;
+
+    const triggerTopUp = useCallback((tierId?: TokenTopUpTierId) => {
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('open-topup-modal', { detail: { tierId: tierId || 'gbp_10' } }));
+        }
+    }, []);
 
     const fetchLedger = useCallback(async () => {
         if (!user) return;
@@ -583,35 +656,67 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                 const usersSnap = await getDocs(collection(db, 'users'));
                 const userPromises = usersSnap.docs.map(async (uDoc) => {
                     const uData = uDoc.data();
-                    const email = uData.email || uDoc.id; // fallback
+                    const email = uData.email || uDoc.id;
                     
-                    // Fetch projects subcollection for this user
                     const projectsSnap = await getDocs(collection(db, 'users', uDoc.id, 'projects'));
                     
-                    // Parse projects to calculate telemetry
-                    return calculateTelemetryForUser(email, uData.onboardingProgress, projectsSnap.docs, uData.deepCutsOpened);
+                    return calculateTelemetryForUser(email, uData.onboardingProgress, projectsSnap.docs, uData.deepCutsOpened, {
+                        tokenBalance: uData.tokenBalance,
+                        lifetimeTokensPurchased: uData.lifetimeTokensPurchased,
+                        lifetimeTokensSpent: uData.lifetimeTokensSpent,
+                    });
                 });
                 telemetryList = await Promise.all(userPromises);
+                setTokenTransactions([]);
             } else {
-                // Fetch only active user
+                // Fetch only active user + immutable tokenTransactions ledger
                 const userDocRef = doc(db, 'users', user.uid);
-                const userDocSnap = await getDoc(userDocRef);
+                const [userDocSnap, projectsSnap, txSnap] = await Promise.all([
+                    getDoc(userDocRef),
+                    getDocs(collection(db, 'users', user.uid, 'projects')),
+                    getDocs(query(collection(db, 'users', user.uid, 'tokenTransactions'), orderBy('createdAt', 'desc'), limit(50))).catch(() => null),
+                ]);
+
                 const uData = userDocSnap.exists() ? userDocSnap.data() : {
                     email: user.email || '',
                     displayName: user.displayName || '',
                     onboardingProgress: { step1: true, step2: true, step3: true, step4: true, step5: true }
                 };
                 
-                // Fetch projects subcollection for this user
-                const projectsSnap = await getDocs(collection(db, 'users', user.uid, 'projects'));
-                
                 const singleTelemetry = calculateTelemetryForUser(
                     uData.email || user.email || 'sandbox@zcene.online',
                     uData.onboardingProgress,
                     projectsSnap.docs,
-                    uData.deepCutsOpened
+                    uData.deepCutsOpened,
+                    {
+                        tokenBalance: uData.tokenBalance,
+                        lifetimeTokensPurchased: uData.lifetimeTokensPurchased,
+                        lifetimeTokensSpent: uData.lifetimeTokensSpent,
+                    }
                 );
                 telemetryList = [singleTelemetry];
+
+                if (txSnap) {
+                    const parsedTxs: TokenTransaction[] = txSnap.docs.map(d => {
+                        const t = d.data();
+                        return {
+                            id: d.id,
+                            uid: t.uid || user.uid,
+                            type: t.type || 'spend_live_synthesis',
+                            delta: Number(t.delta ?? t.amount ?? 0),
+                            balanceAfter: Number(t.balanceAfter) || 0,
+                            tierId: t.tierId,
+                            amountGbp: t.amountGbp,
+                            projectId: t.projectId,
+                            curationSessionId: t.curationSessionId,
+                            description: t.description || 'Token activity',
+                            createdAt: t.createdAt,
+                        };
+                    });
+                    setTokenTransactions(parsedTxs);
+                } else {
+                    setTokenTransactions([]);
+                }
             }
             
             setLedgerData(telemetryList);
@@ -696,15 +801,13 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
         if (isActive) {
             fetchLedger();
         }
-    }, [isActive, fetchLedger]);
+    }, [isActive, fetchLedger, profile?.tokenBalance]);
 
     useEffect(() => {
-        if (isActive && containerRef.current) {
+        if (isActive && containerRef.current && typeof containerRef.current.scrollTo === 'function') {
             containerRef.current.scrollTo(0, 0);
         }
     }, [isActive]);
-
-
 
     // Calculations based on the ledger state
     const filteredLedger = useMemo(() => {
@@ -715,6 +818,22 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
             user.email.toLowerCase().includes(searchTerm.toLowerCase())
         );
     }, [searchTerm, isNormalUserView, activeUserEmail, ledgerData]);
+
+    const currentUserTelemetry = filteredLedger[0] || ledgerData[0] || null;
+    const liveTokenBalance = Math.max(
+        0,
+        Math.floor(Number(profile?.tokenBalance ?? currentUserTelemetry?.tokenBalance ?? 0))
+    );
+    const liveLifetimePurchased = Math.max(
+        0,
+        Math.floor(Number(profile?.lifetimeTokensPurchased ?? currentUserTelemetry?.lifetimeTokensPurchased ?? 0))
+    );
+    const liveLifetimeSpent = Math.max(
+        0,
+        Math.floor(Number(profile?.lifetimeTokensSpent ?? currentUserTelemetry?.lifetimeTokensSpent ?? 0))
+    );
+    const juiceMax = Math.max(liveLifetimePurchased, liveTokenBalance, 100);
+    const juicePct = Math.min(100, Math.round((liveTokenBalance / juiceMax) * 100));
 
     const aggregateMetrics = useMemo(() => {
         let totalProjects = 0;
@@ -752,6 +871,20 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
         setExpandedRow(prev => prev === email ? null : email);
     };
 
+    const formatTxTimestamp = (createdAt: any): string => {
+        if (!createdAt) return 'Just now';
+        const ms = typeof createdAt?.toMillis === 'function'
+            ? createdAt.toMillis()
+            : typeof createdAt?.seconds === 'number'
+                ? createdAt.seconds * 1000
+                : typeof createdAt === 'number'
+                    ? createdAt
+                    : Date.now();
+        const d = new Date(ms);
+        return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) + ', ' +
+            d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    };
+
     return (
         <div ref={containerRef} className="h-full w-full overflow-y-auto bg-[#000000] text-zinc-200 font-display flex flex-col relative select-text">
             <Header
@@ -767,6 +900,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                 onLogout={onLogout}
                 onDeleteAccount={onDeleteAccount}
                 isAdmin={isAdmin}
+                tokenBalance={liveTokenBalance}
                 isProfileOpen={isProfileOpen}
                 setIsProfileOpen={setIsProfileOpen}
                 isDeleteAccountModalOpen={isDeleteAccountModalOpen}
@@ -802,8 +936,8 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                             <h2 className="text-3xl font-medium text-white mb-2">The Discovery Ledger</h2>
                             <p className="text-zinc-400 text-sm max-w-2xl leading-relaxed">
                                 {isNormalUserView 
-                                    ? "Personal discovery ledger tracking your curation volume, seed-artist expansions, AI synthesis requests, and local memory conservation."
-                                    : "Platform-wide ledger tracking curation volume, seed-artist expansions, AI synthesis requests, and local memory conservation across all Authors."
+                                    ? "Your personal Token Wallet, curated Zcene history, and immutable token activity receipts."
+                                    : "Platform-wide ledger tracking curation volume, seed-artist expansions, AI synthesis requests, token wallets, and cache recall across all Authors."
                                 }
                             </p>
                         </div>
@@ -814,11 +948,104 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                         )}
                     </div>
 
-                    {/* Overview Cards (Calculations block) */}
+                    {/* Overview Cards (Admin Exclusive) */}
                     <TelemetryOverviewCards
                         aggregateMetrics={aggregateMetrics}
                         isNormalUserView={isNormalUserView}
                     />
+
+                    {/* Standard User & Admin Preview Mode: Token Wallet Juice Bar + Personal Ledgers */}
+                    {isNormalUserView && (
+                        <div data-testid="wallet-hero-card" className={`bg-zinc-900/40 border border-zinc-800 p-6 sm:p-8 space-y-6 ${RADIUS_TOKENS.frame}`}>
+                            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+                                <div className="space-y-2">
+                                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400 block">
+                                        Available Discovery Balance
+                                    </span>
+                                    <div className="flex items-baseline gap-3">
+                                        <span data-testid="wallet-balance-value" className="text-4xl sm:text-5xl font-bold font-mono text-primary">
+                                            {liveTokenBalance}
+                                        </span>
+                                        <span className="text-sm font-semibold uppercase tracking-widest text-zinc-400">
+                                            Tokens
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-zinc-400 max-w-xl">
+                                        Tokens unlock new Single-Seed Zcenes, Multi-Seed / Anchored Zcenes, and Deep Connections grounded artist consults.
+                                    </p>
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-2.5">
+                                    {TOP_UP_TIER_LIST.map((tier) => (
+                                        <button
+                                            key={tier.id}
+                                            type="button"
+                                            data-testid={`analytics-topup-${tier.id}`}
+                                            onClick={() => triggerTopUp(tier.id)}
+                                            className={`px-4 py-2.5 text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${RADIUS_TOKENS.button} ${
+                                                tier.featured
+                                                    ? 'bg-primary text-black border-primary hover:bg-primary-hover shadow-[0_0_20px_rgba(204,255,0,0.18)]'
+                                                    : 'bg-zinc-950 text-white border-zinc-700 hover:border-primary/60'
+                                            }`}
+                                        >
+                                            <span className="font-mono">+{tier.tokens}T</span>
+                                            <span className={tier.featured ? 'text-black/80 font-mono' : 'text-zinc-400 font-mono'}>
+                                                ({tier.priceDisplay})
+                                            </span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Token Juice Bar */}
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between text-[11px] font-mono text-zinc-400">
+                                    <span>Token Juice Reserve</span>
+                                    <span>{liveTokenBalance} / {juiceMax} T ({juicePct}%)</span>
+                                </div>
+                                <div className="h-3 w-full bg-zinc-950 border border-zinc-800 rounded-full overflow-hidden">
+                                    <motion.div
+                                        initial={{ width: 0 }}
+                                        animate={{ width: `${juicePct}%` }}
+                                        transition={{ duration: 0.45, ease: 'easeOut' }}
+                                        className={`h-full rounded-full ${
+                                            liveTokenBalance < 5 ? 'bg-amber-400' : 'bg-primary'
+                                        }`}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Personal Metrics Strip */}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-zinc-800/80">
+                                <div className="bg-zinc-950/60 border border-zinc-800/80 p-4 rounded-xl">
+                                    <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500 block">Zcenes Curated</span>
+                                    <span className="text-2xl font-bold font-mono text-white mt-1 block">
+                                        {currentUserTelemetry?.projectsCount ?? 0}
+                                    </span>
+                                </div>
+                                <div className="bg-zinc-950/60 border border-zinc-800/80 p-4 rounded-xl">
+                                    <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500 block">Lifetime Purchased</span>
+                                    <span className="text-2xl font-bold font-mono text-emerald-300 mt-1 block">
+                                        {liveLifetimePurchased} T
+                                    </span>
+                                </div>
+                                <div className="bg-zinc-950/60 border border-zinc-800/80 p-4 rounded-xl">
+                                    <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500 block">Lifetime Spent</span>
+                                    <span className="text-2xl font-bold font-mono text-zinc-200 mt-1 block">
+                                        {liveLifetimeSpent} T
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Transparent Pricing Reference */}
+                            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-zinc-400 pt-1">
+                                <span><strong className="text-white font-mono">5T</strong> Single-Seed Zcene</span>
+                                <span><strong className="text-white font-mono">10T</strong> Multi-Seed / Anchored Zcene</span>
+                                <span><strong className="text-white font-mono">3T</strong> Deep Connections (3 Messages)</span>
+                                <span><strong className="text-emerald-300 font-mono">0T</strong> Shared Zcenes & Clones</span>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Filter controls & Refresh */}
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
@@ -838,7 +1065,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                             onClick={fetchLedger}
                             disabled={isLoading}
                             className={`flex items-center justify-center gap-2 px-6 bg-zinc-900 border border-zinc-800 text-zinc-350 hover:border-zinc-500 hover:text-white transition-all cursor-pointer font-medium text-sm disabled:opacity-50 h-[38px] ${
-                                isNormalUserView ? `w-full h-[52px] ${RADIUS_TOKENS.input}` : RADIUS_TOKENS.button
+                                isNormalUserView ? `w-full sm:w-auto ${RADIUS_TOKENS.button}` : RADIUS_TOKENS.button
                             }`}
                         >
                             <span className={`material-symbols-outlined text-sm select-none ${isLoading ? 'animate-spin' : ''}`}>
@@ -855,160 +1082,286 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                         </div>
                     )}
 
-                    {/* Master Ledger List */}
-                    <DiscoveryLedgerTable
-                        isLoading={isLoading}
-                        filteredLedger={filteredLedger}
-                        expandedRow={expandedRow}
-                        toggleRow={toggleRow}
-                    />
-
-                    {/* JIT Auto-Healing Telemetry (Phase 3 Admin Exclusive) */}
-                    {!isNormalUserView && (
-                        <div className="space-y-4 pt-6">
-                            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-zinc-800 pb-4">
+                    {isNormalUserView ? (
+                        <div className="space-y-10">
+                            {/* Personal Curated Zcenes Ledger (Strictly Masked — Zero USD or Cache Telemetry) */}
+                            <div data-testid="standard-projects-ledger" className="space-y-4">
                                 <div>
-                                    <div className="flex items-center gap-3">
-                                        <h3 className="text-xl font-medium text-white">JIT Auto-Healing Telemetry</h3>
-                                        
-                                        {/* 1. Static Status Badge (Design System: Badges & Tags) */}
-                                        <span 
-                                            className={`text-[10px] font-semibold uppercase tracking-widest px-2 py-0.5 rounded-xl w-fit select-none ${
-                                                isJitEnabled 
-                                                    ? 'bg-emerald-500/20 text-emerald-300' 
-                                                    : 'bg-red-500/20 text-red-300'
-                                            }`}
-                                        >
-                                            {isJitEnabled ? 'ACTIVE' : 'DISABLED'}
-                                        </span>
-
-                                        {/* 2. Standard Toggle Switch (Design System: Standard Toggle Switch) */}
-                                        <button
-                                            type="button"
-                                            onClick={handleToggleJit}
-                                            disabled={isTogglingJit}
-                                            aria-label="Toggle JIT Auto-Healing status"
-                                            title={isJitEnabled ? "Click to disable JIT Auto-Healing" : "Click to enable JIT Auto-Healing"}
-                                            className="w-10 h-5 rounded-full relative transition-colors bg-zinc-800 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                            <div 
-                                                className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full transition-transform duration-200 ${
-                                                    isJitEnabled 
-                                                        ? 'translate-x-5 bg-primary' 
-                                                        : 'bg-zinc-400'
-                                                }`} 
-                                            />
-                                        </button>
-                                    </div>
-
-                                    {/* 3. Descriptive Context Block */}
-                                    <p className="text-sm text-zinc-400 mt-2 max-w-3xl leading-relaxed">
-                                        The JIT Healer synthesizes missing database assets on-the-fly via Gemini Flash. To prevent runaway API costs, it is strictly capped at 100 automatic heals per 24 hours (a maximum daily exposure of ~$0.04). If this rolling threshold is breached, JIT Healing will automatically disable. You can use the toggle to manually override and lock the system at any time.
+                                    <h3 className="text-xl font-medium text-white">Your Curated Zcenes</h3>
+                                    <p className="text-xs text-zinc-400 mt-1">
+                                        Token spend across your saved Zcene workspaces. Shared Zcenes saved to your dashboard always cost 0 Tokens.
                                     </p>
                                 </div>
-
-                                <div className="flex items-center gap-6 font-mono text-xs">
-                                    <div>
-                                        <span className="text-zinc-500 block text-[10px] uppercase">Healed Assets</span>
-                                        <span className="text-white font-bold">{jitHeals.length}</span>
-                                    </div>
-                                    <div>
-                                        <span className="text-zinc-500 block text-[10px] uppercase">Total Tokens</span>
-                                        <span className="text-zinc-300 font-bold">{jitHeals.reduce((acc, h) => acc + h.totalTokens, 0).toLocaleString()}</span>
-                                    </div>
-                                    <div>
-                                        <span className="text-zinc-500 block text-[10px] uppercase">Total Cost</span>
-                                        <span className="text-red-400 font-bold font-mono">${jitHeals.reduce((acc, h) => acc + h.costUsd, 0).toFixed(5)}</span>
-                                    </div>
+                                <div className={`border border-zinc-800 bg-zinc-950/30 overflow-x-auto ${RADIUS_TOKENS.frame}`}>
+                                    <table className="w-full text-left border-collapse min-w-[600px]">
+                                        <thead>
+                                            <tr className="border-b border-zinc-800 bg-zinc-900/50">
+                                                <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Zcene / Seed</th>
+                                                <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Curated</th>
+                                                <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Curation Scope</th>
+                                                <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Tokens Spent</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {isLoading && (!currentUserTelemetry || currentUserTelemetry.projects.length === 0) ? (
+                                                <tr>
+                                                    <td colSpan={4} className="p-8 text-center text-zinc-500 text-xs italic">
+                                                        Loading your curated Zcenes...
+                                                    </td>
+                                                </tr>
+                                            ) : !currentUserTelemetry || currentUserTelemetry.projects.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={4} className="p-8 text-center text-zinc-500 text-xs italic">
+                                                        No curated Zcenes recorded yet. Start from any seed artist to map your first Zcene.
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                currentUserTelemetry.projects.map((proj) => (
+                                                    <tr key={proj.id} className="border-b border-zinc-900/60 hover:bg-zinc-900/20 transition-colors">
+                                                        <td className="p-4 text-sm font-medium text-white">
+                                                            {proj.seedArtist}
+                                                        </td>
+                                                        <td className="p-4 text-xs font-mono text-zinc-400">
+                                                            {proj.createdAt ? formatTxTimestamp(proj.createdAt) : '—'}
+                                                        </td>
+                                                        <td className="p-4 text-xs">
+                                                            <span className="px-2.5 py-1 rounded-lg border border-zinc-700/80 bg-zinc-900 text-zinc-300 font-medium">
+                                                                {proj.userFacingScope}
+                                                            </span>
+                                                        </td>
+                                                        <td className="p-4 text-xs text-right font-mono font-bold text-primary">
+                                                            {proj.hasRecordedTokens ? `${proj.tokensSpent} Tokens` : '0 Tokens'}
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
 
-                            <div className="border border-zinc-800 bg-zinc-950/20 overflow-x-auto">
-                                <table className="w-full text-left border-collapse min-w-[700px]">
-                                    <thead>
-                                        <tr className="border-b border-zinc-800 bg-zinc-900/50">
-                                            <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Date</th>
-                                            <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Entity</th>
-                                            <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Type</th>
-                                            <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Triggered By</th>
-                                            <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Tokens</th>
-                                            <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Cost</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {isLoading && jitHeals.length === 0 ? (
-                                            <tr>
-                                                <td colSpan={6} className="p-6 text-center text-zinc-500 text-xs italic">
-                                                    Loading healing receipts...
-                                                </td>
+                            {/* Immutable Token Activity & Top-Up Receipts */}
+                            <div data-testid="token-transactions-ledger" className="space-y-4">
+                                <div>
+                                    <h3 className="text-xl font-medium text-white">Token Activity & Top-Up Receipts</h3>
+                                    <p className="text-xs text-zinc-400 mt-1">
+                                        Verified wallet credits, artist lookups, Zcene curations, Deep Connections unlocks, and automatic error refunds.
+                                    </p>
+                                </div>
+                                <div className={`border border-zinc-800 bg-zinc-950/30 overflow-x-auto ${RADIUS_TOKENS.frame}`}>
+                                    <table className="w-full text-left border-collapse min-w-[640px]">
+                                        <thead>
+                                            <tr className="border-b border-zinc-800 bg-zinc-900/50">
+                                                <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Date</th>
+                                                <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Activity</th>
+                                                <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Category</th>
+                                                <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Change</th>
+                                                <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Balance After</th>
                                             </tr>
-                                        ) : jitHeals.length === 0 ? (
-                                            <tr>
-                                                <td colSpan={6} className="p-6 text-center text-zinc-500 text-xs italic">
-                                                    No JIT healing events recorded yet.
-                                                </td>
-                                            </tr>
-                                        ) : (
-                                            jitHeals.map((heal) => {
-                                                const d = new Date(heal.timestamp);
-                                                const dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ', ' +
-                                                    d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-                                                return (
-                                                    <tr key={heal.id} className="border-b border-zinc-900/60 hover:bg-zinc-900/20 transition-colors">
-                                                        <td className="p-3.5 text-xs text-zinc-400 font-mono">
-                                                            {dateStr}
-                                                        </td>
-                                                        <td className="p-3.5 text-sm text-white font-medium">
-                                                            {heal.displayName}
-                                                            <span className="block text-[11px] font-mono text-zinc-600">{heal.entityId}</span>
-                                                        </td>
-                                                        <td className="p-3.5 text-xs">
-                                                            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
-                                                                heal.entityType === 'label'
-                                                                    ? 'border-teal-500/30 text-teal-400 bg-teal-950/20'
-                                                                    : 'border-purple-500/30 text-purple-400 bg-purple-950/20'
+                                        </thead>
+                                        <tbody>
+                                            {isLoading && tokenTransactions.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={5} className="p-8 text-center text-zinc-500 text-xs italic">
+                                                        Loading token activity...
+                                                    </td>
+                                                </tr>
+                                            ) : tokenTransactions.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={5} className="p-8 text-center text-zinc-500 text-xs italic">
+                                                        No token transactions yet. Top up your wallet above to begin curating.
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                tokenTransactions.map((tx) => {
+                                                    const badge = formatTxTypeBadge(tx.type);
+                                                    const isPositive = tx.delta > 0;
+                                                    return (
+                                                        <tr key={tx.id} className="border-b border-zinc-900/60 hover:bg-zinc-900/20 transition-colors">
+                                                            <td className="p-4 text-xs font-mono text-zinc-400">
+                                                                {formatTxTimestamp(tx.createdAt)}
+                                                            </td>
+                                                            <td className="p-4 text-sm text-zinc-200">
+                                                                {tx.description}
+                                                            </td>
+                                                            <td className="p-4 text-xs">
+                                                                <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-lg border ${badge.style}`}>
+                                                                    {badge.label}
+                                                                </span>
+                                                            </td>
+                                                            <td className={`p-4 text-xs text-right font-mono font-bold ${
+                                                                isPositive ? 'text-emerald-400' : 'text-zinc-200'
                                                             }`}>
-                                                                {heal.entityType}
-                                                            </span>
-                                                        </td>
-                                                        <td className="p-3.5 text-xs text-zinc-300">
-                                                            <span className="font-medium text-zinc-200 block truncate max-w-[220px]" title={heal.callerEmail || heal.callerUid}>
-                                                                {heal.callerEmail || heal.callerUid}
-                                                            </span>
-                                                            {heal.projectName ? (
-                                                                <span 
-                                                                    className="block text-[11px] text-zinc-400 font-medium mt-0.5 truncate max-w-[220px]" 
-                                                                    title={heal.projectId ? `${heal.projectName} (${heal.projectId})` : heal.projectName}
-                                                                >
-                                                                    {heal.projectName}
-                                                                </span>
-                                                            ) : heal.projectId ? (
-                                                                <span 
-                                                                    className="block text-[11px] font-mono text-zinc-500 mt-0.5 truncate max-w-[220px]" 
-                                                                    title={heal.projectId}
-                                                                >
-                                                                    {heal.projectId}
-                                                                </span>
-                                                            ) : (
-                                                                <span className="block text-[11px] font-mono text-zinc-600 mt-0.5 select-none">
-                                                                    —
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                        <td className="p-3.5 text-xs text-right font-mono text-zinc-400">
-                                                            {heal.totalTokens.toLocaleString()}
-                                                        </td>
-                                                        <td className="p-3.5 text-xs text-right font-mono text-red-400 font-bold">
-                                                            ${heal.costUsd.toFixed(5)}
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })
-                                        )}
-                                    </tbody>
-                                </table>
+                                                                {isPositive ? `+${tx.delta} T` : `${tx.delta} T`}
+                                                            </td>
+                                                            <td className="p-4 text-xs text-right font-mono text-zinc-400">
+                                                                {tx.balanceAfter} T
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
+                    ) : (
+                        <>
+                            {/* Master Ledger List (Admin Mode) */}
+                            <DiscoveryLedgerTable
+                                isLoading={isLoading}
+                                filteredLedger={filteredLedger}
+                                expandedRow={expandedRow}
+                                toggleRow={toggleRow}
+                            />
+
+                            {/* JIT Auto-Healing Telemetry (Phase 3 Admin Exclusive) */}
+                            <div className="space-y-4 pt-6">
+                                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-zinc-800 pb-4">
+                                    <div>
+                                        <div className="flex items-center gap-3">
+                                            <h3 className="text-xl font-medium text-white">JIT Auto-Healing Telemetry</h3>
+                                            
+                                            {/* 1. Static Status Badge (Design System: Badges & Tags) */}
+                                            <span 
+                                                className={`text-[10px] font-semibold uppercase tracking-widest px-2 py-0.5 rounded-xl w-fit select-none ${
+                                                    isJitEnabled 
+                                                        ? 'bg-emerald-500/20 text-emerald-300' 
+                                                        : 'bg-red-500/20 text-red-300'
+                                                }`}
+                                            >
+                                                {isJitEnabled ? 'ACTIVE' : 'DISABLED'}
+                                            </span>
+
+                                            {/* 2. Standard Toggle Switch (Design System: Standard Toggle Switch) */}
+                                            <button
+                                                type="button"
+                                                onClick={handleToggleJit}
+                                                disabled={isTogglingJit}
+                                                aria-label="Toggle JIT Auto-Healing status"
+                                                title={isJitEnabled ? "Click to disable JIT Auto-Healing" : "Click to enable JIT Auto-Healing"}
+                                                className="w-10 h-5 rounded-full relative transition-colors bg-zinc-800 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                <div 
+                                                    className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full transition-transform duration-200 ${
+                                                        isJitEnabled 
+                                                            ? 'translate-x-5 bg-primary' 
+                                                            : 'bg-zinc-400'
+                                                    }`} 
+                                                />
+                                            </button>
+                                        </div>
+
+                                        {/* 3. Descriptive Context Block */}
+                                        <p className="text-sm text-zinc-400 mt-2 max-w-3xl leading-relaxed">
+                                            The JIT Healer synthesizes missing database assets on-the-fly via Gemini Flash. To prevent runaway API costs, it is strictly capped at 100 automatic heals per 24 hours (a maximum daily exposure of ~$0.04). If this rolling threshold is breached, JIT Healing will automatically disable. You can use the toggle to manually override and lock the system at any time.
+                                        </p>
+                                    </div>
+
+                                    <div className="flex items-center gap-6 font-mono text-xs">
+                                        <div>
+                                            <span className="text-zinc-500 block text-[10px] uppercase">Healed Assets</span>
+                                            <span className="text-white font-bold">{jitHeals.length}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-zinc-500 block text-[10px] uppercase">Total Tokens</span>
+                                            <span className="text-zinc-300 font-bold">{jitHeals.reduce((acc, h) => acc + h.totalTokens, 0).toLocaleString()}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-zinc-500 block text-[10px] uppercase">Total Cost</span>
+                                            <span className="text-red-400 font-bold font-mono">${jitHeals.reduce((acc, h) => acc + h.costUsd, 0).toFixed(5)}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="border border-zinc-800 bg-zinc-950/20 overflow-x-auto">
+                                    <table className="w-full text-left border-collapse min-w-[700px]">
+                                        <thead>
+                                            <tr className="border-b border-zinc-800 bg-zinc-900/50">
+                                                <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Date</th>
+                                                <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Entity</th>
+                                                <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Type</th>
+                                                <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Triggered By</th>
+                                                <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Tokens</th>
+                                                <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Cost</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {isLoading && jitHeals.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={6} className="p-6 text-center text-zinc-500 text-xs italic">
+                                                        Loading healing receipts...
+                                                    </td>
+                                                </tr>
+                                            ) : jitHeals.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={6} className="p-6 text-center text-zinc-500 text-xs italic">
+                                                        No JIT healing events recorded yet.
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                jitHeals.map((heal) => {
+                                                    const d = new Date(heal.timestamp);
+                                                    const dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ', ' +
+                                                        d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+                                                    return (
+                                                        <tr key={heal.id} className="border-b border-zinc-900/60 hover:bg-zinc-900/20 transition-colors">
+                                                            <td className="p-3.5 text-xs text-zinc-400 font-mono">
+                                                                {dateStr}
+                                                            </td>
+                                                            <td className="p-3.5 text-sm text-white font-medium">
+                                                                {heal.displayName}
+                                                                <span className="block text-[11px] font-mono text-zinc-600">{heal.entityId}</span>
+                                                            </td>
+                                                            <td className="p-3.5 text-xs">
+                                                                <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
+                                                                    heal.entityType === 'label'
+                                                                        ? 'border-teal-500/30 text-teal-400 bg-teal-950/20'
+                                                                        : 'border-purple-500/30 text-purple-400 bg-purple-950/20'
+                                                                }`}>
+                                                                    {heal.entityType}
+                                                                </span>
+                                                            </td>
+                                                            <td className="p-3.5 text-xs text-zinc-300">
+                                                                <span className="font-medium text-zinc-200 block truncate max-w-[220px]" title={heal.callerEmail || heal.callerUid}>
+                                                                    {heal.callerEmail || heal.callerUid}
+                                                                </span>
+                                                                {heal.projectName ? (
+                                                                    <span 
+                                                                        className="block text-[11px] text-zinc-400 font-medium mt-0.5 truncate max-w-[220px]" 
+                                                                        title={heal.projectId ? `${heal.projectName} (${heal.projectId})` : heal.projectName}
+                                                                    >
+                                                                        {heal.projectName}
+                                                                    </span>
+                                                                ) : heal.projectId ? (
+                                                                    <span 
+                                                                        className="block text-[11px] font-mono text-zinc-500 mt-0.5 truncate max-w-[220px]" 
+                                                                        title={heal.projectId}
+                                                                    >
+                                                                        {heal.projectId}
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="block text-[11px] font-mono text-zinc-600 mt-0.5 select-none">
+                                                                        —
+                                                                    </span>
+                                                                )}
+                                                            </td>
+                                                            <td className="p-3.5 text-xs text-right font-mono text-zinc-400">
+                                                                {heal.totalTokens.toLocaleString()}
+                                                            </td>
+                                                            <td className="p-3.5 text-xs text-right font-mono text-red-400 font-bold">
+                                                                ${heal.costUsd.toFixed(5)}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </>
                     )}
 
                 </div>
@@ -1017,7 +1370,11 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
             <footer className="w-full p-8 text-zinc-400 text-sm z-10 relative bg-neutral-900 flex-shrink-0 border-t border-neutral-800 mt-10">
                 <div className="container mx-auto text-center">
                     <ZceneLogo className="h-8 w-auto text-primary mx-auto mb-4" />
-                    <p className="text-zinc-600">© 2026 Zcene Admin Console. Restricted access authorisation archives.</p>
+                    <p className="text-zinc-600">
+                        {isNormalUserView
+                            ? "© 2026 Zcene. Own Music Discovery."
+                            : "© 2026 Zcene Admin Console. Restricted access authorisation archives."}
+                    </p>
                 </div>
             </footer>
         </div>

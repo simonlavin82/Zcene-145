@@ -1,6 +1,6 @@
 import { GoogleGenAI, Type, GenerateContentResponse, ThinkingLevel } from "@google/genai";
 import { GraphData, Node, NodeDetails, Link, ChatMessage, DiscoveryFilters, CANONICAL_STYLES_FLAT } from "../types";
-import { db } from './firebase';
+import { db, auth } from './firebase';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { normalizeArtistId, extractArtistSubGraph, readArtistCacheMany, normalizeGraphData, stripUndefinedProperties, cleanArtistDisplayName } from './artistCacheService';
 import {
@@ -969,12 +969,18 @@ Respond in strict JSON only — no prose, no markdown, no citation markers.`;
       console.warn(`[Diagnostic] signal 'abort' event fired at ${Date.now() - startTime}ms! Reason:`, combinedSignal.reason);
     });
 
-    const password = typeof window !== 'undefined' ? sessionStorage.getItem('zcene_api_password') : null;
+    const authHeaders: Record<string, string> = {};
+    try {
+      if (auth?.currentUser && typeof auth.currentUser.getIdToken === 'function') {
+        const idToken = await auth.currentUser.getIdToken();
+        if (idToken) authHeaders['Authorization'] = `Bearer ${idToken}`;
+      }
+    } catch (_) {}
     const response = await fetch(targetUrl, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
-        ...(password && { 'x-zcene-password': password })
+        ...authHeaders
       },
       body: JSON.stringify(requestBody),
       signal: combinedSignal
@@ -993,12 +999,10 @@ Respond in strict JSON only — no prose, no markdown, no citation markers.`;
           const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
           
           try {
-            const password = typeof window !== 'undefined' ? sessionStorage.getItem('zcene_api_password') : null;
             const fallbackResponse = await fetch(fallbackUrl, {
               method: 'POST',
               headers: { 
-                'Content-Type': 'application/json',
-                ...(password && { 'x-zcene-password': password })
+                'Content-Type': 'application/json'
               },
               body: JSON.stringify(requestBody),
               signal: combinedSignal
@@ -1235,13 +1239,19 @@ export const generateGraphData = async (
       };
 
       const url = `${baseUrl}/v1beta/models/${currentModel}:generateContent`;
-      const password = typeof window !== 'undefined' ? sessionStorage.getItem('zcene_api_password') : null;
+      const authHeaders: Record<string, string> = {};
+      try {
+        if (auth?.currentUser && typeof auth.currentUser.getIdToken === 'function') {
+          const idToken = await auth.currentUser.getIdToken();
+          if (idToken) authHeaders['Authorization'] = `Bearer ${idToken}`;
+        }
+      } catch (_) {}
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-goog-api-key': proxyKey,
-          ...(password && { 'x-zcene-password': password })
+          ...authHeaders
         },
         body: JSON.stringify(requestBody),
         signal
@@ -1769,13 +1779,19 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
 
     const flashModel = (typeof process !== 'undefined' && process.env?.GEMINI_FLASH_MODEL) || 'gemini-3.6-flash';
     const url = `${baseUrl}/v1beta/models/${flashModel}:generateContent`;
-    const password = typeof window !== 'undefined' ? sessionStorage.getItem('zcene_api_password') : null;
+    const authHeaders: Record<string, string> = {};
+    try {
+      if (auth?.currentUser && typeof auth.currentUser.getIdToken === 'function') {
+        const idToken = await auth.currentUser.getIdToken();
+        if (idToken) authHeaders['Authorization'] = `Bearer ${idToken}`;
+      }
+    } catch (_) {}
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-goog-api-key': proxyKey,
-        ...(password && { 'x-zcene-password': password })
+        ...authHeaders
       },
       body: JSON.stringify(requestBody)
     });
@@ -2054,23 +2070,36 @@ export const streamLocalHeuristicChat = async (
     return fullText;
 };
 
+export interface StreamNodeChatAuthOptions {
+  idToken?: string;
+  deepWebSessionId?: string;
+}
+
 export const streamNodeChat = async (
   currentNode: Node,
   history: ChatMessage[],
   message: string,
   graphData: GraphData,
   onChunk: (text: string) => void,
-  apiPassword?: string
+  authOptions?: StreamNodeChatAuthOptions
 ) => {
     const proxyKey = 'backend-proxy-key';
     const baseUrl = typeof window !== 'undefined' ? window.location.origin + '/api/gemini' : 'http://localhost:8080/api/gemini';
-    const password = apiPassword || (typeof window !== 'undefined' ? sessionStorage.getItem('zcene_api_password') : null);
+    let bearerToken = authOptions?.idToken;
+    if (!bearerToken) {
+      try {
+        if (auth?.currentUser && typeof auth.currentUser.getIdToken === 'function') {
+          bearerToken = await auth.currentUser.getIdToken();
+        }
+      } catch (_) {}
+    }
     const ai = new GoogleGenAI({ 
         apiKey: proxyKey,
         httpOptions: { 
             baseUrl,
             headers: {
-                ...(password ? { 'x-zcene-password': password } : {})
+                ...(bearerToken ? { Authorization: `Bearer ${bearerToken}` } : {}),
+                ...(authOptions?.deepWebSessionId ? { 'x-zcene-deepweb-session': authOptions.deepWebSessionId } : {})
             }
         }
     });

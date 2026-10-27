@@ -14,7 +14,7 @@
     "seed:cache-hit": "node scripts/seed_cache_hit.cjs",
     "seed:cache-miss": "node scripts/seed_cache_miss.cjs",
     "purge:v36": "node scripts/execute_v36_purge.cjs",
-    "test": "vitest run tests/v15-core.test.tsx functions/tests/pipeline.test.ts functions/tests/v29-gates.test.ts functions/tests/v30-anchors.test.ts",
+    "test": "vitest run tests/v15-core.test.tsx functions/tests/pipeline.test.ts functions/tests/v29-gates.test.ts functions/tests/v30-anchors.test.ts tests/v38-token-economy.test.tsx",
     "test:regression": "node scratch/test_pipeline_regression.cjs",
     "test:serve": "concurrently \"node --env-file=.env server.js\" \"vite --mode test\""
   },

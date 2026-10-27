@@ -26,6 +26,7 @@ import {
   sanitizeDiscoveryFilters
 } from "./services/cacheQualification";
 import { AnchorResolutionStatus } from "./types";
+import { refundProjectSettlementOnError } from "./tokenWallet";
 
 // Initialize Firebase Admin SDK if not already done
 if (getApps().length === 0) {
@@ -2077,6 +2078,7 @@ export const processCurationJob = onDocumentCreated({
         detailsCache: result.detailsCache,
         activeNodes: hoistedActiveNodes,  // Phase 2B: canonical seed-first ordering
         apiUsage: mergedApiUsage,
+        ...(typeof inputPayload?.tokensSpent === "number" ? { tokensSpent: inputPayload.tokensSpent } : {}),
         ...(inputPayload?.generationType ? { generationType: inputPayload.generationType } : {}),
         ...(result.anchorResolution ? { anchorResolution: result.anchorResolution } : {}),
         seedImageUrls: extractedSeedImageUrls,
@@ -2090,6 +2092,15 @@ export const processCurationJob = onDocumentCreated({
     
     // Unified error messaging using the shared errorTranslationLayer
     const translatedError = translateError(error);
+
+    if (jobData?.userId && jobData?.inputPayload?.curationSessionId) {
+      await refundProjectSettlementOnError({
+        uid: jobData.userId,
+        projectId: jobData.inputPayload?.projectId,
+        curationSessionId: jobData.inputPayload.curationSessionId,
+        reason: "Column 3 Hydration Worker Failure",
+      });
+    }
     
     await jobDocRef.update({
       status: "failed",

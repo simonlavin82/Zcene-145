@@ -8,6 +8,7 @@ const firestore_2 = require("firebase-admin/firestore");
 const errorTranslationLayer_1 = require("./services/errorTranslationLayer");
 const curatorService_1 = require("./services/curatorService");
 const cacheQualification_1 = require("./services/cacheQualification");
+const tokenWallet_1 = require("./tokenWallet");
 // Initialize Firebase Admin SDK if not already done
 if ((0, app_1.getApps)().length === 0) {
     (0, app_1.initializeApp)();
@@ -1899,6 +1900,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 detailsCache: result.detailsCache,
                 activeNodes: hoistedActiveNodes, // Phase 2B: canonical seed-first ordering
                 apiUsage: mergedApiUsage,
+                ...(typeof inputPayload?.tokensSpent === "number" ? { tokensSpent: inputPayload.tokensSpent } : {}),
                 ...(inputPayload?.generationType ? { generationType: inputPayload.generationType } : {}),
                 ...(result.anchorResolution ? { anchorResolution: result.anchorResolution } : {}),
                 seedImageUrls: extractedSeedImageUrls,
@@ -1910,6 +1912,14 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
         console.error(`[Curation Backend] Failed processing job ${jobId}:`, error);
         // Unified error messaging using the shared errorTranslationLayer
         const translatedError = (0, errorTranslationLayer_1.translateError)(error);
+        if (jobData?.userId && jobData?.inputPayload?.curationSessionId) {
+            await (0, tokenWallet_1.refundProjectSettlementOnError)({
+                uid: jobData.userId,
+                projectId: jobData.inputPayload?.projectId,
+                curationSessionId: jobData.inputPayload.curationSessionId,
+                reason: "Column 3 Hydration Worker Failure",
+            });
+        }
         await jobDocRef.update({
             status: "failed",
             errorMessage: translatedError.userFriendlyMessage,

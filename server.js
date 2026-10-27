@@ -100,17 +100,63 @@ const extractCleanJsonString = (rawText) => {
 };
 
 // Proxy all requests starting with /api/gemini/ to the Google GenAI API
+// Rule 43: Verified via Firebase Bearer ID Token + deepWebSessions lease (Admin zcene.online@gmail.com bypassed)
 app.all('/api/gemini/*wildcard', async (req, res) => {
-  const expectedPassword = process.env.API_PASSWORD;
-  const providedPassword = req.headers['x-zcene-password'];
-  
-  if (expectedPassword && providedPassword !== expectedPassword) {
-    return res.status(401).json({ error: "Invalid or missing API password" });
+  const authHeader = req.headers['authorization'] || req.headers['Authorization'] || '';
+  const bearerMatch = typeof authHeader === 'string' ? authHeader.match(/^Bearer\s+(.+)$/i) : null;
+
+  if (!bearerMatch || !bearerMatch[1]) {
+    return res.status(401).json({ error: "Missing Firebase Authorization Bearer token." });
+  }
+
+  let decodedToken;
+  try {
+    decodedToken = await admin.auth().verifyIdToken(bearerMatch[1].trim());
+  } catch (verifyErr) {
+    console.warn("[Gemini Proxy] Invalid Firebase ID token:", verifyErr?.message || verifyErr);
+    return res.status(401).json({ error: "Invalid or expired authentication token." });
+  }
+
+  const callerEmail = (decodedToken.email || '').trim().toLowerCase();
+  const isCallerAdmin = callerEmail === 'zcene.online@gmail.com';
+
+  if (!isCallerAdmin) {
+    const deepWebSessionId = (req.headers['x-zcene-deepweb-session'] || '').toString().trim();
+    if (!deepWebSessionId) {
+      return res.status(403).json({ error: "DEEP_WEB_SESSION_REQUIRED: Unlock a 3-message Deep Connections session to continue." });
+    }
+
+    try {
+      const sessionRef = db.collection('deepWebSessions').doc(deepWebSessionId);
+      await db.runTransaction(async (tx) => {
+        const snap = await tx.get(sessionRef);
+        if (!snap.exists) {
+          throw new Error("INVALID_SESSION");
+        }
+        const sData = snap.data() || {};
+        if (sData.uid !== decodedToken.uid) {
+          throw new Error("SESSION_OWNER_MISMATCH");
+        }
+        const remaining = Math.max(0, Math.floor(Number(sData.remainingMessages) || 0));
+        if (remaining <= 0) {
+          throw new Error("SESSION_EXHAUSTED");
+        }
+        tx.update(sessionRef, {
+          remainingMessages: remaining - 1,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      });
+    } catch (leaseErr) {
+      const code = leaseErr?.message || 'LEASE_ERROR';
+      console.warn(`[Gemini Proxy] Deep Web lease rejected (${code}) for uid=${decodedToken.uid}`);
+      return res.status(403).json({ error: code });
+    }
   }
 
   const headers = { ...req.headers };
   // Cleanse credentials
   delete headers['x-zcene-password'];
+  delete headers['x-zcene-deepweb-session'];
   delete headers['authorization'];
   delete headers['Authorization'];
   delete headers['cookie'];

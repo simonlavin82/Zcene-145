@@ -16,6 +16,12 @@ import { formatSystemTimestamp } from '../utils/formatters';
 import { db, functions } from '../services/firebase';
 import { collection, getDocs } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
+import {
+  TOKEN_PRICING,
+  TOP_UP_TIERS,
+  TOP_UP_TIER_LIST,
+  TokenTopUpTierId,
+} from '../shared/tokenEconomy';
 
 // --- My Stack Dialog Component ---
 export const MyStackDialog: React.FC<{
@@ -730,37 +736,263 @@ export const MyTasteDialog: React.FC<{
   );
 };
 
-// --- Token Confirmation Interceptor Dialog Component ---
+// --- Simulated Stripe Top-Up Modal Component (V38 Prepaid Token Economy) ---
+export interface SimulatedStripeModalProps {
+  isOpen: boolean;
+  initialTierId?: TokenTopUpTierId | null;
+  currentBalance?: number;
+  onClose: () => void;
+  onSuccess?: (newBalance: number, tokensCredited: number) => void;
+}
+
+export const SimulatedStripeModal: React.FC<SimulatedStripeModalProps> = ({
+  isOpen,
+  initialTierId,
+  currentBalance = 0,
+  onClose,
+  onSuccess,
+}) => {
+  const [selectedTierId, setSelectedTierId] = useState<TokenTopUpTierId>(initialTierId || 'gbp_10');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedTierId(initialTierId || 'gbp_10');
+      setIsProcessing(false);
+      setErrorMsg(null);
+    }
+  }, [isOpen, initialTierId]);
+
+  if (!isOpen) return null;
+
+  const selectedTier = TOP_UP_TIERS[selectedTierId] || TOP_UP_TIERS.gbp_10;
+
+  const handleConfirmPurchase = async () => {
+    if (isProcessing) return;
+    setIsProcessing(true);
+    setErrorMsg(null);
+    try {
+      const topUpCallable = httpsCallable(functions, 'simulateStripeTopUpCallable');
+      const result = await topUpCallable({ tierId: selectedTier.id });
+      const data = result.data as { tokenBalance?: number; addedTokens?: number; tokensCredited?: number };
+      const nextBalance = typeof data?.tokenBalance === 'number' ? data.tokenBalance : currentBalance + selectedTier.tokens;
+      const credited = typeof data?.addedTokens === 'number'
+        ? data.addedTokens
+        : typeof data?.tokensCredited === 'number'
+          ? data.tokensCredited
+          : selectedTier.tokens;
+      onSuccess?.(nextBalance, credited);
+      onClose();
+    } catch (err: any) {
+      console.error('[SimulatedStripeModal] Top-up failed:', err);
+      setErrorMsg(err?.message || 'Unable to process simulated top-up. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  return (
+    <ModalBackdrop className="z-[2200]" onClick={isProcessing ? undefined : onClose}>
+      <ModalContainer data-testid="simulated-stripe-modal" className="max-w-md w-full">
+        <ModalHeader>
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-primary !text-[18px]">bolt</span>
+            <h3 className="text-lg font-medium text-white">Top Up Zcene Tokens</h3>
+            <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">
+              Stripe Sim
+            </span>
+          </div>
+          <button
+            type="button"
+            disabled={isProcessing}
+            onClick={onClose}
+            className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none disabled:opacity-40"
+          >
+            <span className="material-symbols-outlined !text-[18px]">close</span>
+          </button>
+        </ModalHeader>
+
+        <div className="p-5 space-y-4 text-sm text-zinc-300">
+          <div className="grid grid-cols-3 gap-2.5">
+            {TOP_UP_TIER_LIST.map((tier) => {
+              const isSelected = tier.id === selectedTier.id;
+              return (
+                <button
+                  key={tier.id}
+                  type="button"
+                  data-testid={`stripe-tier-${tier.id}`}
+                  disabled={isProcessing}
+                  onClick={() => setSelectedTierId(tier.id)}
+                  className={`relative flex flex-col items-center justify-center p-3 rounded-xl border text-center transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-primary/15 border-primary text-white shadow-[0_0_20px_rgba(255,95,31,0.15)]'
+                      : 'bg-zinc-900/70 border-zinc-800 text-zinc-300 hover:border-zinc-600'
+                  }`}
+                >
+                  {tier.featured && (
+                    <span className="absolute -top-2 px-1.5 py-0.2 rounded-full bg-primary text-brand-black text-[9px] font-bold uppercase tracking-wider">
+                      Popular
+                    </span>
+                  )}
+                  <span className="text-lg font-semibold text-white">{tier.priceDisplay}</span>
+                  <span className="text-xs font-mono text-primary font-semibold mt-0.5">
+                    {tier.tokens} Tokens
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="bg-zinc-900/70 border border-zinc-800 rounded-xl p-4 space-y-2.5">
+            <div className="text-xs font-medium text-white leading-relaxed" data-testid="stripe-sim-headline">
+              Stripe Checkout Simulation — Confirm {selectedTier.priceDisplay} Top-Up for {selectedTier.tokens} Tokens
+            </div>
+            <p className="text-[11px] text-zinc-400 leading-relaxed">
+              No real card charge is made during beta testing. Confirming credits {selectedTier.tokens} Tokens directly to your Zcene wallet.
+            </p>
+            <div className="pt-2 border-t border-zinc-800/80 flex items-center justify-between font-mono text-xs">
+              <span className="text-zinc-500">Wallet Balance:</span>
+              <span className="text-zinc-200">
+                {currentBalance}T <span className="text-zinc-500">→</span>{' '}
+                <strong className="text-primary">{currentBalance + selectedTier.tokens} Tokens</strong>
+              </span>
+            </div>
+          </div>
+
+          {errorMsg && (
+            <div className="text-xs text-rose-400 bg-rose-950/30 border border-rose-800/50 rounded-lg p-2.5">
+              {errorMsg}
+            </div>
+          )}
+        </div>
+
+        <ModalFooter>
+          <button
+            type="button"
+            disabled={isProcessing}
+            onClick={onClose}
+            className="px-4 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            data-testid="stripe-confirm-button"
+            disabled={isProcessing}
+            onClick={handleConfirmPurchase}
+            className="px-5 py-2 bg-primary text-brand-black rounded-xl font-semibold text-sm transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+          >
+            {isProcessing ? (
+              <>
+                <span className="material-symbols-outlined !text-[15px] animate-spin">progress_activity</span>
+                <span>Crediting...</span>
+              </>
+            ) : (
+              <span>Confirm {selectedTier.priceDisplay} Top-Up</span>
+            )}
+          </button>
+        </ModalFooter>
+      </ModalContainer>
+    </ModalBackdrop>
+  );
+};
+
+// --- Token Confirmation Interceptor Dialog Component (V38 Token Spend & Top-Up Gate) ---
 export const TokenConfirmationDialog: React.FC<{
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (password: string) => void;
+  onConfirm: (authorizationToken?: string) => void;
   type: 'generation' | 'extension' | 'deep_cut_creation' | 'partial_synthesis' | 'cache_upgrade' | 'data_quality_optimization' | 'live_tour_search' | 'live_synthesis' | 'live_chat_search';
   cachedArtists: string[];
   missingArtists: string[];
   enrichmentArtists?: string[];
+  tokenCost?: number;
+  tokenBalance?: number;
+  isAdmin?: boolean;
+  onOpenTopUp?: (tierId?: TokenTopUpTierId) => void;
   onBack?: () => void;
   error?: string | null;
-}> = ({ isOpen, onClose, onConfirm, type, cachedArtists, missingArtists, enrichmentArtists, onBack, error }) => {
-  const [password, setPassword] = useState(() => {
-    try { return sessionStorage.getItem('zcene_api_password') || ''; } catch(e) { return ''; }
-  });
-  const [showPassword, setShowPassword] = useState(false);
-
+}> = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  type,
+  cachedArtists,
+  missingArtists,
+  enrichmentArtists,
+  tokenCost,
+  tokenBalance = 0,
+  isAdmin = false,
+  onOpenTopUp,
+  onBack,
+  error,
+}) => {
   if (!isOpen) return null;
+
+  const effectiveTokenCost =
+    typeof tokenCost === 'number'
+      ? tokenCost
+      : type === 'live_chat_search'
+        ? TOKEN_PRICING.DEEP_WEB_CONSULT
+        : type === 'live_synthesis'
+          ? TOKEN_PRICING.COMPLEX_QUERY
+          : TOKEN_PRICING.SINGLE_SEED;
+
+  const hasSufficientBalance = isAdmin || tokenBalance >= effectiveTokenCost;
+  const deficit = Math.max(0, effectiveTokenCost - tokenBalance);
+  const remainingBalance = Math.max(0, tokenBalance - effectiveTokenCost);
+
+  const allSelectedSubjects = Array.from(
+    new Set([...(cachedArtists || []), ...(enrichmentArtists || []), ...(missingArtists || [])])
+  ).filter(Boolean);
+
+  const triggerTopUp = (tierId?: TokenTopUpTierId) => {
+    if (onOpenTopUp) {
+      onOpenTopUp(tierId);
+    } else if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('open-topup-modal', { detail: { tierId } }));
+    }
+  };
+
+  const modalTitle = isAdmin
+    ? type === 'live_synthesis'
+      ? 'Confirm Live Synthesis'
+      : type === 'live_chat_search'
+        ? 'Unlock Deep Connections (Admin)'
+        : 'Confirm Curation (Admin)'
+    : !hasSufficientBalance
+      ? 'Top Up Required to Continue'
+      : type === 'live_chat_search'
+        ? 'Unlock Deep Connections'
+        : effectiveTokenCost >= TOKEN_PRICING.COMPLEX_QUERY || type === 'live_synthesis'
+          ? 'Confirm Complex Synthesis'
+          : 'Confirm Zcene Curation';
+
+  const isPureAdminCacheHit =
+    isAdmin &&
+    (!missingArtists || missingArtists.length === 0) &&
+    (!enrichmentArtists || enrichmentArtists.length === 0);
+
+  const barMax = Math.max(tokenBalance, effectiveTokenCost, 50);
+  const currentBarPct = Math.min(100, Math.round((tokenBalance / barMax) * 100));
+  const afterBarPct = Math.min(100, Math.round((remainingBalance / barMax) * 100));
 
   return (
     <ModalBackdrop className="z-[130]" onClick={onClose}>
       <ModalContainer data-testid="token-gate-modal">
         <ModalHeader>
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary !text-[18px]">info</span>
+            <span className="material-symbols-outlined text-primary !text-[18px]">
+              {isAdmin ? 'verified_user' : !hasSufficientBalance ? 'account_balance_wallet' : 'bolt'}
+            </span>
             <h3 className="text-lg font-medium text-white" data-testid="token-gate-title">
-              {type === 'live_synthesis' ? 'Confirm Live Synthesis' : 'Token Quota Warning'}
+              {modalTitle}
             </h3>
           </div>
-          <button 
-            onClick={onClose} 
+          <button
+            type="button"
+            onClick={onClose}
             className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none"
           >
             <span className="material-symbols-outlined !text-[18px]">close</span>
@@ -768,160 +1000,229 @@ export const TokenConfirmationDialog: React.FC<{
         </ModalHeader>
 
         <div className="p-5 space-y-4 text-sm text-zinc-400">
-          <p className="leading-relaxed">
-            {type === 'cache_upgrade'
-              ? 'The cached entry is out of date and needs a quick re-synthesis query to unlock the latest spiderweb layout and Deep Cut features.'
-              : type === 'data_quality_optimization'
-                ? 'A data quality issue was detected on this profile (stale placeholders, bad casing, or unparsed formatting). A live AI optimization pass will re-synthesize and heal the cached record.'
-                : type === 'live_tour_search'
-                  ? 'You are initiating a live search agent lookup to check the latest real-time tour schedules for this artist.'
-                  : type === 'live_synthesis'
-                    ? 'You are initiating a live music graph synthesis constrained by custom filters. This requires a fresh AI synthesis pass and cannot use standard cached entries.'
-                    : 'You are initiating a net-new AI generation flow that requires contacting the live models.'}
-          </p>
-          <div className="bg-zinc-900/60 p-4 border border-zinc-800 space-y-2.5">
-            <div className="flex justify-between font-mono text-xs border-b border-zinc-800 pb-1.5">
-              <span className="text-zinc-500">Query Type:</span>
-              <span className="text-zinc-300 font-semibold uppercase tracking-wider">
-                {type === 'generation' 
-                  ? 'Graph Generation' 
-                  : type === 'extension' 
-                    ? 'Node Expansion' 
-                    : type === 'partial_synthesis'
-                      ? 'Partial Synthesis (Enrichment)'
-                      : type === 'cache_upgrade'
-                        ? 'Cache Upgrade'
-                        : type === 'data_quality_optimization'
-                          ? 'Profile Quality Optimization'
-                          : type === 'live_tour_search'
-                            ? 'Live Tour Agent Search'
-                            : type === 'live_synthesis'
-                              ? 'Filtered Live Synthesis'
-                              : 'Deep Cut Creation'}
-              </span>
-            </div>
-            <div className="flex justify-between font-mono text-xs border-b border-zinc-800 pb-1.5">
-              <span className="text-zinc-500">Estimated Cost:</span>
-              <div className="text-right">
-                <span className="text-primary font-bold">
-                  ~$0.40 – $0.85 (~£0.30 – £0.65)
-                </span>
-                <span className="text-[9px] text-zinc-500 block mt-0.5 lowercase tracking-wide">
-                  Final cost depends on cache recovery and graph complexity.
+          {isAdmin ? (
+            <>
+              <div className="flex items-center justify-between bg-emerald-950/30 border border-emerald-500/30 rounded-xl px-3.5 py-2">
+                <span className="text-xs text-emerald-300 font-medium">Admin Bypass Active</span>
+                <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-semibold">
+                  ADMIN UNLIMITED · 0T
                 </span>
               </div>
-            </div>
 
-            {/* Split breakdown of cached vs synthesis required */}
-            {cachedArtists && cachedArtists.length > 0 && (
-              <div className="space-y-1 pb-1.5 border-b border-zinc-800">
-                <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest block">
-                  Ready (Cached/Free)
-                </span>
-                <div className="flex flex-wrap gap-1.5">
-                  {cachedArtists.map(artist => (
-                    <span key={artist} className="text-[10px] font-mono bg-zinc-800/80 text-zinc-300 px-2 py-0.5 border border-zinc-700/50 rounded-full">
-                      {artist}
-                    </span>
-                  ))}
+              <div className="bg-zinc-900/60 p-4 border border-zinc-800 rounded-xl space-y-2.5">
+                <div className="flex justify-between font-mono text-xs border-b border-zinc-800 pb-1.5">
+                  <span className="text-zinc-500">Query Mode:</span>
+                  <span className="text-zinc-300 font-semibold uppercase tracking-wider">
+                    {type === 'live_chat_search'
+                      ? 'Deep Connections (3 Msgs)'
+                      : isPureAdminCacheHit
+                        ? 'Direct Topology Hit'
+                        : type === 'live_synthesis'
+                          ? 'Filtered Live Synthesis'
+                          : 'Graph Synthesis'}
+                  </span>
                 </div>
-              </div>
-            )}
-
-            {enrichmentArtists && enrichmentArtists.length > 0 && (
-              <div className="space-y-1 pb-1.5 border-b border-zinc-800">
-                <span className="text-[10px] font-semibold text-amber-400 uppercase tracking-widest block">
-                  Enrichment Required (Missing Peer Bands/Attributes)
-                </span>
-                <div className="flex flex-wrap gap-1.5">
-                  {enrichmentArtists.map(artist => (
-                    <span key={artist} className="text-[10px] font-mono bg-amber-950/20 text-amber-400 px-2 py-0.5 border border-amber-900/30 rounded-full">
-                      {artist}
+                <div className="flex justify-between font-mono text-xs border-b border-zinc-800 pb-1.5">
+                  <span className="text-zinc-500">Estimated Backend Cost:</span>
+                  <div className="text-right">
+                    <span className="text-primary font-bold">
+                      {type === 'live_chat_search'
+                        ? '~$0.01 – $0.03'
+                        : isPureAdminCacheHit
+                          ? '$0.0000 Direct Hit'
+                          : '~$0.40 – $0.85 (~£0.30 – £0.65)'}
                     </span>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            {missingArtists && missingArtists.length > 0 && (
-              <div className="space-y-1">
-                <span className="text-[10px] font-semibold text-red-400 uppercase tracking-widest block">
-                  Synthesis Required (~$0.40 – $0.85)
-                </span>
-                <div className="flex flex-wrap gap-1.5">
-                  {missingArtists.map(artist => (
-                    <span key={artist} className="text-[10px] font-mono bg-red-950/20 text-red-400 px-2 py-0.5 border border-red-900/30 rounded-full">
-                      {artist}
+                    <span className="text-[9px] text-zinc-500 block mt-0.5">
+                      Standard user price: {effectiveTokenCost} Tokens
                     </span>
-                  ))}
+                  </div>
                 </div>
+
+                {cachedArtists && cachedArtists.length > 0 && (
+                  <div className="space-y-1 pb-1.5 border-b border-zinc-800">
+                    <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest block">
+                      Ready (Cached)
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {cachedArtists.map(artist => (
+                        <span key={artist} className="text-[10px] font-mono bg-zinc-800/80 text-zinc-300 px-2 py-0.5 border border-zinc-700/50 rounded-full">
+                          {artist}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {enrichmentArtists && enrichmentArtists.length > 0 && (
+                  <div className="space-y-1 pb-1.5 border-b border-zinc-800">
+                    <span className="text-[10px] font-semibold text-amber-400 uppercase tracking-widest block">
+                      Enrichment Required
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {enrichmentArtists.map(artist => (
+                        <span key={artist} className="text-[10px] font-mono bg-amber-950/20 text-amber-400 px-2 py-0.5 border border-amber-900/30 rounded-full">
+                          {artist}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {missingArtists && missingArtists.length > 0 && (
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-semibold text-red-400 uppercase tracking-widest block">
+                      Live Synthesis Required
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {missingArtists.map(artist => (
+                        <span key={artist} className="text-[10px] font-mono bg-red-950/20 text-red-400 px-2 py-0.5 border border-red-900/30 rounded-full">
+                          {artist}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </>
+          ) : (
+            <>
+              <p className="leading-relaxed text-zinc-300">
+                {type === 'live_chat_search'
+                  ? 'Unlock a 3-message Deep Connections AI session for this artist.'
+                  : effectiveTokenCost >= TOKEN_PRICING.COMPLEX_QUERY
+                    ? 'Curate this multi-artist or custom-anchored Zcene web and save it permanently to your Zcenes.'
+                    : 'Curate this Zcene web and unlock it permanently in your Zcenes.'}
+              </p>
 
-          <div className="pt-2">
-            <div className="relative">
-              <Input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
-                data-testid="token-password-input"
-                type={showPassword ? 'text' : 'password'}
-                placeholder="API Access Password" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && password) onConfirm(password);
-                }}
-                className="pr-10"
-                autoFocus
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(p => !p)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
-                tabIndex={-1}
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
-              >
-                {showPassword
-                  ? <VisibilityOffIcon className="w-4 h-4" />
-                  : <VisibilityIcon className="w-4 h-4" />}
-              </button>
-            </div>
-            {error && (
-              <p className="text-red-400 text-xs mt-2 font-medium">{error}</p>
-            )}
-          </div>
+              <div className="bg-zinc-900/60 p-4 border border-zinc-800 rounded-xl space-y-3">
+                {allSelectedSubjects.length > 0 && (
+                  <div className="space-y-1.5 pb-2.5 border-b border-zinc-800">
+                    <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest block">
+                      {type === 'live_chat_search' ? 'Session Scope' : 'Selected Artists'}
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {allSelectedSubjects.map(subject => (
+                        <span
+                          key={subject}
+                          className="text-xs font-mono bg-zinc-800/90 text-zinc-200 px-2.5 py-0.5 border border-zinc-700/70 rounded-full"
+                        >
+                          {subject}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-          {import.meta.env.DEV && (
-            <p className="text-xs text-zinc-500 leading-relaxed pt-2">
-              Note: All live outbound API dispatches are completely short-circuited with a static JSON payload in sandbox mode to protect billing limits.
-            </p>
+                <div className="flex items-center justify-between font-mono text-xs">
+                  <span className="text-zinc-400">Token Cost:</span>
+                  <span className="text-primary font-bold text-sm" data-testid="token-gate-cost">
+                    {effectiveTokenCost} Tokens
+                  </span>
+                </div>
+
+                {/* Juice Bar Preview */}
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex items-center justify-between text-[11px] font-mono">
+                    <span className="text-zinc-500">Your Balance: <strong className="text-zinc-200">{tokenBalance}T</strong></span>
+                    {hasSufficientBalance ? (
+                      <span className="text-zinc-400">
+                        After: <strong className="text-emerald-400">{remainingBalance}T</strong>
+                      </span>
+                    ) : (
+                      <span className="text-amber-400 font-semibold">
+                        Need +{deficit}T more
+                      </span>
+                    )}
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-zinc-800 overflow-hidden relative">
+                    <div
+                      className={`h-full transition-all duration-300 ${hasSufficientBalance ? 'bg-zinc-600' : 'bg-amber-500/70'}`}
+                      style={{ width: `${currentBarPct}%` }}
+                    />
+                    {hasSufficientBalance && (
+                      <div
+                        className="h-full bg-primary absolute top-0 left-0 transition-all duration-300"
+                        style={{ width: `${afterBarPct}%` }}
+                      />
+                    )}
+                  </div>
+                </div>
+
+                {type !== 'live_chat_search' && (
+                  <p className="text-[11px] text-zinc-500 leading-relaxed pt-1 border-t border-zinc-800/70">
+                    Includes a 1-Token artist lookup if uncached; the remaining balance is only charged when you confirm generation.
+                  </p>
+                )}
+              </div>
+
+              {!hasSufficientBalance && (
+                <div className="bg-amber-950/20 border border-amber-500/30 rounded-xl p-3.5 space-y-2.5" data-testid="low-balance-topup-box">
+                  <p className="text-xs text-amber-200/90 leading-relaxed">
+                    Top up your Zcene wallet to continue immediately without losing your selection:
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {TOP_UP_TIER_LIST.map(tier => (
+                      <button
+                        key={tier.id}
+                        type="button"
+                        data-testid={`gate-topup-${tier.id}`}
+                        onClick={() => triggerTopUp(tier.id)}
+                        className="flex flex-col items-center justify-center py-2 px-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-amber-500/40 hover:border-primary transition-colors cursor-pointer"
+                      >
+                        <span className="text-xs font-semibold text-white">{tier.priceDisplay}</span>
+                        <span className="text-[10px] font-mono text-primary">+{tier.tokens}T</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {error && (
+            <p className="text-red-400 text-xs mt-2 font-medium">{error}</p>
           )}
         </div>
 
         <ModalFooter>
           {onBack ? (
-            <button 
-              onClick={onBack} 
+            <button
+              type="button"
+              onClick={onBack}
               className="px-4 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent"
             >
               Back
             </button>
           ) : (
-            <button 
+            <button
+              type="button"
               data-testid="token-cancel-button"
-              onClick={onClose} 
+              onClick={onClose}
               className="px-4 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent"
             >
               Cancel
             </button>
           )}
-          <button 
-            data-testid="token-authorize-button"
-            onClick={() => onConfirm(password)} 
-            disabled={!password}
-            className="px-4 py-1.5 bg-white text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90 disabled:opacity-50"
-          >
-            Confirm
-          </button>
+
+          {!isAdmin && !hasSufficientBalance ? (
+            <button
+              type="button"
+              data-testid="token-authorize-button"
+              onClick={() => triggerTopUp('gbp_10')}
+              className="px-4 py-2 bg-primary text-brand-black rounded-xl font-semibold text-sm transition-opacity hover:opacity-90 cursor-pointer"
+            >
+              Top Up Tokens
+            </button>
+          ) : (
+            <button
+              type="button"
+              data-testid="token-authorize-button"
+              onClick={() => onConfirm('authorized')}
+              className="px-4 py-2 bg-white text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90 cursor-pointer"
+            >
+              {isAdmin ? 'Confirm (Admin)' : `Confirm & Spend ${effectiveTokenCost} Tokens`}
+            </button>
+          )}
         </ModalFooter>
       </ModalContainer>
     </ModalBackdrop>
@@ -1704,24 +2005,45 @@ export interface ConsolidatedValidationModalProps {
   seeds: PreFlightSeed[];
   onConfirm: (updatedSeeds?: PreFlightSeed[]) => void;
   onCancel: () => void;
+  curationSessionId?: string | null;
+  isAdmin?: boolean;
+  onOpenTopUp?: (tierId?: TokenTopUpTierId) => void;
 }
 
-export function ConsolidatedValidationModal({ isOpen, seeds, onConfirm, onCancel }: ConsolidatedValidationModalProps) {
+export function ConsolidatedValidationModal({
+  isOpen,
+  seeds,
+  onConfirm,
+  onCancel,
+  curationSessionId,
+  isAdmin = false,
+  onOpenTopUp,
+}: ConsolidatedValidationModalProps) {
   const [localSeeds, setLocalSeeds] = React.useState<PreFlightSeed[]>(seeds);
   const [editingSeedId, setEditingSeedId] = React.useState<string | null>(null);
   const [customOrigin, setCustomOrigin] = React.useState<string>('');
   const [customGenre, setCustomGenre] = React.useState<string>('');
   const [isVerifying, setIsVerifying] = React.useState<boolean>(false);
   const [verificationError, setVerificationError] = React.useState<string | null>(null);
+  const [needsTopUpForEscape, setNeedsTopUpForEscape] = React.useState<boolean>(false);
 
   React.useEffect(() => {
     setLocalSeeds(seeds);
     setEditingSeedId(null);
     setVerificationError(null);
+    setNeedsTopUpForEscape(false);
     setIsVerifying(false);
   }, [seeds]);
 
   if (!isOpen) return null;
+
+  const triggerTopUp = (tierId?: TokenTopUpTierId) => {
+    if (onOpenTopUp) {
+      onOpenTopUp(tierId);
+    } else if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('open-topup-modal', { detail: { tierId } }));
+    }
+  };
 
   const handleSelectCandidate = (seedId: string, candidate: DisambiguationCandidateStub) => {
     setLocalSeeds(prev => prev.map(s => {
@@ -1743,20 +2065,22 @@ export function ConsolidatedValidationModal({ isOpen, seeds, onConfirm, onCancel
     setCustomOrigin(seed.predictedOrigin && seed.predictedOrigin !== 'Unknown Origin' ? seed.predictedOrigin : '');
     setCustomGenre(seed.genre || '');
     setVerificationError(null);
+    setNeedsTopUpForEscape(false);
   };
 
   const handleCancelEdit = () => {
     setEditingSeedId(null);
     setVerificationError(null);
+    setNeedsTopUpForEscape(false);
   };
 
   const handleSaveEdit = async (seed: PreFlightSeed) => {
     if (!customOrigin.trim() || isVerifying) return;
     setIsVerifying(true);
     setVerificationError(null);
+    setNeedsTopUpForEscape(false);
 
     try {
-      const currentPassword = sessionStorage.getItem('zcene_api_password') || undefined;
       const validateCallable = httpsCallable(functions, 'validateSeedOriginCallable');
       const seedQuery = seed.correctedQuery || seed.query;
       
@@ -1764,7 +2088,7 @@ export function ConsolidatedValidationModal({ isOpen, seeds, onConfirm, onCancel
         seed: seedQuery,
         originHint: customOrigin.trim(),
         genreHint: customGenre.trim() || undefined,
-        ...(currentPassword && { password: currentPassword })
+        ...(curationSessionId ? { curationSessionId, mode: 'escape_hatch' } : {}),
       });
 
       const data = response.data as any;
@@ -1790,12 +2114,18 @@ export function ConsolidatedValidationModal({ isOpen, seeds, onConfirm, onCancel
         }));
         setEditingSeedId(null);
         setVerificationError(null);
+        setNeedsTopUpForEscape(false);
       } else {
         setVerificationError("No significant artist found matching these criteria");
       }
     } catch (err: any) {
       console.warn("[ConsolidatedValidationModal] Re-query bouncer rejected:", err);
-      setVerificationError("No significant artist found matching these criteria");
+      if (err?.message?.includes('INSUFFICIENT_TOKENS') || err?.code === 'functions/failed-precondition') {
+        setNeedsTopUpForEscape(true);
+        setVerificationError("1 Token required to re-query artist origin.");
+      } else {
+        setVerificationError("No significant artist found matching these criteria");
+      }
     } finally {
       setIsVerifying(false);
     }
@@ -1868,7 +2198,7 @@ export function ConsolidatedValidationModal({ isOpen, seeds, onConfirm, onCancel
                         <span className="text-white font-medium text-base truncate">
                           {seed.isCorrected && seed.correctedQuery ? seed.correctedQuery : seed.query}
                         </span>
-                        {seed.isKnownCacheHit && (
+                        {isAdmin && seed.isKnownCacheHit && (
                           <span className="text-[9px] uppercase tracking-wider text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded-full font-semibold">CACHE HIT</span>
                         )}
                       </div>
@@ -1922,36 +2252,52 @@ export function ConsolidatedValidationModal({ isOpen, seeds, onConfirm, onCancel
                           </div>
 
                           {verificationError && (
-                            <div data-testid="bouncer-error" className="flex items-center gap-1.5 text-rose-400 text-xs bg-rose-950/40 border border-rose-800/50 rounded-lg p-2">
-                              <span className="material-symbols-outlined !text-[15px] flex-shrink-0">error</span>
-                              <span>{verificationError}</span>
+                            <div data-testid="bouncer-error" className="flex items-center justify-between gap-2 text-rose-400 text-xs bg-rose-950/40 border border-rose-800/50 rounded-lg p-2">
+                              <div className="flex items-center gap-1.5">
+                                <span className="material-symbols-outlined !text-[15px] flex-shrink-0">error</span>
+                                <span>{verificationError}</span>
+                              </div>
+                              {needsTopUpForEscape && (
+                                <button
+                                  type="button"
+                                  onClick={() => triggerTopUp('gbp_5')}
+                                  className="px-2 py-0.5 text-[10px] font-semibold bg-primary text-brand-black rounded hover:opacity-90 whitespace-nowrap cursor-pointer"
+                                >
+                                  Top Up
+                                </button>
+                              )}
                             </div>
                           )}
 
-                          <div className="flex justify-end gap-2">
-                            <button
-                              type="button"
-                              disabled={isVerifying}
-                              onClick={handleCancelEdit}
-                              className="px-2.5 py-1 text-[11px] text-zinc-400 hover:text-white rounded disabled:opacity-50"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              type="button"
-                              disabled={!customOrigin.trim() || isVerifying}
-                              onClick={() => handleSaveEdit(seed)}
-                              className="px-3 py-1 text-[11px] font-medium bg-amber-500 text-brand-black rounded hover:bg-amber-400 disabled:opacity-50 flex items-center gap-1.5"
-                            >
-                              {isVerifying ? (
-                                <>
-                                  <span className="material-symbols-outlined !text-[12px] animate-spin">progress_activity</span>
-                                  <span>Verifying...</span>
-                                </>
-                              ) : (
-                                <span>Apply</span>
-                              )}
-                            </button>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[10px] text-zinc-500 font-mono">
+                              {!isAdmin && curationSessionId ? '1-Token Flash lookup' : ''}
+                            </span>
+                            <div className="flex justify-end gap-2">
+                              <button
+                                type="button"
+                                disabled={isVerifying}
+                                onClick={handleCancelEdit}
+                                className="px-2.5 py-1 text-[11px] text-zinc-400 hover:text-white rounded disabled:opacity-50"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                disabled={!customOrigin.trim() || isVerifying}
+                                onClick={() => handleSaveEdit(seed)}
+                                className="px-3 py-1 text-[11px] font-medium bg-amber-500 text-brand-black rounded hover:bg-amber-400 disabled:opacity-50 flex items-center gap-1.5"
+                              >
+                                {isVerifying ? (
+                                  <>
+                                    <span className="material-symbols-outlined !text-[12px] animate-spin">progress_activity</span>
+                                    <span>Verifying...</span>
+                                  </>
+                                ) : (
+                                  <span>Apply</span>
+                                )}
+                              </button>
+                            </div>
                           </div>
                         </div>
                       )}

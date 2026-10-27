@@ -12,6 +12,13 @@ import {
   isFullyQualifiedEntityProfile,
   sanitizeDiscoveryFilters
 } from "./services/cacheQualification";
+import { computeBaseProjectTokenCost } from "./shared/tokenEconomy";
+import {
+  requireAuthenticatedCaller,
+  chargePreFlightLookupIfNeeded,
+  settleCurationProjectTokens,
+  refundProjectSettlementOnError,
+} from "./tokenWallet";
 
 if (getApps().length === 0) {
   initializeApp();
@@ -54,19 +61,25 @@ export function stripCountrySlug(name: string): string {
 }
 
 export const validateSeedOriginCallable = onCall({
-  secrets: ["GEMINI_API_KEY", "API_PASSWORD"],
+  secrets: ["GEMINI_API_KEY"],
   timeoutSeconds: 60,
   memory: "512MiB",
 }, async (request) => {
-  const { seed, originHint, genreHint, password } = request.data;
+  const caller = requireAuthenticatedCaller(request);
+  const { seed, originHint, genreHint, curationSessionId, mode, expectedProjectCost } = request.data || {};
   if (!seed) {
     throw new HttpsError("invalid-argument", "Missing seed in payload");
   }
-  
-  const expectedPassword = process.env.API_PASSWORD;
-  if (expectedPassword && password !== expectedPassword) {
-    throw new HttpsError("unauthenticated", "Invalid or missing API password");
-  }
+
+  // Rule 18 & 43: Atomic 1-Token Non-Refundable Pre-Flight / Escape-Hatch Lookup Fee (Admin bypassed)
+  const resolvedMode = originHint || mode === "escape_hatch" ? "escape_hatch" : "initial_preflight";
+  const lookupBilling = await chargePreFlightLookupIfNeeded({
+    caller,
+    curationSessionId,
+    mode: resolvedMode,
+    expectedProjectCost: expectedProjectCost === 10 ? 10 : 5,
+    seedLabel: String(seed).trim(),
+  });
 
   const validationResult = await validateSeedOriginBackend(seed, { originHint, genreHint });
 
@@ -127,27 +140,30 @@ export const validateSeedOriginCallable = onCall({
     console.log(`[validateSeedOriginCallable] Typo correction applied: "${seed}" → "${validationResult.id}"`);
   }
 
-  return validationResult;
+  return {
+    ...validationResult,
+    curationSessionId: lookupBilling.curationSessionId,
+    tokenBalance: lookupBilling.tokenBalance,
+  };
 });
 
 export const executeCurationPipeline = onCall({
-  secrets: ["GEMINI_API_KEY", "API_PASSWORD"],
+  secrets: ["GEMINI_API_KEY"],
   timeoutSeconds: 540,
   memory: "1GiB",
 }, async (request) => {
+  const caller = requireAuthenticatedCaller(request);
   const payload = request.data;
   const safePayload = { ...payload };
-  if (safePayload.password) safePayload.password = '[REDACTED]';
+  if (safePayload.password) delete safePayload.password;
   console.log(`[Curation Backend] Executing executeCurationPipeline with payload:`, safePayload);
 
   if (!payload || !payload.artists) {
     throw new HttpsError("invalid-argument", "Missing artists in payload");
   }
 
-  const expectedPassword = process.env.API_PASSWORD;
-  if (expectedPassword && payload.password !== expectedPassword) {
-    throw new HttpsError("unauthenticated", "Invalid or missing API password");
-  }
+  // Bind userId strictly to verified Firebase Auth identity
+  payload.userId = caller.uid;
 
   const artistList = payload.artists
     .split('::')
@@ -158,6 +174,19 @@ export const executeCurationPipeline = onCall({
   payload.filters = sanitizeDiscoveryFilters(payload.filters);
   const hasActiveFilters = hasActiveDiscoveryFilters(payload.filters);
 
+  // Rule 18 & 43: Settle remaining project token balance (4T/5T Single-Seed or 9T/10T Complex)
+  const totalProjectCost = computeBaseProjectTokenCost(artistList.length, hasActiveFilters);
+  const displaySeeds = artistList.map((s: string) => seedNamesMap[s] || s).join(' + ');
+  const settlement = await settleCurationProjectTokens({
+    caller,
+    curationSessionId: payload.curationSessionId,
+    totalProjectCost,
+    projectId: payload.projectId,
+    txType: "spend_live_synthesis",
+    description: `Zcene Synthesis: ${displaySeeds}`,
+  });
+
+  try {
   console.log(`[Pipeline Diamond] -> Cache Lookup: Checking seeds: ${artistList.join(', ')} (activeFilters=${hasActiveFilters})`);
   
   const detailsCacheEntries: [string, any][] = [];
@@ -551,10 +580,11 @@ export const executeCurationPipeline = onCall({
         schemaVersion: 2,
         supportsLabelDeepCuts: true,
         generationType: determinedGenerationType,
+        tokensSpent: settlement.tokensSpent,
         updatedAt: FieldValue.serverTimestamp()
       };
       
-      await db.collection('users').doc(payload.userId).collection('projects').doc(payload.projectId).update(projectUpdate);
+      await db.collection('users').doc(payload.userId).collection('projects').doc(payload.projectId).set(projectUpdate, { merge: true });
       console.log(`[Pipeline Diamond] -> Successfully updated project ${payload.projectId} graphData via Admin SDK`);
       
       if (determinedGenerationType !== "Direct Hit") {
@@ -568,6 +598,8 @@ export const executeCurationPipeline = onCall({
           updatedAt: FieldValue.serverTimestamp(),
           inputPayload: {
              ...payload,
+             curationSessionId: settlement.curationSessionId,
+             tokensSpent: settlement.tokensSpent,
              artists: resolvedSeedArray.map(s => s.id).join('::'),
              seedNames: {
                ...seedNamesMap,
@@ -582,15 +614,16 @@ export const executeCurationPipeline = onCall({
         console.log(`[Pipeline Diamond] -> Created curation job ${curationJobId} for background hydration`);
 
         // Update project with activeJobId
-        await db.collection('users').doc(payload.userId).collection('projects').doc(payload.projectId).update({
+        await db.collection('users').doc(payload.userId).collection('projects').doc(payload.projectId).set({
            activeJobId: curationJobId
-        });
+        }, { merge: true });
       } else {
         console.log(`[Pipeline Diamond] -> Single Seed Cache Hit: Skipping background hydration job.`);
       }
 
     } catch (err) {
       console.error(`[Pipeline Diamond] -> Failed to update project doc ${payload.projectId} / spawn job`, err);
+      throw err;
     }
   }
 
@@ -600,6 +633,17 @@ export const executeCurationPipeline = onCall({
       graphData: finalGraph,
       detailsCache: "[]",
       rootBreakdown: null,
-      activeJobId: curationJobId
+      activeJobId: curationJobId,
+      tokensSpent: settlement.tokensSpent,
+      tokenBalance: settlement.tokenBalance,
   };
+  } catch (pipelineErr) {
+    await refundProjectSettlementOnError({
+      uid: caller.uid,
+      projectId: payload.projectId,
+      curationSessionId: settlement.curationSessionId,
+      reason: "Column 2 Topology Pipeline Error",
+    });
+    throw pipelineErr;
+  }
 });

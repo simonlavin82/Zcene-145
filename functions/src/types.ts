@@ -204,8 +204,67 @@ export interface Project {
   generationType?: "Root Generation" | "Partial Generation" | "Direct Hit" | "Complex Generation" | string;
   anchorResolution?: AnchorResolutionStatus;
   apiUsage?: Record<string, any>;
+  tokensSpent?: number;
   createdAt?: any;
   updatedAt?: any;
+}
+
+export interface UserProfile {
+  uid?: string;
+  email: string;
+  displayName?: string | null;
+  photoURL?: string | null;
+  role?: 'user' | 'admin';
+  libraryArtists?: string;
+  libraryBaseGraph?: string | null;
+  onboardingProgress?: Record<string, boolean>;
+  deepCutsOpened?: number;
+  pageAuth?: Record<string, any>;
+  tokenBalance?: number;
+  lifetimeTokensPurchased?: number;
+  lifetimeTokensSpent?: number;
+  lastTopUpAt?: any;
+  createdAt?: any;
+  updatedAt?: any;
+}
+
+export type TokenTransactionType =
+  | 'topup_simulated'
+  | 'spend_preflight_lookup'
+  | 'spend_direct_hit'
+  | 'spend_live_synthesis'
+  | 'spend_deep_web'
+  | 'refund_pipeline_error';
+
+export interface TokenTransaction {
+  id: string;
+  uid: string;
+  type: TokenTransactionType;
+  delta: number;
+  balanceAfter: number;
+  amountGbp?: number;
+  tierId?: 'gbp_5' | 'gbp_10' | 'gbp_15';
+  projectId?: string;
+  curationSessionId?: string;
+  description: string;
+  createdAt?: any;
+}
+
+export interface CurationSession {
+  sessionId: string;
+  uid: string;
+  expectedProjectCost: 5 | 10;
+  initialPreFlightCharged: boolean;
+  initialPreFlightCallsUsed: number;
+  escapeHatchCallsUsed: number;
+  preFlightTokensDeducted: number;
+  creditablePreFlightTokens: 0 | 1;
+  settlementTokensDeducted: number;
+  status: 'preflight' | 'settled' | 'refunded_settlement';
+  projectId?: string;
+  createdAt?: any;
+  updatedAt?: any;
+  expireAt?: any;
 }
 
 export type AnchorResolutionStatus =

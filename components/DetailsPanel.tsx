@@ -8,8 +8,10 @@ import { analyticsService } from '../services/analyticsService';
 import { Spinner, HelpIcon, MicIcon, LoadingSpinner, DETAIL_THINKING_STEPS, StackIcon, BandcampIcon } from './Icons';
 import { TokenConfirmationDialog, PROFILE_COLORS, MODAL_PROFILE_COLORS } from './SharedModals';
 import { SegmentedTextToggle } from './ui/SegmentedTextToggle';
-import { db } from '../services/firebase';
+import { db, auth, functions } from '../services/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
+import { TOKEN_PRICING } from '../shared/tokenEconomy';
 import { formatSystemTimestamp, extractInitials } from '../utils/formatters';
 import { Select, InputSizes, LayoutSizes, Button } from './DesignSystem';
 import { Flame, Pin } from 'lucide-react';
@@ -1833,6 +1835,8 @@ interface DetailsPanelProps {
   onAuthRequest?: () => void;
   userTaste?: UserTaste;
   isAdmin?: boolean;
+  tokenBalance?: number;
+  projectId?: string;
   onUpdateTasteProfile?: (taste: UserTaste) => Promise<void>;
   onShowToast?: (message: string) => void;
   onOpenTasteModal?: () => void;
@@ -1846,7 +1850,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
   error, systemError, graphData, libraryArtists, seedArtists, onAddArtist, isCollapsed, onToggleCollapse,
   isSmallScreen, onNodeClick, onNavigate, isGlobalLoading, onCancelGlobalLoading, unreadCount, isActive, collapseBtnRef,
   isMagazineViewOpen, onMagazineViewToggle, chatHistories, onUpdateChatHistories, onAddToStack,
-  isGuest = false, onAuthRequest, user, userTaste, isAdmin = false,
+  isGuest = false, onAuthRequest, user, userTaste, isAdmin = false, tokenBalance = 0, projectId,
   onUpdateTasteProfile, onShowToast, onOpenTasteModal, projectName, onStashArtist, onOpenStackDrawer
 }) => {
     const [viewedIndex, setViewedIndex] = useState(0);
@@ -1940,6 +1944,8 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     const getChatMode = (nodeId: string) => chatModes.get(nodeId) || 'instant';
     const [liveMessageCount, setLiveMessageCount] = useState(3);
     const [pendingChatMessage, setPendingChatMessage] = useState<{ nodeId: string; message: string } | null>(null);
+    const [deepWebUnlockError, setDeepWebUnlockError] = useState<string | null>(null);
+    const deepWebSessionIdRef = useRef<string | null>(null);
 
     const magazineBtnState: 'disabled' | 'attention' | 'neutral' = hasSeenMagazineView ? 'neutral' : 'attention';
     
@@ -2047,9 +2053,14 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         }
     }, [selectedNode, isMagazineViewOpen]);
 
-    const handleSendMessage = async (nodeId: string, message: string, forceLive = false, apiPassword?: string) => {
+    const handleSendMessage = async (nodeId: string, message: string, forceLive = false, overrideDeepWebSessionId?: string) => {
         const currentMode = getChatMode(nodeId);
         if (currentMode === 'live' && liveMessageCount >= 3 && !forceLive) {
+            if (isGuest) {
+                onAuthRequest?.();
+                return;
+            }
+            setDeepWebUnlockError(null);
             setPendingChatMessage({ nodeId, message });
             return;
         }
@@ -2078,6 +2089,13 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
             } else {
                 setLiveMessageCount(prev => prev + 1);
                 const aiTimestamp = Date.now();
+                let idToken: string | undefined;
+                try {
+                    if (auth?.currentUser && typeof auth.currentUser.getIdToken === 'function') {
+                        idToken = await auth.currentUser.getIdToken();
+                    }
+                } catch (_) {}
+                const activeSessionId = overrideDeepWebSessionId || deepWebSessionIdRef.current || undefined;
                 const chatPromise = streamNodeChat(
                     currentNode,
                     history,
@@ -2086,7 +2104,10 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     (chunk) => {
                         onUpdateChatHistories(new Map(chatHistories).set(nodeId, [...newHistory, { role: 'model', text: chunk, timestamp: aiTimestamp } as ChatMessage]));
                     },
-                    apiPassword
+                    {
+                        idToken,
+                        deepWebSessionId: activeSessionId,
+                    }
                 );
 
                 const timeoutPromise = new Promise((_, reject) => 
@@ -2097,13 +2118,22 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
             }
         } catch (err: any) {
             console.error("Chat error:", err);
-            const isPasswordError = err?.message?.includes("password") || err?.message?.includes("401") || err?.status === 401;
-            if (isPasswordError) {
-                // Quota recovery: reset liveMessageCount back to threshold so the TokenConfirmationDialog will prompt again
+            const isAuthOrLeaseError =
+                err?.message?.includes("401") ||
+                err?.message?.includes("403") ||
+                err?.message?.includes("SESSION_EXHAUSTED") ||
+                err?.message?.includes("DEEP_WEB_SESSION_REQUIRED") ||
+                err?.message?.includes("INVALID_SESSION") ||
+                err?.message?.includes("authentication") ||
+                err?.status === 401 ||
+                err?.status === 403;
+            if (isAuthOrLeaseError) {
+                // Quota recovery: reset liveMessageCount back to threshold so TokenConfirmationDialog prompts for a fresh lease
                 setLiveMessageCount(3);
+                deepWebSessionIdRef.current = null;
             }
-            const errorMessage = isPasswordError
-                ? "Invalid or missing API password. Please verify and try again."
+            const errorMessage = isAuthOrLeaseError
+                ? "Deep Connections session expired or unauthorized. Send again to unlock a 3-message session."
                 : err?.message?.includes("timed out") 
                     ? "The AI is taking too long to respond. Please try again."
                     : "Failed to get a response. Please try again.";
@@ -2726,22 +2756,44 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
             {pendingChatMessage && createPortal(
                 <TokenConfirmationDialog
                     isOpen={true}
-                    onClose={() => setPendingChatMessage(null)}
-                    onConfirm={(confirmedPassword: string) => {
-                        if (confirmedPassword) {
-                            try {
-                                sessionStorage.setItem('zcene_api_password', confirmedPassword);
-                            } catch (e) {
-                                console.warn('[DetailsPanel] Unable to persist password to sessionStorage:', e);
-                            }
-                        }
-                        setLiveMessageCount(0);
-                        handleSendMessage(pendingChatMessage.nodeId, pendingChatMessage.message, true, confirmedPassword);
+                    onClose={() => {
                         setPendingChatMessage(null);
+                        setDeepWebUnlockError(null);
+                    }}
+                    onConfirm={async () => {
+                        const target = pendingChatMessage;
+                        if (!target) return;
+                        setDeepWebUnlockError(null);
+                        try {
+                            const unlockCallable = httpsCallable(functions, 'unlockDeepWebSessionCallable');
+                            const currentNode = activeNodes.find(n => n.id.toLowerCase() === target.nodeId.toLowerCase());
+                            const res = await unlockCallable({
+                                projectId: projectId || undefined,
+                                nodeId: target.nodeId,
+                                nodeName: currentNode?.label || target.nodeId,
+                            });
+                            const data = res?.data as { sessionId?: string } | undefined;
+                            const mintedSessionId = data?.sessionId || undefined;
+                            deepWebSessionIdRef.current = mintedSessionId || null;
+                            setLiveMessageCount(0);
+                            setPendingChatMessage(null);
+                            handleSendMessage(target.nodeId, target.message, true, mintedSessionId);
+                        } catch (err: any) {
+                            console.error('[DetailsPanel] Failed to unlock Deep Web session:', err);
+                            setDeepWebUnlockError(
+                                err?.message?.includes('INSUFFICIENT_TOKENS')
+                                    ? 'Insufficient tokens to unlock Deep Connections. Please top up and try again.'
+                                    : err?.message || 'Unable to unlock Deep Connections session. Please try again.'
+                            );
+                        }
                     }}
                     type="live_chat_search"
+                    tokenCost={TOKEN_PRICING.DEEP_WEB_CONSULT}
+                    tokenBalance={tokenBalance}
+                    isAdmin={isAdmin}
+                    error={deepWebUnlockError}
                     cachedArtists={[]}
-                    missingArtists={["Live Chat Search (3 Messages)"]}
+                    missingArtists={["Deep Connections (3 Messages)"]}
                 />,
                 document.body
             )}

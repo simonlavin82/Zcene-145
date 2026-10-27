@@ -37,6 +37,8 @@ interface HeaderProps {
   userTaste?: UserTaste;
   onSaveTaste?: (taste: UserTaste) => Promise<void>;
   onLogin?: (onSuccess?: () => void) => void;
+  tokenBalance?: number;
+  onOpenTopUp?: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -67,9 +69,19 @@ const Header: React.FC<HeaderProps> = ({
   onRestartWalkthrough,
   userTaste,
   onSaveTaste,
-  onLogin
+  onLogin,
+  tokenBalance = 0,
+  onOpenTopUp
 }) => {
   const isDashboard = view === 'dashboard';
+
+  const triggerTopUpModal = React.useCallback(() => {
+    if (onOpenTopUp) {
+      onOpenTopUp();
+    } else if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('open-topup-modal'));
+    }
+  }, [onOpenTopUp]);
 
   const [isTasteDialogOpen, setIsTasteDialogOpen] = React.useState(false);
   const [localTaste, setLocalTaste] = React.useState<UserTaste>([]);
@@ -209,6 +221,22 @@ const Header: React.FC<HeaderProps> = ({
             </div>
             
             <div className="flex-shrink-0 flex items-center pointer-events-auto transition-all duration-300 justify-end gap-2 lg:gap-3 pr-0">
+            {user && !isGuest && !isAdmin && (
+              <button
+                type="button"
+                data-testid="header-token-pill"
+                onClick={triggerTopUpModal}
+                className="h-8 flex flex-shrink-0 items-center justify-center rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-200 transition-colors leading-none shadow-lg border border-primary/40 hover:border-primary pl-2.5 pr-2 gap-1.5 cursor-pointer"
+                title="Token Balance — Click to Top Up"
+              >
+                <span className="material-symbols-outlined text-primary !text-[15px]">bolt</span>
+                <span className="text-xs font-mono font-semibold text-white">{tokenBalance}T</span>
+                <span className="text-[10px] font-semibold bg-primary/20 text-primary px-1.5 py-0.5 rounded-md border border-primary/30 hidden sm:inline">
+                  + Top Up
+                </span>
+              </button>
+            )}
+
             <button 
                 onClick={() => {
                   if (!user) {
@@ -413,6 +441,21 @@ const Header: React.FC<HeaderProps> = ({
                                 Engine
                               </button>
                             </>
+                          )}
+
+                          {user && !isGuest && !isAdmin && (
+                            <button
+                              onClick={() => { setIsProfileOpen(false); triggerTopUpModal(); }}
+                              className="w-full text-left px-3 py-2 text-xs font-medium text-primary hover:bg-zinc-800 transition-all rounded-lg flex items-center justify-between gap-2 group"
+                            >
+                              <span className="flex items-center gap-2">
+                                <span className="material-symbols-outlined !text-[16px] text-primary">bolt</span>
+                                Top Up Tokens
+                              </span>
+                              <span className="font-mono text-[10px] bg-primary/15 border border-primary/30 px-1.5 py-0.5 rounded text-primary">
+                                {tokenBalance}T
+                              </span>
+                            </button>
                           )}
 
                           {!isGuest && (

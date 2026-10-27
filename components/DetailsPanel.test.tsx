@@ -32,8 +32,18 @@ vi.mock('../services/artistCacheService', async (importOriginal) => {
 vi.mock('../services/analyticsService', () => ({
   analyticsService: { track: vi.fn() }
 }));
+const mockHttpsCallable = vi.fn();
+vi.mock('firebase/functions', () => ({
+  httpsCallable: (...args: any[]) => mockHttpsCallable(...args),
+}));
 vi.mock('../services/firebase', () => ({
   db: {},
+  auth: {
+    currentUser: {
+      getIdToken: vi.fn().mockResolvedValue('mock-firebase-id-token'),
+    },
+  },
+  functions: {},
   doc: vi.fn(),
   updateDoc: vi.fn(),
 }));
@@ -380,8 +390,9 @@ describe('DetailsPanel', () => {
         expect(screen.getByText('Sub Pop, Epitaph')).toBeInTheDocument();
     });
 
-    it('captures password in TokenConfirmationDialog for Deep Web chat, stores in sessionStorage, and forwards to streamNodeChat', async () => {
-        sessionStorage.clear();
+    it('unlocks a 3-message Deep Connections session via unlockDeepWebSessionCallable (3T) and forwards Bearer + session lease to streamNodeChat', async () => {
+        const mockUnlockFn = vi.fn().mockResolvedValue({ data: { sessionId: 'dw-session-123', remainingMessages: 3 } });
+        mockHttpsCallable.mockReturnValue(mockUnlockFn);
         (streamNodeChat as any).mockResolvedValueOnce('Mock stream result');
 
         const mockNode = { id: 'needtobreathe-us', type: 'artist' as const, label: 'Needtobreathe' };
@@ -393,6 +404,8 @@ describe('DetailsPanel', () => {
             <DetailsPanel 
                 selectedNode={mockNode}
                 activeNodes={[mockNode]}
+                tokenBalance={25}
+                isAdmin={false}
                 detailsCache={detailsCache}
                 loadingNodeIds={new Set<string>()}
                 onTogglePinNode={vi.fn()}
@@ -433,33 +446,39 @@ describe('DetailsPanel', () => {
         const sendBtn = screen.getByTitle('Send');
         fireEvent.click(sendBtn);
 
-        // Verify TokenConfirmationDialog opens and captures password
-        const passwordInput = await screen.findByTestId('token-password-input');
-        fireEvent.change(passwordInput, { target: { value: 'test-api-secret' } });
+        // Verify passwordless TokenConfirmationDialog opens showing 3 Tokens (no password input)
+        expect(screen.queryByTestId('token-password-input')).not.toBeInTheDocument();
+        expect(await screen.findByTestId('token-gate-cost')).toHaveTextContent('3 Tokens');
 
-        // Click Confirm
+        // Click Confirm & Spend 3 Tokens
         const confirmBtn = screen.getByTestId('token-authorize-button');
         fireEvent.click(confirmBtn);
 
-        // Verify sessionStorage was set
-        expect(sessionStorage.getItem('zcene_api_password')).toBe('test-api-secret');
-
-        // Verify streamNodeChat was called with the apiPassword argument
         await waitFor(() => {
+            expect(mockUnlockFn).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    nodeId: 'needtobreathe-us',
+                    nodeName: 'Needtobreathe',
+                })
+            );
             expect(streamNodeChat).toHaveBeenCalledWith(
                 expect.objectContaining({ id: 'needtobreathe-us' }),
                 expect.any(Array),
                 'what is their latest release?',
                 expect.anything(),
                 expect.any(Function),
-                'test-api-secret'
+                expect.objectContaining({
+                    idToken: 'mock-firebase-id-token',
+                    deepWebSessionId: 'dw-session-123',
+                })
             );
         });
     });
 
-    it('resets liveMessageCount quota on 401/password authentication rejection and displays auth error', async () => {
-        sessionStorage.clear();
-        (streamNodeChat as any).mockRejectedValueOnce(new Error('Invalid or missing API password'));
+    it('resets liveMessageCount quota on 401/403/SESSION_EXHAUSTED rejection and displays session expiry message', async () => {
+        const mockUnlockFn = vi.fn().mockResolvedValue({ data: { sessionId: 'dw-session-expired', remainingMessages: 3 } });
+        mockHttpsCallable.mockReturnValue(mockUnlockFn);
+        (streamNodeChat as any).mockRejectedValueOnce(new Error('403 SESSION_EXHAUSTED'));
 
         const mockNode = { id: 'needtobreathe-us', type: 'artist' as const, label: 'Needtobreathe' };
         const mockDetails = { summary: 'Rock band', details: { artist: 'Needtobreathe' }, links: [] };
@@ -470,6 +489,8 @@ describe('DetailsPanel', () => {
             <DetailsPanel 
                 selectedNode={mockNode}
                 activeNodes={[mockNode]}
+                tokenBalance={25}
+                isAdmin={false}
                 detailsCache={detailsCache}
                 loadingNodeIds={new Set<string>()}
                 onTogglePinNode={vi.fn()}
@@ -506,10 +527,9 @@ describe('DetailsPanel', () => {
         fireEvent.change(chatInput, { target: { value: 'what is their latest release?' } });
         fireEvent.click(screen.getByTitle('Send'));
 
-        // Fill password in modal and confirm
-        const passwordInput = await screen.findByTestId('token-password-input');
-        fireEvent.change(passwordInput, { target: { value: 'bad-password' } });
-        fireEvent.click(screen.getByTestId('token-authorize-button'));
+        // Confirm passwordless 3-Token unlock
+        const confirmBtn = await screen.findByTestId('token-authorize-button');
+        fireEvent.click(confirmBtn);
 
         // Wait for error handling
         await waitFor(() => {
@@ -517,7 +537,7 @@ describe('DetailsPanel', () => {
             const lastCallArgs = onUpdateChatHistories.mock.calls[1][0];
             const messages = lastCallArgs.get('needtobreathe-us');
             const lastMessage = messages[messages.length - 1];
-            expect(lastMessage.text).toContain('Invalid or missing API password');
+            expect(lastMessage.text).toContain('Deep Connections session expired or unauthorized');
         });
     });
 

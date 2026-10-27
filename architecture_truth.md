@@ -1,26 +1,29 @@
 # ZCENE ARCHITECTURAL TRUTH & IMMUTABLE LAWS
  
-![Architecture Diagram](./Zcene Architecture V37.jpg)
+![Architecture Diagram](./Zcene Architecture V38.jpg)
  
-This document defines the absolute, immutable architectural baseline of Zcene (V37). All future development, bug fixes, and AI agent actions MUST strictly adhere to these laws. Legacy paradigms (like naive string matching, bypass assumptions, single-pointer stubs, open-ended prompt instruction textareas, prose-fallback stubs, or storing entity payloads under bare IDs) are strictly forbidden.
+This document defines the absolute, immutable architectural baseline of Zcene (V38 — 43 Laws). All future development, bug fixes, and AI agent actions MUST strictly adhere to these laws. Legacy paradigms (like shared `API_PASSWORD` secrets, naive string matching, bypass assumptions, single-pointer stubs, open-ended prompt instruction textareas, prose-fallback stubs, or storing entity payloads under bare IDs) are strictly forbidden.
  
 ## THE IMMUTABLE ARCHITECTURAL LAWS
  
 ### 1. Three-Column Flow (The Pipeline)
 The curation pipeline is strictly divided into three distinct execution columns. 
-- **Column 1: React UI (App.tsx / Dashboard.tsx / GraphPage.tsx):** Presentation, 3-Tier Anchor configuration, and pre-flight gateway. Completely decoupled from heavy LLM orchestration. Locks the UI via the Active Loader Gate and strictly ignores the HTTP 200 OK from Column 2. Only drops the loader when Column 3 sets project status to 'completed'. The frontend flow explicitly enforces these architectural steps:
-  - **Step 1: Submit Seed(s) + 3-Tier Anchors & Local Topology Routing:** Evaluates `hasActiveDiscoveryFilters(filters)` (ignoring empty filter arrays). Unfiltered single-seed Direct Hits (perfect cache) bypass the network entirely; multi-seed or 3-Tier anchored queries route down the Complex Query path.
-  - **Step 2 (Topology Hit):** Explicitly mapped to `<DisambiguationModal>` ("Look What I Found") to verify origin on cache hits.
-  - **Step 3 (Pre-Flight Gateway & Collision Detection):** Calls `validateSeedOriginCallable` (`3.6 Flash`, `thinking_level: minimal`, Zero Search Grounding / Parametric Only). Detects multi-tenant homonyms (e.g., "Darko US" vs "Darko UK") and synchronously mints 1-to-many Evolved Stub contracts (`_isStub: true, isAmbiguous: true, candidates: [...]`).
-  - **Step 4 (Confirm Your Artists & Escape Hatch Re-Query Bouncer):** Explicitly mapped to `<ConsolidatedValidationModal>`. Presents locked cards for unambiguous seeds, `<DisambiguationRadio>` for collisions, and the "Not this artist?" manual escape hatch.
-    - **Escape Hatch Re-Query Bouncer:** If a user specifies custom origin or genre hints and clicks "Apply", the UI enters an active `isVerifying` state and synchronously re-queries `validateSeedOriginCallable` (`3.6 Flash`, `thinking_level: minimal`, Zero Search Grounding / Parametric Only).
-    - **Zero-Pollution Inline Rejection:** If Flash rejects (`isValid: false` or `not-found`), an inline error banner ("No significant artist found matching these criteria") is displayed, the card remains in edit mode, and "Confirm & Generate" remains locked. Zero stubs are written to Firestore during the modal interaction.
-    - **Verified UI Lock:** "Confirm & Generate" remains strictly disabled while any card is verifying or in edit mode, unlocking only after AI verification succeeds.
-  - **Step 5 (API Confirmation):** Explicitly mapped to `<TokenConfirmationModal>`.
-  - **Step 6 (Active Loader Gate):** LOCKED.
-  - **Step 7 (Drop Loader & Render Zcene):** Drops the loader only when Column 3 sets project status to 'completed'.
+- **Column 1: React UI (App.tsx / Dashboard.tsx / GraphPage.tsx):** Presentation, 3-Tier Anchor configuration, Token Spend & Split-Debit Pre-Flight gateway. Completely decoupled from heavy LLM orchestration. Locks the UI via the Active Loader Gate and strictly ignores the HTTP 200 OK from Column 2. Only drops the loader when Column 3 sets project status to 'completed'. The frontend flow explicitly enforces these architectural steps:
+  - **Step 1: Submit Seed(s) + 3-Tier Anchors:** Evaluates `hasActiveDiscoveryFilters(filters)` (ignoring empty filter arrays). Single-Seed curations cost `5 Tokens` (`TOKEN_PRICING.SINGLE_SEED`); Multi-Seed or 3-Tier Anchored curations cost `10 Tokens` (`TOKEN_PRICING.COMPLEX_QUERY`).
+  - **Step 2: Check Global Topology Cache:** Evaluates Single-Seed and per-seed cache status (`Topology Hit`, `Ambiguous Hit (Cache)`, or `Cache Miss`). **100% of curations** enter Step 3.
+  - **Step 3: Token Spend & Top-Up Gate (`<TokenConfirmationDialog>`):** Intercepts 100% of curations in 3 passwordless modes: Standard Sufficient Balance, Standard Low-Balance Top-Up (triggering `<SimulatedStripeModal>`: `£5 = 50T`, `£10 = 100T`, `£15 = 150T`), and Admin Unlimited (`zcene.online@gmail.com` with raw USD telemetry and `0T` bypass).
+    - **Cached Fast-Track Bypass:** `Topology Hit` (green dashed line) and `Ambiguous Hit (Cache)` (orange dashed line) bypass Flash 3.6 (`0T` pre-flight fee) and route directly into Step 4.
+    - **Cache Miss Pre-Flight (`validateSeedOriginCallable`):** Uncached seeds invoke `validateSeedOriginCallable` (`3.6 Flash`, `thinking_level: minimal`, Zero Search Grounding / Parametric Only), atomically deducting a **non-refundable `1-Token` Pre-Flight Lookup Fee** once per initial uncached seed batch (`mode: 'initial_preflight'`) on `curationSessions/{sessionId}` and synchronously minting 1-to-many Evolved Stub contracts (`_isStub: true, isAmbiguous: boolean, candidates: [...]`).
+  - **Step 4: Confirm Your Artists & Escape Hatch Re-Query Bouncer (`<ConsolidatedValidationModal>`):** Presents locked cards for unambiguous seeds, `<DisambiguationRadio>` for collisions, and the "Not this artist?" manual escape hatch.
+    - **Escape Hatch Re-Query Bouncer (`-1T` per query):** If a user specifies custom origin or genre hints and clicks "Apply", the UI synchronously re-queries `validateSeedOriginCallable` (`mode: 'escape_hatch'`), atomically deducting `1 Token` per manual re-query (`creditablePreFlightTokens` remains capped at `1T`).
+    - **Zero-Pollution Inline Rejection:** If Flash rejects (`isValid: false` or `not-found`), an inline error banner ("No significant artist found matching these criteria") is displayed, the card remains in edit mode, and "Confirm & Generate" remains locked. Zero unverified stubs are written to Firestore.
+    - **Direct Hit / Typo Corrected Settlement Exit (`authorizeDirectHitCallable`):** Cached Topology Hits and post-validation cache intercepts exit Step 4 through `authorizeDirectHitCallable` (settling `-5T` on pure cache hits, or `-4T` remainder after `1T` Flash lookup) -> `applyLocalTopologyHit` -> Step 7 (`Drop Loader & Render Zcene`).
+    - **Cancellation:** Cancelling Step 4 halts downstream settlement (`0T` if cached; the `1T` Flash lookup fee is retained if Flash executed).
+  - **Step 5: Active Loader Gate:** Locks UI completely for live synthesis runs entering Column 2.
+  - **Step 6: Deep Connections Consult (`DetailsPanel.tsx`):** Unlocks a 3-message grounded artist consult for `3 Tokens` via `unlockDeepWebSessionCallable` (minting `deepWebSessions/{sessionId}` verified alongside `Authorization: Bearer <idToken>` in `server.js` `/api/gemini/*`).
+  - **Step 7: Drop Loader & Render Zcene:** Drops the loader immediately on Direct Hit local hydration or when Column 3 sets project status to `'completed'`.
 - **Column 2: HTTP Fast-Track (executeCurationPipeline.ts):** Synchronous execution layer.
-  - **Node 1: Ingest Validated Seed Payload, Sanitize 3-Tier Anchors & Zero Blind Trust:** Ingests frontend-validated seed preferences (`originalQueries`, `disambiguationHints`, `disambiguationGenres`, `activeSeedNames`) and sanitizes `payload.filters` via `sanitizeDiscoveryFilters` (enforcing dynamic `1965–ERA_MAX_BOUND` era bounds with $N - 2$ Rolling Horizon Normalization, mutual exclusion of `includeOrigins`/`excludeOrigins`, canonical countries/genres, and stripping legacy `additionalInstructions`). Forces `needsProGeneration = true` and `Complex Generation` whenever `hasActiveDiscoveryFilters(filters)` is true, preventing cached single seeds from bypassing active 3-Tier filters. Enforces `isFullyQualifiedEntityProfile` at the Read Gate.
+  - **Node 1: Ingest Validated Seed Payload & Settle Token Balance ([Rules 2, 34, 43]):** Verifies `request.auth`, settles remaining project balance (`projectCost - creditablePreFlightTokens`, i.e., `4T`/`5T` Single-Seed or `9T`/`10T` Complex), stamps `tokensSpent` onto `users/{uid}/projects/{projectId}`, and automatically refunds `settlementTokensDeducted` (`4T`/`5T`/`9T`/`10T`) on fatal Column 2 or Column 3 failure (retaining the `1T` Pre-Flight Lookup Fee). Ingests frontend-validated seed preferences (`originalQueries`, `disambiguationHints`, `disambiguationGenres`, `activeSeedNames`) and sanitizes `payload.filters` via `sanitizeDiscoveryFilters` (enforcing dynamic `1965–ERA_MAX_BOUND` era bounds with $N - 2$ Rolling Horizon Normalization, mutual exclusion of `includeOrigins`/`excludeOrigins`, canonical countries/genres, and stripping legacy `additionalInstructions`). Forces `needsProGeneration = true` and `Complex Generation` whenever `hasActiveDiscoveryFilters(filters)` is true, preventing cached single seeds from bypassing active 3-Tier filters. Enforces `isFullyQualifiedEntityProfile` at the Read Gate.
     - **Zero Blind Trust Mandate:** Column 2 MUST NOT synthesize geographic slugs (e.g., `-jp`) from raw user hints. Stubs and routing targets are minted strictly from validated Flash candidate payloads.
   - **Node 2 & 3: Create Topology (3.1 Pro) | Thinking_level: medium & 3-Tier Anchor Hierarchy ([Rule 41]):** Generates skeleton (Seed, AI Artists, Labels, Genres) in `kebab-case-artist-iso-code` format using the 3-Tier Anchor prompt split (Tier 1 Seed Immunity, Tier 2 Hard Era/Origin Guardrails with cross-era lineage authorization, Tier 3 Soft Genre/Label Gravity with Rule 41 Graceful Degradation fallback retry if 0 non-seed artists survive).
   - **Node 17: Root-as-Router Contract:** Bare IDs (e.g., `'gunmoll'`, `'turnstile'`) MUST be minted exclusively as `_isStub: true` forwarders (`redirectTo: "id-iso"`, `candidates: [...]`). Verified payloads (biography, discography, graphData, image) MUST be stored at geographically suffixed IDs (e.g., `artists/gunmoll-us`). Bare IDs are permanently reserved as routers to future-proof against homonyms and must never hold entity payloads. Cache reads checking bare IDs follow `redirectTo` directly to the suffixed canonical document.
@@ -76,7 +79,7 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
   - `synthesisRationale` **MUST** be written explicitly to the root level of the global artist cache document (not buried inside stringified layers).
   - The "Root Breakdown narrative" MUST be written to the root level of the project document to ensure schema continuity.
   - **Dynamic Dashboard Integrity:** Dashboard metadata (e.g., `deepCuts` count) must dynamically match the rendered nodes in the graph data, prohibiting static placeholders.
-  - **Strict Ledger Payload Parity:** The frontend's `buildBaseProjectPayload` MUST defensively omit `generationType` and `apiUsage` from the payload base to prevent the React autosave hook (`merge: true`) from clobbering the backend's precise token metrics and partial generation statuses with default 'Clone' labels.
+  - **Strict Ledger Payload Parity:** The frontend's `buildBaseProjectPayload` MUST defensively omit `generationType`, `apiUsage`, `tokensSpent`, and `anchorResolution` from the payload base to prevent the React autosave hook (`merge: true`) from clobbering the backend's precise token metrics and partial generation statuses with default 'Clone' labels.
 - **The Fast-Track:** Single unambiguous stubs bypass redundant re-validation and fast-track into Generative Topology, while ambiguous stubs are pre-resolved in Column 1.
 
 ### 9. Canonical Seed Slug Resolution via `resolvedSeedNormMap` & `idRewriteMap` (Split-Brain Prevention)
@@ -122,15 +125,15 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 - **Multi-Tenant Disambiguation Contract:** When a collision is detected, the stub holds all potential candidates without prematurely forcing a single `redirectTo` pointer. The user resolves the candidate in Node 4 (`<ConsolidatedValidationModal>`), and the chosen canonical ID is ingested into Column 2.
 - **Local Topology Routing Exemption:** Direct cache hits completely bypass the backend, meaning legacy missing stubs are explicitly not healed during direct cache accesses.
 
-### 18. Authorization Lifecycle
-- **Rule:** Token/billing authorization state must be strictly scoped to the active generation event. The authorization flag must instantly reset to false on any modal cancellation, API failure, or project unmount to prevent tollbooth bypasses.
+### 18. Authorization Lifecycle & Split-Debit Session Scoping
+- **Rule:** Legacy shared `API_PASSWORD` secrets (`zcene_api_password`) are permanently retired across all callables and Express proxy routes in favor of cryptographic Firebase Auth (`request.auth` / `Authorization: Bearer <idToken>`). Token authorization and `curationSessions/{sessionId}` split-debit state must be strictly scoped to the active generation event and reset immediately on modal cancellation, API failure, or project unmount to prevent tollbooth bypasses.
 
 ### 19. External Link Security
 - **Rule:** Official Website and Bandcamp links must rely on deterministic client-side search templates to prevent the AI from hallucinating or routing to malicious squatted domains.
 
-### 20. Mandatory Disambiguation on Direct Hits
-- **Rule:** A single-seed Topology Hit (Green Line) MUST NEVER bypass the user confirmation phase. The frontend MUST explicitly trigger the `<DisambiguationModal>` ("Look What I Found") to allow the user to verify the cached entity's origin. 
-- **Enforcement:** The system is strictly forbidden from instantly hydrating the state and bypassing this modal. The Green Line hydration route can only execute after explicit confirmation from the `<DisambiguationModal>`. Legacy components (e.g., `CacheChoiceDialog`) are strictly prohibited.
+### 20. Mandatory Disambiguation & Settlement on Direct Hits
+- **Rule:** A single-seed Topology Hit (Green Line) or Ambiguous Cache Hit (Orange Line) MUST NEVER bypass `3. Token Spend & Top-Up Gate` (`<TokenConfirmationDialog>`) or `4. Confirm Your Artists` (`<ConsolidatedValidationModal>`), and MUST settle via `authorizeDirectHitCallable` (`-5T` pure cache hit, or `-4T` remainder after `1T` Flash lookup) prior to `applyLocalTopologyHit`.
+- **Enforcement:** The system is strictly forbidden from instantly hydrating state without Box 3 token confirmation, Box 4 artist confirmation, and server-verified Direct Hit token settlement. Legacy components (e.g., `CacheChoiceDialog`) are strictly prohibited.
 ### 21. Locked Semantic Topology & AI Physics Injection
 - **Rule:** D3 node dragging gestures are strictly forbidden. The graph operates as a Locked Semantic Topology to ensure mobile panning remains unobstructed and to preserve the calculated semantic clusters.
 - **Enforcement:** The D3 layout is strictly driven by the 'Final Node Positioning' step via `gemini-3.6-flash` (abstracted via `GEMINI_FLASH_MODEL`). The AI generates float weights (0.1 to 1.0) using a lean bio payload strategy, which dictate variable link distance, spring rigidity, and collision radii. If the AI model fails or returns an empty array, the pipeline gracefully falls back to injecting a neutral weight of `0.5` across all links to guarantee physics stability.
@@ -183,7 +186,7 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 ### 29. Universal Payload Serializer
 - **Rule:** Project saving and share generation must strictly derive from a single source of truth to guarantee 1:1 data parity (including curation elements like pinned/styled nodes).
 - **Share Links Blacklist:** Share links apply a post-serialization blacklist to handle ephemeral environment constraints without risking data omission.
-- **Strict Ledger Parity:** `buildBaseProjectPayload` defensively omits worker-owned telemetry fields (`generationType`, `apiUsage`, and `anchorResolution`) during frontend autosave (`merge: true`) to prevent clobbering background worker token costs, generation classification, and 3-Tier resolution telemetry. `labelIds` are normalized via `normalizeLabelId`.
+- **Strict Ledger Parity:** `buildBaseProjectPayload` defensively omits worker-owned telemetry fields (`generationType`, `apiUsage`, `tokensSpent`, and `anchorResolution`) during frontend autosave (`merge: true`) to prevent clobbering server-stamped token costs, generation classification, and 3-Tier resolution telemetry. `labelIds` are normalized via `normalizeLabelId`.
 - **Display Name Invariant:** Frontend payload MUST pass a `seedNames` map as the absolute source of truth for display names to prevent backend hallucination.
 - **Dashboard Card & UI Isolation:** Dashboard cards & UI consumers must rely solely on the frozen `seedImageUrls` snapshot. Querying the global artists cache for visual assets on isolated projects is strictly prohibited.
 
@@ -191,7 +194,7 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 - **Rule:** Autosave intervals and listeners MUST be suspended via a global lock during generation cycles to prevent race conditions and partial snapshot overwrites.
 
 ### 31. Local State Preemption
-- **Rule:** Zero-cost local routing (Direct Hits) must synchronously inject the graph topology into React state before releasing the global lock.
+- **Rule:** Direct Hit local routing (`applyLocalTopologyHit`) executes immediately after `authorizeDirectHitCallable` settlement and must synchronously inject the graph topology into React state before releasing the global lock.
 
 ### 32. Validation Circuit Breaker
 - **Rule:** The Phase 3 Validation Modal must act as a hard execution stop/return. Failure or dismissal immediately terminates downstream pipeline execution.
@@ -202,7 +205,7 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 ### 34. Cognitive Tiering & Orchestration Stability
 - **Rule:** AI generation strictly utilizes the categorical `thinking_level` parameter (minimal to high) to optimize cost-to-quality ratios based on task complexity. Legacy sampling parameters (`temperature`, `top_p`, `top_k`, and `thinking_budget`) are explicitly forbidden in AI orchestration configurations.
 - **Enforcement:** Deterministic extraction tasks (e.g., origin validation, edge reconciliation) are strictly locked to `minimal` or `low`. Creative narrative synthesis (e.g., Root Breakdowns) requires a `high` thinking level.
-- **Discovery Ledger Rate Pegging:** The Discovery Ledger is permanently pegged to standard non-promotional list rates ($1.50 / 1M input, $7.50 / 1M output) for Gemini 3.6 Flash, strictly ignoring temporary discounts (e.g., 50% promotional pricing) to ensure stable long-term unit cost modeling and billing predictability.
+- **Discovery Ledger Rate Pegging & Split-Debit Settlement:** The Admin Discovery Ledger is permanently pegged to standard non-promotional list rates ($1.50 / 1M input, $7.50 / 1M output) for Gemini 3.6 Flash, strictly ignoring temporary discounts to ensure stable long-term unit cost modeling, while Column 2 enforces atomic Split-Debit remainder settlement (`projectCost - creditablePreFlightTokens`) and automatic settlement refunds on fatal pipeline failure.
 - **API Stability:** The background pipeline jobs officially retain the legacy `generateContent` API. Migration to the stateful Interactions API is formally deferred to preserve single-shot execution stability until multi-turn conversational features are scoped.
 
 ### 35. Geographic Asset Disambiguation
@@ -270,13 +273,13 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
   1. **Tier 1: Global Assets (`/artists/{id}`, `/labels/{id}`):**
      - `createdAt`: Immutable (Genesis timestamp).
      - `updatedAt`: Mutable (Tracks spiderweb attachment, partial generation, or schema migrations).
-     - `expireAt`: Soft-expires 365 days strictly from `createdAt`.
+     - `expireAt`: Soft-expires 365d (`createdAt + 365d`).
      - *Lifecycle Rule:* Soft-expires 365 days from `createdAt` strictly. `updatedAt` mutations DO NOT reset the 365-day biographical lifespan. Stale nodes (> 365 days) are ONLY refreshed when intersected and funded by a natural user-initiated generation. Automated background cron-sweeps and janitorial scanners are strictly forbidden (Anti-Sweep Law, Rule 37).
   2. **Tier 2: Ephemeral Snapshots (`/sharedZcenes/{id}`):**
      - `createdAt`: Immutable.
      - `updatedAt`: NULL (Read-Only immutable snapshot).
      - `expireAt`: +30 Days Hard TTL.
-     - Coordinates stripped (Selective Coordinate Amnesia, Rule 25) to enforce organic guest recalculation.
+     - Coordinates stripped (Selective Coordinate Amnesia, Rule 25) to enforce organic guest recalculation; viewing and cloning ("Save to my Zcenes") cost `0 Tokens`.
   3. **Tier 3: Owned Projects (`users/{uid}/projects/{id}`):**
      - `createdAt`: Immutable.
      - `updatedAt`: Mutable (Project autosave).
@@ -285,5 +288,22 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 - **TTL Cache Bouncer (`isCacheExpired`):**
   - Cache freshness evaluation in `services/artistCacheService.ts` checks `data.createdAt` exclusively. `updatedAt` is completely ignored during cache evaluation.
   - *Fail-Safe Expiry:* Any document lacking a valid `createdAt` timestamp, or containing a corrupted non-date value, fails safe and evaluates to expired (`true`), forcing live verification when intersected by a curation run.
+
+### 43. Token Economy, Split-Debit Pre-Flight & Cache Margin Telemetry Isolation
+- **Rule:** Zcene enforces a server-authoritative Token Wallet economy (`shared/tokenEconomy.ts`, `functions/src/tokenWallet.ts`) where client-side wallet mutations are strictly forbidden by `firestore.rules`.
+- **Simulated Stripe Top-Ups (`simulateStripeTopUpCallable`):**
+  - Tiers: `£5 = 50 Tokens` (`gbp_5`), `£10 = 100 Tokens` (`gbp_10`), `£15 = 150 Tokens` (`gbp_15`).
+  - Credits `users/{uid}.tokenBalance` and `lifetimeTokensPurchased` atomically while writing an immutable `users/{uid}/tokenTransactions/{txId}` receipt.
+- **Discovery Menu & Split-Debit Pre-Flight Protection:**
+  - **Single-Seed Zcene (Live or Direct Hit):** `5 Tokens` (`TOKEN_PRICING.SINGLE_SEED`).
+  - **Complex Zcene (Multi-Seed or 3-Tier Anchored):** `10 Tokens` (`TOKEN_PRICING.COMPLEX_QUERY`).
+  - **Pre-Flight Flash & Escape Hatch Lookup (`validateSeedOriginCallable`):** Deducts a **non-refundable `1-Token` fee** once per initial uncached seed batch (`mode: 'initial_preflight'`) and `1 Token` per manual `"Not this artist?"` Escape Hatch re-query (`mode: 'escape_hatch'`) tracked on `curationSessions/{sessionId}` (`creditablePreFlightTokens` capped at `1T`). Cached `Topology Hit` and `Ambiguous Hit (Cache)` routes bypass Flash (`0T` pre-flight).
+  - **Remainder Settlement & Auto-Refund:** `authorizeDirectHitCallable` (Column 1 Direct Hit / Post-Validation Cache Intercept) or `executeCurationPipeline` (Column 2 Live Synthesis) settles `projectCost - creditablePreFlightTokens` (`4T`/`5T` Single-Seed or `9T`/`10T` Complex) and stamps `tokensSpent` onto `users/{uid}/projects/{projectId}`. If Column 2 or Column 3 fails fatally, `refundProjectSettlementOnError` automatically refunds `settlementTokensDeducted` (`4T`/`5T`/`9T`/`10T`) while retaining the `1T` Pre-Flight Lookup Fee.
+  - **Deep Connections (`DetailsPanel.tsx`):** Costs `3 Tokens` (`TOKEN_PRICING.DEEP_WEB_CONSULT`) via `unlockDeepWebSessionCallable`, minting a `deepWebSessions/{sessionId}` lease (`remainingMessages: 3`) verified alongside `Authorization: Bearer <idToken>` on `/api/gemini/*` (`server.js`).
+  - **Shared Zcenes (`/z/:id` & `"Save to my Zcenes"`):** `0 Tokens` (`handleSaveToDashboard` preserved untouched).
+- **Admin Bypass & Strict Cache Margin Telemetry Isolation:**
+  - Admin (`zcene.online@gmail.com`) bypasses all token deductions (`0T`) via 1-click passwordless confirmation and retains full raw USD cost telemetry (`$0.0000` Direct Hits, `~$0.10–$0.38` live synthesis), cache recall rates, and Author wallet visibility.
+  - Standard Users (`!isAdmin`) and Admin Preview mode (`isNormalUserView === true`) see ONLY their Token Wallet, Token Juice Bar, Top-Up triggers, Personal Curated Zcenes (`tokensSpent`), and Token Activity receipts—strictly redacting `$0.0000` Direct Hit costs, `"CACHE HIT"` / `"Direct Hit"` labels, and cache recall percentages.
+
 
 

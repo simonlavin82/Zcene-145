@@ -2226,6 +2226,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
           selectedNode={selectedNode} 
           activeNodes={activeNodes} 
           isAdmin={isAdmin}
+          tokenBalance={profile?.tokenBalance ?? 0}
           detailsCache={detailsCache} onUpdateDetailsCache={onUpdateDetailsCache}
           loadingNodeIds={loadingNodeIds} 
           onTogglePinNode={onTogglePinNode} 
@@ -2346,6 +2347,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
               await onUpdateProfile({ taste });
             }}
             onRestartWalkthrough={handleRestartWalkthrough}
+            tokenBalance={profile?.tokenBalance ?? 0}
         />
 
         {isSmallScreen ? (

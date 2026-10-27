@@ -44,6 +44,7 @@ interface DashboardProps {
   crateColors?: Record<string, string>;
   onUpdateCrateColor?: (crate: string, color: string) => void;
   onDuplicateProject?: (project: Project) => void;
+  tokenBalance?: number;
 }
 
 const Dashboard: React.FC<DashboardProps> = ({
@@ -75,7 +76,8 @@ const Dashboard: React.FC<DashboardProps> = ({
   onSaveTaste,
   crateColors,
   onUpdateCrateColor,
-  onDuplicateProject
+  onDuplicateProject,
+  tokenBalance = 0
 }) => {
   const [projectToDelete, setProjectToDelete] = React.useState<string | null>(null);
   const [projectToRename, setProjectToRename] = React.useState<Project | null>(null);
@@ -310,6 +312,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         onRestartWalkthrough={onRestartWalkthrough}
         userTaste={userTaste}
         onSaveTaste={onSaveTaste}
+        tokenBalance={tokenBalance}
       />
 
       

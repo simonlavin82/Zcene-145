@@ -1,4 +1,10 @@
 .git
 .gitignore
 node_modules/
+functions/node_modules/
 .env
+*.jpg
+*.png
+tests/
+e2e/
+scratch/

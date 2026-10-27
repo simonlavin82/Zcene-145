@@ -19,7 +19,8 @@ import GraphPage from './components/GraphPage';
 import HomePage from './components/HomePage';
 import Dashboard from './components/Dashboard';
 import SplashScreen from './components/SplashScreen';
-import { MyStackDialog, TokenConfirmationDialog, DisambiguationCandidate, FilterGuidanceModal, ConsolidatedValidationModal, PreFlightSeed } from './components/SharedModals';
+import { MyStackDialog, TokenConfirmationDialog, SimulatedStripeModal, DisambiguationCandidate, FilterGuidanceModal, ConsolidatedValidationModal, PreFlightSeed } from './components/SharedModals';
+import { TOKEN_PRICING, TokenTopUpTierId, computeBaseProjectTokenCost } from './shared/tokenEconomy';
 import { ModalBackdrop, ModalContainer, ModalHeader, ModalFooter, ModalBody } from './components/ui/Dialog';
 
 import { ShareModal } from './components/ShareModal';
@@ -95,17 +96,16 @@ const generateGraphDataViaCloudJob = async (
   isSmartBypass?: boolean,
   isSandboxMode?: boolean,
   seedImageUrl?: string,
-  confirmTokenUsageHook?: (type: any, cached: any, missing: any, enrichment: any, showBack: any, errorMsg?: string) => Promise<string | false | 'back'>,
+  confirmTokenUsageHook?: (type: any, cached: any, missing: any, enrichment: any, showBack: any, errorMsg?: string, tokenCost?: number) => Promise<string | false | 'back'>,
   closeTokenConfirmationHook?: () => void,
-  seedNames?: Record<string, string>
+  seedNames?: Record<string, string>,
+  curationSessionId?: string | null
 ): Promise<{ graphData: GraphData, activeJobId?: string }> => {
   let success = false;
-  let currentError: string | undefined = undefined;
   let finalGraphData = null;
   let activeJobId = undefined;
 
   while (!success) {
-    const password = sessionStorage.getItem('zcene_api_password');
     const payload = {
       artists,
       filters,
@@ -121,7 +121,7 @@ const generateGraphDataViaCloudJob = async (
       ...(isSmartBypass !== undefined && { isSmartBypass }),
       ...(isSandboxMode !== undefined && { isSandboxMode }),
       ...(seedImageUrl && { seedImageUrl }),
-      ...(password && { password })
+      ...(curationSessionId && { curationSessionId })
     };
 
     try {
@@ -140,19 +140,28 @@ const generateGraphDataViaCloudJob = async (
     } catch (error: any) {
       console.error("🔥 HTTPS CALLABLE FAILED:", error);
       console.log("Payload attempted:", payload);
-      
-      if (error.code === 'unauthenticated' || (error.message && error.message.toLowerCase().includes('password'))) {
-        if (confirmTokenUsageHook) {
-          const newPassword = await confirmTokenUsageHook('generation', [], artists.split('::'), undefined, false, currentError || 'Invalid or missing API password. Please try again.');
-          if (!newPassword || newPassword === 'back') {
-            if (closeTokenConfirmationHook) closeTokenConfirmationHook();
-            throw new Error("Password confirmation cancelled");
-          }
-          currentError = 'Invalid API password. Please try again.';
-          // Loop will retry with the new password stored in sessionStorage by confirmTokenUsageHook
-        } else {
-          throw error;
+
+      const isInsufficientTokens =
+        error?.message?.includes('INSUFFICIENT_TOKENS') ||
+        error?.code === 'functions/failed-precondition';
+
+      if (isInsufficientTokens && confirmTokenUsageHook) {
+        const artistCount = artists.split('::').filter(Boolean).length;
+        const neededCost = computeBaseProjectTokenCost(artistCount, hasActiveDiscoveryFilters(filters));
+        const reconfirmed = await confirmTokenUsageHook(
+          artistCount > 1 || hasActiveDiscoveryFilters(filters) ? 'live_synthesis' : 'generation',
+          [],
+          artists.split('::'),
+          undefined,
+          false,
+          'Please top up your Zcene wallet to settle the remaining tokens for this curation.',
+          neededCost
+        );
+        if (!reconfirmed || reconfirmed === 'back') {
+          if (closeTokenConfirmationHook) closeTokenConfirmationHook();
+          throw new Error("Token settlement cancelled");
         }
+        // User topped up and confirmed — retry settlement
       } else {
         if (closeTokenConfirmationHook) closeTokenConfirmationHook();
         throw error;
@@ -967,6 +976,23 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>(View.Home);
   const currentViewRef = useRef<View>(View.Home);
   const sessionTokenApprovedRef = useRef<boolean>(false);
+  const curationSessionIdRef = useRef<string | null>(null);
+  const [simulatedStripeModal, setSimulatedStripeModal] = useState<{
+    isOpen: boolean;
+    initialTierId?: TokenTopUpTierId | null;
+  }>({ isOpen: false });
+
+  useEffect(() => {
+    const handleOpenTopUp = (e: Event) => {
+      const customEvent = e as CustomEvent<{ tierId?: TokenTopUpTierId }>;
+      setSimulatedStripeModal({
+        isOpen: true,
+        initialTierId: customEvent?.detail?.tierId || 'gbp_10',
+      });
+    };
+    window.addEventListener('open-topup-modal', handleOpenTopUp);
+    return () => window.removeEventListener('open-topup-modal', handleOpenTopUp);
+  }, []);
 
   const navigate = useCallback((path: string, replace = false) => {
     if (replace) {
@@ -1120,7 +1146,8 @@ const App: React.FC = () => {
     cachedArtists: string[];
     missingArtists: string[];
     enrichmentArtists?: string[];
-    onConfirm: (password: string) => void;
+    tokenCost?: number;
+    onConfirm: (authorization?: string) => void;
     onCancel: () => void;
     onBack?: () => void;
     error?: string | null;
@@ -1145,7 +1172,8 @@ const App: React.FC = () => {
     missingArtists: string[],
     enrichmentArtists?: string[],
     showBack?: boolean,
-    errorMsg?: string
+    errorMsg?: string,
+    tokenCost?: number
   ) => {
     return new Promise<string | false | 'back'>((resolve) => {
       setTokenConfirmation({
@@ -1154,15 +1182,11 @@ const App: React.FC = () => {
         cachedArtists,
         missingArtists,
         enrichmentArtists,
+        tokenCost,
         error: errorMsg,
-        onConfirm: (password: string) => {
-          sessionStorage.setItem('zcene_api_password', password);
-          // Close immediately — the pipeline receives the password via resolve() and
-          // proceeds asynchronously. Any downstream error is surfaced via toast, not
-          // by re-opening this modal. All callers of closeTokenConfirmation() after
-          // a successful API call will safely no-op against null state.
+        onConfirm: (authorization?: string) => {
           setTokenConfirmation(null);
-          resolve(password);
+          resolve(authorization || 'authorized');
         },
         onCancel: () => {
           setTokenConfirmation(null);
@@ -1989,8 +2013,11 @@ const App: React.FC = () => {
       
       // 4. Save the payload 
       // This executes a deep 1:1 clone of the entire object, bypassing ID collisions.
+      // Rule 29 & 43: Omit server-stamped telemetry/spend from duplicated copy so duplication remains 0 new tokens.
+      const { tokensSpent: _omittedTokensSpent, apiUsage: _omittedApiUsage, ...clonedData } = originalData;
       await setDoc(newDocRef, {
-        ...originalData,
+        ...clonedData,
+        generationType: 'Clone',
         name: newName,
         createdAt: new Date(),
         updatedAt: new Date()
@@ -2678,8 +2705,8 @@ const App: React.FC = () => {
       .map((n: any) => normalizeLabelId(n.label || n.id));
     const normalizedIds = seedList.map((name: string) => normalizeArtistId(name));
 
-    // Rule 36: Worker-owned telemetry fields (generationType, apiUsage, anchorResolution)
-    // are intentionally omitted from client auto-saves to preserve backend authority.
+    // Rule 29 & 43: Server-owned telemetry and billing fields (generationType, apiUsage, anchorResolution, tokensSpent)
+    // are intentionally omitted from client auto-saves and shared clones to preserve backend authority.
     const basePayload: Record<string, any> = {
       name: (projectName && projectName.trim()) 
         ? projectName 
@@ -2998,7 +3025,7 @@ const App: React.FC = () => {
               lastViewedStackCount: 0,
               isMagazineViewOpen: false,
               supportsLabelDeepCuts: true
-           });
+           }, { merge: true });
         } else {
            await updateDoc(doc(db, projectPath), payload);
         }
@@ -3015,6 +3042,85 @@ const App: React.FC = () => {
     isProjectLoadingRef.current = false;
     if (data?.hasUniqueSpiderweb) showCacheToast();
   }, [user, isGuest, showCacheToast, setGraphData, setSeedArtists, setSelectedNode, setActiveNodeIds, setDetailsCache]);
+
+  const authorizeDirectHitAndMintProject = useCallback(async (
+    seedSlug: string,
+    displaySeedLabel: string,
+    isRegeneration: boolean = false,
+    graphToEnhance?: GraphData | null
+  ): Promise<boolean> => {
+    if (!user || isGuest) return true;
+
+    let targetProjectId = currentProjectIdRef.current || currentProjectId;
+    const cleanDisplayName = formatSeed(displaySeedLabel || seedSlug);
+
+    if (!targetProjectId && !isRegeneration && !graphToEnhance) {
+      const newDocRef = doc(collection(db, 'users', user.uid, 'projects'));
+      targetProjectId = newDocRef.id;
+      currentProjectIdRef.current = targetProjectId;
+      setCurrentProjectId(targetProjectId);
+      navigate(`/p/${targetProjectId}`);
+
+      await setDoc(newDocRef, {
+        name: cleanDisplayName || displaySeedLabel || seedSlug,
+        seedArtists: seedSlug,
+        graphData: JSON.stringify({ nodes: [], links: [] }),
+        activeNodes: [],
+        detailsCache: '[]',
+        chatHistories: '[]',
+        discoveryFilters: '{}',
+        lastViewedStackCount: 0,
+        isMagazineViewOpen: false,
+        authorId: user.uid,
+        supportsLabelDeepCuts: true,
+        schemaVersion: 2,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        status: 'curating'
+      });
+    }
+
+    const authorizeCallable = httpsCallable(functions, 'authorizeDirectHitCallable');
+    while (true) {
+      try {
+        await authorizeCallable({
+          projectId: targetProjectId || undefined,
+          seedArtistId: normalizeArtistId(seedSlug),
+          projectName: cleanDisplayName || displaySeedLabel || seedSlug,
+          curationSessionId: curationSessionIdRef.current || undefined,
+        });
+        curationSessionIdRef.current = null;
+        sessionTokenApprovedRef.current = false;
+        return true;
+      } catch (err: any) {
+        const isInsufficient =
+          err?.message?.includes('INSUFFICIENT_TOKENS') ||
+          err?.code === 'functions/failed-precondition';
+        if (isInsufficient) {
+          const reconfirmed = await confirmTokenUsage(
+            'generation',
+            [],
+            [cleanDisplayName || seedSlug],
+            undefined,
+            false,
+            'Top up your Zcene wallet to settle the remaining tokens for this curation.',
+            TOKEN_PRICING.SINGLE_SEED - TOKEN_PRICING.PREFLIGHT_FLASH_FEE
+          );
+          if (!reconfirmed || reconfirmed === 'back') {
+            curationSessionIdRef.current = null;
+            sessionTokenApprovedRef.current = false;
+            return false;
+          }
+          continue;
+        }
+        console.error('[authorizeDirectHitCallable] Failed:', err);
+        showToast(humanizeError(err));
+        curationSessionIdRef.current = null;
+        sessionTokenApprovedRef.current = false;
+        return false;
+      }
+    }
+  }, [user, isGuest, currentProjectId, navigate, confirmTokenUsage, showToast, humanizeError]);
 
   const handleGenerateGraph = useCallback(async (
     rawArtists: string,
@@ -3196,36 +3302,70 @@ const App: React.FC = () => {
         }));
       }
 
-      // Phase 1.5: Total Cache Miss Branch (API Lookup with Early Token Gate)
-      if (!bypassDisambiguation && !skipCacheLookup && cacheCandidatesPerSeed.some(s => !s.isKnownCacheHit)) {
-        // Trigger Password/Token Gate Early for API Authorization
-        if (!bypassTokenConfirmation && !sessionTokenApprovedRef.current) {
-          const confirmedToken = await confirmTokenUsage('live_synthesis', [], artistList, undefined, false);
-          if (!confirmedToken || confirmedToken === 'back') {
-            sessionTokenApprovedRef.current = false;
-            setActiveNodeIds(prevActiveNodeIds);
-            setSeedArtists(prevSeedArtists);
-            setIsLoading(false);
-            isHydratingSessionRef.current = false;
-            isProjectLoadingRef.current = false;
-            setProjectStatus('idle');
-            return;
-          }
-          sessionTokenApprovedRef.current = true;
-        }
+      // Determine routing & V38 Token Spend Cost (5T Single-Seed / Direct Hit, 10T Complex)
+      const routingDecision = deriveRoutingDecision(verdicts, isLiveSynthesis);
+      const requiresLiveSynthesis = isLiveSynthesis || isLiveSynthesisTemp;
+      const needsCacheUpgrade = routingDecision === 'PARTIAL';
+      const projectTokenCost = computeBaseProjectTokenCost(artistList.length, hasActiveFilters);
 
-        // Execute API Lookup for misses now that we have authorization
-        let currentPassword = sessionStorage.getItem('zcene_api_password') || undefined;
+      let tokenType = 'generation';
+      if (requiresLiveSynthesis) tokenType = 'live_synthesis';
+      else if (needsCacheUpgrade) tokenType = 'cache_upgrade';
+
+      // Box 3 (V38 Law 18 & 43): Token Spend & Top-Up Gate intercepts 100% of curations on Pass 1
+      if (!bypassDisambiguation && !bypassTokenConfirmation && !sessionTokenApprovedRef.current) {
+        curationSessionIdRef.current =
+          typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+            ? crypto.randomUUID()
+            : `sess-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+        const cachedSeedLabels = cacheCandidatesPerSeed
+          .filter(s => s.isKnownCacheHit && !requiresLiveSynthesis)
+          .map(s => s.query);
+        const missingSeedLabels = cacheCandidatesPerSeed
+          .filter(s => !s.isKnownCacheHit || requiresLiveSynthesis)
+          .map(s => s.query);
+
+        const confirmedToken = await confirmTokenUsage(
+          tokenType as any,
+          cachedSeedLabels,
+          missingSeedLabels.length > 0 ? missingSeedLabels : cachedSeedLabels,
+          undefined,
+          false,
+          undefined,
+          projectTokenCost
+        );
+        if (!confirmedToken || confirmedToken === 'back') {
+          sessionTokenApprovedRef.current = false;
+          curationSessionIdRef.current = null;
+          setActiveNodeIds(prevActiveNodeIds);
+          setSeedArtists(prevSeedArtists);
+          setIsLoading(false);
+          isHydratingSessionRef.current = false;
+          isProjectLoadingRef.current = false;
+          setProjectStatus('idle');
+          return;
+        }
+        sessionTokenApprovedRef.current = true;
+      }
+
+      // Phase 1.5: Pre-Flight Flash Lookup (Non-refundable -1T fee for uncached misses; cached & ambiguous stubs bypass at 0T)
+      if (!bypassDisambiguation && !skipCacheLookup && cacheCandidatesPerSeed.some(s => !s.isKnownCacheHit)) {
         const validate = httpsCallable(functions, 'validateSeedOriginCallable');
 
         for (let s of cacheCandidatesPerSeed) {
           if (!s.isKnownCacheHit) {
             if (s.isAmbiguous && s.candidates && s.candidates.length > 0) {
-              // Ambiguous candidates already retrieved from database evolved stub
+              // Ambiguous candidates already retrieved from database evolved stub (0T bypass)
               continue;
             }
             try {
-              const result = await validate({ seed: s.query, ...(currentPassword && { password: currentPassword }) });
+              const result = await validate({
+                seed: s.query,
+                curationSessionId: curationSessionIdRef.current || undefined,
+                mode: 'initial_preflight',
+                expectedProjectCost: projectTokenCost,
+              });
               const data = result.data as any;
               if (data && data.isValid) {
                 if (data.hasCollision && Array.isArray(data.candidates) && data.candidates.length > 1) {
@@ -3259,30 +3399,31 @@ const App: React.FC = () => {
                   }
                 }
               }
-            } catch (e) {
-               console.warn("Origin validation failed for " + s.query + ":", e);
+            } catch (e: any) {
+              console.warn("Origin validation failed for " + s.query + ":", e);
+              if (e?.message?.includes('INSUFFICIENT_TOKENS')) {
+                sessionTokenApprovedRef.current = false;
+                curationSessionIdRef.current = null;
+                showToast('Please top up your Zcene wallet to continue.');
+                setActiveNodeIds(prevActiveNodeIds);
+                setSeedArtists(prevSeedArtists);
+                setIsLoading(false);
+                isHydratingSessionRef.current = false;
+                isProjectLoadingRef.current = false;
+                setProjectStatus('idle');
+                return;
+              }
             }
           }
         }
       }
 
-      // Determine quota requirements
-      const routingDecision = deriveRoutingDecision(verdicts, isLiveSynthesis);
-      const requiresLiveSynthesis = isLiveSynthesis || isLiveSynthesisTemp;
-      const hasMisses = routingDecision === 'MISS';
-      const needsCacheUpgrade = routingDecision === 'PARTIAL';
-      
-      let tokenType = 'generation';
-      if (requiresLiveSynthesis) tokenType = 'live_synthesis';
-      else if (needsCacheUpgrade) tokenType = 'cache_upgrade';
-      
-      const requiresQuota = requiresLiveSynthesis || hasMisses || needsCacheUpgrade;
-
-      // 3. Financial Confirmation (Token Quota)
-      if (requiresQuota && !bypassTokenConfirmation && !sessionTokenApprovedRef.current) {
-          const confirmedToken = await confirmTokenUsage(tokenType as any, [], artistList, undefined, false);
+      // Secondary safeguard for bypassDisambiguation=true callers that didn't yet confirm tokens
+      if (!bypassTokenConfirmation && !sessionTokenApprovedRef.current) {
+          const confirmedToken = await confirmTokenUsage(tokenType as any, [], artistList, undefined, false, undefined, projectTokenCost);
           if (!confirmedToken || confirmedToken === 'back') {
             sessionTokenApprovedRef.current = false;
+            curationSessionIdRef.current = null;
             setActiveNodeIds(prevActiveNodeIds);
             setSeedArtists(prevSeedArtists);
             setIsLoading(false);
@@ -3294,7 +3435,7 @@ const App: React.FC = () => {
           sessionTokenApprovedRef.current = true;
       }
 
-      // 3. Visual Confirmation (ConsolidatedValidationModal)
+      // Box 4: Visual Confirmation (ConsolidatedValidationModal)
       if (!bypassDisambiguation && cacheCandidatesPerSeed.length > 0) {
           const confirmed = await new Promise<boolean>((resolve) => {
             setConsolidatedValidationDialog({
@@ -3314,7 +3455,9 @@ const App: React.FC = () => {
           });
 
           if (!confirmed) {
+            // Rule 43: On Box 4 Cancel, 0T spent if cached; non-refundable 1T Flash fee retained if Flash ran.
             sessionTokenApprovedRef.current = false;
+            curationSessionIdRef.current = null;
             setActiveNodeIds(prevActiveNodeIds);
             setSeedArtists(prevSeedArtists);
             setIsLoading(false);
@@ -3399,24 +3542,41 @@ const App: React.FC = () => {
         const newArtistsStr = resolvedArtistSeeds.join('::');
         const hasActiveFiltersNext = hasActiveDiscoveryFilters(activeDiscoveryFilters);
         const isCustomNext = resolvedArtistSeeds.length > 1 || hasActiveFiltersNext;
-        const allKnownCacheHits = cacheCandidatesPerSeed.length > 0 && cacheCandidatesPerSeed.every(s => s.isKnownCacheHit);
-        const nextSkipCacheLookup = !allKnownCacheHits;
+        const canCheckCacheOnPass2 =
+          !isCustomNext &&
+          cacheCandidatesPerSeed.length > 0 &&
+          cacheCandidatesPerSeed.every(s => s.isKnownCacheHit || (s.isAmbiguous && !!s.selectedCandidateId));
+        const nextSkipCacheLookup = !canCheckCacheOnPass2;
         
-        handleGenerateGraph(newArtistsStr, isRegeneration, graphToEnhance, nextSkipCacheLookup, !isCustomNext || sessionTokenApprovedRef.current, overrideFilters, activeDisambiguationHints, true, activeDisambiguationGenres, activeOriginalQueries, activeSeedNames);
+        handleGenerateGraph(newArtistsStr, isRegeneration, graphToEnhance, nextSkipCacheLookup, true, overrideFilters, activeDisambiguationHints, true, activeDisambiguationGenres, activeOriginalQueries, activeSeedNames);
         return;
       }
 
-      // 5. Apply Cache Hit for Single Qualified Hits (Local Routing)
+      // 5. Apply Cache Hit for Single Qualified Hits (V38 Authorize Direct Hit Callable: Settles -5T, or -4T Remainder)
       if (routingDecision === 'TOPOLOGY_HIT' && artistList.length === 1 && singleCacheDocData) {
           if (singleCacheResolvedSearchId && singleCacheResolvedSearchId !== artistList[0]) {
               setSeedArtists(singleCacheResolvedSearchId);
               artistList.splice(0, artistList.length, singleCacheResolvedSearchId);
           }
-          // Locks were released after the silent cache phase; re-assert them so
-          // Autosave / ProjectLoader can't race the batch hydration below.
           isHydratingSessionRef.current = true;
           isProjectLoadingRef.current = true;
           setIsLoading(true);
+          const displayLabel = activeSeedNames[artistList[0]] || artists;
+          const authorized = await authorizeDirectHitAndMintProject(
+            artistList[0],
+            displayLabel,
+            isRegeneration,
+            graphToEnhance
+          );
+          if (!authorized) {
+            setActiveNodeIds(prevActiveNodeIds);
+            setSeedArtists(prevSeedArtists);
+            isHydratingSessionRef.current = false;
+            isProjectLoadingRef.current = false;
+            setIsLoading(false);
+            setProjectStatus('idle');
+            return;
+          }
           await applyLocalTopologyHit(artistList[0], singleCacheDocData, artistList, artists);
           isHydratingSessionRef.current = false;
           isProjectLoadingRef.current = false;
@@ -4250,9 +4410,10 @@ const App: React.FC = () => {
             toFetch.length > 1 || hasActiveFilters, // isSmartBypass
             undefined, // isSandboxMode
             undefined, // seedImageUrl
-            undefined, // confirmTokenUsageHook
-            undefined, // closeTokenConfirmationHook
-            activeSeedNames
+            confirmTokenUsage, // confirmTokenUsageHook
+            closeTokenConfirmation, // closeTokenConfirmationHook
+            activeSeedNames,
+            curationSessionIdRef.current
           );
         } else {
           partialGraphPromise = generateGraphData(toFetch.join('::'), pruned, activeDiscoveryFilters, user?.uid, controller?.signal, activeDisambiguationHints, activeDisambiguationGenres);
@@ -4623,9 +4784,10 @@ const App: React.FC = () => {
           undefined,                    // isSmartBypass
           isSandboxMode,                // isSandboxMode
           seedImageUrl,                 // seedImageUrl
-          undefined,                    // confirmTokenUsageHook
-          undefined,                    // closeTokenConfirmationHook
-          activeSeedNames               // seedNames map
+          confirmTokenUsage,            // confirmTokenUsageHook
+          closeTokenConfirmation,       // closeTokenConfirmationHook
+          activeSeedNames,              // seedNames map
+          curationSessionIdRef.current  // V38 Split-Debit session ID
         );
       } else {
         const payloadArtists = artistList.map(a => normalizeArtistId(a)).join('::');
@@ -4939,8 +5101,11 @@ const App: React.FC = () => {
       }
 
       isHydratingSessionRef.current = false;
+      curationSessionIdRef.current = null;
+      sessionTokenApprovedRef.current = false;
     } catch (err: any) {
       sessionTokenApprovedRef.current = false;
+      curationSessionIdRef.current = null;
       if (err.name !== 'AbortError' && !(controller && controller.signal.aborted)) {
         if (err.message && err.message.includes("discover any relational bridges")) {
           setFilterGuidanceState({
@@ -4976,6 +5141,8 @@ const App: React.FC = () => {
     seedArtists,
 
     confirmTokenUsage,
+    closeTokenConfirmation,
+    authorizeDirectHitAndMintProject,
     detailsCache,
     currentProjectId,
     projectName
@@ -7707,6 +7874,7 @@ const App: React.FC = () => {
             onUpdateCrateColor={(crate, color) => handleUpdateProfile({
               crateColors: { ...(profile?.crateColors || {}), [crate]: color }
             })}
+            tokenBalance={profile?.tokenBalance ?? 0}
           />
         </div>
         <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Graph ? 'z-10' : 'z-0 opacity-0 pointer-events-none'}`}>
@@ -7862,6 +8030,7 @@ const App: React.FC = () => {
             isMenuOpen={isMenuOpen}
             setIsMenuOpen={setIsMenuOpen}
             onRestartWalkthrough={handleDashboardRestartWalkthrough}
+            tokenBalance={profile?.tokenBalance ?? 0}
           />
         </div>
         <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Engine ? 'z-10' : 'z-0 opacity-0 pointer-events-none'}`}>
@@ -7939,6 +8108,7 @@ const App: React.FC = () => {
             setIsMenuOpen={setIsMenuOpen}
             onRestartWalkthrough={handleDashboardRestartWalkthrough}
             onClose={handleSubpageClose}
+            profile={profile}
           />
         </div>
         </React.Suspense>
@@ -8066,11 +8236,15 @@ const App: React.FC = () => {
       <TokenConfirmationDialog
         isOpen={!!tokenConfirmation}
         onClose={() => tokenConfirmation?.onCancel()}
-        onConfirm={(password) => tokenConfirmation?.onConfirm(password)}
+        onConfirm={(authorization) => tokenConfirmation?.onConfirm(authorization)}
         type={tokenConfirmation?.type || 'generation'}
         cachedArtists={tokenConfirmation?.cachedArtists || []}
         missingArtists={tokenConfirmation?.missingArtists || []}
         enrichmentArtists={tokenConfirmation?.enrichmentArtists || []}
+        tokenCost={tokenConfirmation?.tokenCost}
+        tokenBalance={profile?.tokenBalance ?? 0}
+        isAdmin={isAdmin}
+        onOpenTopUp={(tierId) => setSimulatedStripeModal({ isOpen: true, initialTierId: tierId || 'gbp_10' })}
         onBack={tokenConfirmation?.onBack}
         error={tokenConfirmation?.error}
       />
@@ -8079,8 +8253,19 @@ const App: React.FC = () => {
       <ConsolidatedValidationModal
         isOpen={!!consolidatedValidationDialog?.isOpen}
         seeds={consolidatedValidationDialog?.seeds || []}
+        curationSessionId={curationSessionIdRef.current}
+        isAdmin={isAdmin}
+        onOpenTopUp={(tierId) => setSimulatedStripeModal({ isOpen: true, initialTierId: tierId || 'gbp_5' })}
         onConfirm={(updatedSeeds) => consolidatedValidationDialog?.onConfirm(updatedSeeds)}
         onCancel={() => consolidatedValidationDialog?.onCancel()}
+      />
+
+      <SimulatedStripeModal
+        isOpen={simulatedStripeModal.isOpen}
+        initialTierId={simulatedStripeModal.initialTierId}
+        currentBalance={profile?.tokenBalance ?? 0}
+        onClose={() => setSimulatedStripeModal({ isOpen: false })}
+        onSuccess={(_, credited) => showToast(`Added ${credited} Tokens to your Zcene wallet.`)}
       />
 
 

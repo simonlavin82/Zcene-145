@@ -119,8 +119,8 @@ const ARCHITECTURE_RULES = [
     },
     { 
         id: 18, 
-        title: "Authorization Lifecycle", 
-        desc: "Token/billing authorization state must be strictly scoped to the active generation event. The authorization flag must instantly reset to false on any modal cancellation, API failure, or project unmount to prevent tollbooth bypasses." 
+        title: "Authorization Lifecycle & Split-Debit Session Scoping", 
+        desc: "Legacy shared API_PASSWORD is completely retired in favor of cryptographic Firebase Auth (request.auth / Bearer ID tokens). Token authorization and curationSessions/{sessionId} split-debit state are strictly scoped to the active generation event and reset immediately on modal cancellation, API failure, or project unmount." 
     },
     { 
         id: 19, 
@@ -129,8 +129,8 @@ const ARCHITECTURE_RULES = [
     },
     { 
         id: 20, 
-        title: "Mandatory Disambiguation on Direct Hits", 
-        desc: "Green Line MUST NEVER bypass the user confirmation phase." 
+        title: "Mandatory Disambiguation & Settlement on Direct Hits", 
+        desc: "Single-seed Topology Hits and Ambiguous Cache Hits MUST NEVER bypass Box 3 (Token Spend & Top-Up Gate) or Box 4 (Confirm Your Artists), and MUST settle via authorizeDirectHitCallable (-5T pure cache hit, or -4T remainder after 1T Flash lookup) before rendering." 
     },
     { 
         id: 21, 
@@ -175,7 +175,7 @@ const ARCHITECTURE_RULES = [
     { 
         id: 29, 
         title: "Universal Payload Serializer", 
-        desc: "Project saving and share generation must strictly derive from a single source of truth to guarantee 1:1 data parity (including curation elements like pinned/styled nodes). Share links apply a post-serialization blacklist to handle ephemeral environment constraints without risking data omission. Strict Ledger Parity: buildBaseProjectPayload defensively omits generationType, apiUsage, and anchorResolution during frontend autosave (merge: true) to prevent clobbering background worker token costs, labeling, and 3-Tier telemetry. Frontend payload MUST pass a seedNames map as the absolute source of truth for display names to prevent backend hallucination. Dashboard cards & UI consumers must rely solely on the frozen seedImageUrls snapshot." 
+        desc: "Project saving and share generation must strictly derive from a single source of truth to guarantee 1:1 data parity (including curation elements like pinned/styled nodes). Share links apply a post-serialization blacklist to handle ephemeral environment constraints without risking data omission. Strict Ledger Parity: buildBaseProjectPayload defensively omits generationType, apiUsage, tokensSpent, and anchorResolution during frontend autosave (merge: true) to prevent clobbering server-stamped token costs, labeling, and 3-Tier telemetry. Frontend payload MUST pass a seedNames map as the absolute source of truth for display names to prevent backend hallucination. Dashboard cards & UI consumers must rely solely on the frozen seedImageUrls snapshot." 
     },
     { 
         id: 30, 
@@ -185,7 +185,7 @@ const ARCHITECTURE_RULES = [
     { 
         id: 31, 
         title: "Local State Preemption", 
-        desc: "Zero-cost local routing (applyLocalTopologyHit) must synchronously inject the constructed graph into the local React state (setGraphData) before releasing the Hydration Lock. This guarantees that when background sync resumes, local memory matches database state, preventing destructive overwrites." 
+        desc: "Direct Hit local routing (applyLocalTopologyHit) executes immediately after authorizeDirectHitCallable settlement and must synchronously inject the constructed graph into local React state (setGraphData) before releasing the Hydration Lock, preventing destructive autosave overwrites." 
     },
     { 
         id: 32, 
@@ -199,8 +199,8 @@ const ARCHITECTURE_RULES = [
     },
     { 
         id: 34, 
-        title: "Cognitive Tiering & Orchestration Stability", 
-        desc: "All 7 AI touchpoints strictly operate on categorical thinking_level mapping (minimal to high) via the legacy generateContent API. Flash-tier touchpoints dynamically resolve to GEMINI_FLASH_MODEL (target: gemini-3.6-flash). Custom sampling parameters (temperature, top_p, top_k, thinking_budget) are strictly prohibited. Discovery Ledger accounting is permanently pegged to standard list prices ($1.50/1M input, $7.50/1M output), ignoring promotional discounts to preserve margin integrity. Interactions API migration is deferred until conversational features are scoped." 
+        title: "Cognitive Tiering, Orchestration Stability & Split-Debit Settlement", 
+        desc: "All 7 AI touchpoints strictly operate on categorical thinking_level mapping (minimal to high) via the legacy generateContent API. Flash-tier touchpoints dynamically resolve to GEMINI_FLASH_MODEL (target: gemini-3.6-flash). Custom sampling parameters (temperature, top_p, top_k, thinking_budget) are strictly prohibited. Admin Discovery Ledger accounting is permanently pegged to standard list prices ($1.50/1M input, $7.50/1M output), while Column 2 enforces atomic Split-Debit remainder settlement and automatic error refunds." 
     },
     { 
         id: 35, 
@@ -240,7 +240,12 @@ const ARCHITECTURE_RULES = [
     { 
         id: 42, 
         title: "Data Lifecycle, 3-Tier Storage Matrix & Strict createdAt TTL Enforcement", 
-        desc: "Enforces a strict 3-tier storage matrix: Tier 1 (Global Assets /artists & /labels: soft-expires 365 days strictly from immutable createdAt; updatedAt mutations do not reset clock; anti-sweep law prohibits automated cron-sweeps), Tier 2 (Ephemeral Snapshots /sharedZcenes: immutable, 30-day hard TTL, coordinates stripped), and Tier 3 (Owned Projects: permanent user storage, Coordinate Memory preserves settled positions)." 
+        desc: "Enforces a strict 3-tier storage matrix: Tier 1 (Global Assets /artists & /labels: Soft-expires 365d (createdAt + 365d); updatedAt mutations do not reset clock; anti-sweep law prohibits automated cron-sweeps), Tier 2 (Ephemeral Snapshots /sharedZcenes: immutable, 30-day hard TTL, coordinates stripped, 0 Tokens to view or save), and Tier 3 (Owned Projects: permanent user storage, Coordinate Memory preserves settled positions)." 
+    },
+    { 
+        id: 43, 
+        title: "Token Economy, Split-Debit Pre-Flight & Cache Margin Telemetry Isolation", 
+        desc: "Enforces server-authoritative token wallets (Simulated Stripe Top-Ups: £5 = 50T, £10 = 100T, £15 = 150T; firestore.rules locks client balance mutations). Pricing: 5T Single-Seed / Direct Hit, 10T Complex (Multi-Seed or 3-Tier Anchored), 3T Deep Connections (3-Msg Grounded Consult via unlockDeepWebSessionCallable + deepWebSessions lease), 0T Shared /z/:id View & Clone. Split-Debit Pre-Flight: validateSeedOriginCallable deducts a non-refundable 1T fee once per initial uncached seed batch and 1T per manual Escape Hatch re-query (creditablePreFlightTokens capped at 1T); authorizeDirectHitCallable or Column 2 settles the remaining 4T/5T/9T/10T and stamps tokensSpent, auto-refunding settlementTokensDeducted on fatal pipeline failure. Admin (zcene.online@gmail.com) bypasses all deductions (0T) and retains full raw USD & cache recall telemetry; Standard Users & Admin Preview mode strictly redact $0.0000 Direct Hit costs and cache recall ratios." 
     }
 ];
 
@@ -256,27 +261,23 @@ const DiscoveryFlowDiagram: React.FC = () => (
                         <div className="text-white font-medium text-sm mb-3">React UI</div>
                         <ul className="text-[11px] text-zinc-400 space-y-3">
                             <li>
-                                <span className="text-primary font-medium">Submit Seed(s) + 3-Tier Anchors:</span> Evaluates <code>hasActiveDiscoveryFilters</code> (ignoring empty arrays). Unfiltered single-seed Direct Hits bypass the backend; Multi-Seed / 3-Tier Anchored queries route to Complex Generation.
+                                <span className="text-primary font-medium">1 & 2. Submit Seed(s) + Check Global Topology Cache:</span> Evaluates <code>hasActiveDiscoveryFilters</code> & per-seed cache status; 100% of curations enter Box 3.
                             </li>
                             <li>
-                                <span className="text-primary font-medium">Front Gate Cache Guard:</span> Bypasses network if a complete cache doc exists. Topology hits route through <code>&lt;DisambiguationModal&gt;</code> to verify origin.
+                                <span className="text-primary font-medium">3. Token Spend & Top-Up Gate ([Rules 18, 43]):</span> <code>&lt;TokenConfirmationDialog&gt;</code> intercepts every curation (<code>5T</code> Single-Seed/Direct Hit, <code>10T</code> Complex; prompts <code>&lt;SimulatedStripeModal&gt;</code> <code>£5/£10/£15</code> if low balance). Cached <code>Topology Hit</code> & <code>Ambiguous Hit (Cache)</code> bypass Flash into Box 4; <code>Cache Miss</code> enters Flash 3.6.
                             </li>
                             <li>
-                                <span className="text-primary font-medium">Flash 3.6 Collision Detection:</span> Calls <code>validateSeedOriginCallable</code> (<code>thinking_level: minimal</code>, Zero Search Grounding). Synchronously detects homonyms and mints 1-to-many Evolved Stub contracts.
+                                <span className="text-primary font-medium">Flash 3.6 Collision Detection (-1T Pre-Flight):</span> Calls <code>validateSeedOriginCallable</code> (<code>thinking_level: minimal</code>, Zero Search Grounding). Deducts non-refundable <code>1T</code> lookup fee once per uncached batch and mints Evolved Stubs.
                             </li>
                             <li>
-                                <span className="text-primary font-medium">Confirm Artists & Escape Hatch Bouncer:</span> <code>&lt;ConsolidatedValidationModal&gt;</code> presents locked cards, disambiguation radio, and the "Not this artist?" escape hatch.
+                                <span className="text-primary font-medium">4. Confirm Your Artists & Escape Hatch ([Rules 11, 20]):</span> <code>&lt;ConsolidatedValidationModal&gt;</code> presents verified cards, disambiguation radio, and Escape Hatch (<code>-1T</code> per re-query).
                                 <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500 text-[10px]">
-                                    <li><span className="text-zinc-300">Re-Query Bouncer:</span> User custom hints trigger synchronous Flash 3.6 re-verification.</li>
-                                    <li><span className="text-zinc-300">Zero-Pollution Rejection:</span> Unverified inputs rejected inline with error banner; zero unverified stubs written.</li>
-                                    <li><span className="text-zinc-300">Verified UI Lock:</span> Generation locked until all cards are verified or reverted.</li>
+                                    <li><span className="text-zinc-300">Direct Hit / Typo Corrected Exit:</span> Routes through <code>authorizeDirectHitCallable</code> (settling <code>-5T</code> or <code>-4T</code> remainder) directly to Box 7.</li>
+                                    <li><span className="text-zinc-300">Zero-Pollution Rejection:</span> Unverified Escape Hatch inputs rejected inline; zero unverified stubs written.</li>
                                 </ul>
                             </li>
                             <li>
-                                <span className="text-primary font-medium">API Confirmation:</span> <code>&lt;TokenConfirmationModal&gt;</code> intercepts generation to authorize API token spend.
-                            </li>
-                            <li>
-                                <span className="text-primary font-medium">Active Loader Gate:</span> Locks UI completely; drops only when Column 3 sets job status to 'completed'.
+                                <span className="text-primary font-medium">5 & 7. Active Loader Gate → Render Zcene:</span> Live synthesis locks UI until Column 3 sets project status to <code>'completed'</code>; Deep Connections consults unlock via <code>unlockDeepWebSessionCallable</code> (<code>3T</code> / 3 msgs).
                             </li>
                         </ul>
                     </div>
@@ -296,10 +297,10 @@ const DiscoveryFlowDiagram: React.FC = () => (
                         <div className="text-white font-medium text-sm mb-3">HTTP Fast-Track</div>
                         <ul className="text-[11px] text-zinc-400 space-y-3">
                             <li>
-                                <span className="text-primary font-medium">1. Ingest Validated Payload, Sanitize 3-Tier Anchors & Zero Blind Trust</span>
+                                <span className="text-primary font-medium">1. Ingest Validated Seed Payload & Settle Token Balance ([Rules 2, 34, 43])</span>
                                 <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500 text-[10px]">
-                                    <li>Sanitizes <code>payload.filters</code> via <code>sanitizeDiscoveryFilters</code> (1965 to N-2 era bounds, mutual origin exclusion, strips <code>additionalInstructions</code>).</li>
-                                    <li>Forces <code>needsProGeneration = true</code> when <code>hasActiveDiscoveryFilters</code> is true.</li>
+                                    <li>Verifies <code>request.auth</code>, settles remaining balance (<code>4T/5T</code> Single-Seed or <code>9T/10T</code> Complex), stamps <code>tokensSpent</code>, and auto-refunds settlement on fatal pipeline failure.</li>
+                                    <li>Sanitizes <code>payload.filters</code> via <code>sanitizeDiscoveryFilters</code> and forces <code>needsProGeneration = true</code> when <code>hasActiveDiscoveryFilters</code> is true.</li>
                                     <li><span className="text-zinc-300">Zero Blind Trust:</span> Rejects blind stub minting; slugs strictly derive from verified Flash candidate payloads.</li>
                                 </ul>
                             </li>
@@ -400,7 +401,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                 <div className="p-4 rounded-xl border border-zinc-700 bg-zinc-900/80 h-[560px] flex flex-col">
                     <div className="text-white font-medium text-sm mb-2 sticky top-0 bg-zinc-900 py-1 border-b border-zinc-800 z-10 flex items-center justify-between">
                         <span>Rules Ledger</span>
-                        <span className="text-[10px] font-mono text-primary uppercase">42 Laws</span>
+                        <span className="text-[10px] font-mono text-primary uppercase">43 Laws</span>
                     </div>
                     <div className="space-y-2 pt-2 overflow-y-auto pr-1 flex-1">
                         {ARCHITECTURE_RULES.map(rule => (
@@ -470,7 +471,7 @@ const DataLifecycleMatrix: React.FC = () => (
                 <div className="space-y-1.5 text-xs">
                     <div className="flex justify-between border-b border-zinc-800 pb-1.5"><span className="text-zinc-400">createdAt</span><span className="text-white">Immutable</span></div>
                     <div className="flex justify-between border-b border-zinc-800 pb-1.5"><span className="text-zinc-400">updatedAt</span><span className="text-green-400">Mutable</span></div>
-                    <div className="flex justify-between border-b border-zinc-800 pb-1.5"><span className="text-zinc-400">expireAt</span><span className="text-yellow-400">Soft-expires 365d (Stale)</span></div>
+                    <div className="flex justify-between border-b border-zinc-800 pb-1.5"><span className="text-zinc-400">expireAt</span><span className="text-yellow-400">Soft-expires 365d (createdAt + 365d)</span></div>
                     <div className="flex justify-between"><span className="text-zinc-400">cachedAt</span><span className="text-red-500 line-through">Eradicated</span></div>
                 </div>
                 <div className="mt-3 text-[11px] text-zinc-500 leading-relaxed">
@@ -548,7 +549,7 @@ const SharingFlowDiagram: React.FC = () => (
                 <div className="w-full py-2.5 px-2 rounded-lg bg-primary text-brand-black font-bold text-xs text-center shadow-lg shadow-primary/20">
                     SAVE TO MY ZCENES
                 </div>
-                <div className="text-zinc-400 text-[10px] text-center">1:1 Clone via Serializer</div>
+                <div className="text-zinc-400 text-[10px] text-center">1:1 Clone via Serializer (0 Tokens)</div>
             </div>
 
             <div><span className="material-symbols-outlined text-zinc-700 text-sm">arrow_forward</span></div>
@@ -575,7 +576,7 @@ const RunbookAccordion: React.FC = () => {
             >
                 <div className="flex items-center gap-3 text-zinc-200 font-medium text-sm uppercase tracking-wider">
                     <Terminal className="w-4 h-4 text-primary" />
-                    V37 Full-Stack Regression Runbook
+                    V38 Full-Stack Regression Runbook
                 </div>
                 {isOpen ? <ChevronDown className="w-4 h-4 text-zinc-400" /> : <ChevronRight className="w-4 h-4 text-zinc-400" />}
             </button>
@@ -682,6 +683,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                 onLogout={onLogout}
                 onDeleteAccount={onDeleteAccount}
                 isAdmin={isAdmin}
+                tokenBalance={profile?.tokenBalance ?? 0}
                 isProfileOpen={isProfileOpen}
                 setIsProfileOpen={setIsProfileOpen}
                 isDeleteAccountModalOpen={isDeleteAccountModalOpen}
@@ -730,7 +732,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                             ))}
                         </nav>
                         <div className="mt-6 pt-4 border-t border-zinc-800/60 text-[10px] text-zinc-500 font-mono">
-                            Zcene V35 Blueprint<br/>
+                            Zcene V38 Blueprint<br/>
                             100% Anti-Regression
                         </div>
                     </div>
@@ -742,7 +744,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                     <div className="mb-8 border-b border-zinc-700/60 pb-6">
                         <div className="flex items-center gap-3 mb-2">
                             <h1 className="text-2xl sm:text-3xl font-medium text-white">Engine</h1>
-                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-primary/20 text-primary border border-primary/40">V35 Locked</span>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-primary/20 text-primary border border-primary/40">V38 Locked</span>
                         </div>
                         <p className="text-zinc-400 leading-relaxed text-xs sm:text-sm max-w-3xl">
                             Visual mirror and execution interface for the Zcene curation pipeline. Defines behavioral laws, state orchestration, anti-pollution boundaries, and regression-proof contracts.

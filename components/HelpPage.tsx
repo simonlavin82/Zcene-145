@@ -215,6 +215,7 @@ interface HelpPageProps {
   isMenuOpen: boolean;
   setIsMenuOpen: (open: boolean) => void;
   onRestartWalkthrough?: () => void;
+  tokenBalance?: number;
 }
 
 const HelpPage: React.FC<HelpPageProps> = ({ 
@@ -237,7 +238,8 @@ const HelpPage: React.FC<HelpPageProps> = ({
     isMenuOpen,
     setIsMenuOpen,
     onRestartWalkthrough,
-    onNavigateMenu
+    onNavigateMenu,
+    tokenBalance = 0
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -344,6 +346,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
                 isMenuOpen={isMenuOpen}
                 setIsMenuOpen={setIsMenuOpen}
                 onRestartWalkthrough={onRestartWalkthrough}
+                tokenBalance={tokenBalance}
             />
 
             <div className="lg:hidden p-4 sticky top-0 bg-background-dark z-[90] border-b border-zinc-700">

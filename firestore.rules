@@ -42,21 +42,26 @@ service cloud.firestore {
 
     function isValidUser(data) {
       return data.keys().hasAll(['email']) &&
-             data.keys().size() <= 12 &&
+             data.keys().size() <= 20 &&
              data.email is string && data.email.size() <= 256 &&
              (!('displayName' in data) || (data.displayName == null || (data.displayName is string && data.displayName.size() <= 200))) &&
              (!('photoURL' in data) || (data.photoURL == null || (data.photoURL is string && data.photoURL.size() <= 1000))) &&
              (!('createdAt' in data) || (data.createdAt is timestamp)) &&
              (!('updatedAt' in data) || (data.updatedAt is timestamp)) &&
              (!('libraryArtists' in data) || (data.libraryArtists is string)) &&
+             (!('libraryBaseGraph' in data) || (data.libraryBaseGraph == null || data.libraryBaseGraph is string)) &&
              (!('onboardingProgress' in data) || data.onboardingProgress is map) &&
              (!('deepCutsOpened' in data) || (data.deepCutsOpened is int)) &&
-             (!('pageAuth' in data) || data.pageAuth is map);
+             (!('pageAuth' in data) || data.pageAuth is map) &&
+             (!('tokenBalance' in data) || (data.tokenBalance is int && data.tokenBalance >= 0)) &&
+             (!('lifetimeTokensPurchased' in data) || (data.lifetimeTokensPurchased is int && data.lifetimeTokensPurchased >= 0)) &&
+             (!('lifetimeTokensSpent' in data) || (data.lifetimeTokensSpent is int && data.lifetimeTokensSpent >= 0)) &&
+             (!('lastTopUpAt' in data) || (data.lastTopUpAt == null || data.lastTopUpAt is timestamp));
     }
 
     function isValidProject(data) {
       return data.keys().hasAll(['name', 'seedArtists']) &&
-             data.keys().size() <= 35 &&
+             data.keys().size() <= 40 &&
              data.name is string && data.name.size() <= 512 &&
              data.seedArtists is string && data.seedArtists.size() <= 10000 &&
              // LEGACY full-blob fields (optional for backward compat)
@@ -76,7 +81,8 @@ service cloud.firestore {
              (!('updatedAt' in data) || (data.updatedAt is timestamp)) &&
              (!('anchorResolution' in data) || (data.anchorResolution == null || data.anchorResolution is string)) &&
              (!('generationType' in data) || (data.generationType == null || data.generationType is string)) &&
-             (!('apiUsage' in data) || (data.apiUsage == null || data.apiUsage is map));
+             (!('apiUsage' in data) || (data.apiUsage == null || data.apiUsage is map)) &&
+             (!('tokensSpent' in data) || (data.tokensSpent == null || (data.tokensSpent is int && data.tokensSpent >= 0)));
     }
 
     function isValidStackItem(data) {
@@ -112,22 +118,35 @@ service cloud.firestore {
       allow list: if isAdmin();
       
       allow create: if isOwner(userId) && 
-                      isValidUser(incoming());
+                      isValidUser(incoming()) &&
+                      (!('tokenBalance' in incoming()) || incoming().tokenBalance == 0) &&
+                      (!('lifetimeTokensPurchased' in incoming()) || incoming().lifetimeTokensPurchased == 0) &&
+                      (!('lifetimeTokensSpent' in incoming()) || incoming().lifetimeTokensSpent == 0);
       
       allow update: if isOwner(userId) && 
-                      isValidUser(incoming());
+                      isValidUser(incoming()) &&
+                      !request.resource.data.diff(resource.data).affectedKeys()
+                        .hasAny(['tokenBalance', 'lifetimeTokensPurchased', 'lifetimeTokensSpent', 'lastTopUpAt']);
       
       allow delete: if isOwner(userId) || isAdmin();
+
+      match /tokenTransactions/{txId} {
+        allow get: if isOwner(userId) || isAdmin();
+        allow list: if isOwner(userId) || isAdmin();
+        allow write: if false; // Exclusively written by Cloud Functions via Firebase Admin SDK
+      }
 
       match /projects/{projectId} {
         allow get: if isOwner(userId) || isAdmin();
         allow list: if isOwner(userId) || isAdmin();
         
         allow create: if isOwner(userId) && 
-                        isValidProject(incoming());
+                        isValidProject(incoming()) &&
+                        (!('tokensSpent' in incoming()) || incoming().tokensSpent == null || incoming().tokensSpent == 0 || isAdmin());
         
         allow update: if isOwner(userId) && 
-                        isValidProject(incoming());
+                        isValidProject(incoming()) &&
+                        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['tokensSpent']) || isAdmin());
         
         allow delete: if isOwner(userId) || isAdmin();
       }
@@ -341,6 +360,15 @@ service cloud.firestore {
     match /adminLedger/system/jitHeals/{healId} {
       allow read: if isAdmin();
       allow write: if false; // Exclusively written by Cloud Functions via Firebase Admin SDK
+    }
+
+    // --- Prepaid Token Economy Split-Debit & Deep Web Leases (Rule 43) ---
+    match /curationSessions/{sessionId} {
+      allow read, write: if false; // Exclusively managed by Cloud Functions via Firebase Admin SDK
+    }
+
+    match /deepWebSessions/{sessionId} {
+      allow read, write: if false; // Exclusively managed by Cloud Functions & Cloud Run Proxy via Admin SDK
     }
   }
 }
