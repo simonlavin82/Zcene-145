@@ -8,6 +8,8 @@ import { generateGraphData, fetchNodeDetails, resolveArtistCandidatesViaAI } fro
 import { normalizeArtistId, normalizeLabelId, readArtistCacheMany, readLabelCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, getEntityDocWithRedirect, getLabelDocWithRedirect, getAnyEntityDocWithRedirect, titleCaseArtistId, cleanArtistDisplayName, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema, stripUndefinedProperties, isNodeInSeedList, extractCountrySlug, triggerAssetHealing } from './services/artistCacheService';
 import { qualifyCacheEntry, deriveRoutingDecision, CacheVerdict, RoutingDecision, hasActiveDiscoveryFilters, hasActiveTier2Filters, sanitizeDiscoveryFilters } from './services/cacheQualification';
 import { normalizeCountry } from './utils/normalization';
+import { computeProjectHydrationFingerprint } from './utils/projectHydrationFingerprint';
+export { computeProjectHydrationFingerprint };
 import { auth, signInWithGoogle, logout, onAuthStateChanged, User, db, functions, handleFirestoreError, OperationType } from './services/firebase';
 import { translateError, translateToast } from './services/errorTranslationLayer';
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, getDocFromServer, serverTimestamp, addDoc, getDoc, getDocs, orderBy, where, writeBatch, getDocFromCache, updateDoc, increment, limit } from 'firebase/firestore';
@@ -1094,6 +1096,14 @@ const App: React.FC = () => {
   const setDetailsCache = useCallback((updater: Map<string, NodeDetails> | ((prev: Map<string, NodeDetails>) => Map<string, NodeDetails>)) => {
     setDetailsCacheState(prev => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
+      if (healedDetailsCacheRef.current.size === 0) {
+        return next;
+      }
+      let needsHealMerge = false;
+      healedDetailsCacheRef.current.forEach((v, k) => {
+        if (next.get(k) !== v) needsHealMerge = true;
+      });
+      if (!needsHealMerge) return next;
       const merged = new Map(next);
       healedDetailsCacheRef.current.forEach((v, k) => {
         merged.set(k, v);
@@ -1542,6 +1552,7 @@ const App: React.FC = () => {
   const lastViewedStackCountRef = useRef<number>(0);
   const currentCacheKeyRef = useRef<string | null>(null);
   const lastSyncedDocRef = useRef<string>('');
+  const lastHydratedProjectFingerprintRef = useRef<string>('');
   const approvedSeedsRef = useRef<Set<string>>(new Set());
   // Phase A — Coordinate Memory refs
   // lastSettledLayoutRef: dirty-check string to avoid redundant Firestore writes
@@ -1734,6 +1745,7 @@ const App: React.FC = () => {
     console.log(`[Dashboard] Creating Project: ${newId}`);
 
     // EXPLICITLY RESET CANVAS STATE IMMEDIATELY (Fixing state leak from previous guest projects)
+    lastHydratedProjectFingerprintRef.current = '';
     setGraphData({ nodes: [], links: [] });
     setSeedArtists('');
     setActiveNodeIds([]);
@@ -2705,7 +2717,7 @@ const App: React.FC = () => {
       .map((n: any) => normalizeLabelId(n.label || n.id));
     const normalizedIds = seedList.map((name: string) => normalizeArtistId(name));
 
-    // Rule 29 & 43: Server-owned telemetry and billing fields (generationType, apiUsage, anchorResolution, tokensSpent)
+    // Rule 29 & 43: Server-owned telemetry and billing fields (generationType, apiUsage, deepWebApiUsage, anchorResolution, tokensSpent)
     // are intentionally omitted from client auto-saves and shared clones to preserve backend authority.
     const basePayload: Record<string, any> = {
       name: (projectName && projectName.trim()) 
@@ -3029,11 +3041,21 @@ const App: React.FC = () => {
         } else {
            await updateDoc(doc(db, projectPath), payload);
         }
+        if (hoistedActiveNodes.length > 0) {
+          setActiveNodeIds(hoistedActiveNodes);
+        }
+        if (primaryMatchedNode) {
+          setSelectedNode(primaryMatchedNode);
+          hasAutoSelectedRef.current = targetProjectId;
+        }
+        lastHydratedProjectFingerprintRef.current = computeProjectHydrationFingerprint(targetProjectId, payload);
       } catch (e) { }
     }
     
+    graphDataRef.current = normalizedGraph;
     setGraphData(normalizedGraph);
     setSeedArtists(artistsString);
+    projectStatusRef.current = 'completed';
     setProjectStatus('completed');
 
     setIsLoading(false);
@@ -3160,6 +3182,7 @@ const App: React.FC = () => {
     isHydratingSessionRef.current = true;
     isProjectLoadingRef.current = true;
     setIsLoading(true);
+    projectStatusRef.current = 'curating';
     setProjectStatus('curating');
     if (abortControllerRef.current) abortControllerRef.current.abort();
     let controller = new AbortController();
@@ -3168,6 +3191,31 @@ const App: React.FC = () => {
     let bypassToken = bypassTokenConfirmation;
     const prevActiveNodeIds = activeNodeIds;
     const prevSeedArtists = seedArtists;
+    const prevSelectedNode = selectedNode;
+
+    const resetAbortedPreFlightState = () => {
+      sessionTokenApprovedRef.current = false;
+      curationSessionIdRef.current = null;
+      setActiveNodeIds(prevActiveNodeIds);
+      setSeedArtists(prevSeedArtists);
+      setLoadingNodeIds(prev => (prev.size === 0 ? prev : new Set()));
+      fetchingNodeIdsRef.current.clear();
+      isFetchingDetailsRef.current = false;
+      setDetailsError(null);
+      const hasExistingNodes = Boolean(graphDataRef.current?.nodes && graphDataRef.current.nodes.length > 0);
+      if (!hasExistingNodes) {
+        setSelectedNode(null);
+        setPeekedNode(null);
+      } else {
+        setSelectedNode(prevSelectedNode);
+      }
+      setIsLoading(false);
+      isHydratingSessionRef.current = false;
+      isProjectLoadingRef.current = false;
+      const fallbackStatus = hasExistingNodes ? 'completed' : 'idle';
+      projectStatusRef.current = fallbackStatus;
+      setProjectStatus(fallbackStatus);
+    };
 
     // Clear previously approved seeds on fresh project generation
     if (!isRegeneration && !graphToEnhance) {
@@ -3329,21 +3377,14 @@ const App: React.FC = () => {
         const confirmedToken = await confirmTokenUsage(
           tokenType as any,
           cachedSeedLabels,
-          missingSeedLabels.length > 0 ? missingSeedLabels : cachedSeedLabels,
+          missingSeedLabels,
           undefined,
           false,
           undefined,
           projectTokenCost
         );
         if (!confirmedToken || confirmedToken === 'back') {
-          sessionTokenApprovedRef.current = false;
-          curationSessionIdRef.current = null;
-          setActiveNodeIds(prevActiveNodeIds);
-          setSeedArtists(prevSeedArtists);
-          setIsLoading(false);
-          isHydratingSessionRef.current = false;
-          isProjectLoadingRef.current = false;
-          setProjectStatus('idle');
+          resetAbortedPreFlightState();
           return;
         }
         sessionTokenApprovedRef.current = true;
@@ -3402,15 +3443,8 @@ const App: React.FC = () => {
             } catch (e: any) {
               console.warn("Origin validation failed for " + s.query + ":", e);
               if (e?.message?.includes('INSUFFICIENT_TOKENS')) {
-                sessionTokenApprovedRef.current = false;
-                curationSessionIdRef.current = null;
                 showToast('Please top up your Zcene wallet to continue.');
-                setActiveNodeIds(prevActiveNodeIds);
-                setSeedArtists(prevSeedArtists);
-                setIsLoading(false);
-                isHydratingSessionRef.current = false;
-                isProjectLoadingRef.current = false;
-                setProjectStatus('idle');
+                resetAbortedPreFlightState();
                 return;
               }
             }
@@ -3422,14 +3456,7 @@ const App: React.FC = () => {
       if (!bypassTokenConfirmation && !sessionTokenApprovedRef.current) {
           const confirmedToken = await confirmTokenUsage(tokenType as any, [], artistList, undefined, false, undefined, projectTokenCost);
           if (!confirmedToken || confirmedToken === 'back') {
-            sessionTokenApprovedRef.current = false;
-            curationSessionIdRef.current = null;
-            setActiveNodeIds(prevActiveNodeIds);
-            setSeedArtists(prevSeedArtists);
-            setIsLoading(false);
-            isHydratingSessionRef.current = false;
-            isProjectLoadingRef.current = false;
-            setProjectStatus('idle');
+            resetAbortedPreFlightState();
             return;
           }
           sessionTokenApprovedRef.current = true;
@@ -3456,14 +3483,7 @@ const App: React.FC = () => {
 
           if (!confirmed) {
             // Rule 43: On Box 4 Cancel, 0T spent if cached; non-refundable 1T Flash fee retained if Flash ran.
-            sessionTokenApprovedRef.current = false;
-            curationSessionIdRef.current = null;
-            setActiveNodeIds(prevActiveNodeIds);
-            setSeedArtists(prevSeedArtists);
-            setIsLoading(false);
-            isHydratingSessionRef.current = false;
-            isProjectLoadingRef.current = false;
-            setProjectStatus('idle');
+            resetAbortedPreFlightState();
             return;
           }
       }
@@ -3569,12 +3589,7 @@ const App: React.FC = () => {
             graphToEnhance
           );
           if (!authorized) {
-            setActiveNodeIds(prevActiveNodeIds);
-            setSeedArtists(prevSeedArtists);
-            isHydratingSessionRef.current = false;
-            isProjectLoadingRef.current = false;
-            setIsLoading(false);
-            setProjectStatus('idle');
+            resetAbortedPreFlightState();
             return;
           }
           await applyLocalTopologyHit(artistList[0], singleCacheDocData, artistList, artists);
@@ -5421,10 +5436,14 @@ const App: React.FC = () => {
                             detailsCacheRef.current.get(n.id.toLowerCase());
       const hasValidStyle = n.type === 'label' || !!(localExisting?.details?.style || (localExisting as any)?.style);
       if (localExisting && localExisting.summary && localExisting.summary.trim().length >= 5 && !localExisting._isSentinel && hasValidStyle) {
-        results.set(n.id, localExisting);
-        results.set(n.id.toLowerCase(), localExisting);
-        results.set(simpleId, localExisting);
-        if (cacheId !== simpleId) results.set(cacheId, localExisting);
+        const aliasKeys = cacheId !== simpleId
+          ? [n.id, n.id.toLowerCase(), simpleId, cacheId]
+          : [n.id, n.id.toLowerCase(), simpleId];
+        for (const aliasKey of aliasKeys) {
+          if (!detailsCacheRef.current.has(aliasKey)) {
+            results.set(aliasKey, localExisting);
+          }
+        }
         return;
       }
       
@@ -5582,6 +5601,12 @@ const App: React.FC = () => {
         const existing = detailsCacheRef.current.get(k);
         const isExistingLocked = existing && existing.summary && existing.summary.trim().length > 5 && !existing._isSentinel;
         if (isExistingLocked) {
+          const gainsImage = !existing.imageUrl && !!v.imageUrl;
+          const gainsVideo = !existing.youtubeVideoId && !!v.youtubeVideoId;
+          const gainsStyle = !existing.details?.style && !!v.details?.style;
+          if (!gainsImage && !gainsVideo && !gainsStyle) {
+            return;
+          }
           console.log(`[Batch Hydration] Merging missing fields into locked artist: ${k}`);
           detailsCacheRef.current.set(k, {
             ...v,
@@ -5606,10 +5631,17 @@ const App: React.FC = () => {
 
       setDetailsCache(prev => {
         const merged = new Map(prev);
+        let didMutate = false;
         results.forEach((v, k) => {
           const existing = prev.get(k);
           const isExistingLocked = existing && existing.summary && existing.summary.trim().length > 5 && !existing._isSentinel;
           if (isExistingLocked) {
+            const gainsImage = !existing.imageUrl && !!v.imageUrl;
+            const gainsVideo = !existing.youtubeVideoId && !!v.youtubeVideoId;
+            const gainsStyle = !existing.details?.style && !!v.details?.style;
+            if (!gainsImage && !gainsVideo && !gainsStyle) {
+              return;
+            }
             console.log(`[Batch Hydration] Merging missing fields into locked artist state: ${k}`);
             merged.set(k, {
               ...v,
@@ -5622,6 +5654,10 @@ const App: React.FC = () => {
                 style: existing.details?.style || v.details?.style || ''
               }
             });
+            didMutate = true;
+            return;
+          }
+          if (existing === v) {
             return;
           }
           if (existing && existing.imageUrl && !v.imageUrl) {
@@ -5630,8 +5666,9 @@ const App: React.FC = () => {
           } else {
             merged.set(k, v);
           }
+          didMutate = true;
         });
-        return merged;
+        return didMutate ? merged : prev;
       });
     }
   }, []);
@@ -5641,6 +5678,7 @@ const App: React.FC = () => {
     if (!isAuthInitialized || !isFirebaseReady || !currentProjectId) {
       if (!currentProjectId) {
         // Clear ephemeral state if no project selected
+        lastHydratedProjectFingerprintRef.current = '';
         setGraphData(null);
         setSeedArtists('');
         setActiveNodeIds([]);
@@ -5691,6 +5729,17 @@ const App: React.FC = () => {
       return g;
     };
 
+    const syncGraphDataState = (g: any) => {
+      graphDataRef.current = mergeGraphData(graphDataRef.current, g);
+      setGraphData((prev: any) => mergeGraphData(prev, g));
+    };
+
+    const setActiveNodeIdsIfChanged = (nextIds: string[]) => {
+      setActiveNodeIds((prev) =>
+        prev.length === nextIds.length && prev.every((id, idx) => id === nextIds[idx]) ? prev : nextIds
+      );
+    };
+
     const handleSnap = async (snap: any): Promise<boolean> => {
       if (!isMounted || !snap.exists()) {
         isProjectLoadingRef.current = false;
@@ -5698,8 +5747,10 @@ const App: React.FC = () => {
       }
 
       const data = snap.data();
-      const statusChanged = data.status !== projectStatus;
-      const jobChanged = data.activeJobId !== activeJobId;
+      const incomingStatus = data.status || null;
+      const incomingJobId = data.activeJobId || null;
+      const statusChanged = incomingStatus !== projectStatusRef.current;
+      const jobChanged = incomingJobId !== activeJobIdRef.current;
       const incomingHasGraph = data.graphData && typeof data.graphData === 'string' && data.graphData.trim().length > 20;
       const localHasGraph = graphDataRef.current && graphDataRef.current.nodes && graphDataRef.current.nodes.length > 0;
       
@@ -5727,7 +5778,7 @@ const App: React.FC = () => {
         incomingGraphEmpty = false;
       } else if (data.cacheKey) {
         incomingGraphEmpty = false;
-      } else if (data.status === 'curating') {
+      } else if (incomingStatus === 'curating') {
         incomingGraphEmpty = false;
       }
 
@@ -5738,10 +5789,12 @@ const App: React.FC = () => {
       }
       setCurrentProjectOwnerId(data.authorId || null);
       if (data.name !== undefined) setProjectName(data.name);
-      setProjectStatus(data.status || null);
-      setActiveJobId(data.activeJobId || null);
+      projectStatusRef.current = incomingStatus;
+      setProjectStatus(incomingStatus);
+      activeJobIdRef.current = incomingJobId;
+      setActiveJobId(incomingJobId);
       setSupportsLabelDeepCuts(data.supportsLabelDeepCuts === true || data.schemaVersion >= 2);
-      if (data.status === 'curating') {
+      if (incomingStatus === 'curating') {
         setIsLoading(true);
       }
 
@@ -5768,12 +5821,46 @@ const App: React.FC = () => {
         setIsMagazineViewOpen(false); // Safely default to workspace view on initial load
       }
 
-      setPinnedNodes(new Set(data.pinnedNodes || []));
+      const incomingPinnedArr: string[] = Array.isArray(data.pinnedNodes) ? data.pinnedNodes : [];
+      setPinnedNodes((prev) => {
+        if (prev.size === incomingPinnedArr.length && incomingPinnedArr.every((id) => prev.has(id))) {
+          return prev;
+        }
+        return new Set(incomingPinnedArr);
+      });
+
+      const updateLastSyncedSnapshot = () => {
+        const snapPayload = {
+          seedArtists: data.seedArtists || '',
+          discoveryFilters: typeof data.discoveryFilters === 'string' ? data.discoveryFilters : JSON.stringify(data.discoveryFilters || {}),
+          lastViewedStackCount: data.lastViewedStackCount || 0,
+          activeNodes: data.activeNodes || [],
+          pinnedNodes: data.pinnedNodes || [],
+          isMagazineViewOpen: false, // Don't rely on saved state for initial mount
+          chatHistories: typeof data.chatHistories === 'string' ? data.chatHistories : JSON.stringify(data.chatHistories || []),
+          canvasLayout: data.canvasLayout || '[]',
+          graphData: data.graphData || '{}'
+        };
+        lastSyncedDocRef.current = JSON.stringify(snapPayload);
+      };
+
+      const incomingFingerprint = computeProjectHydrationFingerprint(currentProjectId, data);
+      if (
+        localGraphPopulated &&
+        !incomingGraphEmpty &&
+        incomingStatus !== 'curating' &&
+        incomingFingerprint &&
+        incomingFingerprint === lastHydratedProjectFingerprintRef.current
+      ) {
+        updateLastSyncedSnapshot();
+        isProjectLoadingRef.current = false;
+        return true;
+      }
 
       try {
         let loadedFromGraphData = false;
         let hydratedNodes: Node[] = [];
-        if (data.status !== 'curating' && data.graphData && typeof data.graphData === 'string' && data.graphData.trim().length > 20) {
+        if (incomingStatus !== 'curating' && data.graphData && typeof data.graphData === 'string' && data.graphData.trim().length > 20) {
           try {
             const parsed = JSON.parse(data.graphData);
             if (parsed && parsed.nodes && parsed.nodes.length > 0) {
@@ -5803,9 +5890,13 @@ const App: React.FC = () => {
                     detailsCacheRef.current.set(k, v);
                   });
                   setDetailsCache((prev) => {
+                    let changed = false;
                     const merged = new Map(prev);
-                    newCacheMap.forEach((v, k) => merged.set(k, v));
-                    return merged;
+                    newCacheMap.forEach((v, k) => {
+                      if (prev.get(k) !== v) changed = true;
+                      merged.set(k, v);
+                    });
+                    return changed ? merged : prev;
                   });
 
                   // Self-heal node labels with canonical stylized casing from authoritative detailsCache
@@ -5823,7 +5914,7 @@ const App: React.FC = () => {
               }
 
               g.nodes.forEach((n: any) => { n.fx = n.fx ?? null; n.fy = n.fy ?? null; });
-              setGraphData((prev: any) => mergeGraphData(prev, g));
+              syncGraphDataState(g);
 
               // ── FIRESTORE-FIRST: batch-load all node biographies before marking load complete
               const isInitialHydration = isProjectLoadingRef.current;
@@ -5844,7 +5935,7 @@ const App: React.FC = () => {
   const missingEntities = availableEntities.filter((id: string) => !resolvedActiveNodes.includes(id));
   resolvedActiveNodes = [...resolvedActiveNodes, ...missingEntities];
 }
-                setActiveNodeIds(resolvedActiveNodes);
+                setActiveNodeIdsIfChanged(resolvedActiveNodes);
                 
               }
 
@@ -5888,10 +5979,10 @@ const App: React.FC = () => {
                   const seedList = data.seedArtists.split('::').map((s: string) => normalizeArtistId(s.trim())).filter(Boolean);
                   resolvedActiveNodes = seedList.slice(0, 1); // pass through; handleGenerateGraph will compute graph
                 }
-                setActiveNodeIds(resolvedActiveNodes);
+                setActiveNodeIdsIfChanged(resolvedActiveNodes);
               }
 
-              if (!isHydratingSessionRef.current && data.status !== 'curating') {
+              if (!isHydratingSessionRef.current && incomingStatus !== 'curating') {
                 handleGenerateGraph(data.seedArtists || (data.artistIds || []).join('::'), false, null, false, false, parsedFilters);
               } else {
                 console.log(`[ProjectLoader] Bypassing handleGenerateGraph call because the session is already hydrating (API job is active or status is curating).`);
@@ -5935,7 +6026,7 @@ const App: React.FC = () => {
               await batchHydrateDetailsCache(g.nodes, g.links);
               hydratedNodes = g.nodes;
               
-              setGraphData((prev: any) => mergeGraphData(prev, g));
+              syncGraphDataState(g);
 
               if (missing.length > 0) {
                 console.warn(`[ProjectLoader] ${missing.length} artist doc(s) missing from cache: [${missing.join(', ')}]. They will be re-fetched on next graph generation.`);
@@ -5951,7 +6042,7 @@ const App: React.FC = () => {
   const missingEntities = availableEntities.filter((id: string) => !resolvedActiveNodes.includes(id));
   resolvedActiveNodes = [...resolvedActiveNodes, ...missingEntities];
 }
-              setActiveNodeIds(resolvedActiveNodes);
+              setActiveNodeIdsIfChanged(resolvedActiveNodes);
             }
 
 
@@ -5985,7 +6076,7 @@ const App: React.FC = () => {
               await batchHydrateDetailsCache(g.nodes, g.links);
               hydratedNodes = g.nodes;
               
-              setGraphData((prev: any) => mergeGraphData(prev, g));
+              syncGraphDataState(g);
 
 
               if (legacyEntry.detailsCache) {
@@ -6005,7 +6096,7 @@ const App: React.FC = () => {
   const missingEntities = availableEntities.filter((id: string) => !resolvedActiveNodes.includes(id));
   resolvedActiveNodes = [...resolvedActiveNodes, ...missingEntities];
 }
-                setActiveNodeIds(resolvedActiveNodes);
+                setActiveNodeIdsIfChanged(resolvedActiveNodes);
               }
 
             } else {
@@ -6023,7 +6114,7 @@ const App: React.FC = () => {
                   // ── FIRESTORE-FIRST: batch-load biographies from global collection
                   await batchHydrateDetailsCache(g.nodes, g.links);
                   
-                  setGraphData((prev: any) => mergeGraphData(prev, g));
+                  syncGraphDataState(g);
                   hydratedNodes = g.nodes;
                     if (data.activeNodes && Array.isArray(data.activeNodes)) {
                       let resolvedActiveNodes = data.activeNodes;
@@ -6032,7 +6123,7 @@ const App: React.FC = () => {
   const missingEntities = availableEntities.filter((id: string) => !resolvedActiveNodes.includes(id));
   resolvedActiveNodes = [...resolvedActiveNodes, ...missingEntities];
 }
-                      setActiveNodeIds(resolvedActiveNodes);
+                      setActiveNodeIdsIfChanged(resolvedActiveNodes);
                     }
 
                 }
@@ -6052,7 +6143,7 @@ const App: React.FC = () => {
             await batchHydrateDetailsCache(g.nodes, g.links);
             hydratedNodes = g.nodes;
             
-            setGraphData((prev: any) => mergeGraphData(prev, g));
+            syncGraphDataState(g);
 
             let preHydratedIds: string[] = [];
 
@@ -6079,7 +6170,7 @@ const App: React.FC = () => {
   const missingEntities = availableEntities.filter((id: string) => !resolvedActiveNodes.includes(id));
   resolvedActiveNodes = [...resolvedActiveNodes, ...missingEntities];
 }
-              setActiveNodeIds(resolvedActiveNodes);
+              setActiveNodeIdsIfChanged(resolvedActiveNodes);
             }
 
           }
@@ -6113,6 +6204,9 @@ const App: React.FC = () => {
         // should gate the toast. This mirrors the validation scope used by
         // handleGenerateGraph's Front Gate Cache path (validateCacheEntry on seed doc only).
         if (hydratedNodes.length > 0) {
+          if (incomingStatus !== 'curating' && incomingFingerprint) {
+            lastHydratedProjectFingerprintRef.current = incomingFingerprint;
+          }
           const seedIds = new Set(
             (data.seedArtists ? data.seedArtists.split('::') : [...(data.artistIds || []), ...(data.labelIds || [])])
               .map((s: string) => normalizeArtistId(s.trim()))
@@ -6143,18 +6237,7 @@ const App: React.FC = () => {
       }
 
       // Update the last synced payload to prevent the autosave hook from running on load
-      const snapPayload = {
-        seedArtists: data.seedArtists || '',
-        discoveryFilters: typeof data.discoveryFilters === 'string' ? data.discoveryFilters : JSON.stringify(data.discoveryFilters || {}),
-        lastViewedStackCount: data.lastViewedStackCount || 0,
-        activeNodes: data.activeNodes || [],
-        pinnedNodes: data.pinnedNodes || [],
-        isMagazineViewOpen: false, // Don't rely on saved state for initial mount
-        chatHistories: typeof data.chatHistories === 'string' ? data.chatHistories : JSON.stringify(data.chatHistories || []),
-        canvasLayout: data.canvasLayout || '[]',
-        graphData: data.graphData || '{}'
-      };
-      lastSyncedDocRef.current = JSON.stringify(snapPayload);
+      updateLastSyncedSnapshot();
 
       isProjectLoadingRef.current = false;
       return true; // Found
@@ -7881,6 +7964,7 @@ const App: React.FC = () => {
           {graphData && (
             <GraphPage
               key={currentProjectId || (isViewingShare ? 'share' : 'new-project')}
+              projectId={currentProjectId || undefined}
               areFiltersChanged={areFiltersChanged}
               data={formattedGraphData || { nodes: [], links: [] }} baseGraph={baseGraph} libraryArtists={libraryArtists} seedArtists={seedArtists}
               onRegenerate={(n) => handleGenerateGraph(n, true, graphData)} 

@@ -5,14 +5,17 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 import sharp from 'sharp';
 import admin from 'firebase-admin';
-import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
 // Emulator bindings have been explicitly removed to ensure the proxy connects to the live production database.
 
 // Initialize Firebase Admin SDK
 let db;
 try {
-  admin.initializeApp();
+  admin.initializeApp({
+    projectId: process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT || 'zcene-production',
+  });
   db = getFirestore();
   console.log("Firebase Admin initialized successfully.");
 } catch (error) {
@@ -102,28 +105,74 @@ const extractCleanJsonString = (rawText) => {
 // Proxy all requests starting with /api/gemini/ to the Google GenAI API
 // Rule 43: Verified via Firebase Bearer ID Token + deepWebSessions lease (Admin zcene.online@gmail.com bypassed)
 app.all('/api/gemini/*wildcard', async (req, res) => {
-  const authHeader = req.headers['authorization'] || req.headers['Authorization'] || '';
-  const bearerMatch = typeof authHeader === 'string' ? authHeader.match(/^Bearer\s+(.+)$/i) : null;
+  const customIdTokenRaw = (req.headers['x-zcene-id-token'] || '').toString().trim();
+  const forwardedAuthHeader = (req.headers['x-forwarded-authorization'] || '').toString().trim();
+  const authHeader = (req.headers['authorization'] || req.headers['Authorization'] || '').toString().trim();
+  const deepWebSessionId = (req.headers['x-zcene-deepweb-session'] || '').toString().trim();
 
-  if (!bearerMatch || !bearerMatch[1]) {
-    return res.status(401).json({ error: "Missing Firebase Authorization Bearer token." });
+  const extractBearer = (val) => {
+    if (!val) return '';
+    const match = val.match(/^Bearer\s+(.+)$/i);
+    return match && match[1] ? match[1].trim() : val.trim();
+  };
+
+  const candidateToken =
+    extractBearer(customIdTokenRaw) ||
+    extractBearer(forwardedAuthHeader) ||
+    extractBearer(authHeader);
+
+  let decodedToken = null;
+  if (candidateToken) {
+    try {
+      decodedToken = await getAuth().verifyIdToken(candidateToken);
+    } catch (verifyErr) {
+      console.warn("[Gemini Proxy] Invalid Firebase ID token:", verifyErr?.message || verifyErr);
+    }
   }
 
-  let decodedToken;
-  try {
-    decodedToken = await admin.auth().verifyIdToken(bearerMatch[1].trim());
-  } catch (verifyErr) {
-    console.warn("[Gemini Proxy] Invalid Firebase ID token:", verifyErr?.message || verifyErr);
-    return res.status(401).json({ error: "Invalid or expired authentication token." });
+  // If token failed verification and no Deep Web session lease is provided, reject immediately
+  if (!decodedToken && !deepWebSessionId) {
+    return res.status(401).json({
+      code: candidateToken ? "AUTH_TOKEN_INVALID" : "AUTH_TOKEN_MISSING",
+      error: candidateToken ? "Invalid or expired authentication token." : "Missing Firebase Authorization Bearer token.",
+    });
   }
 
-  const callerEmail = (decodedToken.email || '').trim().toLowerCase();
+  const callerEmail = (decodedToken?.email || '').trim().toLowerCase();
   const isCallerAdmin = callerEmail === 'zcene.online@gmail.com';
+  let decrementedSessionRef = null;
+  let activeSessionData = null;
+
+  const refundDecrementedSessionSlot = async (reason) => {
+    if (!decrementedSessionRef) return;
+    const refToRefund = decrementedSessionRef;
+    decrementedSessionRef = null;
+    try {
+      await refToRefund.update({
+        remainingMessages: FieldValue.increment(1),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      console.log(`[Gemini Proxy] Refunded 1 message slot to Deep Web session (${reason})`);
+    } catch (refundErr) {
+      console.error("[Gemini Proxy] Failed to refund Deep Web session slot:", refundErr);
+    }
+  };
+
+  if (isCallerAdmin && deepWebSessionId) {
+    try {
+      const adminSessionSnap = await db.collection('deepWebSessions').doc(deepWebSessionId).get();
+      if (adminSessionSnap.exists) {
+        activeSessionData = adminSessionSnap.data() || null;
+      }
+    } catch (_) {}
+  }
 
   if (!isCallerAdmin) {
-    const deepWebSessionId = (req.headers['x-zcene-deepweb-session'] || '').toString().trim();
     if (!deepWebSessionId) {
-      return res.status(403).json({ error: "DEEP_WEB_SESSION_REQUIRED: Unlock a 3-message Deep Connections session to continue." });
+      return res.status(403).json({
+        code: "DEEP_WEB_SESSION_REQUIRED",
+        error: "DEEP_WEB_SESSION_REQUIRED: Unlock a 3-message Deep Connections session to continue.",
+      });
     }
 
     try {
@@ -134,8 +183,20 @@ app.all('/api/gemini/*wildcard', async (req, res) => {
           throw new Error("INVALID_SESSION");
         }
         const sData = snap.data() || {};
-        if (sData.uid !== decodedToken.uid) {
+        activeSessionData = sData;
+        // If decoded token is available, enforce owner match; otherwise the server-minted session lease authoritatively identifies the user
+        if (decodedToken && sData.uid && sData.uid !== decodedToken.uid) {
           throw new Error("SESSION_OWNER_MISMATCH");
+        }
+        const rawExpireAt = sData.expireAt;
+        const expireAtMs =
+          rawExpireAt && typeof rawExpireAt.toDate === "function"
+            ? rawExpireAt.toDate().getTime()
+            : rawExpireAt instanceof Date
+              ? rawExpireAt.getTime()
+              : null;
+        if (expireAtMs !== null && expireAtMs <= Date.now()) {
+          throw new Error("SESSION_EXHAUSTED");
         }
         const remaining = Math.max(0, Math.floor(Number(sData.remainingMessages) || 0));
         if (remaining <= 0) {
@@ -143,13 +204,14 @@ app.all('/api/gemini/*wildcard', async (req, res) => {
         }
         tx.update(sessionRef, {
           remainingMessages: remaining - 1,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
         });
       });
+      decrementedSessionRef = sessionRef;
     } catch (leaseErr) {
       const code = leaseErr?.message || 'LEASE_ERROR';
-      console.warn(`[Gemini Proxy] Deep Web lease rejected (${code}) for uid=${decodedToken.uid}`);
-      return res.status(403).json({ error: code });
+      console.warn(`[Gemini Proxy] Deep Web lease rejected (${code}) for session=${deepWebSessionId}`);
+      return res.status(403).json({ code, error: code });
     }
   }
 
@@ -157,6 +219,8 @@ app.all('/api/gemini/*wildcard', async (req, res) => {
   // Cleanse credentials
   delete headers['x-zcene-password'];
   delete headers['x-zcene-deepweb-session'];
+  delete headers['x-zcene-id-token'];
+  delete headers['x-forwarded-authorization'];
   delete headers['authorization'];
   delete headers['Authorization'];
   delete headers['cookie'];
@@ -183,8 +247,6 @@ app.all('/api/gemini/*wildcard', async (req, res) => {
     });
   }
 
-
-
   console.log(`[Gemini Proxy] Forwarding ${req.method} ${req.originalUrl} -> ${targetUrl}`);
 
   try {
@@ -200,6 +262,10 @@ app.all('/api/gemini/*wildcard', async (req, res) => {
     const response = await fetch(targetUrl, fetchOptions);
     console.log(`[Gemini Proxy Response] Status: ${response.status} from Google for: ${targetPath}`);
 
+    if (!response.ok) {
+      await refundDecrementedSessionSlot(`upstream_status_${response.status}`);
+    }
+
     res.status(response.status);
     response.headers.forEach((value, key) => {
       const lowerKey = key.toLowerCase();
@@ -210,16 +276,96 @@ app.all('/api/gemini/*wildcard', async (req, res) => {
       }
     });
 
+    const sseDecoder = new TextDecoder('utf-8');
+    let sseTextBuffer = '';
+
     if (response.body) {
       const reader = response.body.getReader();
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         res.write(value);
+        if (value) {
+          try {
+            sseTextBuffer += sseDecoder.decode(value, { stream: true });
+          } catch (_) {}
+        }
       }
     }
     res.end();
+
+    if (deepWebSessionId && response.ok && sseTextBuffer) {
+      try {
+        let promptTokens = 0;
+        let candidatesTokens = 0;
+        let totalTokens = 0;
+
+        const lines = sseTextBuffer.split('\n');
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith('data:')) {
+            try {
+              const parsed = JSON.parse(trimmed.slice(5).trim());
+              if (parsed.usageMetadata) {
+                promptTokens = Number(parsed.usageMetadata.promptTokenCount) || 0;
+                candidatesTokens = Number(parsed.usageMetadata.candidatesTokenCount) || 0;
+                totalTokens = Number(parsed.usageMetadata.totalTokenCount) || (promptTokens + candidatesTokens);
+              }
+            } catch (_) {}
+          }
+        }
+
+        if (totalTokens > 0 || promptTokens > 0 || candidatesTokens > 0) {
+          const targetUid = decodedToken?.uid || activeSessionData?.uid;
+          const targetProjectId = activeSessionData?.projectId;
+          const modelMatch = targetPath.match(/models\/([^:]+)/);
+          const modelKey = modelMatch && modelMatch[1] ? modelMatch[1] : 'gemini-3.6-flash';
+
+          console.log(`[Deep Web Telemetry] uid=${targetUid} project=${targetProjectId || 'none'} model=${modelKey} prompt=${promptTokens} candidates=${candidatesTokens} total=${totalTokens}`);
+
+          if (targetUid) {
+            const writes = [];
+            const userRef = db.collection('users').doc(targetUid);
+            writes.push(
+              userRef.set({
+                deepWebApiUsage: {
+                  [modelKey]: {
+                    prompt: FieldValue.increment(promptTokens),
+                    candidates: FieldValue.increment(candidatesTokens),
+                    total: FieldValue.increment(totalTokens),
+                    calls: FieldValue.increment(1),
+                  }
+                },
+                updatedAt: FieldValue.serverTimestamp(),
+              }, { merge: true })
+            );
+
+            if (targetProjectId) {
+              const projectRef = db.collection('users').doc(targetUid).collection('projects').doc(targetProjectId);
+              writes.push(
+                projectRef.set({
+                  deepWebApiUsage: {
+                    [modelKey]: {
+                      prompt: FieldValue.increment(promptTokens),
+                      candidates: FieldValue.increment(candidatesTokens),
+                      total: FieldValue.increment(totalTokens),
+                      calls: FieldValue.increment(1),
+                    }
+                  },
+                  updatedAt: FieldValue.serverTimestamp(),
+                }, { merge: true })
+              );
+            }
+
+            await Promise.allSettled(writes);
+          }
+        }
+      } catch (telemetryErr) {
+        console.warn('[Gemini Proxy] Failed to persist Deep Web telemetry:', telemetryErr?.message || telemetryErr);
+      }
+    }
   } catch (error) {
+    await refundDecrementedSessionSlot(`upstream_exception_${error?.message || 'unknown'}`);
     console.error(`[Gemini Proxy Error] Failed to forward request to ${targetUrl}:`, error);
     if (!res.headersSent) {
       res.status(500).json({ error: error.message });
@@ -623,7 +769,7 @@ async function triggerReSynthesis(artistId, originalData, collectionName = 'arti
       cacheKey: cleanCanonicalId,
       seedArtists: cleanArtistName,
       detailsCache: updatedDetails,
-      cachedAt: admin.firestore.FieldValue.serverTimestamp(),
+      cachedAt: FieldValue.serverTimestamp(),
       cacheVersion: 2
     };
 
@@ -638,7 +784,7 @@ async function triggerReSynthesis(artistId, originalData, collectionName = 'arti
           artistId: artistId,
           seedArtists: originalData.seedArtists || artistId,
           cacheVersion: 2,
-          cachedAt: admin.firestore.FieldValue.serverTimestamp(),
+          cachedAt: FieldValue.serverTimestamp(),
           redirectTo: cleanCanonicalId
         });
         console.log(`[Re-Synthesis] Mock Created Alias Redirect: ${artistId} -> ${cleanCanonicalId}`);
@@ -728,7 +874,7 @@ async function triggerReSynthesis(artistId, originalData, collectionName = 'arti
       cacheKey: canonicalId,
       seedArtists: artistName,
       detailsCache: updatedDetails,
-      cachedAt: admin.firestore.FieldValue.serverTimestamp(),
+      cachedAt: FieldValue.serverTimestamp(),
       cacheVersion: 2 // Match standard cacheVersion
     };
 
@@ -745,7 +891,7 @@ async function triggerReSynthesis(artistId, originalData, collectionName = 'arti
           artistId: artistId,
           seedArtists: originalData.seedArtists || artistId,
           cacheVersion: 2,
-          cachedAt: admin.firestore.FieldValue.serverTimestamp(),
+          cachedAt: FieldValue.serverTimestamp(),
           redirectTo: canonicalId
         });
         console.log(`[Re-Synthesis] Created Alias Redirect: ${artistId} -> ${canonicalId}`);
@@ -1059,7 +1205,7 @@ If you cannot find a clear YouTube video ID for this artist, return null for the
           ...docData,
           youtubeVideoId: videoId,
           detailsCache: details,
-          cachedAt: admin.firestore.FieldValue.serverTimestamp()
+          cachedAt: FieldValue.serverTimestamp()
         };
         enforceArtistCacheSchemaServer(updatePayload);
         await docRef.set(updatePayload, { merge: true });
@@ -1098,7 +1244,7 @@ If you cannot find a clear YouTube video ID for this artist, return null for the
           ...docData,
           youtubeVideoId: null,
           detailsCache: details,
-          cachedAt: admin.firestore.FieldValue.serverTimestamp()
+          cachedAt: FieldValue.serverTimestamp()
         };
         enforceArtistCacheSchemaServer(updatePayload);
         await docRef.set(updatePayload, { merge: true });

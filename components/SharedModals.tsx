@@ -902,7 +902,7 @@ export const SimulatedStripeModal: React.FC<SimulatedStripeModalProps> = ({
 export const TokenConfirmationDialog: React.FC<{
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (authorizationToken?: string) => void;
+  onConfirm: (authorizationToken?: string) => void | Promise<void>;
   type: 'generation' | 'extension' | 'deep_cut_creation' | 'partial_synthesis' | 'cache_upgrade' | 'data_quality_optimization' | 'live_tour_search' | 'live_synthesis' | 'live_chat_search';
   cachedArtists: string[];
   missingArtists: string[];
@@ -913,6 +913,7 @@ export const TokenConfirmationDialog: React.FC<{
   onOpenTopUp?: (tierId?: TokenTopUpTierId) => void;
   onBack?: () => void;
   error?: string | null;
+  isLoading?: boolean;
 }> = ({
   isOpen,
   onClose,
@@ -927,8 +928,22 @@ export const TokenConfirmationDialog: React.FC<{
   onOpenTopUp,
   onBack,
   error,
+  isLoading = false,
 }) => {
   if (!isOpen) return null;
+
+  const [internalSubmitting, setInternalSubmitting] = useState(false);
+  const isBusy = !!isLoading || internalSubmitting;
+
+  const handleConfirmClick = async () => {
+    if (isBusy) return;
+    setInternalSubmitting(true);
+    try {
+      await Promise.resolve(onConfirm('authorized'));
+    } finally {
+      setInternalSubmitting(false);
+    }
+  };
 
   const effectiveTokenCost =
     typeof tokenCost === 'number'
@@ -943,9 +958,42 @@ export const TokenConfirmationDialog: React.FC<{
   const deficit = Math.max(0, effectiveTokenCost - tokenBalance);
   const remainingBalance = Math.max(0, tokenBalance - effectiveTokenCost);
 
-  const allSelectedSubjects = Array.from(
-    new Set([...(cachedArtists || []), ...(enrichmentArtists || []), ...(missingArtists || [])])
-  ).filter(Boolean);
+  const normalizePillKey = (label: string) => label.trim().toLowerCase();
+  const readyKeySet = new Set<string>();
+  const readyArtists = (cachedArtists || []).filter((artist) => {
+    const clean = artist?.trim();
+    if (!clean) return false;
+    const key = normalizePillKey(clean);
+    if (readyKeySet.has(key)) return false;
+    readyKeySet.add(key);
+    return true;
+  });
+
+  const enrichmentKeySet = new Set<string>();
+  const uniqueEnrichmentArtists = (enrichmentArtists || []).filter((artist) => {
+    const clean = artist?.trim();
+    if (!clean) return false;
+    const key = normalizePillKey(clean);
+    if (readyKeySet.has(key) || enrichmentKeySet.has(key)) return false;
+    enrichmentKeySet.add(key);
+    return true;
+  });
+
+  const missingKeySet = new Set<string>();
+  const uniqueMissingArtists = (missingArtists || []).filter((artist) => {
+    const clean = artist?.trim();
+    if (!clean) return false;
+    const key = normalizePillKey(clean);
+    if (readyKeySet.has(key) || enrichmentKeySet.has(key) || missingKeySet.has(key)) return false;
+    missingKeySet.add(key);
+    return true;
+  });
+
+  const allSelectedSubjects = [
+    ...readyArtists,
+    ...uniqueEnrichmentArtists,
+    ...uniqueMissingArtists,
+  ];
 
   const triggerTopUp = (tierId?: TokenTopUpTierId) => {
     if (onOpenTopUp) {
@@ -971,15 +1019,16 @@ export const TokenConfirmationDialog: React.FC<{
 
   const isPureAdminCacheHit =
     isAdmin &&
-    (!missingArtists || missingArtists.length === 0) &&
-    (!enrichmentArtists || enrichmentArtists.length === 0);
+    type !== 'live_synthesis' &&
+    uniqueMissingArtists.length === 0 &&
+    uniqueEnrichmentArtists.length === 0;
 
   const barMax = Math.max(tokenBalance, effectiveTokenCost, 50);
   const currentBarPct = Math.min(100, Math.round((tokenBalance / barMax) * 100));
   const afterBarPct = Math.min(100, Math.round((remainingBalance / barMax) * 100));
 
   return (
-    <ModalBackdrop className="z-[130]" onClick={onClose}>
+    <ModalBackdrop className="z-[130]" onClick={() => !isBusy && onClose()}>
       <ModalContainer data-testid="token-gate-modal">
         <ModalHeader>
           <div className="flex items-center gap-2">
@@ -992,8 +1041,9 @@ export const TokenConfirmationDialog: React.FC<{
           </div>
           <button
             type="button"
+            disabled={isBusy}
             onClick={onClose}
-            className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none"
+            className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <span className="material-symbols-outlined !text-[18px]">close</span>
           </button>
@@ -1038,13 +1088,13 @@ export const TokenConfirmationDialog: React.FC<{
                   </div>
                 </div>
 
-                {cachedArtists && cachedArtists.length > 0 && (
+                {readyArtists.length > 0 && (
                   <div className="space-y-1 pb-1.5 border-b border-zinc-800">
                     <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest block">
                       Ready (Cached)
                     </span>
                     <div className="flex flex-wrap gap-1.5">
-                      {cachedArtists.map(artist => (
+                      {readyArtists.map(artist => (
                         <span key={artist} className="text-[10px] font-mono bg-zinc-800/80 text-zinc-300 px-2 py-0.5 border border-zinc-700/50 rounded-full">
                           {artist}
                         </span>
@@ -1053,13 +1103,13 @@ export const TokenConfirmationDialog: React.FC<{
                   </div>
                 )}
 
-                {enrichmentArtists && enrichmentArtists.length > 0 && (
+                {uniqueEnrichmentArtists.length > 0 && (
                   <div className="space-y-1 pb-1.5 border-b border-zinc-800">
                     <span className="text-[10px] font-semibold text-amber-400 uppercase tracking-widest block">
                       Enrichment Required
                     </span>
                     <div className="flex flex-wrap gap-1.5">
-                      {enrichmentArtists.map(artist => (
+                      {uniqueEnrichmentArtists.map(artist => (
                         <span key={artist} className="text-[10px] font-mono bg-amber-950/20 text-amber-400 px-2 py-0.5 border border-amber-900/30 rounded-full">
                           {artist}
                         </span>
@@ -1068,13 +1118,13 @@ export const TokenConfirmationDialog: React.FC<{
                   </div>
                 )}
 
-                {missingArtists && missingArtists.length > 0 && (
+                {uniqueMissingArtists.length > 0 && (
                   <div className="space-y-1">
                     <span className="text-[10px] font-semibold text-red-400 uppercase tracking-widest block">
                       Live Synthesis Required
                     </span>
                     <div className="flex flex-wrap gap-1.5">
-                      {missingArtists.map(artist => (
+                      {uniqueMissingArtists.map(artist => (
                         <span key={artist} className="text-[10px] font-mono bg-red-950/20 text-red-400 px-2 py-0.5 border border-red-900/30 rounded-full">
                           {artist}
                         </span>
@@ -1188,8 +1238,9 @@ export const TokenConfirmationDialog: React.FC<{
           {onBack ? (
             <button
               type="button"
+              disabled={isBusy}
               onClick={onBack}
-              className="px-4 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent"
+              className="px-4 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Back
             </button>
@@ -1197,8 +1248,9 @@ export const TokenConfirmationDialog: React.FC<{
             <button
               type="button"
               data-testid="token-cancel-button"
+              disabled={isBusy}
               onClick={onClose}
-              className="px-4 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent"
+              className="px-4 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>
@@ -1208,8 +1260,9 @@ export const TokenConfirmationDialog: React.FC<{
             <button
               type="button"
               data-testid="token-authorize-button"
+              disabled={isBusy}
               onClick={() => triggerTopUp('gbp_10')}
-              className="px-4 py-2 bg-primary text-brand-black rounded-xl font-semibold text-sm transition-opacity hover:opacity-90 cursor-pointer"
+              className="px-4 py-2 bg-primary text-brand-black rounded-xl font-semibold text-sm transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
             >
               Top Up Tokens
             </button>
@@ -1217,10 +1270,18 @@ export const TokenConfirmationDialog: React.FC<{
             <button
               type="button"
               data-testid="token-authorize-button"
-              onClick={() => onConfirm('authorized')}
-              className="px-4 py-2 bg-white text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90 cursor-pointer"
+              disabled={isBusy}
+              onClick={handleConfirmClick}
+              className="px-4 py-2 bg-white text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
             >
-              {isAdmin ? 'Confirm (Admin)' : `Confirm & Spend ${effectiveTokenCost} Tokens`}
+              {isBusy ? (
+                <>
+                  <span className="material-symbols-outlined !text-[15px] animate-spin">progress_activity</span>
+                  <span>{type === 'live_chat_search' ? 'Unlocking...' : 'Confirming...'}</span>
+                </>
+              ) : (
+                <span>{isAdmin ? 'Confirm (Admin)' : `Confirm & Spend ${effectiveTokenCost} Tokens`}</span>
+              )}
             </button>
           )}
         </ModalFooter>
@@ -2003,7 +2064,7 @@ export const DisambiguationRadio: React.FC<DisambiguationRadioProps> = ({ candid
 export interface ConsolidatedValidationModalProps {
   isOpen: boolean;
   seeds: PreFlightSeed[];
-  onConfirm: (updatedSeeds?: PreFlightSeed[]) => void;
+  onConfirm: (updatedSeeds?: PreFlightSeed[]) => void | Promise<void>;
   onCancel: () => void;
   curationSessionId?: string | null;
   isAdmin?: boolean;
@@ -2024,6 +2085,7 @@ export function ConsolidatedValidationModal({
   const [customOrigin, setCustomOrigin] = React.useState<string>('');
   const [customGenre, setCustomGenre] = React.useState<string>('');
   const [isVerifying, setIsVerifying] = React.useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = React.useState<boolean>(false);
   const [verificationError, setVerificationError] = React.useState<string | null>(null);
   const [needsTopUpForEscape, setNeedsTopUpForEscape] = React.useState<boolean>(false);
 
@@ -2138,18 +2200,34 @@ export function ConsolidatedValidationModal({
     return !seed.predictedOrigin || seed.predictedOrigin.trim() === '' || seed.predictedOrigin === 'Unknown Origin';
   });
 
-  const isConfirmDisabled = hasInvalidSeeds || !!editingSeedId || isVerifying;
+  const isConfirmDisabled = hasInvalidSeeds || !!editingSeedId || isVerifying || isSubmitting;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isConfirmDisabled) return;
+    setIsSubmitting(true);
+    try {
+      await Promise.resolve(onConfirm(localSeeds));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
-    <ModalBackdrop onClick={onCancel} className="z-[1100]">
+    <ModalBackdrop onClick={() => !isSubmitting && onCancel()} className="z-[1100]">
       <ModalContainer data-testid="validation-modal" className="!overflow-visible relative z-[1150] max-w-lg w-full">
-        <form onSubmit={e => { e.preventDefault(); onConfirm(localSeeds); }} className="flex flex-col w-full" onClick={e => e.stopPropagation()}>
+        <form onSubmit={handleSubmit} className="flex flex-col w-full" onClick={e => e.stopPropagation()}>
           <ModalHeader>
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-primary !text-[18px]">checklist</span>
               <h3 className="text-lg font-medium text-white">Confirm Your Artists</h3>
             </div>
-            <button type="button" onClick={onCancel} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none">
+            <button
+              type="button"
+              disabled={isSubmitting}
+              onClick={onCancel}
+              className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none disabled:opacity-40 disabled:cursor-not-allowed"
+            >
               <span className="material-symbols-outlined !text-[18px]">close</span>
             </button>
           </ModalHeader>
@@ -2317,11 +2395,28 @@ export function ConsolidatedValidationModal({
             </div>
           </ModalBody>
           <ModalFooter>
-            <button type="button" onClick={onCancel} className="px-4 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent">
+            <button
+              type="button"
+              disabled={isSubmitting}
+              onClick={onCancel}
+              className="px-4 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               Cancel
             </button>
-            <button data-testid="validation-confirm-button" type="submit" disabled={isConfirmDisabled} className={`px-6 py-2 bg-white text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all cursor-pointer whitespace-nowrap ${isConfirmDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
-              Confirm & Generate
+            <button
+              data-testid="validation-confirm-button"
+              type="submit"
+              disabled={isConfirmDisabled}
+              className={`px-6 py-2 bg-white text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all cursor-pointer whitespace-nowrap flex items-center justify-center gap-2 ${isConfirmDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              {isSubmitting ? (
+                <>
+                  <span className="material-symbols-outlined !text-[15px] animate-spin">progress_activity</span>
+                  <span>Generating...</span>
+                </>
+              ) : (
+                <span>Confirm & Generate</span>
+              )}
             </button>
           </ModalFooter>
         </form>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { NodeDetailsCard, DetailsPanel } from './DetailsPanel';
 import { streamNodeChat } from '../services/geminiService';
 
@@ -402,6 +402,7 @@ describe('DetailsPanel', () => {
 
         render(
             <DetailsPanel 
+                projectId="mock-proj-1"
                 selectedNode={mockNode}
                 activeNodes={[mockNode]}
                 tokenBalance={25}
@@ -457,6 +458,7 @@ describe('DetailsPanel', () => {
         await waitFor(() => {
             expect(mockUnlockFn).toHaveBeenCalledWith(
                 expect.objectContaining({
+                    projectId: 'mock-proj-1',
                     nodeId: 'needtobreathe-us',
                     nodeName: 'Needtobreathe',
                 })
@@ -475,6 +477,71 @@ describe('DetailsPanel', () => {
         });
     });
 
+    it('disables authorize button and shows Unlocking... spinner when confirming Deep Connections unlock', async () => {
+        let resolveUnlock: (val: any) => void = () => {};
+        const pendingUnlockPromise = new Promise(resolve => { resolveUnlock = resolve; });
+        const mockUnlockFn = vi.fn().mockReturnValue(pendingUnlockPromise);
+        mockHttpsCallable.mockReturnValue(mockUnlockFn);
+
+        const mockNode = { id: 'needtobreathe-us', type: 'artist' as const, label: 'Needtobreathe' };
+        const mockDetails = { summary: 'Rock band', details: { artist: 'Needtobreathe' }, links: [] };
+        const detailsCache = new Map([['needtobreathe-us', mockDetails as any]]);
+
+        render(
+            <DetailsPanel 
+                projectId="mock-proj-1"
+                selectedNode={mockNode}
+                activeNodes={[mockNode]}
+                tokenBalance={25}
+                isAdmin={false}
+                detailsCache={detailsCache}
+                loadingNodeIds={new Set<string>()}
+                onTogglePinNode={vi.fn()}
+                pinnedNodes={new Set<string>()}
+                onRefreshNode={vi.fn()}
+                error={null}
+                systemError={null}
+                graphData={{ nodes: [mockNode], links: [] }}
+                libraryArtists={[]}
+                seedArtists={[]}
+                onAddArtist={vi.fn()}
+                isCollapsed={false}
+                onToggleCollapse={vi.fn()}
+                isSmallScreen={false}
+                onNodeClick={vi.fn()}
+                onNavigate={vi.fn()}
+                isGlobalLoading={false}
+                onCancelGlobalLoading={vi.fn()}
+                unreadCount={0}
+                isActive={true}
+                isMagazineViewOpen={false}
+                onMagazineViewToggle={vi.fn()}
+                chatHistories={new Map()}
+                onUpdateChatHistories={vi.fn()}
+                onAddToStack={vi.fn()}
+            />
+        );
+
+        fireEvent.click(screen.getByText('Deep Web'));
+        fireEvent.change(screen.getByPlaceholderText('Consult Zcene AI...'), { target: { value: 'tell me more' } });
+        fireEvent.click(screen.getByTitle('Send'));
+
+        const confirmBtn = await screen.findByTestId('token-authorize-button');
+        expect(confirmBtn).not.toBeDisabled();
+        expect(confirmBtn).toHaveTextContent('Confirm & Spend 3 Tokens');
+
+        fireEvent.click(confirmBtn);
+
+        // While unlock callable promise is pending:
+        expect(confirmBtn).toBeDisabled();
+        expect(confirmBtn).toHaveTextContent('Unlocking...');
+
+        // Resolve unlock
+        await act(async () => {
+            resolveUnlock({ data: { sessionId: 'dw-session-123', remainingMessages: 3 } });
+        });
+    });
+
     it('resets liveMessageCount quota on 401/403/SESSION_EXHAUSTED rejection and displays session expiry message', async () => {
         const mockUnlockFn = vi.fn().mockResolvedValue({ data: { sessionId: 'dw-session-expired', remainingMessages: 3 } });
         mockHttpsCallable.mockReturnValue(mockUnlockFn);
@@ -487,6 +554,7 @@ describe('DetailsPanel', () => {
 
         render(
             <DetailsPanel 
+                projectId="mock-proj-1"
                 selectedNode={mockNode}
                 activeNodes={[mockNode]}
                 tokenBalance={25}
@@ -539,6 +607,87 @@ describe('DetailsPanel', () => {
             const lastMessage = messages[messages.length - 1];
             expect(lastMessage.text).toContain('Deep Connections session expired or unauthorized');
         });
+    });
+
+    it('preserves active Deep Connections session and rolls back liveMessageCount on transient/401 error so retry does not double-charge 3 Tokens', async () => {
+        const mockUnlockFn = vi.fn().mockResolvedValue({ data: { sessionId: 'dw-session-fiddlehead', remainingMessages: 3 } });
+        mockHttpsCallable.mockReturnValue(mockUnlockFn);
+        (streamNodeChat as any)
+            .mockRejectedValueOnce(new Error('401 Invalid or expired authentication token'))
+            .mockImplementationOnce(async (_node: any, _hist: any, _msg: string, _graph: any, onChunk: (t: string) => void) => {
+                onChunk('Fiddlehead toured extensively across the Northeast.');
+                return 'Fiddlehead toured extensively across the Northeast.';
+            });
+
+        const mockNode = { id: 'fiddlehead-us', type: 'artist' as const, label: 'Fiddlehead' };
+        const mockDetails = { summary: 'Post-hardcore band', details: { artist: 'Fiddlehead' }, links: [] };
+        const detailsCache = new Map([['fiddlehead-us', mockDetails as any]]);
+        const onUpdateChatHistories = vi.fn();
+
+        render(
+            <DetailsPanel 
+                projectId="mock-proj-1"
+                selectedNode={mockNode}
+                activeNodes={[mockNode]}
+                tokenBalance={88}
+                isAdmin={false}
+                detailsCache={detailsCache}
+                loadingNodeIds={new Set<string>()}
+                onTogglePinNode={vi.fn()}
+                pinnedNodes={new Set<string>()}
+                onRefreshNode={vi.fn()}
+                error={null}
+                systemError={null}
+                graphData={{ nodes: [mockNode], links: [] }}
+                libraryArtists={[]}
+                seedArtists={[]}
+                onAddArtist={vi.fn()}
+                isCollapsed={false}
+                onToggleCollapse={vi.fn()}
+                isSmallScreen={false}
+                onNodeClick={vi.fn()}
+                onNavigate={vi.fn()}
+                isGlobalLoading={false}
+                onCancelGlobalLoading={vi.fn()}
+                unreadCount={0}
+                isActive={true}
+                isMagazineViewOpen={false}
+                onMagazineViewToggle={vi.fn()}
+                chatHistories={new Map()}
+                onUpdateChatHistories={onUpdateChatHistories}
+                onAddToStack={vi.fn()}
+            />
+        );
+
+        // Switch to Deep Web mode
+        fireEvent.click(screen.getByText('Deep Web'));
+
+        // Send 1st message -> triggers 3-Token unlock modal
+        const chatInput = screen.getByPlaceholderText('Consult Zcene AI...');
+        fireEvent.change(chatInput, { target: { value: 'have they toured with spaced?' } });
+        fireEvent.click(screen.getByTitle('Send'));
+
+        const confirmBtn = await screen.findByTestId('token-authorize-button');
+        fireEvent.click(confirmBtn);
+
+        await waitFor(() => {
+            expect(mockUnlockFn).toHaveBeenCalledTimes(1);
+            expect(streamNodeChat).toHaveBeenCalledTimes(1);
+        });
+
+        // Verify counter rolled back to 0 / 3 Messages (0 used) and session is preserved
+        expect(await screen.findByText('0 / 3 Messages')).toBeInTheDocument();
+
+        // Retry sending the message — should NOT open TokenConfirmationDialog or call unlockDeepWebSessionCallable a 2nd time!
+        fireEvent.change(chatInput, { target: { value: 'have they toured with spaced?' } });
+        fireEvent.click(screen.getByTitle('Send'));
+
+        await waitFor(() => {
+            expect(streamNodeChat).toHaveBeenCalledTimes(2);
+        });
+        expect(mockUnlockFn).toHaveBeenCalledTimes(1);
+        expect(screen.queryByTestId('token-authorize-button')).not.toBeInTheDocument();
+        expect(await screen.findByText('1 / 3 Messages')).toBeInTheDocument();
     });
 
     it('expands mobile style breakdown when tapped and collapses on click/pointerdown outside', async () => {
@@ -664,6 +813,23 @@ describe('DetailsPanel', () => {
         it('renders Magazine button when graph mapping is complete and active profile is displayed', () => {
             render(<DetailsPanel {...defaultProps} />);
             expect(screen.getByRole('button', { name: /magazine/i })).toBeInTheDocument();
+        });
+
+        it('renders Create Your Zcene empty state instead of stuck Scanning live cultural archives spinner when Box 4 is cancelled on an empty graph with staged seedArtists', () => {
+            render(
+                <DetailsPanel
+                    {...defaultProps}
+                    selectedNode={null}
+                    activeNodes={[]}
+                    detailsCache={new Map()}
+                    loadingNodeIds={new Set()}
+                    graphData={{ nodes: [], links: [] }}
+                    seedArtists={['Korn']}
+                    isGlobalLoading={false}
+                />
+            );
+            expect(screen.getByText('Create Your Zcene')).toBeInTheDocument();
+            expect(screen.queryByText(/Scanning live cultural archives/i)).not.toBeInTheDocument();
         });
     });
 });

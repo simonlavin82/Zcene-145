@@ -261,6 +261,7 @@ interface NodeDetailsCardProps {
   chatMode: 'instant' | 'live';
   onChatModeChange: (mode: 'instant' | 'live') => void;
   liveMessageCount: number;
+  hasActiveDeepWebSession?: boolean;
   onDeleteMessage?: (index: number) => void;
   onClearChat?: () => void;
   isFullScreenMode?: boolean;
@@ -440,7 +441,7 @@ const ProfileRow: React.FC<ProfileRowProps> = ({ data, colorHex, isSmallScreen, 
 export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
   node, details, isLoading, isGlobalLoading, graphData, libraryArtists, seedArtists, onAddArtist, isSmallScreen, 
   onTogglePin, isPinned, pinSequence, onNodeClick, onNavigate, 
-  chatHistory, onSendMessage, isChatLoading, chatMode, onChatModeChange, liveMessageCount, onDeleteMessage, onClearChat, isFullScreenMode = false, isHero = false, onAddToStack, onToggleMagazineView, searchQuery, isGuest = false, onAuthRequest, user, userTaste, isAdmin = false,
+  chatHistory, onSendMessage, isChatLoading, chatMode, onChatModeChange, liveMessageCount, hasActiveDeepWebSession = false, onDeleteMessage, onClearChat, isFullScreenMode = false, isHero = false, onAddToStack, onToggleMagazineView, searchQuery, isGuest = false, onAuthRequest, user, userTaste, isAdmin = false,
   onUpdateTasteProfile, onShowToast, onOpenTasteModal, isActive = true, onStashArtist, onOpenStackDrawer
 }) => {
     const handleAddToTaste = async (node: Node, details: NodeDetails) => {
@@ -1705,10 +1706,18 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                     </div>
                                                 </div>
                                                 <div className="flex justify-start px-1">
-                                                    <div className="text-[10px] text-zinc-500 font-mono tracking-widest flex items-center gap-1">
-                                                        <span className={`w-1.5 h-1.5 rounded-full ${3 - liveMessageCount > 0 ? 'bg-primary' : 'bg-red-500 animate-pulse'}`}></span>
-                                                        {Math.max(0, 3 - liveMessageCount)} / 3 Messages
-                                                    </div>
+                                                    {(() => {
+                                                        const isSessionUnlockedAndActive = hasActiveDeepWebSession && liveMessageCount < 3;
+                                                        const displayedMessagesUsed = isSessionUnlockedAndActive
+                                                            ? Math.min(3, Math.max(0, liveMessageCount))
+                                                            : (hasActiveDeepWebSession && liveMessageCount >= 3 ? 3 : 0);
+                                                        return (
+                                                            <div className="text-[10px] text-zinc-500 font-mono tracking-widest flex items-center gap-1">
+                                                                <span className={`w-1.5 h-1.5 rounded-full ${isSessionUnlockedAndActive ? 'bg-primary' : 'bg-red-500 animate-pulse'}`}></span>
+                                                                {displayedMessagesUsed} / 3 Messages
+                                                            </div>
+                                                        );
+                                                    })()}
                                                 </div>
                                             </div>
                                         ) : (
@@ -2070,6 +2079,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         
         onUpdateChatHistories(new Map(chatHistories).set(nodeId, newHistory));
         setChatLoadingMap(prev => new Map(prev).set(nodeId, true));
+        let didIncrementLiveCount = false;
 
         try {
             const currentNode = activeNodes.find(n => n.id.toLowerCase() === nodeId.toLowerCase());
@@ -2088,6 +2098,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                 );
             } else {
                 setLiveMessageCount(prev => prev + 1);
+                didIncrementLiveCount = true;
                 const aiTimestamp = Date.now();
                 let idToken: string | undefined;
                 try {
@@ -2118,25 +2129,24 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
             }
         } catch (err: any) {
             console.error("Chat error:", err);
-            const isAuthOrLeaseError =
-                err?.message?.includes("401") ||
-                err?.message?.includes("403") ||
+            const isLeaseExhaustedError =
                 err?.message?.includes("SESSION_EXHAUSTED") ||
                 err?.message?.includes("DEEP_WEB_SESSION_REQUIRED") ||
                 err?.message?.includes("INVALID_SESSION") ||
-                err?.message?.includes("authentication") ||
-                err?.status === 401 ||
-                err?.status === 403;
-            if (isAuthOrLeaseError) {
+                err?.message?.includes("SESSION_OWNER_MISMATCH");
+            if (isLeaseExhaustedError) {
                 // Quota recovery: reset liveMessageCount back to threshold so TokenConfirmationDialog prompts for a fresh lease
                 setLiveMessageCount(3);
                 deepWebSessionIdRef.current = null;
+            } else if (didIncrementLiveCount) {
+                // Roll back optimistic message increment and preserve deepWebSessionIdRef on transient/auth/network errors
+                setLiveMessageCount(prev => Math.max(0, prev - 1));
             }
-            const errorMessage = isAuthOrLeaseError
+            const errorMessage = isLeaseExhaustedError
                 ? "Deep Connections session expired or unauthorized. Send again to unlock a 3-message session."
                 : err?.message?.includes("timed out") 
-                    ? "The AI is taking too long to respond. Please try again."
-                    : "Failed to get a response. Please try again.";
+                    ? "The AI is taking too long to respond. Your Deep Connections session is still active — please try again."
+                    : "Connection interrupted — your Deep Connections session is still active. Please try sending your message again.";
             
             onUpdateChatHistories(new Map(chatHistories).set(nodeId, [
                 ...newHistory, 
@@ -2610,7 +2620,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                         >
                             {filteredAndSortedNodes.length === 0 || systemError ? (
                                 <div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none">
-                                    {(isReconciliationPending || (seedArtists && seedArtists.length > 0)) && !systemError ? (
+                                    {(isReconciliationPending || (Boolean(graphData?.nodes && graphData.nodes.length > 0) && !magazineSearchQuery.trim() && seedArtists && seedArtists.length > 0)) && !systemError ? (
                                         <div className="flex flex-col items-center justify-center gap-6">
                                             {isGlobalLoading ? (
                                                 <LoadingSpinner 
@@ -2672,6 +2682,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 chatMode={getChatMode(node.id)}
                                                 onChatModeChange={(mode) => setChatModes(prev => new Map(prev).set(node.id, mode))}
                                                 liveMessageCount={liveMessageCount}
+                                                hasActiveDeepWebSession={Boolean(deepWebSessionIdRef.current)}
                                                 onDeleteMessage={(index) => handleDeleteMessage(node.id, index)}
                                                 onClearChat={() => handleClearChat(node.id)}
                                                 isFullScreenMode={isMagazineViewOpen}
@@ -2772,10 +2783,13 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                 nodeId: target.nodeId,
                                 nodeName: currentNode?.label || target.nodeId,
                             });
-                            const data = res?.data as { sessionId?: string } | undefined;
+                            const data = res?.data as { sessionId?: string; remainingMessages?: number } | undefined;
                             const mintedSessionId = data?.sessionId || undefined;
+                            const remaining = typeof data?.remainingMessages === 'number'
+                                ? Math.max(0, Math.min(3, Math.floor(data.remainingMessages)))
+                                : 3;
                             deepWebSessionIdRef.current = mintedSessionId || null;
-                            setLiveMessageCount(0);
+                            setLiveMessageCount(Math.max(0, 3 - remaining));
                             setPendingChatMessage(null);
                             handleSendMessage(target.nodeId, target.message, true, mintedSessionId);
                         } catch (err: any) {

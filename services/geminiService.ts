@@ -1779,22 +1779,38 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
 
     const flashModel = (typeof process !== 'undefined' && process.env?.GEMINI_FLASH_MODEL) || 'gemini-3.6-flash';
     const url = `${baseUrl}/v1beta/models/${flashModel}:generateContent`;
-    const authHeaders: Record<string, string> = {};
-    try {
-      if (auth?.currentUser && typeof auth.currentUser.getIdToken === 'function') {
-        const idToken = await auth.currentUser.getIdToken();
-        if (idToken) authHeaders['Authorization'] = `Bearer ${idToken}`;
+    const buildAuthHeaders = async (forceRefresh = false): Promise<Record<string, string>> => {
+      const headers: Record<string, string> = {};
+      try {
+        if (auth?.currentUser && typeof auth.currentUser.getIdToken === 'function') {
+          const idToken = await auth.currentUser.getIdToken(forceRefresh);
+          if (idToken) {
+            headers['Authorization'] = `Bearer ${idToken}`;
+            headers['x-zcene-id-token'] = idToken;
+          }
+        }
+      } catch (_) {}
+      return headers;
+    };
+
+    const executeFetch = async (authHeaders: Record<string, string>) =>
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': proxyKey,
+          ...authHeaders
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+    let response = await executeFetch(await buildAuthHeaders(false));
+    if (response.status === 401 && auth?.currentUser && typeof auth.currentUser.getIdToken === 'function') {
+      const refreshedHeaders = await buildAuthHeaders(true);
+      if (refreshedHeaders['x-zcene-id-token']) {
+        response = await executeFetch(refreshedHeaders);
       }
-    } catch (_) {}
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': proxyKey,
-        ...authHeaders
-      },
-      body: JSON.stringify(requestBody)
-    });
+    }
 
     if (!response.ok) {
       const errText = await response.text();
@@ -2085,20 +2101,23 @@ export const streamNodeChat = async (
 ) => {
     const proxyKey = 'backend-proxy-key';
     const baseUrl = typeof window !== 'undefined' ? window.location.origin + '/api/gemini' : 'http://localhost:8080/api/gemini';
-    let bearerToken = authOptions?.idToken;
-    if (!bearerToken) {
+    const resolveBearerToken = async (forceRefresh = false): Promise<string | undefined> => {
+      if (!forceRefresh && authOptions?.idToken) {
+        return authOptions.idToken;
+      }
       try {
         if (auth?.currentUser && typeof auth.currentUser.getIdToken === 'function') {
-          bearerToken = await auth.currentUser.getIdToken();
+          return await auth.currentUser.getIdToken(forceRefresh);
         }
       } catch (_) {}
-    }
-    const ai = new GoogleGenAI({ 
+      return authOptions?.idToken;
+    };
+    const buildClient = (token?: string) => new GoogleGenAI({ 
         apiKey: proxyKey,
         httpOptions: { 
             baseUrl,
             headers: {
-                ...(bearerToken ? { Authorization: `Bearer ${bearerToken}` } : {}),
+                ...(token ? { Authorization: `Bearer ${token}`, 'x-zcene-id-token': token } : {}),
                 ...(authOptions?.deepWebSessionId ? { 'x-zcene-deepweb-session': authOptions.deepWebSessionId } : {})
             }
         }
@@ -2146,21 +2165,42 @@ export const streamNodeChat = async (
         { role: 'user', parts: [{ text: message }] }
     ];
 
-    const result = await ai.models.generateContentStream({
-        model: "gemini-3-flash-preview",
-        contents,
-        config: { systemInstruction }
-    });
+    const flashModel = (typeof process !== 'undefined' && process.env?.GEMINI_FLASH_MODEL) || 'gemini-3.6-flash';
 
-    let fullText = "";
-    for await (const chunk of result) {
-        const text = chunk.text;
-        if (text) {
-            const cleaned = text.replace(/[*#]/g, '');
-            fullText += cleaned;
-            onChunk(fullText);
+    const runStreamWithToken = async (token?: string) => {
+        const ai = buildClient(token);
+        const result = await ai.models.generateContentStream({
+            model: flashModel,
+            contents,
+            config: { systemInstruction }
+        });
+
+        let fullText = "";
+        for await (const chunk of result) {
+            const text = chunk.text;
+            if (text) {
+                const cleaned = text.replace(/[*#]/g, '');
+                fullText += cleaned;
+                onChunk(fullText);
+            }
         }
+        return fullText;
+    };
+
+    const initialToken = await resolveBearerToken(false);
+    try {
+        return await runStreamWithToken(initialToken);
+    } catch (err: any) {
+        const is401AuthError =
+            err?.status === 401 ||
+            /401|AUTH_TOKEN_INVALID|AUTH_TOKEN_MISSING|Invalid or expired authentication token/i.test(err?.message || '');
+        if (is401AuthError && auth?.currentUser && typeof auth.currentUser.getIdToken === 'function') {
+            const refreshedToken = await resolveBearerToken(true);
+            if (refreshedToken) {
+                return await runStreamWithToken(refreshedToken);
+            }
+        }
+        throw err;
     }
-    return fullText;
 };
 

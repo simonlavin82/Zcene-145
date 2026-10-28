@@ -116,6 +116,7 @@ interface GraphPageProps {
   isMenuOpen: boolean;
   setIsMenuOpen: (open: boolean) => void;
   onStashArtist?: (artistName: string) => void;
+  projectId?: string;
   /** Phase A — Coordinate Memory: passed through to MusicGraph, fired when
    * the D3 simulation settles with final artist/label node positions. */
   onCoordinatesSettled?: (layout: CanvasNodeRef[]) => void;
@@ -1158,6 +1159,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
   isStackDialogOpen, setIsStackDialogOpen,
   isMenuOpen, setIsMenuOpen,
   onStashArtist,
+  projectId,
   onCoordinatesSettled,
   isHydrating
 }) => {
@@ -2222,6 +2224,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
 
   const detailsPanelElement = (
       <DetailsPanel 
+          projectId={projectId}
           projectName={projectName}
           selectedNode={selectedNode} 
           activeNodes={activeNodes} 

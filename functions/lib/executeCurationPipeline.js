@@ -70,6 +70,14 @@ exports.validateSeedOriginCallable = (0, https_1.onCall)({
         seedLabel: String(seed).trim(),
     });
     const validationResult = await (0, curatorService_1.validateSeedOriginBackend)(seed, { originHint, genreHint });
+    // Persist Flash pre-flight micro-cost telemetry BEFORE any Rule 11 rejection or Box 4 cancellation
+    await (0, tokenWallet_1.recordPreFlightApiUsage)({
+        caller,
+        curationSessionId: lookupBilling.curationSessionId,
+        seedLabel: String(seed).trim(),
+        isValid: Boolean(validationResult.isValid),
+        apiUsage: validationResult.apiUsage,
+    });
     // V11.6 Fix 2: Programmatically enforce correctedInput for typos
     if (validationResult.isValid && seed.toLowerCase() !== validationResult.id.toLowerCase()) {
         validationResult.correctedInput = true;

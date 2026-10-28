@@ -53,6 +53,14 @@ export interface UserTelemetry {
     };
     exactCost: number;
     hasExactCost: boolean;
+    preflightLookups?: {
+        calls: number;
+        costUsd: number;
+    };
+    deepWebConsults?: {
+        calls: number;
+        costUsd: number;
+    };
     tokenBalance: number;
     lifetimeTokensPurchased: number;
     lifetimeTokensSpent: number;
@@ -183,7 +191,7 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
                         </tr>
                     ) : (
                         filteredLedger.map((user) => {
-                            const totalActions = user.actionTriggers.createCount + user.actionTriggers.updateCount;
+                            const totalActions = user.actionTriggers.createCount + user.actionTriggers.updateCount + (user.preflightLookups?.calls || 0) + (user.deepWebConsults?.calls || 0);
                             const queryTotal = user.cacheEfficiency.liveQueries + user.cacheEfficiency.cacheHits;
                             const efficiency = queryTotal > 0 ? (user.cacheEfficiency.cacheHits / queryTotal) * 100 : 0;
                             const cost = user.hasExactCost ? user.exactCost : (user.cacheEfficiency.liveQueries * COST_PER_AI_CALL);
@@ -204,7 +212,7 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
                                             {user.tokenBalance}T
                                         </td>
                                         <td className="p-4 text-center font-mono">{user.projectsCount}</td>
-                                        <td className="p-4 text-center font-mono" title={`Create: ${user.actionTriggers.createCount} | Update: ${user.actionTriggers.updateCount}`}>
+                                        <td className="p-4 text-center font-mono" title={`Create: ${user.actionTriggers.createCount} | Update: ${user.actionTriggers.updateCount} | Pre-Flight: ${user.preflightLookups?.calls || 0} | Deep Web: ${user.deepWebConsults?.calls || 0}`}>
                                             {totalActions}
                                         </td>
                                         <td className="p-4 text-center">
@@ -247,6 +255,28 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
                                                                      <span className="text-zinc-400">Deep Cuts Opened:</span>
                                                                      <span className="text-white font-mono">{user.deepCutsOpened}</span>
                                                                  </div>
+                                                                 {(user.preflightLookups?.calls ?? 0) > 0 && (
+                                                                     <div className="flex justify-between border-b border-zinc-800/50 pb-1">
+                                                                         <span className="text-zinc-400">Pre-Flight Lookups:</span>
+                                                                         <span className="text-white font-mono">
+                                                                             {user.preflightLookups!.calls}{' '}
+                                                                             <span className="text-red-400/80 text-xs">
+                                                                                 (${user.preflightLookups!.costUsd.toFixed(4)})
+                                                                             </span>
+                                                                         </span>
+                                                                     </div>
+                                                                 )}
+                                                                 {(user.deepWebConsults?.calls ?? 0) > 0 && (
+                                                                     <div className="flex justify-between border-b border-zinc-800/50 pb-1">
+                                                                         <span className="text-zinc-400">Deep Web Consults:</span>
+                                                                         <span className="text-white font-mono">
+                                                                             {user.deepWebConsults!.calls}{' '}
+                                                                             <span className="text-red-400/80 text-xs">
+                                                                                 (${user.deepWebConsults!.costUsd.toFixed(4)})
+                                                                             </span>
+                                                                         </span>
+                                                                     </div>
+                                                                 )}
                                                                  <div className="flex justify-between">
                                                                      <span className="text-zinc-400">Total Actions:</span>
                                                                      <span className="text-white font-mono font-bold">{totalActions}</span>
@@ -320,7 +350,7 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
                                                                  </thead>
                                                                  <tbody>
                                                                      {user.projects.map((proj, idx) => {
-                                                                         const isZeroCost = proj.generationType === "Direct Hit" || proj.generationType === "Clone";
+                                                                         const isZeroCost = (proj.generationType === "Direct Hit" || proj.generationType === "Clone") && proj.cost === 0;
                                                                          const dateStr = proj.createdAt ? new Date(proj.createdAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).replace(',', ',') : '';
                                                                          return (
                                                                              <tr key={idx} className="border-b border-zinc-800/50 last:border-0 hover:bg-zinc-900/20">
@@ -403,7 +433,7 @@ const formatTxTypeBadge = (type: string): { label: string; style: string } => {
 
 // Fixed unit cost constant for calculations (e.g. $0.0015 per live API request)
 
-const calculateTelemetryForUser = (
+export const calculateTelemetryForUser = (
     email: string,
     onboardingProgress: any,
     projectDocs: any[],
@@ -412,29 +442,63 @@ const calculateTelemetryForUser = (
         tokenBalance?: number;
         lifetimeTokensPurchased?: number;
         lifetimeTokensSpent?: number;
+        preflightApiUsage?: Record<string, any>;
+        deepWebApiUsage?: Record<string, any>;
     }
 ): UserTelemetry => {
     let totalUpdates = 0;
     let totalLiveQueries = 0;
     let totalCacheHits = 0;
     let exactCost = 0;
+    let uninstrumentedEstimatedCost = 0;
     let hasExactCost = false;
     const artistFrequencyMap: Record<string, number> = {};
     const projects: ProjectTelemetry[] = [];
 
     projectDocs.forEach((pDoc) => {
         const pData = pDoc.data();
+
+        // Parse structural node/entity counts first to filter out unmapped "Untitled Zcene" draft shells
+        let graphNodesCount = 0;
+        if (pData.graphData) {
+            try {
+                const parsed = typeof pData.graphData === 'string' ? JSON.parse(pData.graphData) : pData.graphData;
+                if (parsed && Array.isArray(parsed.nodes)) {
+                    graphNodesCount = parsed.nodes.length;
+                }
+            } catch (e) {
+                console.warn("Error parsing graphData for project:", pDoc.id, e);
+            }
+        }
+        const activeNodesCount = Array.isArray(pData.activeNodes) ? pData.activeNodes.length : 0;
+        const artistIdsCount = Array.isArray(pData.artistIds) ? pData.artistIds.length : 0;
+        const labelIdsCount = Array.isArray(pData.labelIds) ? pData.labelIds.length : 0;
+        const hasCacheKey = Boolean(pData.cacheKey && String(pData.cacheKey).trim());
+
+        const isUnmappedEmptyDraft =
+            graphNodesCount === 0 &&
+            activeNodesCount === 0 &&
+            artistIdsCount === 0 &&
+            labelIdsCount === 0 &&
+            !hasCacheKey &&
+            pData.status !== 'curating';
+
+        if (isUnmappedEmptyDraft) {
+            return;
+        }
         
         // 1. Calculate project name / seed fallback
-        const projectName = pData.name;
+        const projectName = typeof pData.name === 'string' ? pData.name.trim() : '';
         const seedStr = pData.seedArtists || '';
         const seeds = seedStr.split('::').map((s: string) => s.trim()).filter(Boolean);
         
         let displayTitle = "Unknown";
-        if (projectName && projectName !== seeds[0]) {
+        if (projectName && projectName !== 'Untitled Zcene' && projectName !== seeds[0]) {
              displayTitle = projectName;
         } else if (seeds.length > 0) {
              displayTitle = cleanArtistDisplayName(seeds[0]);
+        } else if (projectName) {
+             displayTitle = projectName;
         }
         
         seeds.forEach((seed: string) => {
@@ -443,20 +507,8 @@ const calculateTelemetryForUser = (
 
         const projectLiveQueries = seeds.length;
         
-        // 2. Parse activeNodes or graphData nodes to count active nodes
-        let activeCount = 0;
-        if (pData.activeNodes && Array.isArray(pData.activeNodes)) {
-            activeCount = pData.activeNodes.length;
-        } else if (pData.graphData) {
-            try {
-                const parsed = JSON.parse(pData.graphData);
-                if (parsed && Array.isArray(parsed.nodes)) {
-                    activeCount = parsed.nodes.length;
-                }
-            } catch (e) {
-                console.warn("Error parsing graphData for project:", pDoc.id, e);
-            }
-        }
+        // 2. Active node count from activeNodes or parsed graphData nodes
+        const activeCount = activeNodesCount > 0 ? activeNodesCount : graphNodesCount;
         
         const projectCacheHits = Math.max(0, activeCount - projectLiveQueries);
         
@@ -496,6 +548,25 @@ const calculateTelemetryForUser = (
             hasExactCost = true;
         }
 
+        let projectDeepWebCost = 0;
+        if (pData.deepWebApiUsage && typeof pData.deepWebApiUsage === 'object') {
+            for (const [model, usage] of Object.entries(pData.deepWebApiUsage)) {
+                if (!usage || typeof usage !== 'object') continue;
+                const u = usage as any;
+                const prompt = Number(u.prompt) || 0;
+                const candidates = Number(u.candidates) || 0;
+                const total = Number(u.total) || (prompt + candidates);
+                const reasoningTokens = Math.max(0, total - (prompt + candidates));
+                if (model.includes('gemini-3.1-pro') || model.includes('gemini-1.5-pro')) {
+                    projectDeepWebCost += (prompt / 1_000_000) * 3.50;
+                    projectDeepWebCost += ((candidates + reasoningTokens) / 1_000_000) * 10.50;
+                } else {
+                    projectDeepWebCost += (prompt / 1_000_000) * 1.50;
+                    projectDeepWebCost += ((candidates + reasoningTokens) / 1_000_000) * 7.50;
+                }
+            }
+        }
+
         let generationType = pData.generationType;
         let cost = 0;
         let isEstimate = false;
@@ -503,11 +574,11 @@ const calculateTelemetryForUser = (
 
         if (generationType) {
             if (generationType === "Direct Hit" || generationType === "Clone") {
-                cost = 0;
+                cost = projectDeepWebCost;
             } else if (projectHasExactCost) {
-                cost = projectExactCost;
+                cost = projectExactCost + projectDeepWebCost;
             } else {
-                cost = projectLiveQueries * COST_PER_AI_CALL;
+                cost = (projectLiveQueries * COST_PER_AI_CALL) + projectDeepWebCost;
                 isEstimate = true;
             }
         } else {
@@ -520,13 +591,17 @@ const calculateTelemetryForUser = (
                 if (hasProCall) generationType = "Root Generation";
             }
             
-            cost = projectHasExactCost ? projectExactCost : (projectLiveQueries * COST_PER_AI_CALL);
+            cost = projectHasExactCost ? (projectExactCost + projectDeepWebCost) : ((projectLiveQueries * COST_PER_AI_CALL) + projectDeepWebCost);
             isEstimate = !projectHasExactCost;
             
-            if (generationType === "Direct Hit") {
-                cost = 0;
+            if (generationType === "Direct Hit" && !projectHasExactCost) {
+                cost = projectDeepWebCost;
                 isEstimate = false;
             }
+        }
+
+        if (isEstimate && cost > 0) {
+            uninstrumentedEstimatedCost += cost;
         }
 
         const hasRecordedTokens = typeof pData.tokensSpent === 'number';
@@ -562,6 +637,68 @@ const calculateTelemetryForUser = (
         });
     });
 
+    // Aggregate pre-flight / escape-hatch Flash lookup micro-costs (including cancelled Box 4 lookups)
+    let preflightCalls = 0;
+    let preflightCostUsd = 0;
+    if (walletData?.preflightApiUsage && typeof walletData.preflightApiUsage === 'object') {
+        for (const [model, usage] of Object.entries(walletData.preflightApiUsage)) {
+            if (!usage || typeof usage !== 'object') continue;
+            const u = usage as any;
+            const prompt = Number(u.prompt) || 0;
+            const candidates = Number(u.candidates) || 0;
+            const total = Number(u.total) || (prompt + candidates);
+            const reasoningTokens = Math.max(0, total - (prompt + candidates));
+            const calls = Math.max(0, Math.floor(Number(u.calls) || 0));
+            preflightCalls += calls > 0 ? calls : (total > 0 ? 1 : 0);
+
+            if (model.includes('gemini-3.1-pro') || model.includes('gemini-1.5-pro')) {
+                preflightCostUsd += (prompt / 1_000_000) * 3.50;
+                preflightCostUsd += ((candidates + reasoningTokens) / 1_000_000) * 10.50;
+            } else {
+                preflightCostUsd += (prompt / 1_000_000) * 1.50;
+                preflightCostUsd += ((candidates + reasoningTokens) / 1_000_000) * 7.50;
+            }
+        }
+        if (preflightCalls > 0 || preflightCostUsd > 0) {
+            if (!hasExactCost && uninstrumentedEstimatedCost > 0) {
+                exactCost += uninstrumentedEstimatedCost;
+            }
+            exactCost += preflightCostUsd;
+            hasExactCost = true;
+        }
+    }
+
+    // Aggregate Deep Connections (Deep Web) grounded consult micro-costs
+    let deepWebCalls = 0;
+    let deepWebCostUsd = 0;
+    if (walletData?.deepWebApiUsage && typeof walletData.deepWebApiUsage === 'object') {
+        for (const [model, usage] of Object.entries(walletData.deepWebApiUsage)) {
+            if (!usage || typeof usage !== 'object') continue;
+            const u = usage as any;
+            const prompt = Number(u.prompt) || 0;
+            const candidates = Number(u.candidates) || 0;
+            const total = Number(u.total) || (prompt + candidates);
+            const reasoningTokens = Math.max(0, total - (prompt + candidates));
+            const calls = Math.max(0, Math.floor(Number(u.calls) || 0));
+            deepWebCalls += calls > 0 ? calls : (total > 0 ? 1 : 0);
+
+            if (model.includes('gemini-3.1-pro') || model.includes('gemini-1.5-pro')) {
+                deepWebCostUsd += (prompt / 1_000_000) * 3.50;
+                deepWebCostUsd += ((candidates + reasoningTokens) / 1_000_000) * 10.50;
+            } else {
+                deepWebCostUsd += (prompt / 1_000_000) * 1.50;
+                deepWebCostUsd += ((candidates + reasoningTokens) / 1_000_000) * 7.50;
+            }
+        }
+        if (deepWebCalls > 0 || deepWebCostUsd > 0) {
+            if (!hasExactCost && uninstrumentedEstimatedCost > 0) {
+                exactCost += uninstrumentedEstimatedCost;
+            }
+            exactCost += deepWebCostUsd;
+            hasExactCost = true;
+        }
+    }
+
     projects.sort((a, b) => b.createdAt - a.createdAt);
 
     // Sort frequency map to get top searches
@@ -574,9 +711,9 @@ const calculateTelemetryForUser = (
 
     return {
         email,
-        projectsCount: projectDocs.length,
+        projectsCount: projects.length,
         actionTriggers: {
-            createCount: projectDocs.length,
+            createCount: projects.length,
             updateCount: totalUpdates
         },
         artistSearches: {
@@ -591,6 +728,14 @@ const calculateTelemetryForUser = (
         onboardingProgress: onboardingProgress || {},
         exactCost,
         hasExactCost,
+        preflightLookups: {
+            calls: preflightCalls,
+            costUsd: preflightCostUsd,
+        },
+        deepWebConsults: {
+            calls: deepWebCalls,
+            costUsd: deepWebCostUsd,
+        },
         tokenBalance: Math.max(0, Math.floor(Number(walletData?.tokenBalance) || 0)),
         lifetimeTokensPurchased: Math.max(0, Math.floor(Number(walletData?.lifetimeTokensPurchased) || 0)),
         lifetimeTokensSpent: Math.max(0, Math.floor(Number(walletData?.lifetimeTokensSpent) || 0)),
@@ -664,6 +809,8 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                         tokenBalance: uData.tokenBalance,
                         lifetimeTokensPurchased: uData.lifetimeTokensPurchased,
                         lifetimeTokensSpent: uData.lifetimeTokensSpent,
+                        preflightApiUsage: uData.preflightApiUsage,
+                        deepWebApiUsage: uData.deepWebApiUsage,
                     });
                 });
                 telemetryList = await Promise.all(userPromises);
@@ -692,6 +839,8 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                         tokenBalance: uData.tokenBalance,
                         lifetimeTokensPurchased: uData.lifetimeTokensPurchased,
                         lifetimeTokensSpent: uData.lifetimeTokensSpent,
+                        preflightApiUsage: uData.preflightApiUsage,
+                        deepWebApiUsage: uData.deepWebApiUsage,
                     }
                 );
                 telemetryList = [singleTelemetry];

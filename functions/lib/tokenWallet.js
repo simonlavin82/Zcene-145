@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.unlockDeepWebSessionCallable = exports.authorizeDirectHitCallable = exports.simulateStripeTopUpCallable = void 0;
 exports.requireAuthenticatedCaller = requireAuthenticatedCaller;
 exports.chargePreFlightLookupIfNeeded = chargePreFlightLookupIfNeeded;
+exports.recordPreFlightApiUsage = recordPreFlightApiUsage;
 exports.settleCurationProjectTokens = settleCurationProjectTokens;
 exports.refundProjectSettlementOnError = refundProjectSettlementOnError;
 const https_1 = require("firebase-functions/v2/https");
@@ -181,6 +182,64 @@ async function chargePreFlightLookupIfNeeded(params) {
         ...txResult,
         curationSessionId: sessionId,
     };
+}
+/**
+ * Persists and logs Gemini 3.6 Flash apiUsage micro-cost for pre-flight and escape-hatch
+ * lookups so Admin USD telemetry accounts for cancelled Box 4 lookups and Rule 11 bouncer blocks.
+ */
+async function recordPreFlightApiUsage(params) {
+    const { caller, curationSessionId, seedLabel, isValid, apiUsage } = params;
+    if (!apiUsage)
+        return;
+    const model = (apiUsage.model || "gemini-3.6-flash").trim();
+    const promptTokens = Math.max(0, Math.floor(Number(apiUsage.promptTokenCount) || 0));
+    const candidatesTokens = Math.max(0, Math.floor(Number(apiUsage.candidatesTokenCount) || 0));
+    const totalTokens = Math.max(promptTokens + candidatesTokens, Math.floor(Number(apiUsage.totalTokenCount) || 0));
+    if (promptTokens === 0 && candidatesTokens === 0 && totalTokens === 0)
+        return;
+    const reasoningTokens = Math.max(0, totalTokens - (promptTokens + candidatesTokens));
+    const microCostUsd = Number(((promptTokens / 1_000_000) * 1.5 +
+        ((candidatesTokens + reasoningTokens) / 1_000_000) * 7.5).toFixed(6));
+    console.log(`[Pre-Flight Telemetry] uid=${caller.uid} email=${caller.email || "unknown"} seed="${seedLabel}" valid=${isValid} model=${model} prompt=${promptTokens} candidates=${candidatesTokens} total=${totalTokens} costUsd=$${microCostUsd.toFixed(6)}`);
+    try {
+        const writes = [];
+        const userRef = db.collection("users").doc(caller.uid);
+        writes.push(userRef.set({
+            ...(caller.email ? { email: caller.email } : {}),
+            preflightApiUsage: {
+                [model]: {
+                    prompt: firestore_1.FieldValue.increment(promptTokens),
+                    candidates: firestore_1.FieldValue.increment(candidatesTokens),
+                    total: firestore_1.FieldValue.increment(totalTokens),
+                    calls: firestore_1.FieldValue.increment(1),
+                },
+            },
+            updatedAt: firestore_1.FieldValue.serverTimestamp(),
+        }, { merge: true }));
+        if (typeof curationSessionId === "string" && curationSessionId.trim().length > 0) {
+            const sessionRef = db.collection("curationSessions").doc(curationSessionId.trim());
+            writes.push(sessionRef.set({
+                sessionId: curationSessionId.trim(),
+                uid: caller.uid,
+                preflightApiUsage: {
+                    [model]: {
+                        prompt: firestore_1.FieldValue.increment(promptTokens),
+                        candidates: firestore_1.FieldValue.increment(candidatesTokens),
+                        total: firestore_1.FieldValue.increment(totalTokens),
+                        calls: firestore_1.FieldValue.increment(1),
+                    },
+                },
+                lastLookupSeed: seedLabel,
+                lastLookupValid: isValid,
+                updatedAt: firestore_1.FieldValue.serverTimestamp(),
+                expireAt: getSessionExpiry(),
+            }, { merge: true }));
+        }
+        await Promise.all(writes);
+    }
+    catch (err) {
+        console.warn(`[Pre-Flight Telemetry] Non-fatal persistence warning for uid=${caller.uid}:`, err?.message || err);
+    }
 }
 /**
  * Shared Split-Debit Settlement Helper used by both authorizeDirectHitCallable (Column 1 Direct Hit)
@@ -399,8 +458,11 @@ exports.unlockDeepWebSessionCallable = (0, https_1.onCall)({
     if (!nodeId || typeof nodeId !== "string") {
         throw new https_1.HttpsError("invalid-argument", "Missing nodeId for Deep Connections session.");
     }
-    const sessionRef = db.collection("deepWebSessions").doc();
     const cleanProjectId = typeof projectId === "string" && projectId.trim() ? projectId.trim() : null;
+    const normalizedNodeKey = nodeId.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_").slice(0, 64) || "node";
+    const scopedProjectKey = (cleanProjectId || "global").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64);
+    const deterministicSessionId = `${caller.uid}_${scopedProjectKey}_${normalizedNodeKey}`;
+    const sessionRef = db.collection("deepWebSessions").doc(deterministicSessionId);
     const displayLabel = (nodeName || nodeId).toString().trim();
     if (caller.isAdmin) {
         await sessionRef.set({
@@ -419,6 +481,8 @@ exports.unlockDeepWebSessionCallable = (0, https_1.onCall)({
             sessionId: sessionRef.id,
             remainingMessages: 3,
             tokenBalance: null,
+            resumed: false,
+            tokensCharged: 0,
         };
     }
     const cost = tokenEconomy_1.TOKEN_PRICING.DEEP_WEB_CONSULT;
@@ -428,13 +492,34 @@ exports.unlockDeepWebSessionCallable = (0, https_1.onCall)({
         ? db.collection("users").doc(caller.uid).collection("projects").doc(cleanProjectId)
         : null;
     const result = await db.runTransaction(async (tx) => {
-        const [userSnap, projectSnap] = await Promise.all([
+        const [userSnap, projectSnap, existingSessionSnap] = await Promise.all([
             tx.get(userRef),
             projectRef ? tx.get(projectRef) : Promise.resolve(null),
+            tx.get(sessionRef),
         ]);
         const userData = userSnap.exists ? userSnap.data() || {} : {};
         const currentBalance = Math.max(0, Math.floor(Number(userData.tokenBalance) || 0));
         const prevSpent = Math.max(0, Math.floor(Number(userData.lifetimeTokensSpent) || 0));
+        if (existingSessionSnap.exists) {
+            const sData = existingSessionSnap.data() || {};
+            const existingRemaining = Math.max(0, Math.floor(Number(sData.remainingMessages) || 0));
+            const rawExpireAt = sData.expireAt;
+            const expireAtMs = rawExpireAt && typeof rawExpireAt.toDate === "function"
+                ? rawExpireAt.toDate().getTime()
+                : rawExpireAt instanceof Date
+                    ? rawExpireAt.getTime()
+                    : null;
+            const isNotExpired = expireAtMs === null || expireAtMs > Date.now();
+            if (sData.uid === caller.uid && existingRemaining > 0 && isNotExpired) {
+                return {
+                    sessionId: sessionRef.id,
+                    remainingMessages: existingRemaining,
+                    tokenBalance: currentBalance,
+                    resumed: true,
+                    tokensCharged: 0,
+                };
+            }
+        }
         if (currentBalance < cost) {
             throw new https_1.HttpsError("failed-precondition", `INSUFFICIENT_TOKENS: Deep Connections requires ${cost} Tokens, available ${currentBalance} Tokens.`);
         }
@@ -477,6 +562,8 @@ exports.unlockDeepWebSessionCallable = (0, https_1.onCall)({
             sessionId: sessionRef.id,
             remainingMessages: 3,
             tokenBalance: newBalance,
+            resumed: false,
+            tokensCharged: cost,
         };
     });
     return {
