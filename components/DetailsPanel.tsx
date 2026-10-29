@@ -1705,7 +1705,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                     </button>
                                                     </div>
                                                 </div>
-                                                <div className="flex justify-start px-1 pb-16">
+                                                <div className="flex justify-start px-1">
                                                     {(() => {
                                                         const isSessionUnlockedAndActive = hasActiveDeepWebSession && liveMessageCount < 3;
                                                         const displayedMessagesUsed = isSessionUnlockedAndActive
@@ -1721,7 +1721,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div className="flex flex-wrap gap-2 pb-16">
+                                            <div className="flex flex-wrap gap-2">
                                                 {queryChips.map((chip, idx) => {
                                                     const isClicked = clickedChips.has(chip);
                                                     return (
