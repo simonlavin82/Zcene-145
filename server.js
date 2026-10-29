@@ -216,10 +216,20 @@ app.all('/api/gemini/*wildcard', async (req, res) => {
   }
 
   const headers = { ...req.headers };
-  // Cleanse credentials
+  // Extract custom Zcene headers for telemetry before cleansing
+  const headerNodeId = (req.headers['x-zcene-node-id'] || '').toString().trim();
+  const headerNodeName = decodeURIComponent((req.headers['x-zcene-node-name'] || '').toString().trim());
+  const headerProjectName = decodeURIComponent((req.headers['x-zcene-project-name'] || '').toString().trim());
+
+  // Cleanse credentials & custom headers before forwarding upstream
   delete headers['x-zcene-password'];
   delete headers['x-zcene-deepweb-session'];
   delete headers['x-zcene-id-token'];
+  Object.keys(headers).forEach(k => {
+    if (k.toLowerCase().startsWith('x-zcene-')) {
+      delete headers[k];
+    }
+  });
   delete headers['x-forwarded-authorization'];
   delete headers['authorization'];
   delete headers['Authorization'];
@@ -324,8 +334,58 @@ app.all('/api/gemini/*wildcard', async (req, res) => {
           console.log(`[Deep Web Telemetry] uid=${targetUid} project=${targetProjectId || 'none'} model=${modelKey} prompt=${promptTokens} candidates=${candidatesTokens} total=${totalTokens}`);
 
           if (targetUid) {
+            let queryQuestion = '';
+            try {
+              if (requestBodyString) {
+                const parsedBody = JSON.parse(requestBodyString);
+                if (Array.isArray(parsedBody?.contents)) {
+                  const userParts = parsedBody.contents.filter(c => c.role === 'user');
+                  const lastUserPart = userParts[userParts.length - 1];
+                  if (lastUserPart && Array.isArray(lastUserPart.parts)) {
+                    queryQuestion = lastUserPart.parts.map(p => p.text).filter(Boolean).join(' ').trim();
+                  }
+                }
+              }
+            } catch (parseQErr) {
+              console.warn('[Gemini Proxy] Failed to parse query text from requestBodyString:', parseQErr);
+            }
+
+            let queryCostUsd = 0;
+            if (modelKey.includes('gemini-3.1-pro') || modelKey.includes('gemini-1.5-pro')) {
+              queryCostUsd += (promptTokens / 1_000_000) * 3.50;
+              queryCostUsd += (candidatesTokens / 1_000_000) * 10.50;
+            } else {
+              queryCostUsd += (promptTokens / 1_000_000) * 1.50;
+              queryCostUsd += (candidatesTokens / 1_000_000) * 7.50;
+            }
+
+            const resolvedNodeId = headerNodeId || activeSessionData?.lastNodeId || activeSessionData?.nodeId || null;
+            const resolvedNodeName = headerNodeName || activeSessionData?.lastNodeName || activeSessionData?.nodeName || null;
+            const resolvedProjectName = headerProjectName || activeSessionData?.projectName || null;
+
             const writes = [];
             const userRef = db.collection('users').doc(targetUid);
+            const queryDocRef = userRef.collection('deepWebQueries').doc();
+
+            writes.push(
+              queryDocRef.set({
+                id: queryDocRef.id,
+                uid: targetUid,
+                userEmail: callerEmail || activeSessionData?.email || '',
+                projectId: targetProjectId || null,
+                projectName: resolvedProjectName,
+                nodeId: resolvedNodeId,
+                nodeName: resolvedNodeName,
+                question: queryQuestion.slice(0, 500),
+                model: modelKey,
+                promptTokens,
+                candidatesTokens,
+                totalTokens,
+                costUsd: queryCostUsd,
+                timestamp: FieldValue.serverTimestamp(),
+              })
+            );
+
             writes.push(
               userRef.set({
                 deepWebApiUsage: {

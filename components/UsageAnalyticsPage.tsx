@@ -29,6 +29,7 @@ export interface JitHealRecord {
 }
 
 export interface UserTelemetry {
+    uid?: string;
     email: string;
     projectsCount: number;
     actionTriggers: {
@@ -140,6 +141,153 @@ export const TelemetryOverviewCards: React.FC<TelemetryOverviewCardsProps> = ({
                     <span className="text-3xl font-bold font-mono text-primary">${aggregateMetrics.totalSavings.toFixed(4)}</span>
                 </div>
                 <span className="text-xs text-zinc-650 mt-2">saved via local recall</span>
+            </div>
+        </div>
+    );
+};
+
+interface DeepConnectionsQueryLogProps {
+    uid?: string;
+    email: string;
+}
+
+interface DeepWebQueryItem {
+    id: string;
+    nodeId?: string | null;
+    nodeName?: string | null;
+    projectId?: string | null;
+    projectName?: string | null;
+    question: string;
+    costUsd: number;
+    promptTokens: number;
+    candidatesTokens: number;
+    timestamp: any;
+}
+
+const DeepConnectionsQueryLog: React.FC<DeepConnectionsQueryLogProps> = ({ uid, email }) => {
+    const [queries, setQueries] = useState<DeepWebQueryItem[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        let isMounted = true;
+        if (!uid) {
+            setIsLoading(false);
+            return;
+        }
+
+        const fetchQueries = async () => {
+            setIsLoading(true);
+            setError(null);
+            try {
+                const qRef = collection(db, 'users', uid, 'deepWebQueries');
+                const snap = await getDocs(query(qRef, orderBy('timestamp', 'desc'), limit(15)));
+                if (isMounted) {
+                    const items: DeepWebQueryItem[] = snap.docs.map(doc => {
+                        const d = doc.data();
+                        return {
+                            id: doc.id,
+                            nodeId: d.nodeId || null,
+                            nodeName: d.nodeName || null,
+                            projectId: d.projectId || null,
+                            projectName: d.projectName || null,
+                            question: d.question || '',
+                            costUsd: typeof d.costUsd === 'number' ? d.costUsd : 0,
+                            promptTokens: typeof d.promptTokens === 'number' ? d.promptTokens : 0,
+                            candidatesTokens: typeof d.candidatesTokens === 'number' ? d.candidatesTokens : 0,
+                            timestamp: d.timestamp,
+                        };
+                    });
+                    setQueries(items);
+                }
+            } catch (err: any) {
+                console.error('[DeepConnectionsQueryLog] Failed to load queries:', err);
+                if (isMounted) {
+                    setError('Unable to load query log.');
+                }
+            } finally {
+                if (isMounted) setIsLoading(false);
+            }
+        };
+
+        fetchQueries();
+        return () => { isMounted = false; };
+    }, [uid]);
+
+    return (
+        <div className="space-y-3">
+            <div className="flex items-center justify-between">
+                <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">
+                    Deep Connections Query Log
+                </h4>
+                <span className="text-[10px] text-zinc-500 font-mono">
+                    {queries.length > 0 ? `${queries.length} consults` : ''}
+                </span>
+            </div>
+
+            <div className="bg-black/50 border border-zinc-800 rounded-md overflow-hidden">
+                <table className="w-full text-left border-collapse">
+                    <thead>
+                        <tr className="border-b border-zinc-800 bg-zinc-900/30">
+                            <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Date</th>
+                            <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Artist / Node</th>
+                            <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Project</th>
+                            <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Question</th>
+                            <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Cost</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {isLoading ? (
+                            <tr>
+                                <td colSpan={5} className="p-4 text-center text-xs text-zinc-500 italic">
+                                    <span className="inline-flex items-center gap-2">
+                                        <span className="material-symbols-outlined !text-[14px] animate-spin">progress_activity</span>
+                                        Loading Deep Connections queries...
+                                    </span>
+                                </td>
+                            </tr>
+                        ) : error ? (
+                            <tr>
+                                <td colSpan={5} className="p-4 text-center text-xs text-red-400 italic">
+                                    {error}
+                                </td>
+                            </tr>
+                        ) : queries.length === 0 ? (
+                            <tr>
+                                <td colSpan={5} className="p-4 text-center text-xs text-zinc-500 italic">
+                                    No Deep Connections consults recorded yet for this author.
+                                </td>
+                            </tr>
+                        ) : (
+                            queries.map((q) => {
+                                const rawTime = q.timestamp;
+                                const dateMs = rawTime && typeof rawTime.toDate === 'function'
+                                    ? rawTime.toDate().getTime()
+                                    : rawTime instanceof Date
+                                        ? rawTime.getTime()
+                                        : typeof rawTime === 'number'
+                                            ? rawTime
+                                            : null;
+                                const dateStr = dateMs
+                                    ? new Date(dateMs).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).replace(',', ',')
+                                    : '—';
+                                return (
+                                    <tr key={q.id} className="border-b border-zinc-800/50 last:border-0 hover:bg-zinc-900/20">
+                                        <td className="p-3 text-xs text-zinc-400 whitespace-nowrap font-mono">{dateStr}</td>
+                                        <td className="p-3 text-xs text-zinc-300 font-medium whitespace-nowrap">{q.nodeName || q.nodeId || '—'}</td>
+                                        <td className="p-3 text-xs text-zinc-400 whitespace-nowrap">{q.projectName || q.projectId || '—'}</td>
+                                        <td className="p-3 text-xs text-zinc-300 max-w-md truncate" title={q.question}>
+                                            "{q.question}"
+                                        </td>
+                                        <td className="p-3 text-xs text-right font-mono text-red-400/80 whitespace-nowrap">
+                                            ${q.costUsd.toFixed(4)}
+                                        </td>
+                                    </tr>
+                                );
+                            })
+                        )}
+                    </tbody>
+                </table>
             </div>
         </div>
     );
@@ -371,6 +519,11 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
                                                          </div>
                                                      </div>
 
+                                                     {/* Full Width: Deep Connections Query Log (Admin Exclusive) */}
+                                                     <div className="col-span-1 md:col-span-2 pt-4 border-t border-zinc-900 mt-2">
+                                                         <DeepConnectionsQueryLog uid={user.uid} email={user.email} />
+                                                     </div>
+
                                                  </div>
                                              </td>
                                          </tr>
@@ -415,6 +568,8 @@ const formatTxTypeBadge = (type: string): { label: string; style: string } => {
         case 'topup_simulated':
         case 'top_up_simulated':
             return { label: 'Top-Up', style: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' };
+        case 'refund':
+        case 'admin_refund':
         case 'refund_pipeline_error':
         case 'refund_error':
             return { label: 'Auto-Refund', style: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' };
@@ -444,7 +599,8 @@ export const calculateTelemetryForUser = (
         lifetimeTokensSpent?: number;
         preflightApiUsage?: Record<string, any>;
         deepWebApiUsage?: Record<string, any>;
-    }
+    },
+    uid?: string
 ): UserTelemetry => {
     let totalUpdates = 0;
     let totalLiveQueries = 0;
@@ -710,6 +866,7 @@ export const calculateTelemetryForUser = (
     const globalCount = Object.values(artistFrequencyMap).reduce((sum, count) => sum + count, 0);
 
     return {
+        uid: uid || undefined,
         email,
         projectsCount: projects.length,
         actionTriggers: {
@@ -811,7 +968,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                         lifetimeTokensSpent: uData.lifetimeTokensSpent,
                         preflightApiUsage: uData.preflightApiUsage,
                         deepWebApiUsage: uData.deepWebApiUsage,
-                    });
+                    }, uDoc.id);
                 });
                 telemetryList = await Promise.all(userPromises);
                 setTokenTransactions([]);
@@ -841,7 +998,8 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                         lifetimeTokensSpent: uData.lifetimeTokensSpent,
                         preflightApiUsage: uData.preflightApiUsage,
                         deepWebApiUsage: uData.deepWebApiUsage,
-                    }
+                    },
+                    user.uid
                 );
                 telemetryList = [singleTelemetry];
 

@@ -602,8 +602,9 @@ describe('DetailsPanel', () => {
         // Wait for error handling
         await waitFor(() => {
             expect(onUpdateChatHistories).toHaveBeenCalledTimes(2);
-            const lastCallArgs = onUpdateChatHistories.mock.calls[1][0];
-            const messages = lastCallArgs.get('needtobreathe-us');
+            const rawArgs = onUpdateChatHistories.mock.calls[1][0];
+            const lastCallMap = typeof rawArgs === 'function' ? rawArgs(new Map()) : rawArgs;
+            const messages = lastCallMap.get('needtobreathe-us');
             const lastMessage = messages[messages.length - 1];
             expect(lastMessage.text).toContain('Deep Connections session expired or unauthorized');
         });

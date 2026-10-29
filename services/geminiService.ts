@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type, GenerateContentResponse, ThinkingLevel } from "@google/genai";
-import { GraphData, Node, NodeDetails, Link, ChatMessage, DiscoveryFilters, CANONICAL_STYLES_FLAT } from "../types";
+import { GraphData, Node, NodeDetails, Link, ChatMessage, DiscoveryFilters, CANONICAL_STYLES_FLAT, UserTaste } from "../types";
 import { db, auth } from './firebase';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { normalizeArtistId, extractArtistSubGraph, readArtistCacheMany, normalizeGraphData, stripUndefinedProperties, cleanArtistDisplayName } from './artistCacheService';
@@ -2089,6 +2089,13 @@ export const streamLocalHeuristicChat = async (
 export interface StreamNodeChatAuthOptions {
   idToken?: string;
   deepWebSessionId?: string;
+  useSearch?: boolean;
+  detailsCache?: Map<string, NodeDetails>;
+  projectName?: string;
+  seedArtists?: string[];
+  userTaste?: UserTaste;
+  nodeId?: string;
+  nodeName?: string;
 }
 
 export const streamNodeChat = async (
@@ -2112,20 +2119,33 @@ export const streamNodeChat = async (
       } catch (_) {}
       return authOptions?.idToken;
     };
+
+    const canonicalName = cleanArtistDisplayName(currentNode.id, graphData.nodes) || currentNode.label || currentNode.id;
+    const nodeDetails = authOptions?.detailsCache?.get(currentNode.id) || authOptions?.detailsCache?.get(currentNode.id.toLowerCase());
+
     const buildClient = (token?: string) => new GoogleGenAI({ 
         apiKey: proxyKey,
         httpOptions: { 
             baseUrl,
             headers: {
                 ...(token ? { Authorization: `Bearer ${token}`, 'x-zcene-id-token': token } : {}),
-                ...(authOptions?.deepWebSessionId ? { 'x-zcene-deepweb-session': authOptions.deepWebSessionId } : {})
+                ...(authOptions?.deepWebSessionId ? { 'x-zcene-deepweb-session': authOptions.deepWebSessionId } : {}),
+                ...(currentNode?.id ? { 'x-zcene-node-id': currentNode.id } : {}),
+                ...(canonicalName ? { 'x-zcene-node-name': encodeURIComponent(canonicalName) } : {}),
+                ...(authOptions?.projectName ? { 'x-zcene-project-name': encodeURIComponent(authOptions.projectName) } : {}),
             }
         }
     });
     
-    const contextNodes = graphData.nodes.map(n => `"${n.id}" (${n.type})`).slice(0, 30).join(', ');
+    // 1. Context nodes with canonical display names and genres
+    const contextNodes = graphData.nodes.map(n => {
+      const name = cleanArtistDisplayName(n.id, graphData.nodes);
+      const nDetails = authOptions?.detailsCache?.get(n.id) || authOptions?.detailsCache?.get(n.id.toLowerCase());
+      const nGenre = nDetails?.details?.genre || (n as any).genre || '';
+      return `"${name}" (${n.type}${nGenre ? ` - ${nGenre}` : ''})`;
+    }).slice(0, 30).join(', ');
     
-    // V10: Contextualize Chat with Node Snippet and Edge Contexts
+    // 2. Contextualize Chat with Node Snippet and Edge Contexts
     const nodeEdges = graphData.links.filter(l => 
       (typeof l.source === 'object' ? l.source.id : l.source) === currentNode.id ||
       (typeof l.target === 'object' ? l.target.id : l.target) === currentNode.id
@@ -2133,17 +2153,38 @@ export const streamNodeChat = async (
     const edgeContexts = nodeEdges.map(l => {
       const sId = typeof l.source === 'object' ? l.source.id : l.source;
       const tId = typeof l.target === 'object' ? l.target.id : l.target;
-      const other = sId === currentNode.id ? tId : sId;
-      return `${l.context || 'connected'} to ${other}`;
+      const otherId = sId === currentNode.id ? tId : sId;
+      const otherName = cleanArtistDisplayName(otherId, graphData.nodes);
+      return `${l.context || 'connected'} to "${otherName}"`;
     }).filter(Boolean).join(', ');
     
-    const narrativeSnippetText = (currentNode as any).narrativeSnippet ? `\n    Their defining narrative hook in this specific web is: "${(currentNode as any).narrativeSnippet}".` : '';
-    const edgeContextText = edgeContexts ? `\n    They are connected to the following artists in this specific context: [${edgeContexts}].` : '';
+    // 3. Card metadata from detailsCache
+    const genre = nodeDetails?.details?.genre || (currentNode as any).genre || '';
+    const style = nodeDetails?.details?.style || (currentNode as any).style || '';
+    const label = (nodeDetails as any)?.details?.label || (currentNode as any).label || '';
+    const origin = nodeDetails?.details?.origin || currentNode.origin || '';
+    const founded = nodeDetails?.details?.founded || (currentNode as any).founded || '';
+    const summary = nodeDetails?.summary || '';
 
-    const systemInstruction = `You are Zcene, a world-class music curator and edgy historian. 
+    const cardDetailsBlock = [
+      genre ? `Genre: ${genre}` : '',
+      style ? `Style: ${style}` : '',
+      label ? `Record Label: ${label}` : '',
+      origin ? `Origin: ${origin}` : '',
+      founded ? `Founded/Active: ${founded}` : '',
+      summary ? `Biography: ${summary.slice(0, 350)}` : ''
+    ].filter(Boolean).join(' | ');
+
+    const narrativeSnippetText = (currentNode as any).narrativeSnippet ? `\n    Their defining narrative hook in this specific web is: "${(currentNode as any).narrativeSnippet}".` : '';
+    const edgeContextText = edgeContexts ? `\n    Direct connections in this Zcene: [${edgeContexts}].` : '';
+    const cardDetailsText = cardDetailsBlock ? `\n    Verified Card Metadata: [${cardDetailsBlock}].` : '';
+    const projectText = authOptions?.projectName ? `\n    Active Zcene Project: "${authOptions.projectName}".` : '';
+    const seedText = authOptions?.seedArtists && authOptions.seedArtists.length > 0 ? `\n    Seed Artists: [${authOptions.seedArtists.join(', ')}].` : '';
+
+    const systemInstruction = `You are Zcene, a world-class music curator, sonic cartographer, and edgy historian. 
     Your tone is atmospheric, precise, and empowering. You are an expert-friend to the user.
     
-    System Context: You are discussing "${currentNode.id}" (${currentNode.type}).${narrativeSnippetText}${edgeContextText}
+    System Context: You are discussing "${canonicalName}" (${currentNode.type}).${projectText}${seedText}${cardDetailsText}${narrativeSnippetText}${edgeContextText}
     Base your answers firmly on this reality.
 
     The user's current Zcene map includes: [${contextNodes}].
@@ -2155,7 +2196,7 @@ export const streamNodeChat = async (
     4. NO MARKDOWN: Output ONLY plain text sentences.
     5. NO SYMBOLS: Strictly NO bolding (**), no italics (*), no hashes (#), no dashes (-).
     6. NO OPENERS: Do not say "Hi," "Sure," or "I can explain that." Start with the insight.
-    7. FOCUS: Explain the specific musical link or stylistic pivot.`;
+    7. FOCUS: Explain the specific musical link or stylistic pivot with authoritative precision.`;
 
     const contents = [
         ...history.map(m => ({
@@ -2169,10 +2210,14 @@ export const streamNodeChat = async (
 
     const runStreamWithToken = async (token?: string) => {
         const ai = buildClient(token);
+        const config: any = { systemInstruction };
+        if (authOptions?.useSearch) {
+            config.tools = [{ googleSearch: {} }];
+        }
         const result = await ai.models.generateContentStream({
             model: flashModel,
             contents,
-            config: { systemInstruction }
+            config
         });
 
         let fullText = "";

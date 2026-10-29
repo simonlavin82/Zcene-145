@@ -79,7 +79,7 @@ interface GraphPageProps {
   onClearZcene: () => void;
   isActive: boolean;
   chatHistories: Map<string, ChatMessage[]>;
-  onUpdateChatHistories: (histories: Map<string, ChatMessage[]>) => void;
+  onUpdateChatHistories: (histories: Map<string, ChatMessage[]> | ((prev: Map<string, ChatMessage[]>) => Map<string, ChatMessage[]>)) => void;
   onShowToast: (message: string) => void;
   onRefreshUI: () => void;
   onAddToStack: (node: Node, link?: string) => void;
@@ -1173,6 +1173,12 @@ const GraphPage: React.FC<GraphPageProps> = ({
       setIsLeftPanelCollapsed(!isFirst);
   }, [data.nodes.length, seedArtists]);
   const [isDetailsPanelCollapsed, setIsDetailsPanelCollapsed] = useState(true);
+  const [deepWebSession, setDeepWebSession] = useState<{ sessionId: string; remainingMessages: number } | null>(null);
+
+  useEffect(() => {
+    setDeepWebSession(null);
+  }, [projectId]);
+
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [viewedRationale, setViewedRationale] = useState<string | null>(null);
   
@@ -2226,6 +2232,8 @@ const GraphPage: React.FC<GraphPageProps> = ({
       <DetailsPanel 
           projectId={projectId}
           projectName={projectName}
+          activeDeepWebSession={deepWebSession}
+          onUpdateDeepWebSession={setDeepWebSession}
           selectedNode={selectedNode} 
           activeNodes={activeNodes} 
           isAdmin={isAdmin}

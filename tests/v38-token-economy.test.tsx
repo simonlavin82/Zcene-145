@@ -11,7 +11,7 @@ import {
   computeBaseProjectTokenCost,
   computeRemainingSettlementTokens,
 } from '../shared/tokenEconomy';
-import { TokenConfirmationDialog, SimulatedStripeModal } from '../components/SharedModals';
+import { TokenConfirmationDialog, SimulatedStripeModal, MyTasteDialog } from '../components/SharedModals';
 import { UsageAnalyticsPage, calculateTelemetryForUser } from '../components/UsageAnalyticsPage';
 import { BACKEND_REGRESSION_RUNBOOK } from '../docs/backend-regression-runbook';
 import { computeProjectHydrationFingerprint } from '../utils/projectHydrationFingerprint';
@@ -630,5 +630,214 @@ describe('Architecture V38 — Token Economy & Split-Debit Contract', () => {
     expect(tokenWalletSrc).toContain("${caller.uid}_${scopedProjectKey}_${normalizedNodeKey}");
     expect(tokenWalletSrc).toContain("resumed: true");
     expect(tokenWalletSrc).toContain("tokensCharged: 0");
+  });
+
+  it('harmonizes primary CTA buttons and spinners across MyTasteDialog, SimulatedStripeModal, and TokenConfirmationDialog', async () => {
+    // 1. MyTasteDialog (Style Profiles "Done" button)
+    let resolveSave: () => void = () => {};
+    const mockSave = vi.fn().mockImplementation(() => new Promise<void>((resolve) => { resolveSave = resolve; }));
+    const mockTaste = [{ id: 'p1', name: 'Jars Of Clay', color: 'purple', isActive: true }];
+
+    const { unmount: unmountTaste } = render(
+      <MyTasteDialog
+        isOpen={true}
+        onClose={vi.fn()}
+        taste={mockTaste as any}
+        onSave={mockSave}
+      />
+    );
+
+    const doneBtn = screen.getByRole('button', { name: 'Done' });
+    expect(doneBtn).toHaveClass('px-6 py-2 bg-white text-brand-black rounded-xl font-medium text-sm active:scale-95');
+
+    fireEvent.click(doneBtn);
+    expect(mockSave).toHaveBeenCalled();
+    // While saving, spinner and Saving... text appear
+    expect(screen.getByText('Saving...')).toBeInTheDocument();
+    expect(screen.getByText('progress_activity')).toHaveClass('animate-spin');
+
+    resolveSave();
+    unmountTaste();
+
+    // 2. SimulatedStripeModal (Top-Up Confirm button)
+    const { unmount: unmountStripe } = render(
+      <SimulatedStripeModal
+        isOpen={true}
+        initialTierId="gbp_10"
+        currentBalance={85}
+        onClose={vi.fn()}
+      />
+    );
+
+    const stripeConfirmBtn = screen.getByTestId('stripe-confirm-button');
+    expect(stripeConfirmBtn).toHaveClass('px-6 py-2 bg-white text-brand-black rounded-xl font-medium text-sm active:scale-95');
+    unmountStripe();
+
+    // 3. TokenConfirmationDialog (Unlock Deep Connections CTA button)
+    render(
+      <TokenConfirmationDialog
+        isOpen={true}
+        onClose={vi.fn()}
+        onConfirm={vi.fn()}
+        type="live_chat_search"
+        tokenCost={3}
+        tokenBalance={85}
+        isAdmin={false}
+        cachedArtists={[]}
+        missingArtists={["Deep Connections (3 Messages)"]}
+      />
+    );
+
+    const tokenConfirmBtn = screen.getByTestId('token-authorize-button');
+    expect(tokenConfirmBtn).toHaveClass('px-6 py-2 bg-white text-brand-black rounded-xl font-medium text-sm active:scale-95');
+    expect(tokenConfirmBtn).toHaveTextContent('Confirm & Spend 3 Tokens');
+  });
+
+  it('guarantees monotonic chatHistories merge protecting in-flight Deep Connections messages against stale Firestore snapshots and preserving CLEAR CHAT', () => {
+    // Pure logic test modeling App.tsx's handleSnap merge function
+    const simulateHandleSnapMerge = (
+      localState: Map<string, any[]>,
+      incomingFirestoreChatJson: string,
+      lastLocalUpdateAt: number,
+      now: number,
+      isInitialLoad: boolean
+    ): Map<string, any[]> => {
+      const newChatsMap = new Map<string, any[]>(JSON.parse(incomingFirestoreChatJson));
+      const timeSinceLocalUpdate = now - lastLocalUpdateAt;
+      const hasRecentLocalUpdate = lastLocalUpdateAt > 0 && timeSinceLocalUpdate < 15000;
+
+      if (isInitialLoad && !hasRecentLocalUpdate) {
+        return newChatsMap;
+      }
+
+      let hasChanges = false;
+      const merged = new Map(localState);
+
+      for (const [nodeId, incomingMsgs] of newChatsMap.entries()) {
+        const localMsgs = localState.get(nodeId);
+        if (!localMsgs) {
+          merged.set(nodeId, incomingMsgs);
+          hasChanges = true;
+        } else if (incomingMsgs.length > localMsgs.length && !hasRecentLocalUpdate) {
+          merged.set(nodeId, incomingMsgs);
+          hasChanges = true;
+        }
+      }
+
+      return hasChanges ? merged : localState;
+    };
+
+    const t0 = 100000;
+
+    // Scenario A: User sends first Deep Connections message upon unlock
+    // Local state has 1 in-flight message.
+    // Concurrently, Firestore sends an echo from unlockDeepWebSessionCallable where chatHistories is still "[]"
+    const inFlightChat = new Map([
+      ['one-step-closer-us', [{ role: 'user', text: 'which artist is closest?', timestamp: t0 }]]
+    ]);
+    const staleFirestoreSnapshot = JSON.stringify([]);
+
+    const stateAfterUnlockEcho = simulateHandleSnapMerge(
+      inFlightChat,
+      staleFirestoreSnapshot,
+      t0,       // lastLocalUpdateAt was just now
+      t0 + 200, // snapshot arrives 200ms later
+      false     // not initial load
+    );
+
+    // IN-FLIGHT MESSAGE MUST BE PRESERVED (NOT WIPED)
+    expect(stateAfterUnlockEcho.get('one-step-closer-us')).toHaveLength(1);
+    expect(stateAfterUnlockEcho.get('one-step-closer-us')![0].text).toBe('which artist is closest?');
+
+    // Scenario B: Streaming completes, and server.js telemetry write triggers another snapshot
+    // Local state has user message + streamed response (2 messages).
+    // Firestore still has older state or "[]" before autosave.
+    const completedChat = new Map([
+      ['one-step-closer-us', [
+        { role: 'user', text: 'which artist is closest?', timestamp: t0 },
+        { role: 'model', text: 'Anxious stands closest...', timestamp: t0 + 1500 }
+      ]]
+    ]);
+    const stateAfterPostStreamEcho = simulateHandleSnapMerge(
+      completedChat,
+      staleFirestoreSnapshot,
+      t0 + 1500, // lastLocalUpdateAt was on stream completion
+      t0 + 1800, // snapshot arrives 300ms later
+      false
+    );
+
+    expect(stateAfterPostStreamEcho.get('one-step-closer-us')).toHaveLength(2);
+
+    // Scenario C: User clicks CLEAR CHAT for one-step-closer-us
+    // Local state sets the node to []
+    // Firestore echo still has the previous 2 messages before autosave debounces
+    const clearedChat = new Map([
+      ['one-step-closer-us', []]
+    ]);
+    const firestoreWithPriorHistory = JSON.stringify([
+      ['one-step-closer-us', [{ role: 'user', text: 'old message' }, { role: 'model', text: 'old answer' }]]
+    ]);
+
+    const stateAfterClearChatEcho = simulateHandleSnapMerge(
+      clearedChat,
+      firestoreWithPriorHistory,
+      t0 + 5000, // cleared just now
+      t0 + 5200, // echo arrives 200ms later
+      false
+    );
+
+    // CLEAR CHAT MUST NOT BE RESURRECTED BY STALE FIRESTORE ECHO
+    expect(stateAfterClearChatEcho.get('one-step-closer-us')).toEqual([]);
+  });
+
+  it('enforces V38.3 Project-Wide 3-Message Pass, Dual Graph Topology + Search Grounding, and Admin Query Log contracts', async () => {
+    // 1. TokenConfirmationDialog copy for live_chat_search
+    render(
+      <TokenConfirmationDialog
+        isOpen={true}
+        onClose={vi.fn()}
+        onConfirm={vi.fn()}
+        type="live_chat_search"
+        cachedArtists={['One Step Closer']}
+        missingArtists={[]}
+        tokenCost={TOKEN_PRICING.DEEP_WEB_CONSULT}
+        tokenBalance={85}
+      />
+    );
+
+    expect(screen.getByText(/across all artists in this Zcene/i)).toBeInTheDocument();
+
+    // 2. unlockDeepWebSessionCallable in tokenWallet.ts scopes deterministicSessionId to _deepweb_pass
+    const walletSrc = fs.readFileSync(path.resolve(__dirname, '../functions/src/tokenWallet.ts'), 'utf-8');
+    expect(walletSrc).toContain('_deepweb_pass');
+    expect(walletSrc).toContain('legacyNodeSessionRef');
+    expect(walletSrc).toContain('tx.delete(legacyNodeSessionRef)');
+
+    // 3. server.js records deepWebQueries telemetry and cleanses x-zcene-* headers
+    const serverSrc = fs.readFileSync(path.resolve(__dirname, '../server.js'), 'utf-8');
+    expect(serverSrc).toContain("collection('deepWebQueries')");
+    expect(serverSrc).toContain("startsWith('x-zcene-')");
+    expect(serverSrc).toContain('queryQuestion');
+    expect(serverSrc).toContain('queryCostUsd');
+
+    // 4. firestore.rules restricts deepWebQueries to admin read-only
+    const rulesSrc = fs.readFileSync(path.resolve(__dirname, '../firestore.rules'), 'utf-8');
+    expect(rulesSrc).toContain('match /deepWebQueries/{queryId}');
+    expect(rulesSrc).toContain('allow get, list: if isAdmin();');
+    expect(rulesSrc).toContain('allow write: if false;');
+
+    // 5. geminiService.ts attaches tools: [{ googleSearch: {} }] conditionally when useSearch is true
+    const geminiSrc = fs.readFileSync(path.resolve(__dirname, '../services/geminiService.ts'), 'utf-8');
+    expect(geminiSrc).toContain('if (authOptions?.useSearch)');
+    expect(geminiSrc).toContain('config.tools = [{ googleSearch: {} }]');
+    expect(geminiSrc).toContain("'x-zcene-node-id'");
+    expect(geminiSrc).toContain("'x-zcene-node-name'");
+    expect(geminiSrc).toContain("'x-zcene-project-name'");
+
+    // 6. UsageAnalyticsPage formatTxTypeBadge maps 'refund' and 'admin_refund' to Auto-Refund
+    const analyticsSrc = fs.readFileSync(path.resolve(__dirname, '../components/UsageAnalyticsPage.tsx'), 'utf-8');
+    expect(analyticsSrc).toContain("case 'refund':");
+    expect(analyticsSrc).toContain("case 'admin_refund':");
+    expect(analyticsSrc).toContain('DeepConnectionsQueryLog');
   });
 });

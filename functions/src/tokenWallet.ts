@@ -635,9 +635,17 @@ export const unlockDeepWebSessionCallable = onCall(
     const cleanProjectId = typeof projectId === "string" && projectId.trim() ? projectId.trim() : null;
     const normalizedNodeKey = nodeId.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_").slice(0, 64) || "node";
     const scopedProjectKey = (cleanProjectId || "global").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64);
-    const deterministicSessionId = `${caller.uid}_${scopedProjectKey}_${normalizedNodeKey}`;
+    
+    // V38.3: Project-Wide session pass
+    const deterministicSessionId = cleanProjectId
+      ? `${caller.uid}_${scopedProjectKey}_deepweb_pass`
+      : `${caller.uid}_global_deepweb_pass`;
+    const legacyNodeSessionId = `${caller.uid}_${scopedProjectKey}_${normalizedNodeKey}`;
+
     const sessionRef = db.collection("deepWebSessions").doc(deterministicSessionId);
+    const legacyNodeSessionRef = db.collection("deepWebSessions").doc(legacyNodeSessionId);
     const displayLabel = (nodeName || nodeId).toString().trim();
+    const displayProjectLabel = (request.data?.projectName || cleanProjectId || displayLabel || "Zcene").toString().trim();
 
     if (caller.isAdmin) {
       await sessionRef.set({
@@ -645,7 +653,9 @@ export const unlockDeepWebSessionCallable = onCall(
         uid: caller.uid,
         isAdmin: true,
         projectId: cleanProjectId,
-        nodeId,
+        projectName: displayProjectLabel,
+        lastNodeId: nodeId,
+        lastNodeName: displayLabel,
         remainingMessages: 3,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
@@ -669,16 +679,18 @@ export const unlockDeepWebSessionCallable = onCall(
       : null;
 
     const result = await db.runTransaction(async (tx) => {
-      const [userSnap, projectSnap, existingSessionSnap] = await Promise.all([
+      const [userSnap, projectSnap, existingSessionSnap, legacySessionSnap] = await Promise.all([
         tx.get(userRef),
         projectRef ? tx.get(projectRef) : Promise.resolve(null),
         tx.get(sessionRef),
+        tx.get(legacyNodeSessionRef),
       ]);
 
       const userData = userSnap.exists ? userSnap.data() || {} : {};
       const currentBalance = Math.max(0, Math.floor(Number(userData.tokenBalance) || 0));
       const prevSpent = Math.max(0, Math.floor(Number(userData.lifetimeTokensSpent) || 0));
 
+      // 1. Check existing project-wide pass
       if (existingSessionSnap.exists) {
         const sData = existingSessionSnap.data() || {};
         const existingRemaining = Math.max(0, Math.floor(Number(sData.remainingMessages) || 0));
@@ -692,9 +704,56 @@ export const unlockDeepWebSessionCallable = onCall(
         const isNotExpired = expireAtMs === null || expireAtMs > Date.now();
 
         if (sData.uid === caller.uid && existingRemaining > 0 && isNotExpired) {
+          tx.set(
+            sessionRef,
+            {
+              lastNodeId: nodeId,
+              lastNodeName: displayLabel,
+              updatedAt: FieldValue.serverTimestamp(),
+            },
+            { merge: true }
+          );
           return {
             sessionId: sessionRef.id,
             remainingMessages: existingRemaining,
+            tokenBalance: currentBalance,
+            resumed: true,
+            tokensCharged: 0,
+          };
+        }
+      }
+
+      // 2. Check legacy node-scoped session for seamless carryover/migration
+      if (legacySessionSnap && legacySessionSnap.exists) {
+        const legacyData = legacySessionSnap.data() || {};
+        const legacyRemaining = Math.max(0, Math.floor(Number(legacyData.remainingMessages) || 0));
+        const rawExpireAt = legacyData.expireAt;
+        const expireAtMs =
+          rawExpireAt && typeof rawExpireAt.toDate === "function"
+            ? rawExpireAt.toDate().getTime()
+            : rawExpireAt instanceof Date
+              ? rawExpireAt.getTime()
+              : null;
+        const isNotExpired = expireAtMs === null || expireAtMs > Date.now();
+
+        if (legacyData.uid === caller.uid && legacyRemaining > 0 && isNotExpired) {
+          tx.set(sessionRef, {
+            sessionId: sessionRef.id,
+            uid: caller.uid,
+            isAdmin: false,
+            projectId: cleanProjectId,
+            projectName: displayProjectLabel,
+            lastNodeId: nodeId,
+            lastNodeName: displayLabel,
+            remainingMessages: legacyRemaining,
+            createdAt: legacyData.createdAt || FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+            expireAt: legacyData.expireAt || getSessionExpiry(),
+          });
+          tx.delete(legacyNodeSessionRef);
+          return {
+            sessionId: sessionRef.id,
+            remainingMessages: legacyRemaining,
             tokenBalance: currentBalance,
             resumed: true,
             tokensCharged: 0,
@@ -727,7 +786,9 @@ export const unlockDeepWebSessionCallable = onCall(
         uid: caller.uid,
         isAdmin: false,
         projectId: cleanProjectId,
-        nodeId,
+        projectName: displayProjectLabel,
+        lastNodeId: nodeId,
+        lastNodeName: displayLabel,
         remainingMessages: 3,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
@@ -741,7 +802,7 @@ export const unlockDeepWebSessionCallable = onCall(
         delta: -cost,
         balanceAfter: newBalance,
         ...(cleanProjectId ? { projectId: cleanProjectId } : {}),
-        description: `Deep Connections (3 Messages): ${displayLabel}`,
+        description: `Deep Connections (3 Messages): ${displayProjectLabel}`,
         createdAt: FieldValue.serverTimestamp(),
       });
 

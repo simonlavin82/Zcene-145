@@ -1548,6 +1548,7 @@ const App: React.FC = () => {
   const activeNodesRef = useRef<Node[]>([]);
   const detailsCacheRef = useRef<Map<string, NodeDetails>>(new Map());
   const chatHistoriesRef = useRef<Map<string, ChatMessage[]>>(new Map());
+  const lastLocalChatUpdateAtRef = useRef<number>(0);
   const discoveryFiltersRef = useRef<DiscoveryFilters>({});
   const lastViewedStackCountRef = useRef<number>(0);
   const currentCacheKeyRef = useRef<string | null>(null);
@@ -1570,6 +1571,17 @@ const App: React.FC = () => {
   useEffect(() => { discoveryFiltersRef.current = discoveryFilters; }, [discoveryFilters]);
   useEffect(() => { lastViewedStackCountRef.current = lastViewedStackCount; }, [lastViewedStackCount]);
   useEffect(() => { currentCacheKeyRef.current = currentCacheKey; }, [currentCacheKey]);
+
+  const handleUpdateChatHistories = useCallback((
+    updaterOrMap: Map<string, ChatMessage[]> | ((prev: Map<string, ChatMessage[]>) => Map<string, ChatMessage[]>)
+  ) => {
+    lastLocalChatUpdateAtRef.current = Date.now();
+    setChatHistories((prev) => {
+      const next = typeof updaterOrMap === 'function' ? updaterOrMap(prev) : updaterOrMap;
+      chatHistoriesRef.current = next;
+      return next;
+    });
+  }, []);
 
   const isGuest = useMemo(() => {
     if (isViewingShare) return true;
@@ -5688,10 +5700,12 @@ const App: React.FC = () => {
         setCurrentProjectOwnerId(null);
         setSelectedNode(null);
         hasAutoSelectedRef.current = null;
+        lastLocalChatUpdateAtRef.current = 0;
       }
       return;
     }
 
+    lastLocalChatUpdateAtRef.current = 0;
     let isMounted = true;
     const unsubscribeList: (() => void)[] = [];
 
@@ -5812,8 +5826,37 @@ const App: React.FC = () => {
         try {
           const newChatsMap = new Map<string, ChatMessage[]>(JSON.parse(data.chatHistories));
           setChatHistories((prev) => {
-            if (prev.size !== newChatsMap.size) return newChatsMap;
-            return JSON.stringify(Array.from(prev.entries())) === data.chatHistories ? prev : newChatsMap;
+            const isInitialLoad = isProjectLoadingRef.current || prev.size === 0;
+            const timeSinceLocalUpdate = Date.now() - lastLocalChatUpdateAtRef.current;
+            const hasRecentLocalUpdate = lastLocalChatUpdateAtRef.current > 0 && timeSinceLocalUpdate < 15000;
+
+            if (isInitialLoad && !hasRecentLocalUpdate) {
+              chatHistoriesRef.current = newChatsMap;
+              return newChatsMap;
+            }
+
+            // Monotonic / additive merge that protects in-flight and recent local chats
+            let hasChanges = false;
+            const merged = new Map(prev);
+
+            for (const [nodeId, incomingMsgs] of newChatsMap.entries()) {
+              const localMsgs = prev.get(nodeId);
+              if (!localMsgs) {
+                // If local never touched this node, adopt incoming
+                merged.set(nodeId, incomingMsgs);
+                hasChanges = true;
+              } else if (incomingMsgs.length > localMsgs.length && !hasRecentLocalUpdate) {
+                // Remote has strictly more messages and local is not actively in an update window
+                merged.set(nodeId, incomingMsgs);
+                hasChanges = true;
+              }
+              // If localMsgs.length >= incomingMsgs.length, or hasRecentLocalUpdate is true,
+              // we PRESERVE localMsgs! Never allow a stale Firestore snapshot to wipe local in-flight or newer messages.
+            }
+
+            if (!hasChanges) return prev;
+            chatHistoriesRef.current = merged;
+            return merged;
           });
         } catch (e) { console.error("Chat histories parse fail", e); }
       }
@@ -8063,7 +8106,7 @@ const App: React.FC = () => {
                 }
               }}
               onNavigate={handleMenuNavigate} onClearLibrary={handleClearLib} onClearZcene={handleClearZcene}
-              isActive={currentView === View.Graph} chatHistories={chatHistories} onUpdateChatHistories={setChatHistories}
+              isActive={currentView === View.Graph} chatHistories={chatHistories} onUpdateChatHistories={handleUpdateChatHistories}
               onShowToast={showToast} onRefreshUI={handleRefreshUI} onAddToStack={handleAddToStack} stackCount={stack.length}
               onShareZcene={handleTriggerShareModal} isSharingZcene={isSharing}
               onDeleteAccount={handleDeleteAccount}

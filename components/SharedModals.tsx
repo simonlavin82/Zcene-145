@@ -725,8 +725,20 @@ export const MyTasteDialog: React.FC<{
               <button onClick={onClose} disabled={isSaving} className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors disabled:opacity-50">
                 Cancel
               </button>
-              <button onClick={handleSaveClick} disabled={isSaving} className="px-6 py-1.5 bg-white text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90 disabled:opacity-50">
-                {isSaving ? 'Saving...' : 'Done'}
+              <button
+                type="button"
+                onClick={handleSaveClick}
+                disabled={isSaving}
+                className="px-6 py-2 bg-white text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap"
+              >
+                {isSaving ? (
+                  <>
+                    <span className="material-symbols-outlined !text-[15px] animate-spin">progress_activity</span>
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <span>Done</span>
+                )}
               </button>
             </div>
           </div>
@@ -881,7 +893,7 @@ export const SimulatedStripeModal: React.FC<SimulatedStripeModalProps> = ({
             data-testid="stripe-confirm-button"
             disabled={isProcessing}
             onClick={handleConfirmPurchase}
-            className="px-5 py-2 bg-primary text-brand-black rounded-xl font-semibold text-sm transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center gap-2 cursor-pointer"
+            className="px-6 py-2 bg-white text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap"
           >
             {isProcessing ? (
               <>
@@ -1138,7 +1150,7 @@ export const TokenConfirmationDialog: React.FC<{
             <>
               <p className="leading-relaxed text-zinc-300">
                 {type === 'live_chat_search'
-                  ? 'Unlock a 3-message Deep Connections AI session for this artist.'
+                  ? 'Unlock a 3-message Deep Connections AI session across all artists in this Zcene.'
                   : effectiveTokenCost >= TOKEN_PRICING.COMPLEX_QUERY
                     ? 'Curate this multi-artist or custom-anchored Zcene web and save it permanently to your Zcenes.'
                     : 'Curate this Zcene web and unlock it permanently in your Zcenes.'}
@@ -1272,7 +1284,7 @@ export const TokenConfirmationDialog: React.FC<{
               data-testid="token-authorize-button"
               disabled={isBusy}
               onClick={handleConfirmClick}
-              className="px-4 py-2 bg-white text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+              className="px-6 py-2 bg-white text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap"
             >
               {isBusy ? (
                 <>
@@ -2407,7 +2419,7 @@ export function ConsolidatedValidationModal({
               data-testid="validation-confirm-button"
               type="submit"
               disabled={isConfirmDisabled}
-              className={`px-6 py-2 bg-white text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all cursor-pointer whitespace-nowrap flex items-center justify-center gap-2 ${isConfirmDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+              className={`px-6 py-2 bg-white text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap ${isConfirmDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               {isSubmitting ? (
                 <>

@@ -1705,7 +1705,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                     </button>
                                                     </div>
                                                 </div>
-                                                <div className="flex justify-start px-1">
+                                                <div className="flex justify-start px-1 pb-16">
                                                     {(() => {
                                                         const isSessionUnlockedAndActive = hasActiveDeepWebSession && liveMessageCount < 3;
                                                         const displayedMessagesUsed = isSessionUnlockedAndActive
@@ -1721,7 +1721,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div className="flex flex-wrap gap-2">
+                                            <div className="flex flex-wrap gap-2 pb-16">
                                                 {queryChips.map((chip, idx) => {
                                                     const isClicked = clickedChips.has(chip);
                                                     return (
@@ -1837,7 +1837,7 @@ interface DetailsPanelProps {
   isMagazineViewOpen: boolean;
   onMagazineViewToggle: (isOpen: boolean) => void;
   chatHistories: Map<string, ChatMessage[]>;
-  onUpdateChatHistories: (histories: Map<string, ChatMessage[]>) => void;
+  onUpdateChatHistories: (histories: Map<string, ChatMessage[]> | ((prev: Map<string, ChatMessage[]>) => Map<string, ChatMessage[]>)) => void;
   onAddToStack: (node: Node, link?: string) => void;
   isGuest?: boolean;
   user?: any;
@@ -1852,6 +1852,8 @@ interface DetailsPanelProps {
   projectName?: string;
   onStashArtist?: (artistName: string) => void;
   onOpenStackDrawer?: () => void;
+  activeDeepWebSession?: { sessionId: string; remainingMessages: number } | null;
+  onUpdateDeepWebSession?: (session: { sessionId: string; remainingMessages: number } | null | ((prev: { sessionId: string; remainingMessages: number } | null) => { sessionId: string; remainingMessages: number } | null)) => void;
 }
 
 export const DetailsPanel: React.FC<DetailsPanelProps> = ({
@@ -1860,7 +1862,8 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
   isSmallScreen, onNodeClick, onNavigate, isGlobalLoading, onCancelGlobalLoading, unreadCount, isActive, collapseBtnRef,
   isMagazineViewOpen, onMagazineViewToggle, chatHistories, onUpdateChatHistories, onAddToStack,
   isGuest = false, onAuthRequest, user, userTaste, isAdmin = false, tokenBalance = 0, projectId,
-  onUpdateTasteProfile, onShowToast, onOpenTasteModal, projectName, onStashArtist, onOpenStackDrawer
+  onUpdateTasteProfile, onShowToast, onOpenTasteModal, projectName, onStashArtist, onOpenStackDrawer,
+  activeDeepWebSession, onUpdateDeepWebSession
 }) => {
     const [viewedIndex, setViewedIndex] = useState(0);
     const [chatLoadingMap, setChatLoadingMap] = useState<Map<string, boolean>>(new Map());
@@ -1951,7 +1954,23 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     
     const [chatModes, setChatModes] = useState<Map<string, 'instant' | 'live'>>(new Map());
     const getChatMode = (nodeId: string) => chatModes.get(nodeId) || 'instant';
-    const [liveMessageCount, setLiveMessageCount] = useState(3);
+    const [liveMessageCount, setLiveMessageCount] = useState<number>(() => {
+        if (activeDeepWebSession && typeof activeDeepWebSession.remainingMessages === 'number' && activeDeepWebSession.remainingMessages > 0) {
+            return Math.max(0, 3 - activeDeepWebSession.remainingMessages);
+        }
+        return 3;
+    });
+
+    useEffect(() => {
+        if (activeDeepWebSession && typeof activeDeepWebSession.remainingMessages === 'number' && activeDeepWebSession.remainingMessages > 0) {
+            deepWebSessionIdRef.current = activeDeepWebSession.sessionId;
+            setLiveMessageCount(Math.max(0, 3 - activeDeepWebSession.remainingMessages));
+        } else if (!activeDeepWebSession) {
+            deepWebSessionIdRef.current = null;
+            setLiveMessageCount(3);
+        }
+    }, [activeDeepWebSession]);
+
     const [pendingChatMessage, setPendingChatMessage] = useState<{ nodeId: string; message: string } | null>(null);
     const [deepWebUnlockError, setDeepWebUnlockError] = useState<string | null>(null);
     const deepWebSessionIdRef = useRef<string | null>(null);
@@ -2062,6 +2081,9 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         }
     }, [selectedNode, isMagazineViewOpen]);
 
+    const chatHistoriesRef = useRef(chatHistories);
+    useEffect(() => { chatHistoriesRef.current = chatHistories; }, [chatHistories]);
+
     const handleSendMessage = async (nodeId: string, message: string, forceLive = false, overrideDeepWebSessionId?: string) => {
         const currentMode = getChatMode(nodeId);
         if (currentMode === 'live' && liveMessageCount >= 3 && !forceLive) {
@@ -2074,10 +2096,14 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
             return;
         }
 
-        const history = chatHistories.get(nodeId) || [];
+        const history = (chatHistoriesRef.current || chatHistories).get(nodeId) || [];
         const newHistory = [...history, { role: 'user', text: message, timestamp: Date.now() } as ChatMessage];
         
-        onUpdateChatHistories(new Map(chatHistories).set(nodeId, newHistory));
+        onUpdateChatHistories((prev) => {
+            const next = new Map(prev);
+            next.set(nodeId, newHistory);
+            return next;
+        });
         setChatLoadingMap(prev => new Map(prev).set(nodeId, true));
         let didIncrementLiveCount = false;
 
@@ -2093,11 +2119,25 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     detailsCache,
                     graphData,
                     (chunk) => {
-                        onUpdateChatHistories(new Map(chatHistories).set(nodeId, [...newHistory, { role: 'model', text: chunk, timestamp: aiTimestamp } as ChatMessage]));
+                        onUpdateChatHistories((prev) => {
+                            const next = new Map(prev);
+                            next.set(nodeId, [...newHistory, { role: 'model', text: chunk, timestamp: aiTimestamp } as ChatMessage]);
+                            return next;
+                        });
                     }
                 );
             } else {
-                setLiveMessageCount(prev => prev + 1);
+                setLiveMessageCount(prev => {
+                    const nextCount = prev + 1;
+                    onUpdateDeepWebSession?.((prevSession) => {
+                        if (!prevSession) return prevSession;
+                        return {
+                            ...prevSession,
+                            remainingMessages: Math.max(0, 3 - nextCount),
+                        };
+                    });
+                    return nextCount;
+                });
                 didIncrementLiveCount = true;
                 const aiTimestamp = Date.now();
                 let idToken: string | undefined;
@@ -2113,11 +2153,22 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     message,
                     graphData,
                     (chunk) => {
-                        onUpdateChatHistories(new Map(chatHistories).set(nodeId, [...newHistory, { role: 'model', text: chunk, timestamp: aiTimestamp } as ChatMessage]));
+                        onUpdateChatHistories((prev) => {
+                            const next = new Map(prev);
+                            next.set(nodeId, [...newHistory, { role: 'model', text: chunk, timestamp: aiTimestamp } as ChatMessage]);
+                            return next;
+                        });
                     },
                     {
                         idToken,
                         deepWebSessionId: activeSessionId,
+                        useSearch: true,
+                        detailsCache,
+                        projectName,
+                        seedArtists,
+                        userTaste,
+                        nodeId: currentNode.id,
+                        nodeName: cleanArtistDisplayName(currentNode.id, graphData.nodes),
                     }
                 );
 
@@ -2138,9 +2189,20 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                 // Quota recovery: reset liveMessageCount back to threshold so TokenConfirmationDialog prompts for a fresh lease
                 setLiveMessageCount(3);
                 deepWebSessionIdRef.current = null;
+                onUpdateDeepWebSession?.(null);
             } else if (didIncrementLiveCount) {
                 // Roll back optimistic message increment and preserve deepWebSessionIdRef on transient/auth/network errors
-                setLiveMessageCount(prev => Math.max(0, prev - 1));
+                setLiveMessageCount(prev => {
+                    const rolledBack = Math.max(0, prev - 1);
+                    onUpdateDeepWebSession?.((prevSession) => {
+                        if (!prevSession) return prevSession;
+                        return {
+                            ...prevSession,
+                            remainingMessages: Math.max(0, 3 - rolledBack),
+                        };
+                    });
+                    return rolledBack;
+                });
             }
             const errorMessage = isLeaseExhaustedError
                 ? "Deep Connections session expired or unauthorized. Send again to unlock a 3-message session."
@@ -2148,24 +2210,36 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     ? "The AI is taking too long to respond. Your Deep Connections session is still active — please try again."
                     : "Connection interrupted — your Deep Connections session is still active. Please try sending your message again.";
             
-            onUpdateChatHistories(new Map(chatHistories).set(nodeId, [
-                ...newHistory, 
-                { role: 'model', text: errorMessage } as ChatMessage
-            ]));
+            onUpdateChatHistories((prev) => {
+                const next = new Map(prev);
+                next.set(nodeId, [
+                    ...newHistory, 
+                    { role: 'model', text: errorMessage } as ChatMessage
+                ]);
+                return next;
+            });
         } finally {
             setChatLoadingMap(prev => new Map(prev).set(nodeId, false));
         }
     };
 
     const handleDeleteMessage = (nodeId: string, index: number) => {
-        const history = chatHistories.get(nodeId) || [];
-        const newHistory = [...history];
-        newHistory.splice(index, 1);
-        onUpdateChatHistories(new Map(chatHistories).set(nodeId, newHistory));
+        onUpdateChatHistories((prev) => {
+            const history = prev.get(nodeId) || [];
+            const newHistory = [...history];
+            newHistory.splice(index, 1);
+            const next = new Map(prev);
+            next.set(nodeId, newHistory);
+            return next;
+        });
     };
 
     const handleClearChat = (nodeId: string) => {
-        onUpdateChatHistories(new Map(chatHistories).set(nodeId, []));
+        onUpdateChatHistories((prev) => {
+            const next = new Map(prev);
+            next.set(nodeId, []);
+            return next;
+        });
     };
 
     const filteredAndSortedNodes = useMemo(() => {
@@ -2781,7 +2855,8 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                             const res = await unlockCallable({
                                 projectId: projectId || undefined,
                                 nodeId: target.nodeId,
-                                nodeName: currentNode?.label || target.nodeId,
+                                nodeName: currentNode?.label || cleanArtistDisplayName(target.nodeId, graphData.nodes) || target.nodeId,
+                                projectName: projectName || undefined,
                             });
                             const data = res?.data as { sessionId?: string; remainingMessages?: number } | undefined;
                             const mintedSessionId = data?.sessionId || undefined;
@@ -2789,7 +2864,11 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                 ? Math.max(0, Math.min(3, Math.floor(data.remainingMessages)))
                                 : 3;
                             deepWebSessionIdRef.current = mintedSessionId || null;
-                            setLiveMessageCount(Math.max(0, 3 - remaining));
+                            const used = Math.max(0, 3 - remaining);
+                            setLiveMessageCount(used);
+                            if (mintedSessionId) {
+                                onUpdateDeepWebSession?.({ sessionId: mintedSessionId, remainingMessages: remaining });
+                            }
                             setPendingChatMessage(null);
                             handleSendMessage(target.nodeId, target.message, true, mintedSessionId);
                         } catch (err: any) {

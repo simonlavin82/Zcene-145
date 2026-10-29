@@ -175,6 +175,11 @@ service cloud.firestore {
         allow update: if isOwner(userId) && isValidSession(incoming());
         allow delete: if isOwner(userId) || isAdmin();
       }
+
+      match /deepWebQueries/{queryId} {
+        allow get, list: if isAdmin();
+        allow write: if false; // Exclusively written by Cloud Run backend proxy via Firebase Admin SDK
+      }
     }
 
     match /sharedZcenes/{shareId} {
