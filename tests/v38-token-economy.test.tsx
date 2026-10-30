@@ -805,34 +805,38 @@ describe('Architecture V38 — Token Economy & Split-Debit Contract', () => {
       />
     );
 
-    expect(screen.getByText(/across all artists in this Zcene/i)).toBeInTheDocument();
+    expect(screen.getByText(/across all artists and Zcenes with no expiration/i)).toBeInTheDocument();
 
-    // 2. unlockDeepWebSessionCallable in tokenWallet.ts scopes deterministicSessionId to _deepweb_pass
+    // 2. unlockDeepWebSessionCallable in tokenWallet.ts scopes canonicalSessionId to _global_deepweb_pass
     const walletSrc = fs.readFileSync(path.resolve(__dirname, '../functions/src/tokenWallet.ts'), 'utf-8');
-    expect(walletSrc).toContain('_deepweb_pass');
+    expect(walletSrc).toContain('_global_deepweb_pass');
     expect(walletSrc).toContain('legacyNodeSessionRef');
-    expect(walletSrc).toContain('tx.delete(legacyNodeSessionRef)');
+    expect(walletSrc).toContain('legacyProjectSessionRef');
 
-    // 3. server.js records deepWebQueries telemetry and cleanses x-zcene-* headers
+    // 3. server.js records deepWebQueries telemetry and extracts x-zcene-project-id
     const serverSrc = fs.readFileSync(path.resolve(__dirname, '../server.js'), 'utf-8');
     expect(serverSrc).toContain("collection('deepWebQueries')");
     expect(serverSrc).toContain("startsWith('x-zcene-')");
+    expect(serverSrc).toContain('headerProjectId');
     expect(serverSrc).toContain('queryQuestion');
     expect(serverSrc).toContain('queryCostUsd');
 
-    // 4. firestore.rules restricts deepWebQueries to admin read-only
+    // 4. firestore.rules allows get on deepWebSessions by owning user
     const rulesSrc = fs.readFileSync(path.resolve(__dirname, '../firestore.rules'), 'utf-8');
+    expect(rulesSrc).toContain('match /deepWebSessions/{sessionId}');
+    expect(rulesSrc).toContain('resource.data.uid == request.auth.uid');
     expect(rulesSrc).toContain('match /deepWebQueries/{queryId}');
     expect(rulesSrc).toContain('allow get, list: if isAdmin();');
     expect(rulesSrc).toContain('allow write: if false;');
 
-    // 5. geminiService.ts attaches tools: [{ googleSearch: {} }] conditionally when useSearch is true
+    // 5. geminiService.ts attaches tools: [{ googleSearch: {} }] conditionally and forwards project id
     const geminiSrc = fs.readFileSync(path.resolve(__dirname, '../services/geminiService.ts'), 'utf-8');
     expect(geminiSrc).toContain('if (authOptions?.useSearch)');
     expect(geminiSrc).toContain('config.tools = [{ googleSearch: {} }]');
     expect(geminiSrc).toContain("'x-zcene-node-id'");
     expect(geminiSrc).toContain("'x-zcene-node-name'");
     expect(geminiSrc).toContain("'x-zcene-project-name'");
+    expect(geminiSrc).toContain("'x-zcene-project-id'");
 
     // 6. UsageAnalyticsPage formatTxTypeBadge maps 'refund' and 'admin_refund' to Auto-Refund
     const analyticsSrc = fs.readFileSync(path.resolve(__dirname, '../components/UsageAnalyticsPage.tsx'), 'utf-8');

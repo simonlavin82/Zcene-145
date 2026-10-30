@@ -117,6 +117,7 @@ interface GraphPageProps {
   setIsMenuOpen: (open: boolean) => void;
   onStashArtist?: (artistName: string) => void;
   projectId?: string;
+  activeDeepWebSession?: { sessionId: string; remainingMessages: number } | null;
   /** Phase A — Coordinate Memory: passed through to MusicGraph, fired when
    * the D3 simulation settles with final artist/label node positions. */
   onCoordinatesSettled?: (layout: CanvasNodeRef[]) => void;
@@ -1161,7 +1162,8 @@ const GraphPage: React.FC<GraphPageProps> = ({
   onStashArtist,
   projectId,
   onCoordinatesSettled,
-  isHydrating
+  isHydrating,
+  activeDeepWebSession: propsActiveDeepWebSession,
 }) => {
   const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
   const hasInitializedPanelRef = useRef(false);
@@ -1174,10 +1176,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
   }, [data.nodes.length, seedArtists]);
   const [isDetailsPanelCollapsed, setIsDetailsPanelCollapsed] = useState(true);
   const [deepWebSession, setDeepWebSession] = useState<{ sessionId: string; remainingMessages: number } | null>(null);
-
-  useEffect(() => {
-    setDeepWebSession(null);
-  }, [projectId]);
+  const effectiveDeepWebSession = propsActiveDeepWebSession !== undefined ? propsActiveDeepWebSession : deepWebSession;
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [viewedRationale, setViewedRationale] = useState<string | null>(null);
@@ -2232,7 +2231,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
       <DetailsPanel 
           projectId={projectId}
           projectName={projectName}
-          activeDeepWebSession={deepWebSession}
+          activeDeepWebSession={effectiveDeepWebSession}
           onUpdateDeepWebSession={setDeepWebSession}
           selectedNode={selectedNode} 
           activeNodes={activeNodes} 

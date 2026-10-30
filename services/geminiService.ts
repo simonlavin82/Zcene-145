@@ -2091,6 +2091,7 @@ export interface StreamNodeChatAuthOptions {
   deepWebSessionId?: string;
   useSearch?: boolean;
   detailsCache?: Map<string, NodeDetails>;
+  projectId?: string;
   projectName?: string;
   seedArtists?: string[];
   userTaste?: UserTaste;
@@ -2133,6 +2134,7 @@ export const streamNodeChat = async (
                 ...(currentNode?.id ? { 'x-zcene-node-id': currentNode.id } : {}),
                 ...(canonicalName ? { 'x-zcene-node-name': encodeURIComponent(canonicalName) } : {}),
                 ...(authOptions?.projectName ? { 'x-zcene-project-name': encodeURIComponent(authOptions.projectName) } : {}),
+                ...(authOptions?.projectId ? { 'x-zcene-project-id': authOptions.projectId } : {}),
             }
         }
     });

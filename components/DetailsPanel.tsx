@@ -1955,14 +1955,14 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     const [chatModes, setChatModes] = useState<Map<string, 'instant' | 'live'>>(new Map());
     const getChatMode = (nodeId: string) => chatModes.get(nodeId) || 'instant';
     const [liveMessageCount, setLiveMessageCount] = useState<number>(() => {
-        if (activeDeepWebSession && typeof activeDeepWebSession.remainingMessages === 'number' && activeDeepWebSession.remainingMessages > 0) {
+        if (activeDeepWebSession && typeof activeDeepWebSession.remainingMessages === 'number') {
             return Math.max(0, 3 - activeDeepWebSession.remainingMessages);
         }
         return 3;
     });
 
     useEffect(() => {
-        if (activeDeepWebSession && typeof activeDeepWebSession.remainingMessages === 'number' && activeDeepWebSession.remainingMessages > 0) {
+        if (activeDeepWebSession && typeof activeDeepWebSession.remainingMessages === 'number') {
             deepWebSessionIdRef.current = activeDeepWebSession.sessionId;
             setLiveMessageCount(Math.max(0, 3 - activeDeepWebSession.remainingMessages));
         } else if (!activeDeepWebSession) {
@@ -2164,6 +2164,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                         deepWebSessionId: activeSessionId,
                         useSearch: true,
                         detailsCache,
+                        projectId: projectId || undefined,
                         projectName,
                         seedArtists,
                         userTaste,
@@ -2886,7 +2887,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     isAdmin={isAdmin}
                     error={deepWebUnlockError}
                     cachedArtists={[]}
-                    missingArtists={["Deep Connections (3 Messages)"]}
+                    missingArtists={["All Artists & Zcenes (No Expiration)"]}
                 />,
                 document.body
             )}

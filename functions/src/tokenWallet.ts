@@ -636,13 +636,13 @@ export const unlockDeepWebSessionCallable = onCall(
     const normalizedNodeKey = nodeId.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_").slice(0, 64) || "node";
     const scopedProjectKey = (cleanProjectId || "global").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64);
     
-    // V38.3: Project-Wide session pass
-    const deterministicSessionId = cleanProjectId
-      ? `${caller.uid}_${scopedProjectKey}_deepweb_pass`
-      : `${caller.uid}_global_deepweb_pass`;
+    // V38.4: Account-Wide session pass (across all Zcene projects, zero time expiry)
+    const canonicalSessionId = `${caller.uid}_global_deepweb_pass`;
+    const legacyProjectSessionId = cleanProjectId ? `${caller.uid}_${scopedProjectKey}_deepweb_pass` : null;
     const legacyNodeSessionId = `${caller.uid}_${scopedProjectKey}_${normalizedNodeKey}`;
 
-    const sessionRef = db.collection("deepWebSessions").doc(deterministicSessionId);
+    const sessionRef = db.collection("deepWebSessions").doc(canonicalSessionId);
+    const legacyProjectSessionRef = legacyProjectSessionId ? db.collection("deepWebSessions").doc(legacyProjectSessionId) : null;
     const legacyNodeSessionRef = db.collection("deepWebSessions").doc(legacyNodeSessionId);
     const displayLabel = (nodeName || nodeId).toString().trim();
     const displayProjectLabel = (request.data?.projectName || cleanProjectId || displayLabel || "Zcene").toString().trim();
@@ -659,7 +659,7 @@ export const unlockDeepWebSessionCallable = onCall(
         remainingMessages: 3,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
-        expireAt: getSessionExpiry(),
+        expireAt: null,
       });
       return {
         success: true,
@@ -679,10 +679,11 @@ export const unlockDeepWebSessionCallable = onCall(
       : null;
 
     const result = await db.runTransaction(async (tx) => {
-      const [userSnap, projectSnap, existingSessionSnap, legacySessionSnap] = await Promise.all([
+      const [userSnap, projectSnap, existingSessionSnap, legacyProjectSessionSnap, legacyNodeSessionSnap] = await Promise.all([
         tx.get(userRef),
         projectRef ? tx.get(projectRef) : Promise.resolve(null),
         tx.get(sessionRef),
+        legacyProjectSessionRef ? tx.get(legacyProjectSessionRef) : Promise.resolve(null),
         tx.get(legacyNodeSessionRef),
       ]);
 
@@ -690,25 +691,18 @@ export const unlockDeepWebSessionCallable = onCall(
       const currentBalance = Math.max(0, Math.floor(Number(userData.tokenBalance) || 0));
       const prevSpent = Math.max(0, Math.floor(Number(userData.lifetimeTokensSpent) || 0));
 
-      // 1. Check existing project-wide pass
+      // 1. Check existing canonical global pass (valid until remainingMessages <= 0)
       if (existingSessionSnap.exists) {
         const sData = existingSessionSnap.data() || {};
         const existingRemaining = Math.max(0, Math.floor(Number(sData.remainingMessages) || 0));
-        const rawExpireAt = sData.expireAt;
-        const expireAtMs =
-          rawExpireAt && typeof rawExpireAt.toDate === "function"
-            ? rawExpireAt.toDate().getTime()
-            : rawExpireAt instanceof Date
-              ? rawExpireAt.getTime()
-              : null;
-        const isNotExpired = expireAtMs === null || expireAtMs > Date.now();
 
-        if (sData.uid === caller.uid && existingRemaining > 0 && isNotExpired) {
+        if (sData.uid === caller.uid && existingRemaining > 0) {
           tx.set(
             sessionRef,
             {
               lastNodeId: nodeId,
               lastNodeName: displayLabel,
+              ...(cleanProjectId ? { projectId: cleanProjectId, projectName: displayProjectLabel } : {}),
               updatedAt: FieldValue.serverTimestamp(),
             },
             { merge: true }
@@ -723,32 +717,56 @@ export const unlockDeepWebSessionCallable = onCall(
         }
       }
 
-      // 2. Check legacy node-scoped session for seamless carryover/migration
-      if (legacySessionSnap && legacySessionSnap.exists) {
-        const legacyData = legacySessionSnap.data() || {};
-        const legacyRemaining = Math.max(0, Math.floor(Number(legacyData.remainingMessages) || 0));
-        const rawExpireAt = legacyData.expireAt;
-        const expireAtMs =
-          rawExpireAt && typeof rawExpireAt.toDate === "function"
-            ? rawExpireAt.toDate().getTime()
-            : rawExpireAt instanceof Date
-              ? rawExpireAt.getTime()
-              : null;
-        const isNotExpired = expireAtMs === null || expireAtMs > Date.now();
+      // 2. Check legacy project-wide pass for seamless auto-migration to global pass
+      if (legacyProjectSessionSnap && legacyProjectSessionSnap.exists) {
+        const lpData = legacyProjectSessionSnap.data() || {};
+        const lpRemaining = Math.max(0, Math.floor(Number(lpData.remainingMessages) || 0));
 
-        if (legacyData.uid === caller.uid && legacyRemaining > 0 && isNotExpired) {
+        if (lpData.uid === caller.uid && lpRemaining > 0) {
           tx.set(sessionRef, {
             sessionId: sessionRef.id,
             uid: caller.uid,
             isAdmin: false,
-            projectId: cleanProjectId,
-            projectName: displayProjectLabel,
+            projectId: cleanProjectId || lpData.projectId || null,
+            projectName: displayProjectLabel || lpData.projectName || "Zcene",
+            lastNodeId: nodeId,
+            lastNodeName: displayLabel,
+            remainingMessages: lpRemaining,
+            createdAt: lpData.createdAt || FieldValue.serverTimestamp(),
+            updatedAt: FieldValue.serverTimestamp(),
+            expireAt: null,
+          });
+          if (legacyProjectSessionRef) {
+            tx.delete(legacyProjectSessionRef);
+          }
+          return {
+            sessionId: sessionRef.id,
+            remainingMessages: lpRemaining,
+            tokenBalance: currentBalance,
+            resumed: true,
+            tokensCharged: 0,
+          };
+        }
+      }
+
+      // 3. Check legacy node-scoped session for seamless auto-migration to global pass
+      if (legacyNodeSessionSnap && legacyNodeSessionSnap.exists) {
+        const legacyData = legacyNodeSessionSnap.data() || {};
+        const legacyRemaining = Math.max(0, Math.floor(Number(legacyData.remainingMessages) || 0));
+
+        if (legacyData.uid === caller.uid && legacyRemaining > 0) {
+          tx.set(sessionRef, {
+            sessionId: sessionRef.id,
+            uid: caller.uid,
+            isAdmin: false,
+            projectId: cleanProjectId || legacyData.projectId || null,
+            projectName: displayProjectLabel || legacyData.projectName || "Zcene",
             lastNodeId: nodeId,
             lastNodeName: displayLabel,
             remainingMessages: legacyRemaining,
             createdAt: legacyData.createdAt || FieldValue.serverTimestamp(),
             updatedAt: FieldValue.serverTimestamp(),
-            expireAt: legacyData.expireAt || getSessionExpiry(),
+            expireAt: null,
           });
           tx.delete(legacyNodeSessionRef);
           return {
@@ -792,7 +810,7 @@ export const unlockDeepWebSessionCallable = onCall(
         remainingMessages: 3,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
-        expireAt: getSessionExpiry(),
+        expireAt: null,
       });
 
       tx.set(txRef, {

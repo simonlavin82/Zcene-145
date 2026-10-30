@@ -188,16 +188,7 @@ app.all('/api/gemini/*wildcard', async (req, res) => {
         if (decodedToken && sData.uid && sData.uid !== decodedToken.uid) {
           throw new Error("SESSION_OWNER_MISMATCH");
         }
-        const rawExpireAt = sData.expireAt;
-        const expireAtMs =
-          rawExpireAt && typeof rawExpireAt.toDate === "function"
-            ? rawExpireAt.toDate().getTime()
-            : rawExpireAt instanceof Date
-              ? rawExpireAt.getTime()
-              : null;
-        if (expireAtMs !== null && expireAtMs <= Date.now()) {
-          throw new Error("SESSION_EXHAUSTED");
-        }
+        // V38.4: Zero time expiry — session remains valid until remainingMessages reaches 0
         const remaining = Math.max(0, Math.floor(Number(sData.remainingMessages) || 0));
         if (remaining <= 0) {
           throw new Error("SESSION_EXHAUSTED");
@@ -220,11 +211,16 @@ app.all('/api/gemini/*wildcard', async (req, res) => {
   const headerNodeId = (req.headers['x-zcene-node-id'] || '').toString().trim();
   const headerNodeName = decodeURIComponent((req.headers['x-zcene-node-name'] || '').toString().trim());
   const headerProjectName = decodeURIComponent((req.headers['x-zcene-project-name'] || '').toString().trim());
+  const headerProjectId = (req.headers['x-zcene-project-id'] || '').toString().trim();
 
   // Cleanse credentials & custom headers before forwarding upstream
   delete headers['x-zcene-password'];
   delete headers['x-zcene-deepweb-session'];
   delete headers['x-zcene-id-token'];
+  delete headers['x-zcene-project-id'];
+  delete headers['x-zcene-project-name'];
+  delete headers['x-zcene-node-id'];
+  delete headers['x-zcene-node-name'];
   Object.keys(headers).forEach(k => {
     if (k.toLowerCase().startsWith('x-zcene-')) {
       delete headers[k];
@@ -327,7 +323,7 @@ app.all('/api/gemini/*wildcard', async (req, res) => {
 
         if (totalTokens > 0 || promptTokens > 0 || candidatesTokens > 0) {
           const targetUid = decodedToken?.uid || activeSessionData?.uid;
-          const targetProjectId = activeSessionData?.projectId;
+          const targetProjectId = headerProjectId || activeSessionData?.projectId || null;
           const modelMatch = targetPath.match(/models\/([^:]+)/);
           const modelKey = modelMatch && modelMatch[1] ? modelMatch[1] : 'gemini-3.6-flash';
 

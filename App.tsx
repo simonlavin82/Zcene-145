@@ -1120,6 +1120,7 @@ const App: React.FC = () => {
   const [lastAppliedFilters, setLastAppliedFilters] = useState<DiscoveryFilters>({});
   const [isMagazineViewOpen, setIsMagazineViewOpen] = useState(false);
   const [profile, setProfile] = useState<any>(null);
+  const [activeDeepWebSession, setActiveDeepWebSession] = useState<{ sessionId: string; remainingMessages: number } | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [user, setUser] = useState<User | null>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -5206,11 +5207,12 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
-  // Sync user profile from Firestore (Real-Time)
+  // Sync user profile from Firestore (Real-Time) & Global Deep Web Session
   useEffect(() => {
     if (!user || !isAuthInitialized || !isFirebaseReady) {
       setProfile(null);
       setLibraryArtists([]);
+      setActiveDeepWebSession(null);
       return;
     }
 
@@ -5268,7 +5270,25 @@ const App: React.FC = () => {
       console.error("[Profile Listener] Failed to fetch profile:", err);
     });
 
-    return () => unsubscribe();
+    // Subscribe to real-time account-wide Deep Connections pass
+    const sessionRef = doc(db, 'deepWebSessions', `${user.uid}_global_deepweb_pass`);
+    const unsubSession = onSnapshot(sessionRef, (snap) => {
+      if (snap.exists()) {
+        const sData = snap.data();
+        const rem = Math.max(0, Math.floor(Number(sData.remainingMessages) || 0));
+        // Hydrate session object (including remainingMessages: 0 so UI displays 3/3 completed)
+        setActiveDeepWebSession({ sessionId: snap.id, remainingMessages: rem });
+      } else {
+        setActiveDeepWebSession(null);
+      }
+    }, (err) => {
+      console.warn("[App Deep Web Listener] snapshot notice:", err);
+    });
+
+    return () => {
+      unsubscribe();
+      unsubSession();
+    };
   }, [user, isAuthInitialized, isFirebaseReady]);
 
   useEffect(() => {
@@ -8008,6 +8028,7 @@ const App: React.FC = () => {
             <GraphPage
               key={currentProjectId || (isViewingShare ? 'share' : 'new-project')}
               projectId={currentProjectId || undefined}
+              activeDeepWebSession={activeDeepWebSession}
               areFiltersChanged={areFiltersChanged}
               data={formattedGraphData || { nodes: [], links: [] }} baseGraph={baseGraph} libraryArtists={libraryArtists} seedArtists={seedArtists}
               onRegenerate={(n) => handleGenerateGraph(n, true, graphData)} 

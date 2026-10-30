@@ -1150,7 +1150,7 @@ export const TokenConfirmationDialog: React.FC<{
             <>
               <p className="leading-relaxed text-zinc-300">
                 {type === 'live_chat_search'
-                  ? 'Unlock a 3-message Deep Connections AI session across all artists in this Zcene.'
+                  ? 'Unlock 3 Deep Connections consults. Works across all artists and Zcenes with no expiration.'
                   : effectiveTokenCost >= TOKEN_PRICING.COMPLEX_QUERY
                     ? 'Curate this multi-artist or custom-anchored Zcene web and save it permanently to your Zcenes.'
                     : 'Curate this Zcene web and unlock it permanently in your Zcenes.'}
