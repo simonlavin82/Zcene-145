@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Project } from '../types';
 import { getProjectDisplayTitle, cleanArtistDisplayName, isNodeInSeedList } from '../services/artistCacheService';
@@ -27,6 +27,7 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
   onShareProject,
   onDuplicateProject
 }) => {
+  const [imgError, setImgError] = useState(false);
   const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
   const displayTitle = getProjectDisplayTitle(project);
   const isUnmapped = project.status !== 'completed' && project.status !== 'curating' && project.status !== 'pending' && project.status !== 'failed' && !project.seedArtists;
@@ -81,7 +82,7 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
     >
       
       {/* Background Layer: Smart Fallback cascade (0 images = monogram, 1 image = full bleed, 2+ images = split card) */}
-      <div className="absolute inset-0 z-0 flex rounded-2xl overflow-hidden">
+      <div className="absolute inset-0 z-0 rounded-2xl overflow-hidden pointer-events-none bg-zinc-950">
         {imageUrls.length >= 2 ? (
           <>
             {/* Left artist: anchored left, cross-fades out across the right half */}
@@ -92,7 +93,13 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
                 maskImage: 'linear-gradient(to right, black 30%, transparent 75%)',
               }}
             >
-              <img src={imageUrls[0]} alt={displayTitle} className="w-full h-full object-cover object-left" crossOrigin="anonymous" />
+              <img 
+                src={imageUrls[0]} 
+                alt={displayTitle} 
+                className="absolute inset-0 w-full h-full object-cover object-left" 
+                loading="lazy"
+                decoding="async"
+              />
             </div>
             {/* Right artist: anchored right, cross-fades out across the left half */}
             <div
@@ -102,15 +109,28 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
                 maskImage: 'linear-gradient(to left, black 30%, transparent 75%)',
               }}
             >
-              <img src={imageUrls[1]} alt={displayTitle} className="w-full h-full object-cover object-right" crossOrigin="anonymous" />
+              <img 
+                src={imageUrls[1]} 
+                alt={displayTitle} 
+                className="absolute inset-0 w-full h-full object-cover object-right" 
+                loading="lazy"
+                decoding="async"
+              />
             </div>
           </>
-        ) : imageUrls.length === 1 ? (
-          <div className="w-full h-full">
-            <img src={imageUrls[0]} alt={displayTitle} className="w-full h-full object-cover" crossOrigin="anonymous" />
+        ) : (imageUrls.length === 1 && !imgError) ? (
+          <div className="absolute inset-0 w-full h-full">
+            <img 
+              src={imageUrls[0]} 
+              alt={displayTitle} 
+              className="absolute inset-0 w-full h-full object-cover" 
+              loading="lazy"
+              decoding="async"
+              onError={() => setImgError(true)}
+            />
           </div>
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-zinc-800/40 to-zinc-900/80 relative overflow-hidden">
+          <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-zinc-800/40 to-zinc-900/80 relative overflow-hidden">
              {/* Monogram for missing images */}
              <div className="absolute bottom-0 right-0 translate-y-[14%] translate-x-[8%] text-white/10 font-black text-8xl uppercase select-none leading-none">
                {extractInitials(displayTitle)}
