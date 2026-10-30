@@ -33,7 +33,9 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
   const isUnmapped = project.status !== 'completed' && project.status !== 'curating' && project.status !== 'pending' && project.status !== 'failed' && !project.seedArtists;
   
   const imageUrls = useSeedImages(project.seedArtists, project.detailsCache, project.graphData, project.seedImageUrl, project.seedImageUrls);
-  const dominantColor = useDominantColor(imageUrls[0] || undefined, displayTitle);
+  const hasArtwork = Boolean(imageUrls.length > 0 && imageUrls[0] && imageUrls[0] !== 'not-found' && !imgError);
+  const dominantColor = useDominantColor(hasArtwork ? imageUrls[0] : undefined);
+  const hasAccentColor = Boolean(hasArtwork && dominantColor && dominantColor !== 'transparent');
 
   // Derive deep cuts count dynamically
   let deepCutsCount = 0;
@@ -71,13 +73,11 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
       onClick={() => onSelectProject(project.id)}
       className={`group relative border border-transparent hover:border-primary rounded-2xl p-5 transition-all cursor-pointer flex flex-col justify-between w-full md:w-[350px] h-[180px] shadow-[0_0_40px_rgba(0,0,0,0.7)] ${activeMenuId === project.id ? 'z-50' : 'overflow-hidden z-0'}`}
       style={{
-        '--scene-accent': dominantColor,
-        // Blend scene accent toward white for bright legible title color
-        '--scene-accent-title': dominantColor
-          ? `color-mix(in oklch, ${dominantColor} 25%, white)`
-          : 'white',
-
-
+        ...(hasAccentColor ? {
+          '--scene-accent': dominantColor,
+          // Blend scene accent toward white for bright legible title color
+          '--scene-accent-title': `color-mix(in oklch, ${dominantColor} 25%, white)`,
+        } : {}),
       } as React.CSSProperties}
     >
       
@@ -148,10 +148,13 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
           <div className="flex items-start justify-between gap-3">
             <div className="flex flex-row items-center gap-4 flex-1 min-w-0">
               <div className="flex flex-col gap-1.5 min-w-0 flex-1">
-                <h3 className="text-base font-medium line-clamp-2 pr-2 transition-colors" style={{ color: 'var(--scene-accent-title, white)' }}>
+                <h3 
+                  className="text-base font-medium line-clamp-2 pr-2 transition-colors text-zinc-100" 
+                  style={hasAccentColor ? { color: 'var(--scene-accent-title, white)' } : undefined}
+                >
                   {displayTitle}
                 </h3>
-                <p className="font-mono text-[10px] font-normal truncate uppercase tracking-widest" style={{ color: 'var(--scene-accent-title, white)' }}>
+                <p className="font-mono text-[10px] font-normal truncate uppercase tracking-widest text-zinc-400">
                   {project.updatedAt ? `Edited ${formatSystemTimestamp(project.updatedAt)}` : 'New Project'}
                 </p>
                 {project.status === 'curating' || project.status === 'pending' || (project.status !== 'failed' && project.status !== 'completed' && project.seedArtists) ? (
@@ -165,7 +168,7 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
                 ) : project.status === 'completed' ? (
                   null
                 ) : (
-                  <span className="text-[9px] uppercase tracking-wide text-zinc-500 font-bold px-1.5 py-0.5 bg-zinc-800/80 rounded-md border border-zinc-800 font-mono whitespace-nowrap backdrop-blur-sm w-fit mt-0.5">
+                  <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800/80 rounded-md border border-zinc-700/60 font-mono whitespace-nowrap backdrop-blur-sm w-fit mt-0.5">
                     Unmapped
                   </span>
                 )}
