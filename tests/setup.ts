@@ -29,3 +29,26 @@ if (typeof window !== 'undefined' && typeof HTMLCanvasElement !== 'undefined') {
     clip: () => {},
   })) as any;
 }
+
+if (typeof window !== 'undefined' && !window.ResizeObserver) {
+  const MockResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+  window.ResizeObserver = MockResizeObserver as any;
+  global.ResizeObserver = MockResizeObserver as any;
+}
+
+if (typeof window !== 'undefined' && typeof SVGElement !== 'undefined') {
+  Object.defineProperty(SVGElement.prototype, 'width', {
+    configurable: true,
+    get() { return { baseVal: { value: 800 } }; }
+  });
+  Object.defineProperty(SVGElement.prototype, 'height', {
+    configurable: true,
+    get() { return { baseVal: { value: 600 } }; }
+  });
+}
+
+

@@ -391,6 +391,11 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     highlightedNodesRef.current = highlightedNodes;
   }, [highlightedNodes]);
 
+  const searchQueryRef = useRef(searchQuery);
+  useEffect(() => {
+    searchQueryRef.current = searchQuery;
+  }, [searchQuery]);
+
   useEffect(() => {
     const trimmedQuery = searchQuery.trim();
     if (!trimmedQuery) { 
@@ -404,6 +409,8 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         const displayName = (node.label || node.id).replace(/-/g, ' ');
         if (displayName.toLowerCase().includes(query) || String(node.id).toLowerCase().includes(query)) {
             newHighlighted.add(String(node.id));
+            newHighlighted.add(String(node.id).toLowerCase());
+            newHighlighted.add(normalizeArtistId(String(node.id)));
         }
     });
     setHighlightedNodes(newHighlighted);
@@ -713,6 +720,10 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             const svg = d3.select(svgRef.current);
 
             // Restore node opacities
+            const isSearchActive = searchQueryRef.current.trim().length > 0;
+            const hlNodes = highlightedNodesRef.current;
+            const selHighlight = selectionHighlightIdsRef.current;
+
             svg.selectAll<SVGGElement, Node>("g.node-element")
                 .transition().duration(200)
                 .style("opacity", (n: any) => {
@@ -720,19 +731,33 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     const isFilteredOut = n.type !== 'artist' && 
                                           Object.prototype.hasOwnProperty.call(activeFilters, nodeType) && 
                                           !activeFilters[nodeType];
-                    if (isFilteredOut) return 0.1;
+                    if (isFilteredOut) return 0.05;
 
-                    const selHighlight = selectionHighlightIdsRef.current;
-                    const hlNodes = highlightedNodesRef.current;
+                    if (isSearchActive) {
+                        if (hlNodes.size === 0) return 0.05;
+                        const isMatch = hlNodes.has(n.id) || 
+                                        hlNodes.has(String(n.id).toLowerCase()) || 
+                                        hlNodes.has(normalizeArtistId(String(n.id)));
+                        return isMatch ? 1 : 0.05;
+                    }
+
                     if (selHighlight) return selHighlight.has(n.id) ? 1 : 0.1;
-                    if (hlNodes.size > 0) return hlNodes.has(n.id) ? 1 : 0.1;
                     return 1;
                 });
 
             // Restore visual line strokes and opacities
             svg.selectAll<SVGLineElement, Link>("line.visual-line")
                 .transition().duration(200)
-                .attr("stroke", "#e4e4e7")
+                .attr("stroke", (l: any) => {
+                    if (isSearchActive) {
+                        const s = typeof l.source === 'string' ? l.source : l.source.id;
+                        const t = typeof l.target === 'string' ? l.target : l.target.id;
+                        const isMatchS = hlNodes.has(s) || hlNodes.has(String(s).toLowerCase());
+                        const isMatchT = hlNodes.has(t) || hlNodes.has(String(t).toLowerCase());
+                        return (isMatchS && isMatchT) ? "#F6E468" : "#e4e4e7";
+                    }
+                    return "#e4e4e7";
+                })
                 .attr("stroke-opacity", (l: any) => {
                     const s = typeof l.source === 'string' ? l.source : l.source.id;
                     const t = typeof l.target === 'string' ? l.target : l.target.id;
@@ -746,10 +771,14 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     };
                     if (isLinkFilteredOut(sNode) || isLinkFilteredOut(tNode)) return 0.05;
 
-                    const selHighlight = selectionHighlightIdsRef.current;
-                    const hlNodes = highlightedNodesRef.current;
+                    if (isSearchActive) {
+                        if (hlNodes.size === 0) return 0.05;
+                        const isMatchS = hlNodes.has(s) || hlNodes.has(String(s).toLowerCase());
+                        const isMatchT = hlNodes.has(t) || hlNodes.has(String(t).toLowerCase());
+                        return (isMatchS && isMatchT) ? 0.6 : 0.05;
+                    }
+
                     if (selHighlight) return (selHighlight.has(s) && selHighlight.has(t)) ? 0.6 : 0.05;
-                    if (hlNodes.size > 0) return (hlNodes.has(s) && hlNodes.has(t)) ? 0.6 : 0.05;
                     return 0.3;
                 });
         }
@@ -1306,18 +1335,27 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         .style("font-size", "12px")
         .text(d => toDisplayLabel(d));
 
+    const isSearchActive = searchQueryRef.current.trim().length > 0;
+    const hlNodes = highlightedNodesRef.current;
+    const selHighlight = selectionHighlightIdsRef.current;
+
     nodeElements
         .style("opacity", d => {
             const nodeType = d.type as FilterKeys;
             const isFilteredOut = d.type !== 'artist' && 
                                   Object.prototype.hasOwnProperty.call(activeFilters, nodeType) && 
                                   !activeFilters[nodeType];
-            if (isFilteredOut) return 0.1;
+            if (isFilteredOut) return 0.05;
 
-            const selHighlight = selectionHighlightIdsRef.current;
-            const hlNodes = highlightedNodesRef.current;
+            if (isSearchActive) {
+                if (hlNodes.size === 0) return 0.05;
+                const isMatch = hlNodes.has(d.id) || 
+                                hlNodes.has(String(d.id).toLowerCase()) || 
+                                hlNodes.has(normalizeArtistId(String(d.id)));
+                return isMatch ? 1 : 0.05;
+            }
+
             if (selHighlight) return selHighlight.has(d.id) ? 1 : 0.1;
-            if (hlNodes.size > 0) return hlNodes.has(d.id) ? 1 : 0.1;
             return 1;
         });
 
@@ -1327,6 +1365,13 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         .join("line")
         .attr("class", "visual-line")
         .attr("stroke", (d: any) => {
+            if (isSearchActive) {
+                const s = nodeId(d.source);
+                const t = nodeId(d.target);
+                const isMatchS = hlNodes.has(s) || hlNodes.has(String(s).toLowerCase());
+                const isMatchT = hlNodes.has(t) || hlNodes.has(String(t).toLowerCase());
+                return (isMatchS && isMatchT) ? "#F6E468" : "#e4e4e7";
+            }
             const activeNode = selectedNode || peekedNode || activeHoveredNodeRef.current;
             if (activeNode) {
                 const s = nodeId(d.source);
@@ -1339,12 +1384,8 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         })
         .attr("stroke-width", 1)
         .attr("stroke-opacity", (d: any) => {
-            const activeNode = selectedNode || peekedNode || activeHoveredNodeRef.current;
             const s = nodeId(d.source);
             const t = nodeId(d.target);
-            if (activeNode && (isSameNodeId(s, activeNode.id) || isSameNodeId(t, activeNode.id))) {
-                return 0.9;
-            }
 
             const sNode = visibleNodes.find(n => n.id === s);
             const tNode = visibleNodes.find(n => n.id === t);
@@ -1355,10 +1396,19 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             };
             if (isLinkFilteredOut(sNode) || isLinkFilteredOut(tNode)) return 0.05;
 
-            const selHighlight = selectionHighlightIdsRef.current;
-            const hlNodes = highlightedNodesRef.current;
+            if (isSearchActive) {
+                if (hlNodes.size === 0) return 0.05;
+                const isMatchS = hlNodes.has(s) || hlNodes.has(String(s).toLowerCase());
+                const isMatchT = hlNodes.has(t) || hlNodes.has(String(t).toLowerCase());
+                return (isMatchS && isMatchT) ? 0.6 : 0.05;
+            }
+
+            const activeNode = selectedNode || peekedNode || activeHoveredNodeRef.current;
+            if (activeNode && (isSameNodeId(s, activeNode.id) || isSameNodeId(t, activeNode.id))) {
+                return 0.9;
+            }
+
             if (selHighlight) return (selHighlight.has(s) && selHighlight.has(t)) ? 0.3 : 0.05;
-            if (hlNodes.size > 0) return (hlNodes.has(s) && hlNodes.has(t)) ? 0.6 : 0.05;
             return 0.4;
         })
         .attr("stroke-dasharray", "3,3")
@@ -1434,6 +1484,8 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
   // Set tracking target when selectedNode or peekedNode changes
   useEffect(() => {
+      const isSearchActive = searchQuery.trim().length > 0;
+      if (isSearchActive) return;
       const activeNode = selectedNode || peekedNode;
       if (activeNode) {
           isTrackingRef.current = true;
@@ -1442,7 +1494,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
           isTrackingRef.current = false;
           targetNodeIdRef.current = null;
       }
-  }, [selectedNode, peekedNode]);
+  }, [selectedNode, peekedNode, searchQuery]);
 
   // Pin Hover Box and highlight connections when selectedNode or peekedNode changes
   useEffect(() => {
@@ -1495,6 +1547,8 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     if (container.empty()) return;
     const nodeElements = container.select(".node-group").selectAll<SVGGElement, Node>("g.node-element");
     
+    const isSearchActive = searchQuery.trim().length > 0;
+
     nodeElements
         .transition().duration(300)
         .style("opacity", d => {
@@ -1502,15 +1556,19 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             const isFilteredOut = d.type !== 'artist' && 
                                   Object.prototype.hasOwnProperty.call(activeFilters, nodeType) && 
                                   !activeFilters[nodeType];
-            if (isFilteredOut) return 0.1;
+            if (isFilteredOut) return 0.05;
+
+            // Search priority: If search query is non-empty, it takes absolute top priority
+            if (isSearchActive) {
+                if (highlightedNodes.size === 0) return 0.05;
+                const isMatch = highlightedNodes.has(d.id) || 
+                                highlightedNodes.has(String(d.id).toLowerCase()) || 
+                                highlightedNodes.has(normalizeArtistId(String(d.id)));
+                return isMatch ? 1 : 0.05;
+            }
 
             if (selectionHighlightIds) {
                 if (selectionHighlightIds.has(d.id)) return 1;
-                if (d.type === 'artist') return 0.4;
-                return 0.1;
-            }
-            if (highlightedNodes.size > 0) {
-                if (highlightedNodes.has(d.id)) return 1;
                 if (d.type === 'artist') return 0.4;
                 return 0.1;
             }
@@ -1520,22 +1578,30 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     nodeElements.select("path")
         .transition().duration(300)
         .attr("stroke-width", d => {
-            const activeNode = selectedNode || peekedNode;
+            const activeNode = !isSearchActive ? (selectedNode || peekedNode) : null;
             const isSelected = activeNode ? isSameNodeId(activeNode.id, d.id) : false;
             const isSeed = d.type === 'artist' && isNodeInSeedList(d.id || d.label || '', seedArtists);
             if (isSelected) return 4;
             return isSeed ? 3 : 2;
         })
         .attr("stroke", d => {
-            const activeNode = selectedNode || peekedNode;
+            const activeNode = !isSearchActive ? (selectedNode || peekedNode) : null;
             const isSelected = activeNode ? isSameNodeId(activeNode.id, d.id) : false;
             const isSeed = d.type === 'artist' && isNodeInSeedList(d.id || d.label || '', seedArtists);
             if (isSelected) return '#F6E468';
             return isSeed ? '#F6E468' : 'transparent';
         });
+
     container.select(".link-group").selectAll<SVGLineElement, Link>("line.visual-line")
         .transition().duration(300)
         .attr("stroke", (d: any) => {
+            if (isSearchActive) {
+                const s = typeof d.source === 'string' ? d.source : d.source.id;
+                const t = typeof d.target === 'string' ? d.target : d.target.id;
+                const isMatchS = highlightedNodes.has(s) || highlightedNodes.has(String(s).toLowerCase());
+                const isMatchT = highlightedNodes.has(t) || highlightedNodes.has(String(t).toLowerCase());
+                return (isMatchS && isMatchT) ? "#F6E468" : "#e4e4e7";
+            }
             const activeNode = selectedNode || peekedNode || activeHoveredNodeRef.current;
             if (!activeNode) return "#e4e4e7";
             const s = typeof d.source === 'string' ? d.source : d.source.id;
@@ -1544,7 +1610,6 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             return isFirstDegree ? "#F6E468" : "#e4e4e7";
         })
         .attr("stroke-opacity", (d: any) => {
-            const activeNode = selectedNode || peekedNode || activeHoveredNodeRef.current;
             const s = typeof d.source === 'string' ? d.source : d.source.id;
             const t = typeof d.target === 'string' ? d.target : d.target.id;
             
@@ -1557,16 +1622,23 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             };
             if (isLinkFilteredOut(sNode) || isLinkFilteredOut(tNode)) return 0.05;
 
+            if (isSearchActive) {
+                if (highlightedNodes.size === 0) return 0.05;
+                const isMatchS = highlightedNodes.has(s) || highlightedNodes.has(String(s).toLowerCase());
+                const isMatchT = highlightedNodes.has(t) || highlightedNodes.has(String(t).toLowerCase());
+                return (isMatchS && isMatchT) ? 0.6 : 0.05;
+            }
+
+            const activeNode = selectedNode || peekedNode || activeHoveredNodeRef.current;
             if (activeNode) {
                 const isFirstDegree = isSameNodeId(s, activeNode.id) || isSameNodeId(t, activeNode.id);
                 if (isFirstDegree) return 0.9;
             }
 
             if (selectionHighlightIds) return (selectionHighlightIds.has(s) && selectionHighlightIds.has(t)) ? 0.3 : 0.05;
-            if (highlightedNodes.size > 0) return (highlightedNodes.has(s) && highlightedNodes.has(t)) ? 0.6 : 0.05;
             return 0.3;
         });
-  }, [selectionHighlightIds, highlightedNodes, activeFilters, visibleNodes, selectedNode, peekedNode]);
+  }, [selectionHighlightIds, highlightedNodes, activeFilters, visibleNodes, selectedNode, peekedNode, searchQuery, seedArtists]);
 
   return (
     <div 

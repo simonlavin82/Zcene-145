@@ -6476,7 +6476,7 @@ const App: React.FC = () => {
         // Auto-hydrate the Deep Cut panel on load if nothing is selected
         const searchParams = new URLSearchParams(window.location.search);
         const urlSelected = searchParams.get('selected');
-        if (!urlSelected && (!selectedNode || hasAutoSelectedRef.current !== currentProjectId)) {
+        if (!urlSelected && hasAutoSelectedRef.current !== currentProjectId) {
           hasAutoSelectedRef.current = currentProjectId;
           const seedList = (seedArtists || '').split('::').map(s => s.trim()).filter(Boolean);
           const firstSeedNode = graphData.nodes.find(n => 
@@ -6505,7 +6505,7 @@ const App: React.FC = () => {
       console.log(`[Re-hydration Hook] Project status: idle/null. Clearing loading state.`);
       setIsLoading(false);
     }
-  }, [user, currentProjectId, isFirebaseReady, isGuest, projectStatus, graphData, selectedNode, seedArtists, handleNodeClick]);
+  }, [user, currentProjectId, isFirebaseReady, isGuest, projectStatus, graphData, seedArtists, handleNodeClick]);
 
 
   // Save Current Project to Firestore (Silent background task)
