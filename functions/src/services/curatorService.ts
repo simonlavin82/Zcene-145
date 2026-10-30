@@ -1801,10 +1801,6 @@ export const LABEL_NODE_DETAILS_SCHEMA = {
       type: Type.STRING,
       description: "A scannable bio (approx. 100 words) using Markdown: short paragraphs, bolding for key terms, and bullet points for lists. Focus on significance and catalogue."
     },
-    imageUrl: {
-      type: Type.STRING,
-      description: "A direct HTTPS image URL representing the record label, extracted from authoritative biographical context."
-    },
     members: {
       type: Type.ARRAY,
       items: { type: Type.STRING },
@@ -2130,12 +2126,12 @@ export const fetchNodeDetailsBackend = async (
       : null
   }));
 
+  const isLabelNode = String(node.type || '').toLowerCase() === 'label';
   const hydratedDetails: any = {
     ...details,
     summary: sanitizeBioText(details.summary || "No summary available (AI response was truncated)."),
     details: (() => {
       const d = details.details || {};
-      const isLabelNode = String(node.type || '').toLowerCase() === 'label';
       const sanitizeMetaField = (val: string | undefined): string => {
         if (!val) return "";
         const t = val.trim().toLowerCase();
@@ -2164,7 +2160,7 @@ export const fetchNodeDetailsBackend = async (
     members: (details.members || []).map(sanitizeString),
     recommendationReason: sanitizeString(details.recommendationReason || ""),
     youtubeVideoId: extractValidYoutubeId(details.youtubeVideoId),
-    imageUrl: sanitizeImageUrl(details.imageUrl, sanitizeString),
+    imageUrl: isLabelNode ? null : sanitizeImageUrl(details.imageUrl, sanitizeString),
     youtubeSearchQuery: typeof details.youtubeSearchQuery === 'string' && details.youtubeSearchQuery.trim().length > 0
       ? sanitizeString(details.youtubeSearchQuery.trim())
       : `${details.details?.artist || details.artist || ''} ${details.details?.genre || details.genre || ''} official music video`.trim(),

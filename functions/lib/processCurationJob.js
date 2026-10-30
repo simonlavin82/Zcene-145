@@ -151,7 +151,7 @@ function sanitizeLabelProfile(details) {
     };
     return {
         summary: parsed.summary || parsed.bio || parsed.description || "",
-        imageUrl: parsed.imageUrl || parsed.image || null,
+        imageUrl: null,
         details: cleanDetails,
         discography: Array.isArray(parsed.discography) ? parsed.discography : [],
         links: Array.isArray(parsed.links) ? parsed.links : [],
@@ -695,6 +695,9 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                     details.imageUrl = 'not-found';
                                     details.discography = [];
                                 }
+                            }
+                            else if (isLabel) {
+                                details.imageUrl = null;
                             }
                             const finalCleanArtistName = seedNamesMap[artistNormId] ||
                                 seedNamesMap[(0, curatorService_1.normalizeArtistId)(rawName)] ||

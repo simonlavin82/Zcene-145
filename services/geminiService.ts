@@ -326,10 +326,6 @@ export const LABEL_NODE_DETAILS_SCHEMA = {
       type: Type.STRING,
       description: "A scannable bio (approx. 100 words) using Markdown: short paragraphs, bolding for key terms, and bullet points for lists. Focus on significance and catalogue."
     },
-    imageUrl: {
-      type: Type.STRING,
-      description: "A direct HTTPS image URL representing the record label, extracted from authoritative biographical context."
-    },
     members: {
       type: Type.ARRAY,
       items: { type: Type.STRING },
@@ -1896,7 +1892,8 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
         recommendationReason: sanitizeString(details.recommendationReason || ""),
     };
 
-    const validImageUrl = sanitizeImageUrl(details.imageUrl, sanitizeString);
+    const isLabelNode = String(node.type || '').toLowerCase() === 'label';
+    const validImageUrl = isLabelNode ? "" : sanitizeImageUrl(details.imageUrl, sanitizeString);
     if (validImageUrl) {
         hydratedDetails.imageUrl = validImageUrl;
     } else {

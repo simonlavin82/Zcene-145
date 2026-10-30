@@ -1646,10 +1646,6 @@ exports.LABEL_NODE_DETAILS_SCHEMA = {
             type: genai_1.Type.STRING,
             description: "A scannable bio (approx. 100 words) using Markdown: short paragraphs, bolding for key terms, and bullet points for lists. Focus on significance and catalogue."
         },
-        imageUrl: {
-            type: genai_1.Type.STRING,
-            description: "A direct HTTPS image URL representing the record label, extracted from authoritative biographical context."
-        },
         members: {
             type: genai_1.Type.ARRAY,
             items: { type: genai_1.Type.STRING },
@@ -1947,12 +1943,12 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint,
             ? l.url.trim()
             : null
     }));
+    const isLabelNode = String(node.type || '').toLowerCase() === 'label';
     const hydratedDetails = {
         ...details,
         summary: sanitizeBioText(details.summary || "No summary available (AI response was truncated)."),
         details: (() => {
             const d = details.details || {};
-            const isLabelNode = String(node.type || '').toLowerCase() === 'label';
             const sanitizeMetaField = (val) => {
                 if (!val)
                     return "";
@@ -1984,7 +1980,7 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint,
         members: (details.members || []).map(sanitizeString),
         recommendationReason: sanitizeString(details.recommendationReason || ""),
         youtubeVideoId: (0, exports.extractValidYoutubeId)(details.youtubeVideoId),
-        imageUrl: (0, exports.sanitizeImageUrl)(details.imageUrl, sanitizeString),
+        imageUrl: isLabelNode ? null : (0, exports.sanitizeImageUrl)(details.imageUrl, sanitizeString),
         youtubeSearchQuery: typeof details.youtubeSearchQuery === 'string' && details.youtubeSearchQuery.trim().length > 0
             ? sanitizeString(details.youtubeSearchQuery.trim())
             : `${details.details?.artist || details.artist || ''} ${details.details?.genre || details.genre || ''} official music video`.trim(),
