@@ -156,25 +156,35 @@ export const AudioPreviewPlayer: React.FC<AudioPreviewPlayerProps> = ({
   const [hasResolved, setHasResolved] = useState(!!initialPreviewUrl);
 
   const abortControllerRef = useRef<AbortController | null>(null);
+  const onPreviewResolvedRef = useRef(onPreviewResolved);
 
-  // Sync state if props update from cache
+  useEffect(() => {
+    onPreviewResolvedRef.current = onPreviewResolved;
+  }, [onPreviewResolved]);
+
+  // Sync state if props update from cache or when nodeId changes
   useEffect(() => {
     if (initialPreviewUrl) {
       setPreview({
         previewUrl: initialPreviewUrl,
         previewTrackName: initialTrackName || 'Preview',
-        itunesArtistId: itunesArtistId || 0,
+        itunesArtistId: Number(itunesArtistId) || 0,
       });
       setHasResolved(true);
+    } else {
+      setPreview(null);
+      setHasResolved(false);
     }
-  }, [initialPreviewUrl, initialTrackName, itunesArtistId]);
+    setIsLoading(false);
+  }, [nodeId, initialPreviewUrl, initialTrackName, itunesArtistId]);
 
   // On-demand fetch if previewUrl is missing but verified itunesArtistId exists
   useEffect(() => {
     if (preview?.previewUrl || hasResolved) return;
 
-    if (!itunesArtistId || itunesArtistId <= 0) {
-      setHasResolved(true);
+    const numericId = Number(itunesArtistId);
+    if (!numericId || numericId <= 0) {
+      // Do not lock hasResolved = true prematurely while details is still loading
       return;
     }
 
@@ -184,14 +194,14 @@ export const AudioPreviewPlayer: React.FC<AudioPreviewPlayerProps> = ({
 
     setIsLoading(true);
 
-    resolveArtistAudioPreview(itunesArtistId, ac.signal)
+    resolveArtistAudioPreview(numericId, ac.signal)
       .then(res => {
         if (!ac.signal.aborted) {
           setHasResolved(true);
           setIsLoading(false);
           if (res) {
             setPreview(res);
-            onPreviewResolved?.({
+            onPreviewResolvedRef.current?.({
               previewUrl: res.previewUrl,
               previewTrackName: res.previewTrackName,
               itunesArtistId: res.itunesArtistId,
@@ -209,7 +219,7 @@ export const AudioPreviewPlayer: React.FC<AudioPreviewPlayerProps> = ({
     return () => {
       ac.abort();
     };
-  }, [nodeId, itunesArtistId, hasResolved, preview?.previewUrl, onPreviewResolved]);
+  }, [nodeId, itunesArtistId, hasResolved, preview?.previewUrl]);
 
   // Stop playback on node switch or unmount
   useEffect(() => {

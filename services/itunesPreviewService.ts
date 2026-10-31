@@ -26,21 +26,22 @@ export async function resolveArtistAudioPreview(
   itunesArtistId?: number | null,
   signal?: AbortSignal
 ): Promise<AudioPreviewResult | null> {
-  if (!itunesArtistId || itunesArtistId <= 0) {
+  const numericId = Number(itunesArtistId);
+  if (!numericId || isNaN(numericId) || numericId <= 0) {
     return null;
   }
 
-  if (previewMemoryCache.has(itunesArtistId)) {
-    return previewMemoryCache.get(itunesArtistId) ?? null;
+  if (previewMemoryCache.has(numericId)) {
+    return previewMemoryCache.get(numericId) ?? null;
   }
 
-  if (inFlightRequests.has(itunesArtistId)) {
-    return inFlightRequests.get(itunesArtistId)!;
+  if (inFlightRequests.has(numericId)) {
+    return inFlightRequests.get(numericId)!;
   }
 
   const fetchPromise = (async (): Promise<AudioPreviewResult | null> => {
     try {
-      const lookupUrl = `https://itunes.apple.com/lookup?id=${itunesArtistId}&entity=song&limit=1`;
+      const lookupUrl = `https://itunes.apple.com/lookup?id=${numericId}&entity=song&limit=1`;
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 3500);
 
@@ -59,31 +60,33 @@ export async function resolveArtistAudioPreview(
               previewUrl: track.previewUrl,
               previewTrackName: track.trackName || 'Preview',
               collectionName: track.collectionName,
-              itunesArtistId,
+              itunesArtistId: numericId,
               trackViewUrl: track.trackViewUrl,
             };
-            previewMemoryCache.set(itunesArtistId, result);
+            previewMemoryCache.set(numericId, result);
             return result;
           }
+
+          // Verified empty response (artist exists on iTunes but has no 30s song previews)
+          previewMemoryCache.set(numericId, null);
+          return null;
         }
       } finally {
         clearTimeout(timeout);
       }
 
-      // Negative cache on empty result
-      previewMemoryCache.set(itunesArtistId, null);
       return null;
     } catch (err: any) {
       if (err.name !== 'AbortError') {
-        console.warn(`[iTunes Preview] Error looking up artist ID ${itunesArtistId}:`, err.message || err);
+        console.warn(`[iTunes Preview] Error looking up artist ID ${numericId}:`, err.message || err);
       }
       return null;
     } finally {
-      inFlightRequests.delete(itunesArtistId);
+      inFlightRequests.delete(numericId);
     }
   })();
 
-  inFlightRequests.set(itunesArtistId, fetchPromise);
+  inFlightRequests.set(numericId, fetchPromise);
   return fetchPromise;
 }
 
@@ -94,7 +97,8 @@ export function primePreviewCache(
   itunesArtistId: number,
   preview: AudioPreviewResult
 ): void {
-  if (itunesArtistId > 0) {
-    previewMemoryCache.set(itunesArtistId, preview);
+  const numericId = Number(itunesArtistId);
+  if (numericId > 0) {
+    previewMemoryCache.set(numericId, preview);
   }
 }

@@ -2454,6 +2454,9 @@ const App: React.FC = () => {
                     : undefined;
                 const tourDates = parsed?.tourDates || [];
                 const tourCachedAt = parsed?.tourCachedAt || "";
+                const itunesArtistId = parsed?.itunesArtistId ? Number(parsed.itunesArtistId) : undefined;
+                const previewUrl = typeof parsed?.previewUrl === 'string' && parsed.previewUrl.trim().length > 0 ? parsed.previewUrl.trim() : undefined;
+                const previewTrackName = typeof parsed?.previewTrackName === 'string' && parsed.previewTrackName.trim().length > 0 ? parsed.previewTrackName.trim() : undefined;
                 
                 const isPlaceholderBio = bio.includes('sandbox mock') || bio.includes('test scenarios');
                 const isBioTooShort = !bio || bio.trim().length < 5;
@@ -2476,7 +2479,10 @@ const App: React.FC = () => {
                     groundingLinks,
                     youtubeVideoId,
                     youtubeSearchQuery,
-                    synthesisRationale: data.synthesisRationale || parsed?.synthesisRationale || ""
+                    synthesisRationale: data.synthesisRationale || parsed?.synthesisRationale || "",
+                    itunesArtistId,
+                    previewUrl,
+                    previewTrackName
                 };
 
                 const isDisplayable = bio && bio.trim().length > 5 && !isPlaceholderBio;
@@ -2944,7 +2950,10 @@ const App: React.FC = () => {
                   groundingLinks: parsedDetails?.groundingLinks || [],
                   tourDates: parsedDetails?.tourDates || [],
                   tourCachedAt: parsedDetails?.tourCachedAt || "",
-                  synthesisRationale: parsedDetails?.synthesisRationale || normalizedGraph.synthesisRationale || undefined
+                  synthesisRationale: parsedDetails?.synthesisRationale || normalizedGraph.synthesisRationale || undefined,
+                  itunesArtistId: parsedDetails?.itunesArtistId ? Number(parsedDetails.itunesArtistId) : undefined,
+                  previewUrl: typeof parsedDetails?.previewUrl === 'string' && parsedDetails.previewUrl.trim().length > 0 ? parsedDetails.previewUrl.trim() : undefined,
+                  previewTrackName: typeof parsedDetails?.previewTrackName === 'string' && parsedDetails.previewTrackName.trim().length > 0 ? parsedDetails.previewTrackName.trim() : undefined
                };
                 
                setDetailsCache(prev => {
@@ -5586,6 +5595,9 @@ const App: React.FC = () => {
             ? parsed.youtubeSearchQuery.trim() : undefined;
         const tourDates = parsed?.tourDates || [];
         const tourCachedAt = parsed?.tourCachedAt || '';
+        const itunesArtistId = parsed?.itunesArtistId ? Number(parsed.itunesArtistId) : undefined;
+        const previewUrl = typeof parsed?.previewUrl === 'string' && parsed.previewUrl.trim().length > 0 ? parsed.previewUrl.trim() : undefined;
+        const previewTrackName = typeof parsed?.previewTrackName === 'string' && parsed.previewTrackName.trim().length > 0 ? parsed.previewTrackName.trim() : undefined;
 
         if (!bio || bio.length < 5) return;
 
@@ -5601,7 +5613,10 @@ const App: React.FC = () => {
           groundingLinks,
           youtubeVideoId,
           youtubeSearchQuery,
-          synthesisRationale: parsed?.synthesisRationale
+          synthesisRationale: parsed?.synthesisRationale,
+          itunesArtistId,
+          previewUrl,
+          previewTrackName
         };
 
         // Register under all lookup key variants
@@ -5636,7 +5651,8 @@ const App: React.FC = () => {
           const gainsImage = !existing.imageUrl && !!v.imageUrl;
           const gainsVideo = !existing.youtubeVideoId && !!v.youtubeVideoId;
           const gainsStyle = !existing.details?.style && !!v.details?.style;
-          if (!gainsImage && !gainsVideo && !gainsStyle) {
+          const gainsAudio = (!existing.itunesArtistId && !!v.itunesArtistId) || (!existing.previewUrl && !!v.previewUrl);
+          if (!gainsImage && !gainsVideo && !gainsStyle && !gainsAudio) {
             return;
           }
           console.log(`[Batch Hydration] Merging missing fields into locked artist: ${k}`);
@@ -5645,6 +5661,9 @@ const App: React.FC = () => {
             ...existing,
             imageUrl: v.imageUrl || existing.imageUrl || '',
             youtubeVideoId: v.youtubeVideoId || existing.youtubeVideoId,
+            itunesArtistId: v.itunesArtistId || existing.itunesArtistId,
+            previewUrl: v.previewUrl || existing.previewUrl,
+            previewTrackName: v.previewTrackName || existing.previewTrackName,
             details: {
               ...(v.details || {}),
               ...(existing.details || {}),
@@ -5671,7 +5690,8 @@ const App: React.FC = () => {
             const gainsImage = !existing.imageUrl && !!v.imageUrl;
             const gainsVideo = !existing.youtubeVideoId && !!v.youtubeVideoId;
             const gainsStyle = !existing.details?.style && !!v.details?.style;
-            if (!gainsImage && !gainsVideo && !gainsStyle) {
+            const gainsAudio = (!existing.itunesArtistId && !!v.itunesArtistId) || (!existing.previewUrl && !!v.previewUrl);
+            if (!gainsImage && !gainsVideo && !gainsStyle && !gainsAudio) {
               return;
             }
             console.log(`[Batch Hydration] Merging missing fields into locked artist state: ${k}`);
@@ -5680,6 +5700,9 @@ const App: React.FC = () => {
               ...existing,
               imageUrl: v.imageUrl || existing.imageUrl || '',
               youtubeVideoId: v.youtubeVideoId || existing.youtubeVideoId,
+              itunesArtistId: v.itunesArtistId || existing.itunesArtistId,
+              previewUrl: v.previewUrl || existing.previewUrl,
+              previewTrackName: v.previewTrackName || existing.previewTrackName,
               details: {
                 ...(v.details || {}),
                 ...(existing.details || {}),
@@ -7445,7 +7468,10 @@ const App: React.FC = () => {
                                   youtubeSearchQuery: typeof parsed.youtubeSearchQuery === 'string' && parsed.youtubeSearchQuery.trim()
                                     ? parsed.youtubeSearchQuery.trim()
                                     : `${artistName} ${genre} official music video`.trim(),
-                                  synthesisRationale: data.synthesisRationale || parsed.synthesisRationale || ""
+                                  synthesisRationale: data.synthesisRationale || parsed.synthesisRationale || "",
+                                  itunesArtistId: parsed?.itunesArtistId ? Number(parsed.itunesArtistId) : undefined,
+                                  previewUrl: typeof parsed?.previewUrl === 'string' && parsed.previewUrl.trim().length > 0 ? parsed.previewUrl.trim() : undefined,
+                                  previewTrackName: typeof parsed?.previewTrackName === 'string' && parsed.previewTrackName.trim().length > 0 ? parsed.previewTrackName.trim() : undefined
                                 };
                                console.log("[Global Cache] Fallback successful for:", node.id);
                              }
@@ -7657,7 +7683,10 @@ const App: React.FC = () => {
                                     youtubeVideoId: parsed.youtubeVideoId || null,
                                     youtubeSearchQuery: typeof parsed.youtubeSearchQuery === 'string' && parsed.youtubeSearchQuery.trim()
                                       ? parsed.youtubeSearchQuery.trim()
-                                      : `${parsed.details?.artist || ''} ${parsed.details?.genre || ''} official music video`.trim()
+                                      : `${parsed.details?.artist || ''} ${parsed.details?.genre || ''} official music video`.trim(),
+                                    itunesArtistId: parsed?.itunesArtistId ? Number(parsed.itunesArtistId) : undefined,
+                                    previewUrl: typeof parsed?.previewUrl === 'string' && parsed.previewUrl.trim().length > 0 ? parsed.previewUrl.trim() : undefined,
+                                    previewTrackName: typeof parsed?.previewTrackName === 'string' && parsed.previewTrackName.trim().length > 0 ? parsed.previewTrackName.trim() : undefined
                                   };
                                   details = fallbackDetails;
                                   console.log(`[Reconciliation] Merging detailsCache from legacy base doc.`);

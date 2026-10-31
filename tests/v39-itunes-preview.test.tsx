@@ -84,6 +84,46 @@ describe('Architecture V39.2 Clean Slate: Instant 30-Second iTunes Audio Preview
       expect(cached).toBeNull();
       expect(fetchMock).toHaveBeenCalledTimes(1);
     });
+
+    it('accepts string itunesArtistId and coerces to number safely', async () => {
+      const mockTrack = {
+        wrapperType: 'track',
+        kind: 'song',
+        artistId: 1578305972,
+        trackName: 'Boomerang',
+        previewUrl: 'https://audio-ssl.itunes.apple.com/itunes-assets/boomerang.m4a',
+      };
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ results: [mockTrack] })
+      });
+      global.fetch = fetchMock;
+
+      const result = await resolveArtistAudioPreview('1578305972' as any);
+      expect(result).not.toBeNull();
+      expect(result?.itunesArtistId).toBe(1578305972);
+    });
+
+    it('does not negative-cache if request was aborted', async () => {
+      const abortError = new Error('The user aborted a request.');
+      abortError.name = 'AbortError';
+      const fetchMock = vi.fn().mockRejectedValue(abortError);
+      global.fetch = fetchMock;
+
+      const result = await resolveArtistAudioPreview(12345678);
+      expect(result).toBeNull();
+
+      // Subsequent successful call should be allowed to retry
+      const successMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ results: [{ wrapperType: 'track', kind: 'song', previewUrl: 'https://test.m4a', trackName: 'Test' }] })
+      });
+      global.fetch = successMock;
+
+      const retryResult = await resolveArtistAudioPreview(12345678);
+      expect(retryResult).not.toBeNull();
+      expect(successMock).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('Part 2: AudioPreviewPlayer Component & UI Resilience', () => {
