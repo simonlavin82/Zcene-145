@@ -1302,9 +1302,9 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 <AudioPreviewPlayer
                                     nodeId={node.id}
                                     artistName={getArtistDisplayName(details, node)}
-                                    previewUrl={details.previewUrl}
-                                    previewTrackName={details.previewTrackName}
-                                    itunesArtistId={details.itunesArtistId}
+                                    previewUrl={details?.previewUrl}
+                                    previewTrackName={details?.previewTrackName}
+                                    itunesArtistId={details?.itunesArtistId}
                                     onPreviewResolved={(res) => {
                                         if (details) {
                                             details.previewUrl = res.previewUrl;

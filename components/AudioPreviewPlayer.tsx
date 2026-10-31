@@ -121,7 +121,7 @@ export const stopGlobalAudio = () => {
 
 export interface AudioPreviewPlayerProps {
   nodeId: string;
-  artistName: string;
+  artistName?: string;
   previewUrl?: string | null;
   previewTrackName?: string | null;
   itunesArtistId?: number | null;
@@ -143,7 +143,7 @@ export const AudioPreviewPlayer: React.FC<AudioPreviewPlayerProps> = ({
       return {
         previewUrl: initialPreviewUrl,
         previewTrackName: initialTrackName || 'Preview',
-        itunesArtistId: itunesArtistId || undefined,
+        itunesArtistId: itunesArtistId || 0,
       };
     }
     return null;
@@ -163,15 +163,20 @@ export const AudioPreviewPlayer: React.FC<AudioPreviewPlayerProps> = ({
       setPreview({
         previewUrl: initialPreviewUrl,
         previewTrackName: initialTrackName || 'Preview',
-        itunesArtistId: itunesArtistId || undefined,
+        itunesArtistId: itunesArtistId || 0,
       });
       setHasResolved(true);
     }
   }, [initialPreviewUrl, initialTrackName, itunesArtistId]);
 
-  // On-demand fetch if previewUrl is missing
+  // On-demand fetch if previewUrl is missing but verified itunesArtistId exists
   useEffect(() => {
     if (preview?.previewUrl || hasResolved) return;
+
+    if (!itunesArtistId || itunesArtistId <= 0) {
+      setHasResolved(true);
+      return;
+    }
 
     abortControllerRef.current?.abort();
     const ac = new AbortController();
@@ -179,7 +184,7 @@ export const AudioPreviewPlayer: React.FC<AudioPreviewPlayerProps> = ({
 
     setIsLoading(true);
 
-    resolveArtistAudioPreview(artistName, itunesArtistId, ac.signal)
+    resolveArtistAudioPreview(itunesArtistId, ac.signal)
       .then(res => {
         if (!ac.signal.aborted) {
           setHasResolved(true);
@@ -204,7 +209,7 @@ export const AudioPreviewPlayer: React.FC<AudioPreviewPlayerProps> = ({
     return () => {
       ac.abort();
     };
-  }, [nodeId, artistName, itunesArtistId, hasResolved, preview?.previewUrl, onPreviewResolved]);
+  }, [nodeId, itunesArtistId, hasResolved, preview?.previewUrl, onPreviewResolved]);
 
   // Stop playback on node switch or unmount
   useEffect(() => {
@@ -242,13 +247,21 @@ export const AudioPreviewPlayer: React.FC<AudioPreviewPlayerProps> = ({
     }
   }, [nodeId, isPlaying, preview?.previewUrl]);
 
-  // Silent fallback: if resolved and no preview was found, render completely empty
-  if (hasResolved && !preview?.previewUrl) {
-    return null;
+  // If loading preview for a verified itunesArtistId, display subtle 28px shimmer loader
+  if (isLoading && !preview?.previewUrl) {
+    return (
+      <div className={`flex items-center justify-center my-2.5 w-full select-none ${className}`}>
+        <div className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-zinc-900/60 border border-zinc-800/80 shadow-md animate-pulse">
+          <div className="w-5 h-5 rounded-full bg-zinc-800" />
+          <div className="w-24 h-3 rounded bg-zinc-800" />
+          <div className="w-8 h-3 rounded bg-zinc-800/60" />
+        </div>
+      </div>
+    );
   }
 
-  // If loading and no preview yet, keep UI clean and unobtrusive
-  if (isLoading && !preview?.previewUrl) {
+  // Silent fallback: if resolved and no preview was found (or unindexed), render completely empty
+  if (hasResolved && !preview?.previewUrl) {
     return null;
   }
 
