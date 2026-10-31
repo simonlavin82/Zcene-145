@@ -130,8 +130,9 @@ app.all('/api/gemini/*wildcard', async (req, res) => {
     }
   }
 
-  // If token failed verification and no Deep Web session lease is provided, reject immediately
-  if (!decodedToken && !deepWebSessionId) {
+  // Phase 1 / Rule 43: Enforce strict Firebase Auth Bearer token verification on all proxy calls.
+  // Deep Web session leases cannot bypass auth.
+  if (!decodedToken) {
     return res.status(401).json({
       code: candidateToken ? "AUTH_TOKEN_INVALID" : "AUTH_TOKEN_MISSING",
       error: candidateToken ? "Invalid or expired authentication token." : "Missing Firebase Authorization Bearer token.",
@@ -184,8 +185,8 @@ app.all('/api/gemini/*wildcard', async (req, res) => {
         }
         const sData = snap.data() || {};
         activeSessionData = sData;
-        // If decoded token is available, enforce owner match; otherwise the server-minted session lease authoritatively identifies the user
-        if (decodedToken && sData.uid && sData.uid !== decodedToken.uid) {
+        // Phase 1 / Rule 43: Enforce strict UID ownership verification ({uid}_global_deepweb_pass / sData.uid)
+        if (!sData.uid || sData.uid !== decodedToken.uid) {
           throw new Error("SESSION_OWNER_MISMATCH");
         }
         // V38.4: Zero time expiry — session remains valid until remainingMessages reaches 0

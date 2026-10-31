@@ -1,8 +1,8 @@
 # ZCENE ARCHITECTURAL TRUTH & IMMUTABLE LAWS
  
-![Architecture Diagram](./Zcene Architecture V38.jpg)
+![Architecture Diagram](./Zcene Architecture V39.jpg)
  
-This document defines the absolute, immutable architectural baseline of Zcene (V38 — 43 Laws). All future development, bug fixes, and AI agent actions MUST strictly adhere to these laws. Legacy paradigms (like shared `API_PASSWORD` secrets, naive string matching, bypass assumptions, single-pointer stubs, open-ended prompt instruction textareas, prose-fallback stubs, or storing entity payloads under bare IDs) are strictly forbidden.
+This document defines the absolute, immutable architectural baseline of Zcene (V39 — 43 Laws). All future development, bug fixes, and AI agent actions MUST strictly adhere to these laws. Legacy paradigms (like shared `API_PASSWORD` secrets, naive string matching, bypass assumptions, single-pointer stubs, open-ended prompt instruction textareas, prose-fallback stubs, or storing entity payloads under bare IDs) are strictly forbidden.
  
 ## THE IMMUTABLE ARCHITECTURAL LAWS
  
@@ -20,7 +20,7 @@ The curation pipeline is strictly divided into three distinct execution columns.
     - **Direct Hit / Typo Corrected Settlement Exit (`authorizeDirectHitCallable`):** Cached Topology Hits and post-validation cache intercepts exit Step 4 through `authorizeDirectHitCallable` (settling `-5T` on pure cache hits, or `-4T` remainder after `1T` Flash lookup) -> `applyLocalTopologyHit` -> Step 7 (`Drop Loader & Render Zcene`).
     - **Cancellation:** Cancelling Step 4 halts downstream settlement (`0T` if cached; the `1T` Flash lookup fee is retained if Flash executed).
   - **Step 5: Active Loader Gate:** Locks UI completely for live synthesis runs entering Column 2.
-  - **Step 6: Deep Connections Consult (`DetailsPanel.tsx`):** Unlocks a 3-message grounded artist consult for `3 Tokens` via `unlockDeepWebSessionCallable` (minting `deepWebSessions/{sessionId}` verified alongside `Authorization: Bearer <idToken>` in `server.js` `/api/gemini/*`).
+  - **Step 6: Deep Connections Consult (`DetailsPanel.tsx`):** Unlocks or resumes an account-wide 3-message artist consult for `3 Tokens` via `unlockDeepWebSessionCallable` (minting `deepWebSessions/{uid}_global_deepweb_pass`; no TTL, free resume across Zcenes while < 3 messages used, atomic per-message `remainingMessages` decrement with +1 auto-refund on failed reply, strictly verified alongside Firebase Auth Bearer `<idToken>` and UID ownership matching in `server.js` `/api/gemini/*`).
   - **Step 7: Drop Loader & Render Zcene:** Drops the loader immediately on Direct Hit local hydration or when Column 3 sets project status to `'completed'`.
 - **Column 2: HTTP Fast-Track (executeCurationPipeline.ts):** Synchronous execution layer.
   - **Node 1: Ingest Validated Seed Payload & Settle Token Balance ([Rules 2, 34, 43]):** Verifies `request.auth`, settles remaining project balance (`projectCost - creditablePreFlightTokens`, i.e., `4T`/`5T` Single-Seed or `9T`/`10T` Complex), stamps `tokensSpent` onto `users/{uid}/projects/{projectId}`, and automatically refunds `settlementTokensDeducted` (`4T`/`5T`/`9T`/`10T`) on fatal Column 2 or Column 3 failure (retaining the `1T` Pre-Flight Lookup Fee). Ingests frontend-validated seed preferences (`originalQueries`, `disambiguationHints`, `disambiguationGenres`, `activeSeedNames`) and sanitizes `payload.filters` via `sanitizeDiscoveryFilters` (enforcing dynamic `1965–ERA_MAX_BOUND` era bounds with $N - 2$ Rolling Horizon Normalization, mutual exclusion of `includeOrigins`/`excludeOrigins`, canonical countries/genres, and stripping legacy `additionalInstructions`). Forces `needsProGeneration = true` and `Complex Generation` whenever `hasActiveDiscoveryFilters(filters)` is true, preventing cached single seeds from bypassing active 3-Tier filters. Enforces `isFullyQualifiedEntityProfile` at the Read Gate.
@@ -56,12 +56,12 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 
 ### 7. Fail-Fast Media & Profile Gatekeeper (`isFullyQualifiedEntityProfile`)
 - The cache validation predicate (`isFullyQualifiedEntityProfile` in `cacheQualification.ts`) must enforce strict completeness across both Read and Write Gates.
-- Nodes lacking crucial metadata (`summary <= 50` chars, missing `genre`/`origin`/`founded`, non-array `discography` for artists [`!Array.isArray(profile.discography)`], missing `imageUrl`, or prose-fallback `recommendationReason` containing `"Synthesised from live cultural archives"`) are instantly flagged as cache misses at the Read Gate and barred from global persistence at the Write Gate. Note: `imageUrl: "not-found"` is a valid terminal monogram state when accompanied by valid `Array.isArray(profile.discography)` (honest empty arrays `[]` are fully accepted for unindexed underground artists).
+- Nodes lacking crucial metadata (`summary <= 50` chars, missing `genre`/`origin`/`founded`, non-array `discography` for artists [`!Array.isArray(profile.discography)`], missing `imageUrl` for artists [Labels are strictly exempt from the `imageUrl` check], or prose-fallback `recommendationReason` containing `"Synthesised from live cultural archives"`) are instantly flagged as cache misses at the Read Gate and barred from global persistence at the Write Gate. Note: `imageUrl: "not-found"` is a valid terminal monogram state when accompanied by valid `Array.isArray(profile.discography)` (honest empty arrays `[]` are fully accepted for unindexed underground artists).
 
 ### 8. Strict Topology Verification, Schema-Locked Hydration & Cache Serialization
 - **Schema-Locked Deep Cut Hydration:** `fetchNodeDetailsBackend` (`curatorService.ts`) and `healOrphanedAsset.ts` MUST enforce `responseMimeType: "application/json"` and the entity-type parameterized `NODE_DETAILS_SCHEMA` (with 3x retry):
   - **For Artists:** `style` is in `required` and enforced strictly via `CANONICAL_STYLES_FLAT` enum inside the Gemini schema, guaranteeing zero hallucinated styles.
-  - **For Labels:** `style` is completely omitted from both `properties` and `required` arrays.
+  - **For Labels:** `style` and `imageUrl` are completely omitted from both `properties` and `required` arrays (`LABEL_NODE_DETAILS_SCHEMA`), and `sanitizeLabelProfile` strictly enforces `imageUrl: null` in both backend (`processCurationJob.ts`) and client (`artistCacheService.ts`).
   - **Zero-Hallucination Discography Grounding:** Empty arrays `[]` are explicitly permitted for underground/DIY artists without catalog releases. The prompt and schema strictly instruct the model: *"Only include real, verified releases. Never fabricate or guess album titles if uncertain — return an empty array [] instead. Release years must match genuine release history (YYYY) or be omitted."*
   - Legacy prose fallbacks (`"Synthesised from live cultural archives..."`) are strictly eradicated across backend and frontend services.
 - **iTunes Discography Reconciliation & Tier 4 Quarantine:** When the 4-Tier iTunes scraper executes, candidate discographies are cross-referenced and reconciled via `reconcileDiscographyWithITunes`:
@@ -164,8 +164,9 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 - **Rationale:** Shared and cloned Zcenes intentionally receive fresh organic D3 layouts because the recipient's viewport dimensions and graph context are unknown at write time. Owned projects retain their settled topology to eliminate re-orientation on re-entry.
 - **Enforcement:** The stripping destructure `const { x, y, vx, vy, fx, fy, index, ...cleanNode } = n` is an immutable pattern in share and duplication code paths. It must never be extended to project autosave, canvasLayout writes, or `handleCoordinatesSettled` writes.
 
-### 26. Contextual Tooltips
+### 26. Contextual Tooltips & Connections Search Priority
 - **Rule:** Spiderweb node tooltips must prioritize the AI-generated `narrativeSnippet` (epicenter hook) over the encyclopedic `summary` to provide cohesive, web-specific context.
+- **Connections Search Priority (V38.7):** Active graph search queries (`searchQuery`) take strict priority over `selectedNode` and `peekedNode` in node and edge opacity calculations. When a query is active, non-matching nodes are dimmed; queries with zero matches ghost all nodes to provide immediate visual feedback without clearing selection state.
 
 ### 27. Unified Generation DNA & Multi-Seed Co-Anchoring (Tabula Rasa & Global Asset Reuse)
 - **Rule:** All generation modes (Single-Seed, Multi-Seed, Single-Seed + Anchors, Multi-Seed + Anchors) share the exact same unified prompt DNA, node taxonomy rules, and organic target density philosophy (~18–26 Deep Cuts). Complex Generations operate Tabula Rasa (from a blank slate), dynamically co-anchor both the topological spiderweb and the editorial narrative across all seeds, preventing parametric gravity from collapsing into a single famous entity.
@@ -238,7 +239,7 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
      - *Execution Limits:* Limit to $\le 5$ candidates executed in parallel (`Promise.allSettled`) bounded by a 2,500ms `AbortController` timeout.
      - *Discography Reconciliation:* Candidate winner is reconciled via `reconcileDiscographyWithITunes`, which strips format noise (`cleanCollectionTitle`), drops unverified hallucinations, and backfills top verified releases.
   4. **Tier 4 (Fail-Fast Reject / Terminal Quarantine):** Unverified lone wolves, underground artists absent from iTunes, and unresolved discography ties return `{ imageUrl: null, reconciledDiscography: [] }` -> caller records `imageUrl = 'not-found'` and sets `discography = []`. Once all 4 tiers have executed, `'not-found'` is a valid terminal monogram state, and the unverified discography is quarantined to `[]` to prevent hallucinations from poisoning Firestore.
-  5. **Label Immunity:** Record label entities strictly bypass iTunes image scraping (`if (!isLabel)`) and retain their curated catalog releases without modification.
+  5. **Label Immunity:** Record label entities strictly bypass iTunes image scraping (`if (!isLabel)`), retain their curated catalog releases without modification, and persist `imageUrl: null`.
 
 ### 39. Deterministic Metadata Projection & Pod Genre Affinity
 - **Rule:** Column 3 background worker (`processCurationJob.ts`) executes a deterministic enrichment pass (Step 4B) prior to Degree-0 cleanup, guaranteeing that 100% of generated artists (including secondary/recommended bridging artists in multi-seed generations) are wired to valid Country, Founded, and Genre nodes, while ensuring canonical Style metadata is projected from `detailsCache`.
@@ -267,7 +268,7 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
   2. **Level 2 (Hard Spatial & Temporal Guardrails):** Dynamic Rolling Era Horizon (`1965–ERA_MAX_BOUND`, where `ERA_MAX_BOUND = currentYear - 2`, inclusive `<` and `>` year bounds; unfiltered when both thumbs rest at outer bounds). Enforces **Horizon Normalization**: values resting at or beyond the dynamic upper horizon (`foundedBefore >= ERA_MAX_BOUND`) are normalized to `undefined`, neutralizing legacy stored 2026 data and preventing false cache invalidation across calendar year rollovers. Governs 22 Canonical Countries (`CANONICAL_COUNTRIES_22` with mutually exclusive `Include | Exclude` toggle). Enforced at three gates: Gemini 3.1 Pro prompt rules, Column 2 post-processing (`curatorService.ts`), and Column 3 **Step 2B Post-Hydration Boundary Audit** (`processCurationJob.ts`) prior to Step 3 Magazine synthesis (so boundary violators are excised from both `finalGraph` and `detailsCacheEntries` before prose generation).
   3. **Level 3 (Dual-Layer Scene Gravity & Granular Telemetry):** Canonical Genres (`CANONICAL_GENRE_TAXONOMY`) and Creatable Anchor Labels (`anchorLabels`, normalized via `normalizeLabelId`). Treated strictly as soft gravitational pulls—never hard client or server node-deletion gates. When a Level 3 anchor (such as a 1990s label) has no factual signings among bands founded inside the Level 2 era window, the engine weaves that label as sonic/historical gravity in the Editorial Narrative while refusing to hallucinate false graph edges, and records strict physical-node `anchorResolution` telemetry (`"Tier 1 + Tier 2 + Tier 3 (Full Parity)"`, `"Tier 1 + Tier 2 + Tier 3 (Genre Applied; Label Bypassed — Narrative Gravity Only)"`, `"Tier 1 + Tier 2 + Tier 3 (Label Applied; Genre Bypassed — Narrative Gravity Only)"`, or `"Tier 1 + Tier 2 Applied (Tier 3 bypassed due to boundary conflict)"`).
 
-### 42. Data Lifecycle, 3-Tier Storage Matrix & Strict createdAt TTL Enforcement
+### 42. Data Lifecycle, 3-Tier Storage Matrix & Session TTLs
 - **Rule:** Zcene enforces a strict 3-Tier Storage Matrix across all Firestore collections. In Tier 1 (Global Assets: `/artists` and `/labels`), the 365-day expiration clock is permanently anchored to `createdAt`. Mutations to `updatedAt` (such as appending a spiderweb, promoting a Deep Cut stub to a Primary Seed during partial generation, or self-healing missing fields) **DO NOT reset the 365-day biographical lifespan**.
 - **3-Tier Storage Matrix Invariants:**
   1. **Tier 1: Global Assets (`/artists/{id}`, `/labels/{id}`):**
@@ -275,11 +276,11 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
      - `updatedAt`: Mutable (Tracks spiderweb attachment, partial generation, or schema migrations).
      - `expireAt`: Soft-expires 365d (`createdAt + 365d`).
      - *Lifecycle Rule:* Soft-expires 365 days from `createdAt` strictly. `updatedAt` mutations DO NOT reset the 365-day biographical lifespan. Stale nodes (> 365 days) are ONLY refreshed when intersected and funded by a natural user-initiated generation. Automated background cron-sweeps and janitorial scanners are strictly forbidden (Anti-Sweep Law, Rule 37).
-  2. **Tier 2: Ephemeral Snapshots (`/sharedZcenes/{id}`):**
-     - `createdAt`: Immutable.
-     - `updatedAt`: NULL (Read-Only immutable snapshot).
-     - `expireAt`: +30 Days Hard TTL.
-     - Coordinates stripped (Selective Coordinate Amnesia, Rule 25) to enforce organic guest recalculation; viewing and cloning ("Save to my Zcenes") cost `0 Tokens`.
+  2. **Tier 2: Ephemeral Snapshots & Sessions (`/sharedZcenes`, `/curationJobs`, `/curationSessions`, `/deepWebSessions`):**
+     - `createdAt`: IMMUTABLE (DeepWeb Pass: reset on re-unlock).
+     - `updatedAt`: NULL (Shared) | MUTABLE (Jobs / Sessions / DeepWeb Pass).
+     - `expireAt`: 30d (Shared) | 24h (Jobs / Sessions) | NULL (DeepWeb Pass).
+     - *Lifecycle Rule:* Hard TTL on ephemeral docs (`/sharedZcenes`: +30d; `/curationJobs`: completedAt +24h; `/curationSessions`: +24h sliding). `/deepWebSessions` (`{uid}_global_deepweb_pass`) persists with no TTL for free cross-Zcene resume until all 3 messages are consumed. Coordinates stripped (`Selective Coordinate Amnesia`, Rule 25) to enforce organic guest recalculation; viewing and cloning ("Save to my Zcenes") cost `0 Tokens`.
   3. **Tier 3: Owned Projects (`users/{uid}/projects/{id}`):**
      - `createdAt`: Immutable.
      - `updatedAt`: Mutable (Project autosave).
@@ -299,7 +300,7 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
   - **Complex Zcene (Multi-Seed or 3-Tier Anchored):** `10 Tokens` (`TOKEN_PRICING.COMPLEX_QUERY`).
   - **Pre-Flight Flash & Escape Hatch Lookup (`validateSeedOriginCallable`):** Deducts a **non-refundable `1-Token` fee** once per initial uncached seed batch (`mode: 'initial_preflight'`) and `1 Token` per manual `"Not this artist?"` Escape Hatch re-query (`mode: 'escape_hatch'`) tracked on `curationSessions/{sessionId}` (`creditablePreFlightTokens` capped at `1T`). Cached `Topology Hit` and `Ambiguous Hit (Cache)` routes bypass Flash (`0T` pre-flight).
   - **Remainder Settlement & Auto-Refund:** `authorizeDirectHitCallable` (Column 1 Direct Hit / Post-Validation Cache Intercept) or `executeCurationPipeline` (Column 2 Live Synthesis) settles `projectCost - creditablePreFlightTokens` (`4T`/`5T` Single-Seed or `9T`/`10T` Complex) and stamps `tokensSpent` onto `users/{uid}/projects/{projectId}`. If Column 2 or Column 3 fails fatally, `refundProjectSettlementOnError` automatically refunds `settlementTokensDeducted` (`4T`/`5T`/`9T`/`10T`) while retaining the `1T` Pre-Flight Lookup Fee.
-  - **Deep Connections (`DetailsPanel.tsx`):** Costs `3 Tokens` (`TOKEN_PRICING.DEEP_WEB_CONSULT`) via `unlockDeepWebSessionCallable`, minting a `deepWebSessions/{sessionId}` lease (`remainingMessages: 3`) verified alongside `Authorization: Bearer <idToken>` on `/api/gemini/*` (`server.js`).
+  - **Deep Connections (`DetailsPanel.tsx`):** Costs `3 Tokens` (`TOKEN_PRICING.DEEP_WEB_CONSULT`) via `unlockDeepWebSessionCallable`, minting or resuming an account-wide `deepWebSessions/{uid}_global_deepweb_pass` pass (`remainingMessages: 3`, no TTL, free resume across Zcenes while < 3 messages used). Bounded by atomic per-message `remainingMessages` decrement with +1 auto-refund on failed reply in `server.js`, verified alongside strict Firebase Auth Bearer `<idToken>` and UID ownership matching on `/api/gemini/*`. Telemetry is committed to `users/{uid}/deepWebQueries` and project `deepWebApiUsage`.
   - **Shared Zcenes (`/z/:id` & `"Save to my Zcenes"`):** `0 Tokens` (`handleSaveToDashboard` preserved untouched).
 - **Admin Bypass & Strict Cache Margin Telemetry Isolation:**
   - Admin (`zcene.online@gmail.com`) bypasses all token deductions (`0T`) via 1-click passwordless confirmation and retains full raw USD cost telemetry (`$0.0000` Direct Hits, `~$0.10–$0.38` live synthesis), cache recall rates, and Author wallet visibility.

@@ -208,7 +208,7 @@ export const qualifyCacheEntry = (data: any, seedId?: string): CacheQualificatio
   const hasBio = typeof bio === 'string' && bio.trim().length > MIN_BIO_LENGTH && !bio.toLowerCase().includes('sandbox mock') && !isProseFallback;
   const hasGenre = typeof genre === 'string' && genre.trim().length > 0 && genre.trim().toLowerCase() !== 'unknown';
   const hasStyle = isLabel || (typeof style === 'string' && style.trim().length > 0 && style.trim().toLowerCase() !== 'unknown');
-  const hasImage = typeof imageUrl === 'string' && imageUrl.trim().length > 0;
+  const hasImage = isLabel || (typeof imageUrl === 'string' && imageUrl.trim().length > 0);
   if (!hasBio) missing.push('bio');
   if (!hasGenre) missing.push('genre');
   if (!hasStyle) missing.push('style');

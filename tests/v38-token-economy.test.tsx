@@ -15,6 +15,7 @@ import { TokenConfirmationDialog, SimulatedStripeModal, MyTasteDialog } from '..
 import { UsageAnalyticsPage, calculateTelemetryForUser } from '../components/UsageAnalyticsPage';
 import { BACKEND_REGRESSION_RUNBOOK } from '../docs/backend-regression-runbook';
 import { computeProjectHydrationFingerprint } from '../utils/projectHydrationFingerprint';
+import { sanitizeLabelProfile } from '../services/artistCacheService';
 import { View } from '../types';
 
 const mockHttpsCallable = vi.fn();
@@ -516,9 +517,9 @@ describe('Architecture V38 — Token Economy & Split-Debit Contract', () => {
     expect(screen.getByText(/\$0\.0000 Direct Hit/i)).toBeInTheDocument();
   });
 
-  it('synchronizes BACKEND_REGRESSION_RUNBOOK heading with Architecture V38', () => {
-    expect(BACKEND_REGRESSION_RUNBOOK).toContain('# V38 Regression Suite (Full-Stack)');
-    expect(BACKEND_REGRESSION_RUNBOOK).not.toContain('# V37 Regression Suite');
+  it('synchronizes BACKEND_REGRESSION_RUNBOOK heading with Architecture V39', () => {
+    expect(BACKEND_REGRESSION_RUNBOOK).toContain('# V39 Regression Suite (Full-Stack)');
+    expect(BACKEND_REGRESSION_RUNBOOK).not.toContain('# V38 Regression Suite');
   });
 
   it('computes stable ProjectLoader hydration fingerprints across D3 physics ticks, canvasLayout saves, and metadata stamps while invalidating on topology or detailsCache updates', () => {
@@ -843,5 +844,19 @@ describe('Architecture V38 — Token Economy & Split-Debit Contract', () => {
     expect(analyticsSrc).toContain("case 'refund':");
     expect(analyticsSrc).toContain("case 'admin_refund':");
     expect(analyticsSrc).toContain('DeepConnectionsQueryLog');
+  });
+
+  it('enforces V39 security fix in server.js and client label imageUrl: null sanitization', () => {
+    const serverSrc = fs.readFileSync(path.resolve(__dirname, '../server.js'), 'utf-8');
+    expect(serverSrc).toContain('if (!decodedToken)');
+    expect(serverSrc).toContain('SESSION_OWNER_MISMATCH');
+    expect(serverSrc).toContain('sData.uid !== decodedToken.uid');
+
+    const sanitized = sanitizeLabelProfile({
+      summary: 'Test label',
+      imageUrl: 'https://example.com/image.jpg',
+      details: { genre: 'Hardcore', origin: 'US', founded: '1985' }
+    });
+    expect(sanitized.imageUrl).toBeNull();
   });
 });

@@ -1562,7 +1562,7 @@ export const sanitizeLabelProfile = (details: any): any => {
   };
   return {
     summary: parsed.summary || parsed.bio || parsed.description || "",
-    imageUrl: parsed.imageUrl || parsed.image || null,
+    imageUrl: null,
     details: cleanDetails,
     discography: Array.isArray(parsed.discography) ? parsed.discography : [],
     links: Array.isArray(parsed.links) ? parsed.links : [],

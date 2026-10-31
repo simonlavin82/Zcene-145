@@ -69,8 +69,8 @@ const ARCHITECTURE_RULES = [
     },
     { 
         id: 8, 
-        title: "Grounding / Scraper Logic", 
-        desc: "Search API & prose fallbacks eradicated; Deep Cut hydration strictly enforces responseMimeType: 'application/json' and NODE_DETAILS_SCHEMA with strict enum decoding for Artists (omitted for Labels) across a 3x retry loop. Zero-hallucination discography grounding explicitly permits honest empty arrays [] for underground artists, forbids fabricating album titles, and mandates authentic release years. 4-Tier iTunes scraper executes with Tier 1 taxonomic distance candidate scoring, exact release-year constraints for fuzzy matches, candidate discography reconciliation against authentic iTunes releases (reconcileDiscographyWithITunes), and Tier 4 fail-fast reject/terminal quarantine setting imageUrl: 'not-found' and discography: [] for unverified artists while strictly exempting label entities." 
+        title: "Grounding & Schema-Scraper Locker Logic", 
+        desc: "Deep Cut hydration enforces responseMimeType: 'application/json' and ARTIST/LABEL_NODE_DETAILS_SCHEMA (with Zero Google Search Grounding). LABEL_NODE_DETAILS_SCHEMA omits imageUrl and sanitizeLabelProfile enforces imageUrl: null in both backend and client. Honest LLM generation is preserved by permitting empty discography arrays ([]). Post-synthesis filters enforce exact releaseYear constraints, and Tier 3 strict homonym collisions are stripped via token-Jaccard similarity scoring. Unverified fabricated albums for Artists are strictly quarantined to []." 
     },
     { 
         id: 9, 
@@ -220,7 +220,7 @@ const ARCHITECTURE_RULES = [
     { 
         id: 38, 
         title: "4-Tier Asset Disambiguation Waterfall", 
-        desc: "Third-party media scraping executes a 4-tier cascade: (1) Strict whole-word taxonomy match with genre-distance candidate scoring (promotes candidate if score >= 8 vs runner-up <= 4; reconciles discography), (2) Geographic suffix fallback, (3) Resilient Discography Tie-Breaker with exact release-year constraints, genre-affinity scoring, and iTunes discography reconciliation, (4) Tier 4 Fail-Fast Reject / Terminal Quarantine: unverified artists receive imageUrl: 'not-found' and discography: []. Label entities strictly bypass image scraping and retain catalog releases." 
+        desc: "Third-party media scraping (Artists ONLY; Record Labels are strictly excluded and locked to imageUrl: null) executes a 4-tier cascade: (1) Strict whole-word taxonomy match (homonyms escalate via genre-distance scoring), (2) Geographic suffix fallback, (3) Resilient Discography Tie-Breaker. Verified candidates automatically trigger iTunes Discography Reconciliation, overwriting and backfilling the LLM discography array with authentic iTunes collection metadata. (4) Fall-fast rejection to 'not-found' and discography purge." 
     },
     { 
         id: 39, 
@@ -239,13 +239,13 @@ const ARCHITECTURE_RULES = [
     },
     { 
         id: 42, 
-        title: "Data Lifecycle, 3-Tier Storage Matrix & Strict createdAt TTL Enforcement", 
-        desc: "Enforces a strict 3-tier storage matrix: Tier 1 (Global Assets /artists & /labels: Soft-expires 365d (createdAt + 365d); updatedAt mutations do not reset clock; anti-sweep law prohibits automated cron-sweeps), Tier 2 (Ephemeral Snapshots /sharedZcenes: immutable, 30-day hard TTL, coordinates stripped, 0 Tokens to view or save), and Tier 3 (Owned Projects: permanent user storage, Coordinate Memory preserves settled positions)." 
+        title: "Data Lifecycle, 3-Tier Storage Matrix & Session TTLs", 
+        desc: "Enforces a strict 3-tier storage matrix: Tier 1 (Global Assets /artists & /labels: Soft-expires 365d (createdAt + 365d); updatedAt mutations do not reset clock; anti-sweep law prohibits automated cron-sweeps), Tier 2 (Ephemeral Snapshots & Sessions /sharedZcenes: +30d hard TTL; /curationJobs: completedAt +24h; /curationSessions: +24h sliding; /deepWebSessions: no TTL account pass until all 3 messages consumed), and Tier 3 (Owned Projects /users/{uid}/projects: permanent user storage, Coordinate Memory preserves settled positions)." 
     },
     { 
         id: 43, 
-        title: "Token Economy, Split-Debit Pre-Flight & Cache Margin Telemetry Isolation", 
-        desc: "Enforces server-authoritative token wallets (Simulated Stripe Top-Ups: £5 = 50T, £10 = 100T, £15 = 150T; firestore.rules locks client balance mutations). Pricing: 5T Single-Seed / Direct Hit, 10T Complex (Multi-Seed or 3-Tier Anchored), 3T Deep Connections (3-Msg Grounded Consult via unlockDeepWebSessionCallable + deepWebSessions lease), 0T Shared /z/:id View & Clone. Split-Debit Pre-Flight: validateSeedOriginCallable deducts a non-refundable 1T fee once per initial uncached seed batch and 1T per manual Escape Hatch re-query (creditablePreFlightTokens capped at 1T); authorizeDirectHitCallable or Column 2 settles the remaining 4T/5T/9T/10T and stamps tokensSpent, auto-refunding settlementTokensDeducted on fatal pipeline failure. Admin (zcene.online@gmail.com) bypasses all deductions (0T) and retains full raw USD & cache recall telemetry; Standard Users & Admin Preview mode strictly redact $0.0000 Direct Hit costs and cache recall ratios." 
+        title: "Prepaid Token Economy, Split-Debit Wallet & Telemetry Isolation", 
+        desc: "Zcene enforces a server-authoritative prepaid Token Economy on users/{uid} (tokenBalance, tokenTransactions), write-locked against client mutation in firestore.rules. Standard users top up via <SimulatedStripeModal> (£5=50T, £10=100T, £15=150T) and spend value-based tokens across all curations: 5 Tokens for Single-Seed (Direct Hit or Synthesis), 10 Tokens for Complex (Multi-Seed or 3-Tier Anchored), and 3 Tokens for Deep Connections (3-message consult via unlockDeepWebSessionCallable + account-wide {uid}_global_deepweb_pass in deepWebSessions; no TTL, free resume across Zcenes while < 3 messages used, atomic per-message remainingMessages decrement with +1 auto-refund on failed reply, and strict Bearer ID token + UID ownership verification), with 1 Token deducted upfront per uncached Flash pre-flight/escape-hatch lookup and credited (up to 1T) against final project settlement. Shared links (/z/:id) and 'Save to My Zcenes' (Clone) remain permanently free (0 Tokens). Admin (zcene.online@gmail.com) bypasses all token deductions while retaining raw USD telemetry; Standard Users and Admin Preview mode on /analytics display only the Token Juice Bar, Top-Up controls, and 'Tokens Spent per Zcene'—never raw $0.0000 Direct Hit costs or cache recall percentages." 
     }
 ];
 
@@ -259,12 +259,12 @@ const DiscoveryFlowDiagram: React.FC = () => (
                     <div>
                         <div className="text-primary text-[10px] font-mono mb-1 uppercase tracking-wider font-semibold">Column 1</div>
                         <div className="text-white font-medium text-sm mb-3">React UI</div>
-                        <ul className="text-[11px] text-zinc-400 space-y-3">
+                        <ul className="text-[11px] text-zinc-400 space-y-3 break-words [overflow-wrap:anywhere]">
                             <li>
                                 <span className="text-primary font-medium">1 & 2. Submit Seed(s) + Check Global Topology Cache:</span> Evaluates <code>hasActiveDiscoveryFilters</code> & per-seed cache status; 100% of curations enter Box 3.
                             </li>
                             <li>
-                                <span className="text-primary font-medium">3. Token Spend & Top-Up Gate ([Rules 18, 43]):</span> <code>&lt;TokenConfirmationDialog&gt;</code> intercepts every curation (<code>5T</code> Single-Seed/Direct Hit, <code>10T</code> Complex; prompts <code>&lt;SimulatedStripeModal&gt;</code> <code>£5/£10/£15</code> if low balance). Cached <code>Topology Hit</code> & <code>Ambiguous Hit (Cache)</code> bypass Flash into Box 4; <code>Cache Miss</code> enters Flash 3.6.
+                                <span className="text-primary font-medium">3. Token Spend & Top-Up Gate ([Rules 18, 43]):</span> <code>&lt;TokenConfirmationDialog&gt;</code> intercepts every curation (<code>5T</code> Single-Seed/Direct Hit, <code>10T</code> Complex; <code>3T</code> Deep Connections 3-message account pass; prompts <code>&lt;SimulatedStripeModal&gt;</code> <code>£5/£10/£15</code> if low balance). Cached <code>Topology Hit</code> & <code>Ambiguous Hit (Cache)</code> bypass Flash into Box 4; <code>Cache Miss</code> enters Flash 3.6.
                             </li>
                             <li>
                                 <span className="text-primary font-medium">Flash 3.6 Collision Detection (-1T Pre-Flight):</span> Calls <code>validateSeedOriginCallable</code> (<code>thinking_level: minimal</code>, Zero Search Grounding). Deducts non-refundable <code>1T</code> lookup fee once per uncached batch and mints Evolved Stubs.
@@ -277,7 +277,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                                 </ul>
                             </li>
                             <li>
-                                <span className="text-primary font-medium">5 & 7. Active Loader Gate → Render Zcene:</span> Live synthesis locks UI until Column 3 sets project status to <code>'completed'</code>; Deep Connections consults unlock via <code>unlockDeepWebSessionCallable</code> (<code>3T</code> / 3 msgs).
+                                <span className="text-primary font-medium">5 & 7. Active Loader Gate → Render Zcene:</span> Live synthesis locks UI until Column 3 sets project status to <code>'completed'</code>; Deep Connections consults unlock or resume account-wide pass (<code>{'{uid}_global_deepweb_pass'}</code>; <code>3T</code> / 3 msgs, no TTL) via <code>unlockDeepWebSessionCallable</code>.
                             </li>
                         </ul>
                     </div>
@@ -295,7 +295,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                     <div>
                         <div className="text-primary text-[10px] font-mono mb-1 uppercase tracking-wider font-semibold">Column 2 (Synchronous)</div>
                         <div className="text-white font-medium text-sm mb-3">HTTP Fast-Track</div>
-                        <ul className="text-[11px] text-zinc-400 space-y-3">
+                        <ul className="text-[11px] text-zinc-400 space-y-3 break-words [overflow-wrap:anywhere]">
                             <li>
                                 <span className="text-primary font-medium">1. Ingest Validated Seed Payload & Settle Token Balance ([Rules 2, 34, 43])</span>
                                 <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500 text-[10px]">
@@ -338,12 +338,12 @@ const DiscoveryFlowDiagram: React.FC = () => (
                     <div>
                         <div className="text-primary text-[10px] font-mono mb-1 uppercase tracking-wider font-semibold">Column 3 (Asynchronous)</div>
                         <div className="text-white font-medium text-sm mb-3">Background Worker</div>
-                        <ul className="text-[11px] text-zinc-400 space-y-3">
+                        <ul className="text-[11px] text-zinc-400 space-y-3 break-words [overflow-wrap:anywhere]">
                             <li>
                                 <span className="text-primary font-medium">2. Hydrate Node Batch | 3.6 Flash (low) [Rule 8 & 40]</span>
                                 <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500 text-[10px]">
-                                    <li>Read Gate: Verifies <code>isFullyQualifiedEntityProfile</code> (labels normalized via <code>normalizeLabelId</code>); rejects prose-fallback stubs.</li>
-                                    <li>Miss: Enforces strict <code>responseMimeType: 'application/json'</code> + <code>NODE_DETAILS_SCHEMA</code> (zero prose fallback; 3x retry) & 4-Tier iTunes scraper.</li>
+                                    <li>Read Gate (isFullyQualifiedEntityProfile): Requires complete structured schema (Array.isArray(discography) & authentic recommendationReason; Labels are exempt from the imageUrl check). Rejects prose-fallback stubs, routing them to fresh hydration.</li>
+                                    <li>Miss: Enforces strict <code>responseMimeType: 'application/json'</code> + <code>ARTIST/LABEL_NODE_DETAILS_SCHEMA</code> (zero prose fallback; 3x retry). 4-Tier iTunes scraper runs for Artists ONLY (Labels omit imageUrl & force imageUrl: null).</li>
                                     <li>Slug deduplication ignores stubs; injects pre-generated seed stubs on timeout.</li>
                                 </ul>
                             </li>
@@ -380,7 +380,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                                 </ul>
                             </li>
                             <li>
-                                <span className="text-primary font-medium">6. Persist Assets (Dual Write Gate Guard [Rule 40]) & Telemetry:</span> Requires <code>synthesisRationale &gt;= 50</code> chars for seed <code>graphData</code> and <code>isFullyQualifiedEntityProfile</code> (<code>discography.length &gt; 0</code> &amp; authentic <code>recommendationReason</code>) for global <code>/artists</code> Deep Cuts. Updates job status to 'completed'.
+                                <span className="text-primary font-medium">6. Persist Assets (Dual Write Gate Guard [Rule 40]) & Telemetry:</span> Commits seed <code>graphData</code> ONLY if <code>synthesisRationale &gt;= 50</code> chars. Commits global <code>/artists</code> &amp; <code>/labels</code> ONLY if profile passes <code>isFullyQualifiedEntityProfile</code> (<code>Array.isArray(discography)</code>, authentic <code>recommendationReason</code>, zero prose-fallback stubs; Labels enforce <code>imageUrl: null</code>). Updates job status to 'completed'.
                             </li>
                             <li>
                                 <span className="text-primary font-medium">Node 36: JIT Asset Healer (3.6 Flash)</span>
@@ -469,10 +469,10 @@ const DataLifecycleMatrix: React.FC = () => (
                 </div>
                 <div className="text-zinc-500 text-[10px] mb-3 uppercase font-mono">artists / labels</div>
                 <div className="space-y-1.5 text-xs">
-                    <div className="flex justify-between border-b border-zinc-800 pb-1.5"><span className="text-zinc-400">createdAt</span><span className="text-white">Immutable</span></div>
-                    <div className="flex justify-between border-b border-zinc-800 pb-1.5"><span className="text-zinc-400">updatedAt</span><span className="text-green-400">Mutable</span></div>
-                    <div className="flex justify-between border-b border-zinc-800 pb-1.5"><span className="text-zinc-400">expireAt</span><span className="text-yellow-400">Soft-expires 365d (createdAt + 365d)</span></div>
-                    <div className="flex justify-between"><span className="text-zinc-400">cachedAt</span><span className="text-red-500 line-through">Eradicated</span></div>
+                    <div className="flex justify-between items-start gap-3 border-b border-zinc-800 pb-1.5"><span className="text-zinc-400 shrink-0">createdAt</span><span className="text-white text-right">Immutable</span></div>
+                    <div className="flex justify-between items-start gap-3 border-b border-zinc-800 pb-1.5"><span className="text-zinc-400 shrink-0">updatedAt</span><span className="text-green-400 text-right">Mutable</span></div>
+                    <div className="flex justify-between items-start gap-3 border-b border-zinc-800 pb-1.5"><span className="text-zinc-400 shrink-0">expireAt</span><span className="text-yellow-400 text-right">Soft-expires 365d (createdAt + 365d)</span></div>
+                    <div className="flex justify-between items-start gap-3"><span className="text-zinc-400 shrink-0">cachedAt</span><span className="text-red-500 line-through text-right">Eradicated</span></div>
                 </div>
                 <div className="mt-3 text-[11px] text-zinc-500 leading-relaxed">
                     Soft-expires at 365 days. Lifecycle Rule: Soft-expires 365 days from createdAt strictly. updatedAt mutations (e.g., appending a graph to a stub) DO NOT reset the 365-day biographical lifespan. Stale nodes are ONLY refreshed when intersected by a user-funded generation. Never auto-swept.
@@ -485,15 +485,15 @@ const DataLifecycleMatrix: React.FC = () => (
                     <div className="w-2 h-2 rounded-full bg-purple-500"></div>
                     <div className="text-purple-400 font-bold text-xs uppercase tracking-wider">Tier 2: Ephemeral</div>
                 </div>
-                <div className="text-zinc-500 text-[10px] mb-3 uppercase font-mono">sharedZcenes</div>
+                <div className="text-zinc-500 text-[10px] mb-3 uppercase font-mono break-words [overflow-wrap:anywhere]">/sharedZcenes, /curationJobs, /curationSessions, /deepWebSessions</div>
                 <div className="space-y-1.5 text-xs">
-                    <div className="flex justify-between border-b border-zinc-800 pb-1.5"><span className="text-zinc-400">createdAt</span><span className="text-white">Immutable</span></div>
-                    <div className="flex justify-between border-b border-zinc-800 pb-1.5"><span className="text-zinc-400">updatedAt</span><span className="text-zinc-600">NULL (Read-Only)</span></div>
-                    <div className="flex justify-between border-b border-zinc-800 pb-1.5"><span className="text-zinc-400">expireAt</span><span className="text-orange-400">+30 Days Hard TTL</span></div>
-                    <div className="flex justify-between"><span className="text-zinc-400">cachedAt</span><span className="text-red-500 line-through">Eradicated</span></div>
+                    <div className="flex justify-between items-start gap-3 border-b border-zinc-800 pb-1.5"><span className="text-zinc-400 shrink-0">createdAt</span><span className="text-white text-right">IMMUTABLE (DeepWeb Pass: reset on re-unlock)</span></div>
+                    <div className="flex justify-between items-start gap-3 border-b border-zinc-800 pb-1.5"><span className="text-zinc-400 shrink-0">updatedAt</span><span className="text-zinc-300 text-right">NULL (Shared) | MUTABLE (Jobs / Sessions / DeepWeb Pass)</span></div>
+                    <div className="flex justify-between items-start gap-3 border-b border-zinc-800 pb-1.5"><span className="text-zinc-400 shrink-0">expireAt</span><span className="text-orange-400 text-right">30d (Shared) | 24h (Jobs / Sessions) | NULL (DeepWeb Pass)</span></div>
+                    <div className="flex justify-between items-start gap-3"><span className="text-zinc-400 shrink-0">cachedAt</span><span className="text-red-500 line-through text-right">Eradicated</span></div>
                 </div>
                 <div className="mt-3 text-[11px] text-zinc-500 leading-relaxed">
-                    Frozen snapshots generated for sharing. Coordinates stripped (Amnesia) to enforce organic guest recalculation.
+                    Hard TTL on ephemeral docs (/sharedZcenes: +30d; /curationJobs: completedAt +24h; /curationSessions: +24h sliding). /deepWebSessions ({'{uid}_global_deepweb_pass'}) persists with no TTL for free cross-Zcene resume until all 3 messages are consumed.
                 </div>
             </div>
 
@@ -505,10 +505,10 @@ const DataLifecycleMatrix: React.FC = () => (
                 </div>
                 <div className="text-zinc-500 text-[10px] mb-3 uppercase font-mono">users/uid/projects</div>
                 <div className="space-y-1.5 text-xs">
-                    <div className="flex justify-between border-b border-zinc-800 pb-1.5"><span className="text-zinc-400">createdAt</span><span className="text-white">Immutable</span></div>
-                    <div className="flex justify-between border-b border-zinc-800 pb-1.5"><span className="text-zinc-400">updatedAt</span><span className="text-green-400">Mutable</span></div>
-                    <div className="flex justify-between border-b border-zinc-800 pb-1.5"><span className="text-zinc-400">expireAt</span><span className="text-zinc-600">NULL (No TTL)</span></div>
-                    <div className="flex justify-between"><span className="text-zinc-400">cachedAt</span><span className="text-red-500 line-through">Eradicated</span></div>
+                    <div className="flex justify-between items-start gap-3 border-b border-zinc-800 pb-1.5"><span className="text-zinc-400 shrink-0">createdAt</span><span className="text-white text-right">Immutable</span></div>
+                    <div className="flex justify-between items-start gap-3 border-b border-zinc-800 pb-1.5"><span className="text-zinc-400 shrink-0">updatedAt</span><span className="text-green-400 text-right">Mutable</span></div>
+                    <div className="flex justify-between items-start gap-3 border-b border-zinc-800 pb-1.5"><span className="text-zinc-400 shrink-0">expireAt</span><span className="text-zinc-500 text-right">NULL (No TTL)</span></div>
+                    <div className="flex justify-between items-start gap-3"><span className="text-zinc-400 shrink-0">cachedAt</span><span className="text-red-500 line-through text-right">Eradicated</span></div>
                 </div>
                 <div className="mt-3 text-[11px] text-zinc-500 leading-relaxed">
                     User-controlled topologies. Preserves fixed Coordinate Memory in canvasLayout to prevent spatial re-orientation.
@@ -576,7 +576,7 @@ const RunbookAccordion: React.FC = () => {
             >
                 <div className="flex items-center gap-3 text-zinc-200 font-medium text-sm uppercase tracking-wider">
                     <Terminal className="w-4 h-4 text-primary" />
-                    V38 Full-Stack Regression Runbook
+                    V39 Full-Stack Regression Runbook
                 </div>
                 {isOpen ? <ChevronDown className="w-4 h-4 text-zinc-400" /> : <ChevronRight className="w-4 h-4 text-zinc-400" />}
             </button>
@@ -732,7 +732,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                             ))}
                         </nav>
                         <div className="mt-6 pt-4 border-t border-zinc-800/60 text-[10px] text-zinc-500 font-mono">
-                            Zcene V38 Blueprint<br/>
+                            Zcene V39 Blueprint<br/>
                             100% Anti-Regression
                         </div>
                     </div>
@@ -744,7 +744,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                     <div className="mb-8 border-b border-zinc-700/60 pb-6">
                         <div className="flex items-center gap-3 mb-2">
                             <h1 className="text-2xl sm:text-3xl font-medium text-white">Engine</h1>
-                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-primary/20 text-primary border border-primary/40">V38 Locked</span>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-primary/20 text-primary border border-primary/40">V39 Locked</span>
                         </div>
                         <p className="text-zinc-400 leading-relaxed text-xs sm:text-sm max-w-3xl">
                             Visual mirror and execution interface for the Zcene curation pipeline. Defines behavioral laws, state orchestration, anti-pollution boundaries, and regression-proof contracts.
@@ -822,7 +822,7 @@ LOCKED SEMANTIC TOPOLOGY (Rule 21):
             <footer className="w-full p-6 text-zinc-400 text-xs z-10 relative bg-neutral-900 flex-shrink-0 border-t border-neutral-800">
                 <div className="container mx-auto text-center">
                     <ZceneLogo className="h-6 w-auto text-primary mx-auto mb-2" />
-                    <p className="text-zinc-600">© 2026 Zcene Admin Console. V35 Programmatic Architecture.</p>
+                    <p className="text-zinc-600">© 2026 Zcene Admin Console. V39 Programmatic Architecture.</p>
                 </div>
             </footer>
         </div>
