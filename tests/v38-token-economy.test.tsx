@@ -2,7 +2,7 @@ import React from 'react';
 import fs from 'fs';
 import path from 'path';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import {
   ADMIN_EMAIL,
   TOKEN_PRICING,
@@ -858,5 +858,37 @@ describe('Architecture V38 — Token Economy & Split-Debit Contract', () => {
       details: { genre: 'Hardcore', origin: 'US', founded: '1985' }
     });
     expect(sanitized.imageUrl).toBeNull();
+  });
+
+  it('V39.1: allows deleting single profile in MyTasteDialog and transitions to empty state', async () => {
+    const mockSave = vi.fn().mockResolvedValue(undefined);
+    const mockTaste = [{ id: 'p1', name: 'Profile 1', color: 'purple', isActive: true }];
+
+    const { unmount } = render(
+      <MyTasteDialog
+        isOpen={true}
+        onClose={vi.fn()}
+        taste={mockTaste as any}
+        onSave={mockSave}
+      />
+    );
+
+    // Profile 1 tab should have close icon even though profiles.length === 1
+    const profileTab = screen.getByText('Profile 1').closest('button')!;
+    const tabCloseIcon = within(profileTab).getByText('close');
+    expect(tabCloseIcon).toBeInTheDocument();
+
+    // Click close icon to delete the single profile
+    fireEvent.click(tabCloseIcon.closest('div')!);
+
+    // Should now transition to empty state
+    expect(screen.getByText('No profiles yet. Click + to create one.')).toBeInTheDocument();
+
+    // Click "Done" and verify onSave is called with empty array []
+    const doneBtn = screen.getByRole('button', { name: 'Done' });
+    fireEvent.click(doneBtn);
+    expect(mockSave).toHaveBeenCalledWith([]);
+
+    unmount();
   });
 });

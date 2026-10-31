@@ -279,12 +279,15 @@ export const MyTasteDialog: React.FC<{
     setActiveTabId(newProfile.id);
   };
 
-  const handleDeleteProfile = () => {
-    if (activeProfileIndex === -1) return;
-    const newProfiles = profiles.filter(p => p.id !== activeTabId);
+  const handleDeleteProfile = (targetId?: string) => {
+    const idToDelete = targetId || activeTabId;
+    if (!idToDelete) return;
+    const newProfiles = profiles.filter(p => p.id !== idToDelete);
     setProfiles(newProfiles);
     if (newProfiles.length > 0) {
-      setActiveTabId(newProfiles[0].id);
+      if (activeTabId === idToDelete) {
+        setActiveTabId(newProfiles[0].id);
+      }
     } else {
       setActiveTabId(null);
     }
@@ -334,9 +337,9 @@ export const MyTasteDialog: React.FC<{
               <div className="flex items-center gap-1.5">
                 <div className={`w-2 h-2 rounded-full ${getColorClass(p.color)} ${!p.isActive ? 'opacity-30' : ''}`} />
                 {p.name}
-                {profiles.length > 1 && activeTabId === p.id && (
+                {activeTabId === p.id && (
                   <div 
-                    onClick={(e) => { e.stopPropagation(); handleDeleteProfile(); }}
+                    onClick={(e) => { e.stopPropagation(); handleDeleteProfile(p.id); }}
                     className="flex items-center justify-center rounded-full hover:bg-zinc-700/50 p-0.5 ml-1 transition-colors text-zinc-400 hover:text-white cursor-pointer"
                   >
                     <span className="material-symbols-outlined !text-[12px]">close</span>
