@@ -16,6 +16,7 @@ import { formatSystemTimestamp, extractInitials } from '../utils/formatters';
 import { Select, InputSizes, LayoutSizes, Button } from './DesignSystem';
 import { Flame, Pin } from 'lucide-react';
 import { useDominantColor } from '../hooks/useDominantColor';
+import { AudioPreviewPlayer, stopGlobalAudio } from './AudioPreviewPlayer';
 const SENTINEL_INSIGHT = 'No insight provided.';
 
 export const getArtistDisplayName = (details: any, node: any): string => {
@@ -1296,6 +1297,26 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 </div>
                             )}
 
+                            {/* Architecture V39.2: 30-Second iTunes Audio Preview Player (Artists only) */}
+                            {!isLabelNode && (
+                                <AudioPreviewPlayer
+                                    nodeId={node.id}
+                                    artistName={getArtistDisplayName(details, node)}
+                                    previewUrl={details.previewUrl}
+                                    previewTrackName={details.previewTrackName}
+                                    itunesArtistId={details.itunesArtistId}
+                                    onPreviewResolved={(res) => {
+                                        if (details) {
+                                            details.previewUrl = res.previewUrl;
+                                            details.previewTrackName = res.previewTrackName;
+                                            if (res.itunesArtistId) {
+                                                details.itunesArtistId = res.itunesArtistId;
+                                            }
+                                        }
+                                    }}
+                                />
+                            )}
+
                             {(() => {
                                 const hasInsight = details.recommendationReason &&
                                     details.recommendationReason !== SENTINEL_INSIGHT &&
@@ -1509,6 +1530,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                         href={youtubeUrl} 
                                                         target="_blank" 
                                                         rel="noopener noreferrer" 
+                                                        onClick={() => stopGlobalAudio()}
                                                         className="flex items-center justify-start px-4 py-2 rounded-xl font-medium transition-all active:scale-[0.98] bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-white border border-zinc-700 hover:border-zinc-600"
                                                     >
                                                         <div className="flex items-center gap-3">
@@ -1531,6 +1553,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                         href={link.url} 
                                                         target="_blank" 
                                                         rel="noopener noreferrer" 
+                                                        onClick={() => stopGlobalAudio()}
                                                         className="flex items-center justify-start px-4 py-2 rounded-xl font-medium transition-all active:scale-[0.98] bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-white border border-zinc-700 hover:border-zinc-600"
                                                     >
                                                         <div className="flex items-center gap-3">
@@ -1876,6 +1899,13 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     const [renderMode, setRenderMode] = useState<'magazine' | 'panel'>(isMagazineViewOpen ? 'magazine' : 'panel');
     const [isTransitioning, setIsTransitioning] = useState(false);
     const [showScrollTop, setShowScrollTop] = useState(false);
+
+    // Auto-stop preview audio whenever Deep Cuts panel is collapsed
+    useEffect(() => {
+        if (isCollapsed) {
+            stopGlobalAudio();
+        }
+    }, [isCollapsed]);
 
     const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
         if (e.currentTarget.scrollTop > 500) {

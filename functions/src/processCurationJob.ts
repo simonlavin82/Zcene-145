@@ -750,6 +750,9 @@ export const processCurationJob = onDocumentCreated({
                       if (Array.isArray(scrapeResult.reconciledDiscography)) {
                         details.discography = scrapeResult.reconciledDiscography;
                       }
+                      if (scrapeResult.itunesArtistId) {
+                        details.itunesArtistId = scrapeResult.itunesArtistId;
+                      }
                     } else {
                       // ⚠️ STRICT FAIL-FAST RULE & TIER 4 QUARANTINE (Rule 38):
                       console.warn(`[Image Scraper / Rule 38] No verified image for ${searchArtistName}. Setting not-found and quarantining discography to [].`);

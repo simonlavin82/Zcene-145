@@ -213,6 +213,9 @@ export const healOrphanedAsset = onCall({
           if (Array.isArray(scrapeResult.reconciledDiscography)) {
             synthesizedDetails.discography = scrapeResult.reconciledDiscography;
           }
+          if (scrapeResult.itunesArtistId) {
+            synthesizedDetails.itunesArtistId = scrapeResult.itunesArtistId;
+          }
         } else {
           // Tier 4 Reject & Discography Quarantine (Rule 38)
           synthesizedDetails.imageUrl = 'not-found';

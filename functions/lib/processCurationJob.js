@@ -682,6 +682,9 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                         if (Array.isArray(scrapeResult.reconciledDiscography)) {
                                             details.discography = scrapeResult.reconciledDiscography;
                                         }
+                                        if (scrapeResult.itunesArtistId) {
+                                            details.itunesArtistId = scrapeResult.itunesArtistId;
+                                        }
                                     }
                                     else {
                                         // ⚠️ STRICT FAIL-FAST RULE & TIER 4 QUARANTINE (Rule 38):

@@ -2588,6 +2588,7 @@ export const reconcileDiscographyWithITunes = (
 export interface ScrapeImageResult {
   imageUrl: string | null;
   reconciledDiscography: DiscographyItem[];
+  itunesArtistId?: number | null;
 }
 
 interface CandidateVerification {
@@ -2697,7 +2698,7 @@ export const scrapeImageUrlBackend = async (
 ): Promise<ScrapeImageResult> => {
   // Strategy: High-Speed Deterministic iTunes API (Artists Only)
   if (type === 'label') {
-    return { imageUrl: null, reconciledDiscography: discography || [] };
+    return { imageUrl: null, reconciledDiscography: discography || [], itunesArtistId: null };
   }
 
   let cleanArtistName = stripCountrySlug(artistName).trim();
@@ -2736,7 +2737,7 @@ export const scrapeImageUrlBackend = async (
       if (artwork) {
         const reconciled = reconcileDiscographyWithITunes(discography || [], albums, cleanArtistName);
         console.log(`[scrapeImageUrlBackend] [Tier 1 Hit] "${cleanArtistName}" verified via strict taxonomy overlap. (iTunes ID: ${winner.artistId}, Genre: '${winner.primaryGenreName}')`);
-        return { imageUrl: artwork, reconciledDiscography: reconciled };
+        return { imageUrl: artwork, reconciledDiscography: reconciled, itunesArtistId: Number(winner.artistId) || null };
       }
     } else if (strictMatches.length > 1) {
       // Tier 1 Genre-Distance Scoring (Rule 38)
@@ -2756,7 +2757,7 @@ export const scrapeImageUrlBackend = async (
         if (artwork) {
           const reconciled = reconcileDiscographyWithITunes(discography || [], albums, cleanArtistName);
           console.log(`[scrapeImageUrlBackend] [Tier 1 Genre-Distance Hit] "${cleanArtistName}" resolved among ${strictMatches.length} candidates via taxonomic distance (Score: ${top.score} vs ${runnerUp.score}). Winner iTunes ID: ${winner.artistId} ('${winner.primaryGenreName}')`);
-          return { imageUrl: artwork, reconciledDiscography: reconciled };
+          return { imageUrl: artwork, reconciledDiscography: reconciled, itunesArtistId: Number(winner.artistId) || null };
         }
       }
 
@@ -2800,7 +2801,7 @@ export const scrapeImageUrlBackend = async (
           if (artwork) {
             const reconciled = reconcileDiscographyWithITunes(discography || [], albums, cleanArtistName);
             console.log(`[scrapeImageUrlBackend] [Tier 2 Hit] "${cleanArtistName}" verified via geographic fallback "${fallbackName}". (iTunes ID: ${winner.artistId}, Genre: '${winner.primaryGenreName}')`);
-            return { imageUrl: artwork, reconciledDiscography: reconciled };
+            return { imageUrl: artwork, reconciledDiscography: reconciled, itunesArtistId: Number(winner.artistId) || null };
           }
         }
       } else {
@@ -2886,14 +2887,14 @@ export const scrapeImageUrlBackend = async (
       if (artwork) {
         const reconciled = reconcileDiscographyWithITunes(discography || [], albums, cleanArtistName);
         console.log(`[scrapeImageUrlBackend] [Tier 3 Hit] "${cleanArtistName}" (iTunes ID: ${finalWinner.candidate.artistId}) verified via ${finalWinner.matchCount} album matches: [${finalWinner.matchedTitles.map(t => `"${t}"`).join(', ')}]`);
-        return { imageUrl: artwork, reconciledDiscography: reconciled };
+        return { imageUrl: artwork, reconciledDiscography: reconciled, itunesArtistId: Number(finalWinner.candidate.artistId) || null };
       }
     }
   }
 
   // --- Tier 4: Reject Unverified Lone Wolves / Fail-Fast (Rule 38 Discography Purge) ---
   console.warn(`[scrapeImageUrlBackend] [Tier 4 Reject] "${cleanArtistName}" failed all verification tiers. Rejecting unverified asset. Returning not-found and purging discography.`);
-  return { imageUrl: null, reconciledDiscography: [] };
+  return { imageUrl: null, reconciledDiscography: [], itunesArtistId: null };
 };
 
 export const generateSemanticLinkWeights = async (

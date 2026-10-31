@@ -69,6 +69,7 @@ export interface NodeDetails {
   discography?: Array<{
     albumName: string;
     releaseYear: string;
+    previewUrl?: string | null;
   }>;
   recommendationReason?: string;
   youtubeVideoId?: string;
@@ -79,6 +80,9 @@ export interface NodeDetails {
   }>;
   synthesisRationale?: string;
   _isSentinel?: boolean;
+  itunesArtistId?: number | null;
+  previewUrl?: string | null;
+  previewTrackName?: string | null;
 }
 
 export interface ParsedArtist {

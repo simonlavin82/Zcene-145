@@ -1,13 +1,21 @@
 import React from 'react';
 
-export const ModalBackdrop: React.FC<{ children: React.ReactNode; onClick?: () => void; className?: string }> = ({ children, onClick, className = '' }) => (
-  <div 
-    className={`fixed inset-0 bg-black/60 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 pointer-events-auto ${className}`}
-    onClick={onClick}
-  >
-    {children}
-  </div>
-);
+export const ModalBackdrop: React.FC<{ children: React.ReactNode; onClick?: () => void; className?: string }> = ({ children, onClick, className = '' }) => {
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('zcene:stop-audio'));
+    }
+  }, []);
+
+  return (
+    <div 
+      className={`fixed inset-0 bg-black/60 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 pointer-events-auto ${className}`}
+      onClick={onClick}
+    >
+      {children}
+    </div>
+  );
+};
 
 export const ModalContainer: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
   <div 
