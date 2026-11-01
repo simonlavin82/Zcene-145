@@ -306,27 +306,34 @@ export const AudioPreviewPlayer: React.FC<AudioPreviewPlayerProps> = ({
         }
       }}
     >
-      {/* Centered Glassmorphic "One-Circle" Watermark */}
-      <div
-        className={`relative w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-sm transition-all duration-200 ${
-          isPlaying 
-            ? 'bg-black/75 border border-primary/50 text-primary shadow-[0_0_16px_rgba(246,228,104,0.35)] scale-100' 
-            : currentTime > 0
-              ? 'bg-black/60 border border-primary/40 text-primary shadow-md hover:scale-105 active:scale-95'
-              : 'bg-black/20 hover:bg-black/40 border border-white/10 hover:border-white/25 text-white/85 hover:text-white shadow-sm hover:scale-105 active:scale-95'
-        }`}
-      >
-        {/* Circular SVG Progress Ring */}
-        <svg className="absolute inset-0 w-12 h-12 -rotate-90 pointer-events-none" viewBox="0 0 52 52">
-          {/* Background ring */}
+      {/* Concentric "One-SVG" Watermark Disk */}
+      <div className="relative w-12 h-12 flex items-center justify-center transition-transform duration-200 hover:scale-105 active:scale-95 shadow-sm">
+        <svg className="w-12 h-12 pointer-events-none" viewBox="0 0 52 52">
+          {/* Layer 1: Background Glass Disk (Locked to exact cx/cy) */}
           <circle
             cx="26"
             cy="26"
             r={radius}
-            className="stroke-white/10 fill-none"
+            className={`transition-colors duration-200 ${
+              isPlaying 
+                ? 'fill-black/75 stroke-primary/40' 
+                : currentTime > 0
+                  ? 'fill-black/60 stroke-primary/30'
+                  : 'fill-black/20 hover:fill-black/35 stroke-white/10'
+            }`}
+            strokeWidth="1.5"
+          />
+
+          {/* Layer 2: Subtle Track Ring */}
+          <circle
+            cx="26"
+            cy="26"
+            r={radius}
+            className="stroke-white/5 fill-none"
             strokeWidth="2.5"
           />
-          {/* Active progress ring */}
+
+          {/* Layer 3: Active Yellow Progress Ring (Rotated in SVG coordinate space) */}
           {(isPlaying || currentTime > 0) && (
             <circle
               cx="26"
@@ -337,20 +344,32 @@ export const AudioPreviewPlayer: React.FC<AudioPreviewPlayerProps> = ({
               strokeDasharray={circumference}
               strokeDashoffset={strokeDashoffset}
               strokeLinecap="round"
+              transform="rotate(-90 26 26)"
             />
           )}
         </svg>
 
-        {/* Center Content: Live countdown when playing, Optically Centered Play Icon when idle/paused */}
-        {isPlaying ? (
-          <span className="font-mono text-xs font-bold text-primary tracking-tight select-none relative z-10">
-            {Math.max(1, Math.ceil(duration - currentTime))}s
-          </span>
-        ) : (
-          <svg className="w-4 h-4 fill-current translate-x-[0.5px] select-none pointer-events-none relative z-10" viewBox="0 0 20 20">
-            <polygon points="6,4 16,10 6,16" />
-          </svg>
-        )}
+        {/* Center Action Element: Raw Countdown when Playing; Optically Centered Play Icon when Idle/Paused */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          {isPlaying ? (
+            <span className="font-mono text-xs font-bold text-primary tracking-tight select-none">
+              {Math.max(1, Math.ceil(duration - currentTime))}
+            </span>
+          ) : (
+            <svg className="w-4 h-4 fill-white/85 select-none translate-x-[0.5px]" viewBox="0 0 20 20">
+              <polygon points="7,4 17,10 7,16" />
+            </svg>
+          )}
+        </div>
+      </div>
+
+      {/* Restored Bottom Gradient HUD: Track Name ONLY (Visible strictly when playing) */}
+      <div className={`absolute bottom-0 inset-x-0 h-11 bg-gradient-to-t from-black/85 via-black/40 to-transparent flex items-end justify-center px-3 pb-2 pointer-events-none transition-opacity duration-300 ${
+        isPlaying ? 'opacity-100' : 'opacity-0'
+      }`}>
+        <span className="text-xs font-medium text-white/90 truncate max-w-[150px] drop-shadow-md text-center">
+          {preview.previewTrackName}
+        </span>
       </div>
     </div>
   );
