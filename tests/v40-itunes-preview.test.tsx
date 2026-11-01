@@ -127,7 +127,7 @@ describe('Architecture V40: Instant 30-Second iTunes Audio Previews', () => {
   });
 
   describe('Part 2: AudioPreviewPlayer Component & UI Resilience', () => {
-    it('renders audio player pill when previewUrl is present', () => {
+    it('renders artwork watermark audio player overlay when previewUrl is present', () => {
       render(
         <AudioPreviewPlayer
           nodeId="spaced"
@@ -139,7 +139,34 @@ describe('Architecture V40: Instant 30-Second iTunes Audio Previews', () => {
 
       expect(screen.getByText('Boomerang')).toBeDefined();
       expect(screen.getByText('30s')).toBeDefined();
-      expect(screen.getByText('Preview')).toBeDefined();
+      expect(screen.getByRole('button', { name: /Play 30s Audio Preview/i })).toBeDefined();
+    });
+
+    it('supports Play -> Pause -> Play resume cycle via GlobalAudioController without deadlock', () => {
+      // Mock HTMLMediaElement methods and paused property in jsdom
+      const playSpy = vi.spyOn(window.HTMLMediaElement.prototype, 'play').mockImplementation(async function(this: any) {
+        Object.defineProperty(this, 'paused', { value: false, configurable: true });
+      });
+      const pauseSpy = vi.spyOn(window.HTMLMediaElement.prototype, 'pause').mockImplementation(function(this: any) {
+        Object.defineProperty(this, 'paused', { value: true, configurable: true });
+      });
+
+      // 1. Initial Play
+      audioController.play('spaced', 'https://audio-ssl.itunes.apple.com/itunes-assets/boomerang.m4a');
+      expect(audioController.getCurrentTrackId()).toBe('spaced');
+
+      // 2. Pause
+      audioController.pause();
+      expect(pauseSpy).toHaveBeenCalled();
+
+      // 3. Play again (Resume)
+      audioController.play('spaced', 'https://audio-ssl.itunes.apple.com/itunes-assets/boomerang.m4a');
+      expect(playSpy).toHaveBeenCalled();
+      expect(audioController.getCurrentTrackId()).toBe('spaced');
+
+      audioController.stop();
+      playSpy.mockRestore();
+      pauseSpy.mockRestore();
     });
 
     it('renders 28px shimmer loader when itunesArtistId is present and fetch is pending', () => {

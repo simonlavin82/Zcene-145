@@ -1,6 +1,6 @@
 /**
  * Architecture V40: Instant 30-Second iTunes Audio Preview Player Component
- * Zero-token, on-demand client streaming anchored under artist artwork in Deep Cuts and Magazine View.
+ * Zero-token, on-demand client streaming overlaid on artist artwork in Deep Cuts and Magazine View.
  */
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { resolveArtistAudioPreview, AudioPreviewResult } from '../services/itunesPreviewService';
@@ -34,9 +34,10 @@ class GlobalAudioController {
     };
   }
 
-  private notify(isPlaying: boolean) {
+  private notify() {
+    const isPlaying = !!this.audio && !this.audio.paused && !this.audio.ended;
     const time = this.audio ? this.audio.currentTime : 0;
-    const dur = this.audio && !isNaN(this.audio.duration) ? this.audio.duration : 30;
+    const dur = this.audio && !isNaN(this.audio.duration) && this.audio.duration > 0 ? this.audio.duration : 30;
     this.listeners.forEach(fn => fn(this.currentTrackId, isPlaying, time, dur));
   }
 
@@ -45,17 +46,20 @@ class GlobalAudioController {
   }
 
   public isTrackPlaying(trackId: string): boolean {
-    return this.currentTrackId === trackId && !!this.audio && !this.audio.paused;
+    return this.currentTrackId === trackId && !!this.audio && !this.audio.paused && !this.audio.ended;
   }
 
   public play(trackId: string, previewUrl: string) {
     if (this.currentTrackId === trackId && this.audio) {
+      // If audio reached the end, restart from beginning; otherwise resume from paused timestamp
+      if (this.audio.ended || (this.audio.duration > 0 && this.audio.currentTime >= this.audio.duration - 0.2)) {
+        this.audio.currentTime = 0;
+      }
       if (this.audio.paused) {
         this.audio.play().catch(err => {
-          console.warn('[GlobalAudioController] Play failed:', err);
-          this.notify(false);
+          console.warn('[GlobalAudioController] Resume failed:', err);
+          this.notify();
         });
-        this.notify(true);
       }
       return;
     }
@@ -68,10 +72,9 @@ class GlobalAudioController {
       this.audio = new Audio(previewUrl);
       this.audio.volume = 0.85;
 
-      this.audio.addEventListener('timeupdate', () => {
-        this.notify(true);
-      });
-
+      this.audio.addEventListener('play', () => this.notify());
+      this.audio.addEventListener('pause', () => this.notify());
+      this.audio.addEventListener('timeupdate', () => this.notify());
       this.audio.addEventListener('ended', () => {
         this.stop();
       });
@@ -83,9 +86,7 @@ class GlobalAudioController {
         this.stop();
       });
 
-      this.audio.play().then(() => {
-        this.notify(true);
-      }).catch(err => {
+      this.audio.play().catch(err => {
         console.warn('[GlobalAudioController] Play stream error:', err);
         this.stop();
       });
@@ -98,7 +99,6 @@ class GlobalAudioController {
   public pause() {
     if (this.audio && !this.audio.paused) {
       this.audio.pause();
-      this.notify(false);
     }
   }
 
@@ -263,14 +263,12 @@ export const AudioPreviewPlayer: React.FC<AudioPreviewPlayerProps> = ({
     }
   }, [nodeId, isPlaying, preview?.previewUrl]);
 
-  // If loading preview for a verified itunesArtistId, display subtle 28px shimmer loader
+  // If loading preview for a verified itunesArtistId, display centered glassmorphic pulse
   if (isLoading && !preview?.previewUrl) {
     return (
-      <div className={`flex items-center justify-center my-2.5 w-full select-none ${className}`}>
-        <div className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-zinc-900/60 border border-zinc-800/80 shadow-md animate-pulse">
-          <div className="w-5 h-5 rounded-full bg-zinc-800" />
-          <div className="w-24 h-3 rounded bg-zinc-800" />
-          <div className="w-8 h-3 rounded bg-zinc-800/60" />
+      <div className={`absolute inset-0 flex items-center justify-center pointer-events-none z-30 ${className}`}>
+        <div className="w-12 h-12 rounded-full bg-black/45 border border-white/20 flex items-center justify-center animate-pulse backdrop-blur-sm shadow-md">
+          <div className="w-4 h-4 rounded-full bg-white/30" />
         </div>
       </div>
     );
@@ -285,46 +283,54 @@ export const AudioPreviewPlayer: React.FC<AudioPreviewPlayerProps> = ({
     return null;
   }
 
-  // Calculate circular progress (0 to 1)
+  // Calculate circular progress (0 to 1) for 48px (12rem) watermark button
   const progress = duration > 0 ? Math.min(currentTime / duration, 1) : 0;
-  const radius = 11;
+  const radius = 23;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - progress * circumference;
 
   return (
-    <div className={`flex items-center justify-center my-2.5 w-full select-none ${className}`}>
-      <div 
-        onClick={handleTogglePlay}
-        className="group flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-zinc-900/90 border border-zinc-700/70 hover:border-zinc-500 shadow-[0_4px_16px_rgba(0,0,0,0.6)] backdrop-blur-md transition-all duration-200 cursor-pointer max-w-full"
-        title={isPlaying ? "Pause Preview" : "Play 30s Audio Preview"}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === ' ' || e.key === 'Enter') {
-            e.preventDefault();
-            handleTogglePlay(e as any);
-          }
-        }}
-      >
-        {/* Play/Pause Button with SVG Progress Ring */}
-        <div className="relative w-6 h-6 flex-shrink-0 flex items-center justify-center">
-          <svg className="absolute inset-0 w-6 h-6 -rotate-90 pointer-events-none" viewBox="0 0 26 26">
+    <div 
+      className={`absolute inset-0 z-30 select-none group/overlay cursor-pointer ${className}`}
+      onClick={handleTogglePlay}
+      tabIndex={0}
+      role="button"
+      aria-label={isPlaying ? "Pause Preview" : "Play 30s Audio Preview"}
+      onKeyDown={(e) => {
+        if (e.key === ' ' || e.key === 'Enter') {
+          e.preventDefault();
+          handleTogglePlay(e as any);
+        }
+      }}
+    >
+      {/* Centered Glassmorphic Watermark Play/Pause Button */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div
+          className={`pointer-events-auto relative w-12 h-12 rounded-full flex items-center justify-center shadow-[0_4px_24px_rgba(0,0,0,0.6)] backdrop-blur-md transition-all duration-200 ${
+            isPlaying 
+              ? 'bg-black/75 border border-primary/60 text-primary scale-100 shadow-[0_0_16px_rgba(246,228,104,0.3)]' 
+              : 'bg-black/55 hover:bg-black/75 border border-white/25 text-white hover:scale-105 active:scale-95'
+          }`}
+          title={isPlaying ? "Pause Preview" : "Play 30s Audio Preview"}
+        >
+          {/* Circular SVG Progress Ring */}
+          <svg className="absolute inset-0 w-12 h-12 -rotate-90 pointer-events-none" viewBox="0 0 52 52">
             {/* Background ring */}
             <circle
-              cx="13"
-              cy="13"
+              cx="26"
+              cy="26"
               r={radius}
-              className="stroke-zinc-700/60 fill-none"
-              strokeWidth="2"
+              className="stroke-white/15 fill-none"
+              strokeWidth="2.5"
             />
             {/* Active progress ring */}
-            {isPlaying && (
+            {(isPlaying || currentTime > 0) && (
               <circle
-                cx="13"
-                cy="13"
+                cx="26"
+                cy="26"
                 r={radius}
                 className="stroke-primary fill-none transition-[stroke-dashoffset] duration-150 ease-linear"
-                strokeWidth="2.5"
+                strokeWidth="3"
                 strokeDasharray={circumference}
                 strokeDashoffset={strokeDashoffset}
                 strokeLinecap="round"
@@ -332,47 +338,35 @@ export const AudioPreviewPlayer: React.FC<AudioPreviewPlayerProps> = ({
             )}
           </svg>
 
-          {/* Center Play/Pause Icon Button */}
-          <div className={`w-5 h-5 rounded-full flex items-center justify-center transition-all ${
-            isPlaying 
-              ? 'bg-primary text-brand-black shadow-[0_0_8px_rgba(246,228,104,0.4)]' 
-              : 'bg-zinc-200 text-zinc-950 group-hover:bg-white group-hover:scale-105'
-          }`}>
-            {isPlaying ? (
-              // Pause Icon
-              <svg className="w-2.5 h-2.5 fill-current" viewBox="0 0 24 24">
-                <rect x="6" y="4" width="4" height="16" rx="1" />
-                <rect x="14" y="4" width="4" height="16" rx="1" />
-              </svg>
-            ) : (
-              // Play Icon
-              <svg className="w-2.5 h-2.5 fill-current translate-x-[0.5px]" viewBox="0 0 24 24">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-            )}
-          </div>
+          {/* Center Play / Pause Icon */}
+          {isPlaying ? (
+            // Pause Icon
+            <svg className="w-4 h-4 fill-current relative z-10" viewBox="0 0 24 24">
+              <rect x="6" y="4" width="4" height="16" rx="1" />
+              <rect x="14" y="4" width="4" height="16" rx="1" />
+            </svg>
+          ) : (
+            // Play Icon
+            <svg className="w-4 h-4 fill-current translate-x-[1.5px] relative z-10" viewBox="0 0 24 24">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          )}
         </div>
+      </div>
 
-        {/* Track Title */}
-        <div className="flex flex-col min-w-0 pr-1">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-medium text-zinc-200 truncate max-w-[130px] sm:max-w-[190px] leading-tight group-hover:text-white transition-colors">
-              {preview.previewTrackName}
-            </span>
-            <span className="text-[9px] uppercase tracking-wider font-semibold text-zinc-500 flex-shrink-0">
-              30s
-            </span>
-          </div>
-        </div>
-
-        {/* Remaining / Elapsed Pill */}
-        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-800/90 px-1.5 py-0.5 rounded border border-zinc-700/50 flex-shrink-0">
-          {isPlaying 
-            ? `${Math.max(0, Math.ceil(duration - currentTime))}s` 
-            : 'Preview'}
+      {/* Sleek Bottom Gradient Bar (Track Name + Countdown) */}
+      <div className={`absolute bottom-0 inset-x-0 h-14 bg-gradient-to-t from-black/90 via-black/60 to-transparent flex items-end justify-between px-3 pb-2.5 pointer-events-none transition-opacity duration-300 ${
+        isPlaying || currentTime > 0 ? 'opacity-100' : 'opacity-85 group-hover/overlay:opacity-100'
+      }`}>
+        <span className="text-xs font-medium text-white truncate max-w-[105px] sm:max-w-[125px] drop-shadow-md">
+          {preview.previewTrackName}
+        </span>
+        <span className="text-[11px] font-mono font-semibold text-primary bg-black/60 px-1.5 py-0.5 rounded border border-white/15 backdrop-blur-sm shadow-sm flex-shrink-0">
+          {Math.max(0, Math.ceil(duration - currentTime))}s
         </span>
       </div>
     </div>
   );
 };
+
 

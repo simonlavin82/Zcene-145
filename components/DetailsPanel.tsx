@@ -1285,6 +1285,25 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                 onLoad={() => setImgLoaded(true)}
                                                 onError={handleImageError}
                                             />
+
+                                            {/* Architecture V40: 30-Second iTunes Audio Preview Player (Overlaid on artwork) */}
+                                            <AudioPreviewPlayer
+                                                key={node.id}
+                                                nodeId={node.id}
+                                                artistName={getArtistDisplayName(details, node)}
+                                                previewUrl={details?.previewUrl}
+                                                previewTrackName={details?.previewTrackName}
+                                                itunesArtistId={details?.itunesArtistId}
+                                                onPreviewResolved={(res) => {
+                                                    if (details) {
+                                                        details.previewUrl = res.previewUrl;
+                                                        details.previewTrackName = res.previewTrackName;
+                                                        if (res.itunesArtistId) {
+                                                            details.itunesArtistId = res.itunesArtistId;
+                                                        }
+                                                    }
+                                                }}
+                                            />
                                         </div>
                                     </>
                                 ) : (
@@ -1292,30 +1311,27 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                         <span className="text-8xl font-black text-white/5 uppercase select-none absolute bottom-0 right-0 translate-y-[14%] translate-x-[8%] leading-none">
                                             {extractInitials(getArtistDisplayName(details, node))}
                                         </span>
+                                        {/* Architecture V40: 30-Second iTunes Audio Preview Player (Overlaid on initials) */}
+                                        <AudioPreviewPlayer
+                                            key={node.id}
+                                            nodeId={node.id}
+                                            artistName={getArtistDisplayName(details, node)}
+                                            previewUrl={details?.previewUrl}
+                                            previewTrackName={details?.previewTrackName}
+                                            itunesArtistId={details?.itunesArtistId}
+                                            onPreviewResolved={(res) => {
+                                                if (details) {
+                                                    details.previewUrl = res.previewUrl;
+                                                    details.previewTrackName = res.previewTrackName;
+                                                    if (res.itunesArtistId) {
+                                                        details.itunesArtistId = res.itunesArtistId;
+                                                    }
+                                                }
+                                            }}
+                                        />
                                     </div>
                                 )}
                                 </div>
-                            )}
-
-                            {/* Architecture V40: 30-Second iTunes Audio Preview Player (Artists only) */}
-                            {!isLabelNode && (
-                                <AudioPreviewPlayer
-                                    key={node.id}
-                                    nodeId={node.id}
-                                    artistName={getArtistDisplayName(details, node)}
-                                    previewUrl={details?.previewUrl}
-                                    previewTrackName={details?.previewTrackName}
-                                    itunesArtistId={details?.itunesArtistId}
-                                    onPreviewResolved={(res) => {
-                                        if (details) {
-                                            details.previewUrl = res.previewUrl;
-                                            details.previewTrackName = res.previewTrackName;
-                                            if (res.itunesArtistId) {
-                                                details.itunesArtistId = res.itunesArtistId;
-                                            }
-                                        }
-                                    }}
-                                />
                             )}
 
                             {(() => {

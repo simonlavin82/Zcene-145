@@ -277,7 +277,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                                 </ul>
                             </li>
                             <li>
-                                <span className="text-primary font-medium">5 & 7. Active Loader Gate → Render Zcene (V40):</span> Live synthesis locks UI until Column 3 sets project status to <code>'completed'</code>; Deep Connections consults unlock or resume account-wide pass (<code>{'{uid}_global_deepweb_pass'}</code>; <code>3T</code> / 3 msgs, no TTL) via <code>unlockDeepWebSessionCallable</code>. Drops loader on Direct Hit or job completion, rendering D3 Canvas, Magazine View, and Deep Cuts (<code>&lt;DetailsPanel&gt;</code>) with <code>&lt;AudioPreviewPlayer key=&#123;node.id&#125;&gt;</code> for on-demand 30s audio previews (Labels strictly excluded; single global playback).
+                                <span className="text-primary font-medium">5 & 7. Active Loader Gate → Render Zcene (V40):</span> Live synthesis locks UI until Column 3 sets project status to <code>'completed'</code>; Deep Connections consults unlock or resume account-wide pass (<code>{'{uid}_global_deepweb_pass'}</code>; <code>3T</code> / 3 msgs, no TTL) via <code>unlockDeepWebSessionCallable</code>. Drops loader on Direct Hit or job completion, rendering D3 Canvas, Magazine View, and Deep Cuts (<code>&lt;DetailsPanel&gt;</code>) with <code>&lt;AudioPreviewPlayer key=&#123;node.id&#125;&gt;</code> overlaid on artist artwork for on-demand 30s audio previews (Labels strictly excluded; single global playback).
                             </li>
                         </ul>
                     </div>
