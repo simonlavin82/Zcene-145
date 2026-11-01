@@ -1139,9 +1139,19 @@ const App: React.FC = () => {
 
   const activeNodes = useMemo(() => {
     if (!graphData || !graphData.nodes) return [];
-    return activeNodeIds
+    const resolved = activeNodeIds
       .map(id => graphData.nodes.find(n => n.id.toLowerCase() === id.toLowerCase() || normalizeArtistId(n.id) === normalizeArtistId(id) || isArtistIdMatch(n.id, id)))
       .filter((n): n is Node => !!n && (n.type === 'artist' || n.type === 'label'));
+
+    // Canonical Presentation Sort (Audio Flow):
+    // Artists strictly precede Record Labels while preserving original graph traversal order.
+    return [...resolved].sort((a, b) => {
+      const isLabelA = a.type === 'label';
+      const isLabelB = b.type === 'label';
+      if (!isLabelA && isLabelB) return -1;
+      if (isLabelA && !isLabelB) return 1;
+      return 0; // Stable sort: preserves original discovery sequence
+    });
   }, [activeNodeIds, graphData]);
   const [isStackDialogOpen, setIsStackDialogOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);

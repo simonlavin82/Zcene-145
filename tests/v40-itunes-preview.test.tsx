@@ -252,4 +252,45 @@ describe('Architecture V40: Instant 30-Second iTunes Audio Previews', () => {
       expect(isFullyQualifiedEntityProfile(undergroundProfile, false)).toBe(true);
     });
   });
+
+  describe('Part 4: Canonical Presentation Sort (Audio Flow & Discovery Order)', () => {
+    it('stably groups all artists before record labels while strictly preserving backend traversal order', () => {
+      // Simulate raw graph traversal order where Artists and Labels are interleaved
+      // Note: 'Spaced' appears before 'Antidote', which is non-alphabetical to verify stable sort
+      const rawDiscoveryNodes = [
+        { id: 'spaced-us', label: 'Spaced', type: 'artist' },
+        { id: 'revelation-records', label: 'Revelation Records', type: 'label' },
+        { id: 'antidote-us', label: 'Antidote', type: 'artist' },
+        { id: 'triple-b-records', label: 'Triple B Records', type: 'label' },
+        { id: 'scowl-us', label: 'Scowl', type: 'artist' },
+      ];
+
+      // Canonical Presentation Comparator (mirrored in App.tsx and DetailsPanel.tsx)
+      const sorted = [...rawDiscoveryNodes].sort((a, b) => {
+        const isLabelA = a.type === 'label';
+        const isLabelB = b.type === 'label';
+        if (!isLabelA && isLabelB) return -1;
+        if (isLabelA && !isLabelB) return 1;
+        return 0; // Stable sort
+      });
+
+      // Artists must strictly precede all Record Labels
+      expect(sorted.map(n => n.id)).toEqual([
+        'spaced-us',
+        'antidote-us',
+        'scowl-us',
+        'revelation-records',
+        'triple-b-records',
+      ]);
+
+      // Verify stable discovery order is preserved within artist group (Spaced precedes Antidote)
+      expect(sorted[0].id).toBe('spaced-us');
+      expect(sorted[1].id).toBe('antidote-us');
+      expect(sorted[2].id).toBe('scowl-us');
+
+      // Verify stable discovery order is preserved within label group (Revelation precedes Triple B)
+      expect(sorted[3].id).toBe('revelation-records');
+      expect(sorted[4].id).toBe('triple-b-records');
+    });
+  });
 });

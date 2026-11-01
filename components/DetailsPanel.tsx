@@ -2044,7 +2044,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         const centerDot = () => {
             const track = trackRef.current;
             const dot = activeDotRef.current;
-            if (track && dot) {
+            if (track && dot && typeof track.scrollTo === 'function') {
                 const scrollTarget = dot.offsetLeft - (track.clientWidth / 2) + (dot.clientWidth / 2);
                 track.scrollTo({ left: scrollTarget, behavior: 'smooth' });
             }
@@ -2360,7 +2360,15 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                 }
             }
             
-            return 0; // Preserve default chronological order
+            // 3. Canonical Presentation Sort (Audio Flow):
+            // Artists strictly precede Record Labels while preserving the original
+            // traversal sequence (stable sort returning 0 for identical entity types).
+            const isLabelA = a.type === 'label';
+            const isLabelB = b.type === 'label';
+            if (!isLabelA && isLabelB) return -1;
+            if (isLabelA && !isLabelB) return 1;
+
+            return 0; // Preserve default chronological / discovery order within groups
         });
 
         return result;

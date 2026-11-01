@@ -832,6 +832,40 @@ describe('DetailsPanel', () => {
             expect(screen.getByText('Create Your Zcene')).toBeInTheDocument();
             expect(screen.queryByText(/Scanning live cultural archives/i)).not.toBeInTheDocument();
         });
+
+        it('stably orders artists before record labels in pagination dots preserving traversal order', () => {
+            const artist1 = { id: 'spaced-us', type: 'artist' as const, label: 'Spaced' };
+            const label1 = { id: 'revelation-records', type: 'label' as const, label: 'Revelation Records' };
+            const artist2 = { id: 'scowl-us', type: 'artist' as const, label: 'Scowl' };
+            const detailsMap = new Map([
+                ['spaced-us', { summary: 'Spaced summary', details: { artist: 'Spaced' }, links: [] } as any],
+                ['revelation-records', { summary: 'Revelation summary', details: { label: 'Revelation Records' }, links: [] } as any],
+                ['scowl-us', { summary: 'Scowl summary', details: { artist: 'Scowl' }, links: [] } as any],
+            ]);
+
+            // Feed raw activeNodes with label randomly interleaved between artists
+            const { container } = render(
+                <DetailsPanel
+                    {...defaultProps}
+                    selectedNode={artist1}
+                    activeNodes={[artist1, label1, artist2]}
+                    detailsCache={detailsMap}
+                />
+            );
+
+            // Locate dot titles in the pagination track
+            const dotElements = container.querySelectorAll('[title]');
+            const dotTitles = Array.from(dotElements)
+                .map(el => el.getAttribute('title'))
+                .filter(title => title && (title.includes('Spaced') || title.includes('Revelation') || title.includes('Scowl')));
+
+            // Artists must precede Labels, and Spaced must precede Scowl
+            expect(dotTitles).toEqual([
+                'Spaced',
+                'Scowl',
+                'Revelation',
+            ]);
+        });
     });
 });
 
