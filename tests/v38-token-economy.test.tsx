@@ -517,9 +517,9 @@ describe('Architecture V38 — Token Economy & Split-Debit Contract', () => {
     expect(screen.getByText(/\$0\.0000 Direct Hit/i)).toBeInTheDocument();
   });
 
-  it('synchronizes BACKEND_REGRESSION_RUNBOOK heading with Architecture V39', () => {
-    expect(BACKEND_REGRESSION_RUNBOOK).toContain('# V39 Regression Suite (Full-Stack)');
-    expect(BACKEND_REGRESSION_RUNBOOK).not.toContain('# V38 Regression Suite');
+  it('synchronizes BACKEND_REGRESSION_RUNBOOK heading with Architecture V40', () => {
+    expect(BACKEND_REGRESSION_RUNBOOK).toContain('# V40 Regression Suite (Full-Stack)');
+    expect(BACKEND_REGRESSION_RUNBOOK).not.toContain('# V39 Regression Suite');
   });
 
   it('computes stable ProjectLoader hydration fingerprints across D3 physics ticks, canvasLayout saves, and metadata stamps while invalidating on topology or detailsCache updates', () => {
