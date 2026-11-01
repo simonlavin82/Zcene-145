@@ -88,7 +88,7 @@ describe('Architecture V41: 2-Stage 30-Day Trash & Immutable Discovery Ledger', 
       updatedAt: { toMillis: () => Date.now() - 86400000 },
     };
 
-    it('renders Dashboard with active and trashed tabs and 0T restore / delete forever actions for trashed items', () => {
+    it('renders Dashboard with toolbar trash button, static heading, preserved pills on trashed cards, and 0T restore', () => {
       const onTrashProject = vi.fn();
       const onRestoreProject = vi.fn();
       const onPermanentDeleteProject = vi.fn();
@@ -120,20 +120,40 @@ describe('Architecture V41: 2-Stage 30-Day Trash & Immutable Discovery Ledger', 
         />
       );
 
-      // Tab badges reflect counts
-      expect(screen.getByText(/YOUR ZCENES \(1\)/i)).toBeInTheDocument();
-      expect(screen.getByText(/TRASH \(1\)/i)).toBeInTheDocument();
+      // Clean static heading without underline tabs
+      expect(screen.getByRole('heading', { level: 1, name: 'YOUR ZCENES' })).toBeInTheDocument();
 
-      // Active tab shows Turnstile, hides Trashed Spaced
+      // Active view shows Turnstile, hides Trashed Spaced
       expect(screen.getByText('Turnstile')).toBeInTheDocument();
       expect(screen.queryByText('Spaced')).not.toBeInTheDocument();
 
-      // Switch to Trash tab
-      fireEvent.click(screen.getByText(/TRASH \(1\)/i));
+      // Trash button is in the toolbar with count indicator
+      const trashButton = screen.getByRole('button', { name: /View Trash \(1\)/i });
+      expect(trashButton).toBeInTheDocument();
 
-      // Trash tab shows Spaced and 30-day restore banner
+      // Click toolbar Trash button to switch to Trash view
+      fireEvent.click(trashButton);
+
+      // Heading switches to TRASH
+      expect(screen.getByRole('heading', { level: 1, name: 'TRASH' })).toBeInTheDocument();
+
+      // Trash view shows Spaced
       expect(screen.getByText('Spaced')).toBeInTheDocument();
-      expect(screen.getByText(/Items in Trash are safely preserved for 30 days/i)).toBeInTheDocument();
+
+      // Redundant amber warning banner is completely removed
+      expect(screen.queryByText(/Items in Trash are safely preserved for 30 days/i)).not.toBeInTheDocument();
+
+      // Trashed card displays DAYS LEFT (not shorthand d left)
+      expect(screen.getByText(/DAYS LEFT/i)).toBeInTheDocument();
+
+      // Trashed card preserves full metadata pills: ROOT ARTISTS, ARTISTS, and DEEP CUTS
+      expect(screen.getByText(/ROOT ARTISTS: 1/i)).toBeInTheDocument();
+      expect(screen.getByText(/ARTISTS: 1/i)).toBeInTheDocument();
+      expect(screen.getByText(/DEEP CUTS: 1/i)).toBeInTheDocument();
+
+      // Clicking Trash button again toggles back to active view
+      fireEvent.click(screen.getByRole('button', { name: /View Active Workspaces/i }));
+      expect(screen.getByRole('heading', { level: 1, name: 'YOUR ZCENES' })).toBeInTheDocument();
     });
   });
 

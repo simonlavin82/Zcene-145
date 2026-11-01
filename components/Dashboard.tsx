@@ -359,6 +359,30 @@ const Dashboard: React.FC<DashboardProps> = ({
                   ]}
                 />
 
+                {/* Trash View Toggle */}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab(activeTab === 'trash' ? 'active' : 'trash')}
+                  className={`group relative h-[38px] w-[38px] flex-shrink-0 flex items-center justify-center rounded-xl border backdrop-blur-md shadow-xl transition-all duration-200 cursor-pointer ${
+                    activeTab === 'trash'
+                      ? 'border-amber-500/60 bg-amber-500/20 text-amber-400 shadow-amber-500/10'
+                      : 'border-zinc-700 bg-zinc-900/80 text-zinc-400 hover:text-white hover:bg-zinc-800/80'
+                  }`}
+                  title={activeTab === 'trash' ? "View Active Workspaces" : `View Trash (${trashedProjects.length})`}
+                  aria-label={activeTab === 'trash' ? "View Active Workspaces" : `View Trash (${trashedProjects.length})`}
+                >
+                  <span className={`material-symbols-outlined !text-[20px] transition-colors ${
+                    activeTab === 'trash' ? 'text-amber-400' : 'text-zinc-400 group-hover:text-white'
+                  }`}>
+                    delete
+                  </span>
+                  {trashedProjects.length > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-black font-mono shadow-sm">
+                      {trashedProjects.length}
+                    </span>
+                  )}
+                </button>
+
                 {/* Deep Search Input */}
                 <div 
                   className={`group relative h-[38px] flex items-center transition-all duration-300 ease-in-out overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900/80 backdrop-blur-md shadow-xl origin-left ${isSearchExpanded ? 'w-56 sm:w-64 focus-within:ring-1 focus-within:ring-primary' : 'w-[38px] cursor-pointer'}`}
@@ -435,41 +459,12 @@ const Dashboard: React.FC<DashboardProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center gap-6">
-              <button
-                onClick={() => setActiveTab('active')}
-                className={`text-base font-medium uppercase tracking-widest pb-1 border-b-2 transition-colors cursor-pointer ${
-                  activeTab === 'active'
-                    ? 'text-zinc-200 border-primary font-bold'
-                    : 'text-zinc-500 border-transparent hover:text-zinc-400'
-                }`}
-              >
-                YOUR ZCENES ({activeProjects.length})
-              </button>
-              {(trashedProjects.length > 0 || activeTab === 'trash') && (
-                <button
-                  onClick={() => setActiveTab('trash')}
-                  className={`text-base font-medium uppercase tracking-widest pb-1 border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
-                    activeTab === 'trash'
-                      ? 'text-amber-400 border-amber-400 font-bold'
-                      : 'text-zinc-500 border-transparent hover:text-amber-400/80'
-                  }`}
-                >
-                  <span className="material-symbols-outlined !text-[16px]">delete</span>
-                  TRASH ({trashedProjects.length})
-                </button>
-              )}
+            <div>
+              <h1 className="text-base font-medium uppercase tracking-widest text-zinc-200">
+                {activeTab === 'trash' ? 'TRASH' : 'YOUR ZCENES'}
+              </h1>
             </div>
           </div>
-
-          {activeTab === 'trash' && (
-            <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center gap-3 text-sm text-amber-200/90">
-              <span className="material-symbols-outlined text-amber-400 !text-xl flex-shrink-0">info</span>
-              <span>
-                Items in Trash are safely preserved for 30 days and can be restored at <strong>0T</strong> before workspace mapping is permanently purged. Historical curation telemetry and token receipts remain immutable in your Discovery Ledger.
-              </span>
-            </div>
-          )}
 
           {targetProjects.length === 0 ? (
             activeTab === 'active' ? (
@@ -733,8 +728,19 @@ const Dashboard: React.FC<DashboardProps> = ({
                         const rowBg = index % 2 === 0 ? 'bg-zinc-900' : 'bg-zinc-950/40';
                         const tdClass = `transition-colors ${rowBg} group-hover:bg-white/5 ${index === 0 ? 'relative z-10' : ''}`;
                         const isTrashed = project.status === 'trashed';
+                        const purgeMs = project.purgeAt?.toMillis
+                          ? project.purgeAt.toMillis()
+                          : project.purgeAt?.toDate
+                          ? project.purgeAt.toDate().getTime()
+                          : project.purgeAt?.seconds
+                          ? project.purgeAt.seconds * 1000
+                          : typeof project.purgeAt === 'string' || typeof project.purgeAt === 'number'
+                          ? new Date(project.purgeAt).getTime()
+                          : project.trashedAt
+                          ? (project.trashedAt?.toMillis ? project.trashedAt.toMillis() : project.trashedAt?.toDate ? project.trashedAt.toDate().getTime() : new Date(project.trashedAt).getTime()) + 30 * 24 * 3600 * 1000
+                          : Date.now();
                         const daysLeft = isTrashed
-                          ? Math.max(0, Math.ceil(((project.purgeAt ? (project.purgeAt.toDate ? project.purgeAt.toDate().getTime() : new Date(project.purgeAt).getTime()) : (project.trashedAt ? (project.trashedAt.toDate ? project.trashedAt.toDate().getTime() : new Date(project.trashedAt).getTime()) + 30 * 24 * 3600 * 1000 : Date.now())) - Date.now()) / (1000 * 60 * 60 * 24)))
+                          ? Math.max(0, Math.ceil((purgeMs - Date.now()) / (1000 * 60 * 60 * 24)))
                           : 0;
                         
                         return (
@@ -793,7 +799,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                               {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
                               {isTrashed ? (
                                 <span className="text-[10px] uppercase tracking-wider text-amber-400 font-bold px-2 py-0.5 bg-amber-500/10 rounded-md border border-amber-500/20 whitespace-nowrap">
-                                  Trashed ({daysLeft}d left)
+                                  Trashed ({daysLeft} {daysLeft === 1 ? 'day' : 'days'} left)
                                 </span>
                               ) : (project.status === 'curating' || project.status === 'pending' || (project.status !== 'failed' && !hasGraphNodes && project.seedArtists)) ? (
                                 <span className="text-[10px] uppercase tracking-wider text-amber-500/80 font-bold px-2 py-0.5 bg-amber-500/10 rounded-md border border-amber-500/10 whitespace-nowrap animate-pulse">

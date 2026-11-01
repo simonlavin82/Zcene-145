@@ -33,11 +33,21 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
 }) => {
   const [imgError, setImgError] = useState(false);
   const isTrashed = project.status === 'trashed';
-  const purgeMs = project.purgeAt?.toMillis ? project.purgeAt.toMillis() : (project.purgeAt?.seconds ? project.purgeAt.seconds * 1000 : null);
+  const purgeMs = project.purgeAt?.toMillis
+    ? project.purgeAt.toMillis()
+    : project.purgeAt?.toDate
+    ? project.purgeAt.toDate().getTime()
+    : project.purgeAt?.seconds
+    ? project.purgeAt.seconds * 1000
+    : typeof project.purgeAt === 'string' || typeof project.purgeAt === 'number'
+    ? new Date(project.purgeAt).getTime()
+    : project.trashedAt
+    ? (project.trashedAt?.toMillis ? project.trashedAt.toMillis() : new Date(project.trashedAt).getTime()) + 30 * 24 * 60 * 60 * 1000
+    : null;
   const daysLeft = purgeMs ? Math.max(0, Math.ceil((purgeMs - Date.now()) / (24 * 60 * 60 * 1000))) : 30;
   const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
   const displayTitle = getProjectDisplayTitle(project);
-  const isUnmapped = project.status !== 'completed' && project.status !== 'curating' && project.status !== 'pending' && project.status !== 'failed' && !project.seedArtists;
+  const isUnmapped = project.status !== 'completed' && project.status !== 'trashed' && project.status !== 'curating' && project.status !== 'pending' && project.status !== 'failed' && !project.seedArtists;
   
   const imageUrls = useSeedImages(project.seedArtists, project.detailsCache, project.graphData, project.seedImageUrl, project.seedImageUrls);
   const hasArtwork = Boolean(imageUrls.length > 0 && imageUrls[0] && imageUrls[0] !== 'not-found' && !imgError);
@@ -166,7 +176,7 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
                 </p>
                 {isTrashed ? (
                   <span className="text-[9px] uppercase tracking-wide text-amber-300 font-bold px-1.5 py-0.5 bg-amber-950/60 rounded-md border border-amber-500/40 font-mono whitespace-nowrap backdrop-blur-sm w-fit mt-0.5">
-                    {daysLeft}d left
+                    {daysLeft} {daysLeft === 1 ? 'DAY' : 'DAYS'} LEFT
                   </span>
                 ) : project.status === 'curating' || project.status === 'pending' || (project.status !== 'failed' && project.status !== 'completed' && project.seedArtists) ? (
                   <span className="text-[9px] uppercase tracking-wider text-amber-500/80 font-bold px-1.5 py-0.5 bg-amber-500/10 rounded-md border border-amber-500/10 whitespace-nowrap animate-pulse backdrop-blur-sm w-fit mt-0.5">
@@ -292,7 +302,7 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
               <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
                 ROOT ARTISTS: {seedList.length}
               </span>
-              {project.status === 'completed' && (
+              {(project.status === 'completed' || isTrashed) && (
                 <>
                   <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
                     ARTISTS: {recommendedCount}
