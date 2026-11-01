@@ -293,11 +293,12 @@ export const AudioPreviewPlayer: React.FC<AudioPreviewPlayerProps> = ({
 
   return (
     <div 
-      className={`absolute inset-0 z-30 select-none group/overlay cursor-pointer ${className}`}
+      className={`absolute inset-0 z-30 select-none cursor-pointer flex items-center justify-center ${className}`}
       onClick={handleTogglePlay}
       tabIndex={0}
       role="button"
-      aria-label={isPlaying ? "Pause Preview" : "Play 30s Audio Preview"}
+      aria-label={isPlaying ? "Pause Preview" : `Play 30s Audio Preview: ${preview.previewTrackName}`}
+      title={isPlaying ? "Pause Preview" : `Play 30s Audio Preview: ${preview.previewTrackName}`}
       onKeyDown={(e) => {
         if (e.key === ' ' || e.key === 'Enter') {
           e.preventDefault();
@@ -305,67 +306,51 @@ export const AudioPreviewPlayer: React.FC<AudioPreviewPlayerProps> = ({
         }
       }}
     >
-      {/* Centered Glassmorphic Watermark Play/Pause Button */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div
-          className={`pointer-events-auto relative w-12 h-12 rounded-full flex items-center justify-center shadow-[0_4px_24px_rgba(0,0,0,0.6)] backdrop-blur-md transition-all duration-200 ${
-            isPlaying 
-              ? 'bg-black/75 border border-primary/60 text-primary scale-100 shadow-[0_0_16px_rgba(246,228,104,0.3)]' 
-              : 'bg-black/40 hover:bg-black/60 border border-white/20 hover:border-white/40 text-white/90 hover:scale-105 active:scale-95'
-          }`}
-          title={isPlaying ? "Pause Preview" : "Play 30s Audio Preview"}
-        >
-          {/* Circular SVG Progress Ring */}
-          <svg className="absolute inset-0 w-12 h-12 -rotate-90 pointer-events-none" viewBox="0 0 52 52">
-            {/* Background ring */}
+      {/* Centered Glassmorphic "One-Circle" Watermark */}
+      <div
+        className={`relative w-12 h-12 rounded-full flex items-center justify-center backdrop-blur-sm transition-all duration-200 ${
+          isPlaying 
+            ? 'bg-black/75 border border-primary/50 text-primary shadow-[0_0_16px_rgba(246,228,104,0.35)] scale-100' 
+            : currentTime > 0
+              ? 'bg-black/60 border border-primary/40 text-primary shadow-md hover:scale-105 active:scale-95'
+              : 'bg-black/20 hover:bg-black/40 border border-white/10 hover:border-white/25 text-white/85 hover:text-white shadow-sm hover:scale-105 active:scale-95'
+        }`}
+      >
+        {/* Circular SVG Progress Ring */}
+        <svg className="absolute inset-0 w-12 h-12 -rotate-90 pointer-events-none" viewBox="0 0 52 52">
+          {/* Background ring */}
+          <circle
+            cx="26"
+            cy="26"
+            r={radius}
+            className="stroke-white/10 fill-none"
+            strokeWidth="2.5"
+          />
+          {/* Active progress ring */}
+          {(isPlaying || currentTime > 0) && (
             <circle
               cx="26"
               cy="26"
               r={radius}
-              className="stroke-white/15 fill-none"
-              strokeWidth="2.5"
+              className="stroke-primary fill-none transition-[stroke-dashoffset] duration-150 ease-linear"
+              strokeWidth="3"
+              strokeDasharray={circumference}
+              strokeDashoffset={strokeDashoffset}
+              strokeLinecap="round"
             />
-            {/* Active progress ring */}
-            {(isPlaying || currentTime > 0) && (
-              <circle
-                cx="26"
-                cy="26"
-                r={radius}
-                className="stroke-primary fill-none transition-[stroke-dashoffset] duration-150 ease-linear"
-                strokeWidth="3"
-                strokeDasharray={circumference}
-                strokeDashoffset={strokeDashoffset}
-                strokeLinecap="round"
-              />
-            )}
-          </svg>
-
-          {/* Center Play / Pause Icon */}
-          {isPlaying ? (
-            // Pause Icon
-            <svg className="w-4 h-4 fill-current relative z-10" viewBox="0 0 24 24">
-              <rect x="6" y="4" width="4" height="16" rx="1" />
-              <rect x="14" y="4" width="4" height="16" rx="1" />
-            </svg>
-          ) : (
-            // Play Icon - Optically centered
-            <svg className="w-4 h-4 fill-current translate-x-[1px] relative z-10" viewBox="0 0 24 24">
-              <path d="M8 5v14l11-7z" />
-            </svg>
           )}
-        </div>
-      </div>
+        </svg>
 
-      {/* Sleek Bottom Gradient Bar (Track Name + Countdown) - Completely hidden in Idle State */}
-      <div className={`absolute bottom-0 inset-x-0 h-14 bg-gradient-to-t from-black/90 via-black/60 to-transparent flex items-end justify-between px-3 pb-2.5 pointer-events-none transition-opacity duration-300 ${
-        isPlaying || currentTime > 0 ? 'opacity-100' : 'opacity-0'
-      }`}>
-        <span className="text-xs font-medium text-white truncate max-w-[105px] sm:max-w-[125px] drop-shadow-md">
-          {preview.previewTrackName}
-        </span>
-        <span className="text-[11px] font-mono font-semibold text-primary bg-black/60 px-1.5 py-0.5 rounded border border-white/15 backdrop-blur-sm shadow-sm flex-shrink-0">
-          {Math.max(0, Math.ceil(duration - currentTime))}s
-        </span>
+        {/* Center Content: Live countdown when playing, Optically Centered Play Icon when idle/paused */}
+        {isPlaying ? (
+          <span className="font-mono text-xs font-bold text-primary tracking-tight select-none relative z-10">
+            {Math.max(1, Math.ceil(duration - currentTime))}s
+          </span>
+        ) : (
+          <svg className="w-4 h-4 fill-current translate-x-[0.5px] select-none pointer-events-none relative z-10" viewBox="0 0 20 20">
+            <polygon points="6,4 16,10 6,16" />
+          </svg>
+        )}
       </div>
     </div>
   );

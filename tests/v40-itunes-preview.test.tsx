@@ -137,9 +137,9 @@ describe('Architecture V40: Instant 30-Second iTunes Audio Previews', () => {
         />
       );
 
-      expect(screen.getByText('Boomerang')).toBeDefined();
-      expect(screen.getByText('30s')).toBeDefined();
-      expect(screen.getByRole('button', { name: /Play 30s Audio Preview/i })).toBeDefined();
+      const button = screen.getByRole('button', { name: /Play 30s Audio Preview: Boomerang/i });
+      expect(button).toBeDefined();
+      expect(button.getAttribute('title')).toContain('Boomerang');
     });
 
     it('supports Play -> Pause -> Play resume cycle via GlobalAudioController without deadlock', () => {
