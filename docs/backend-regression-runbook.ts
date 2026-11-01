@@ -1,5 +1,5 @@
 export const BACKEND_REGRESSION_RUNBOOK = `
-# V40 Regression Suite (Full-Stack)
+# V41 Regression Suite (Full-Stack)
 
 This suite locks down the Zcene generation engine locally without incurring Gemini API costs or requiring the heavy Java Firebase Emulator.
 

@@ -15,6 +15,8 @@ interface DashboardProjectCardProps {
   setProjectToDelete: (id: string) => void;
   onShareProject?: (project: Project) => void;
   onDuplicateProject?: (project: Project) => void;
+  onRestoreProject?: (id: string) => void;
+  setProjectToPurge?: (id: string) => void;
 }
 
 export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
@@ -25,9 +27,14 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
   handleRenameClick,
   setProjectToDelete,
   onShareProject,
-  onDuplicateProject
+  onDuplicateProject,
+  onRestoreProject,
+  setProjectToPurge
 }) => {
   const [imgError, setImgError] = useState(false);
+  const isTrashed = project.status === 'trashed';
+  const purgeMs = project.purgeAt?.toMillis ? project.purgeAt.toMillis() : (project.purgeAt?.seconds ? project.purgeAt.seconds * 1000 : null);
+  const daysLeft = purgeMs ? Math.max(0, Math.ceil((purgeMs - Date.now()) / (24 * 60 * 60 * 1000))) : 30;
   const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
   const displayTitle = getProjectDisplayTitle(project);
   const isUnmapped = project.status !== 'completed' && project.status !== 'curating' && project.status !== 'pending' && project.status !== 'failed' && !project.seedArtists;
@@ -157,7 +164,11 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
                 <p className="font-mono text-[10px] font-normal truncate uppercase tracking-widest text-zinc-400">
                   {project.updatedAt ? `Edited ${formatSystemTimestamp(project.updatedAt)}` : 'New Project'}
                 </p>
-                {project.status === 'curating' || project.status === 'pending' || (project.status !== 'failed' && project.status !== 'completed' && project.seedArtists) ? (
+                {isTrashed ? (
+                  <span className="text-[9px] uppercase tracking-wide text-amber-300 font-bold px-1.5 py-0.5 bg-amber-950/60 rounded-md border border-amber-500/40 font-mono whitespace-nowrap backdrop-blur-sm w-fit mt-0.5">
+                    {daysLeft}d left
+                  </span>
+                ) : project.status === 'curating' || project.status === 'pending' || (project.status !== 'failed' && project.status !== 'completed' && project.seedArtists) ? (
                   <span className="text-[9px] uppercase tracking-wider text-amber-500/80 font-bold px-1.5 py-0.5 bg-amber-500/10 rounded-md border border-amber-500/10 whitespace-nowrap animate-pulse backdrop-blur-sm w-fit mt-0.5">
                     Mapping...
                   </span>
@@ -190,51 +201,85 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setActiveMenuId(null)} />
                   <div className="absolute right-0 mt-2 w-48 z-50 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1 shadow-2xl shadow-black pointer-events-auto text-left animate-fade-in-down antialiased">
-                    <button
-                      onClick={() => {
-                        setActiveMenuId(null);
-                        handleRenameClick(project);
-                      }}
-                      className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
-                    >
-                      <span className="material-symbols-outlined !text-[16px] text-zinc-500">edit</span>
-                      Rename
-                    </button>
-                    {onShareProject && (
-                      <button
-                        onClick={() => {
-                          setActiveMenuId(null);
-                          onShareProject(project);
-                        }}
-                        className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
-                      >
-                        <span className="material-symbols-outlined !text-[16px] text-zinc-500">share</span>
-                        Share
-                      </button>
+                    {isTrashed ? (
+                      <>
+                        {onRestoreProject && (
+                          <button
+                            onClick={() => {
+                              setActiveMenuId(null);
+                              onRestoreProject(project.id);
+                            }}
+                            className="w-full text-left px-3 py-2 text-xs font-medium text-emerald-400 hover:bg-emerald-500/10 transition-all rounded-lg flex items-center gap-2 group cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined !text-[16px] text-emerald-400">restore</span>
+                            Restore (0T)
+                          </button>
+                        )}
+                        <div className="border-t border-zinc-800/80 my-1" />
+                        <button
+                          onClick={() => {
+                            setActiveMenuId(null);
+                            if (setProjectToPurge) {
+                              setProjectToPurge(project.id);
+                            } else {
+                              setProjectToDelete(project.id);
+                            }
+                          }}
+                          className="w-full text-left px-3 py-2 text-xs font-medium text-[#ef4444] hover:bg-[#ef4444]/10 transition-all rounded-lg flex items-center gap-2 group cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined !text-[16px] text-[#ef4444]">delete_forever</span>
+                          Delete Forever
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => {
+                            setActiveMenuId(null);
+                            handleRenameClick(project);
+                          }}
+                          className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                        >
+                          <span className="material-symbols-outlined !text-[16px] text-zinc-500">edit</span>
+                          Rename
+                        </button>
+                        {onShareProject && (
+                          <button
+                            onClick={() => {
+                              setActiveMenuId(null);
+                              onShareProject(project);
+                            }}
+                            className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                          >
+                            <span className="material-symbols-outlined !text-[16px] text-zinc-500">share</span>
+                            Share
+                          </button>
+                        )}
+                        {onDuplicateProject && (
+                          <button
+                            onClick={() => {
+                              setActiveMenuId(null);
+                              onDuplicateProject(project);
+                            }}
+                            className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                          >
+                            <span className="material-symbols-outlined !text-[16px] text-zinc-500">content_copy</span>
+                            Duplicate
+                          </button>
+                        )}
+                        <div className="border-t border-zinc-800/80 my-1" />
+                        <button
+                          onClick={() => {
+                            setActiveMenuId(null);
+                            setProjectToDelete(project.id);
+                          }}
+                          className="w-full text-left px-3 py-2 text-xs font-medium text-[#ef4444] hover:bg-[#ef4444]/10 transition-all rounded-lg flex items-center gap-2 group cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined !text-[16px] text-[#ef4444]">delete</span>
+                          Move to Trash
+                        </button>
+                      </>
                     )}
-                    {onDuplicateProject && (
-                      <button
-                        onClick={() => {
-                          setActiveMenuId(null);
-                          onDuplicateProject(project);
-                        }}
-                        className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
-                      >
-                        <span className="material-symbols-outlined !text-[16px] text-zinc-500">content_copy</span>
-                        Duplicate
-                      </button>
-                    )}
-                    <div className="border-t border-zinc-800/80 my-1" />
-                    <button
-                      onClick={() => {
-                        setActiveMenuId(null);
-                        setProjectToDelete(project.id);
-                      }}
-                      className="w-full text-left px-3 py-2 text-xs font-medium text-[#ef4444] hover:bg-[#ef4444]/10 transition-all rounded-lg flex items-center gap-2 group"
-                    >
-                      <span className="material-symbols-outlined !text-[16px] text-[#ef4444]">delete</span>
-                      Delete
-                    </button>
                   </div>
                 </>
               )}

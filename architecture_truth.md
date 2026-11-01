@@ -1,8 +1,8 @@
 # ZCENE ARCHITECTURAL TRUTH & IMMUTABLE LAWS
  
-![Architecture Diagram](./Zcene Architecture V40.jpg)
+![Architecture Diagram](./Zcene Architecture V41.jpg)
  
-This document defines the absolute, immutable architectural baseline of Zcene (V40 — 43 Laws). All future development, bug fixes, and AI agent actions MUST strictly adhere to these laws. Legacy paradigms (like shared `API_PASSWORD` secrets, naive string matching, bypass assumptions, single-pointer stubs, open-ended prompt instruction textareas, prose-fallback stubs, or storing entity payloads under bare IDs) are strictly forbidden.
+This document defines the absolute, immutable architectural baseline of Zcene (V41 — 43 Laws). All future development, bug fixes, and AI agent actions MUST strictly adhere to these laws. Legacy paradigms (like shared `API_PASSWORD` secrets, naive string matching, bypass assumptions, single-pointer stubs, open-ended prompt instruction textareas, prose-fallback stubs, or storing entity payloads under bare IDs) are strictly forbidden.
  
 ## THE IMMUTABLE ARCHITECTURAL LAWS
  
@@ -21,7 +21,7 @@ The curation pipeline is strictly divided into three distinct execution columns.
     - **Cancellation:** Cancelling Step 4 halts downstream settlement (`0T` if cached; the `1T` Flash lookup fee is retained if Flash executed).
   - **Step 5: Active Loader Gate:** Locks UI completely for live synthesis runs entering Column 2.
   - **Step 6: Deep Connections Consult (`DetailsPanel.tsx`):** Unlocks or resumes an account-wide 3-message artist consult for `3 Tokens` via `unlockDeepWebSessionCallable` (minting `deepWebSessions/{uid}_global_deepweb_pass`; no TTL, free resume across Zcenes while < 3 messages used, atomic per-message `remainingMessages` decrement with +1 auto-refund on failed reply, strictly verified alongside Firebase Auth Bearer `<idToken>` and UID ownership matching in `server.js` `/api/gemini/*`).
-  - **Step 7: Drop Loader & Render Zcene ([Rule 29]):** Drops the loader immediately on Direct Hit local hydration or when Column 3 sets project status to `'completed'`. Mounts the D3 Canvas, Magazine View modal, and Deep Cuts panel (`<DetailsPanel>`). Renders `<AudioPreviewPlayer key={node.id}>` overlaid on artist artwork: resolves an instant 30-second audio preview stream on-demand via zero-token client lookup (`lookup?id=${itunesArtistId}&entity=song&limit=1`). Record Labels are strictly excluded. The singleton `GlobalAudioController` guarantees only one audio stream plays across the entire platform at any time, auto-stopping playback on node transition, modal open, or page navigation.
+  - **Step 7: Drop Loader & Render Zcene ([Rule 29]):** Drops the loader immediately on Direct Hit local hydration or when Column 3 sets project status to `'completed'`. Mounts the D3 Canvas, Magazine View modal, and Deep Cuts panel (`<DetailsPanel>`). Enforces the **Canonical Presentation Sort (Audio Flow)**: a stable UI presentation sort grouping Artists before Record Labels in Deep Cuts and default Magazine View while strictly preserving underlying graph topology and backend traversal order. Overlays `<AudioPreviewPlayer key={node.id}>` with the **One-SVG Concentric Artwork Watermark** on artist cards: resolves an instant 30-second audio preview stream on-demand via zero-token client lookup (`lookup?id=${itunesArtistId}&entity=song&limit=1`). Record Labels are strictly excluded. The singleton `GlobalAudioController` guarantees only one audio stream plays across the entire platform at any time, auto-stopping playback on node transition, modal open, or page navigation.
 - **Column 2: HTTP Fast-Track (executeCurationPipeline.ts):** Synchronous execution layer.
   - **Node 1: Ingest Validated Seed Payload & Settle Token Balance ([Rules 2, 34, 43]):** Verifies `request.auth`, settles remaining project balance (`projectCost - creditablePreFlightTokens`, i.e., `4T`/`5T` Single-Seed or `9T`/`10T` Complex), stamps `tokensSpent` onto `users/{uid}/projects/{projectId}`, and automatically refunds `settlementTokensDeducted` (`4T`/`5T`/`9T`/`10T`) on fatal Column 2 or Column 3 failure (retaining the `1T` Pre-Flight Lookup Fee). Ingests frontend-validated seed preferences (`originalQueries`, `disambiguationHints`, `disambiguationGenres`, `activeSeedNames`) and sanitizes `payload.filters` via `sanitizeDiscoveryFilters` (enforcing dynamic `1965–ERA_MAX_BOUND` era bounds with $N - 2$ Rolling Horizon Normalization, mutual exclusion of `includeOrigins`/`excludeOrigins`, canonical countries/genres, and stripping legacy `additionalInstructions`). Forces `needsProGeneration = true` and `Complex Generation` whenever `hasActiveDiscoveryFilters(filters)` is true, preventing cached single seeds from bypassing active 3-Tier filters. Enforces `isFullyQualifiedEntityProfile` at the Read Gate.
     - **Zero Blind Trust Mandate:** Column 2 MUST NOT synthesize geographic slugs (e.g., `-jp`) from raw user hints. Stubs and routing targets are minted strictly from validated Flash candidate payloads.
@@ -190,7 +190,7 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 - **Strict Ledger Parity:** `buildBaseProjectPayload` defensively omits worker-owned telemetry fields (`generationType`, `apiUsage`, `tokensSpent`, and `anchorResolution`) during frontend autosave (`merge: true`) to prevent clobbering server-stamped token costs, generation classification, and 3-Tier resolution telemetry. `labelIds` are normalized via `normalizeLabelId`.
 - **Display Name Invariant:** Frontend payload MUST pass a `seedNames` map as the absolute source of truth for display names to prevent backend hallucination.
 - **Dashboard Card & UI Isolation:** Dashboard cards & UI consumers must rely solely on the frozen `seedImageUrls` snapshot. Querying the global artists cache for visual assets on isolated projects is strictly prohibited.
-- **V40 Audio Field Parity:** Client hydration (`batchHydrateDetailsCache`, `handleNodeClick`, Local Topology Routing, and Reconciliation) and project autosave pipelines preserve `itunesArtistId`, `previewUrl`, and `previewTrackName` across saving, cloning, and cache synchronization. The Gemini prompt schemas (`NODE_DETAILS_SCHEMA`) remain strictly free of audio fields to guarantee zero LLM link hallucination.
+- **V41 Audio Flow & Presentation Sort Parity:** Client hydration (`batchHydrateDetailsCache`, `handleNodeClick`, Local Topology Routing, and Reconciliation) and project autosave pipelines preserve `itunesArtistId`, `previewUrl`, and `previewTrackName` across saving, cloning, and cache synchronization. The Gemini prompt schemas (`NODE_DETAILS_SCHEMA`) remain strictly free of audio fields to guarantee zero LLM link hallucination. The UI enforces the **Canonical Presentation Sort (Audio Flow)**: stable client-side grouping of Artists before Record Labels in Deep Cuts and Magazine View without mutating raw graph traversal indices, styled with the **One-SVG Concentric Artwork Watermark** inside `<AudioPreviewPlayer key={node.id}>`.
 
 ### 30. Strict Hydration Lock
 - **Rule:** Autosave intervals and listeners MUST be suspended via a global lock during generation cycles to prevent race conditions and partial snapshot overwrites.
@@ -284,17 +284,20 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
      - `updatedAt`: NULL (Shared) | MUTABLE (Jobs / Sessions / DeepWeb Pass).
      - `expireAt`: 30d (Shared) | 24h (Jobs / Sessions) | NULL (DeepWeb Pass).
      - *Lifecycle Rule:* Hard TTL on ephemeral docs (`/sharedZcenes`: +30d; `/curationJobs`: completedAt +24h; `/curationSessions`: +24h sliding). `/deepWebSessions` (`{uid}_global_deepweb_pass`) persists with no TTL for free cross-Zcene resume until all 3 messages are consumed. Coordinates stripped (`Selective Coordinate Amnesia`, Rule 25) to enforce organic guest recalculation; viewing and cloning ("Save to my Zcenes") cost `0 Tokens`.
-  3. **Tier 3: Owned Projects (`users/{uid}/projects/{id}`):**
+  3. **Tier 3: Owned Projects (`users/{uid}/projects/{id}`) — 2-Stage 30-Day Trash & Telemetry Compaction:**
      - `createdAt`: Immutable.
-     - `updatedAt`: Mutable (Project autosave).
-     - `expireAt`: NULL (Permanent user storage, no TTL).
-     - Preserves settled positions in `canvasLayout` via Coordinate Memory (Rule 21).
+     - `updatedAt`: Mutable (Project autosave, coordinate pinning, and status transitions).
+     - `purgeAt`: `trashedAt + 30d` (Set when user deletes active canvas; evaluates automatic compaction) | `NULL` (Active).
+     - `expireAt`: `NULL` (Hard TTLs prohibited; permanent financial and telemetry storage).
+     - *2-Stage Lifecycle Rule:* 
+       1. **Stage 1 (30-Day Trash):** Deleting an active workspace sets `status: 'trashed'`, `trashedAt: serverTimestamp()`, and `purgeAt: trashedAt + 30d`. All topology data (`graphData`, `detailsCache`, and `canvasLayout`) remains 100% intact. The user can click **Restore (0T)** inside the Dashboard Trash view to instantly restore their workspace (including pinned nodes and coordinates) at zero token cost.
+       2. **Stage 2 (Telemetry Compaction & Permanent Archival):** When `purgeAt <= Date.now()` or the user clicks **Delete Forever**, the document transitions to `status: 'deleted'`. Heavy interactive payload fields (`graphData`, `detailsCache`, `canvasLayout`, `chatHistories`) are permanently compacted to `null` to eliminate storage bloat, while the lightweight telemetry header (`name`, `seedArtists`, `generationType`, `tokensSpent`, `apiUsage`, `anchorResolution`, `activeNodesCount`, `createdAt`) is permanently retained. `firestore.rules` strictly forbids client `deleteDoc` calls on any project with recorded token/API spend.
 - **TTL Cache Bouncer (`isCacheExpired`):**
   - Cache freshness evaluation in `services/artistCacheService.ts` checks `data.createdAt` exclusively. `updatedAt` is completely ignored during cache evaluation.
   - *Fail-Safe Expiry:* Any document lacking a valid `createdAt` timestamp, or containing a corrupted non-date value, fails safe and evaluates to expired (`true`), forcing live verification when intersected by a curation run.
 
-### 43. Token Economy, Split-Debit Pre-Flight & Cache Margin Telemetry Isolation
-- **Rule:** Zcene enforces a server-authoritative Token Wallet economy (`shared/tokenEconomy.ts`, `functions/src/tokenWallet.ts`) where client-side wallet mutations are strictly forbidden by `firestore.rules`.
+### 43. Token Economy, 2-Stage 30-Day Trash & Immutable Discovery Ledger Accounting
+- **Rule:** Zcene enforces a server-authoritative Token Wallet economy (`shared/tokenEconomy.ts`, `functions/src/tokenWallet.ts`) where client-side wallet mutations and hard project document deletions are strictly forbidden by `firestore.rules`.
 - **Simulated Stripe Top-Ups (`simulateStripeTopUpCallable`):**
   - Tiers: `£5 = 50 Tokens` (`gbp_5`), `£10 = 100 Tokens` (`gbp_10`), `£15 = 150 Tokens` (`gbp_15`).
   - Credits `users/{uid}.tokenBalance` and `lifetimeTokensPurchased` atomically while writing an immutable `users/{uid}/tokenTransactions/{txId}` receipt.
@@ -305,9 +308,16 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
   - **Remainder Settlement & Auto-Refund:** `authorizeDirectHitCallable` (Column 1 Direct Hit / Post-Validation Cache Intercept) or `executeCurationPipeline` (Column 2 Live Synthesis) settles `projectCost - creditablePreFlightTokens` (`4T`/`5T` Single-Seed or `9T`/`10T` Complex) and stamps `tokensSpent` onto `users/{uid}/projects/{projectId}`. If Column 2 or Column 3 fails fatally, `refundProjectSettlementOnError` automatically refunds `settlementTokensDeducted` (`4T`/`5T`/`9T`/`10T`) while retaining the `1T` Pre-Flight Lookup Fee.
   - **Deep Connections (`DetailsPanel.tsx`):** Costs `3 Tokens` (`TOKEN_PRICING.DEEP_WEB_CONSULT`) via `unlockDeepWebSessionCallable`, minting or resuming an account-wide `deepWebSessions/{uid}_global_deepweb_pass` pass (`remainingMessages: 3`, no TTL, free resume across Zcenes while < 3 messages used). Bounded by atomic per-message `remainingMessages` decrement with +1 auto-refund on failed reply in `server.js`, verified alongside strict Firebase Auth Bearer `<idToken>` and UID ownership matching on `/api/gemini/*`. Telemetry is committed to `users/{uid}/deepWebQueries` and project `deepWebApiUsage`.
   - **Shared Zcenes (`/z/:id` & `"Save to my Zcenes"`):** `0 Tokens` (`handleSaveToDashboard` preserved untouched).
-- **Admin Bypass & Strict Cache Margin Telemetry Isolation:**
-  - Admin (`zcene.online@gmail.com`) bypasses all token deductions (`0T`) via 1-click passwordless confirmation and retains full raw USD cost telemetry (`$0.0000` Direct Hits, `~$0.10–$0.38` live synthesis), cache recall rates, and Author wallet visibility.
-  - Standard Users (`!isAdmin`) and Admin Preview mode (`isNormalUserView === true`) see ONLY their Token Wallet, Token Juice Bar, Top-Up triggers, Personal Curated Zcenes (`tokensSpent`), and Token Activity receipts—strictly redacting `$0.0000` Direct Hit costs, `"CACHE HIT"` / `"Direct Hit"` labels, and cache recall percentages.
+- **2-Stage 30-Day Trash Lifecycle:**
+  - **Stage 1 (30-Day Trash):** Deleting an active workspace sets `status: 'trashed'`, `trashedAt: serverTimestamp()`, and `purgeAt: trashedAt + 30d`. All topology data (`graphData`, `detailsCache`, `canvasLayout`) remains intact. Users restore workspaces at `0 Tokens` via the Dashboard Trash tab.
+  - **Stage 2 (Compacted Archival):** When `purgeAt <= Date.now()` or user triggers "Delete Forever", the document transitions to `status: 'deleted'`. Topology blobs are nullified while telemetry headers (`tokensSpent`, `apiUsage`, `anchorResolution`, `activeNodesCount`) are permanently retained. Hard `deleteDoc` is write-locked in `firestore.rules`.
+- **Immutable Discovery Ledger Dual-Write & Historical Reconciliation:**
+  - Cloud Functions dual-write `apiUsage`, `costUsd`, `seedArtist`, `generationType`, and `anchorResolution` directly to `users/{uid}/tokenTransactions/{txId}` upon curation completion.
+  - On `/analytics`, `Sync Archives` reconciles `tokenTransactions` against `projects`, automatically reconstituting deleted historical runs (e.g., Barry White, earlier Spaced) as `[ARCHIVED]` records.
+  - Platform KPI cards (`AI DISCOVERY COST`, `CURATION PROJECTS`, `CACHE RECALL RATE`, `PRESERVED BUDGET`) and user-facing `ZCENES CURATED` reflect 100% lifetime accounting accuracy across `[ACTIVE]`, `[TRASHED]`, and `[ARCHIVED]` curations.
+- **Admin Author-Targeted Wallet Inspection:**
+  - Admin (`zcene.online@gmail.com`) retains raw USD telemetry, lifetime `[ACTIVE]`/`[TRASHED]`/`[ARCHIVED]` project ledgers, and author token transaction streams inside the expanded row.
+  - Clicking **"Inspect Wallet"** enables Admin Preview Mode targeted to that specific author's UID (rendering Simon's live 57T balance, Juice Bar, curated Zcenes, and receipts rather than the Admin's empty wallet).
 
 
 

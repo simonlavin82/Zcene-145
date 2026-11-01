@@ -168,6 +168,8 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
         projectId: payload.projectId,
         txType: "spend_live_synthesis",
         description: `Zcene Synthesis: ${displaySeeds}`,
+        generationTypeToStamp: hasActiveFilters ? "Filtered Live Synthesis" : "Root Generation",
+        seedArtist: displaySeeds,
     });
     try {
         console.log(`[Pipeline Diamond] -> Cache Lookup: Checking seeds: ${artistList.join(', ')} (activeFilters=${hasActiveFilters})`);

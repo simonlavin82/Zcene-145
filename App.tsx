@@ -12,7 +12,7 @@ import { computeProjectHydrationFingerprint } from './utils/projectHydrationFing
 export { computeProjectHydrationFingerprint };
 import { auth, signInWithGoogle, logout, onAuthStateChanged, User, db, functions, handleFirestoreError, OperationType } from './services/firebase';
 import { translateError, translateToast } from './services/errorTranslationLayer';
-import { collection, doc, setDoc, deleteDoc, onSnapshot, query, getDocFromServer, serverTimestamp, addDoc, getDoc, getDocs, orderBy, where, writeBatch, getDocFromCache, updateDoc, increment, limit } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, onSnapshot, query, getDocFromServer, serverTimestamp, addDoc, getDoc, getDocs, orderBy, where, writeBatch, getDocFromCache, updateDoc, increment, limit, Timestamp } from 'firebase/firestore';
 const StyleGuidePage = React.lazy(() => import('./components/DesignSystem').then(m => ({ default: m.StyleGuidePage })));
 const EnginePage = React.lazy(() => import('./components/EnginePage').then(m => ({ default: m.EnginePage })));
 const UsageAnalyticsPage = React.lazy(() => import('./components/UsageAnalyticsPage').then(m => ({ default: m.UsageAnalyticsPage })));
@@ -1976,19 +1976,75 @@ const App: React.FC = () => {
     }
   }, [user, showToast]);
 
-  const handleDeleteProject = useCallback(async (projectId: string) => {
+  const handleTrashProject = useCallback(async (projectId: string) => {
     if (!user) return;
+    const project = projects.find(p => p.id === projectId);
+    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+    const purgeAt = Timestamp.fromMillis(Date.now() + thirtyDaysMs);
+    
+    let activeCount = Array.isArray(project?.activeNodes) ? project.activeNodes.length : 0;
+    if (activeCount === 0 && project?.graphData) {
+      try {
+        const parsed = typeof project.graphData === 'string' ? JSON.parse(project.graphData) : project.graphData;
+        activeCount = parsed?.nodes?.length || 0;
+      } catch {}
+    }
+
     const path = `users/${user.uid}/projects/${projectId}`;
     try {
-      await deleteDoc(doc(db, 'users', user.uid, 'projects', projectId));
+      await setDoc(doc(db, 'users', user.uid, 'projects', projectId), {
+        status: 'trashed',
+        trashedAt: serverTimestamp(),
+        purgeAt,
+        activeNodesCount: activeCount,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
 
       if (currentProjectId === projectId) {
         navigate('/dashboard');
       }
+      showToast("Zcene moved to 30-Day Trash");
     } catch (err) {
-      handleFirestoreError(err, OperationType.DELETE, path);
+      handleFirestoreError(err, OperationType.WRITE, path);
     }
-  }, [user, currentProjectId, showToast]);
+  }, [user, projects, currentProjectId, showToast]);
+
+  const handleRestoreProject = useCallback(async (projectId: string) => {
+    if (!user) return;
+    const path = `users/${user.uid}/projects/${projectId}`;
+    try {
+      await setDoc(doc(db, 'users', user.uid, 'projects', projectId), {
+        status: 'completed',
+        trashedAt: null,
+        purgeAt: null,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+      showToast("Zcene restored to Active workspaces (0T)");
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, path);
+    }
+  }, [user, showToast]);
+
+  const handlePermanentDeleteProject = useCallback(async (projectId: string) => {
+    if (!user) return;
+    const path = `users/${user.uid}/projects/${projectId}`;
+    try {
+      await setDoc(doc(db, 'users', user.uid, 'projects', projectId), {
+        status: 'deleted',
+        deletedAt: serverTimestamp(),
+        graphData: null,
+        detailsCache: null,
+        canvasLayout: null,
+        chatHistories: null,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+      showToast("Zcene canvas purged. Curation history retained in Discovery Ledger.");
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, path);
+    }
+  }, [user, showToast]);
+
+  const handleDeleteProject = handleTrashProject;
 
   const handleUpdateProjectName = useCallback(async (name: string) => {
     setProjectName(name);
@@ -5402,8 +5458,28 @@ const App: React.FC = () => {
     const projectsRef = collection(db, 'users', user.uid, 'projects');
     const unsubscribe = onSnapshot(projectsRef, (snapshot) => {
       const projs: Project[] = [];
+      const nowMs = Date.now();
       snapshot.forEach((docSnap) => {
         const data = docSnap.data();
+
+        // Stage 2 Auto-Compaction: Check if 30-day purgeAt has expired for trashed projects
+        if (data.status === 'trashed' && data.purgeAt) {
+          const purgeMs = typeof data.purgeAt?.toMillis === 'function'
+            ? data.purgeAt.toMillis()
+            : (typeof data.purgeAt?.seconds === 'number' ? data.purgeAt.seconds * 1000 : 0);
+          if (purgeMs > 0 && purgeMs <= nowMs && (data.graphData !== null || data.detailsCache !== null)) {
+            setDoc(doc(db, 'users', user.uid, 'projects', docSnap.id), {
+              status: 'deleted',
+              deletedAt: serverTimestamp(),
+              graphData: null,
+              detailsCache: null,
+              canvasLayout: null,
+              chatHistories: null,
+              updatedAt: serverTimestamp(),
+            }, { merge: true }).catch(err => console.warn("[Auto-Compaction] Warning:", err));
+          }
+        }
+
         projs.push({
           id: docSnap.id,
           name: data.name || '',
@@ -5425,7 +5501,11 @@ const App: React.FC = () => {
           authorId: data.authorId,
           generationType: data.generationType,
           apiUsage: data.apiUsage,
-          anchorResolution: data.anchorResolution
+          anchorResolution: data.anchorResolution,
+          trashedAt: data.trashedAt,
+          purgeAt: data.purgeAt,
+          deletedAt: data.deletedAt,
+          activeNodesCount: data.activeNodesCount
         });
       });
       setProjects(projs);
@@ -8036,6 +8116,9 @@ const App: React.FC = () => {
             onCreateProject={handleCreateProject}
             isCreatingProject={isCreatingProject}
             onDeleteProject={handleDeleteProject}
+            onTrashProject={handleTrashProject}
+            onRestoreProject={handleRestoreProject}
+            onPermanentDeleteProject={handlePermanentDeleteProject}
             onRenameProject={handleRenameProject}
             onShareProject={handleDashboardShareProject}
             onDuplicateProject={handleDuplicateProject}

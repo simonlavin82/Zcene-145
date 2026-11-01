@@ -24,6 +24,9 @@ interface DashboardProps {
   onCreateProject: () => void;
   isCreatingProject?: boolean;
   onDeleteProject: (projectId: string) => void;
+  onTrashProject?: (projectId: string) => void;
+  onRestoreProject?: (projectId: string) => void;
+  onPermanentDeleteProject?: (projectId: string) => void;
   onRenameProject?: (projectId: string, newName: string) => void;
   onLogoClick: () => void;
   onLogout: () => void;
@@ -57,6 +60,9 @@ const Dashboard: React.FC<DashboardProps> = ({
   onCreateProject,
   isCreatingProject,
   onDeleteProject,
+  onTrashProject,
+  onRestoreProject,
+  onPermanentDeleteProject,
   onRenameProject,
   onLogoClick,
   onLogout,
@@ -80,8 +86,14 @@ const Dashboard: React.FC<DashboardProps> = ({
   onDuplicateProject,
   tokenBalance = 0
 }) => {
+  const [activeTab, setActiveTab] = React.useState<'active' | 'trash'>('active');
   const [projectToDelete, setProjectToDelete] = React.useState<string | null>(null);
+  const [projectToPurge, setProjectToPurge] = React.useState<string | null>(null);
   const [projectToRename, setProjectToRename] = React.useState<Project | null>(null);
+
+  const handleTrash = onTrashProject || onDeleteProject;
+  const handleRestore = onRestoreProject;
+  const handlePurge = onPermanentDeleteProject;
   const [renameValue, setRenameValue] = React.useState('');
   const [view, setView] = React.useState<'grid' | 'list'>('grid');
   const [activeMenuId, setActiveMenuId] = React.useState<string | null>(null);
@@ -124,11 +136,15 @@ const Dashboard: React.FC<DashboardProps> = ({
       .toUpperCase();
   };
 
+  const activeProjects = React.useMemo(() => projects.filter(p => p.status !== 'trashed' && p.status !== 'deleted'), [projects]);
+  const trashedProjects = React.useMemo(() => projects.filter(p => p.status === 'trashed'), [projects]);
+  const targetProjects = activeTab === 'trash' ? trashedProjects : activeProjects;
+
   const filteredProjects = React.useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    if (!query) return projects;
+    if (!query) return targetProjects;
 
-    return projects.filter((project) => {
+    return targetProjects.filter((project) => {
       // 1. Check Project Name and Clean Display Title
       const rawName = (project.name || '').toLowerCase();
       if (rawName.includes(query)) return true;
@@ -164,7 +180,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
       return false;
     });
-  }, [projects, searchQuery]);
+  }, [targetProjects, searchQuery]);
 
   const groupedProjects = React.useMemo(() => {
     const groups: Record<string, Project[]> = {};
@@ -419,16 +435,61 @@ const Dashboard: React.FC<DashboardProps> = ({
               </div>
             </div>
 
-            <div>
-              <h1 className="text-base font-medium uppercase tracking-widest text-zinc-200">YOUR ZCENES</h1>
+            <div className="flex items-center gap-6">
+              <button
+                onClick={() => setActiveTab('active')}
+                className={`text-base font-medium uppercase tracking-widest pb-1 border-b-2 transition-colors cursor-pointer ${
+                  activeTab === 'active'
+                    ? 'text-zinc-200 border-primary font-bold'
+                    : 'text-zinc-500 border-transparent hover:text-zinc-400'
+                }`}
+              >
+                YOUR ZCENES ({activeProjects.length})
+              </button>
+              {(trashedProjects.length > 0 || activeTab === 'trash') && (
+                <button
+                  onClick={() => setActiveTab('trash')}
+                  className={`text-base font-medium uppercase tracking-widest pb-1 border-b-2 transition-colors flex items-center gap-2 cursor-pointer ${
+                    activeTab === 'trash'
+                      ? 'text-amber-400 border-amber-400 font-bold'
+                      : 'text-zinc-500 border-transparent hover:text-amber-400/80'
+                  }`}
+                >
+                  <span className="material-symbols-outlined !text-[16px]">delete</span>
+                  TRASH ({trashedProjects.length})
+                </button>
+              )}
             </div>
           </div>
 
-          {projects.length === 0 ? (
-            <CreateProjectCard 
-              onCreateProject={onCreateProject} 
-              isCreatingProject={isCreatingProject} 
-            />
+          {activeTab === 'trash' && (
+            <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center gap-3 text-sm text-amber-200/90">
+              <span className="material-symbols-outlined text-amber-400 !text-xl flex-shrink-0">info</span>
+              <span>
+                Items in Trash are safely preserved for 30 days and can be restored at <strong>0T</strong> before workspace mapping is permanently purged. Historical curation telemetry and token receipts remain immutable in your Discovery Ledger.
+              </span>
+            </div>
+          )}
+
+          {targetProjects.length === 0 ? (
+            activeTab === 'active' ? (
+              <CreateProjectCard 
+                onCreateProject={onCreateProject} 
+                isCreatingProject={isCreatingProject} 
+              />
+            ) : (
+              <div className="w-full flex flex-col items-center justify-center py-16 px-4 text-center bg-zinc-950/40 border border-dashed border-zinc-800/80 rounded-xl">
+                <div className="w-12 h-12 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500 mb-4">
+                  <span className="material-symbols-outlined !text-2xl">auto_delete</span>
+                </div>
+                <h3 className="text-base font-semibold text-white mb-1">
+                  Trash is empty
+                </h3>
+                <p className="text-sm text-zinc-400 max-w-md">
+                  Trashed Zcenes will appear here for 30 days with 0T restore capability before being automatically compacted.
+                </p>
+              </div>
+            )
           ) : filteredProjects.length === 0 ? (
             <div className="w-full flex flex-col items-center justify-center py-16 px-4 text-center bg-zinc-950/40 border border-dashed border-zinc-800/80 rounded-xl">
               <div className="w-12 h-12 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500 mb-4">
@@ -535,6 +596,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                           setProjectToDelete={setProjectToDelete}
                           onShareProject={onShareProject}
                           onDuplicateProject={onDuplicateProject}
+                          onRestoreProject={handleRestore}
+                          setProjectToPurge={setProjectToPurge}
                         />
                       ))}
                     </div>
@@ -543,10 +606,12 @@ const Dashboard: React.FC<DashboardProps> = ({
               })}
               
               {/* Standalone Add New Crate Folder */}
-              <CreateProjectCard 
-                onCreateProject={onCreateProject} 
-                isCreatingProject={isCreatingProject} 
-              />
+              {activeTab === 'active' && (
+                <CreateProjectCard 
+                  onCreateProject={onCreateProject} 
+                  isCreatingProject={isCreatingProject} 
+                />
+              )}
             </div>
           ) : (
             /* High-Contrast Tabular List View */
@@ -667,17 +732,26 @@ const Dashboard: React.FC<DashboardProps> = ({
                         
                         const rowBg = index % 2 === 0 ? 'bg-zinc-900' : 'bg-zinc-950/40';
                         const tdClass = `transition-colors ${rowBg} group-hover:bg-white/5 ${index === 0 ? 'relative z-10' : ''}`;
+                        const isTrashed = project.status === 'trashed';
+                        const daysLeft = isTrashed
+                          ? Math.max(0, Math.ceil(((project.purgeAt ? (project.purgeAt.toDate ? project.purgeAt.toDate().getTime() : new Date(project.purgeAt).getTime()) : (project.trashedAt ? (project.trashedAt.toDate ? project.trashedAt.toDate().getTime() : new Date(project.trashedAt).getTime()) + 30 * 24 * 3600 * 1000 : Date.now())) - Date.now()) / (1000 * 60 * 60 * 24)))
+                          : 0;
                         
                         return (
                           <tr 
                             key={project.id}
-                            onClick={() => onSelectProject(project.id)}
-                            className="group cursor-pointer border-b border-zinc-800/30"
+                            onClick={() => {
+                              if (isTrashed) return;
+                              onSelectProject(project.id);
+                            }}
+                            className={`group border-b border-zinc-800/30 ${isTrashed ? 'cursor-default opacity-80' : 'cursor-pointer'}`}
                           >
                             <td className={`py-4 px-6 font-medium text-white group-hover:text-primary transition-colors ${tdClass}`}>
                               {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
                               <div className="flex items-center gap-3">
-                                <span className="material-symbols-outlined text-zinc-555 !text-lg group-hover:text-primary transition-colors">folder</span>
+                                <span className={`material-symbols-outlined !text-lg transition-colors ${isTrashed ? 'text-amber-400' : 'text-zinc-555 group-hover:text-primary'}`}>
+                                  {isTrashed ? 'auto_delete' : 'folder'}
+                                </span>
                                 <span className="truncate max-w-[240px]">{displayTitle}</span>
                               </div>
                             </td>
@@ -717,7 +791,11 @@ const Dashboard: React.FC<DashboardProps> = ({
                             </td>
                             <td className={`py-4 px-6 font-normal ${tdClass}`}>
                               {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
-                              {(project.status === 'curating' || project.status === 'pending' || (project.status !== 'failed' && !hasGraphNodes && project.seedArtists)) ? (
+                              {isTrashed ? (
+                                <span className="text-[10px] uppercase tracking-wider text-amber-400 font-bold px-2 py-0.5 bg-amber-500/10 rounded-md border border-amber-500/20 whitespace-nowrap">
+                                  Trashed ({daysLeft}d left)
+                                </span>
+                              ) : (project.status === 'curating' || project.status === 'pending' || (project.status !== 'failed' && !hasGraphNodes && project.seedArtists)) ? (
                                 <span className="text-[10px] uppercase tracking-wider text-amber-500/80 font-bold px-2 py-0.5 bg-amber-500/10 rounded-md border border-amber-500/10 whitespace-nowrap animate-pulse">
                                   Mapping...
                                 </span>
@@ -728,7 +806,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                               ) : project.status === 'completed' ? (
                                 <span className="text-[10px] uppercase tracking-widest text-primary/70 font-bold px-2 py-0.5 bg-primary/10 rounded-md border border-primary/20 whitespace-nowrap">
                                   Mapped
-                                  </span>
+                                </span>
                               ) : (
                                 <span className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold px-2 py-0.5 bg-zinc-800 rounded-md border border-zinc-800 whitespace-nowrap">
                                   Unmapped
@@ -749,51 +827,79 @@ const Dashboard: React.FC<DashboardProps> = ({
                                   <>
                                     <div className="fixed inset-0 z-10" onClick={() => setActiveMenuId(null)} />
                                     <div className="absolute right-0 top-8 w-48 z-50 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1 shadow-2xl shadow-black pointer-events-auto text-left animate-fade-in-down antialiased">
-                                      <button
-                                        onClick={() => {
-                                          setActiveMenuId(null);
-                                          handleRenameClick(project);
-                                        }}
-                                        className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
-                                      >
-                                        <span className="material-symbols-outlined !text-[16px] text-zinc-500">edit</span>
-                                        Rename
-                                      </button>
-                                      {onShareProject && (
-                                        <button
-                                          onClick={() => {
-                                            setActiveMenuId(null);
-                                            onShareProject(project);
-                                          }}
-                                          className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
-                                        >
-                                          <span className="material-symbols-outlined !text-[16px] text-zinc-500">share</span>
-                                          Share
-                                        </button>
+                                      {isTrashed ? (
+                                        <>
+                                          <button
+                                            onClick={() => {
+                                              setActiveMenuId(null);
+                                              handleRestore?.(project.id);
+                                            }}
+                                            className="w-full text-left px-3 py-2 text-xs font-medium text-emerald-400 hover:bg-emerald-500/10 transition-all rounded-lg flex items-center gap-2 group"
+                                          >
+                                            <span className="material-symbols-outlined !text-[16px] text-emerald-400">restore_from_trash</span>
+                                            Restore (0T)
+                                          </button>
+                                          <div className="border-t border-zinc-800/80 my-1" />
+                                          <button
+                                            onClick={() => {
+                                              setActiveMenuId(null);
+                                              setProjectToPurge(project.id);
+                                            }}
+                                            className="w-full text-left px-3 py-2 text-xs font-medium text-[#ef4444] hover:bg-[#ef4444]/10 transition-all rounded-lg flex items-center gap-2 group"
+                                          >
+                                            <span className="material-symbols-outlined !text-[16px] text-[#ef4444]">delete_forever</span>
+                                            Delete Forever
+                                          </button>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <button
+                                            onClick={() => {
+                                              setActiveMenuId(null);
+                                              handleRenameClick(project);
+                                            }}
+                                            className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                                          >
+                                            <span className="material-symbols-outlined !text-[16px] text-zinc-500">edit</span>
+                                            Rename
+                                          </button>
+                                          {onShareProject && (
+                                            <button
+                                              onClick={() => {
+                                                setActiveMenuId(null);
+                                                onShareProject(project);
+                                              }}
+                                              className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                                            >
+                                              <span className="material-symbols-outlined !text-[16px] text-zinc-500">share</span>
+                                              Share
+                                            </button>
+                                          )}
+                                          {onDuplicateProject && (
+                                            <button
+                                              onClick={() => {
+                                                setActiveMenuId(null);
+                                                onDuplicateProject(project);
+                                              }}
+                                              className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                                            >
+                                              <span className="material-symbols-outlined !text-[16px] text-zinc-500">content_copy</span>
+                                              Duplicate
+                                            </button>
+                                          )}
+                                          <div className="border-t border-zinc-800/80 my-1" />
+                                          <button
+                                            onClick={() => {
+                                              setActiveMenuId(null);
+                                              setProjectToDelete(project.id);
+                                            }}
+                                            className="w-full text-left px-3 py-2 text-xs font-medium text-[#ef4444] hover:bg-[#ef4444]/10 transition-all rounded-lg flex items-center gap-2 group"
+                                          >
+                                            <span className="material-symbols-outlined !text-[16px] text-[#ef4444]">delete</span>
+                                            Move to Trash
+                                          </button>
+                                        </>
                                       )}
-                                      {onDuplicateProject && (
-                                        <button
-                                          onClick={() => {
-                                            setActiveMenuId(null);
-                                            onDuplicateProject(project);
-                                          }}
-                                          className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
-                                        >
-                                          <span className="material-symbols-outlined !text-[16px] text-zinc-500">content_copy</span>
-                                          Duplicate
-                                        </button>
-                                      )}
-                                      <div className="border-t border-zinc-800/80 my-1" />
-                                      <button
-                                        onClick={() => {
-                                          setActiveMenuId(null);
-                                          setProjectToDelete(project.id);
-                                        }}
-                                        className="w-full text-left px-3 py-2 text-xs font-medium text-[#ef4444] hover:bg-[#ef4444]/10 transition-all rounded-lg flex items-center gap-2 group"
-                                      >
-                                        <span className="material-symbols-outlined !text-[16px] text-[#ef4444]">delete</span>
-                                        Delete
-                                      </button>
                                     </div>
                                   </>
                                 )}
@@ -877,15 +983,15 @@ const Dashboard: React.FC<DashboardProps> = ({
         </ModalBackdrop>
       )}
 
-      {/* Custom Delete Confirmation Modal */}
+      {/* Custom Move to Trash Confirmation Modal */}
       {projectToDelete && (
         <ModalBackdrop className="z-[110]" onClick={() => setProjectToDelete(null)}>
           <ModalContainer className="text-left">
             <ModalHeader>
               <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-red-500 !text-[18px]">warning</span>
+                <span className="material-symbols-outlined text-amber-500 !text-[18px]">delete</span>
                 <h3 className="text-base font-medium text-white">
-                  Confirm Deletion
+                  Move to 30-Day Trash
                 </h3>
               </div>
               <button 
@@ -897,8 +1003,8 @@ const Dashboard: React.FC<DashboardProps> = ({
             </ModalHeader>
 
             <ModalBody className="space-y-4">
-              <p className="leading-relaxed">
-                Are you sure you want to delete <span className="font-semibold text-white">{projects.find(p => p.id === projectToDelete)?.name || 'this Zcene'}</span>? This action cannot be undone. All mapping and chat history for this Zcene will be permanently removed.
+              <p className="leading-relaxed text-zinc-300">
+                Are you sure you want to move <span className="font-semibold text-white">{projects.find(p => p.id === projectToDelete)?.name || 'this Zcene'}</span> to Trash? Your canvas mapping, node coordinates, and audio details will be safely preserved for 30 days and can be restored at zero token cost (0T). After 30 days, mapping data will be permanently purged to conserve storage, while historical curation telemetry remains preserved in your lifetime Discovery Ledger.
               </p>
             </ModalBody>
 
@@ -911,12 +1017,58 @@ const Dashboard: React.FC<DashboardProps> = ({
               </button>
               <button 
                 onClick={() => {
-                  onDeleteProject(projectToDelete);
+                  handleTrash(projectToDelete);
                   setProjectToDelete(null);
                 }} 
-                className="px-4 py-1.5 bg-red-500 text-white rounded-xl font-medium text-sm transition-opacity hover:opacity-90"
+                className="px-4 py-1.5 bg-amber-500 hover:bg-amber-600 text-black font-semibold rounded-xl text-sm transition-opacity"
               >
-                Confirm
+                Move to Trash
+              </button>
+            </ModalFooter>
+          </ModalContainer>
+        </ModalBackdrop>
+      )}
+
+      {/* Custom Permanent Purge Confirmation Modal */}
+      {projectToPurge && (
+        <ModalBackdrop className="z-[110]" onClick={() => setProjectToPurge(null)}>
+          <ModalContainer className="text-left">
+            <ModalHeader>
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-red-500 !text-[18px]">delete_forever</span>
+                <h3 className="text-base font-medium text-white">
+                  Permanently Purge Canvas?
+                </h3>
+              </div>
+              <button 
+                onClick={() => setProjectToPurge(null)} 
+                className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none"
+              >
+                <span className="material-symbols-outlined !text-[18px]">close</span>
+              </button>
+            </ModalHeader>
+
+            <ModalBody className="space-y-4">
+              <p className="leading-relaxed text-zinc-300">
+                Are you sure you want to permanently delete <span className="font-semibold text-white">{projects.find(p => p.id === projectToPurge)?.name || 'this Zcene'}</span>? Canvas layout, node graphs, and chat history will be permanently deleted immediately. Historical curation telemetry and token receipts remain preserved in your lifetime Discovery Ledger.
+              </p>
+            </ModalBody>
+
+            <ModalFooter>
+              <button 
+                onClick={() => setProjectToPurge(null)} 
+                className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => {
+                  handlePurge?.(projectToPurge);
+                  setProjectToPurge(null);
+                }} 
+                className="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl text-sm transition-opacity"
+              >
+                Delete Forever
               </button>
             </ModalFooter>
           </ModalContainer>

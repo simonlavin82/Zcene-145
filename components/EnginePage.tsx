@@ -175,7 +175,7 @@ const ARCHITECTURE_RULES = [
     { 
         id: 29, 
         title: "Universal Payload Serializer", 
-        desc: "Project saving, autosave, and share generation derive from a single source of truth to guarantee 1:1 data parity (including curation elements like pinned/styled nodes). Share links apply a post-serialization blacklist for ephemeral constraints without risking data omission. Strict Ledger Parity: buildBaseProjectPayload defensively omits generationType, apiUsage, tokensSpent, and anchorResolution during frontend autosave (merge: true) to prevent clobbering server-stamped token costs, labeling, and 3-Tier telemetry. Frontend payload MUST pass a seedNames map as the absolute source of truth for display names to prevent backend hallucination. Dashboard cards & UI consumers must rely solely on the frozen seedImageUrls snapshot. V40 Audio Parity: Client hydration and autosave pipelines preserve itunesArtistId, previewUrl, and previewTrackName across project saving, cloning, and reconciliation while strictly keeping LLM schemas free of audio fields to prevent hallucinations." 
+        desc: "Project saving, autosave, and share generation derive from a single source of truth to guarantee 1:1 data parity (including curation elements like pinned/styled nodes). Share links apply a post-serialization blacklist for ephemeral constraints without risking data omission. Strict Ledger Parity: buildBaseProjectPayload defensively omits generationType, apiUsage, tokensSpent, and anchorResolution during frontend autosave (merge: true) to prevent clobbering server-stamped token costs, labeling, and 3-Tier telemetry. Frontend payload MUST pass a seedNames map as the absolute source of truth for display names to prevent backend hallucination. Dashboard cards & UI consumers must rely solely on the frozen seedImageUrls snapshot. V41 Audio Flow & Presentation Sort Parity: Client hydration and autosave pipelines preserve itunesArtistId, previewUrl, and previewTrackName across project saving, cloning, and reconciliation while strictly keeping LLM schemas free of audio fields to prevent hallucinations. The UI enforces the Canonical Presentation Sort (Audio Flow) grouping Artists before Record Labels in Deep Cuts and Magazine View while preserving graph traversal order, overlaid with the One-SVG Concentric Artwork Watermark." 
     },
     { 
         id: 30, 
@@ -244,8 +244,8 @@ const ARCHITECTURE_RULES = [
     },
     { 
         id: 43, 
-        title: "Prepaid Token Economy, Split-Debit Wallet & Telemetry Isolation", 
-        desc: "Zcene enforces a server-authoritative prepaid Token Economy on users/{uid} (tokenBalance, tokenTransactions), write-locked against client mutation in firestore.rules. Standard users top up via <SimulatedStripeModal> (£5=50T, £10=100T, £15=150T) and spend value-based tokens across all curations: 5 Tokens for Single-Seed (Direct Hit or Synthesis), 10 Tokens for Complex (Multi-Seed or 3-Tier Anchored), and 3 Tokens for Deep Connections (3-message consult via unlockDeepWebSessionCallable + account-wide {uid}_global_deepweb_pass in deepWebSessions; no TTL, free resume across Zcenes while < 3 messages used, atomic per-message remainingMessages decrement with +1 auto-refund on failed reply, and strict Bearer ID token + UID ownership verification), with 1 Token deducted upfront per uncached Flash pre-flight/escape-hatch lookup and credited (up to 1T) against final project settlement. Shared links (/z/:id) and 'Save to My Zcenes' (Clone) remain permanently free (0 Tokens). Admin (zcene.online@gmail.com) bypasses all token deductions while retaining raw USD telemetry; Standard Users and Admin Preview mode on /analytics display only the Token Juice Bar, Top-Up controls, and 'Tokens Spent per Zcene'—never raw $0.0000 Direct Hit costs or cache recall percentages." 
+        title: "Prepaid Token Economy, 2-Stage Trash & Immutable Discovery Ledger", 
+        desc: "Zcene enforces a server-authoritative prepaid Token Economy on users/{uid} (tokenBalance, tokenTransactions), write-locked against client mutation in firestore.rules. Standard users top up via <SimulatedStripeModal> (£5=50T, £10=100T, £15=150T) and spend value-based tokens: 5T Single-Seed, 10T Complex, 3T Deep Connections (account-wide {uid}_global_deepweb_pass, no TTL), with 1T non-refundable pre-flight credited against final settlement. Workspace deletions follow a 2-Stage 30-Day Trash lifecycle: Stage 1 preserves 100% of graphData/canvasLayout for 0T user restoration; Stage 2 compacts heavy blobs to null upon permanent purge while preserving telemetry headers. Cloud Functions dual-write exact apiUsage, costUsd, seedArtist, and anchorResolution to users/{uid}/tokenTransactions. The Discovery Ledger reconciles tokenTransactions against projects during Sync Archives, auto-reconstituting historical deleted runs (e.g., Barry White, earlier Spaced) as [ARCHIVED] so platform KPI totals (AI Discovery Cost, Curation Projects, Cache Recall Rate) retain 100% lifetime accuracy. Admin retains raw USD telemetry, [ACTIVE]/[TRASHED]/[ARCHIVED] author audit ledgers, and Author-Targeted Wallet Inspection ('Inspect Wallet' renders the author's live 57T balance, Juice Bar, and receipts; never the Admin's empty wallet)." 
     }
 ];
 
@@ -277,7 +277,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                                 </ul>
                             </li>
                             <li>
-                                <span className="text-primary font-medium">5 & 7. Active Loader Gate → Render Zcene (V40):</span> Live synthesis locks UI until Column 3 sets project status to <code>'completed'</code>; Deep Connections consults unlock or resume account-wide pass (<code>{'{uid}_global_deepweb_pass'}</code>; <code>3T</code> / 3 msgs, no TTL) via <code>unlockDeepWebSessionCallable</code>. Drops loader on Direct Hit or job completion, rendering D3 Canvas, Magazine View, and Deep Cuts (<code>&lt;DetailsPanel&gt;</code>) with <code>&lt;AudioPreviewPlayer key=&#123;node.id&#125;&gt;</code> overlaid on artist artwork for on-demand 30s audio previews (Labels strictly excluded; single global playback).
+                                <span className="text-primary font-medium">5 & 7. Active Loader Gate → Render Zcene (V41 Audio Flow):</span> Live synthesis locks UI until Column 3 sets project status to <code>'completed'</code>; Deep Connections consults unlock or resume account-wide pass (<code>{'{uid}_global_deepweb_pass'}</code>; <code>3T</code> / 3 msgs, no TTL) via <code>unlockDeepWebSessionCallable</code>. Drops loader on Direct Hit or job completion, rendering D3 Canvas, Magazine View, and Deep Cuts (<code>&lt;DetailsPanel&gt;</code>). Enforces <strong>Canonical Presentation Sort (Audio Flow)</strong>: a stable presentation sort grouping Artists before Record Labels in Deep Cuts and Magazine View while preserving backend graph traversal order. Overlays <code>&lt;AudioPreviewPlayer key=&#123;node.id&#125;&gt;</code> with One-SVG Concentric Artwork Watermark on artist artwork for on-demand 30s audio previews (Labels strictly excluded; single global playback).
                             </li>
                         </ul>
                     </div>
@@ -497,21 +497,21 @@ const DataLifecycleMatrix: React.FC = () => (
                 </div>
             </div>
 
-            {/* Tier 3 */}
+            {/* Tier 3: Owned */}
             <div className="bg-zinc-900 border border-zinc-700 p-4 rounded-xl">
                 <div className="flex items-center gap-2 mb-2">
                     <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                    <div className="text-emerald-400 font-bold text-xs uppercase tracking-wider">Tier 3: Owned</div>
+                    <div className="text-emerald-400 font-bold text-xs uppercase tracking-wider">Tier 3: Owned (2-Stage Lifecycle)</div>
                 </div>
                 <div className="text-zinc-500 text-[10px] mb-3 uppercase font-mono">users/uid/projects</div>
                 <div className="space-y-1.5 text-xs">
                     <div className="flex justify-between items-start gap-3 border-b border-zinc-800 pb-1.5"><span className="text-zinc-400 shrink-0">createdAt</span><span className="text-white text-right">Immutable</span></div>
-                    <div className="flex justify-between items-start gap-3 border-b border-zinc-800 pb-1.5"><span className="text-zinc-400 shrink-0">updatedAt</span><span className="text-green-400 text-right">Mutable</span></div>
-                    <div className="flex justify-between items-start gap-3 border-b border-zinc-800 pb-1.5"><span className="text-zinc-400 shrink-0">expireAt</span><span className="text-zinc-500 text-right">NULL (No TTL)</span></div>
-                    <div className="flex justify-between items-start gap-3"><span className="text-zinc-400 shrink-0">cachedAt</span><span className="text-red-500 line-through text-right">Eradicated</span></div>
+                    <div className="flex justify-between items-start gap-3 border-b border-zinc-800 pb-1.5"><span className="text-zinc-400 shrink-0">updatedAt</span><span className="text-green-400 text-right">Mutable (Autosave & Compaction)</span></div>
+                    <div className="flex justify-between items-start gap-3 border-b border-zinc-800 pb-1.5"><span className="text-zinc-400 shrink-0">purgeAt</span><span className="text-amber-400 text-right">trashedAt + 30d (Trash) | NULL (Active)</span></div>
+                    <div className="flex justify-between items-start gap-3"><span className="text-zinc-400 shrink-0">lifecycle</span><span className="text-emerald-400 text-right">Active → 30d Trash (0T Restore) → Compaction</span></div>
                 </div>
                 <div className="mt-3 text-[11px] text-zinc-500 leading-relaxed">
-                    User-controlled topologies. Preserves fixed Coordinate Memory in canvasLayout to prevent spatial re-orientation.
+                    Enforces a 2-Stage Lifecycle: Active workspaces soft-delete to 30-Day Trash (<code className="text-amber-300">status: 'trashed'</code>), retaining 100% of <code className="text-zinc-300">graphData</code>, <code className="text-zinc-300">detailsCache</code>, and <code className="text-zinc-300">canvasLayout</code> for zero-token (0T) user restoration. After 30 days or upon "Delete Forever", documents undergo Telemetry Compaction (<code className="text-zinc-400">status: 'deleted'</code>): heavy graph blobs are stripped to null while financial and cache headers (<code className="text-primary">tokensSpent</code>, <code className="text-red-400">apiUsage</code>, <code className="text-zinc-300">anchorResolution</code>, <code className="text-zinc-300">activeNodesCount</code>) are permanently retained for immutable accounting in The Discovery Ledger.
                 </div>
             </div>
         </div>
@@ -576,7 +576,7 @@ const RunbookAccordion: React.FC = () => {
             >
                 <div className="flex items-center gap-3 text-zinc-200 font-medium text-sm uppercase tracking-wider">
                     <Terminal className="w-4 h-4 text-primary" />
-                    V40 Full-Stack Regression Runbook
+                    V41 Full-Stack Regression Runbook
                 </div>
                 {isOpen ? <ChevronDown className="w-4 h-4 text-zinc-400" /> : <ChevronRight className="w-4 h-4 text-zinc-400" />}
             </button>
@@ -732,7 +732,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                             ))}
                         </nav>
                         <div className="mt-6 pt-4 border-t border-zinc-800/60 text-[10px] text-zinc-500 font-mono">
-                            Zcene V40 Blueprint<br/>
+                            Zcene V41 Blueprint<br/>
                             100% Anti-Regression
                         </div>
                     </div>
@@ -744,7 +744,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                     <div className="mb-8 border-b border-zinc-700/60 pb-6">
                         <div className="flex items-center gap-3 mb-2">
                             <h1 className="text-2xl sm:text-3xl font-medium text-white">Engine</h1>
-                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-primary/20 text-primary border border-primary/40">V40 Locked</span>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-primary/20 text-primary border border-primary/40">V41 Locked</span>
                         </div>
                         <p className="text-zinc-400 leading-relaxed text-xs sm:text-sm max-w-3xl">
                             Visual mirror and execution interface for the Zcene curation pipeline. Defines behavioral laws, state orchestration, anti-pollution boundaries, and regression-proof contracts.
@@ -822,7 +822,7 @@ LOCKED SEMANTIC TOPOLOGY (Rule 21):
             <footer className="w-full p-6 text-zinc-400 text-xs z-10 relative bg-neutral-900 flex-shrink-0 border-t border-neutral-800">
                 <div className="container mx-auto text-center">
                     <ZceneLogo className="h-6 w-auto text-primary mx-auto mb-2" />
-                    <p className="text-zinc-600">© 2026 Zcene Admin Console. V40 Programmatic Architecture.</p>
+                    <p className="text-zinc-600">© 2026 Zcene Admin Console. V41 Programmatic Architecture.</p>
                 </div>
             </footer>
         </div>

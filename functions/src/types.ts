@@ -185,22 +185,26 @@ export interface Project {
   artistIds?: string[];     // e.g. ['buggin', 'end-it', 'spaced']
   /** Array of normalized label IDs pointing to individual /labels/{id} cache docs. */
   labelIds?: string[];      // e.g. ['relapse-records', 'armageddon-label']
-  canvasLayout?: string;    // JSON CanvasNodeRef[] — artist positions only
+  canvasLayout?: string | null;    // JSON CanvasNodeRef[] — artist positions only; nullified on Stage 2 compaction
   // --- DEPRECATED (Phase 1): compound cacheKey — kept for backward-compatible reads of old project docs ---
   /** @deprecated Use `artistIds` instead. Retained for backward-compatible hydration of legacy projects. */
   cacheKey?: string;
   // --- LEGACY: full blob fallback for very old project docs ---
   graphData?: string | null;
-  detailsCache?: string;    // JSON Map
+  detailsCache?: string | null;    // JSON Map; nullified on Stage 2 compaction
   // --- Always present ---
   activeNodes: string[];
   pinnedNodes?: string[];
-  chatHistories?: string;   // JSON Map
+  chatHistories?: string | null;   // JSON Map; nullified on Stage 2 compaction
   discoveryFilters?: string; // JSON
   lastViewedStackCount?: number;
   isMagazineViewOpen?: boolean;
   authorId?: string;
-  status?: string;
+  status?: 'curating' | 'completed' | 'failed' | 'trashed' | 'deleted' | string;
+  trashedAt?: any;
+  purgeAt?: any;
+  deletedAt?: any;
+  activeNodesCount?: number;
   activeJobId?: string | null;
   coverImage?: string;
   seedImageUrl?: string;

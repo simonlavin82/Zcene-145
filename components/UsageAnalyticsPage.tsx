@@ -78,6 +78,8 @@ export interface ProjectTelemetry {
     cost: number;
     isEstimate: boolean;
     createdAt: number;
+    status?: 'active' | 'trashed' | 'deleted' | 'archived' | string;
+    isArchived?: boolean;
 }
 
 export interface TelemetryOverviewCardsProps {
@@ -293,11 +295,145 @@ const DeepConnectionsQueryLog: React.FC<DeepConnectionsQueryLogProps> = ({ uid, 
     );
 };
 
+export const formatTxTimestamp = (createdAt: any): string => {
+    if (!createdAt) return 'Just now';
+    const ms = typeof createdAt?.toMillis === 'function'
+        ? createdAt.toMillis()
+        : typeof createdAt?.seconds === 'number'
+            ? createdAt.seconds * 1000
+            : typeof createdAt === 'number'
+                ? createdAt
+                : Date.now();
+    const d = new Date(ms);
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) + ', ' +
+        d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+};
+
+interface AuthorTokenActivityTableProps {
+    uid?: string;
+    email: string;
+}
+
+const AuthorTokenActivityTable: React.FC<AuthorTokenActivityTableProps> = ({ uid, email }) => {
+    const [txs, setTxs] = useState<any[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        let isMounted = true;
+        if (!uid) {
+            setIsLoading(false);
+            return;
+        }
+
+        const fetchTxs = async () => {
+            setIsLoading(true);
+            setError(null);
+            try {
+                const txRef = collection(db, 'users', uid, 'tokenTransactions');
+                const snap = await getDocs(query(txRef, orderBy('createdAt', 'desc'), limit(50)));
+                if (isMounted) {
+                    const parsed = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    setTxs(parsed);
+                }
+            } catch (err: any) {
+                console.error('[AuthorTokenActivityTable] Failed to load transactions:', err);
+                if (isMounted) setError('Unable to load token receipts.');
+            } finally {
+                if (isMounted) setIsLoading(false);
+            }
+        };
+
+        fetchTxs();
+        return () => { isMounted = false; };
+    }, [uid]);
+
+    return (
+        <div className="space-y-3">
+            <div className="flex items-center justify-between">
+                <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">
+                    Token Activity & Top-Up Receipts
+                </h4>
+                <span className="text-[10px] text-zinc-500 font-mono">
+                    {txs.length > 0 ? `${txs.length} transactions` : ''}
+                </span>
+            </div>
+
+            <div className="bg-black/50 border border-zinc-800 rounded-md overflow-hidden">
+                <table className="w-full text-left border-collapse">
+                    <thead>
+                        <tr className="border-b border-zinc-800 bg-zinc-900/30">
+                            <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Date</th>
+                            <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Activity</th>
+                            <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Category</th>
+                            <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Change</th>
+                            <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Balance</th>
+                            <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">AI Cost</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {isLoading ? (
+                            <tr>
+                                <td colSpan={6} className="p-4 text-center text-xs text-zinc-500 italic">
+                                    <span className="inline-flex items-center gap-2">
+                                        <span className="material-symbols-outlined !text-[14px] animate-spin">progress_activity</span>
+                                        Loading token transactions...
+                                    </span>
+                                </td>
+                            </tr>
+                        ) : error ? (
+                            <tr>
+                                <td colSpan={6} className="p-4 text-center text-xs text-red-400 italic">
+                                    {error}
+                                </td>
+                            </tr>
+                        ) : txs.length === 0 ? (
+                            <tr>
+                                <td colSpan={6} className="p-4 text-center text-xs text-zinc-500 italic">
+                                    No token transactions recorded yet for this author.
+                                </td>
+                            </tr>
+                        ) : (
+                            txs.map((t) => {
+                                const badge = formatTxTypeBadge(t.type);
+                                const isPositive = Number(t.delta) > 0;
+                                const dateStr = formatTxTimestamp(t.createdAt);
+                                const costStr = typeof t.costUsd === 'number' ? `$${t.costUsd.toFixed(4)}` : (t.costUsd ? `$${Number(t.costUsd).toFixed(4)}` : '—');
+                                return (
+                                    <tr key={t.id} className="border-b border-zinc-800/50 last:border-0 hover:bg-zinc-900/20">
+                                        <td className="p-3 text-xs text-zinc-400 whitespace-nowrap font-mono">{dateStr}</td>
+                                        <td className="p-3 text-xs text-zinc-300 font-medium">{t.description || 'Token Activity'}</td>
+                                        <td className="p-3 text-xs">
+                                            <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${badge.style}`}>
+                                                {badge.label}
+                                            </span>
+                                        </td>
+                                        <td className={`p-3 text-xs text-right font-mono font-bold ${isPositive ? 'text-emerald-400' : 'text-zinc-200'}`}>
+                                            {isPositive ? `+${t.delta}T` : `${t.delta}T`}
+                                        </td>
+                                        <td className="p-3 text-xs text-right font-mono text-zinc-400">
+                                            {t.balanceAfter ?? '—'}T
+                                        </td>
+                                        <td className="p-3 text-xs text-right font-mono text-red-400/80">
+                                            {costStr}
+                                        </td>
+                                    </tr>
+                                );
+                            })
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+};
+
 export interface DiscoveryLedgerTableProps {
     isLoading: boolean;
     filteredLedger: UserTelemetry[];
     expandedRow: string | null;
     toggleRow: (email: string) => void;
+    onInspectUser?: (user: UserTelemetry) => void;
 }
 
 export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
@@ -305,6 +441,7 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
     filteredLedger,
     expandedRow,
     toggleRow,
+    onInspectUser,
 }) => {
     return (
         <div className="border border-zinc-800 bg-zinc-950/20 overflow-x-auto">
@@ -354,7 +491,23 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
                                         className="border-b border-zinc-900 hover:bg-zinc-900/20 cursor-pointer transition-colors"
                                     >
                                         <td className="p-4">
-                                            <span className="font-medium text-white">{user.email}</span>
+                                            <div className="flex items-center justify-between gap-3">
+                                                <span className="font-medium text-white">{user.email}</span>
+                                                {onInspectUser && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            onInspectUser(user);
+                                                        }}
+                                                        className="px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 text-[11px] font-semibold flex items-center gap-1.5 transition-colors cursor-pointer select-none"
+                                                        title={`Inspect ${user.email}'s live wallet and curated zcenes`}
+                                                    >
+                                                        <span className="material-symbols-outlined !text-[13px]">visibility</span>
+                                                        Inspect Wallet
+                                                    </button>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="p-4 text-center font-mono text-primary font-semibold">
                                             {user.tokenBalance}T
@@ -500,10 +653,35 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
                                                                      {user.projects.map((proj, idx) => {
                                                                          const isZeroCost = (proj.generationType === "Direct Hit" || proj.generationType === "Clone") && proj.cost === 0;
                                                                          const dateStr = proj.createdAt ? new Date(proj.createdAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).replace(',', ',') : '';
+                                                                         const isTrashed = proj.status === 'trashed';
+                                                                         const isPurged = proj.status === 'deleted';
+                                                                         const isArchived = proj.status === 'archived' || proj.isArchived;
+
                                                                          return (
                                                                              <tr key={idx} className="border-b border-zinc-800/50 last:border-0 hover:bg-zinc-900/20">
-                                                                                 <td className="p-3 text-xs text-zinc-300 font-medium">{proj.seedArtist}</td>
-                                                                                 <td className="p-3 text-xs text-zinc-400 whitespace-nowrap">{dateStr}</td>
+                                                                                 <td className="p-3 text-xs text-zinc-300 font-medium">
+                                                                                     <div className="flex items-center gap-2">
+                                                                                         {isTrashed ? (
+                                                                                             <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 whitespace-nowrap">
+                                                                                                 TRASHED
+                                                                                             </span>
+                                                                                         ) : isPurged ? (
+                                                                                             <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded bg-red-500/15 text-red-300 border border-red-500/30 whitespace-nowrap">
+                                                                                                 PURGED
+                                                                                             </span>
+                                                                                         ) : isArchived ? (
+                                                                                             <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded bg-zinc-800 text-zinc-400 border border-zinc-700 whitespace-nowrap">
+                                                                                                 ARCHIVED
+                                                                                             </span>
+                                                                                         ) : (
+                                                                                             <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 whitespace-nowrap">
+                                                                                                 ACTIVE
+                                                                                             </span>
+                                                                                         )}
+                                                                                         <span>{proj.seedArtist}</span>
+                                                                                     </div>
+                                                                                 </td>
+                                                                                 <td className="p-3 text-xs text-zinc-400 whitespace-nowrap font-mono">{dateStr}</td>
                                                                                  <td className="p-3 text-xs text-zinc-400">{proj.generationType}</td>
                                                                                  <td className="p-3 text-xs text-right font-mono text-zinc-300">
                                                                                      {proj.hasRecordedTokens ? `${proj.tokensSpent}T` : '—'}
@@ -517,6 +695,11 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
                                                                  </tbody>
                                                              </table>
                                                          </div>
+                                                     </div>
+
+                                                     {/* Full Width: Author Token Receipts (Admin View) */}
+                                                     <div className="col-span-1 md:col-span-2 pt-4 border-t border-zinc-900 mt-2">
+                                                         <AuthorTokenActivityTable uid={user.uid} email={user.email} />
                                                      </div>
 
                                                      {/* Full Width: Deep Connections Query Log (Admin Exclusive) */}
@@ -600,7 +783,8 @@ export const calculateTelemetryForUser = (
         preflightApiUsage?: Record<string, any>;
         deepWebApiUsage?: Record<string, any>;
     },
-    uid?: string
+    uid?: string,
+    txDocs?: any[]
 ): UserTelemetry => {
     let totalUpdates = 0;
     let totalLiveQueries = 0;
@@ -610,9 +794,13 @@ export const calculateTelemetryForUser = (
     let hasExactCost = false;
     const artistFrequencyMap: Record<string, number> = {};
     const projects: ProjectTelemetry[] = [];
+    const knownProjectIds = new Set<string>();
+    const existingProjectsBySeed: Record<string, { id: string; matched: boolean }[]> = {};
 
     projectDocs.forEach((pDoc) => {
         const pData = pDoc.data();
+        const projectId = pDoc.id;
+        knownProjectIds.add(projectId);
 
         // Parse structural node/entity counts first to filter out unmapped "Untitled Zcene" draft shells
         let graphNodesCount = 0;
@@ -626,12 +814,16 @@ export const calculateTelemetryForUser = (
                 console.warn("Error parsing graphData for project:", pDoc.id, e);
             }
         }
-        const activeNodesCount = Array.isArray(pData.activeNodes) ? pData.activeNodes.length : 0;
+        const activeNodesCount = typeof pData.activeNodesCount === 'number'
+            ? pData.activeNodesCount
+            : (Array.isArray(pData.activeNodes) ? pData.activeNodes.length : 0);
         const artistIdsCount = Array.isArray(pData.artistIds) ? pData.artistIds.length : 0;
         const labelIdsCount = Array.isArray(pData.labelIds) ? pData.labelIds.length : 0;
         const hasCacheKey = Boolean(pData.cacheKey && String(pData.cacheKey).trim());
+        const hasSpendOrHistory = (typeof pData.tokensSpent === 'number' && pData.tokensSpent > 0) || Boolean(pData.apiUsage) || pData.status === 'deleted' || pData.status === 'trashed';
 
         const isUnmappedEmptyDraft =
+            !hasSpendOrHistory &&
             graphNodesCount === 0 &&
             activeNodesCount === 0 &&
             artistIdsCount === 0 &&
@@ -661,16 +853,31 @@ export const calculateTelemetryForUser = (
             artistFrequencyMap[seed] = (artistFrequencyMap[seed] || 0) + 1;
         });
 
-        const projectLiveQueries = seeds.length;
+        const seedKey = cleanArtistDisplayName(seeds[0] || projectName || displayTitle).toLowerCase();
+        if (seedKey && seedKey !== 'unknown') {
+            if (!existingProjectsBySeed[seedKey]) existingProjectsBySeed[seedKey] = [];
+            existingProjectsBySeed[seedKey].push({ id: pDoc.id, matched: false });
+        }
+
+        const projectLiveQueries = seeds.length || 1;
         
         // 2. Active node count from activeNodes or parsed graphData nodes
         const activeCount = activeNodesCount > 0 ? activeNodesCount : graphNodesCount;
         
-        const projectCacheHits = Math.max(0, activeCount - projectLiveQueries);
-        
-        totalLiveQueries += projectLiveQueries;
-        totalCacheHits += projectCacheHits;
-        totalUpdates += activeCount;
+        let projectCacheHits = 0;
+        if (pData.anchorResolution && typeof pData.anchorResolution === 'object') {
+            const hits = Number(pData.anchorResolution.cacheHits) || 0;
+            const misses = Number(pData.anchorResolution.cacheMisses) || 0;
+            projectCacheHits = hits;
+            totalLiveQueries += (misses > 0 ? misses : (pData.generationType === 'Direct Hit' ? 0 : 1));
+            totalCacheHits += hits;
+            totalUpdates += (hits + misses);
+        } else {
+            projectCacheHits = Math.max(0, activeCount - projectLiveQueries);
+            totalLiveQueries += (pData.generationType === 'Direct Hit' ? 0 : projectLiveQueries);
+            totalCacheHits += (pData.generationType === 'Direct Hit' ? activeCount : projectCacheHits);
+            totalUpdates += activeCount;
+        }
         let projectExactCost = 0;
         let projectHasExactCost = false;
         let hasProCall = false;
@@ -780,6 +987,8 @@ export const calculateTelemetryForUser = (
             createdAt = typeof pData.createdAt.toMillis === 'function' ? pData.createdAt.toMillis() : (pData.createdAt.seconds ? pData.createdAt.seconds * 1000 : Date.now());
         }
 
+        const status = pData.status === 'trashed' ? 'trashed' : (pData.status === 'deleted' ? 'deleted' : 'active');
+
         projects.push({
             id: pDoc.id,
             seedArtist: displayTitle,
@@ -789,9 +998,122 @@ export const calculateTelemetryForUser = (
             hasRecordedTokens,
             cost,
             isEstimate,
-            createdAt
+            createdAt,
+            status
         });
     });
+
+    // V41 Historical Reconciliation: Reconstitute hard-deleted runs from tokenTransactions
+    if (Array.isArray(txDocs)) {
+        txDocs.forEach((txDoc) => {
+            const tx = typeof txDoc.data === 'function' ? txDoc.data() : txDoc;
+            const isCurationSpend = 
+                tx.type === 'spend_live_synthesis' || 
+                tx.type === 'spend_direct_hit' || 
+                (typeof tx.description === 'string' && (tx.description.toLowerCase().includes('zcene curation') || tx.description.toLowerCase().includes('zcene synthesis')));
+
+            if (!isCurationSpend) return;
+
+            // 1. Check if tx has exact projectId in knownProjectIds
+            const txProjectId = tx.projectId;
+            if (txProjectId && knownProjectIds.has(txProjectId)) {
+                return;
+            }
+
+            // Extract display seed artist from tx.seedArtist or tx.description
+            let seedName = tx.seedArtist || '';
+            if (!seedName && typeof tx.description === 'string') {
+                seedName = tx.description
+                    .replace(/^Zcene\s+(?:Curation|Synthesis):\s*/i, '')
+                    .replace(/\s*\(\d+T.*?\)$/i, '')
+                    .trim();
+            }
+            if (!seedName) seedName = 'Archived Curation';
+            const cleanSeed = cleanArtistDisplayName(seedName);
+            const seedKey = cleanSeed.toLowerCase();
+
+            // 2. If tx has no projectId, try pairing with an unmatched existing project doc of the same seed
+            if (!txProjectId && existingProjectsBySeed[seedKey]) {
+                const unmatchedProject = existingProjectsBySeed[seedKey].find(p => !p.matched);
+                if (unmatchedProject) {
+                    unmatchedProject.matched = true;
+                    return; // Corresponds to existing project doc
+                }
+            }
+
+            // Otherwise, this transaction is a verified hard-deleted curation run that needs reconstitution
+            const syntheticId = txProjectId || `archived_${tx.id || Math.random().toString(36).substring(2, 9)}`;
+            if (knownProjectIds.has(syntheticId)) return;
+            knownProjectIds.add(syntheticId);
+
+            // Determine tokens and cost
+            const tokensSpent = Math.abs(Number(tx.delta ?? tx.amount ?? 5)) || 5;
+            let generationType = tx.generationType;
+            if (!generationType) {
+                generationType = tx.type === 'spend_direct_hit' ? 'Direct Hit' : 'Root Generation';
+            }
+
+            let txCost = 0;
+            let isEstimate = false;
+            if (typeof tx.costUsd === 'number') {
+                txCost = tx.costUsd;
+            } else if (tx.apiUsage) {
+                for (const [model, usage] of Object.entries(tx.apiUsage)) {
+                    const u = usage as any;
+                    const prompt = Number(u.prompt) || 0;
+                    const candidates = Number(u.candidates) || 0;
+                    const total = Number(u.total) || (prompt + candidates);
+                    const reasoningTokens = Math.max(0, total - (prompt + candidates));
+                    if (model.includes('gemini-3.1-pro') || model.includes('gemini-1.5-pro')) {
+                        txCost += (prompt / 1_000_000) * 3.50 + ((candidates + reasoningTokens) / 1_000_000) * 10.50;
+                    } else {
+                        txCost += (prompt / 1_000_000) * 1.50 + ((candidates + reasoningTokens) / 1_000_000) * 7.50;
+                    }
+                }
+            } else if (generationType === 'Direct Hit') {
+                txCost = 0.0000;
+            } else {
+                // Historical standard estimate for live synthesis
+                txCost = COST_PER_AI_CALL;
+                isEstimate = true;
+            }
+
+            if (txCost > 0) {
+                exactCost += txCost;
+                hasExactCost = true;
+            }
+
+            if (generationType === 'Direct Hit') {
+                totalCacheHits += 10;
+                totalUpdates += 10;
+            } else {
+                totalLiveQueries += 1;
+                totalCacheHits += 9;
+                totalUpdates += 10;
+            }
+
+            artistFrequencyMap[cleanSeed] = (artistFrequencyMap[cleanSeed] || 0) + 1;
+
+            let createdAt = Date.now();
+            if (tx.createdAt) {
+                createdAt = typeof tx.createdAt.toMillis === 'function' ? tx.createdAt.toMillis() : (tx.createdAt.seconds ? tx.createdAt.seconds * 1000 : (typeof tx.createdAt === 'number' ? tx.createdAt : Date.now()));
+            }
+
+            projects.push({
+                id: syntheticId,
+                seedArtist: cleanSeed,
+                generationType,
+                userFacingScope: 'Single-Seed Zcene',
+                tokensSpent,
+                hasRecordedTokens: true,
+                cost: txCost,
+                isEstimate,
+                createdAt,
+                status: 'archived',
+                isArchived: true
+            });
+        });
+    }
 
     // Aggregate pre-flight / escape-hatch Flash lookup micro-costs (including cancelled Box 4 lookups)
     let preflightCalls = 0;
@@ -926,6 +1248,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
     const [searchTerm, setSearchTerm] = useState('');
     const [expandedRow, setExpandedRow] = useState<string | null>(null);
     const [simulateNormalUser, setSimulateNormalUser] = useState(false);
+    const [inspectedAuthor, setInspectedAuthor] = useState<{ uid: string; email: string } | null>(null);
     const [ledgerData, setLedgerData] = useState<UserTelemetry[]>([]);
     const [tokenTransactions, setTokenTransactions] = useState<TokenTransaction[]>([]);
     const [jitHeals, setJitHeals] = useState<JitHealRecord[]>([]);
@@ -960,35 +1283,64 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                     const uData = uDoc.data();
                     const email = uData.email || uDoc.id;
                     
-                    const projectsSnap = await getDocs(collection(db, 'users', uDoc.id, 'projects'));
+                    const [projectsSnap, txSnap] = await Promise.all([
+                        getDocs(collection(db, 'users', uDoc.id, 'projects')),
+                        getDocs(query(collection(db, 'users', uDoc.id, 'tokenTransactions'), orderBy('createdAt', 'desc'), limit(100))).catch(() => null),
+                    ]);
                     
-                    return calculateTelemetryForUser(email, uData.onboardingProgress, projectsSnap.docs, uData.deepCutsOpened, {
-                        tokenBalance: uData.tokenBalance,
-                        lifetimeTokensPurchased: uData.lifetimeTokensPurchased,
-                        lifetimeTokensSpent: uData.lifetimeTokensSpent,
-                        preflightApiUsage: uData.preflightApiUsage,
-                        deepWebApiUsage: uData.deepWebApiUsage,
-                    }, uDoc.id);
+                    return calculateTelemetryForUser(
+                        email,
+                        uData.onboardingProgress,
+                        projectsSnap.docs,
+                        uData.deepCutsOpened,
+                        {
+                            tokenBalance: uData.tokenBalance,
+                            lifetimeTokensPurchased: uData.lifetimeTokensPurchased,
+                            lifetimeTokensSpent: uData.lifetimeTokensSpent,
+                            preflightApiUsage: uData.preflightApiUsage,
+                            deepWebApiUsage: uData.deepWebApiUsage,
+                        },
+                        uDoc.id,
+                        txSnap ? txSnap.docs : []
+                    );
                 });
                 telemetryList = await Promise.all(userPromises);
                 setTokenTransactions([]);
             } else {
-                // Fetch only active user + immutable tokenTransactions ledger
-                const userDocRef = doc(db, 'users', user.uid);
+                // Determine target user for Preview / Standard mode
+                let targetUid = user.uid;
+                let targetEmail = user.email || 'sandbox@zcene.online';
+
+                if (isAdmin && simulateNormalUser) {
+                    if (inspectedAuthor && inspectedAuthor.uid) {
+                        targetUid = inspectedAuthor.uid;
+                        targetEmail = inspectedAuthor.email;
+                    } else {
+                        // Fallback: inspect first non-admin author from current ledger data
+                        const candidate = ledgerData.find(l => l.email !== user.email && l.uid);
+                        if (candidate && candidate.uid) {
+                            targetUid = candidate.uid;
+                            targetEmail = candidate.email;
+                        }
+                    }
+                }
+
+                // Fetch target user doc + projects + tokenTransactions
+                const userDocRef = doc(db, 'users', targetUid);
                 const [userDocSnap, projectsSnap, txSnap] = await Promise.all([
                     getDoc(userDocRef),
-                    getDocs(collection(db, 'users', user.uid, 'projects')),
-                    getDocs(query(collection(db, 'users', user.uid, 'tokenTransactions'), orderBy('createdAt', 'desc'), limit(50))).catch(() => null),
+                    getDocs(collection(db, 'users', targetUid, 'projects')),
+                    getDocs(query(collection(db, 'users', targetUid, 'tokenTransactions'), orderBy('createdAt', 'desc'), limit(100))).catch(() => null),
                 ]);
 
                 const uData = userDocSnap.exists() ? userDocSnap.data() : {
-                    email: user.email || '',
-                    displayName: user.displayName || '',
+                    email: targetEmail,
+                    displayName: '',
                     onboardingProgress: { step1: true, step2: true, step3: true, step4: true, step5: true }
                 };
                 
                 const singleTelemetry = calculateTelemetryForUser(
-                    uData.email || user.email || 'sandbox@zcene.online',
+                    uData.email || targetEmail,
                     uData.onboardingProgress,
                     projectsSnap.docs,
                     uData.deepCutsOpened,
@@ -999,7 +1351,8 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                         preflightApiUsage: uData.preflightApiUsage,
                         deepWebApiUsage: uData.deepWebApiUsage,
                     },
-                    user.uid
+                    targetUid,
+                    txSnap ? txSnap.docs : []
                 );
                 telemetryList = [singleTelemetry];
 
@@ -1008,7 +1361,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                         const t = d.data();
                         return {
                             id: d.id,
-                            uid: t.uid || user.uid,
+                            uid: t.uid || targetUid,
                             type: t.type || 'spend_live_synthesis',
                             delta: Number(t.delta ?? t.amount ?? 0),
                             balanceAfter: Number(t.balanceAfter) || 0,
@@ -1083,7 +1436,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
         } finally {
             setIsLoading(false);
         }
-    }, [user, isAdmin, simulateNormalUser]);
+    }, [user, isAdmin, simulateNormalUser, inspectedAuthor]);
 
     const handleToggleJit = async () => {
         if (!isAdmin || isTogglingJit) return;
@@ -1119,26 +1472,23 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
     // Calculations based on the ledger state
     const filteredLedger = useMemo(() => {
         if (isNormalUserView) {
-            return ledgerData.filter(u => u.email.toLowerCase() === activeUserEmail.toLowerCase());
+            return ledgerData;
         }
         return ledgerData.filter(user => 
             user.email.toLowerCase().includes(searchTerm.toLowerCase())
         );
-    }, [searchTerm, isNormalUserView, activeUserEmail, ledgerData]);
+    }, [searchTerm, isNormalUserView, ledgerData]);
 
     const currentUserTelemetry = filteredLedger[0] || ledgerData[0] || null;
-    const liveTokenBalance = Math.max(
-        0,
-        Math.floor(Number(profile?.tokenBalance ?? currentUserTelemetry?.tokenBalance ?? 0))
-    );
-    const liveLifetimePurchased = Math.max(
-        0,
-        Math.floor(Number(profile?.lifetimeTokensPurchased ?? currentUserTelemetry?.lifetimeTokensPurchased ?? 0))
-    );
-    const liveLifetimeSpent = Math.max(
-        0,
-        Math.floor(Number(profile?.lifetimeTokensSpent ?? currentUserTelemetry?.lifetimeTokensSpent ?? 0))
-    );
+    const liveTokenBalance = (isAdmin && simulateNormalUser)
+        ? Math.max(0, Math.floor(Number(currentUserTelemetry?.tokenBalance ?? 0)))
+        : Math.max(0, Math.floor(Number(profile?.tokenBalance ?? currentUserTelemetry?.tokenBalance ?? 0)));
+    const liveLifetimePurchased = (isAdmin && simulateNormalUser)
+        ? Math.max(0, Math.floor(Number(currentUserTelemetry?.lifetimeTokensPurchased ?? 0)))
+        : Math.max(0, Math.floor(Number(profile?.lifetimeTokensPurchased ?? currentUserTelemetry?.lifetimeTokensPurchased ?? 0)));
+    const liveLifetimeSpent = (isAdmin && simulateNormalUser)
+        ? Math.max(0, Math.floor(Number(currentUserTelemetry?.lifetimeTokensSpent ?? 0)))
+        : Math.max(0, Math.floor(Number(profile?.lifetimeTokensSpent ?? currentUserTelemetry?.lifetimeTokensSpent ?? 0)));
     const juiceMax = Math.max(liveLifetimePurchased, liveTokenBalance, 100);
     const juicePct = Math.min(100, Math.round((liveTokenBalance / juiceMax) * 100));
 
@@ -1250,10 +1600,45 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                         </div>
                         {isAdmin && (
                             <div className="flex-shrink-0">
-                                <AdminViewToggle value={simulateNormalUser} onChange={setSimulateNormalUser} />
+                                <AdminViewToggle 
+                                    value={simulateNormalUser} 
+                                    onChange={(nextVal) => {
+                                        if (nextVal && !inspectedAuthor) {
+                                            // Default to the first non-admin author if available
+                                            const primaryAuthor = ledgerData.find(l => l.email !== user?.email && l.uid);
+                                            if (primaryAuthor && primaryAuthor.uid) {
+                                                setInspectedAuthor({ uid: primaryAuthor.uid, email: primaryAuthor.email });
+                                            }
+                                        } else if (!nextVal) {
+                                            setInspectedAuthor(null);
+                                        }
+                                        setSimulateNormalUser(nextVal);
+                                    }} 
+                                />
                             </div>
                         )}
                     </div>
+
+                    {/* Admin Inspection Exit Banner */}
+                    {isAdmin && simulateNormalUser && (
+                        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-sm">
+                            <div className="flex items-center gap-3 text-amber-200">
+                                <span className="material-symbols-outlined text-amber-400 !text-xl flex-shrink-0">visibility</span>
+                                <span>
+                                    Previewing wallet & curation history as <strong className="text-white">{inspectedAuthor?.email || currentUserTelemetry?.email || activeUserEmail}</strong>. Real money API costs and cache statistics are masked according to Standard User permissions.
+                                </span>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setSimulateNormalUser(false);
+                                    setInspectedAuthor(null);
+                                }}
+                                className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-semibold text-xs transition-colors cursor-pointer whitespace-nowrap self-start sm:self-auto"
+                            >
+                                Exit Inspection
+                            </button>
+                        </div>
+                    )}
 
                     {/* Overview Cards (Admin Exclusive) */}
                     <TelemetryOverviewCards
@@ -1423,24 +1808,39 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                                     </td>
                                                 </tr>
                                             ) : (
-                                                currentUserTelemetry.projects.map((proj) => (
-                                                    <tr key={proj.id} className="border-b border-zinc-900/60 hover:bg-zinc-900/20 transition-colors">
-                                                        <td className="p-4 text-sm font-medium text-white">
-                                                            {proj.seedArtist}
-                                                        </td>
-                                                        <td className="p-4 text-xs font-mono text-zinc-400">
-                                                            {proj.createdAt ? formatTxTimestamp(proj.createdAt) : '—'}
-                                                        </td>
-                                                        <td className="p-4 text-xs">
-                                                            <span className="px-2.5 py-1 rounded-lg border border-zinc-700/80 bg-zinc-900 text-zinc-300 font-medium">
-                                                                {proj.userFacingScope}
-                                                            </span>
-                                                        </td>
-                                                        <td className="p-4 text-xs text-right font-mono font-bold text-primary">
-                                                            {proj.hasRecordedTokens ? `${proj.tokensSpent} Tokens` : '0 Tokens'}
-                                                        </td>
-                                                    </tr>
-                                                ))
+                                                currentUserTelemetry.projects.map((proj) => {
+                                                    const isTrashed = proj.status === 'trashed';
+                                                    const isArchived = proj.status === 'archived' || proj.isArchived;
+                                                    return (
+                                                        <tr key={proj.id} className="border-b border-zinc-900/60 hover:bg-zinc-900/20 transition-colors">
+                                                            <td className="p-4 text-sm font-medium text-white">
+                                                                <div className="flex items-center gap-2">
+                                                                    {isTrashed ? (
+                                                                        <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 whitespace-nowrap">
+                                                                            TRASHED
+                                                                        </span>
+                                                                    ) : isArchived ? (
+                                                                        <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded bg-zinc-800 text-zinc-400 border border-zinc-700 whitespace-nowrap">
+                                                                            ARCHIVED
+                                                                        </span>
+                                                                    ) : null}
+                                                                    <span>{proj.seedArtist}</span>
+                                                                </div>
+                                                            </td>
+                                                            <td className="p-4 text-xs font-mono text-zinc-400">
+                                                                {proj.createdAt ? formatTxTimestamp(proj.createdAt) : '—'}
+                                                            </td>
+                                                            <td className="p-4 text-xs">
+                                                                <span className="px-2.5 py-1 rounded-lg border border-zinc-700/80 bg-zinc-900 text-zinc-300 font-medium">
+                                                                    {proj.userFacingScope}
+                                                                </span>
+                                                            </td>
+                                                            <td className="p-4 text-xs text-right font-mono font-bold text-primary">
+                                                                {proj.hasRecordedTokens ? `${proj.tokensSpent} Tokens` : '0 Tokens'}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })
                                             )}
                                         </tbody>
                                     </table>
@@ -1521,6 +1921,10 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                 filteredLedger={filteredLedger}
                                 expandedRow={expandedRow}
                                 toggleRow={toggleRow}
+                                onInspectUser={(inspected) => {
+                                    setInspectedAuthor({ uid: inspected.uid || '', email: inspected.email });
+                                    setSimulateNormalUser(true);
+                                }}
                             />
 
                             {/* JIT Auto-Healing Telemetry (Phase 3 Admin Exclusive) */}

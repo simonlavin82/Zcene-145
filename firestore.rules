@@ -63,7 +63,7 @@ service cloud.firestore {
 
     function isValidProject(data) {
       return data.keys().hasAll(['name', 'seedArtists']) &&
-             data.keys().size() <= 40 &&
+             data.keys().size() <= 50 &&
              data.name is string && data.name.size() <= 512 &&
              data.seedArtists is string && data.seedArtists.size() <= 10000 &&
              // LEGACY full-blob fields (optional for backward compat)
@@ -71,7 +71,7 @@ service cloud.firestore {
              (!('detailsCache' in data) || (data.detailsCache == null || data.detailsCache is string)) &&
              // NEW lightweight reference fields
              (!('cacheKey' in data) || (data.cacheKey is string && data.cacheKey.size() <= 512)) &&
-             (!('canvasLayout' in data) || (data.canvasLayout is string)) &&
+             (!('canvasLayout' in data) || (data.canvasLayout == null || data.canvasLayout is string)) &&
              (!('artistIds' in data) || (data.artistIds is list)) &&
              (!('activeNodes' in data) || (data.activeNodes is list)) &&
              (!('chatHistories' in data) || (data.chatHistories == null || data.chatHistories is string)) &&
@@ -79,6 +79,11 @@ service cloud.firestore {
              (!('lastViewedStackCount' in data) || (data.lastViewedStackCount is int)) &&
              (!('isMagazineViewOpen' in data) || (data.isMagazineViewOpen is bool)) &&
              (!('authorId' in data) || (data.authorId is string)) &&
+             (!('status' in data) || (data.status == null || data.status is string)) &&
+             (!('trashedAt' in data) || (data.trashedAt == null || data.trashedAt is timestamp)) &&
+             (!('purgeAt' in data) || (data.purgeAt == null || data.purgeAt is timestamp)) &&
+             (!('deletedAt' in data) || (data.deletedAt == null || data.deletedAt is timestamp)) &&
+             (!('activeNodesCount' in data) || (data.activeNodesCount == null || data.activeNodesCount is int)) &&
              (!('createdAt' in data) || (data.createdAt is timestamp)) &&
              (!('updatedAt' in data) || (data.updatedAt is timestamp)) &&
              (!('anchorResolution' in data) || (data.anchorResolution == null || data.anchorResolution is string)) &&
@@ -151,9 +156,17 @@ service cloud.firestore {
         
         allow update: if isOwner(userId) && 
                         isValidProject(incoming()) &&
-                        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['tokensSpent']) || isAdmin());
+                        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['tokensSpent', 'apiUsage', 'anchorResolution', 'generationType']) || isAdmin());
         
-        allow delete: if isOwner(userId) || isAdmin();
+        // Anti-Vandalism & Permanent Ledger Invariant:
+        // Disallow hard deleteDoc on any project that has recorded tokens or API cost.
+        // Users must soft-delete via status: 'trashed' or status: 'deleted'.
+        allow delete: if isAdmin() || (
+          isOwner(userId) && (
+            (!('tokensSpent' in resource.data) || resource.data.tokensSpent == null || resource.data.tokensSpent == 0) &&
+            (!('apiUsage' in resource.data) || resource.data.apiUsage == null)
+          )
+        );
       }
 
       match /stack/{itemId} {

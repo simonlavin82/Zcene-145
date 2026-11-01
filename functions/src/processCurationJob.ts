@@ -2089,6 +2089,58 @@ export const processCurationJob = onDocumentCreated({
         seedImageUrls: extractedSeedImageUrls,
         ...(extractedSeedImageUrl ? { seedImageUrl: extractedSeedImageUrl } : {})
       });
+
+      // V41 Immutable Telemetry Dual-Write: Stamp exact telemetry onto tokenTransactions
+      let calculatedCostUsd = 0;
+      for (const [model, usage] of Object.entries(mergedApiUsage)) {
+        const u = usage as any;
+        const prompt = Number(u.prompt) || 0;
+        const candidates = Number(u.candidates) || 0;
+        const total = Number(u.total) || (prompt + candidates);
+        const reasoningTokens = Math.max(0, total - (prompt + candidates));
+        if (model.includes('gemini-3.1-pro') || model.includes('gemini-1.5-pro')) {
+          if (prompt > 128000) {
+            calculatedCostUsd += (prompt / 1_000_000) * 7.00 + ((candidates + reasoningTokens) / 1_000_000) * 21.00;
+          } else {
+            calculatedCostUsd += (prompt / 1_000_000) * 3.50 + ((candidates + reasoningTokens) / 1_000_000) * 10.50;
+          }
+        } else {
+          calculatedCostUsd += (prompt / 1_000_000) * 1.50 + ((candidates + reasoningTokens) / 1_000_000) * 7.50;
+        }
+      }
+      calculatedCostUsd = Number(calculatedCostUsd.toFixed(4));
+
+      try {
+        const userTxCol = db.collection("users").doc(jobData.userId).collection("tokenTransactions");
+        let targetTxRef: FirebaseFirestore.DocumentReference | null = null;
+        if (inputPayload?.projectId) {
+          const q = await userTxCol.where("projectId", "==", inputPayload.projectId).limit(1).get();
+          if (!q.empty) {
+            targetTxRef = q.docs[0].ref;
+          }
+        }
+        if (!targetTxRef && inputPayload?.curationSessionId) {
+          const q = await userTxCol.where("curationSessionId", "==", inputPayload.curationSessionId).limit(1).get();
+          if (!q.empty) {
+            targetTxRef = q.docs[0].ref;
+          }
+        }
+        if (targetTxRef) {
+          await targetTxRef.set(
+            {
+              projectId: inputPayload.projectId,
+              apiUsage: mergedApiUsage,
+              costUsd: calculatedCostUsd,
+              ...(inputPayload?.generationType ? { generationType: inputPayload.generationType } : {}),
+              ...(result.anchorResolution ? { anchorResolution: result.anchorResolution } : {}),
+              updatedAt: FieldValue.serverTimestamp(),
+            },
+            { merge: true }
+          );
+        }
+      } catch (txErr: any) {
+        console.warn(`[Curation Backend] Non-fatal tokenTransactions dual-write warning:`, txErr?.message || txErr);
+      }
     }
 
 

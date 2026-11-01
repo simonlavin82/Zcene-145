@@ -351,6 +351,10 @@ export async function settleCurationProjectTokens(params: {
   txType: "spend_direct_hit" | "spend_live_synthesis";
   description: string;
   generationTypeToStamp?: string;
+  seedArtist?: string;
+  costUsd?: number;
+  apiUsage?: Record<string, any>;
+  anchorResolution?: Record<string, any>;
 }): Promise<{
   tokensSpent: number;
   creditablePreFlight: number;
@@ -477,6 +481,11 @@ export async function settleCurationProjectTokens(params: {
           creditablePreFlight > 0
             ? `${description} (${remainingSettlement}T balance after 1T pre-flight)`
             : `${description} (${remainingSettlement}T)`,
+        ...(generationTypeToStamp ? { generationType: generationTypeToStamp } : (txType === "spend_direct_hit" ? { generationType: "Direct Hit" } : {})),
+        ...(params.seedArtist ? { seedArtist: params.seedArtist } : {}),
+        ...(typeof params.costUsd === "number" ? { costUsd: params.costUsd } : (txType === "spend_direct_hit" ? { costUsd: 0.0000 } : {})),
+        ...(params.apiUsage ? { apiUsage: params.apiUsage } : (txType === "spend_direct_hit" ? { apiUsage: {} } : {})),
+        ...(params.anchorResolution ? { anchorResolution: params.anchorResolution } : (txType === "spend_direct_hit" ? { anchorResolution: { cacheHits: 1, cacheMisses: 0 } } : {})),
         createdAt: FieldValue.serverTimestamp(),
       });
     }
@@ -606,6 +615,10 @@ export const authorizeDirectHitCallable = onCall(
       txType: "spend_direct_hit",
       description: `Zcene Curation: ${label}`,
       generationTypeToStamp: "Direct Hit",
+      seedArtist: label,
+      costUsd: 0.0000,
+      apiUsage: {},
+      anchorResolution: { cacheHits: 1, cacheMisses: 0 },
     });
 
     return {

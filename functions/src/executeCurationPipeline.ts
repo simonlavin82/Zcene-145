@@ -194,6 +194,8 @@ export const executeCurationPipeline = onCall({
     projectId: payload.projectId,
     txType: "spend_live_synthesis",
     description: `Zcene Synthesis: ${displaySeeds}`,
+    generationTypeToStamp: hasActiveFilters ? "Filtered Live Synthesis" : "Root Generation",
+    seedArtist: displaySeeds,
   });
 
   try {
