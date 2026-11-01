@@ -57,6 +57,7 @@ class GlobalAudioController {
       }
       if (this.audio.paused) {
         this.audio.play().catch(err => {
+          if (err.name === 'AbortError') return; // Silence rapid tap interruption
           console.warn('[GlobalAudioController] Resume failed:', err);
           this.notify();
         });
@@ -87,6 +88,7 @@ class GlobalAudioController {
       });
 
       this.audio.play().catch(err => {
+        if (err.name === 'AbortError') return; // Silence rapid tap interruption
         console.warn('[GlobalAudioController] Play stream error:', err);
         this.stop();
       });
@@ -309,7 +311,7 @@ export const AudioPreviewPlayer: React.FC<AudioPreviewPlayerProps> = ({
           className={`pointer-events-auto relative w-12 h-12 rounded-full flex items-center justify-center shadow-[0_4px_24px_rgba(0,0,0,0.6)] backdrop-blur-md transition-all duration-200 ${
             isPlaying 
               ? 'bg-black/75 border border-primary/60 text-primary scale-100 shadow-[0_0_16px_rgba(246,228,104,0.3)]' 
-              : 'bg-black/55 hover:bg-black/75 border border-white/25 text-white hover:scale-105 active:scale-95'
+              : 'bg-black/40 hover:bg-black/60 border border-white/20 hover:border-white/40 text-white/90 hover:scale-105 active:scale-95'
           }`}
           title={isPlaying ? "Pause Preview" : "Play 30s Audio Preview"}
         >
@@ -346,17 +348,17 @@ export const AudioPreviewPlayer: React.FC<AudioPreviewPlayerProps> = ({
               <rect x="14" y="4" width="4" height="16" rx="1" />
             </svg>
           ) : (
-            // Play Icon
-            <svg className="w-4 h-4 fill-current translate-x-[1.5px] relative z-10" viewBox="0 0 24 24">
+            // Play Icon - Optically centered
+            <svg className="w-4 h-4 fill-current translate-x-[1px] relative z-10" viewBox="0 0 24 24">
               <path d="M8 5v14l11-7z" />
             </svg>
           )}
         </div>
       </div>
 
-      {/* Sleek Bottom Gradient Bar (Track Name + Countdown) */}
+      {/* Sleek Bottom Gradient Bar (Track Name + Countdown) - Completely hidden in Idle State */}
       <div className={`absolute bottom-0 inset-x-0 h-14 bg-gradient-to-t from-black/90 via-black/60 to-transparent flex items-end justify-between px-3 pb-2.5 pointer-events-none transition-opacity duration-300 ${
-        isPlaying || currentTime > 0 ? 'opacity-100' : 'opacity-85 group-hover/overlay:opacity-100'
+        isPlaying || currentTime > 0 ? 'opacity-100' : 'opacity-0'
       }`}>
         <span className="text-xs font-medium text-white truncate max-w-[105px] sm:max-w-[125px] drop-shadow-md">
           {preview.previewTrackName}
