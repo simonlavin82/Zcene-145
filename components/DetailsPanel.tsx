@@ -1297,7 +1297,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 </div>
                             )}
 
-                            {/* Architecture V39.2: 30-Second iTunes Audio Preview Player (Artists only) */}
+                            {/* Architecture V40: 30-Second iTunes Audio Preview Player (Artists only) */}
                             {!isLabelNode && (
                                 <AudioPreviewPlayer
                                     key={node.id}

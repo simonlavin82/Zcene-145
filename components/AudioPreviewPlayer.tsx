@@ -1,3 +1,7 @@
+/**
+ * Architecture V40: Instant 30-Second iTunes Audio Preview Player Component
+ * Zero-token, on-demand client streaming anchored under artist artwork in Deep Cuts and Magazine View.
+ */
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { resolveArtistAudioPreview, AudioPreviewResult } from '../services/itunesPreviewService';
 
@@ -73,6 +77,8 @@ class GlobalAudioController {
       });
 
       this.audio.addEventListener('error', (e) => {
+        // Architecture V40: Ignore harmless teardown events triggered when audio.src is cleared on stop/unmount
+        if (!this.audio?.src || this.audio.src === '' || this.audio.src === window.location.href || !this.currentTrackId) return;
         console.warn('[GlobalAudioController] Audio playback error:', e);
         this.stop();
       });

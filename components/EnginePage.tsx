@@ -175,7 +175,7 @@ const ARCHITECTURE_RULES = [
     { 
         id: 29, 
         title: "Universal Payload Serializer", 
-        desc: "Project saving and share generation must strictly derive from a single source of truth to guarantee 1:1 data parity (including curation elements like pinned/styled nodes). Share links apply a post-serialization blacklist to handle ephemeral environment constraints without risking data omission. Strict Ledger Parity: buildBaseProjectPayload defensively omits generationType, apiUsage, tokensSpent, and anchorResolution during frontend autosave (merge: true) to prevent clobbering server-stamped token costs, labeling, and 3-Tier telemetry. Frontend payload MUST pass a seedNames map as the absolute source of truth for display names to prevent backend hallucination. Dashboard cards & UI consumers must rely solely on the frozen seedImageUrls snapshot." 
+        desc: "Project saving, autosave, and share generation derive from a single source of truth to guarantee 1:1 data parity (including curation elements like pinned/styled nodes). Share links apply a post-serialization blacklist for ephemeral constraints without risking data omission. Strict Ledger Parity: buildBaseProjectPayload defensively omits generationType, apiUsage, tokensSpent, and anchorResolution during frontend autosave (merge: true) to prevent clobbering server-stamped token costs, labeling, and 3-Tier telemetry. Frontend payload MUST pass a seedNames map as the absolute source of truth for display names to prevent backend hallucination. Dashboard cards & UI consumers must rely solely on the frozen seedImageUrls snapshot. V40 Audio Parity: Client hydration and autosave pipelines preserve itunesArtistId, previewUrl, and previewTrackName across project saving, cloning, and reconciliation while strictly keeping LLM schemas free of audio fields to prevent hallucinations." 
     },
     { 
         id: 30, 
@@ -220,7 +220,7 @@ const ARCHITECTURE_RULES = [
     { 
         id: 38, 
         title: "4-Tier Asset Disambiguation Waterfall", 
-        desc: "Third-party media scraping (Artists ONLY; Record Labels are strictly excluded and locked to imageUrl: null) executes a 4-tier cascade: (1) Strict whole-word taxonomy match (homonyms escalate via genre-distance scoring), (2) Geographic suffix fallback, (3) Resilient Discography Tie-Breaker. Verified candidates automatically trigger iTunes Discography Reconciliation, overwriting and backfilling the LLM discography array with authentic iTunes collection metadata. (4) Fall-fast rejection to 'not-found' and discography purge." 
+        desc: "Third-party media scraping (Artists ONLY; Record Labels strictly excluded and locked to imageUrl: null & itunesArtistId: null) executes a 4-tier cascade: (1) Strict taxonomy match (homonyms escalate via genre-distance scoring), (2) Geographic suffix fallback, (3) Resilient Discography Tie-Breaker. Verified candidates trigger iTunes Discography Reconciliation AND deterministically stamp itunesArtistId: Number(winner.artistId) onto detailsCache (0 added HTTP calls), delegating 30s audio streaming to the browser client on-demand (entity=song&limit=1). (4) Fail-fast reject to imageUrl: 'not-found', discography: [], itunesArtistId: null." 
     },
     { 
         id: 39, 
@@ -230,7 +230,7 @@ const ARCHITECTURE_RULES = [
     { 
         id: 40, 
         title: "Synthesis Rationale & Deep Cut Integrity (Read/Write Gates)", 
-        desc: "Direct Hits strictly require a non-empty synthesisRationale (>= 50 chars) AND a fully qualified profile (isFullyQualifiedEntityProfile: summary > 50 chars, genre/origin/founded, canonical style for artists, Array.isArray(profile.discography) where honest empty arrays [] are accepted for unindexed underground artists and non-arrays/null are rejected, valid imageUrl or terminal 'not-found' monogram, and authentic recommendationReason) at both the Read Gate and Write Gate (Step 6). Prose-fallback stubs ('Synthesised from live cultural archives...') are hard-rejected. If Step 3 Root Breakdown exceeds 90s or throws 504, execution immediately fails over to 3.6 Flash (low). Step 4B locks canonical ISO artist suffixes (-be) over slash-separated border-town origins." 
+        desc: "Direct Hits strictly require a non-empty synthesisRationale (>= 50 chars) AND a fully qualified profile (isFullyQualifiedEntityProfile: summary > 50 chars, genre/origin/founded, canonical style for artists, Array.isArray(profile.discography) where honest empty arrays [] are accepted for unindexed underground artists and non-arrays/null are rejected, valid imageUrl or terminal 'not-found' monogram, and authentic recommendationReason) at both the Read Gate and Write Gate (Step 6). Prose-fallback stubs ('Synthesised from live cultural archives...') are hard-rejected. V40 Audio Agnosticism: isFullyQualifiedEntityProfile is 100% agnostic to itunesArtistId, previewUrl, and previewTrackName. Missing audio previews NEVER disqualify a profile, trigger a cache miss, or initiate JIT healing. If Step 3 Root Breakdown exceeds 90s or throws 504, execution immediately fails over to 3.6 Flash (low). Step 4B locks canonical ISO artist suffixes (-be) over slash-separated border-town origins." 
     },
     { 
         id: 41, 
@@ -277,7 +277,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                                 </ul>
                             </li>
                             <li>
-                                <span className="text-primary font-medium">5 & 7. Active Loader Gate → Render Zcene:</span> Live synthesis locks UI until Column 3 sets project status to <code>'completed'</code>; Deep Connections consults unlock or resume account-wide pass (<code>{'{uid}_global_deepweb_pass'}</code>; <code>3T</code> / 3 msgs, no TTL) via <code>unlockDeepWebSessionCallable</code>.
+                                <span className="text-primary font-medium">5 & 7. Active Loader Gate → Render Zcene (V40):</span> Live synthesis locks UI until Column 3 sets project status to <code>'completed'</code>; Deep Connections consults unlock or resume account-wide pass (<code>{'{uid}_global_deepweb_pass'}</code>; <code>3T</code> / 3 msgs, no TTL) via <code>unlockDeepWebSessionCallable</code>. Drops loader on Direct Hit or job completion, rendering D3 Canvas, Magazine View, and Deep Cuts (<code>&lt;DetailsPanel&gt;</code>) with <code>&lt;AudioPreviewPlayer key=&#123;node.id&#125;&gt;</code> for on-demand 30s audio previews (Labels strictly excluded; single global playback).
                             </li>
                         </ul>
                     </div>
@@ -340,10 +340,10 @@ const DiscoveryFlowDiagram: React.FC = () => (
                         <div className="text-white font-medium text-sm mb-3">Background Worker</div>
                         <ul className="text-[11px] text-zinc-400 space-y-3 break-words [overflow-wrap:anywhere]">
                             <li>
-                                <span className="text-primary font-medium">2. Hydrate Node Batch | 3.6 Flash (low) [Rule 8 & 40]</span>
+                                <span className="text-primary font-medium">2. Hydrate Node Batch | 3.6 Flash (low) [Rules 8, 38 & 40]</span>
                                 <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500 text-[10px]">
-                                    <li>Read Gate (isFullyQualifiedEntityProfile): Requires complete structured schema (Array.isArray(discography) & authentic recommendationReason; Labels are exempt from the imageUrl check). Rejects prose-fallback stubs, routing them to fresh hydration.</li>
-                                    <li>Miss: Enforces strict <code>responseMimeType: 'application/json'</code> + <code>ARTIST/LABEL_NODE_DETAILS_SCHEMA</code> (zero prose fallback; 3x retry). 4-Tier iTunes scraper runs for Artists ONLY (Labels omit imageUrl & force imageUrl: null).</li>
+                                    <li>Read Gate (isFullyQualifiedEntityProfile): Requires complete structured schema (Array.isArray(discography), authentic recommendationReason, canonical style; Labels are exempt from the imageUrl check). 100% agnostic to audio preview fields. Rejects prose-fallback stubs, routing them to fresh hydration.</li>
+                                    <li>Miss: Enforces strict <code>responseMimeType: 'application/json'</code> + <code>ARTIST/LABEL_NODE_DETAILS_SCHEMA</code> (zero prose fallback; 3x retry; labels omit style and force imageUrl: null). Rule 38 4-Tier Scraper deterministically stamps <code>itunesArtistId</code> onto winning artists (0 added HTTP calls); unverified artists fail fast to <code>imageUrl: 'not-found'</code>, <code>discography: []</code>, and <code>itunesArtistId: null</code>.</li>
                                     <li>Slug deduplication ignores stubs; injects pre-generated seed stubs on timeout.</li>
                                 </ul>
                             </li>

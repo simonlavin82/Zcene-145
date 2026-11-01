@@ -12,7 +12,7 @@ import {
   stopGlobalAudio 
 } from '../components/AudioPreviewPlayer';
 
-describe('Architecture V39.2 Clean Slate: Instant 30-Second iTunes Audio Previews', () => {
+describe('Architecture V40: Instant 30-Second iTunes Audio Previews', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     stopGlobalAudio();
@@ -182,7 +182,7 @@ describe('Architecture V39.2 Clean Slate: Instant 30-Second iTunes Audio Preview
     });
   });
 
-  describe('Part 3: V39 Architectural Safety Guard (Rule 37 & Rule 40 Agnosticism)', () => {
+  describe('Part 3: V40 Architectural Safety Guard (Rule 37 & Rule 40 Agnosticism)', () => {
     const baseArtistProfile = {
       summary: 'Spaced is a modern hardcore band from Buffalo, NY known for groove and psychedelic atmosphere.',
       details: {

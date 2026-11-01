@@ -1,5 +1,5 @@
 /**
- * Architecture V39.2: Clean Slate Zero-Token iTunes Audio Preview Service
+ * Architecture V40: Clean Slate Zero-Token iTunes Audio Preview Service
  *
  * Exclusively accepts an itunesArtistId captured deterministically by the backend Rule 38 scraper.
  * Zero name-based searches, zero suffix stripping, zero ambiguity.
