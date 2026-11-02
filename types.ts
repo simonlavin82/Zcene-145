@@ -6,6 +6,7 @@ export enum View {
   StyleGuide = 'styleguide',
   Engine = 'engine',
   Analytics = 'analytics',
+  Trash = 'trash',
 }
 
 export interface Node {
@@ -210,7 +211,7 @@ export interface Project {
   seedImageUrl?: string;
   seedImageUrls?: (string | null)[];
   generationType?: "Root Generation" | "Partial Generation" | "Direct Hit" | "Complex Generation" | string;
-  anchorResolution?: AnchorResolutionStatus;
+  anchorResolution?: AnchorResolutionStatus | { cacheHits?: number; cacheMisses?: number } | any;
   apiUsage?: Record<string, any>;
   tokensSpent?: number;
   createdAt?: any;

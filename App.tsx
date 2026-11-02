@@ -16,6 +16,7 @@ import { collection, doc, setDoc, deleteDoc, onSnapshot, query, getDocFromServer
 const StyleGuidePage = React.lazy(() => import('./components/DesignSystem').then(m => ({ default: m.StyleGuidePage })));
 const EnginePage = React.lazy(() => import('./components/EnginePage').then(m => ({ default: m.EnginePage })));
 const UsageAnalyticsPage = React.lazy(() => import('./components/UsageAnalyticsPage').then(m => ({ default: m.UsageAnalyticsPage })));
+const TrashPage = React.lazy(() => import('./components/TrashPage').then(m => ({ default: m.TrashPage })));
 import HelpPage from './components/HelpPage';
 import GraphPage from './components/GraphPage';
 import HomePage from './components/HomePage';
@@ -2202,6 +2203,7 @@ const App: React.FC = () => {
       case 'design': navigate('/design'); break;
       case 'engine': navigate('/engine'); break;
       case 'analytics': navigate('/analytics'); break;
+      case 'trash': navigate('/trash'); break;
       default: navigate('/');
     }
   }, [navigate]);
@@ -6785,9 +6787,10 @@ const App: React.FC = () => {
       const isDashboardPath = pathname === '/dashboard';
       const isSharePath = pathname.startsWith('/z/');
       const isProjectPath = pathname.startsWith('/project/') || pathname.startsWith('/p/');
+      const isTrashPath = pathname === '/trash';
 
       // --- ROUTING LOGIC ---
-      if (isAppPath || isDashboardPath || isProjectPath || pathname === '/help' || pathname.startsWith('/design') || pathname === '/engine' || pathname === '/analytics' || shareIdFromQuery || projectIdFromQuery || isSharePath) {
+      if (isAppPath || isDashboardPath || isProjectPath || pathname === '/help' || pathname.startsWith('/design') || pathname === '/engine' || pathname === '/analytics' || isTrashPath || shareIdFromQuery || projectIdFromQuery || isSharePath) {
         // Optimization: Pre-capture pathname + search for redirection if auth is not ready
         if (!isAuthInitialized) {
           authRedirectPathRef.current = pathname + window.location.search;
@@ -6984,6 +6987,12 @@ const App: React.FC = () => {
         } else if (pathname === '/analytics') {
           if (user) {
             if (currentViewRef.current !== View.Analytics) setCurrentView(View.Analytics);
+          } else {
+            setCurrentView(View.Home);
+          }
+        } else if (pathname === '/trash') {
+          if (user) {
+            if (currentViewRef.current !== View.Trash) setCurrentView(View.Trash);
           } else {
             setCurrentView(View.Home);
           }
@@ -7963,6 +7972,7 @@ const App: React.FC = () => {
       [View.StyleGuide]: isAdmin ? '/design' : '/',
       [View.Engine]: isAdmin ? '/engine' : '/',
       [View.Analytics]: user ? '/analytics' : '/',
+      [View.Trash]: user ? '/trash' : '/',
       [View.Home]: '/'
     }[newView];
     if (window.location.pathname !== targetPath) {
@@ -8379,6 +8389,35 @@ const App: React.FC = () => {
             onRestartWalkthrough={handleDashboardRestartWalkthrough}
             onClose={handleSubpageClose}
             profile={profile}
+          />
+        </div>
+        <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Trash ? 'z-10' : 'z-0 opacity-0 pointer-events-none'}`}>
+          <TrashPage
+            onNavigate={handleViewChange}
+            onNavigateMenu={handleMenuNavigate}
+            isActive={currentView === View.Trash}
+            user={user}
+            projects={projects}
+            onSelectProject={(id) => navigate(`/p/${id}`)}
+            onRestoreProject={handleRestoreProject}
+            onPermanentDeleteProject={handlePermanentDeleteProject}
+            onLogoClick={handleLogoClick}
+            isSmallScreen={isSmallScreen}
+            stackCount={stack.length}
+            isStackNew={stack.length > lastViewedStackCount}
+            onOpenStack={handleOpenStack}
+            onLogout={handleLogout}
+            onDeleteAccount={handleDeleteAccount}
+            isAdmin={isAdmin}
+            isProfileOpen={isProfileOpen}
+            setIsProfileOpen={setIsProfileOpen}
+            isDeleteAccountModalOpen={isDeleteAccountModalOpen}
+            setIsDeleteAccountModalOpen={setIsDeleteAccountModalOpen}
+            isMenuOpen={isMenuOpen}
+            setIsMenuOpen={setIsMenuOpen}
+            onRestartWalkthrough={handleDashboardRestartWalkthrough}
+            onClose={handleSubpageClose}
+            tokenBalance={profile?.tokenBalance ?? 0}
           />
         </div>
         </React.Suspense>

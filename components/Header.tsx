@@ -416,33 +416,7 @@ const Header: React.FC<HeaderProps> = ({
                           </div>
                         )}
                         <div className="p-1">
-                          <button
-                            onClick={() => { setIsProfileOpen(false); onNavigate('help'); }}
-                            className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
-                          >
-                            <span className="material-symbols-outlined !text-[16px] text-zinc-500">help</span>
-                            Help
-                          </button>
-
-                          {isAdmin && (
-                            <>
-                              <button
-                                onClick={() => { setIsProfileOpen(false); onNavigate('design'); }}
-                                className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
-                              >
-                                <span className="material-symbols-outlined !text-[16px] text-zinc-500">grid_view</span>
-                                Design System
-                              </button>
-                              <button
-                                onClick={() => { setIsProfileOpen(false); onNavigate('engine'); }}
-                                className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
-                              >
-                                <span className="material-symbols-outlined !text-[16px] text-zinc-500">settings_input_component</span>
-                                Engine
-                              </button>
-                            </>
-                          )}
-
+                          {/* 1. Top Up Tokens */}
                           {user && !isGuest && !isAdmin && (
                             <button
                               onClick={() => { setIsProfileOpen(false); triggerTopUpModal(); }}
@@ -458,6 +432,7 @@ const Header: React.FC<HeaderProps> = ({
                             </button>
                           )}
 
+                          {/* 2. Discovery Ledger */}
                           {!isGuest && (
                             <button
                               onClick={() => { setIsProfileOpen(false); onNavigate('analytics'); }}
@@ -468,18 +443,49 @@ const Header: React.FC<HeaderProps> = ({
                             </button>
                           )}
 
+                          {/* 3. Trash (No contextual count indicators) */}
+                          {user && !isGuest && (
+                            <button
+                              onClick={() => { setIsProfileOpen(false); onNavigate('trash'); }}
+                              className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                            >
+                              <span className="material-symbols-outlined !text-[16px] text-zinc-500">delete</span>
+                              Trash
+                            </button>
+                          )}
+
+                          {/* 4. Help */}
                           <button
-                            onClick={() => {
-                              setIsProfileOpen(false);
-                              window.open('https://instagram.com/zcene.io', '_blank');
-                            }}
+                            onClick={() => { setIsProfileOpen(false); onNavigate('help'); }}
                             className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
                           >
-                            <span className="material-symbols-outlined !text-[16px] text-zinc-500">camera_alt</span>
-                            Instagram
-                            <span className="material-symbols-outlined !text-[10px] ml-auto opacity-40">open_in_new</span>
+                            <span className="material-symbols-outlined !text-[16px] text-zinc-500">help</span>
+                            Help
                           </button>
 
+                          {/* 5. Engine (Admin only) */}
+                          {isAdmin && (
+                            <button
+                              onClick={() => { setIsProfileOpen(false); onNavigate('engine'); }}
+                              className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                            >
+                              <span className="material-symbols-outlined !text-[16px] text-zinc-500">settings_input_component</span>
+                              Engine
+                            </button>
+                          )}
+
+                          {/* 6. Design System (Admin only) */}
+                          {isAdmin && (
+                            <button
+                              onClick={() => { setIsProfileOpen(false); onNavigate('design'); }}
+                              className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                            >
+                              <span className="material-symbols-outlined !text-[16px] text-zinc-500">grid_view</span>
+                              Design System
+                            </button>
+                          )}
+
+                          {/* 7. Restart Walkthrough */}
                           <button
                             onClick={() => {
                               setIsProfileOpen(false);
@@ -497,6 +503,19 @@ const Header: React.FC<HeaderProps> = ({
                           >
                             <span className="material-symbols-outlined !text-[16px] text-zinc-500">restart_alt</span>
                             Restart Walkthrough
+                          </button>
+
+                          {/* 8. Instagram (External link) */}
+                          <button
+                            onClick={() => {
+                              setIsProfileOpen(false);
+                              window.open('https://instagram.com/zcene.io', '_blank');
+                            }}
+                            className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                          >
+                            <span className="material-symbols-outlined !text-[16px] text-zinc-500">camera_alt</span>
+                            Instagram
+                            <span className="material-symbols-outlined !text-[10px] ml-auto opacity-40">open_in_new</span>
                           </button>
                         </div>
 

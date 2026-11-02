@@ -5,6 +5,8 @@ import fs from 'fs';
 import path from 'path';
 import { UsageAnalyticsPage, calculateTelemetryForUser, DiscoveryLedgerTable } from '../components/UsageAnalyticsPage';
 import Dashboard from '../components/Dashboard';
+import Header from '../components/Header';
+import { TrashPage } from '../components/TrashPage';
 import { Project } from '../types';
 import { ADMIN_EMAIL } from '../shared/tokenEconomy';
 
@@ -88,11 +90,68 @@ describe('Architecture V41: 2-Stage 30-Day Trash & Immutable Discovery Ledger', 
       updatedAt: { toMillis: () => Date.now() - 86400000 },
     };
 
-    it('renders Dashboard with toolbar trash button, static heading, preserved pills on trashed cards, and 0T restore', () => {
-      const onTrashProject = vi.fn();
-      const onRestoreProject = vi.fn();
-      const onPermanentDeleteProject = vi.fn();
+    it('restructures slide-out drawer menu in Header to the exact 10-item sequence', () => {
+      const onNavigate = vi.fn();
+      const onLogout = vi.fn();
+      const setIsProfileOpen = vi.fn();
+      const setIsDeleteAccountModalOpen = vi.fn();
 
+      // Render Header with open profile menu as Admin
+      render(
+        <Header
+          user={{ uid: 'admin-1', email: 'zcene.online@gmail.com' } as any}
+          view="dashboard"
+          isSmallScreen={false}
+          isMagazineViewOpen={false}
+          stackCount={0}
+          isStackNew={false}
+          onOpenStack={vi.fn()}
+          onNavigate={onNavigate}
+          onLogout={onLogout}
+          onDeleteAccount={vi.fn()}
+          isAdmin={true}
+          isProfileOpen={true}
+          setIsProfileOpen={setIsProfileOpen}
+          isDeleteAccountModalOpen={false}
+          setIsDeleteAccountModalOpen={setIsDeleteAccountModalOpen}
+          isMenuOpen={false}
+          setIsMenuOpen={vi.fn()}
+          tokenBalance={100}
+        />
+      );
+
+      // Verify menu buttons
+      const menuButtons = screen.getAllByRole('button');
+      const menuTextList = menuButtons.map(b => b.textContent?.trim() || '');
+
+      // Check presence and relative order of the items
+      const discoveryIndex = menuTextList.findIndex(t => t.includes('Discovery Ledger'));
+      const trashIndex = menuTextList.findIndex(t => t.includes('Trash'));
+      const helpIndex = menuTextList.findIndex(t => t.includes('Help'));
+      const engineIndex = menuTextList.findIndex(t => t.includes('Engine'));
+      const designIndex = menuTextList.findIndex(t => t.includes('Design System'));
+      const restartIndex = menuTextList.findIndex(t => t.includes('Restart Walkthrough'));
+      const instagramIndex = menuTextList.findIndex(t => t.includes('Instagram'));
+      const signOutIndex = menuTextList.findIndex(t => t.includes('Sign Out'));
+      const deleteAccountIndex = menuTextList.findIndex(t => t.includes('Delete Account'));
+
+      expect(discoveryIndex).toBeGreaterThan(-1);
+      expect(trashIndex).toBeGreaterThan(discoveryIndex);
+      expect(helpIndex).toBeGreaterThan(trashIndex);
+      expect(engineIndex).toBeGreaterThan(helpIndex);
+      expect(designIndex).toBeGreaterThan(engineIndex);
+      expect(restartIndex).toBeGreaterThan(designIndex);
+      expect(instagramIndex).toBeGreaterThan(restartIndex);
+      expect(signOutIndex).toBeGreaterThan(instagramIndex);
+      expect(deleteAccountIndex).toBeGreaterThan(signOutIndex);
+
+      // Verify Trash item has NO count badges or contextual indicators
+      const trashBtn = screen.getByRole('button', { name: /^delete\s*Trash$/i });
+      expect(trashBtn).toBeInTheDocument();
+      expect(trashBtn.textContent).not.toMatch(/\d+/);
+    });
+
+    it('renders clean Dashboard with static heading, strictly active projects, and no toolbar trash icon', () => {
       render(
         <Dashboard
           user={{ uid: 'user-1', email: 'member@zcene.online' } as any}
@@ -101,10 +160,10 @@ describe('Architecture V41: 2-Stage 30-Day Trash & Immutable Discovery Ledger', 
           isStackNew={false}
           onSelectProject={vi.fn()}
           onCreateProject={vi.fn()}
-          onDeleteProject={onTrashProject}
-          onTrashProject={onTrashProject}
-          onRestoreProject={onRestoreProject}
-          onPermanentDeleteProject={onPermanentDeleteProject}
+          onDeleteProject={vi.fn()}
+          onTrashProject={vi.fn()}
+          onRestoreProject={vi.fn()}
+          onPermanentDeleteProject={vi.fn()}
           onLogoClick={vi.fn()}
           onLogout={vi.fn()}
           onDeleteAccount={vi.fn()}
@@ -123,37 +182,58 @@ describe('Architecture V41: 2-Stage 30-Day Trash & Immutable Discovery Ledger', 
       // Clean static heading without underline tabs
       expect(screen.getByRole('heading', { level: 1, name: 'YOUR ZCENES' })).toBeInTheDocument();
 
-      // Active view shows Turnstile, hides Trashed Spaced
+      // Active view shows Turnstile, strictly hides Trashed Spaced
       expect(screen.getByText('Turnstile')).toBeInTheDocument();
       expect(screen.queryByText('Spaced')).not.toBeInTheDocument();
 
-      // Trash button is in the toolbar with count indicator
-      const trashButton = screen.getByRole('button', { name: /View Trash \(1\)/i });
-      expect(trashButton).toBeInTheDocument();
+      // Toolbar does NOT have a trash button
+      expect(screen.queryByRole('button', { name: /View Trash/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /delete/i })).not.toBeInTheDocument();
+    });
 
-      // Click toolbar Trash button to switch to Trash view
-      fireEvent.click(trashButton);
+    it('renders dedicated TrashPage with full-width layout template, back button, trashed projects, and 0T restore', () => {
+      const onRestoreProject = vi.fn();
+      const onPermanentDeleteProject = vi.fn();
+      const onClose = vi.fn();
 
-      // Heading switches to TRASH
-      expect(screen.getByRole('heading', { level: 1, name: 'TRASH' })).toBeInTheDocument();
+      render(
+        <TrashPage
+          user={{ uid: 'user-1', email: 'member@zcene.online' } as any}
+          projects={[mockActiveProject, mockTrashedProject]}
+          onRestoreProject={onRestoreProject}
+          onPermanentDeleteProject={onPermanentDeleteProject}
+          onNavigate={vi.fn()}
+          isActive={true}
+          onClose={onClose}
+          isSmallScreen={false}
+          onLogout={vi.fn()}
+          onDeleteAccount={vi.fn()}
+          isProfileOpen={false}
+          setIsProfileOpen={vi.fn()}
+          isDeleteAccountModalOpen={false}
+          setIsDeleteAccountModalOpen={vi.fn()}
+          isMenuOpen={false}
+          setIsMenuOpen={vi.fn()}
+        />
+      );
 
-      // Trash view shows Spaced
+      // Top-left Back button
+      expect(screen.getByRole('button', { name: /arrow_back\s*Back/i })).toBeInTheDocument();
+
+      // Clean page title
+      expect(screen.getByRole('heading', { level: 2, name: 'Trash' })).toBeInTheDocument();
+
+      // Renders only trashed projects (Spaced), strictly hides active Turnstile
       expect(screen.getByText('Spaced')).toBeInTheDocument();
+      expect(screen.queryByText('Turnstile')).not.toBeInTheDocument();
 
-      // Redundant amber warning banner is completely removed
-      expect(screen.queryByText(/Items in Trash are safely preserved for 30 days/i)).not.toBeInTheDocument();
-
-      // Trashed card displays DAYS LEFT (not shorthand d left)
+      // Trashed card displays DAYS LEFT badge
       expect(screen.getByText(/DAYS LEFT/i)).toBeInTheDocument();
 
       // Trashed card preserves full metadata pills: ROOT ARTISTS, ARTISTS, and DEEP CUTS
       expect(screen.getByText(/ROOT ARTISTS: 1/i)).toBeInTheDocument();
       expect(screen.getByText(/ARTISTS: 1/i)).toBeInTheDocument();
       expect(screen.getByText(/DEEP CUTS: 1/i)).toBeInTheDocument();
-
-      // Clicking Trash button again toggles back to active view
-      fireEvent.click(screen.getByRole('button', { name: /View Active Workspaces/i }));
-      expect(screen.getByRole('heading', { level: 1, name: 'YOUR ZCENES' })).toBeInTheDocument();
     });
   });
 

@@ -10,6 +10,7 @@ var View;
     View["StyleGuide"] = "styleguide";
     View["Engine"] = "engine";
     View["Analytics"] = "analytics";
+    View["Trash"] = "trash";
 })(View || (exports.View = View = {}));
 exports.ERA_MIN_BOUND = 1965;
 /**
