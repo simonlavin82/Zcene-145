@@ -5,6 +5,7 @@ import Header from './Header';
 import Markdown from 'react-markdown';
 import { Terminal, ChevronDown, ChevronRight } from 'lucide-react';
 import { BACKEND_REGRESSION_RUNBOOK } from '../docs/backend-regression-runbook';
+import { BackButton } from './DesignSystem';
 
 interface SourcePageProps {
     onNavigate: (view: View) => void;
@@ -29,6 +30,7 @@ interface SourcePageProps {
     onRestartWalkthrough?: () => void;
     onClose?: () => void;
     onNavigateMenu?: (path: string) => void;
+    tokenBalance?: number;
 }
 
 const ARCHITECTURE_RULES = [
@@ -613,7 +615,8 @@ export const EnginePage: React.FC<SourcePageProps> = ({
     setIsMenuOpen,
     onRestartWalkthrough,
     onClose,
-    onNavigateMenu
+    onNavigateMenu,
+    tokenBalance
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -683,7 +686,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                 onLogout={onLogout}
                 onDeleteAccount={onDeleteAccount}
                 isAdmin={isAdmin}
-                tokenBalance={profile?.tokenBalance ?? 0}
+                tokenBalance={tokenBalance ?? profile?.tokenBalance ?? 0}
                 isProfileOpen={isProfileOpen}
                 setIsProfileOpen={setIsProfileOpen}
                 isDeleteAccountModalOpen={isDeleteAccountModalOpen}
@@ -694,11 +697,12 @@ export const EnginePage: React.FC<SourcePageProps> = ({
             />
 
             {/* Mobile Navigation Dropdown */}
-            <div className="lg:hidden p-4 sticky top-0 bg-background-dark z-[90] border-b border-zinc-700">
-                <div className="relative">
+            <div className="lg:hidden p-4 sticky top-0 bg-background-dark/95 backdrop-blur-md z-[90] border-b border-zinc-800 flex items-center gap-3">
+                <BackButton onClose={onClose} onNavigate={onNavigateMenu || onNavigate} fallbackView={View.Dashboard} />
+                <div className="relative flex-1 min-w-0">
                     <select
                         id="engine-nav"
-                        className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900 text-zinc-300 py-2.5 pl-4 pr-8 text-xs font-medium focus:ring-1 focus:ring-primary focus:outline-none"
+                        className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900 text-zinc-300 py-2 pl-4 pr-8 text-xs font-medium focus:ring-1 focus:ring-primary focus:outline-none"
                         onChange={handleSelectChange}
                         defaultValue=""
                     >
@@ -707,38 +711,38 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                             <option key={s.id} value={s.id}>{s.title}</option>
                         ))}
                     </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-zinc-400">
-                        <span className="material-symbols-outlined text-sm">unfold_more</span>
-                    </div>
+                    <span className="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">arrow_drop_down</span>
                 </div>
             </div>
 
-            <div className="container mx-auto px-4 sm:px-6 py-8 flex flex-col lg:flex-row gap-8 flex-1">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex gap-12 flex-grow">
                 {/* Desktop Sticky Sidebar */}
-                <aside className="w-64 flex-shrink-0 hidden lg:block">
-                    <div className="sticky top-8 bg-zinc-900/40 p-4 rounded-xl border border-zinc-800">
-                        <div className="text-[10px] font-mono text-primary uppercase tracking-wider mb-2 font-semibold">Engine Navigation</div>
-                        <h3 className="text-zinc-200 font-medium text-xs mb-3">System Pillars</h3>
-                        <nav className="flex flex-col space-y-1">
-                            {sections.map(s => (
-                                <a 
-                                    key={s.id} 
-                                    href={`#${s.id}`} 
-                                    onClick={(e) => handleNavClick(e, s.id)}
-                                    className="text-xs text-zinc-400 hover:text-primary transition-colors py-1.5 px-2 rounded hover:bg-zinc-800/50"
-                                >
-                                    {s.title}
-                                </a>
-                            ))}
-                        </nav>
-                        <div className="mt-6 pt-4 border-t border-zinc-800/60 text-[10px] text-zinc-500 font-mono">
-                            Zcene V41 Blueprint<br/>
-                            100% Anti-Regression
-                        </div>
+                <aside className="w-56 flex-shrink-0 sticky top-28 self-start h-[calc(100vh-8rem)] hidden lg:block overflow-y-auto overflow-x-hidden pl-4 scrollbar-thin scrollbar-thumb-zinc-800">
+                    <div className="pt-6 pb-4">
+                        <BackButton onClose={onClose} onNavigate={onNavigateMenu || onNavigate} fallbackView={View.Dashboard} />
+                    </div>
+                    <nav className="space-y-1">
+                        {sections.map(s => (
+                            <a 
+                                key={s.id} 
+                                href={`#${s.id}`} 
+                                onClick={(e) => handleNavClick(e, s.id)}
+                                className="block text-zinc-400 hover:text-primary hover:bg-zinc-800/50 py-1.5 px-2 rounded-xl transition-colors text-sm"
+                            >
+                                {s.title}
+                            </a>
+                        ))}
+                    </nav>
+                    <div className="mt-8 pt-4 border-t border-zinc-800/60 text-[10px] text-zinc-500 font-mono pl-2">
+                        Zcene V41 Blueprint<br/>
+                        100% Anti-Regression
                     </div>
                 </aside>
 
-                <main className="flex-1 min-w-0">
+                <main className="flex-1 py-10 space-y-16 min-w-0">
+                    <div className="lg:hidden pt-4 pb-2">
+                        <BackButton onClose={onClose} onNavigate={onNavigateMenu || onNavigate} fallbackView={View.Dashboard} />
+                    </div>
                     
                     {/* Header Banner */}
                     <div className="mb-8 border-b border-zinc-700/60 pb-6">

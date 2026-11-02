@@ -7,6 +7,7 @@ import { User } from 'firebase/auth';
 import { getProjectDisplayTitle, isNodeInSeedList } from '../services/artistCacheService';
 import { formatSystemTimestamp } from '../utils/formatters';
 import { ModalBackdrop, ModalContainer, ModalHeader, ModalBody, ModalFooter } from './ui/Dialog';
+import { BackButton } from './DesignSystem';
 
 export interface TrashPageProps {
   user: User | null;
@@ -118,9 +119,10 @@ export const TrashPage: React.FC<TrashPageProps> = ({
   }, [projectToPurge, trashedProjects]);
 
   return (
-    <div className="flex flex-col min-h-screen bg-brand-black text-white selection:bg-primary selection:text-black">
+    <div className="h-full w-full overflow-y-auto bg-background-dark text-white selection:bg-primary selection:text-black flex flex-col relative">
       <Header
         user={user}
+        onLogoClick={onLogoClick}
         view="dashboard"
         isSmallScreen={isSmallScreen}
         isMagazineViewOpen={false}
@@ -145,21 +147,7 @@ export const TrashPage: React.FC<TrashPageProps> = ({
         <div className="max-w-6xl mx-auto space-y-8">
           {/* Back Button */}
           <div className="pt-6 pb-2">
-            <button
-              onClick={() => {
-                if (onClose) {
-                  onClose();
-                } else if (window.history.length > 1) {
-                  window.history.back();
-                } else {
-                  onNavigate(View.Dashboard);
-                }
-              }}
-              className="inline-flex items-center gap-2 text-zinc-400 hover:text-white transition-colors bg-transparent border-0 p-0 cursor-pointer text-sm font-medium"
-            >
-              <span className="material-symbols-outlined text-sm">arrow_back</span>
-              Back
-            </button>
+            <BackButton onClose={onClose} onNavigate={onNavigateMenu || onNavigate} fallbackView={View.Dashboard} />
           </div>
 
           {/* Header Info & Controls */}

@@ -137,6 +137,54 @@ export const Button: React.FC<ButtonProps> = ({
   );
 };
 
+export interface BackButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  label?: string;
+  onClose?: () => void;
+  onNavigate?: (view: any) => void;
+  fallbackView?: any;
+}
+
+export const BackButton: React.FC<BackButtonProps> = ({
+  label = 'Back',
+  onClick,
+  onClose,
+  onNavigate,
+  fallbackView = View.Dashboard,
+  className = '',
+  ...props
+}) => {
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (onClick) {
+      onClick(e);
+      return;
+    }
+    if (onClose) {
+      onClose();
+      return;
+    }
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+    if (onNavigate) {
+      onNavigate(fallbackView);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      className={`h-8 flex flex-shrink-0 items-center justify-center rounded-xl bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 active:scale-95 transition-all leading-none shadow-md border border-zinc-700/50 pl-2.5 pr-3.5 gap-2 text-xs font-medium cursor-pointer ${className}`}
+      title={label}
+      {...props}
+    >
+      <ArrowLeft size={16} className="text-zinc-400 group-hover:text-white shrink-0 transition-colors" />
+      <span>{label}</span>
+    </button>
+  );
+};
+
 export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   variant?: 'sm' | 'md';
 }
@@ -418,6 +466,7 @@ interface StyleGuidePageProps {
     onRestartWalkthrough?: () => void;
     onClose?: () => void;
     onNavigateMenu?: (path: string) => void;
+    tokenBalance?: number;
 }
 
 export interface RootsBreakdownButtonProps {
@@ -455,25 +504,26 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
     isActive, 
     onShowToast, 
     profile, 
-    onUpdateProfile,
-    user,
-    onLogoClick,
-    isSmallScreen,
-    stackCount,
-    isStackNew,
-    onOpenStack,
-    onLogout,
-    onDeleteAccount,
-    isAdmin,
-    isProfileOpen,
-    setIsProfileOpen,
-    isDeleteAccountModalOpen,
-    setIsDeleteAccountModalOpen,
-    isMenuOpen,
-    setIsMenuOpen,
-    onRestartWalkthrough,
-    onClose,
-    onNavigateMenu
+    onUpdateProfile, 
+    user, 
+    onLogoClick, 
+    isSmallScreen, 
+    stackCount, 
+    isStackNew, 
+    onOpenStack, 
+    onLogout, 
+    onDeleteAccount, 
+    isAdmin, 
+    isProfileOpen, 
+    setIsProfileOpen, 
+    isDeleteAccountModalOpen, 
+    setIsDeleteAccountModalOpen, 
+    isMenuOpen, 
+    setIsMenuOpen, 
+    onRestartWalkthrough, 
+    onClose, 
+    onNavigateMenu,
+    tokenBalance
 }) => {
     const [demoFocusMode, setDemoFocusMode] = useState<'organic' | 'cluster'>('organic');
     const [demoAdminToggle, setDemoAdminToggle] = useState(false);
@@ -572,6 +622,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                 onLogout={onLogout}
                 onDeleteAccount={onDeleteAccount}
                 isAdmin={isAdmin}
+                tokenBalance={tokenBalance ?? profile?.tokenBalance ?? 0}
                 isProfileOpen={isProfileOpen}
                 setIsProfileOpen={setIsProfileOpen}
                 isDeleteAccountModalOpen={isDeleteAccountModalOpen}
@@ -581,31 +632,26 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                 onRestartWalkthrough={onRestartWalkthrough}
             />
             
-            <div className="lg:hidden p-4 sticky top-0 bg-background-dark z-[90] border-b border-zinc-700">
-                <div className="relative">
+            <div className="lg:hidden p-4 sticky top-0 bg-background-dark/95 backdrop-blur-md z-[90] border-b border-zinc-800 flex items-center gap-3">
+                <BackButton onClose={onClose} onNavigate={onNavigateMenu || onNavigate} fallbackView={View.Dashboard} />
+                <div className="relative flex-1 min-w-0">
                     <select
                         id="styleguide-nav"
-                        className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900 text-zinc-300 py-2.5 pl-4 pr-8 font-medium focus:ring-1 focus:ring-primary focus:outline-none"
+                        className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900 text-zinc-300 py-2 pl-4 pr-8 text-xs font-medium focus:ring-1 focus:ring-primary focus:outline-none"
                         onChange={handleSelectChange}
                         defaultValue=""
                     >
                         <option value="" disabled>Jump to section...</option>
                         {sections.map(section => (<option key={section.id} value={section.id}>{section.title}</option>))}
                     </select>
-                    <span className="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400">arrow_drop_down</span>
+                    <span className="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">arrow_drop_down</span>
                 </div>
             </div>
 
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex gap-12 flex-grow">
                 <aside className="w-56 flex-shrink-0 sticky top-28 self-start h-[calc(100vh-8rem)] hidden lg:block overflow-y-auto overflow-x-hidden pl-4 scrollbar-thin scrollbar-thumb-zinc-800">
-                    <div className="pt-6 pb-2">
-                        <button 
-                            onClick={() => onClose ? onClose() : (window.history.length > 1 ? window.history.back() : onNavigate(View.Home))} 
-                            className="inline-flex items-center gap-2 text-zinc-400 hover:text-white transition-colors bg-transparent border-0 p-0 cursor-pointer text-sm font-medium"
-                        >
-                            <span className="material-symbols-outlined text-sm">arrow_back</span>
-                            Back
-                        </button>
+                    <div className="pt-6 pb-4">
+                        <BackButton onClose={onClose} onNavigate={onNavigateMenu || onNavigate} fallbackView={View.Dashboard} />
                     </div>
                     <nav className="space-y-1">
                         {sections.map(section => (
@@ -615,14 +661,8 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                 </aside>
 
                 <main className="flex-1 py-10 space-y-24 min-w-0">
-                    <div className="lg:hidden pt-6 pb-2">
-                        <button 
-                            onClick={() => onClose ? onClose() : (window.history.length > 1 ? window.history.back() : onNavigate(View.Home))} 
-                            className="inline-flex items-center gap-2 text-zinc-400 hover:text-white transition-colors bg-transparent border-0 p-0 cursor-pointer text-sm font-medium"
-                        >
-                            <span className="material-symbols-outlined text-sm">arrow_back</span>
-                            Back
-                        </button>
+                    <div className="lg:hidden pt-4 pb-2">
+                        <BackButton onClose={onClose} onNavigate={onNavigateMenu || onNavigate} fallbackView={View.Dashboard} />
                     </div>
                     {/* 0. INTRODUCTION */}
                     <section id="introduction">

@@ -8337,6 +8337,7 @@ const App: React.FC = () => {
             setIsMenuOpen={setIsMenuOpen}
             onRestartWalkthrough={handleDashboardRestartWalkthrough}
             onClose={handleSubpageClose}
+            tokenBalance={profile?.tokenBalance ?? 0}
           />
         </div>
         <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.StyleGuide ? 'z-10' : 'z-0 opacity-0 pointer-events-none'}`}>
@@ -8364,6 +8365,7 @@ const App: React.FC = () => {
             setIsMenuOpen={setIsMenuOpen}
             onRestartWalkthrough={handleDashboardRestartWalkthrough}
             onClose={handleSubpageClose}
+            tokenBalance={profile?.tokenBalance ?? 0}
           />
         </div>
         <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Analytics ? 'z-10' : 'z-0 opacity-0 pointer-events-none'}`}>

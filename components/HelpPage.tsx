@@ -3,6 +3,7 @@ import { View } from '../types';
 import * as d3 from 'd3';
 import { ZceneLogo, LegendSymbol, InstagramIcon, MicIcon, StackIcon } from './Icons';
 import Header from './Header';
+import { BackButton } from './DesignSystem';
 
 // --- Visual Support Components ---
 
@@ -349,11 +350,12 @@ const HelpPage: React.FC<HelpPageProps> = ({
                 tokenBalance={tokenBalance}
             />
 
-            <div className="lg:hidden p-4 sticky top-0 bg-background-dark z-[90] border-b border-zinc-700">
-                <div className="relative">
+            <div className="lg:hidden p-4 sticky top-0 bg-background-dark/95 backdrop-blur-md z-[90] border-b border-zinc-800 flex items-center gap-3">
+                <BackButton onClose={onClose} onNavigate={onNavigateMenu || onNavigate} fallbackView={View.Dashboard} />
+                <div className="relative flex-1 min-w-0">
                     <select
                         id="help-nav"
-                        className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900 text-zinc-300 py-2.5 pl-4 pr-8 font-medium focus:ring-1 focus:ring-primary focus:outline-none"
+                        className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900 text-zinc-300 py-2 pl-4 pr-8 text-xs font-medium focus:ring-1 focus:ring-primary focus:outline-none"
                         onChange={handleSelectChange}
                         defaultValue=""
                     >
@@ -362,20 +364,14 @@ const HelpPage: React.FC<HelpPageProps> = ({
                             <option key={section.id} value={section.id}>{section.title}</option>
                         ))}
                     </select>
-                    <span className="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400">arrow_drop_down</span>
+                    <span className="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">arrow_drop_down</span>
                 </div>
             </div>
 
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex gap-12 flex-grow">
                 <aside className="w-56 flex-shrink-0 sticky top-28 self-start h-[calc(100vh-8rem)] hidden lg:block overflow-y-auto overflow-x-hidden pl-4 scrollbar-thin scrollbar-thumb-zinc-800">
-                    <div className="pt-6 pb-2">
-                        <button 
-                            onClick={() => onClose ? onClose() : (window.history.length > 1 ? window.history.back() : onNavigate(View.Home))} 
-                            className="inline-flex items-center gap-2 text-zinc-400 hover:text-white transition-colors bg-transparent border-0 p-0 cursor-pointer text-sm font-medium"
-                        >
-                            <span className="material-symbols-outlined text-sm">arrow_back</span>
-                            Back
-                        </button>
+                    <div className="pt-6 pb-4">
+                        <BackButton onClose={onClose} onNavigate={onNavigateMenu || onNavigate} fallbackView={View.Dashboard} />
                     </div>
                     <nav className="space-y-1">
                         {sections.map(section => (
@@ -392,14 +388,8 @@ const HelpPage: React.FC<HelpPageProps> = ({
                 </aside>
 
                 <main className="flex-1 py-10 space-y-24 min-w-0">
-                    <div className="lg:hidden pt-6 pb-2">
-                        <button 
-                            onClick={() => onClose ? onClose() : (window.history.length > 1 ? window.history.back() : onNavigate(View.Home))} 
-                            className="inline-flex items-center gap-2 text-zinc-400 hover:text-white transition-colors bg-transparent border-0 p-0 cursor-pointer text-sm font-medium"
-                        >
-                            <span className="material-symbols-outlined text-sm">arrow_back</span>
-                            Back
-                        </button>
+                    <div className="lg:hidden pt-4 pb-2">
+                        <BackButton onClose={onClose} onNavigate={onNavigateMenu || onNavigate} fallbackView={View.Dashboard} />
                     </div>
                     
                     {/* ── CHOOSING ARTISTS ── */}

@@ -10,6 +10,7 @@ import { AdminViewToggle } from './ui/AdminViewToggle';
 import { cleanArtistDisplayName } from '../services/artistCacheService';
 import { TOP_UP_TIER_LIST, TokenTopUpTierId } from '../shared/tokenEconomy';
 import { TokenTransaction } from '../types';
+import { BackButton } from './DesignSystem';
 
 export interface JitHealRecord {
     id: string;
@@ -403,8 +404,8 @@ const AuthorTokenActivityTable: React.FC<AuthorTokenActivityTableProps> = ({ uid
                                     <tr key={t.id} className="border-b border-zinc-800/50 last:border-0 hover:bg-zinc-900/20">
                                         <td className="p-3 text-xs text-zinc-400 whitespace-nowrap font-mono">{dateStr}</td>
                                         <td className="p-3 text-xs text-zinc-300 font-medium">{t.description || 'Token Activity'}</td>
-                                        <td className="p-3 text-xs">
-                                            <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${badge.style}`}>
+                                        <td className="p-3 text-xs min-w-[120px] w-max whitespace-nowrap">
+                                            <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border whitespace-nowrap inline-flex items-center shrink-0 ${badge.style}`}>
                                                 {badge.label}
                                             </span>
                                         </td>
@@ -1543,7 +1544,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
     };
 
     return (
-        <div ref={containerRef} className="h-full w-full overflow-y-auto bg-[#000000] text-zinc-200 font-display flex flex-col relative select-text">
+        <div ref={containerRef} className="h-full w-full overflow-y-auto bg-background-dark text-zinc-200 font-display flex flex-col relative select-text">
             <Header
                 user={user}
                 onLogoClick={onLogoClick}
@@ -1570,21 +1571,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
             <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-10 flex-grow">
                 <div className="max-w-6xl mx-auto space-y-10">
                     <div className="pt-6 pb-2">
-                        <button 
-                            onClick={() => {
-                                if (onClose) {
-                                    onClose();
-                                } else if (window.history.length > 1) {
-                                    window.history.back();
-                                } else {
-                                    onNavigate(View.Home);
-                                }
-                            }} 
-                            className="inline-flex items-center gap-2 text-zinc-400 hover:text-white transition-colors bg-transparent border-0 p-0 cursor-pointer text-sm font-medium"
-                        >
-                            <span className="material-symbols-outlined text-sm">arrow_back</span>
-                            Back
-                        </button>
+                        <BackButton onClose={onClose} onNavigate={onNavigateMenu || onNavigate} fallbackView={View.Dashboard} />
                     </div>
                     
                     {/* Header Info */}
@@ -1790,7 +1777,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                             <tr className="border-b border-zinc-800 bg-zinc-900/50">
                                                 <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Zcene / Seed</th>
                                                 <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Curated</th>
-                                                <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Curation Scope</th>
+                                                <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 min-w-[140px] w-max whitespace-nowrap">Curation Scope</th>
                                                 <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Tokens Spent</th>
                                             </tr>
                                         </thead>
@@ -1827,15 +1814,15 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                                                     <span>{proj.seedArtist}</span>
                                                                 </div>
                                                             </td>
-                                                            <td className="p-4 text-xs font-mono text-zinc-400">
+                                                            <td className="p-4 text-xs font-mono text-zinc-400 whitespace-nowrap">
                                                                 {proj.createdAt ? formatTxTimestamp(proj.createdAt) : '—'}
                                                             </td>
-                                                            <td className="p-4 text-xs">
-                                                                <span className="px-2.5 py-1 rounded-lg border border-zinc-700/80 bg-zinc-900 text-zinc-300 font-medium">
+                                                            <td className="p-4 text-xs min-w-[140px] w-max whitespace-nowrap">
+                                                                <span className="px-2.5 py-1 rounded-lg border border-zinc-700/80 bg-zinc-900 text-zinc-300 font-medium whitespace-nowrap inline-flex items-center shrink-0">
                                                                     {proj.userFacingScope}
                                                                 </span>
                                                             </td>
-                                                            <td className="p-4 text-xs text-right font-mono font-bold text-primary">
+                                                            <td className="p-4 text-xs text-right font-mono font-bold text-primary whitespace-nowrap">
                                                                 {proj.hasRecordedTokens ? `${proj.tokensSpent} Tokens` : '0 Tokens'}
                                                             </td>
                                                         </tr>
@@ -1861,7 +1848,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                             <tr className="border-b border-zinc-800 bg-zinc-900/50">
                                                 <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Date</th>
                                                 <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Activity</th>
-                                                <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Category</th>
+                                                <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 min-w-[120px] w-max whitespace-nowrap">Category</th>
                                                 <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Change</th>
                                                 <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Balance After</th>
                                             </tr>
@@ -1885,23 +1872,23 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                                     const isPositive = tx.delta > 0;
                                                     return (
                                                         <tr key={tx.id} className="border-b border-zinc-900/60 hover:bg-zinc-900/20 transition-colors">
-                                                            <td className="p-4 text-xs font-mono text-zinc-400">
+                                                            <td className="p-4 text-xs font-mono text-zinc-400 whitespace-nowrap">
                                                                 {formatTxTimestamp(tx.createdAt)}
                                                             </td>
                                                             <td className="p-4 text-sm text-zinc-200">
                                                                 {tx.description}
                                                             </td>
-                                                            <td className="p-4 text-xs">
-                                                                <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-lg border ${badge.style}`}>
+                                                            <td className="p-4 text-xs min-w-[120px] w-max whitespace-nowrap">
+                                                                <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-lg border whitespace-nowrap inline-flex items-center shrink-0 ${badge.style}`}>
                                                                     {badge.label}
                                                                 </span>
                                                             </td>
-                                                            <td className={`p-4 text-xs text-right font-mono font-bold ${
+                                                            <td className={`p-4 text-xs text-right font-mono font-bold whitespace-nowrap ${
                                                                 isPositive ? 'text-emerald-400' : 'text-zinc-200'
                                                             }`}>
                                                                 {isPositive ? `+${tx.delta} T` : `${tx.delta} T`}
                                                             </td>
-                                                            <td className="p-4 text-xs text-right font-mono text-zinc-400">
+                                                            <td className="p-4 text-xs text-right font-mono text-zinc-400 whitespace-nowrap">
                                                                 {tx.balanceAfter} T
                                                             </td>
                                                         </tr>

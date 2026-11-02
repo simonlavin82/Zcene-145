@@ -218,7 +218,7 @@ describe('Architecture V41: 2-Stage 30-Day Trash & Immutable Discovery Ledger', 
       );
 
       // Top-left Back button
-      expect(screen.getByRole('button', { name: /arrow_back\s*Back/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /back/i })).toBeInTheDocument();
 
       // Clean page title
       expect(screen.getByRole('heading', { level: 2, name: 'Trash' })).toBeInTheDocument();
