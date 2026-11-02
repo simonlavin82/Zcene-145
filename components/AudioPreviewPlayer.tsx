@@ -307,7 +307,7 @@ export const AudioPreviewPlayer: React.FC<AudioPreviewPlayerProps> = ({
       }}
     >
       {/* Concentric "One-SVG" Watermark Disk */}
-      <div className="relative w-12 h-12 flex items-center justify-center transition-transform duration-200 hover:scale-105 active:scale-95 shadow-sm">
+      <div className="relative w-12 h-12 flex items-center justify-center transition-transform duration-200 hover:scale-105 active:scale-95">
         <svg className="w-12 h-12 pointer-events-none" viewBox="0 0 52 52">
           {/* Layer 1: Background Glass Disk (Locked to exact cx/cy) */}
           <circle
