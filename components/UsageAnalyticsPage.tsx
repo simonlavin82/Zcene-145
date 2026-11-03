@@ -3,7 +3,7 @@ import { View, COST_PER_AI_CALL, RADIUS_TOKENS, TokenTransaction } from '../type
 import { ZceneLogo } from './Icons';
 import Header from './Header';
 import { db } from '../services/firebase';
-import { collection, getDocs, doc, getDoc, setDoc, serverTimestamp, query, orderBy, limit } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, setDoc, serverTimestamp, query, orderBy, limit, where } from 'firebase/firestore';
 import { motion } from 'motion/react';
 import { InfoTooltip } from './ui/InfoTooltip';
 import { AdminViewToggle } from './ui/AdminViewToggle';
@@ -20,6 +20,8 @@ import {
     usdToGbp,
 } from '../shared/tokenEconomy';
 import { BackButton } from './DesignSystem';
+
+export const DEFAULT_CUSTOMER_EMAIL = 'simon.lavin1@gmail.com';
 
 export interface JitHealRecord {
     id: string;
@@ -2015,14 +2017,39 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                 let targetEmail = user.email || 'sandbox@zcene.online';
 
                 if (isAdmin && simulateNormalUser) {
+                    const desiredEmail = inspectedAuthor?.email || DEFAULT_CUSTOMER_EMAIL;
+                    targetEmail = desiredEmail;
+
                     if (inspectedAuthor && inspectedAuthor.uid) {
                         targetUid = inspectedAuthor.uid;
-                        targetEmail = inspectedAuthor.email;
                     } else {
-                        const candidate = ledgerData.find(l => l.email !== user.email && l.uid);
+                        const candidate = ledgerData.find(l => l.email?.toLowerCase() === desiredEmail.toLowerCase() && l.uid) ||
+                                          ledgerData.find(l => !isAdminEmail(l.email) && l.uid);
                         if (candidate && candidate.uid) {
                             targetUid = candidate.uid;
                             targetEmail = candidate.email;
+                            setInspectedAuthor({ uid: candidate.uid, email: candidate.email });
+                        } else {
+                            try {
+                                const userMatchSnap = await getDocs(
+                                    query(collection(db, 'users'), where('email', '==', desiredEmail), limit(1))
+                                );
+                                if (!userMatchSnap.empty) {
+                                    targetUid = userMatchSnap.docs[0].id;
+                                    targetEmail = userMatchSnap.docs[0].data()?.email || desiredEmail;
+                                    setInspectedAuthor({ uid: targetUid, email: targetEmail });
+                                } else {
+                                    const anyUsersSnap = await getDocs(query(collection(db, 'users'), limit(10)));
+                                    const nonAdminDoc = anyUsersSnap.docs.find(d => !isAdminEmail(d.data()?.email || d.id));
+                                    if (nonAdminDoc) {
+                                        targetUid = nonAdminDoc.id;
+                                        targetEmail = nonAdminDoc.data()?.email || nonAdminDoc.id;
+                                        setInspectedAuthor({ uid: targetUid, email: targetEmail });
+                                    }
+                                }
+                            } catch (resolveErr) {
+                                console.warn('[UsageAnalyticsPage] Could not resolve preview user UID by email:', resolveErr);
+                            }
                         }
                     }
                 }
@@ -2258,10 +2285,12 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                     value={simulateNormalUser} 
                                     onChange={(nextVal) => {
                                         if (nextVal && !inspectedAuthor) {
-                                            const primaryAuthor = ledgerData.find(l => l.email !== user?.email && l.uid);
-                                            if (primaryAuthor && primaryAuthor.uid) {
-                                                setInspectedAuthor({ uid: primaryAuthor.uid, email: primaryAuthor.email });
-                                            }
+                                            const candidate = ledgerData.find(l => l.email?.toLowerCase() === DEFAULT_CUSTOMER_EMAIL.toLowerCase() && l.uid) ||
+                                                              ledgerData.find(l => !isAdminEmail(l.email) && l.uid);
+                                            setInspectedAuthor({
+                                                uid: candidate?.uid || '',
+                                                email: candidate?.email || DEFAULT_CUSTOMER_EMAIL,
+                                            });
                                         } else if (!nextVal) {
                                             setInspectedAuthor(null);
                                         }
@@ -2279,7 +2308,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                             <div className="flex items-center gap-3 text-amber-200">
                                 <span className="material-symbols-outlined text-amber-400 !text-xl flex-shrink-0">visibility</span>
                                 <span>
-                                    Previewing wallet & curation history as <strong className="text-white">{inspectedAuthor?.email || currentUserTelemetry?.email || activeUserEmail}</strong>. Real money API costs and cache statistics are masked according to Standard User permissions.
+                                    Previewing wallet & curation history as <strong className="text-white">{inspectedAuthor?.email || currentUserTelemetry?.email || DEFAULT_CUSTOMER_EMAIL}</strong>. Real money API costs and cache statistics are masked according to Standard User permissions.
                                 </span>
                             </div>
                             <button
@@ -2426,7 +2455,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                     {isNormalUserView ? (
                         <div data-testid="token-transactions-ledger" className="space-y-4">
                             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-                                <div>
+                                <div className="min-w-0 max-w-xl">
                                     <h3 className="text-xl font-medium text-white">Token Activity & Top-Up Receipts</h3>
                                     <p className="text-xs text-zinc-400 mt-1">
                                         Unified Zcene curations, workspace lifecycle status, artist lookups, Deep Connections unlocks, and wallet receipts. Shared Zcenes cost 0 Tokens.
@@ -2434,7 +2463,11 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                 </div>
 
                                 {/* Filter Pills */}
-                                <div role="tablist" aria-label="Filter token activity" className="flex flex-wrap items-center gap-1.5">
+                                <div
+                                    role="tablist"
+                                    aria-label="Filter token activity"
+                                    className="flex flex-nowrap whitespace-nowrap overflow-x-auto hide-scrollbar scrollbar-hide shrink-0 items-center gap-1.5 max-w-full pb-1 md:pb-0"
+                                >
                                     {ACTIVITY_FILTER_PILLS.map((pill) => {
                                         const isSelected = activityFilter === pill.id;
                                         return (
@@ -2445,7 +2478,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                                 aria-selected={isSelected}
                                                 data-testid={`activity-filter-${pill.id}`}
                                                 onClick={() => setActivityFilter(pill.id)}
-                                                className={`px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer border ${RADIUS_TOKENS.button} ${
+                                                className={`px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer border shrink-0 whitespace-nowrap ${RADIUS_TOKENS.button} ${
                                                     isSelected
                                                         ? 'bg-primary text-black border-primary'
                                                         : 'bg-zinc-900/60 text-zinc-400 border-zinc-800 hover:border-zinc-600 hover:text-white'

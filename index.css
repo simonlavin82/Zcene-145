@@ -134,9 +134,11 @@
   /* Observation B: Suppress native scrollbar rendering on any element.
      Used on the connection snippet tooltip to prevent sub-pixel scrollbar
      slivers from appearing on mobile high-DPI screens. */
+  .hide-scrollbar::-webkit-scrollbar,
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+  .hide-scrollbar,
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
