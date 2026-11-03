@@ -2,7 +2,7 @@
  
 ![Architecture Diagram](./Zcene Architecture V42.jpg)
  
-This document defines the absolute, immutable architectural baseline of Zcene (V41 — 43 Laws). All future development, bug fixes, and AI agent actions MUST strictly adhere to these laws. Legacy paradigms (like shared `API_PASSWORD` secrets, naive string matching, bypass assumptions, single-pointer stubs, open-ended prompt instruction textareas, prose-fallback stubs, or storing entity payloads under bare IDs) are strictly forbidden.
+This document defines the absolute, immutable architectural baseline of Zcene (V42 — 43 Laws). All future development, bug fixes, and AI agent actions MUST strictly adhere to these laws. Legacy paradigms (like shared `API_PASSWORD` secrets, naive string matching, bypass assumptions, single-pointer stubs, open-ended prompt instruction textareas, prose-fallback stubs, or storing entity payloads under bare IDs) are strictly forbidden.
  
 ## THE IMMUTABLE ARCHITECTURAL LAWS
  

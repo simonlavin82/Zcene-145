@@ -530,16 +530,31 @@ describe('Architecture V41: 2-Stage 30-Day Trash & Immutable Discovery Ledger', 
   });
 
   describe('Part 5: Architecture & Master Blueprint Parity Gate', () => {
-    it('verifies architecture_truth.md and EnginePage.tsx are 100% in lockstep with V41', () => {
+    it('verifies architecture_truth.md and EnginePage.tsx are 100% in lockstep with V42', () => {
       const truthPath = path.resolve(__dirname, '../architecture_truth.md');
       const truthContent = fs.readFileSync(truthPath, 'utf8');
 
       const enginePath = path.resolve(__dirname, '../components/EnginePage.tsx');
       const engineContent = fs.readFileSync(enginePath, 'utf8');
 
-      // Check V41 headers
-      expect(truthContent).toContain('V41 — 43 Laws');
-      expect(engineContent).toContain('Zcene V41 Blueprint');
+      const runbookPath = path.resolve(__dirname, '../docs/backend-regression-runbook.ts');
+      const runbookContent = fs.readFileSync(runbookPath, 'utf8');
+
+      // Check V42 headers & badges
+      expect(truthContent).toContain('V42 — 43 Laws');
+      expect(engineContent).toContain('Zcene V42 Blueprint');
+      expect(engineContent).toContain('V42 Locked');
+      expect(engineContent).toContain('V42 Full-Stack Regression Runbook');
+      expect(runbookContent).toContain('# V42 Regression Suite (Full-Stack)');
+      expect(runbookContent).toContain('cd functions && npx vitest run tests/v42-iso-disambiguation.test.ts');
+
+      // Check Rule 43 Purge Protocol alignment (projects & tokenTransactions preserved, never purged)
+      const purgeTargetsSlice = runbookContent.split('### Purge Targets:')[1]?.split('### Strictly Preserved:')[0] || '';
+      const preservedSlice = runbookContent.split('### Strictly Preserved:')[1] || '';
+      expect(purgeTargetsSlice).not.toContain('users/{uid}/projects');
+      expect(purgeTargetsSlice).not.toContain('users/{uid}/tokenTransactions');
+      expect(preservedSlice).toContain('users/{uid}/projects');
+      expect(preservedSlice).toContain('users/{uid}/tokenTransactions');
 
       // Check Rule 29: Canonical Presentation Sort & One-SVG Concentric Watermark
       expect(truthContent).toContain('### 29. Universal Payload Serializer');

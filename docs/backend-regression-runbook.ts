@@ -1,5 +1,5 @@
 export const BACKEND_REGRESSION_RUNBOOK = `
-# V41 Regression Suite (Full-Stack)
+# V42 Regression Suite (Full-Stack)
 
 This suite locks down the Zcene generation engine locally without incurring Gemini API costs or requiring the heavy Java Firebase Emulator.
 
@@ -36,6 +36,9 @@ npx vitest run tests/v40-itunes-preview.test.tsx
 # Run DetailsPanel 3-column layout & style tests
 npx vitest run components/DetailsPanel.test.tsx
 
+# Run V42 Global 249-Country ISO-3166 Registry & Disambiguation Lock tests
+cd functions && npx vitest run tests/v42-iso-disambiguation.test.ts
+
 # Or run with UI for visual tracing:
 npx vitest --ui
 \`\`\`
@@ -66,20 +69,20 @@ npx vitest --ui
     *   *Circuit Breaker & Kill Switch:* Asserts that exceeding 100 heals in 24 hours trips the auto-kill circuit breaker, throws \`resource-exhausted\`, and honors the admin toggle in \`adminLedger/system/settings\`.
     *   *Telemetry Audit:* Validates receipt creation in \`adminLedger/system/jitHeals\` with accurate token counts and list-price cost calculations.
 
-## V36/V37 Database Purge Runbook Protocol
+## Database Purge Runbook Protocol
 
-When rolling out architectural schema shifts (such as the V36 mandatory Style enum for artists), a full database purge MUST be executed to prevent legacy, un-styled cached documents from triggering the strict JIT healer upon re-entry.
+When rolling out global entity cache schema shifts (such as mandatory Style enums or canonical ISO-3166 slug migrations), global entity cache purges target only regenerable Tier 1 / Tier 2 collections while strictly preserving user-owned financial and workspace records under V41/V42 [Rule 43].
 
 ### Purge Targets:
 1. \`/artists\` — Global artist entity library
 2. \`/labels\` — Global label entity library
 3. \`curationJobs\` — Active and historical curation job records
 4. \`/sharedZcenes\` & \`/sharedzcenes\` — Ephemeral guest share snapshots
-5. \`users/{uid}/projects\` — User-saved project topologies (purged via Firestore \`collectionGroup('projects')\`)
-6. \`adminLedger/system/jitHeals\` — Historical JIT healing receipts
+5. \`adminLedger/system/jitHeals\` — Historical JIT healing receipts
 
 ### Strictly Preserved:
-* Root \`users/{uid}\` documents — User accounts, authentication data, settings, and custom Style / Taste Profiles (\`tasteProfiles\`).
+* Root \`users/{uid}\` documents — User accounts, authentication data, token balances, settings, and custom Style / Taste Profiles (\`tasteProfiles\`).
+* \`users/{uid}/projects\` & \`users/{uid}/tokenTransactions\` — User-saved project workspaces and token transaction receipts (under V41/V42 [Rule 43], user projects and token receipts are immutable financial ledger records and are **never** wiped during global cache purges).
 * \`adminLedger/system/settings\` — Platform-wide settings and JIT kill-switch toggles.
 
 ### Execution Command:
