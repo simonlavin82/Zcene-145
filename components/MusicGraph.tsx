@@ -7,6 +7,7 @@ import { LegendSymbol } from './Icons';
 import { CanvasControlStyles, InputSizes, Button } from './DesignSystem';
 import { zceneCategoricalPalette, zceneFallbackColor, nodeTypeColorMap } from '../utils/formatters';
 import { normalizeArtistId, isNodeInSeedList, cleanLabelDisplayName } from '../services/artistCacheService';
+import { sanitizeDirectionalLinkContext, resolveFallbackRelationContext } from '../shared/linkContext';
 
 type FilterKeys = 'genre' | 'label' | 'country' | 'founded' | 'seed' | 'recommended';
 
@@ -528,7 +529,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
     const formatRelationContext = (contexts: string[]): string => {
         if (contexts.length === 0) {
-            return "is connected to";
+            return "shares scene lineage with";
         }
         if (contexts.length === 1) {
             return contexts[0].trim();
@@ -539,7 +540,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             const words = trimmed.split(/\s+/);
             if (words.length > 1) {
                 const lastWord = words[words.length - 1].toLowerCase();
-                if (['with', 'by', 'to', 'for', 'of', 'from'].includes(lastWord)) {
+                if (['with', 'alongside', 'by', 'to', 'for', 'of', 'from'].includes(lastWord)) {
                     return {
                         base: words.slice(0, -1).join(' '),
                         prep: lastWord
@@ -639,7 +640,15 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 });
 
                 // Aggregate all artist connections and group them
-                const connectionsByArtist = new Map<string, { node: Node; contexts: string[] }>();
+                const sourceDisplayLabel = toDisplayLabel(d);
+                const fullNodesForFallback = (data?.nodes || visibleNodes).map(n => ({
+                    id: n.id,
+                    type: n.type,
+                    label: toDisplayLabel(n),
+                }));
+                const fullLinksForFallback = data?.links || visibleLinks;
+
+                const connectionsByArtist = new Map<string, { node: Node; contexts: string[]; legacyContext?: string }>();
                 directArtistLinks.forEach(l => {
                     const sId = nodeId(l.source);
                     const tId = nodeId(l.target);
@@ -651,14 +660,34 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     if (!connectionsByArtist.has(normOtherId)) {
                         connectionsByArtist.set(normOtherId, { node: otherNode, contexts: [] });
                     }
-                    const contextStr = (sId === d.id) ? l.forwardContext : l.inverseContext;
-                    if (contextStr) {
-                        connectionsByArtist.get(normOtherId)!.contexts.push(contextStr);
+                    const entry = connectionsByArtist.get(normOtherId)!;
+                    const rawContextStr = (sId === d.id) ? l.forwardContext : l.inverseContext;
+                    const sanitizedContext = sanitizeDirectionalLinkContext(
+                        rawContextStr,
+                        sourceDisplayLabel,
+                        toDisplayLabel(otherNode)
+                    );
+                    if (sanitizedContext && !entry.contexts.includes(sanitizedContext)) {
+                        entry.contexts.push(sanitizedContext);
+                    } else if (l.context && !entry.legacyContext) {
+                        entry.legacyContext = l.context;
                     }
                 });
 
-                const connections = Array.from(connectionsByArtist.values()).map(({ node, contexts }) => {
-                    const rawContext = formatRelationContext(contexts);
+                const connections = Array.from(connectionsByArtist.values()).map(({ node, contexts, legacyContext }) => {
+                    const resolvedContexts = contexts.length > 0
+                        ? contexts
+                        : [
+                            resolveFallbackRelationContext({
+                                sourceNode: { id: d.id, type: d.type, label: sourceDisplayLabel },
+                                targetNode: { id: node.id, type: node.type, label: toDisplayLabel(node) },
+                                allNodes: fullNodesForFallback,
+                                allLinks: fullLinksForFallback,
+                                synthesisRationale: data?.synthesisRationale,
+                                legacyLinkContext: legacyContext,
+                            })
+                          ];
+                    const rawContext = formatRelationContext(resolvedContexts);
                     const capitalizedContext = rawContext.charAt(0).toUpperCase() + rawContext.slice(1);
                     return {
                         context: capitalizedContext,

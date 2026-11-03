@@ -774,7 +774,7 @@ const generateMockGraphData = (artists: string, baseGraph?: GraphData, filters?:
     for (let i = 0; i < artistList.length - 1; i++) {
       const parentName = artistList[i].toLowerCase() === 'gaye' ? 'Marvin Gaye' : artistList[i];
       const childName = artistList[i+1].toLowerCase() === 'gaye' ? 'Marvin Gaye' : artistList[i+1];
-      addLink(parentName, childName, 2, "is connected to");
+      addLink(parentName, childName, 2, "bridges musical lineage with");
     }
   }
 

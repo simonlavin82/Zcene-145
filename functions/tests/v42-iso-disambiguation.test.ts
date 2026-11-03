@@ -8,7 +8,13 @@ import {
   areCountryIsosCompatible,
   canonicalizeArtistSlugWithOrigin,
   shouldAdoptCanonicalSlugCandidate,
+  inferNodeOriginsFromCountryLinks,
+  inspectSlugDedupAmbiguity,
 } from '../../shared/isoCountries';
+import {
+  buildDisambiguationSnippet,
+  upsertBareRouterStub,
+} from '../src/services/routerStubService';
 import {
   isFullyQualifiedEntityProfile,
   qualifyCacheEntry,
@@ -370,6 +376,175 @@ describe('Architecture V42: Global 249-Country ISO-3166 Registry & End-to-End Di
       expect(fetchMock.mock.calls[0][0]).toContain('&country=TH');
       expect(fetchMock.mock.calls[1][0]).not.toContain('&country=');
       expect(preview?.previewTrackName).toBe('Khwam Chuea');
+    });
+  });
+
+  describe('6. V42.1 Deep-Cut Scene Homonym Guard & Evolved Router Stub Snippets', () => {
+    it('inferNodeOriginsFromCountryLinks stamps origin onto artist and label nodes linked to country nodes while ignoring band names like "Japan"', () => {
+      const nodes: any[] = [
+        { id: 'klear-th', label: 'Klear', type: 'artist', origin: 'Thailand', group: 1 },
+        { id: 'paradox', label: 'Paradox', type: 'artist', group: 1 },
+        { id: 'genie', label: 'Genie', type: 'label', group: 1 },
+        { id: 'japan', label: 'Japan', type: 'artist', group: 2 },
+        { id: 'david-sylvian', label: 'David Sylvian', type: 'artist', group: 2 },
+        { id: 'thailand', label: 'Thailand', type: 'country', group: 1 },
+      ];
+      const links = [
+        { source: 'paradox', target: 'thailand' },
+        { source: 'thailand', target: 'genie' },
+        { source: 'david-sylvian', target: 'japan' }, // artist-to-artist link, NOT country!
+      ];
+
+      const count = inferNodeOriginsFromCountryLinks(nodes, links);
+      expect(count).toBe(2);
+      expect(nodes.find(n => n.id === 'paradox')?.origin).toBe('Thailand');
+      expect(canonicalizeArtistSlugWithOrigin('paradox', nodes.find(n => n.id === 'paradox')?.origin)).toBe('paradox-th');
+      expect(nodes.find(n => n.id === 'genie')?.origin).toBe('Thailand');
+      // Artist "David Sylvian" linked to band "Japan" (type: 'artist') must NOT get origin: "Japan"
+      expect(nodes.find(n => n.id === 'david-sylvian')?.origin).toBeUndefined();
+    });
+
+    it('blocks un-suffixed deep cuts from adopting foreign cached homonyms (paradox-de in a Thai scene) or ambiguous multi-ISO siblings', () => {
+      const germanParadoxDoc = {
+        id: 'paradox-de',
+        data: {
+          artistId: 'paradox',
+          cacheKey: 'paradox-de',
+          detailsCache: { details: { origin: 'Würzburg, Germany', genre: 'Thrash Metal' } },
+        },
+      };
+      const thaiBodyslamDoc = {
+        id: 'bodyslam-th',
+        data: {
+          artistId: 'bodyslam',
+          cacheKey: 'bodyslam-th',
+          detailsCache: { details: { origin: 'Bangkok, Thailand', genre: 'Rock' } },
+        },
+      };
+
+      // Deep cut with expectedIso === null inside a Thai scene (`sceneAnchorIsos: ['th']`)
+      // MUST reject paradox-de while still adopting bodyslam-th!
+      expect(
+        shouldAdoptCanonicalSlugCandidate(null, germanParadoxDoc.id, germanParadoxDoc.data, 'paradox', {
+          sceneAnchorIsos: ['th'],
+          hasAmbiguousSibling: false,
+          isSeed: false,
+        })
+      ).toBe(false);
+
+      expect(
+        shouldAdoptCanonicalSlugCandidate(null, thaiBodyslamDoc.id, thaiBodyslamDoc.data, 'bodyslam', {
+          sceneAnchorIsos: ['th'],
+          hasAmbiguousSibling: false,
+          isSeed: false,
+        })
+      ).toBe(true);
+
+      // Multi-ISO collision detection via inspectSlugDedupAmbiguity
+      const thaiParadoxDoc = {
+        id: 'paradox-th',
+        data: {
+          artistId: 'paradox',
+          cacheKey: 'paradox-th',
+          detailsCache: { details: { origin: 'Bangkok, Thailand', genre: 'Alternative Rock' } },
+        },
+      };
+      expect(inspectSlugDedupAmbiguity([germanParadoxDoc, thaiParadoxDoc], 'paradox')).toBe(true);
+      expect(
+        shouldAdoptCanonicalSlugCandidate(null, thaiParadoxDoc.id, thaiParadoxDoc.data, 'paradox', {
+          hasAmbiguousSibling: true,
+          isSeed: false,
+        })
+      ).toBe(false);
+    });
+
+    it('upsertBareRouterStub upgrades single-pointer homonyms to isAmbiguous: true and preserves/backfills disambiguationSnippet', async () => {
+      const store = new Map<string, any>();
+      const fakeDb: any = {
+        collection: (coll: string) => ({
+          doc: (docId: string) => ({
+            get: async () => ({
+              exists: store.has(`${coll}/${docId}`),
+              data: () => store.get(`${coll}/${docId}`),
+            }),
+            set: async (payload: any, opts?: { merge?: boolean }) => {
+              const key = `${coll}/${docId}`;
+              const prev = opts?.merge ? store.get(key) || {} : {};
+              store.set(key, { ...prev, ...payload });
+            },
+          }),
+        }),
+      };
+
+      // 1. First homonym (paradox-de) mints single-pointer stub with snippet
+      await upsertBareRouterStub(fakeDb, 'paradox', 'paradox-de', {
+        name: 'Paradox',
+        origin: 'Germany',
+        genre: 'Thrash Metal',
+        summary: '**Paradox** is a veteran German thrash metal band formed in Würzburg in 1986. Known for Product of Imagination.',
+      });
+      const step1 = store.get('artists/paradox');
+      expect(step1._isStub).toBe(true);
+      expect(step1.isAmbiguous).toBe(false);
+      expect(step1.redirectTo).toBe('paradox-de');
+      expect(step1.candidates[0].disambiguationSnippet).toBe(
+        'Paradox is a veteran German thrash metal band formed in Würzburg in 1986.'
+      );
+
+      // 2. Second homonym (paradox-th) upgrades artists/paradox to Evolved Ambiguous Stub preserving both snippets
+      await upsertBareRouterStub(fakeDb, 'paradox', 'paradox-th', {
+        name: 'Paradox',
+        origin: 'Bangkok, Thailand',
+        genre: 'Alternative Rock',
+        summary: 'Paradox is an iconic Thai alternative rock band known for surreal theatrical live shows.',
+      });
+      const step2 = store.get('artists/paradox');
+      expect(step2._isStub).toBe(true);
+      expect(step2.isAmbiguous).toBe(true);
+      expect(step2.redirectTo).toBeNull();
+      expect(step2.candidates).toHaveLength(2);
+      expect(step2.candidates[0].id).toBe('paradox-de');
+      expect(step2.candidates[0].disambiguationSnippet).toContain('German thrash metal');
+      expect(step2.candidates[1].id).toBe('paradox-th');
+      expect(step2.candidates[1].disambiguationSnippet).toContain('iconic Thai alternative rock band');
+
+      // 3. Backfills missing disambiguationSnippet on an existing ambiguous candidate (klear-th case)
+      store.set('artists/klear', {
+        _isStub: true,
+        isAmbiguous: true,
+        redirectTo: null,
+        candidates: [
+          {
+            id: 'klear-us',
+            name: 'Klear',
+            origin: 'USA',
+            genre: 'Post-Grunge',
+            disambiguationSnippet: 'American post-grunge band from Buffalo, New York.',
+          },
+          {
+            id: 'klear-th',
+            name: 'Klear',
+            origin: 'Thailand',
+            genre: 'Pop Rock',
+          },
+        ],
+      });
+
+      await upsertBareRouterStub(fakeDb, 'klear', 'klear-th', {
+        name: 'Klear',
+        origin: 'Bangkok, Thailand',
+        genre: 'Pop Rock',
+        summary: '**Klear** is a prominent Thai pop-rock band signed to Genie Records in Bangkok.',
+      });
+
+      const klearStub = store.get('artists/klear');
+      expect(klearStub.isAmbiguous).toBe(true);
+      expect(klearStub.candidates).toHaveLength(2);
+      expect(klearStub.candidates[0].disambiguationSnippet).toBe('American post-grunge band from Buffalo, New York.');
+      expect(klearStub.candidates[1].disambiguationSnippet).toBe(
+        'Klear is a prominent Thai pop-rock band signed to Genie Records in Bangkok.'
+      );
+      expect(buildDisambiguationSnippet({ genre: 'Pop Rock', origin: 'Thailand' })).toBe('Pop Rock act from Thailand.');
     });
   });
 });

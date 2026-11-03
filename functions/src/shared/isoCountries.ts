@@ -897,17 +897,167 @@ export const canonicalizeArtistSlugWithOrigin = (rawId: string, origin?: string 
   return baseId.endsWith(`-${originSlug}`) ? baseId : `${baseId}-${originSlug}`;
 };
 
+export interface SlugDedupGuardOptions {
+  /** Normalized or raw country ISOs anchoring the current curation scene (e.g., ['th'] from klear-th). */
+  sceneAnchorIsos?: Iterable<string>;
+  /** True if `artists/{bareId}` is an Evolved Ambiguous Stub (`isAmbiguous: true`) or >=2 distinct `-iso` homonyms exist. */
+  hasAmbiguousSibling?: boolean;
+  /** True if evaluating a primary seed (false/omitted for deep cuts). */
+  isSeed?: boolean;
+}
+
+/**
+ * Inspects a Firestore `artistId >= baseNormId` snapshot batch to detect whether the bare artist
+ * has an Evolved Ambiguous Stub (`isAmbiguous: true`) or multiple distinct country homonyms.
+ */
+export const inspectSlugDedupAmbiguity = (
+  docs: Array<{ id: string; data: any }>,
+  baseNormId: string
+): boolean => {
+  const targetBare = stripCountrySlug(normalizeEntitySlugInternal(baseNormId));
+  if (!targetBare) return false;
+
+  const distinctIsos = new Set<string>();
+  for (const doc of docs) {
+    if (!doc || !doc.id) continue;
+    const dData = doc.data || {};
+    const docBare = stripCountrySlug(normalizeEntitySlugInternal(dData?.artistId || doc.id));
+    if (docBare !== targetBare && normalizeEntitySlugInternal(doc.id) !== targetBare) {
+      continue;
+    }
+    if (dData?.isAmbiguous || (Array.isArray(dData?.candidates) && dData.candidates.length > 1)) {
+      return true;
+    }
+    if (!dData?._isStub && !dData?.redirectTo) {
+      const suffixIso = extractTrailingCountryIso(doc.id);
+      const originIso = dData?.detailsCache?.details?.origin
+        ? normalizeIsoCode(extractCountrySlug(dData.detailsCache.details.origin))
+        : null;
+      const resolvedIso = suffixIso || originIso;
+      if (resolvedIso) {
+        distinctIsos.add(resolvedIso);
+      }
+    }
+  }
+  return distinctIsos.size > 1;
+};
+
+/**
+ * Infers missing `node.origin` on `artist` and `label` nodes directly from `artist/label <-> country`
+ * edges in `links` BEFORE canonical slugging and hydration ([Rule 2], [Rule 9], [Rule 36]).
+ *
+ * Prevents deep cuts like `{ id: "paradox", type: "artist" }` linked to `{ id: "thailand", type: "country" }`
+ * from entering Column 3 with `origin: null` and getting hijacked by foreign homonyms (`paradox-de`).
+ */
+export const inferNodeOriginsFromCountryLinks = (
+  nodes?: any[] | null,
+  links?: any[] | null
+): number => {
+  if (!Array.isArray(nodes) || !Array.isArray(links) || nodes.length === 0 || links.length === 0) {
+    return 0;
+  }
+
+  const nodeMap = new Map<string, any>();
+  for (const n of nodes) {
+    if (!n || n.id == null) continue;
+    const rawId = String(n.id);
+    nodeMap.set(rawId, n);
+    nodeMap.set(rawId.toLowerCase(), n);
+    const norm = normalizeEntitySlugInternal(rawId);
+    if (norm && !nodeMap.has(norm)) {
+      nodeMap.set(norm, n);
+    }
+  }
+
+  const resolveEndpointId = (ep: any): string => {
+    if (!ep) return '';
+    return typeof ep === 'string' ? ep : (ep.id != null ? String(ep.id) : '');
+  };
+
+  const resolveCountryNameIfCountryEndpoint = (endpointId: string): string | null => {
+    if (!endpointId) return null;
+    const matchedNode =
+      nodeMap.get(endpointId) ||
+      nodeMap.get(endpointId.toLowerCase()) ||
+      nodeMap.get(normalizeEntitySlugInternal(endpointId));
+
+    // Never treat an explicit non-country node (e.g. band named "Japan" or "Boston") as a country petal!
+    if (matchedNode) {
+      if (String(matchedNode.type || '').toLowerCase() !== 'country') {
+        return null;
+      }
+      const rawCountry = String(matchedNode.label || matchedNode.id || endpointId).trim();
+      const iso = extractCountrySlug(rawCountry);
+      if (iso && iso !== 'global' && ISO_TO_COUNTRY_NAME[iso]) {
+        return ISO_TO_COUNTRY_NAME[iso];
+      }
+      return rawCountry || null;
+    }
+
+    if (isCanonicalCountrySlugOrCode(endpointId)) {
+      const iso = extractCountrySlug(endpointId);
+      if (iso && iso !== 'global' && ISO_TO_COUNTRY_NAME[iso]) {
+        return ISO_TO_COUNTRY_NAME[iso];
+      }
+      return endpointId;
+    }
+
+    return null;
+  };
+
+  let inferredCount = 0;
+
+  for (const link of links) {
+    if (!link) continue;
+    const sId = resolveEndpointId(link.source);
+    const tId = resolveEndpointId(link.target);
+    if (!sId || !tId) continue;
+
+    const sCountry = resolveCountryNameIfCountryEndpoint(sId);
+    const tCountry = resolveCountryNameIfCountryEndpoint(tId);
+
+    if (tCountry && !sCountry) {
+      const entityNode =
+        nodeMap.get(sId) || nodeMap.get(sId.toLowerCase()) || nodeMap.get(normalizeEntitySlugInternal(sId));
+      const nType = String(entityNode?.type || 'artist').toLowerCase();
+      if (entityNode && (nType === 'artist' || nType === 'label') && (!entityNode.origin || !String(entityNode.origin).trim())) {
+        const existingSuffixIso = nType === 'artist' ? extractTrailingCountryIso(String(entityNode.id || '')) : null;
+        const linkIso = normalizeIsoCode(extractCountrySlug(tCountry));
+        if (!existingSuffixIso || areCountryIsosCompatible(existingSuffixIso, linkIso)) {
+          entityNode.origin = tCountry;
+          inferredCount++;
+        }
+      }
+    } else if (sCountry && !tCountry) {
+      const entityNode =
+        nodeMap.get(tId) || nodeMap.get(tId.toLowerCase()) || nodeMap.get(normalizeEntitySlugInternal(tId));
+      const nType = String(entityNode?.type || 'artist').toLowerCase();
+      if (entityNode && (nType === 'artist' || nType === 'label') && (!entityNode.origin || !String(entityNode.origin).trim())) {
+        const existingSuffixIso = nType === 'artist' ? extractTrailingCountryIso(String(entityNode.id || '')) : null;
+        const linkIso = normalizeIsoCode(extractCountrySlug(sCountry));
+        if (!existingSuffixIso || areCountryIsosCompatible(existingSuffixIso, linkIso)) {
+          entityNode.origin = sCountry;
+          inferredCount++;
+        }
+      }
+    }
+  }
+
+  return inferredCount;
+};
+
 /**
  * Cross-Homonym Slug Deduplication Guard ([Rule 2], [Rule 9], [Rule 10], [Rule 28], [Rule 36]):
  * Ensures range queries on `artistId` ONLY adopt canonical 2-letter ISO documents belonging to the
  * SAME bare artist AND compatible country ISO (preventing `paradox-th` from adopting `paradox-de`,
- * `klear` [Thailand] from adopting `klear-us`, or `kala` from adopting `kalapana-us` / `kala-thailand`).
+ * `klear` [Thailand] from adopting `klear-us`, or un-suffixed `paradox` in a Thai scene from adopting `paradox-de`).
  */
 export const shouldAdoptCanonicalSlugCandidate = (
   expectedIso: string | null | undefined,
   candidateDocId: string,
   candidateData?: any,
-  baseNormId?: string
+  baseNormId?: string,
+  options?: SlugDedupGuardOptions
 ): boolean => {
   if (!candidateDocId) return false;
   // Rule 10 Invariant: Skip ALL stubs and redirect pointers
@@ -948,5 +1098,26 @@ export const shouldAdoptCanonicalSlugCandidate = (
 
   const originIso = rawOrigin ? normalizeIsoCode(extractCountrySlug(rawOrigin)) : null;
   const candIso = suffixIso || originIso;
-  return areCountryIsosCompatible(expectedIso, candIso);
+  const normExpected = normalizeIsoCode(expectedIso);
+
+  // Scene-Aware & Ambiguity-Safe Guard when expectedIso is null:
+  if (!normExpected) {
+    // 1. Never blindly pick one homonym when an Evolved Ambiguous Stub or multi-ISO collision exists
+    if (options?.hasAmbiguousSibling) {
+      return false;
+    }
+    // 2. For non-seed deep cuts, never adopt a cached foreign homonym that conflicts with the scene's anchor country ISOs
+    if (!options?.isSeed && options?.sceneAnchorIsos && candIso) {
+      const normalizedSceneSet = new Set<string>();
+      for (const rawSceneIso of options.sceneAnchorIsos) {
+        const normScene = normalizeIsoCode(rawSceneIso) || normalizeIsoCode(extractCountrySlug(rawSceneIso));
+        if (normScene) normalizedSceneSet.add(normScene);
+      }
+      if (normalizedSceneSet.size > 0 && !normalizedSceneSet.has(candIso)) {
+        return false;
+      }
+    }
+  }
+
+  return areCountryIsosCompatible(normExpected, candIso);
 };

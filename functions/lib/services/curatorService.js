@@ -4,6 +4,7 @@ exports.generateSemanticLinkWeights = exports.scrapeImageUrlBackend = exports.re
 const genai_1 = require("@google/genai");
 const types_1 = require("../types");
 const isoCountries_1 = require("../shared/isoCountries");
+const linkContext_1 = require("../shared/linkContext");
 const cacheQualification_1 = require("./cacheQualification");
 exports.GEMINI_FLASH_MODEL = process.env.GEMINI_FLASH_MODEL || "gemini-3.6-flash";
 // --- UTILITIES PORTED FROM artistCacheService.ts ---
@@ -536,11 +537,11 @@ exports.GRAPH_RESPONSE_SCHEMA = {
                     },
                     forwardContext: {
                         type: genai_1.Type.STRING,
-                        description: "A brief, 3-7 word explanation of the relationship in present tense from source to target, e.g., 'discovers and champions' or 'formed in' or 'influenced'."
+                        description: "A concise 3-7 word directional predicate phrase in present/past tense from source to target OMITTING both endpoint names (e.g., 'discovers and champions', 'traded arena rock hooks with', 'influenced'). Never use generic 'is connected to'."
                     },
                     inverseContext: {
                         type: genai_1.Type.STRING,
-                        description: "A brief explanation from target to source, reversing the semantics, e.g., 'discovered and championed by' or 'was formed in' or 'was influenced by'."
+                        description: "A concise 3-7 word directional predicate phrase from target to source reversing the semantics and OMITTING both endpoint names (e.g., 'discovered and championed by', 'traded arena rock hooks with', 'was influenced by'). Never use generic 'is connected to'."
                     }
                 },
                 required: ["source", "target", "value", "forwardContext", "inverseContext"]
@@ -554,29 +555,29 @@ exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = `I have an existing music 
         The graph ALREADY CONTAINS the following nodes: [{{existingNodeIds}}].
         
         Your task is to generate ONLY the NEW nodes and links needed to integrate the seed artists ({{artists}}) into the existing graph. Follow these rules:
-        1.  CANONICAL NAMING: For ALL nodes (especially the seed artists provided in "{{artists}}"), you MUST use the canonical, professional spelling and capitalization as recognized by the music industry. For example, use "Radiohead" even if the user typed "radiohead", and use "blink-182" with a lowercase 'b' and hyphen if that is the correct format.
+        1.  CANONICAL NAMING & ORIGIN STAMPING: For ALL nodes (especially the seed artists provided in "{{artists}}"), you MUST use the canonical, professional spelling and capitalization as recognized by the music industry. For example, use "Radiohead" even if the user typed "radiohead", and use "blink-182" with a lowercase 'b' and hyphen if that is the correct format. Additionally, for EVERY 'artist' and 'label' node you create, you MUST populate its 'origin' property with its country of origin (e.g., "Thailand", "USA", "United Kingdom", "Japan") so international homonyms are never confused.
         2.  DO NOT duplicate any of the existing nodes listed above. When creating links, you MUST reference the existing node IDs if a connection is needed.
         3.  For EACH seed artist in "{{artists}}", if they do not already exist as a node, you MUST add them as an 'artist' node to the 'nodes' array. This is a mandatory requirement. After adding the artist node, attempt to find its primary genre, record label, country of origin, and the year they were formed/founded (YYYY). If you find these details, create nodes for them (if they don't already exist) and link them back to the seed artist. The 'id' for the year node must be the 4-digit year (e.g., "1998") and its type must be 'founded'. If you cannot find some or all of these details, that is acceptable, but the seed artist node itself MUST still be included in the graph.
         4.  In addition, identify and add 8-12 NEW related artists that are musically connected to the seed artists. For these NEW artists, you MUST also identify and create their respective genre, label, country, and especially their 'founded' year nodes (YYYY) to ensure the spiderweb is rich with chronological data. Assign them to the same 'group' as the seed artist they relate to, or a new group if they relate to multiple.
         5.  TEMPORAL ECOSYSTEM & SCENE AUTHENTICITY RULE (STRICT): You MUST reconstruct the true historical scene and temporal ecosystem of the seed artist(s). Node selection must be strictly restricted to the primary active era, geographic scene, and lived touring ecosystem of the seed(s). For example, if a seed artist was primarily active in a late-1990s scene, you MUST surface their exact period-accurate peers from that specific 1990s era. If the seed is a modern 2020s band, you MUST surface contemporary peers from their current 2020s ecosystem. Do NOT suggest modern algorithmic equivalents for legacy bands, and do NOT pull in historical legacy ancestors for modern bands unless they genuinely shared the same active touring scene. The graph must represent a period-accurate, contemporary snapshot of the artist's specific moment in time. EXCEPTION (3-TIER ANCHOR OVERRIDE): When explicit Level 2 Era or Country Guardrails are active below, those guardrails take absolute precedence for all NEW recommended artists. In that case, you MUST map cross-era or cross-border lineage, influence, and spiritual succession connecting the sacred seed artist(s) to peers founded within the specified era/origin window, even if the seed artist belongs to a different decade or country.
         6.  It is absolutely critical that each 'founded' node is linked ONLY to the correct artist node who was founded in that year.
-        7.  LINK RELATIONSHIP CONTEXT (Dual-Context): Each link in the 'links' array MUST natively output two strings:
-            - 'forwardContext': Explains the connection from source to target (e.g. 'discovers and champions', 'is a sub-genre of').
-            - 'inverseContext': Reverses the semantic direction from target to source (e.g. 'discovered and championed by', 'is the parent genre of').
+        7.  LINK RELATIONSHIP CONTEXT (Dual-Context): Each link in the 'links' array MUST natively output two concise 3-7 word predicate strings OMITTING both endpoint names (never use "is connected to"):
+            - 'forwardContext': Explains the connection from source to target (e.g. 'discovers and champions', 'traded stadium rock hooks with').
+            - 'inverseContext': Reverses the semantic direction from target to source (e.g. 'discovered and championed by', 'traded stadium rock hooks with').
         8.  JSON SCHEMA: The output must be a single, valid JSON object with 'nodes' and 'links' arrays matching the schema.
         
-        STRUCTURAL ONLY: You MUST NOT generate or include any biographies, summaries, member lists, discographies, or detailed profile metadata for the artists. The response must strictly contain only structural layout nodes (id, type, group) and connection links (source, target, value, context).
+        STRUCTURAL ONLY: You MUST NOT generate or include any biographies, summaries, member lists, discographies, or detailed profile metadata for the artists. The response must strictly contain only structural layout nodes (id, type, group, label, origin) and connection links (source, target, value, forwardContext, inverseContext).
         
         ABSOLUTELY CRITICAL FINAL CHECK: Before you output the JSON, verify that for EVERY SINGLE OBJECT in the 'links' array, the value of its 'source' property and the value of its 'target' property perfectly match an 'id' from an object in EITHER the provided existing nodes list OR your new 'nodes' array. THERE MUST BE NO ORPHANED LINKS. If you create a link with a 'source' or 'target' ID (e.g., "Arista Records"), you MUST ALSO define a node with that exact same 'id' (e.g., { "id": "Arista Records", "type": "label", ... }). Do not invent connections to nodes you haven't defined. This is a strict, mandatory requirement.
         
         IMPORTANT: Ensure that any double quotes within string values are properly escaped (e.g., "Artist \\"Name\\""). The final output must be perfectly valid JSON. Do not emit literal '\\n' strings; use standard JSON string encoding for line breaks. Your entire response MUST be ONLY the raw JSON object, without any surrounding text, explanations, or markdown code fences.`;
 exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = `Given the following list of seed artists: {{artists}}.
 Your task is to explore the genuine cultural, historical, and musical intersection of these seed artists from a blank slate (Tabula Rasa), performing a true co-equal "melting pot" traversal where all input seeds act as simultaneous structural foundations, avoiding any attention bias toward a single anchor artist. The output must be a single, valid JSON object with keys: 'nodes', and 'links'.
-'nodes' should be an array of objects, each with 'id', 'type', and 'group'. The 'type' can be 'artist', 'genre', 'label', 'country', or 'founded'.
+'nodes' should be an array of objects, each with 'id', 'type', 'group', 'label', and (for every 'artist' and 'label' node) 'origin'. The 'type' can be 'artist', 'genre', 'label', 'country', or 'founded'.
 'links' should be an array of objects, each with 'source', 'target', 'value', 'forwardContext', and 'inverseContext' describing the directional relationship.
 
 Follow these rules precisely:
-1.  CANONICAL NAMING: For ALL nodes, use the canonical, professional spelling and capitalization as recognized by the music industry. For example, use "Radiohead" even if the seed provided was "radiohead", and "blink-182" with a lowercase 'b' and hyphen if that is its official name.
+1.  CANONICAL NAMING & ORIGIN STAMPING: For ALL nodes, use the canonical, professional spelling and capitalization as recognized by the music industry. For example, use "Radiohead" even if the seed provided was "radiohead", and "blink-182" with a lowercase 'b' and hyphen if that is its official name. For EVERY 'artist' and 'label' node, populate its 'origin' field with its country of origin (e.g., "Thailand", "USA", "United Kingdom", "Japan") so international homonyms are never confused.
 2.  MANDATORY SEED NODES (CO-EQUAL ROOTS): You MUST ensure an 'artist' node exists for EVERY seed artist listed in {{artists}}. Assign a unique 'group' number for each seed artist (e.g. 1 for seed 1, 2 for seed 2). Treat every seed as a co-equal foundational anchor. If any seed artist has active filters, do not label them as "[Indirect recommendation]" or isolate them.
 3.  For each seed artist, find and add nodes for their primary genre, record label, country of origin, and the year they were formed/founded (YYYY). The 'id' for the year node must be the 4-digit year (e.g. "1994") and its type must be 'founded'. For metadata nodes (genre, label, country, founded), use canonical IDs and types.
 4.  TARGET ENTITY DENSITY & DUAL-STRUCTURE TOPOLOGY (RULE 27 — CROSSOVER BRIDGE + NATIVE ECOSYSTEMS):
@@ -589,22 +590,22 @@ Follow these rules precisely:
     STRICT ANTI-FILLER VALVE: Conversely, NEVER pad the graph with generic or tenuously connected artists just to hit numbers. If an artist belongs to a genuinely tiny or isolated micro-scene with few authentic peers, scaling down and stopping at 9 to 10 new artists if sparse is required; never pad. Quality, historical veracity, and shared scene reality always override numerical quantity.
     
     Labels are explicitly EXCLUDED from this artist cap; generate the natural amount of authentic Label nodes required to accurately connect the generated artists together based on historical reality (typically resulting in an organic overall density of roughly 18 to 26 total Deep Cuts). ONLY include artists that strictly meet any provided discovery filters.
-5.  For all artists (seed and related), create links connecting them to their respective genre, label, country, and founded year nodes. CRITICAL TOPOLOGY RULE: You MUST create direct links connecting each seed artist to their native ecosystem peers (sharing their 'group' number), and direct links connecting bridging artists to the seeds/peers they connect. Every new artist MUST be connected back to the central spiderweb, either directly to a seed artist or through a chain of artist-to-artist links. DO NOT leave any artist nodes floating or only connected to metadata nodes. Each link MUST include a 'forwardContext' and 'inverseContext' string explaining the bidirectional relationship (e.g., 'releases music on XL Recordings' / 'released by'). Keep the contexts brief.
+5.  For all artists (seed and related), create links connecting them to their respective genre, label, country, and founded year nodes. CRITICAL TOPOLOGY RULE: You MUST create direct links connecting each seed artist to their native ecosystem peers (sharing their 'group' number), and direct links connecting bridging artists to the seeds/peers they connect. Every new artist MUST be connected back to the central spiderweb, either directly to a seed artist or through a chain of artist-to-artist links. DO NOT leave any artist nodes floating or only connected to metadata nodes. Each link MUST include concise 3-7 word 'forwardContext' and 'inverseContext' predicate strings OMITTING both endpoint names (e.g., 'releases music on' / 'released albums by', 'toured the regional club circuit with' — never generic 'is connected to').
 6.  TEMPORAL ECOSYSTEM & SCENE AUTHENTICITY RULE (STRICT): You MUST reconstruct the true historical scene and temporal ecosystem of the seed artist(s). Node selection must be strictly restricted to the primary active era, geographic scene, and lived touring ecosystem of the seed(s). For example, if a seed artist was primarily active in a late-1990s scene, you MUST surface their exact period-accurate peers from that specific 1990s era. If the seed is a modern 2020s band, you MUST surface contemporary peers from their current 2020s ecosystem. Do NOT suggest modern algorithmic equivalents for legacy bands, and do NOT pull in historical legacy ancestors for modern bands unless they genuinely shared the same active touring scene. The graph must represent a period-accurate, contemporary snapshot of the artist's specific moment in time. EXCEPTION (3-TIER ANCHOR OVERRIDE): When explicit Level 2 Era or Country Guardrails are active below, those guardrails take absolute precedence for all NEW recommended artists. In that case, you MUST map cross-era or cross-border lineage, influence, and spiritual succession connecting the sacred seed artist(s) to peers founded within the specified era/origin window, even if the seed artist belongs to a different decade or country.
 7.  CRITICAL: Each 'founded' node MUST be linked ONLY to the correct artist who was founded in that year.
 8.  JSON SCHEMA: The output must be a single, valid JSON object with 'nodes' and 'links' arrays matching the schema.
 
-STRUCTURAL ONLY: You MUST NOT generate or include any biographies, summaries, member lists, discographies, or detailed profile metadata for the artists. The response must strictly contain only structural layout nodes (id, type, group) and connection links (source, target, value, forwardContext, inverseContext).
+STRUCTURAL ONLY: You MUST NOT generate or include any biographies, summaries, member lists, discographies, or detailed profile metadata for the artists. The response must strictly contain only structural layout nodes (id, type, group, label, origin) and connection links (source, target, value, forwardContext, inverseContext).
 
 ABSOLUTELY CRITICAL FINAL CHECK: Before you output the JSON, verify that for EVERY SINGLE OBJECT in the 'links' array, the value of its 'source' property and the value of its 'target' property perfectly match an 'id' from an object in the 'nodes' array. THERE MUST BE NO ORPHANED LINKS. If you create a link with a 'source' or 'target' ID (e.g., "Arista Records"), you MUST ALSO define a node with that exact same 'id' (e.g., { "id": "Arista Records", "type": "label", ... }). Do not invent connections to nodes you haven't defined. This is an architectural requirement.
 
 NEGATIVE CONSTRAINT: NEVER use em-dashes (—) or long hyphens for dramatic effect or clause separation. Use standard editorial punctuation (commas, colons, or semicolons).`;
 exports.GENERATE_GRAPH_PROMPT_TEMPLATE = `Given the following list of seed artists: {{artists}}. Generate a music family tree connecting them. The output must be a single, valid JSON object with keys: 'nodes', and 'links'.
-'nodes' should be an array of objects, each with 'id', 'type', and 'group'. The 'type' can be 'artist', 'genre', 'label', 'country', or 'founded'.
+'nodes' should be an array of objects, each with 'id', 'type', 'group', 'label', and (for every 'artist' and 'label' node) 'origin'. The 'type' can be 'artist', 'genre', 'label', 'country', or 'founded'.
 'links' should be an array of objects, each with 'source', 'target', 'value', 'forwardContext', and 'inverseContext' describing the directional relationship.
 
 Follow these rules precisely:
-1.  CANONICAL NAMING: For ALL nodes, use the canonical, professional spelling and capitalization as recognized by the music industry. For example, use "Radiohead" even if the seed provided was "radiohead", and "blink-182" with a lowercase 'b' and hyphen if that is its official name.
+1.  CANONICAL NAMING & ORIGIN STAMPING: For ALL nodes, use the canonical, professional spelling and capitalization as recognized by the music industry. For example, use "Radiohead" even if the seed provided was "radiohead", and "blink-182" with a lowercase 'b' and hyphen if that is its official name. For EVERY 'artist' and 'label' node, populate its 'origin' field with its country of origin (e.g., "Thailand", "USA", "United Kingdom", "Japan") so international homonyms are never confused.
 2.  MANDATORY: You MUST create an 'artist' node for EVERY seed artist provided in the list: {{artists}}. Assign a unique 'group' number for each seed artist.
 3.  For each seed artist, find and add nodes for their primary genre, record label, country of origin, and the year they were formed/founded (YYYY). The 'id' for the year node must be the 4-digit year (e.g. "1994") and its type must be 'founded'.
 4.  TARGET ENTITY DENSITY (RULE 27 — 10 TO 16 NEW ARTISTS):
@@ -615,12 +616,12 @@ Follow these rules precisely:
     STRICT ANTI-FILLER VALVE: If the seed belongs to an isolated micro-niche, scale down, stopping at 9 to 10 new artists if sparse; never pad with irrelevant or generic artists just to hit a number. Quality, historical veracity, and shared scene reality always override numerical quantity.
     
     Labels are explicitly EXCLUDED from this cap; generate the natural amount of Label nodes required to accurately connect the generated artists together based on historical reality (resulting in an organic target density of roughly 18 to 26 total Deep Cuts). ONLY include artists that strictly meet any provided discovery filters.
-5.  For all artists (seed and related), create links connecting them to their respective genre, label, country, and founded year nodes. CRITICAL TOPOLOGY RULE: You MUST create direct links connecting the seed artist(s) to the NEW related artists you introduce. Every new artist MUST be connected back to the central spiderweb, either directly to the seed artist, or through a chain of artist-to-artist links. DO NOT leave any artist nodes floating or only connected to metadata nodes. All direct connections of a seed artist should share their 'group' number. Each link MUST include a 'forwardContext' and 'inverseContext' string explaining the bidirectional relationship (e.g., 'releases music on XL Recordings' / 'released by'). Keep the contexts brief.
+5.  For all artists (seed and related), create links connecting them to their respective genre, label, country, and founded year nodes. CRITICAL TOPOLOGY RULE: You MUST create direct links connecting the seed artist(s) to the NEW related artists you introduce. Every new artist MUST be connected back to the central spiderweb, either directly to the seed artist, or through a chain of artist-to-artist links. DO NOT leave any artist nodes floating or only connected to metadata nodes. All direct connections of a seed artist should share their 'group' number. Each link MUST include concise 3-7 word 'forwardContext' and 'inverseContext' predicate strings OMITTING both endpoint names (e.g., 'releases music on' / 'released albums by', 'toured the regional club circuit with' — never generic 'is connected to').
 6.  TEMPORAL ECOSYSTEM & SCENE AUTHENTICITY RULE (STRICT): You MUST reconstruct the true historical scene and temporal ecosystem of the seed artist(s). Node selection must be strictly restricted to the primary active era, geographic scene, and lived touring ecosystem of the seed(s). For example, if a seed artist was primarily active in a late-1990s scene, you MUST surface their exact period-accurate peers from that specific 1990s era. If the seed is a modern 2020s band, you MUST surface contemporary peers from their current 2020s ecosystem. Do NOT suggest modern algorithmic equivalents for legacy bands, and do NOT pull in historical legacy ancestors for modern bands unless they genuinely shared the same active touring scene. The graph must represent a period-accurate, contemporary snapshot of the artist's specific moment in time. EXCEPTION (3-TIER ANCHOR OVERRIDE): When explicit Level 2 Era or Country Guardrails are active below, those guardrails take absolute precedence for all NEW recommended artists. In that case, you MUST map cross-era or cross-border lineage, influence, and spiritual succession connecting the sacred seed artist(s) to peers founded within the specified era/origin window, even if the seed artist belongs to a different decade or country.
 7.  CRITICAL: Each 'founded' node MUST be linked ONLY to the correct artist who was founded in that year.
 8.  JSON SCHEMA: The output must be a single, valid JSON object with 'nodes' and 'links' arrays matching the schema.
 
-STRUCTURAL ONLY: You MUST NOT generate or include any biographies, summaries, member lists, discographies, or detailed profile metadata for the artists. The response must strictly contain only structural layout nodes (id, type, group) and connection links (source, target, value, context).
+STRUCTURAL ONLY: You MUST NOT generate or include any biographies, summaries, member lists, discographies, or detailed profile metadata for the artists. The response must strictly contain only structural layout nodes (id, type, group, label, origin) and connection links (source, target, value, forwardContext, inverseContext).
         
 ABSOLUTELY CRITICAL FINAL CHECK: Before you output the JSON, verify that for EVERY SINGLE OBJECT in the 'links' array, the value of its 'source' property and the value of its 'target' property perfectly match an 'id' from an object in the 'nodes' array. THERE MUST BE NO ORPHANED LINKS. If you create a link with a 'source' or 'target' ID (e.g., "Arista Records"), you MUST ALSO define a node with that exact same 'id' (e.g., { "id": "Arista Records", "type": "label", ... }). Do not invent connections to nodes you haven't defined. This is a architecture requirement.
 
@@ -963,7 +964,13 @@ const reconcileNarrativeEdges = async (apiKey, narrative, nodes, existingLinks, 
     const ai = new genai_1.GoogleGenAI({ apiKey, httpOptions: { timeout: 120000 } });
     // Build a deduplicated set of existing edge keys for efficient exclusion
     const existingEdgeSet = new Set(existingLinks.map(l => [l.source, l.target].sort().join('--')));
-    // Only expose artist-type nodes — metadata petals are not valid edge endpoints
+    const labelById = new Map();
+    for (const n of nodes) {
+        if (n?.id) {
+            labelById.set(n.id, n.label || (0, isoCountries_1.stripCountrySlug)(n.id));
+        }
+    }
+    // Only expose artist/label nodes — metadata petals are not valid edge endpoints
     const artistNodes = nodes
         .filter(n => n.type === 'artist' || n.type === 'label')
         .map(n => n.id);
@@ -973,7 +980,7 @@ const reconcileNarrativeEdges = async (apiKey, narrative, nodes, existingLinks, 
 
 Below is the Root Breakdown narrative generated for this graph, followed by the complete list of valid node IDs and the edges that already exist.
 
-Your task: identify connections between artists that are EXPLICITLY stated or directly implied in the narrative text but are MISSING from the existing edges list. Only return edges where BOTH the source and target appear verbatim in the Valid Node IDs list. Do not invent connections that are not in the text.
+Your task: identify connections between artists/labels that are EXPLICITLY stated or directly implied in the narrative text but are MISSING from the existing edges list. Only return edges where BOTH the source and target appear verbatim in the Valid Node IDs list. Do not invent connections that are not in the text.
 
 --- NARRATIVE ---
 ${narrative}
@@ -987,8 +994,8 @@ ${JSON.stringify(existingLinks.map(l => `${l.source} → ${l.target}`))}
 Return a JSON array of missing edges. For each missing edge provide:
 - source: the exact node ID from the valid list
 - target: the exact node ID from the valid list  
-- forwardContext: short verbatim excerpt describing action from source to target
-- inverseContext: short verbatim excerpt (or reversed text) describing action from target to source
+- forwardContext: a concise 3 to 8 word directional verb/prepositional predicate phrase from source to target grounded in the narrative, OMITTING both artist/label names so the UI bullet "• {Capitalized forwardContext} {TargetName}" reads naturally (e.g. "kept explosive live rock energy alive alongside", "traded stadium rock hooks with", "refined emotional arena balladry alongside"). NEVER output generic "is connected to" and NEVER include the source or target artist names in the phrase.
+- inverseContext: a concise 3 to 8 word directional verb/prepositional predicate phrase from target to source reversing or mirroring the relationship, OMITTING both artist/label names so "• {Capitalized inverseContext} {SourceName}" reads naturally.
 - weight: a float 0.1–1.0 representing connection strength (1.0 = defining influence, 0.1 = loose mention)
 
 If no missing edges are found, return an empty array [].`;
@@ -1008,11 +1015,11 @@ If no missing edges are found, return an empty array [].`;
                 },
                 forwardContext: {
                     type: genai_1.Type.STRING,
-                    description: "Short excerpt describing relationship from source to target."
+                    description: "3-8 word directional predicate phrase from source to target omitting both artist/label names (e.g. 'kept explosive live energy alive alongside'). Never 'is connected to'."
                 },
                 inverseContext: {
                     type: genai_1.Type.STRING,
-                    description: "Short excerpt or inverse phrase from target to source."
+                    description: "3-8 word directional predicate phrase from target to source omitting both artist/label names (e.g. 'kept explosive live energy alive alongside'). Never 'is connected to'."
                 },
                 weight: {
                     type: genai_1.Type.NUMBER,
@@ -1043,17 +1050,36 @@ If no missing edges are found, return an empty array [].`;
         if (!text)
             return [];
         const parsed = JSON.parse(text);
-        // Final safety pass: enforce that both endpoints exist in our node list
-        // and that the edge is not already present in the graph.
+        // Final safety pass: enforce that both endpoints exist in our node list,
+        // that the edge is not already present, and sanitize directional contexts.
         const artistNodeSet = new Set(artistNodes);
-        return parsed.filter(edge => {
-            if (!artistNodeSet.has(edge.source) || !artistNodeSet.has(edge.target))
-                return false;
+        const validEdges = [];
+        for (const edge of parsed) {
+            if (!edge || !artistNodeSet.has(edge.source) || !artistNodeSet.has(edge.target))
+                continue;
             if (edge.source === edge.target)
-                return false;
+                continue;
             const key = [edge.source, edge.target].sort().join('--');
-            return !existingEdgeSet.has(key);
-        });
+            if (existingEdgeSet.has(key))
+                continue;
+            existingEdgeSet.add(key);
+            const srcLabel = labelById.get(edge.source) || edge.source;
+            const tgtLabel = labelById.get(edge.target) || edge.target;
+            const cleanForward = (0, linkContext_1.sanitizeDirectionalLinkContext)(edge.forwardContext, srcLabel, tgtLabel) ||
+                (0, linkContext_1.sanitizeDirectionalLinkContext)(edge.context, srcLabel, tgtLabel) ||
+                "highlighted in this scene alongside";
+            const cleanInverse = (0, linkContext_1.sanitizeDirectionalLinkContext)(edge.inverseContext, tgtLabel, srcLabel) ||
+                (0, linkContext_1.sanitizeDirectionalLinkContext)(edge.context, tgtLabel, srcLabel) ||
+                cleanForward;
+            validEdges.push({
+                source: edge.source,
+                target: edge.target,
+                forwardContext: cleanForward,
+                inverseContext: cleanInverse,
+                weight: typeof edge.weight === "number" ? edge.weight : 0.6,
+            });
+        }
+        return validEdges;
     }
     catch (error) {
         console.error("[reconcileNarrativeEdges] Failed to reconcile narrative edges:", error);

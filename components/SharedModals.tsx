@@ -2139,8 +2139,8 @@ export function ConsolidatedValidationModal({
 
   const handleStartEdit = (seed: PreFlightSeed) => {
     setEditingSeedId(seed.id);
-    setCustomOrigin(seed.predictedOrigin && seed.predictedOrigin !== 'Unknown Origin' ? seed.predictedOrigin : '');
-    setCustomGenre(seed.genre || '');
+    setCustomOrigin('');
+    setCustomGenre('');
     setVerificationError(null);
     setNeedsTopUpForEscape(false);
   };
@@ -2177,7 +2177,7 @@ export function ConsolidatedValidationModal({
             return {
               ...s,
               predictedOrigin: data.origin || customOrigin.trim(),
-              genre: data.genre || customGenre.trim() || s.genre,
+              genre: data.genre || customGenre.trim() || '',
               isKnownCacheHit: false, // force fresh pipeline routing
               isAmbiguous: hasCollision,
               candidates: hasCollision ? data.candidates : undefined,
@@ -2207,6 +2207,82 @@ export function ConsolidatedValidationModal({
       setIsVerifying(false);
     }
   };
+
+  const renderEscapeHatchEditor = (seed: PreFlightSeed) => (
+    <div className="mt-2.5 p-2.5 bg-zinc-950/80 border border-zinc-800 rounded-lg flex flex-col gap-2.5">
+      <p className="text-[11px] text-zinc-400 font-light">
+        Specify the intended regional origin or country for <strong>{seed.query}</strong>:
+      </p>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          autoFocus
+          disabled={isVerifying}
+          value={customOrigin}
+          onChange={e => setCustomOrigin(e.target.value)}
+          placeholder="Country or region (required, e.g. Thailand)"
+          className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500 disabled:opacity-50"
+        />
+        <input
+          type="text"
+          disabled={isVerifying}
+          value={customGenre}
+          onChange={e => setCustomGenre(e.target.value)}
+          placeholder="Genre (optional)"
+          className="w-36 bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500 disabled:opacity-50"
+        />
+      </div>
+
+      {verificationError && (
+        <div data-testid="bouncer-error" className="flex items-center justify-between gap-2 text-rose-400 text-xs bg-rose-950/40 border border-rose-800/50 rounded-lg p-2">
+          <div className="flex items-center gap-1.5">
+            <span className="material-symbols-outlined !text-[15px] flex-shrink-0">error</span>
+            <span>{verificationError}</span>
+          </div>
+          {needsTopUpForEscape && (
+            <button
+              type="button"
+              onClick={() => triggerTopUp('gbp_5')}
+              className="px-2 py-0.5 text-[10px] font-semibold bg-primary text-brand-black rounded hover:opacity-90 whitespace-nowrap cursor-pointer"
+            >
+              Top Up
+            </button>
+          )}
+        </div>
+      )}
+
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[10px] text-zinc-500 font-mono">
+          {!isAdmin && curationSessionId ? '1-Token Flash lookup' : ''}
+        </span>
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            disabled={isVerifying}
+            onClick={handleCancelEdit}
+            className="px-2.5 py-1 text-[11px] text-zinc-400 hover:text-white rounded disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={!customOrigin.trim() || isVerifying}
+            onClick={() => handleSaveEdit(seed)}
+            className="px-3 py-1 text-[11px] font-medium bg-amber-500 text-brand-black rounded hover:bg-amber-400 disabled:opacity-50 flex items-center gap-1.5"
+          >
+            {isVerifying ? (
+              <>
+                <span className="material-symbols-outlined !text-[12px] animate-spin">progress_activity</span>
+                <span>Verifying...</span>
+              </>
+            ) : (
+              <span>Apply</span>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 
   const hasInvalidSeeds = localSeeds.some(seed => {
     if (seed.isAmbiguous) {
@@ -2253,6 +2329,7 @@ export function ConsolidatedValidationModal({
             <div className="flex flex-col gap-4">
               {localSeeds.map(seed => {
                 const isAmbiguous = !!(seed.isAmbiguous && seed.candidates && seed.candidates.length > 1);
+                const isEditing = editingSeedId === seed.id;
 
                 if (isAmbiguous) {
                   return (
@@ -2265,24 +2342,38 @@ export function ConsolidatedValidationModal({
                           COLLISION DETECTED
                         </span>
                       </div>
-                      <p className="text-xs text-zinc-300 font-light">
-                        Multiple prominent acts share this name. Select your intended artist:
-                      </p>
-                      <div className="flex flex-col gap-2 mt-1">
-                        {seed.candidates!.map(candidate => (
-                          <DisambiguationRadio
-                            key={candidate.id}
-                            candidate={candidate}
-                            isSelected={seed.selectedCandidateId === candidate.id}
-                            onSelect={() => handleSelectCandidate(seed.id, candidate)}
-                          />
-                        ))}
-                      </div>
+                      {!isEditing ? (
+                        <>
+                          <p className="text-xs text-zinc-300 font-light">
+                            Multiple prominent acts share this name. Select your intended artist:
+                          </p>
+                          <div className="flex flex-col gap-2 mt-1">
+                            {seed.candidates!.map(candidate => (
+                              <DisambiguationRadio
+                                key={candidate.id}
+                                candidate={candidate}
+                                isSelected={seed.selectedCandidateId === candidate.id}
+                                onSelect={() => handleSelectCandidate(seed.id, candidate)}
+                              />
+                            ))}
+                          </div>
+                          <div className="mt-1 pt-2 border-t border-amber-500/20 flex items-center justify-between">
+                            <button
+                              type="button"
+                              onClick={() => handleStartEdit(seed)}
+                              className="text-[11px] text-zinc-400 hover:text-amber-400 transition-colors flex items-center gap-1 font-light underline decoration-zinc-700 underline-offset-2"
+                            >
+                              <span className="material-symbols-outlined !text-[13px]">help_outline</span>
+                              Not listed? Specify another origin
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        renderEscapeHatchEditor(seed)
+                      )}
                     </div>
                   );
                 }
-
-                const isEditing = editingSeedId === seed.id;
 
                 return (
                   <div key={seed.id} className="flex flex-col gap-2 p-3 bg-zinc-900/50 border border-zinc-700/50 rounded-xl">
@@ -2321,78 +2412,7 @@ export function ConsolidatedValidationModal({
                           </div>
                         </>
                       ) : (
-                        <div className="mt-2.5 p-2.5 bg-zinc-950/80 border border-zinc-800 rounded-lg flex flex-col gap-2.5">
-                          <p className="text-[11px] text-zinc-400 font-light">
-                            Specify the intended regional origin or country for <strong>{seed.query}</strong>:
-                          </p>
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              disabled={isVerifying}
-                              value={customOrigin}
-                              onChange={e => setCustomOrigin(e.target.value)}
-                              placeholder="e.g. United Kingdom, Australia, Chicago..."
-                              className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500 disabled:opacity-50"
-                            />
-                            <input
-                              type="text"
-                              disabled={isVerifying}
-                              value={customGenre}
-                              onChange={e => setCustomGenre(e.target.value)}
-                              placeholder="Genre (optional)"
-                              className="w-28 bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500 disabled:opacity-50"
-                            />
-                          </div>
-
-                          {verificationError && (
-                            <div data-testid="bouncer-error" className="flex items-center justify-between gap-2 text-rose-400 text-xs bg-rose-950/40 border border-rose-800/50 rounded-lg p-2">
-                              <div className="flex items-center gap-1.5">
-                                <span className="material-symbols-outlined !text-[15px] flex-shrink-0">error</span>
-                                <span>{verificationError}</span>
-                              </div>
-                              {needsTopUpForEscape && (
-                                <button
-                                  type="button"
-                                  onClick={() => triggerTopUp('gbp_5')}
-                                  className="px-2 py-0.5 text-[10px] font-semibold bg-primary text-brand-black rounded hover:opacity-90 whitespace-nowrap cursor-pointer"
-                                >
-                                  Top Up
-                                </button>
-                              )}
-                            </div>
-                          )}
-
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-[10px] text-zinc-500 font-mono">
-                              {!isAdmin && curationSessionId ? '1-Token Flash lookup' : ''}
-                            </span>
-                            <div className="flex justify-end gap-2">
-                              <button
-                                type="button"
-                                disabled={isVerifying}
-                                onClick={handleCancelEdit}
-                                className="px-2.5 py-1 text-[11px] text-zinc-400 hover:text-white rounded disabled:opacity-50"
-                              >
-                                Cancel
-                              </button>
-                              <button
-                                type="button"
-                                disabled={!customOrigin.trim() || isVerifying}
-                                onClick={() => handleSaveEdit(seed)}
-                                className="px-3 py-1 text-[11px] font-medium bg-amber-500 text-brand-black rounded hover:bg-amber-400 disabled:opacity-50 flex items-center gap-1.5"
-                              >
-                                {isVerifying ? (
-                                  <>
-                                    <span className="material-symbols-outlined !text-[12px] animate-spin">progress_activity</span>
-                                    <span>Verifying...</span>
-                                  </>
-                                ) : (
-                                  <span>Apply</span>
-                                )}
-                              </button>
-                            </div>
-                          </div>
-                        </div>
+                        renderEscapeHatchEditor(seed)
                       )}
                     </div>
 

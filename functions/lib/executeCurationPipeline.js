@@ -9,6 +9,7 @@ const cacheQualification_1 = require("./services/cacheQualification");
 const isoCountries_1 = require("./shared/isoCountries");
 Object.defineProperty(exports, "canonicalizeArtistSlugWithOrigin", { enumerable: true, get: function () { return isoCountries_1.canonicalizeArtistSlugWithOrigin; } });
 Object.defineProperty(exports, "shouldAdoptCanonicalSlugCandidate", { enumerable: true, get: function () { return isoCountries_1.shouldAdoptCanonicalSlugCandidate; } });
+const routerStubService_1 = require("./services/routerStubService");
 const tokenEconomy_1 = require("./shared/tokenEconomy");
 const tokenWallet_1 = require("./tokenWallet");
 if ((0, app_1.getApps)().length === 0) {
@@ -44,73 +45,6 @@ function isEntitySeedMatch(seedNorm, candidateNorm) {
     return false;
 }
 exports.stripCountrySlug = isoCountries_1.stripCountrySlug;
-async function upsertBareRouterStub(bareNormId, targetCanonicalId, candidateMeta) {
-    if (!bareNormId || bareNormId === targetCanonicalId)
-        return;
-    const stubDocRef = db.collection("artists").doc(bareNormId);
-    const stubSnap = await stubDocRef.get();
-    const existingData = stubSnap.exists ? stubSnap.data() : null;
-    const newCandidate = {
-        id: targetCanonicalId,
-        name: candidateMeta?.name || bareNormId,
-        origin: candidateMeta?.origin || "Unknown",
-        genre: candidateMeta?.genre || "Unknown",
-    };
-    if (existingData?._isStub && existingData?.isAmbiguous) {
-        const existingCandidates = Array.isArray(existingData.candidates) ? existingData.candidates : [];
-        const hasTarget = existingCandidates.some((c) => c?.id === targetCanonicalId);
-        if (!hasTarget) {
-            await stubDocRef.set({
-                _isStub: true,
-                isAmbiguous: true,
-                redirectTo: null,
-                candidates: [...existingCandidates, newCandidate],
-                updatedAt: firestore_1.FieldValue.serverTimestamp(),
-            }, { merge: true });
-        }
-        console.log(`[Pipeline Diamond] Preserving ambiguous stub for ${bareNormId}`);
-        return;
-    }
-    // Multi-Tenant Homonym Protection (Rule 6 & Rule 17):
-    // If an existing single-pointer stub points to a DIFFERENT valid 2-letter ISO homonym (e.g. paradox-de vs paradox-th),
-    // upgrade the bare stub to an Evolved Ambiguous Stub instead of clobbering redirectTo!
-    const existingRedirect = typeof existingData?.redirectTo === "string" ? existingData.redirectTo : null;
-    const existingRedirectIso = existingRedirect ? (0, isoCountries_1.extractTrailingCountryIso)(existingRedirect) : null;
-    const targetIso = (0, isoCountries_1.extractTrailingCountryIso)(targetCanonicalId);
-    const isExistingValidTwoLetterCanonical = Boolean(existingRedirect &&
-        existingRedirectIso &&
-        /-[a-z]{2}$/i.test(existingRedirect) &&
-        !existingRedirect.endsWith("-uk"));
-    if (existingData?._isStub &&
-        isExistingValidTwoLetterCanonical &&
-        existingRedirect !== targetCanonicalId &&
-        targetIso &&
-        !(0, isoCountries_1.areCountryIsosCompatible)(existingRedirectIso, targetIso)) {
-        const prevCandidates = Array.isArray(existingData.candidates) && existingData.candidates.length > 0
-            ? existingData.candidates
-            : [{ id: existingRedirect, name: candidateMeta?.name || bareNormId, origin: existingRedirectIso.toUpperCase(), genre: "Unknown" }];
-        const merged = prevCandidates.some((c) => c?.id === targetCanonicalId)
-            ? prevCandidates
-            : [...prevCandidates, newCandidate];
-        await stubDocRef.set({
-            _isStub: true,
-            isAmbiguous: true,
-            redirectTo: null,
-            candidates: merged,
-            updatedAt: firestore_1.FieldValue.serverTimestamp(),
-        }, { merge: true });
-        console.log(`[Pipeline Diamond] -> Upgraded bare stub ${bareNormId} to Evolved Ambiguous Stub (${existingRedirect} + ${targetCanonicalId})`);
-        return;
-    }
-    await stubDocRef.set({
-        _isStub: true,
-        isAmbiguous: false,
-        redirectTo: targetCanonicalId,
-        candidates: candidateMeta?.candidates || [newCandidate],
-        cachedAt: firestore_1.FieldValue.serverTimestamp(),
-    }, { merge: true });
-    console.log(`[Pipeline Diamond] -> Synchronously minted bare stub forwarder: ${bareNormId} -> ${targetCanonicalId}`);
-}
 exports.validateSeedOriginCallable = (0, https_1.onCall)({
     secrets: ["GEMINI_API_KEY"],
     timeoutSeconds: 60,
@@ -162,24 +96,35 @@ exports.validateSeedOriginCallable = (0, https_1.onCall)({
             const isAmbiguous = !!(validationResult.hasCollision && validationResult.candidates && validationResult.candidates.length > 1);
             const candidates = validationResult.candidates || [];
             if (isAmbiguous) {
+                const existingSnap = await stubDocRef.get();
+                const existingCandidates = existingSnap.exists && Array.isArray(existingSnap.data()?.candidates)
+                    ? existingSnap.data().candidates
+                    : [];
+                const mergedCandidates = [...candidates];
+                for (const prev of existingCandidates) {
+                    if (prev?.id && !mergedCandidates.some((c) => c?.id === prev.id)) {
+                        mergedCandidates.push(prev);
+                    }
+                }
                 await stubDocRef.set({
                     _isStub: true,
                     isAmbiguous: true,
                     redirectTo: null,
-                    candidates,
+                    artistId: bareNormId,
+                    cacheKey: bareNormId,
+                    candidates: mergedCandidates,
                     cachedAt: firestore_1.FieldValue.serverTimestamp()
                 }, { merge: true });
-                console.log(`[validateSeedOriginCallable] Minted evolved ambiguous stub for "${bareNormId}" with ${candidates.length} candidates`);
+                console.log(`[validateSeedOriginCallable] Minted evolved ambiguous stub for "${bareNormId}" with ${mergedCandidates.length} candidates`);
             }
             else if (candidates.length === 1 && candidates[0].id !== bareNormId) {
-                await stubDocRef.set({
-                    _isStub: true,
-                    isAmbiguous: false,
-                    redirectTo: candidates[0].id,
+                await (0, routerStubService_1.upsertBareRouterStub)(db, bareNormId, candidates[0].id, {
+                    name: candidates[0].name || validationResult.id || seed,
+                    origin: candidates[0].origin || validationResult.origin,
+                    genre: candidates[0].genre || validationResult.genre,
+                    disambiguationSnippet: candidates[0].disambiguationSnippet,
                     candidates,
-                    cachedAt: firestore_1.FieldValue.serverTimestamp()
-                }, { merge: true });
-                console.log(`[validateSeedOriginCallable] Minted single-hit stub for "${bareNormId}" -> "${candidates[0].id}"`);
+                });
             }
         }
         catch (stubErr) {
@@ -270,10 +215,11 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
                     .limit(10)
                     .get();
                 if (!dedupQuery.empty) {
+                    const hasAmbiguousSibling = (0, isoCountries_1.inspectSlugDedupAmbiguity)(dedupQuery.docs.map(d => ({ id: d.id, data: d.data() })), strippedSeed);
                     // Prefer a compatible canonical doc that has graphData (most complete)
                     for (const snap of dedupQuery.docs) {
                         const snapData = snap.data();
-                        if (!(0, isoCountries_1.shouldAdoptCanonicalSlugCandidate)(expectedSeedIso, snap.id, snapData, strippedSeed)) {
+                        if (!(0, isoCountries_1.shouldAdoptCanonicalSlugCandidate)(expectedSeedIso, snap.id, snapData, strippedSeed, { hasAmbiguousSibling, isSeed: true })) {
                             continue;
                         }
                         if (snap.id !== seedNorm && snapData.artistId) {
@@ -295,7 +241,7 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
             if (originalQuery) {
                 const bareNormId = (0, curatorService_1.normalizeArtistId)(originalQuery);
                 if (bareNormId !== resolvedSeedNorm && (!expectedSeedIso || (0, isoCountries_1.areCountryIsosCompatible)(expectedSeedIso, (0, isoCountries_1.extractTrailingCountryIso)(resolvedSeedNorm)))) {
-                    await upsertBareRouterStub(bareNormId, resolvedSeedNorm, {
+                    await (0, routerStubService_1.upsertBareRouterStub)(db, bareNormId, resolvedSeedNorm, {
                         name: seedNamesMap[resolvedSeedNorm] || seedNamesMap[seedNorm] || originalQuery,
                         origin: hintCountry || undefined,
                         genre: hintGenre || undefined,
@@ -416,10 +362,11 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
                     // All verified entities with non-global origins resolve strictly to 2-letter ISO suffixed IDs (e.g. klear-th).
                     const normId = (0, isoCountries_1.canonicalizeArtistSlugWithOrigin)(bareNormId, validationResult.origin);
                     if (normId !== bareNormId) {
-                        await upsertBareRouterStub(bareNormId, normId, {
+                        await (0, routerStubService_1.upsertBareRouterStub)(db, bareNormId, normId, {
                             name: validationResult.id,
                             origin: validationResult.origin || "Unknown",
                             genre: validationResult.genre || "Unknown",
+                            disambiguationSnippet: validationResult.candidates?.[0]?.disambiguationSnippet,
                             candidates: validationResult.candidates,
                         });
                     }
@@ -498,6 +445,11 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
             }
         }
         if (finalGraph.nodes) {
+            // Infer missing `origin` on artist/label nodes from `artist/label <-> country` edges BEFORE canonical slugging
+            const inferredCount = (0, isoCountries_1.inferNodeOriginsFromCountryLinks)(finalGraph.nodes, finalGraph.links);
+            if (inferredCount > 0) {
+                console.log(`[Pipeline Diamond] -> Inferred origin from country links for ${inferredCount} graph node(s)`);
+            }
             const idRewriteMap = new Map();
             for (const n of finalGraph.nodes) {
                 if (n.type) {
@@ -518,7 +470,7 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
                     }
                     newId = seedMatch.id;
                 }
-                else if (n.type !== 'label' && n.origin) {
+                else if (n.type === 'artist' && n.origin) {
                     newId = (0, isoCountries_1.canonicalizeArtistSlugWithOrigin)(originalNormId, n.origin);
                 }
                 if (newId !== n.id) {

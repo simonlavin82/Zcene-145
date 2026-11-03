@@ -39,6 +39,9 @@ npx vitest run components/DetailsPanel.test.tsx
 # Run V42 Global 249-Country ISO-3166 Registry & Disambiguation Lock tests
 cd functions && npx vitest run tests/v42-iso-disambiguation.test.ts
 
+# Run V42.1 Escape Hatch Blank-Input UX & Zero "Is connected to" Tooltip tests
+npx vitest run tests/v42_1-escape-hatch-and-tooltips.test.tsx
+
 # Or run with UI for visual tracing:
 npx vitest --ui
 \`\`\`

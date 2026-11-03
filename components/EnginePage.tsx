@@ -42,7 +42,7 @@ const ARCHITECTURE_RULES = [
     { 
         id: 2, 
         title: "Slugging Reasoning", 
-        desc: "Prevents namespace collisions. Enforces global 249-country ISO-3166-1 alpha-2 mapping via shared/isoCountries.ts (e.g., Scotland → GB, Thailand → TH); full-country-name suffixes (-thailand) and cross-country slug dedup hijacking are strictly forbidden." 
+        desc: "Prevents namespace collisions. Enforces global 249-country ISO-3166-1 alpha-2 mapping via shared/isoCountries.ts (e.g., Scotland → GB, Thailand → TH) with pre-slugging country-link origin inference (inferNodeOriginsFromCountryLinks) and scene-aware/ambiguity-safe deep-cut slug deduplication; full-country-name suffixes (-thailand) and cross-country homonym hijacking are strictly forbidden." 
     },
     { 
         id: 3, 
@@ -162,7 +162,7 @@ const ARCHITECTURE_RULES = [
     { 
         id: 26, 
         title: "Contextual Tooltips", 
-        desc: "Hover states and tooltips must prioritize native narrative snippets (node.narrativeSnippet) generated during the Root Breakdown over generic database summaries. This ensures tooltips reinforce specific editorial relationships without requiring post-generation extraction. Edge relationships must natively output bi-directional phrasing to prevent frontend verb-flipping." 
+        desc: "Hover states and tooltips must prioritize native narrative snippets (node.narrativeSnippet) generated during the Root Breakdown over generic database summaries. Edge relationships output sanitized 3–8 word bi-directional predicate phrases (forwardContext / inverseContext) omitting endpoint names, with deterministic graph/narrative fallback resolution (shared label → narrative co-mention → shared genre/country scene → 'shares scene lineage with') so generic 'Is connected to' copy never renders." 
     },
     { 
         id: 27, 
@@ -346,7 +346,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                                 <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500 text-[10px]">
                                     <li>Read Gate (isFullyQualifiedEntityProfile + Origin-Suffix Parity): Requires complete structured schema and origin matching <code>-iso</code> suffix (100% agnostic to audio preview fields). Rejects foreign homonyms and prose-fallback stubs.</li>
                                     <li>Miss: Enforces <code>lockedSeeds</code> / <code>-iso</code> identity lock, canonical <code>node.id</code> scene context, and strict <code>ARTIST/LABEL_NODE_DETAILS_SCHEMA</code> (3x retry). Rule 38 4-Tier Scraper queries regional <code>country=ISO</code> storefronts first before US fallback and stamps <code>itunesArtistId</code>; unverified artists fail fast to <code>imageUrl: 'not-found'</code>, <code>discography: []</code>, <code>itunesArtistId: null</code>.</li>
-                                    <li>Slug deduplication skips stubs and cross-country homonyms; falls back to <code>seedStubs</code> if retries fail.</li>
+                                    <li>Slug deduplication skips stubs, ambiguous multi-ISO collisions, and cross-scene foreign homonyms (<code>sceneAnchorIsos</code>); falls back to <code>seedStubs</code> if retries fail.</li>
                                 </ul>
                             </li>
                             <li>
@@ -366,7 +366,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                             <li>
                                 <span className="text-primary font-medium">Step 4A: Topology Parity | 3.6 Flash (minimal)</span>
                                 <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500 text-[10px]">
-                                    <li>Injects missing narrative connections into graph edges via <code>reconcileNarrativeEdges</code>.</li>
+                                    <li>Injects missing narrative connections into <code>finalGraph.links</code> via <code>reconcileNarrativeEdges</code> with sanitized directional <code>forwardContext</code> &amp; <code>inverseContext</code> predicates.</li>
                                 </ul>
                             </li>
                             <li>

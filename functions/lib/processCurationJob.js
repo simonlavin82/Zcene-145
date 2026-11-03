@@ -10,6 +10,7 @@ const curatorService_1 = require("./services/curatorService");
 const cacheQualification_1 = require("./services/cacheQualification");
 const isoCountries_1 = require("./shared/isoCountries");
 const executeCurationPipeline_1 = require("./executeCurationPipeline");
+const routerStubService_1 = require("./services/routerStubService");
 const tokenWallet_1 = require("./tokenWallet");
 // Initialize Firebase Admin SDK if not already done
 if ((0, app_1.getApps)().length === 0) {
@@ -328,9 +329,10 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             .limit(10)
                             .get();
                         if (!dedupQuery.empty) {
+                            const hasAmbiguousSibling = (0, isoCountries_1.inspectSlugDedupAmbiguity)(dedupQuery.docs.map(d => ({ id: d.id, data: d.data() })), strippedSeed);
                             for (const snap of dedupQuery.docs) {
                                 const snapData = snap.data();
-                                if (!(0, executeCurationPipeline_1.shouldAdoptCanonicalSlugCandidate)(expectedSeedIso, snap.id, snapData, strippedSeed)) {
+                                if (!(0, executeCurationPipeline_1.shouldAdoptCanonicalSlugCandidate)(expectedSeedIso, snap.id, snapData, strippedSeed, { hasAmbiguousSibling, isSeed: true })) {
                                     continue;
                                 }
                                 if (snap.id !== seedNorm && snapData.artistId) {
@@ -431,6 +433,34 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 if (!finalGraph.nodes || finalGraph.nodes.length === 0 || artistNodesCount < minimumRequiredArtists) {
                     throw new Error(`Generated graph failed structural integrity check. Artist nodes count: ${artistNodesCount} (minimum required: ${minimumRequiredArtists}). Curation aborted.`);
                 }
+                // Infer missing `origin` on artist/label nodes from `artist/label <-> country` edges BEFORE hydration
+                const inferredOriginsCount = (0, isoCountries_1.inferNodeOriginsFromCountryLinks)(finalGraph.nodes, finalGraph.links);
+                if (inferredOriginsCount > 0) {
+                    console.log(`[Curation Backend] Inferred origin from country links for ${inferredOriginsCount} graph node(s).`);
+                }
+                // Build sceneAnchorIsos from locked seeds, resolved seeds, and explicit origin guardrails
+                // so deep-cut slug dedup never adopts a cached foreign homonym (e.g. paradox-de inside a Thai scene).
+                const sceneAnchorIsos = new Set();
+                for (const seed of artistList) {
+                    const seedNorm = (0, curatorService_1.normalizeArtistId)(seed);
+                    const canonicalSeedId = resolvedSeedNormMap.get(seedNorm) ?? seedNorm;
+                    const lock = getSeedLock(canonicalSeedId) || getSeedLock(seed);
+                    const iso = lock?.countryIso || (0, isoCountries_1.extractTrailingCountryIso)(canonicalSeedId);
+                    if (iso)
+                        sceneAnchorIsos.add(iso);
+                }
+                for (const rs of resolvedSeedArray) {
+                    const rsIso = (0, isoCountries_1.extractTrailingCountryIso)(rs?.id || '') || (rs?.origin ? (0, isoCountries_1.normalizeIsoCode)((0, curatorService_1.extractCountrySlug)(rs.origin)) : null);
+                    if (rsIso)
+                        sceneAnchorIsos.add(rsIso);
+                }
+                if (Array.isArray(inputPayload.filters?.includeOrigins)) {
+                    for (const rawIncOrigin of inputPayload.filters.includeOrigins) {
+                        const incIso = (0, isoCountries_1.normalizeIsoCode)((0, curatorService_1.extractCountrySlug)(String(rawIncOrigin)));
+                        if (incIso)
+                            sceneAnchorIsos.add(incIso);
+                    }
+                }
                 // Parse seed artists list (already done above)
                 // Strip regional slugs from the seed artists string to prevent prompt hallucination
                 const cleanSeedArtistsContext = artistList
@@ -524,11 +554,16 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                     .limit(10)
                                     .get();
                                 if (!existingQuery.empty) {
+                                    const hasAmbiguousSibling = (0, isoCountries_1.inspectSlugDedupAmbiguity)(existingQuery.docs.map(d => ({ id: d.id, data: d.data() })), baseNormId);
                                     // Pick the most-complete compatible canonical doc (has graphData preferred)
                                     let bestDocId = artistNormId;
                                     for (const snap of existingQuery.docs) {
                                         const snapData = snap.data();
-                                        if (!(0, executeCurationPipeline_1.shouldAdoptCanonicalSlugCandidate)(expectedNodeIso, snap.id, snapData, baseNormId)) {
+                                        if (!(0, executeCurationPipeline_1.shouldAdoptCanonicalSlugCandidate)(expectedNodeIso, snap.id, snapData, baseNormId, {
+                                            sceneAnchorIsos,
+                                            hasAmbiguousSibling,
+                                            isSeed: isSeedEntity,
+                                        })) {
                                             continue;
                                         }
                                         if (snap.id !== artistNormId && snapData.artistId) {
@@ -959,7 +994,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                 source: typeof l.source === 'string' ? l.source : l.source.id,
                                 target: typeof l.target === 'string' ? l.target : l.target.id,
                             }));
-                            const nodePayload = finalGraph.nodes.map((n) => ({ id: n.id, type: n.type }));
+                            const nodePayload = finalGraph.nodes.map((n) => ({ id: n.id, type: n.type, label: n.label }));
                             const reconciledEdges = await (0, curatorService_1.reconcileNarrativeEdges)(process.env.GEMINI_API_KEY, rootBreakdownStr, nodePayload, existingLinkIds, usageCollector);
                             if (reconciledEdges.length > 0) {
                                 console.log(`[Curation Backend] Step 4: Injecting ${reconciledEdges.length} narrative-cited missing edge(s):`, reconciledEdges.map(e => `${e.source} → ${e.target}`));
@@ -969,7 +1004,8 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                         target: edge.target,
                                         value: 1,
                                         weight: edge.weight,
-                                        context: edge.context,
+                                        forwardContext: edge.forwardContext,
+                                        inverseContext: edge.inverseContext,
                                     });
                                 });
                             }
@@ -1855,6 +1891,25 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         }
                         await recDocRef.update(sanitizeUndefinedProperties(updatePayload));
                         console.log(`[Curation Backend] Proactively updated detailsCache for recommendation (${collName}): ${cleanCanonicalId}`);
+                    }
+                    // Maintain Root-as-Router / Evolved Ambiguous Stub on `artists/{recNorm}` for all verified `-iso` artists
+                    if (!isLabel &&
+                        !recDetails?._isStub &&
+                        cleanCanonicalId !== recNorm &&
+                        (0, isoCountries_1.extractTrailingCountryIso)(cleanCanonicalId) &&
+                        /-[a-z]{2}$/i.test(cleanCanonicalId) &&
+                        !cleanCanonicalId.endsWith("-uk")) {
+                        try {
+                            await (0, routerStubService_1.upsertBareRouterStub)(db, recNorm, cleanCanonicalId, {
+                                name: recDetails?.details?.artist || recArtist || recNorm,
+                                origin: recDetails?.details?.origin,
+                                genre: recDetails?.details?.genre,
+                                summary: recDetails?.summary,
+                            });
+                        }
+                        catch (stubSyncErr) {
+                            console.warn(`[Curation Backend] Non-fatal bare router stub sync warning for "${recNorm}" -> "${cleanCanonicalId}":`, stubSyncErr);
+                        }
                     }
                 }
                 // Topology already rewritten and deduplicated in the pre-computation block before Step 5.
