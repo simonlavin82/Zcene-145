@@ -10,9 +10,16 @@ import {
   extractCleanJsonString,
   scrapeImageUrlBackend,
   getNodeDetailsSchema,
-  FETCH_NODE_DETAILS_PROMPT_TEMPLATE
+  FETCH_NODE_DETAILS_PROMPT_TEMPLATE,
+  buildHydrationIdentityLockBlock
 } from "./services/curatorService";
-import { stripCountrySlug } from "./executeCurationPipeline";
+import {
+  stripCountrySlug,
+  extractTrailingCountryIso,
+  normalizeIsoCode,
+  doesOriginMatchExpectedIso,
+  ISO_TO_COUNTRY_NAME
+} from "./shared/isoCountries";
 import { isFullyQualifiedEntityProfile } from "./services/cacheQualification";
 
 if (getApps().length === 0) {
@@ -67,9 +74,12 @@ export const healOrphanedAsset = onCall({
 
   const collectionName = isLabel ? 'labels' : 'artists';
   let docRef = db.collection(collectionName).doc(canonicalId);
+  const resolvedCountryIso = !isLabel
+    ? (normalizeIsoCode(countrySlug) || extractTrailingCountryIso(canonicalId))
+    : null;
 
   try {
-    // 1. [Rule 8, 37 & 40] Cache Qualification Gate: Reject and overwrite stubs or prose-fallback payloads
+    // 1. [Rule 8, 37 & 40] Cache Qualification Gate: Reject and overwrite stubs, prose-fallback payloads, or foreign homonyms
     const existingSnap = await docRef.get();
     if (existingSnap.exists) {
       const existingData = existingSnap.data();
@@ -89,12 +99,12 @@ export const healOrphanedAsset = onCall({
         }
       }
 
-      if (!isStub && isFullyQualifiedEntityProfile(cachedDetails, isLabel)) {
+      if (!isStub && isFullyQualifiedEntityProfile(cachedDetails, isLabel, resolvedCountryIso)) {
         console.log(`[JIT Healer] Complete Tier 1 cache hit for ${collectionName}/${canonicalId}. Bypassing.`);
         return { success: true, canonicalId, alreadyExisted: true, data: cachedDetails };
       }
 
-      console.log(`[JIT Healer] Existing doc ${collectionName}/${canonicalId} failed V33 qualification gate (isStub: ${isStub}). Overwriting with full synthesis...`);
+      console.log(`[JIT Healer] Existing doc ${collectionName}/${canonicalId} failed V33/V42 qualification gate (isStub: ${isStub}). Overwriting with full synthesis...`);
     }
 
     // 2. Global Auto-Kill Circuit Breaker: Count platform-wide receipts logged in rolling 24 hours
@@ -124,11 +134,11 @@ export const healOrphanedAsset = onCall({
 
     // 2. Synthesize missing entity via Gemini 3.6 Flash (ThinkingLevel.LOW) with exact Column 3 prompt and schema parity
     const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: 60000 } });
-    const cleanSearchName = displayName || titleCaseArtistId(stripCountrySlug(canonicalId));
+    const cleanSearchName = stripCountrySlug(displayName || '') || titleCaseArtistId(stripCountrySlug(canonicalId));
     const currentDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    const originHint = countrySlug 
-      ? (countrySlug.toUpperCase() === 'US' ? 'United States' : countrySlug.toUpperCase() === 'GB' ? 'United Kingdom' : countrySlug.toUpperCase()) 
-      : null;
+    const originHint = resolvedCountryIso
+      ? ISO_TO_COUNTRY_NAME[resolvedCountryIso]
+      : (countrySlug ? String(countrySlug).toUpperCase() : null);
 
     let prompt = FETCH_NODE_DETAILS_PROMPT_TEMPLATE
       .replace('{{nodeIdentifier}}', cleanSearchName)
@@ -136,9 +146,12 @@ export const healOrphanedAsset = onCall({
       .replace('{{contextNodes}}', '')
       .replace(/{{currentDate}}/g, currentDate);
 
-    if (originHint) {
-      prompt = prompt.replace(/{{#if originHint}}[\s\S]*?{{originHint}}[\s\S]*?{{\/if}}/g, 
-          `- **Origin Hint (CRITICAL):** Details for: ${originHint}.`);
+    const identityLockBlock = buildHydrationIdentityLockBlock(cleanSearchName, entityType, {
+      originHint,
+      countryIso: resolvedCountryIso,
+    });
+    if (identityLockBlock) {
+      prompt = prompt.replace(/{{#if originHint}}[\s\S]*?{{\/if}}/g, identityLockBlock);
     } else {
       prompt = prompt.replace(/{{#if originHint}}[\s\S]*?{{\/if}}/g, '');
     }
@@ -192,12 +205,15 @@ export const healOrphanedAsset = onCall({
       }
     }
 
-    // 3. [Rule 8, 37 & 38] Rich Media Scraping Integration & iTunes Discography Reconciliation
+    // 3. [Rule 8, 35, 37 & 38] Rich Media Scraping Integration & Regional iTunes Storefront Routing
     if (!isLabel) {
       const searchArtistName = cleanTitle;
       const genre = synthesizedDetails.details?.genre || "";
       const summary = synthesizedDetails.summary || "";
-      const origin = synthesizedDetails.details?.origin || (countrySlug ? countrySlug.toUpperCase() : "");
+      const candidateOrigin = synthesizedDetails.details?.origin || "";
+      const lockedOrigin = (resolvedCountryIso && !doesOriginMatchExpectedIso(candidateOrigin, resolvedCountryIso))
+        ? (originHint || resolvedCountryIso.toUpperCase())
+        : (candidateOrigin || originHint || "");
 
       try {
         const scrapeResult = await scrapeImageUrlBackend(
@@ -205,8 +221,9 @@ export const healOrphanedAsset = onCall({
           'artist',
           genre,
           summary,
-          origin,
-          synthesizedDetails.discography || []
+          lockedOrigin,
+          synthesizedDetails.discography || [],
+          resolvedCountryIso
         );
         if (scrapeResult && scrapeResult.imageUrl) {
           synthesizedDetails.imageUrl = scrapeResult.imageUrl;
@@ -230,9 +247,9 @@ export const healOrphanedAsset = onCall({
       synthesizedDetails.imageUrl = null;
     }
 
-    // 4. [Rule 40] Write Gate Guard: verify profile is fully qualified before persisting
-    if (!isFullyQualifiedEntityProfile(synthesizedDetails, isLabel)) {
-      throw new HttpsError("internal", `[Rule 40 Write Gate] Synthesized profile for "${cleanTitle}" (${canonicalId}) failed isFullyQualifiedEntityProfile validation.`);
+    // 4. [Rule 40] Write Gate Guard: verify profile is fully qualified AND satisfies Origin-Suffix Parity before persisting
+    if (!isFullyQualifiedEntityProfile(synthesizedDetails, isLabel, resolvedCountryIso)) {
+      throw new HttpsError("internal", `[Rule 40 Write Gate] Synthesized profile for "${cleanTitle}" (${canonicalId}) failed isFullyQualifiedEntityProfile / Origin-Suffix Parity validation.`);
     }
 
     // 5. Persist single canonical document strictly adhering to Tier 1 schema parity

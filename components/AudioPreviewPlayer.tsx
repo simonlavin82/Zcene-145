@@ -4,6 +4,7 @@
  */
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { resolveArtistAudioPreview, AudioPreviewResult } from '../services/itunesPreviewService';
+import { extractTrailingCountryIso } from '../shared/isoCountries';
 
 // ─── SINGLETON GLOBAL AUDIO MANAGER ──────────────────────────────────────────
 // Guarantees only ONE audio preview plays at any time across the entire application.
@@ -202,7 +203,7 @@ export const AudioPreviewPlayer: React.FC<AudioPreviewPlayerProps> = ({
 
     setIsLoading(true);
 
-    resolveArtistAudioPreview(numericId, ac.signal)
+    resolveArtistAudioPreview(numericId, ac.signal, extractTrailingCountryIso(nodeId))
       .then(res => {
         if (!ac.signal.aborted) {
           setHasResolved(true);

@@ -1,9 +1,11 @@
 /**
- * Architecture V40: Clean Slate Zero-Token iTunes Audio Preview Service
+ * Architecture V40 / V42: Clean Slate Zero-Token iTunes Audio Preview Service
  *
  * Exclusively accepts an itunesArtistId captured deterministically by the backend Rule 38 scraper.
- * Zero name-based searches, zero suffix stripping, zero ambiguity.
+ * Non-US artists query their regional ISO-3166-1 alpha-2 storefront (&country=ISO) first before
+ * falling back to the default US storefront.
  */
+import { normalizeIsoCode } from '../shared/isoCountries';
 
 export interface AudioPreviewResult {
   previewUrl: string;
@@ -24,7 +26,8 @@ const inFlightRequests = new Map<number, Promise<AudioPreviewResult | null>>();
  */
 export async function resolveArtistAudioPreview(
   itunesArtistId?: number | null,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  countryIso?: string | null
 ): Promise<AudioPreviewResult | null> {
   const numericId = Number(itunesArtistId);
   if (!numericId || isNaN(numericId) || numericId <= 0) {
@@ -39,42 +42,52 @@ export async function resolveArtistAudioPreview(
     return inFlightRequests.get(numericId)!;
   }
 
+  const normIso = normalizeIsoCode(countryIso);
+  const storefrontsToTry: Array<string | undefined> =
+    normIso && normIso !== 'us' ? [normIso.toUpperCase(), undefined] : [undefined];
+
   const fetchPromise = (async (): Promise<AudioPreviewResult | null> => {
     try {
-      const lookupUrl = `https://itunes.apple.com/lookup?id=${numericId}&entity=song&limit=1`;
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 3500);
+      let anySucceededWithoutTrack = false;
 
-      try {
-        const res = await fetch(lookupUrl, {
-          signal: signal ? AbortSignal.any([signal, controller.signal]) : controller.signal,
-        });
+      for (const storefront of storefrontsToTry) {
+        const countryParam = storefront ? `&country=${encodeURIComponent(storefront)}` : '';
+        const lookupUrl = `https://itunes.apple.com/lookup?id=${numericId}&entity=song&limit=1${countryParam}`;
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 3500);
 
-        if (res.ok) {
-          const data = await res.json();
-          const track = (data.results || []).find(
-            (r: any) => r.wrapperType === 'track' && r.kind === 'song' && r.previewUrl
-          );
-          if (track && track.previewUrl) {
-            const result: AudioPreviewResult = {
-              previewUrl: track.previewUrl,
-              previewTrackName: track.trackName || 'Preview',
-              collectionName: track.collectionName,
-              itunesArtistId: numericId,
-              trackViewUrl: track.trackViewUrl,
-            };
-            previewMemoryCache.set(numericId, result);
-            return result;
+        try {
+          const res = await fetch(lookupUrl, {
+            signal: signal ? AbortSignal.any([signal, controller.signal]) : controller.signal,
+          });
+
+          if (res.ok) {
+            anySucceededWithoutTrack = true;
+            const data = await res.json();
+            const track = (data.results || []).find(
+              (r: any) => r.wrapperType === 'track' && r.kind === 'song' && r.previewUrl
+            );
+            if (track && track.previewUrl) {
+              const result: AudioPreviewResult = {
+                previewUrl: track.previewUrl,
+                previewTrackName: track.trackName || 'Preview',
+                collectionName: track.collectionName,
+                itunesArtistId: numericId,
+                trackViewUrl: track.trackViewUrl,
+              };
+              previewMemoryCache.set(numericId, result);
+              return result;
+            }
           }
-
-          // Verified empty response (artist exists on iTunes but has no 30s song previews)
-          previewMemoryCache.set(numericId, null);
-          return null;
+        } finally {
+          clearTimeout(timeout);
         }
-      } finally {
-        clearTimeout(timeout);
       }
 
+      if (anySucceededWithoutTrack) {
+        // Verified empty response across attempted storefronts
+        previewMemoryCache.set(numericId, null);
+      }
       return null;
     } catch (err: any) {
       if (err.name !== 'AbortError') {
@@ -101,4 +114,12 @@ export function primePreviewCache(
   if (numericId > 0) {
     previewMemoryCache.set(numericId, preview);
   }
+}
+
+/**
+ * Test helper to reset in-memory preview cache between isolated storefront unit tests.
+ */
+export function clearPreviewMemoryCacheForTests(): void {
+  previewMemoryCache.clear();
+  inFlightRequests.clear();
 }

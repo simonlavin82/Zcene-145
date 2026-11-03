@@ -12,6 +12,12 @@ import {
   DocumentSnapshot,
 } from 'firebase/firestore';
 import { GraphData, Node, Link, ArtistCacheEntry, DiscoveryFilters, NodeDetails } from '../types';
+import {
+  extractCountrySlug as extractIsoCountrySlug,
+  extractTrailingCountryIso,
+  stripCountrySlug,
+  ISO_TO_COUNTRY_NAME,
+} from '../shared/isoCountries';
 
 // ─── JIT ASSET HEALER DEDUPLICATION & COOLDOWN (V22) ──────────────────────────
 const healingInFlight = new Set<string>();
@@ -46,11 +52,13 @@ export const triggerAssetHealing = async (
   healingInFlight.add(cacheKey);
 
   try {
+    const inferredCountrySlug = entityType === 'artist' ? extractTrailingCountryIso(normId) : null;
     const healCallable = httpsCallable(functions, 'healOrphanedAsset');
     const result: any = await healCallable({
       entityId: normId,
       entityType,
-      displayName: displayName || normId,
+      displayName: displayName || stripCountrySlug(normId),
+      ...(inferredCountrySlug ? { countrySlug: inferredCountrySlug } : {}),
       ...(projectId ? { projectId } : {}),
       ...(projectName ? { projectName } : {})
     });
@@ -227,42 +235,11 @@ export const isCacheDocumentVerified = (data: Record<string, any>): boolean => {
   return true;
 };
 
-const COUNTRY_ISO_MAP: Record<string, string> = {
-  'united states': 'us', 'usa': 'us', 'us': 'us',
-  'united kingdom': 'gb', 'uk': 'gb', 'england': 'gb', 'great britain': 'gb', 'scotland': 'gb', 'wales': 'gb', 'northern ireland': 'gb',
-  'australia': 'au', 'canada': 'ca', 'germany': 'de',
-  'france': 'fr', 'japan': 'jp', 'sweden': 'se',
-  'italy': 'it', 'spain': 'es', 'brazil': 'br',
-  'mexico': 'mx', 'netherlands': 'nl', 'belgium': 'be',
-  'norway': 'no', 'finland': 'fi', 'denmark': 'dk',
-  'ireland': 'ie', 'new zealand': 'nz', 'poland': 'pl',
-  'austria': 'at', 'switzerland': 'ch'
-};
-
 /**
- * Extracts a clean, normalized country slug from origin strings.
- * e.g. "San Diego, CA, United States" -> "us"
- * e.g. "London, England, United Kingdom" -> "gb"
- * e.g. "Italy" -> "it"
+ * Extracts a clean, normalized 2-letter ISO-3166-1 alpha-2 country slug from origin strings
+ * (backed by `shared/isoCountries.ts`). Never falls back to full country words like "thailand".
  */
-export const extractCountrySlug = (originStr?: string): string => {
-  if (!originStr || typeof originStr !== 'string' || originStr.trim().length === 0) {
-    return 'global';
-  }
-
-  // Pre-split on '/' to handle multi-origin border towns (e.g. "La Calamine, Belgium / Kelmis, Germany" -> "La Calamine, Belgium")
-  const primaryOrigin = originStr.split('/')[0].trim();
-  const parts = primaryOrigin.split(',').map(s => s.trim()).filter(Boolean);
-  const rawCountry = parts.length > 0 ? parts[parts.length - 1] : primaryOrigin;
-  const lowerCountry = rawCountry.toLowerCase().trim();
-  
-  if (COUNTRY_ISO_MAP[lowerCountry]) {
-    return COUNTRY_ISO_MAP[lowerCountry];
-  }
-
-  const slug = normalizeArtistId(rawCountry);
-  return slug || 'global';
-};
+export const extractCountrySlug = extractIsoCountrySlug;
 
 
 /**
@@ -293,37 +270,37 @@ export const cleanArtistDisplayName = (rawIdOrName?: string | null, graphNodes?:
   if (/\+/.test(trimmed)) return trimmed;
 
 
-  // 1. Known common country routing suffixes and slugs in display or kebab case
-  const countrySuffixes = [
-    'united states', 'united kingdom', 'global', 'australia', 'canada', 'germany', 'france',
-    'japan', 'sweden', 'italy', 'spain', 'brazil', 'mexico', 'netherlands', 'belgium',
-    'norway', 'finland', 'denmark', 'ireland', 'new zealand', 'poland', 'austria',
-    'switzerland', 'uk', 'usa', 'us', 'de', 'fr', 'jp', 'se', 'it', 'es', 'br', 'mx',
-    'nl', 'be', 'no', 'fi', 'dk', 'ie', 'nz', 'pl', 'at', 'ch', 'pt', 'ar', 'co', 'au', 'ca', 'gb'
-  ];
+  // 1. Strip hyphen/underscore country routing suffixes via the unified 249-country ISO registry
+  let cleaned = stripCountrySlug(trimmed);
+  if (cleaned === trimmed) {
+    // Also check spaced full-word country routing suffixes (e.g. "Buggin United States", "Klear Thailand", "Klear - TH")
+    const spaced = trimmed.replace(/[-_]+/g, ' ').trim();
+    const lowerSpaced = spaced.toLowerCase();
+    const lowerTrimmed = trimmed.toLowerCase();
+    const fullCountryNames = [
+      'global', 'united states', 'united kingdom', 'northern ireland', 'great britain',
+      'england', 'scotland', 'wales', 'usa', 'uk',
+      ...Object.values(ISO_TO_COUNTRY_NAME).map(c => c.toLowerCase()),
+      ...Object.keys(ISO_TO_COUNTRY_NAME)
+    ].sort((a, b) => b.length - a.length);
 
-  let cleaned = trimmed;
-  // If kebab/snake case, convert to spaced words first for suffix checking
-  const spaced = trimmed.replace(/[-_]+/g, ' ').trim();
-  const lowerSpaced = spaced.toLowerCase();
-  const lowerTrimmed = trimmed.toLowerCase();
-
-  for (const suffix of countrySuffixes) {
-    if (lowerSpaced.endsWith(` ${suffix}`)) {
-      // BOUNDARY CHECK: Prevent erroneously stripping short words like "It" from normal titles like "End It"
-      const isShortCode = suffix.length <= 3;
-      const originalEndsWithHyphenSuffix = lowerTrimmed.endsWith(`-${suffix}`) || lowerTrimmed.endsWith(`_${suffix}`) || lowerTrimmed.endsWith(` - ${suffix}`);
-      
-      if (isShortCode && !originalEndsWithHyphenSuffix) {
+    for (const suffix of fullCountryNames) {
+      if (lowerSpaced.endsWith(` ${suffix}`)) {
+        // BOUNDARY CHECK: Prevent erroneously stripping short words like "It" from normal titles like "End It"
+        const isShortCode = suffix.length <= 3;
+        const originalEndsWithHyphenSuffix =
+          lowerTrimmed.endsWith(`-${suffix}`) ||
+          lowerTrimmed.endsWith(`_${suffix}`) ||
+          lowerTrimmed.endsWith(` - ${suffix}`);
+        if (isShortCode && !originalEndsWithHyphenSuffix) {
           continue;
-      }
-
-      // Strip the suffix and any preceding hyphen/space
-      const suffixLen = suffix.length;
-      const baseSpaced = spaced.slice(0, spaced.length - suffixLen).trim().replace(/[-_]$/, '').trim();
-      if (baseSpaced.length > 0) {
-        cleaned = baseSpaced;
-        break;
+        }
+        const suffixLen = suffix.length;
+        const baseSpaced = spaced.slice(0, spaced.length - suffixLen).trim().replace(/[-_]$/, '').trim();
+        if (baseSpaced.length > 0) {
+          cleaned = baseSpaced;
+          break;
+        }
       }
     }
   }
@@ -413,9 +390,8 @@ export const isNodeInSeedList = (nodeIdOrLabel?: string | null, seedList?: strin
   if (!nodeIdOrLabel || !seedList || !Array.isArray(seedList) || seedList.length === 0) return false;
   
   const targetNorm = normalizeArtistId(nodeIdOrLabel);
-  // Explicitly strip country routing suffixes to ensure base string matches
-  const countrySuffixRegex = /-(united-states|united-kingdom|global|australia|canada|germany|france|japan|sweden|italy|spain|brazil|mexico|netherlands|belgium|norway|finland|denmark|ireland|new-zealand|poland|austria|switzerland|uk|usa|us|portugal|argentina|colombia|de|fr|jp|se|it|es|br|mx|nl|be|no|fi|dk|ie|nz|pl|at|ch|pt|ar|co|au|ca|gb)$/;
-  const strippedTargetNorm = targetNorm.replace(countrySuffixRegex, '');
+  // Explicitly strip country routing suffixes via the global 249-country ISO registry
+  const strippedTargetNorm = stripCountrySlug(targetNorm);
   
   const targetClean = cleanArtistDisplayName(nodeIdOrLabel).toLowerCase();
 
@@ -424,7 +400,7 @@ export const isNodeInSeedList = (nodeIdOrLabel?: string | null, seedList?: strin
     if (seed === nodeIdOrLabel) return true;
     
     const seedNorm = normalizeArtistId(seed);
-    const strippedSeedNorm = seedNorm.replace(countrySuffixRegex, '');
+    const strippedSeedNorm = stripCountrySlug(seedNorm);
 
     // Direct and alias comparisons
     if (seedNorm === targetNorm) return true;
@@ -1389,13 +1365,10 @@ export const getEntityDocWithRedirect = async (
       // redirect chain can resolve correctly. This eliminates the miss waterfall on page
       // load for graph nodes whose IDs include an origin suffix.
       if (depth === 0) {
-        // Match both full country name suffixes (e.g. -japan, -germany) AND
-        // ISO 3166-1 alpha-2 two-letter country codes (e.g. -jp, -at, -de, -gb, -us).
-        const suffixMatch = entityId.match(
-          /^(.+)-(?:usa|uk|united-states|united-kingdom|canada|australia|germany|france|sweden|norway|italy|spain|brazil|mexico|japan|south-korea|[a-z]{2})$/i
-        );
-        if (suffixMatch) {
-          const bareId = suffixMatch[1];
+        // Match both full country name suffixes (e.g. -thailand, -japan, -germany) AND
+        // ISO 3166-1 alpha-2 two-letter country codes across all 249 countries via stripCountrySlug.
+        const bareId = stripCountrySlug(entityId);
+        if (bareId && bareId !== entityId) {
           console.log(`[Proxy Fetch] Cache miss for ${entityId} — retrying with bare ID: ${bareId}`);
           return getEntityDocWithRedirect(bareId, entityType, depth + 1);
         }
@@ -1415,8 +1388,8 @@ export const getEntityDocWithRedirect = async (
     if (data && data._isStub && (data.isAmbiguous || (Array.isArray(data.candidates) && data.candidates.length > 1))) {
       console.log(`[Client-Side Redirect Proxy] Ambiguous stub detected for ${entityId}, stopping redirect traversal.`);
     } else if (data && data.redirectTo && depth < 3) {
-      let targetId = data.redirectTo.trim();
-      const match = targetId.match(/^([a-z0-9\-]+-(?:united-states|united-kingdom|canada|australia|germany|france|sweden|norway|italy|spain|brazil|mexico|japan|south-korea))-.+$/i);
+      let targetId = data.redirectTo.trim().replace(/-(after|before|genre|inc_genres|exc_origins|inc_origins|label|inc_labels|anchor_labels):[^\s]+/gi, '');
+      const match = targetId.match(/^([a-z0-9\-]+-(?:united-states|united-kingdom|canada|australia|germany|france|sweden|norway|italy|spain|brazil|mexico|japan|south-korea|thailand))-.+$/i);
       if (match) {
         console.log(`[Redirect Suffix Cleaner Proxy] Normalized redirect: ${targetId} -> ${match[1]}`);
         targetId = match[1];
@@ -1498,21 +1471,9 @@ export const findCanonicalNodeForArtist = (name: string, nodes: Node[]): Node | 
     const checkPair = (a: string, b: string) => {
       if (!a || !b) return false;
       if (a === b) return true;
-      
-      const KNOWN_COUNTRY_SLUGS = [
-        'united-states', 'united-kingdom', 'global', 'australia', 'canada', 'germany', 'france',
-        'japan', 'sweden', 'italy', 'spain', 'brazil', 'mexico', 'netherlands', 'belgium',
-        'norway', 'finland', 'denmark', 'ireland', 'new-zealand', 'poland', 'austria',
-        'switzerland', 'uk', 'usa', 'us'
-      ];
-      
-      // Only allow a prefix match if the suffix stripped off is exactly a known country slug
-      for (const suffix of KNOWN_COUNTRY_SLUGS) {
-        if (a === `${b}-${suffix}` || b === `${a}-${suffix}`) {
-          return true;
-        }
-      }
-      return false;
+      const bareA = stripCountrySlug(a);
+      const bareB = stripCountrySlug(b);
+      return Boolean(bareA && bareB && bareA === bareB);
     };
     return checkPair(normSearch, normId) || (normLabel ? checkPair(normSearch, normLabel) : false);
   });

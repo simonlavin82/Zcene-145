@@ -42,7 +42,7 @@ const ARCHITECTURE_RULES = [
     { 
         id: 2, 
         title: "Slugging Reasoning", 
-        desc: "Prevents namespace collisions. Enforces ISO mapping via COUNTRY_ISO_MAP (e.g., Scotland → GB)." 
+        desc: "Prevents namespace collisions. Enforces global 249-country ISO-3166-1 alpha-2 mapping via shared/isoCountries.ts (e.g., Scotland → GB, Thailand → TH); full-country-name suffixes (-thailand) and cross-country slug dedup hijacking are strictly forbidden." 
     },
     { 
         id: 3, 
@@ -207,12 +207,12 @@ const ARCHITECTURE_RULES = [
     { 
         id: 35, 
         title: "Geographic Asset Disambiguation", 
-        desc: "If the deterministic iTunes scraper fails to validate an image asset due to a multi-artist name collision or missing legal alias, the background worker must parse the node's parametric origin data, append the relevant regional suffix (e.g., ' US', ' UK'), and execute a secondary validation query." 
+        desc: "Non-US artists query their regional iTunes storefront (&country=ISO, e.g., country=TH) prior to US fallback. If Tier 1 fails due to a homonym collision, Tier 2 appends the 2-letter ISO code (e.g., ' US', ' TH') for a secondary validation query." 
     },
     { 
         id: 36, 
         title: "Entity Taxonomy Normalization", 
-        desc: "The extraction pipeline MUST algorithmically enforce pure root IDs for all global assets. Artists require strict kebab-case-artist-iso-code formatting. To future-proof against homonyms, bare IDs (e.g., 'gunmoll') are strictly reserved as routing stubs and must never hold entity payloads. All verified entities, whether seeds or deep cuts, must resolve to their geographically suffixed ID. Label taxonomy normalizations (normalizeLabelId) strip structural suffixes (-records, -music, -recordings, -discos, -platen, -label, etc.) down to pure root IDs across hydration, idRewriteMap, labelIds, and Level 3 anchorLabels. Canonical stylized display names synthesized by the AI (e.g., intentional lowercase or special characters) must bypass forced Title Case formatters and be preserved as the absolute UI truth." 
+        desc: "The extraction pipeline MUST algorithmically enforce pure root IDs for all global assets. Artists require strict 2-letter kebab-case-artist-iso-code formatting via the unified 249-country ISO registry (never full-word suffixes). To future-proof against homonyms, bare IDs (e.g., 'gunmoll') are strictly reserved as routing stubs and must never hold entity payloads. All verified entities, whether seeds or deep cuts, must resolve to their geographically suffixed ID. Label taxonomy normalizations (normalizeLabelId) strip structural suffixes (-records, -music, -recordings, -discos, -platen, -label, etc.) down to pure root IDs across hydration, idRewriteMap, labelIds, and Level 3 anchorLabels. Canonical stylized display names synthesized by the AI (e.g., intentional lowercase or special characters) must bypass forced Title Case formatters and be preserved as the absolute UI truth." 
     },
     { 
         id: 37, 
@@ -232,7 +232,7 @@ const ARCHITECTURE_RULES = [
     { 
         id: 40, 
         title: "Synthesis Rationale & Deep Cut Integrity (Read/Write Gates)", 
-        desc: "Direct Hits strictly require a non-empty synthesisRationale (>= 50 chars) AND a fully qualified profile (isFullyQualifiedEntityProfile: summary > 50 chars, genre/origin/founded, canonical style for artists, Array.isArray(profile.discography) where honest empty arrays [] are accepted for unindexed underground artists and non-arrays/null are rejected, valid imageUrl or terminal 'not-found' monogram, and authentic recommendationReason) at both the Read Gate and Write Gate (Step 6). Prose-fallback stubs ('Synthesised from live cultural archives...') are hard-rejected. V40 Audio Agnosticism: isFullyQualifiedEntityProfile is 100% agnostic to itunesArtistId, previewUrl, and previewTrackName. Missing audio previews NEVER disqualify a profile, trigger a cache miss, or initiate JIT healing. If Step 3 Root Breakdown exceeds 90s or throws 504, execution immediately fails over to 3.6 Flash (low). Step 4B locks canonical ISO artist suffixes (-be) over slash-separated border-town origins." 
+        desc: "Direct Hits strictly require a non-empty synthesisRationale (>= 50 chars) AND a fully qualified profile (isFullyQualifiedEntityProfile + Origin-Suffix Parity: summary > 50 chars, genre/origin/founded matching the entity's -iso suffix, canonical style for artists, Array.isArray(profile.discography) where honest empty arrays [] are accepted for unindexed underground artists and non-arrays/null are rejected, valid imageUrl or terminal 'not-found' monogram, and authentic recommendationReason) at both the Read Gate and Write Gate (Step 6). Foreign homonym profiles and prose-fallback stubs are hard-rejected. V40 Audio Agnosticism: isFullyQualifiedEntityProfile is 100% agnostic to itunesArtistId, previewUrl, and previewTrackName. If Step 3 Root Breakdown exceeds 90s or throws 504, execution immediately fails over to 3.6 Flash (low). Step 4B locks canonical ISO artist suffixes (-be, -th) over free-text origins." 
     },
     { 
         id: 41, 
@@ -322,7 +322,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                                 </ul>
                             </li>
                             <li>
-                                <span className="text-primary font-medium">Saves Baseline & Handoff:</span> Persists baseline topology to Firestore, returns HTTP 200 OK, and creates curation job.
+                                <span className="text-primary font-medium">Saves Baseline & Handoff:</span> Persists baseline topology to Firestore, returns HTTP 200 OK, and writes <code>curationJobs</code> with <code>lockedSeeds</code> (origin, ISO &amp; genre lock).
                             </li>
                         </ul>
                     </div>
@@ -344,9 +344,9 @@ const DiscoveryFlowDiagram: React.FC = () => (
                             <li>
                                 <span className="text-primary font-medium">2. Hydrate Node Batch | 3.6 Flash (low) [Rules 8, 38 & 40]</span>
                                 <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500 text-[10px]">
-                                    <li>Read Gate (isFullyQualifiedEntityProfile): Requires complete structured schema (Array.isArray(discography), authentic recommendationReason, canonical style; Labels are exempt from the imageUrl check). 100% agnostic to audio preview fields. Rejects prose-fallback stubs, routing them to fresh hydration.</li>
-                                    <li>Miss: Enforces strict <code>responseMimeType: 'application/json'</code> + <code>ARTIST/LABEL_NODE_DETAILS_SCHEMA</code> (zero prose fallback; 3x retry; labels omit style and force imageUrl: null). Rule 38 4-Tier Scraper deterministically stamps <code>itunesArtistId</code> onto winning artists (0 added HTTP calls); unverified artists fail fast to <code>imageUrl: 'not-found'</code>, <code>discography: []</code>, and <code>itunesArtistId: null</code>.</li>
-                                    <li>Slug deduplication ignores stubs; injects pre-generated seed stubs on timeout.</li>
+                                    <li>Read Gate (isFullyQualifiedEntityProfile + Origin-Suffix Parity): Requires complete structured schema and origin matching <code>-iso</code> suffix (100% agnostic to audio preview fields). Rejects foreign homonyms and prose-fallback stubs.</li>
+                                    <li>Miss: Enforces <code>lockedSeeds</code> / <code>-iso</code> identity lock, canonical <code>node.id</code> scene context, and strict <code>ARTIST/LABEL_NODE_DETAILS_SCHEMA</code> (3x retry). Rule 38 4-Tier Scraper queries regional <code>country=ISO</code> storefronts first before US fallback and stamps <code>itunesArtistId</code>; unverified artists fail fast to <code>imageUrl: 'not-found'</code>, <code>discography: []</code>, <code>itunesArtistId: null</code>.</li>
+                                    <li>Slug deduplication skips stubs and cross-country homonyms; falls back to <code>seedStubs</code> if retries fail.</li>
                                 </ul>
                             </li>
                             <li>

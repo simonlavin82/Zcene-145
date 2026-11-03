@@ -27,6 +27,9 @@
  *   Column 2 (executeCurationPipeline) and Column 3 (worker) MUST NOT be invoked.
  */
 
+import { doesOriginMatchExpectedIso, extractTrailingCountryIso } from '../shared/isoCountries';
+export { doesOriginMatchExpectedIso, extractTrailingCountryIso };
+
 export type CacheVerdict = 'TOPOLOGY_HIT' | 'USABLE_STALE' | 'STUB' | 'MISS';
 
 export interface CacheQualification {
@@ -111,7 +114,11 @@ export const parseGraphField = (graphField: any): { nodes: any[]; links: any[] }
  *        "not-found" monogram state after a real 4-tier scrape;
  *        only undefined/null/"" means image scraping has not run).
  */
-export const isFullyQualifiedEntityProfile = (profile: any, isLabel: boolean = false): boolean => {
+export const isFullyQualifiedEntityProfile = (
+  profile: any,
+  isLabel: boolean = false,
+  expectedIsoOrEntityId?: string | null
+): boolean => {
   if (!profile || typeof profile !== 'object' || Array.isArray(profile)) return false;
   if (profile._isStub === true || profile.redirectTo) return false;
 
@@ -136,6 +143,14 @@ export const isFullyQualifiedEntityProfile = (profile: any, isLabel: boolean = f
   const foundedRaw = profile.details?.founded ?? profile.founded;
   if (isInvalidMeta(genreRaw) || isInvalidMeta(originRaw) || isInvalidMeta(foundedRaw)) {
     return false;
+  }
+
+  // Gate B — Origin-Suffix Parity ([Rule 40]): Reject profiles whose origin contradicts their locked -iso suffix
+  if (!isLabel && expectedIsoOrEntityId) {
+    const originStr = Array.isArray(originRaw) ? originRaw.join(', ') : String(originRaw);
+    if (!doesOriginMatchExpectedIso(originStr, expectedIsoOrEntityId)) {
+      return false;
+    }
   }
 
   const recReason = String(profile.recommendationReason ?? '').trim();
@@ -192,7 +207,8 @@ export const qualifyCacheEntry = (data: any, seedId?: string): CacheQualificatio
 
   const isStructurallyUsable = hasNodes && hasEdges && hasRationale;
 
-  // ── 2. Seed profile (bio / genre / style / image / V33 anti-pollution checks) ─────
+  // ── 2. Seed profile (bio / genre / style / image / V33 & V42 anti-pollution checks) ─────
+  const targetEntityId = seedId || data.cacheKey || data.artistId || '';
   const profile = extractSeedProfile(data.detailsCache, seedId || data.artistId || data.cacheKey);
   const isLabel = !!data?.labelId;
   const bio = profile?.summary || profile?.bio || profile?.description || profile?.text || '';
@@ -200,6 +216,15 @@ export const qualifyCacheEntry = (data: any, seedId?: string): CacheQualificatio
   const genre = Array.isArray(genreRaw) ? genreRaw.join(', ') : genreRaw;
   const styleRaw = profile?.details?.style || profile?.style || data?.details?.style || '';
   const style = Array.isArray(styleRaw) ? styleRaw.join(', ') : styleRaw;
+  const originRaw = profile?.details?.origin || profile?.origin || data?.details?.origin || '';
+  const originStr = Array.isArray(originRaw) ? originRaw.join(', ') : String(originRaw || '').trim();
+  const expectedIso = !isLabel ? extractTrailingCountryIso(targetEntityId) : null;
+  const hasOriginMismatch =
+    !isLabel &&
+    !!expectedIso &&
+    originStr.length > 0 &&
+    originStr.toLowerCase() !== 'unknown' &&
+    !doesOriginMatchExpectedIso(originStr, expectedIso);
   const imageUrl = profile?.imageUrl || profile?.image || '';
   const recReason = String(profile?.recommendationReason || '').trim();
   const isProseFallback = recReason.toLowerCase().includes('synthesised from live cultural archives');
@@ -215,15 +240,29 @@ export const qualifyCacheEntry = (data: any, seedId?: string): CacheQualificatio
   if (!hasImage) missing.push('imageUrl');
   if (isProseFallback) missing.push('recommendationReason');
   if (hasInvalidDiscography) missing.push('discography');
+  if (hasOriginMismatch) missing.push('originMismatch');
 
-  const isFullyQualified = isStructurallyUsable && hasBio && hasGenre && hasStyle && hasImage && !isProseFallback && !hasInvalidDiscography;
+  const isFullyQualified =
+    isStructurallyUsable &&
+    hasBio &&
+    hasGenre &&
+    hasStyle &&
+    hasImage &&
+    !isProseFallback &&
+    !hasInvalidDiscography &&
+    !hasOriginMismatch;
 
   let verdict: CacheVerdict;
   if (isFullyQualified) verdict = 'TOPOLOGY_HIT';
-  else if (isStructurallyUsable && !isProseFallback && !hasInvalidDiscography) verdict = 'USABLE_STALE';
+  else if (isStructurallyUsable && !isProseFallback && !hasInvalidDiscography && !hasOriginMismatch) verdict = 'USABLE_STALE';
   else verdict = 'STUB';
 
-  return { verdict, isStructurallyUsable: isStructurallyUsable && !isProseFallback && !hasInvalidDiscography, isFullyQualified, missing };
+  return {
+    verdict,
+    isStructurallyUsable: isStructurallyUsable && !isProseFallback && !hasInvalidDiscography && !hasOriginMismatch,
+    isFullyQualified,
+    missing,
+  };
 };
 
 /** Option A: anything structurally usable is rendered locally at zero cost. */

@@ -6,7 +6,7 @@ const app_1 = require("firebase-admin/app");
 const firestore_1 = require("firebase-admin/firestore");
 const genai_1 = require("@google/genai");
 const curatorService_1 = require("./services/curatorService");
-const executeCurationPipeline_1 = require("./executeCurationPipeline");
+const isoCountries_1 = require("./shared/isoCountries");
 const cacheQualification_1 = require("./services/cacheQualification");
 if ((0, app_1.getApps)().length === 0) {
     (0, app_1.initializeApp)();
@@ -55,8 +55,11 @@ exports.healOrphanedAsset = (0, https_1.onCall)({
     }
     const collectionName = isLabel ? 'labels' : 'artists';
     let docRef = db.collection(collectionName).doc(canonicalId);
+    const resolvedCountryIso = !isLabel
+        ? ((0, isoCountries_1.normalizeIsoCode)(countrySlug) || (0, isoCountries_1.extractTrailingCountryIso)(canonicalId))
+        : null;
     try {
-        // 1. [Rule 8, 37 & 40] Cache Qualification Gate: Reject and overwrite stubs or prose-fallback payloads
+        // 1. [Rule 8, 37 & 40] Cache Qualification Gate: Reject and overwrite stubs, prose-fallback payloads, or foreign homonyms
         const existingSnap = await docRef.get();
         if (existingSnap.exists) {
             const existingData = existingSnap.data();
@@ -76,11 +79,11 @@ exports.healOrphanedAsset = (0, https_1.onCall)({
                     cachedDetails = existingData.detailsCache;
                 }
             }
-            if (!isStub && (0, cacheQualification_1.isFullyQualifiedEntityProfile)(cachedDetails, isLabel)) {
+            if (!isStub && (0, cacheQualification_1.isFullyQualifiedEntityProfile)(cachedDetails, isLabel, resolvedCountryIso)) {
                 console.log(`[JIT Healer] Complete Tier 1 cache hit for ${collectionName}/${canonicalId}. Bypassing.`);
                 return { success: true, canonicalId, alreadyExisted: true, data: cachedDetails };
             }
-            console.log(`[JIT Healer] Existing doc ${collectionName}/${canonicalId} failed V33 qualification gate (isStub: ${isStub}). Overwriting with full synthesis...`);
+            console.log(`[JIT Healer] Existing doc ${collectionName}/${canonicalId} failed V33/V42 qualification gate (isStub: ${isStub}). Overwriting with full synthesis...`);
         }
         // 2. Global Auto-Kill Circuit Breaker: Count platform-wide receipts logged in rolling 24 hours
         const twentyFourHoursAgoMs = Date.now() - 24 * 60 * 60 * 1000;
@@ -105,18 +108,22 @@ exports.healOrphanedAsset = (0, https_1.onCall)({
         console.log(`[JIT Healer] Initiating full-parity synthesis for ${entityType}: "${canonicalId}" (raw: "${entityId}") using ${curatorService_1.GEMINI_FLASH_MODEL}...`);
         // 2. Synthesize missing entity via Gemini 3.6 Flash (ThinkingLevel.LOW) with exact Column 3 prompt and schema parity
         const ai = new genai_1.GoogleGenAI({ apiKey, httpOptions: { timeout: 60000 } });
-        const cleanSearchName = displayName || (0, curatorService_1.titleCaseArtistId)((0, executeCurationPipeline_1.stripCountrySlug)(canonicalId));
+        const cleanSearchName = (0, isoCountries_1.stripCountrySlug)(displayName || '') || (0, curatorService_1.titleCaseArtistId)((0, isoCountries_1.stripCountrySlug)(canonicalId));
         const currentDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-        const originHint = countrySlug
-            ? (countrySlug.toUpperCase() === 'US' ? 'United States' : countrySlug.toUpperCase() === 'GB' ? 'United Kingdom' : countrySlug.toUpperCase())
-            : null;
+        const originHint = resolvedCountryIso
+            ? isoCountries_1.ISO_TO_COUNTRY_NAME[resolvedCountryIso]
+            : (countrySlug ? String(countrySlug).toUpperCase() : null);
         let prompt = curatorService_1.FETCH_NODE_DETAILS_PROMPT_TEMPLATE
             .replace('{{nodeIdentifier}}', cleanSearchName)
             .replace('{{nodeType}}', entityType)
             .replace('{{contextNodes}}', '')
             .replace(/{{currentDate}}/g, currentDate);
-        if (originHint) {
-            prompt = prompt.replace(/{{#if originHint}}[\s\S]*?{{originHint}}[\s\S]*?{{\/if}}/g, `- **Origin Hint (CRITICAL):** Details for: ${originHint}.`);
+        const identityLockBlock = (0, curatorService_1.buildHydrationIdentityLockBlock)(cleanSearchName, entityType, {
+            originHint,
+            countryIso: resolvedCountryIso,
+        });
+        if (identityLockBlock) {
+            prompt = prompt.replace(/{{#if originHint}}[\s\S]*?{{\/if}}/g, identityLockBlock);
         }
         else {
             prompt = prompt.replace(/{{#if originHint}}[\s\S]*?{{\/if}}/g, '');
@@ -164,14 +171,17 @@ exports.healOrphanedAsset = (0, https_1.onCall)({
                 docRef = db.collection(collectionName).doc(canonicalId);
             }
         }
-        // 3. [Rule 8, 37 & 38] Rich Media Scraping Integration & iTunes Discography Reconciliation
+        // 3. [Rule 8, 35, 37 & 38] Rich Media Scraping Integration & Regional iTunes Storefront Routing
         if (!isLabel) {
             const searchArtistName = cleanTitle;
             const genre = synthesizedDetails.details?.genre || "";
             const summary = synthesizedDetails.summary || "";
-            const origin = synthesizedDetails.details?.origin || (countrySlug ? countrySlug.toUpperCase() : "");
+            const candidateOrigin = synthesizedDetails.details?.origin || "";
+            const lockedOrigin = (resolvedCountryIso && !(0, isoCountries_1.doesOriginMatchExpectedIso)(candidateOrigin, resolvedCountryIso))
+                ? (originHint || resolvedCountryIso.toUpperCase())
+                : (candidateOrigin || originHint || "");
             try {
-                const scrapeResult = await (0, curatorService_1.scrapeImageUrlBackend)(searchArtistName, 'artist', genre, summary, origin, synthesizedDetails.discography || []);
+                const scrapeResult = await (0, curatorService_1.scrapeImageUrlBackend)(searchArtistName, 'artist', genre, summary, lockedOrigin, synthesizedDetails.discography || [], resolvedCountryIso);
                 if (scrapeResult && scrapeResult.imageUrl) {
                     synthesizedDetails.imageUrl = scrapeResult.imageUrl;
                     if (Array.isArray(scrapeResult.reconciledDiscography)) {
@@ -196,9 +206,9 @@ exports.healOrphanedAsset = (0, https_1.onCall)({
         else {
             synthesizedDetails.imageUrl = null;
         }
-        // 4. [Rule 40] Write Gate Guard: verify profile is fully qualified before persisting
-        if (!(0, cacheQualification_1.isFullyQualifiedEntityProfile)(synthesizedDetails, isLabel)) {
-            throw new https_1.HttpsError("internal", `[Rule 40 Write Gate] Synthesized profile for "${cleanTitle}" (${canonicalId}) failed isFullyQualifiedEntityProfile validation.`);
+        // 4. [Rule 40] Write Gate Guard: verify profile is fully qualified AND satisfies Origin-Suffix Parity before persisting
+        if (!(0, cacheQualification_1.isFullyQualifiedEntityProfile)(synthesizedDetails, isLabel, resolvedCountryIso)) {
+            throw new https_1.HttpsError("internal", `[Rule 40 Write Gate] Synthesized profile for "${cleanTitle}" (${canonicalId}) failed isFullyQualifiedEntityProfile / Origin-Suffix Parity validation.`);
         }
         // 5. Persist single canonical document strictly adhering to Tier 1 schema parity
         const canonicalPayload = {
@@ -222,7 +232,7 @@ exports.healOrphanedAsset = (0, https_1.onCall)({
             canonicalPayload.labelId = canonicalId; // strictly labelId on labels
         }
         else {
-            canonicalPayload.artistId = (0, executeCurationPipeline_1.stripCountrySlug)(canonicalId); // strictly artistId on artists
+            canonicalPayload.artistId = (0, isoCountries_1.stripCountrySlug)(canonicalId); // strictly artistId on artists
         }
         await docRef.set(canonicalPayload, { merge: true });
         console.log(`[JIT Healer] Successfully healed and persisted complete Tier 1 asset with schema parity: ${collectionName}/${canonicalId} (image: ${synthesizedDetails.imageUrl})`);

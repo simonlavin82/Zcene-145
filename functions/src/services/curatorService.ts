@@ -1,6 +1,13 @@
 import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import { GraphData, Node, Link, DiscoveryFilters, DisambiguationCandidateStub, CANONICAL_STYLES_FLAT } from "../types";
-import { stripCountrySlug } from "../executeCurationPipeline";
+import {
+  extractCountrySlug as extractIsoCountrySlug,
+  extractTrailingCountryIso,
+  stripCountrySlug,
+  doesOriginMatchExpectedIso,
+  normalizeIsoCode,
+  ISO_TO_COUNTRY_NAME,
+} from "../shared/isoCountries";
 import {
   hasActiveDiscoveryFilters,
   hasActiveTier2Filters,
@@ -191,36 +198,11 @@ export const sanitizeImageUrl = (rawUrl?: string | null, sanitizeStrFn?: (s: str
   }
 };
 
-const COUNTRY_ISO_MAP: Record<string, string> = {
-  'united states': 'us', 'usa': 'us', 'us': 'us',
-  'united kingdom': 'gb', 'uk': 'gb', 'england': 'gb', 'great britain': 'gb', 'scotland': 'gb', 'wales': 'gb', 'northern ireland': 'gb',
-  'australia': 'au', 'canada': 'ca', 'germany': 'de',
-  'france': 'fr', 'japan': 'jp', 'sweden': 'se',
-  'italy': 'it', 'spain': 'es', 'brazil': 'br',
-  'mexico': 'mx', 'netherlands': 'nl', 'belgium': 'be',
-  'norway': 'no', 'finland': 'fi', 'denmark': 'dk',
-  'ireland': 'ie', 'new zealand': 'nz', 'poland': 'pl',
-  'austria': 'at', 'switzerland': 'ch'
-};
-
-export const extractCountrySlug = (originStr?: string): string => {
-  if (!originStr || typeof originStr !== 'string' || originStr.trim().length === 0) {
-    return 'global';
-  }
-
-  // Pre-split on '/' to handle multi-origin border towns (e.g. "La Calamine, Belgium / Kelmis, Germany" -> "La Calamine, Belgium")
-  const primaryOrigin = originStr.split('/')[0].trim();
-  const parts = primaryOrigin.split(',').map(s => s.trim()).filter(Boolean);
-  const rawCountry = parts.length > 0 ? parts[parts.length - 1] : primaryOrigin;
-  const lowerCountry = rawCountry.toLowerCase().trim();
-  
-  if (COUNTRY_ISO_MAP[lowerCountry]) {
-    return COUNTRY_ISO_MAP[lowerCountry];
-  }
-
-  const slug = normalizeArtistId(rawCountry);
-  return slug || 'global';
-};
+/**
+ * Global 249-Country ISO-3166-1 Alpha-2 Country Slug Extractor ([Rule 2] & [Rule 36]).
+ * Never returns a full country word like "thailand" — resolves strictly to 2-letter ISO or 'global'.
+ */
+export const extractCountrySlug = extractIsoCountrySlug;
 
 export const buildCompositeCacheKey = (artistId: string, filters?: DiscoveryFilters): string => {
   if (!filters) return artistId;
@@ -1948,11 +1930,86 @@ export const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed infor
 
 // --- DETAILS HYDRATION MODULES ---
 
+export interface NodeDetailsHydrationHints {
+  originHint?: string | null;
+  countryIso?: string | null;
+  genreHint?: string | null;
+}
+
+/**
+ * Resolves connected scene peers/labels/genres from `graphData.links` using canonical `node.id`
+ * while displaying clean human-readable labels (stripping country routing suffixes).
+ */
+export const resolveSceneContextNodes = (node: Node, graphData: GraphData): string => {
+  if (!graphData || !Array.isArray(graphData.links) || !Array.isArray(graphData.nodes)) {
+    return '';
+  }
+  return graphData.links
+    .filter(l => {
+      const sourceId = typeof l.source === 'string' ? l.source : (l.source as Node).id;
+      const targetId = typeof l.target === 'string' ? l.target : (l.target as Node).id;
+      return sourceId === node.id || targetId === node.id;
+    })
+    .map(l => {
+      const sourceId = typeof l.source === 'string' ? l.source : (l.source as Node).id;
+      const targetId = typeof l.target === 'string' ? l.target : (l.target as Node).id;
+      return sourceId === node.id ? targetId : sourceId;
+    })
+    .map(id => graphData.nodes.find(n => n.id === id))
+    .filter(Boolean)
+    .map(n => {
+      const displayLabel = (n!.label && n!.label !== n!.id)
+        ? n!.label
+        : titleCaseArtistId(stripCountrySlug(n!.id));
+      return `${displayLabel} (${n!.type})`;
+    })
+    .slice(0, 10)
+    .join(', ');
+};
+
+/**
+ * Builds the MANDATORY IDENTITY LOCK block injected into `FETCH_NODE_DETAILS_PROMPT_TEMPLATE`
+ * so Gemini 3.6 Flash is strictly forbidden from hydrating a foreign (e.g. US/UK) homonym.
+ */
+export const buildHydrationIdentityLockBlock = (
+  searchArtistName: string,
+  nodeType: string,
+  hints?: NodeDetailsHydrationHints | null
+): string => {
+  const countryIso = normalizeIsoCode(hints?.countryIso);
+  const originLabel =
+    (hints?.originHint && hints.originHint !== 'Unknown' ? hints.originHint.trim() : '') ||
+    (countryIso ? ISO_TO_COUNTRY_NAME[countryIso] : '');
+  const genreLabel =
+    hints?.genreHint && hints.genreHint.trim() && hints.genreHint.trim().toLowerCase() !== 'unknown'
+      ? hints.genreHint.trim()
+      : '';
+
+  if (!originLabel && !countryIso && !genreLabel) {
+    return '';
+  }
+
+  const lines: string[] = [];
+  if (originLabel) {
+    lines.push(`- **Origin Hint (CRITICAL):** Details for: ${originLabel}${countryIso ? ` (ISO: ${countryIso.toUpperCase()})` : ''}.`);
+  }
+  if (genreLabel) {
+    lines.push(`- **Genre Anchor (CRITICAL):** Primary scene/genre: ${genreLabel}.`);
+  }
+  if (originLabel || countryIso) {
+    const regionDesc = originLabel || countryIso!.toUpperCase();
+    lines.push(
+      `- **MANDATORY IDENTITY LOCK (ZERO FOREIGN HOMONYMS):** You MUST hydrate ONLY the ${nodeType} "${searchArtistName}" from ${regionDesc}${countryIso ? ` (ISO-3166: ${countryIso.toUpperCase()})` : ''}${genreLabel ? `, associated with ${genreLabel}` : ''}. Returning biography, formation year, members, notable artists, or discography from any US, UK, or foreign homonym with the same name is STRICTLY FORBIDDEN. In \`details.origin\`, state the authentic city/country within ${regionDesc}. Every release in \`discography\` MUST belong exclusively to the ${regionDesc} ${nodeType} (return \`[]\` if uncertain).`
+    );
+  }
+  return lines.join('\n    ');
+};
+
 export const fetchNodeDetailsBackend = async (
   node: Node,
   graphData: GraphData,
   seedArtists: string,
-  originHint?: string | null,
+  originHint?: string | NodeDetailsHydrationHints | null,
   usageCollector?: UsageCollector
 ): Promise<any> => {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -1965,19 +2022,9 @@ export const fetchNodeDetailsBackend = async (
     httpOptions: { timeout: 300000 } // 5 minutes
   });
   const currentModel = GEMINI_FLASH_MODEL;
+  const isLabelNode = String(node.type || '').toLowerCase() === 'label';
 
-  const contextNodes = graphData.links
-    .filter(l => (typeof l.source === 'string' ? l.source : (l.source as Node).id) === node.id || (typeof l.target === 'string' ? l.target : (l.target as Node).id) === node.id)
-    .map(l => {
-      const sourceId = typeof l.source === 'string' ? l.source : (l.source as Node).id;
-      const targetId = typeof l.target === 'string' ? l.target : (l.target as Node).id;
-      return sourceId === node.id ? targetId : sourceId;
-    })
-    .map(id => graphData.nodes.find(n => n.id === id))
-    .filter(Boolean)
-    .map(n => `${n!.label || n!.id} (${n!.type})`)
-    .slice(0, 10)
-    .join(', ');
+  const contextNodes = resolveSceneContextNodes(node, graphData);
 
   const currentDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -1986,18 +2033,44 @@ export const fetchNodeDetailsBackend = async (
     searchArtistName = node.label;
   }
 
-  let prompt = FETCH_NODE_DETAILS_PROMPT_TEMPLATE
+  const structuredHints: NodeDetailsHydrationHints =
+    typeof originHint === 'string'
+      ? { originHint }
+      : (originHint || {});
+
+  const resolvedCountryIso = !isLabelNode
+    ? (
+        normalizeIsoCode(structuredHints.countryIso) ||
+        extractTrailingCountryIso(node.id) ||
+        (structuredHints.originHint ? normalizeIsoCode(extractCountrySlug(structuredHints.originHint)) : null) ||
+        ((node as any).origin ? normalizeIsoCode(extractCountrySlug((node as any).origin)) : null)
+      )
+    : null;
+
+  const resolvedOriginHint =
+    (structuredHints.originHint && structuredHints.originHint !== 'Unknown' ? structuredHints.originHint : null) ||
+    ((node as any).origin && (node as any).origin !== 'Unknown' ? (node as any).origin : null) ||
+    (resolvedCountryIso ? ISO_TO_COUNTRY_NAME[resolvedCountryIso] : null);
+
+  const identityLockBlock = buildHydrationIdentityLockBlock(searchArtistName, node.type, {
+    originHint: resolvedOriginHint,
+    countryIso: resolvedCountryIso,
+    genreHint: structuredHints.genreHint || (node as any).genre || null,
+  });
+
+  let basePrompt = FETCH_NODE_DETAILS_PROMPT_TEMPLATE
     .replace('{{nodeIdentifier}}', searchArtistName)
     .replace('{{nodeType}}', node.type)
     .replace('{{contextNodes}}', contextNodes)
     .replace(/{{currentDate}}/g, currentDate);
       
-  if (originHint) {
-    prompt = prompt.replace(/{{#if originHint}}[\s\S]*?{{originHint}}[\s\S]*?{{\/if}}/g, 
-        `- **Origin Hint (CRITICAL):** Details for: ${originHint}.`);
+  if (identityLockBlock) {
+    basePrompt = basePrompt.replace(/{{#if originHint}}[\s\S]*?{{\/if}}/g, identityLockBlock);
   } else {
-    prompt = prompt.replace(/{{#if originHint}}[\s\S]*?{{\/if}}/g, '');
+    basePrompt = basePrompt.replace(/{{#if originHint}}[\s\S]*?{{\/if}}/g, '');
   }
+
+  let prompt = basePrompt;
 
 
 
@@ -2078,7 +2151,6 @@ export const fetchNodeDetailsBackend = async (
         }
       }
 
-      const isLabelNode = String(node.type || '').toLowerCase() === 'label';
       const candidateBio = sanitizeBioText(parsedCandidate?.summary || parsedCandidate?.bio || "");
       const candidateReason = String(parsedCandidate?.recommendationReason || '').trim();
       const hasValidDiscography = isLabelNode || Array.isArray(parsedCandidate?.discography);
@@ -2094,6 +2166,19 @@ export const fetchNodeDetailsBackend = async (
           `Invalid data format from details service: incomplete structured payload for ${node.id} ` +
           `(bioLen=${candidateBio.length}, hasReason=${!!candidateReason}, discographyLen=${Array.isArray(parsedCandidate?.discography) ? parsedCandidate.discography.length : 0}).`
         );
+      }
+
+      // Gate A — Origin-Suffix Parity Retry Escalation ([Rule 8], [Rule 40]):
+      // Reject foreign homonyms (e.g. US band returned for a -th Thai artist) and escalate corrective feedback on retry.
+      if (!isLabelNode && resolvedCountryIso) {
+        const candidateOrigin = String(parsedCandidate?.details?.origin || parsedCandidate?.origin || '').trim();
+        if (!doesOriginMatchExpectedIso(candidateOrigin, resolvedCountryIso)) {
+          const expectedCountryLabel = ISO_TO_COUNTRY_NAME[resolvedCountryIso] || resolvedCountryIso.toUpperCase();
+          prompt = `${basePrompt}\n\nCRITICAL RETRY CORRECTION: Your previous output returned a foreign homonym from "${candidateOrigin || 'Unknown'}". That is the WRONG artist! You MUST hydrate ONLY "${searchArtistName}" from ${resolvedOriginHint || expectedCountryLabel} (ISO: ${resolvedCountryIso.toUpperCase()}). Set details.origin to their authentic city/country in ${expectedCountryLabel} and include ONLY releases by the ${expectedCountryLabel} artist (or [] if uncertain).`;
+          throw new Error(
+            `Origin mismatch for ${node.id}: expected ${expectedCountryLabel} (${resolvedCountryIso}), got "${candidateOrigin}".`
+          );
+        }
       }
 
       details = parsedCandidate;
@@ -2126,7 +2211,6 @@ export const fetchNodeDetailsBackend = async (
       : null
   }));
 
-  const isLabelNode = String(node.type || '').toLowerCase() === 'label';
   const hydratedDetails: any = {
     ...details,
     summary: sanitizeBioText(details.summary || "No summary available (AI response was truncated)."),
@@ -2441,39 +2525,52 @@ export const evaluateGenreDistanceScore = (
 };
 
 export const fetchArtistCollections = async (
-  artistId: number | string
+  artistId: number | string,
+  countryIso?: string | null
 ): Promise<{ artwork: string | null; albums: any[] }> => {
-  try {
-    const lookupUrl = `https://itunes.apple.com/lookup?id=${artistId}&entity=album&limit=200`;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 2500);
+  const normIso = normalizeIsoCode(countryIso);
+  const storefrontsToTry: Array<string | undefined> =
+    normIso && normIso !== 'us' ? [normIso.toUpperCase(), undefined] : [undefined];
+
+  for (const storefront of storefrontsToTry) {
     try {
-      const res = await fetch(lookupUrl, { signal: controller.signal });
-      if (res.ok) {
-        const data = await res.json();
-        const albums = (data.results || []).filter(
-          (r: any) => r.wrapperType === 'collection' && String(r.artistId) === String(artistId)
-        );
-        let artwork: string | null = null;
-        for (const alb of albums) {
-          if (alb.artworkUrl100) {
-            artwork = alb.artworkUrl100.replace('100x100bb', '600x600bb');
-            break;
+      const countryParam = storefront ? `&country=${encodeURIComponent(storefront)}` : '';
+      const lookupUrl = `https://itunes.apple.com/lookup?id=${artistId}&entity=album&limit=200${countryParam}`;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 2500);
+      try {
+        const res = await fetch(lookupUrl, { signal: controller.signal });
+        if (res.ok) {
+          const data = await res.json();
+          const albums = (data.results || []).filter(
+            (r: any) => r.wrapperType === 'collection' && String(r.artistId) === String(artistId)
+          );
+          if (albums.length > 0) {
+            let artwork: string | null = null;
+            for (const alb of albums) {
+              if (alb.artworkUrl100) {
+                artwork = alb.artworkUrl100.replace('100x100bb', '600x600bb');
+                break;
+              }
+            }
+            return { artwork, albums };
           }
         }
-        return { artwork, albums };
+      } finally {
+        clearTimeout(timeout);
       }
-    } finally {
-      clearTimeout(timeout);
+    } catch (err: any) {
+      // Graceful fallback to next storefront
     }
-  } catch (err: any) {
-    // Graceful fallback
   }
   return { artwork: null, albums: [] };
 };
 
-export const fetchArtistArtwork = async (artistId: number | string): Promise<string | null> => {
-  const result = await fetchArtistCollections(artistId);
+export const fetchArtistArtwork = async (
+  artistId: number | string,
+  countryIso?: string | null
+): Promise<string | null> => {
+  const result = await fetchArtistCollections(artistId, countryIso);
   return result.artwork;
 };
 
@@ -2602,7 +2699,8 @@ interface CandidateVerification {
 const verifyCandidateDiscography = async (
   candidate: any,
   cleanArtistName: string,
-  discography: DiscographyItem[]
+  discography: DiscographyItem[],
+  storefrontCountry?: string
 ): Promise<CandidateVerification> => {
   const normArtist = (cleanArtistName || "").toLowerCase().replace(/[^a-z0-9]/g, '');
   const validZceneAlbums: { raw: string; norm: string; year?: number }[] = [];
@@ -2625,7 +2723,8 @@ const verifyCandidateDiscography = async (
   }
 
   try {
-    const lookupUrl = `https://itunes.apple.com/lookup?id=${candidate.artistId}&entity=album&limit=200`;
+    const countryParam = storefrontCountry ? `&country=${encodeURIComponent(storefrontCountry)}` : '';
+    const lookupUrl = `https://itunes.apple.com/lookup?id=${candidate.artistId}&entity=album&limit=200${countryParam}`;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 2500);
     try {
@@ -2694,7 +2793,8 @@ export const scrapeImageUrlBackend = async (
   genre: string,
   summary: string,
   origin?: string,
-  discography?: DiscographyItem[]
+  discography?: DiscographyItem[],
+  countryIso?: string | null
 ): Promise<ScrapeImageResult> => {
   // Strategy: High-Speed Deterministic iTunes API (Artists Only)
   if (type === 'label') {
@@ -2708,75 +2808,88 @@ export const scrapeImageUrlBackend = async (
 
   const normName = (name: string) => (name || "").toLowerCase().replace(/[^a-z0-9]/g, '');
 
-  // --- Tier 1: Base Query & Strict Taxonomy Match ---
-  let baseExactMatches: any[] = [];
-  try {
-    const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(cleanArtistName)}&entity=musicArtist&limit=20`;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
+  // Rule 35 & Rule 38 Regional Storefront Routing:
+  // Non-US artists query their regional ISO-3166-1 alpha-2 storefront (&country=ISO, e.g. TH, GB, JP)
+  // FIRST before falling back to the default US storefront.
+  const resolvedIso =
+    normalizeIsoCode(countryIso) ||
+    (origin ? normalizeIsoCode(extractCountrySlug(origin)) : null);
+  const storefrontsToTry: Array<string | undefined> =
+    resolvedIso && resolvedIso !== 'us' ? [resolvedIso.toUpperCase(), undefined] : [undefined];
+
+  for (const storefront of storefrontsToTry) {
+    const countryParam = storefront ? `&country=${encodeURIComponent(storefront)}` : '';
+    const storefrontLabel = storefront || 'US(default)';
+
+    // --- Tier 1: Base Query & Strict Taxonomy Match ---
+    let baseExactMatches: any[] = [];
     try {
-      const res = await fetch(itunesUrl, { signal: controller.signal });
-      if (res.ok) {
-        const data = await res.json();
-        const targetNorm = normName(cleanArtistName);
-        baseExactMatches = (data.results || []).filter((r: any) => normName(r.artistName) === targetNorm);
+      const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(cleanArtistName)}&entity=musicArtist&limit=20${countryParam}`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      try {
+        const res = await fetch(itunesUrl, { signal: controller.signal });
+        if (res.ok) {
+          const data = await res.json();
+          const targetNorm = normName(cleanArtistName);
+          baseExactMatches = (data.results || []).filter((r: any) => normName(r.artistName) === targetNorm);
+        }
+      } finally {
+        clearTimeout(timeoutId);
       }
-    } finally {
-      clearTimeout(timeoutId);
+    } catch (err: any) {
+      console.warn(`[scrapeImageUrlBackend] iTunes search failed for "${cleanArtistName}" (${storefrontLabel}):`, err.message);
     }
-  } catch (err: any) {
-    console.warn(`[scrapeImageUrlBackend] iTunes search failed for "${cleanArtistName}":`, err.message);
-  }
 
-  if (baseExactMatches.length > 0) {
-    const strictMatches = baseExactMatches.filter(r => evaluateGenreMatch(r.primaryGenreName, genre, summary));
+    if (baseExactMatches.length > 0) {
+      const strictMatches = baseExactMatches.filter(r => evaluateGenreMatch(r.primaryGenreName, genre, summary));
 
-    if (strictMatches.length === 1) {
-      const winner = strictMatches[0];
-      const { artwork, albums } = await fetchArtistCollections(winner.artistId);
-      if (artwork) {
-        const reconciled = reconcileDiscographyWithITunes(discography || [], albums, cleanArtistName);
-        console.log(`[scrapeImageUrlBackend] [Tier 1 Hit] "${cleanArtistName}" verified via strict taxonomy overlap. (iTunes ID: ${winner.artistId}, Genre: '${winner.primaryGenreName}')`);
-        return { imageUrl: artwork, reconciledDiscography: reconciled, itunesArtistId: Number(winner.artistId) || null };
-      }
-    } else if (strictMatches.length > 1) {
-      // Tier 1 Genre-Distance Scoring (Rule 38)
-      const scoredCandidates = strictMatches.map(c => ({
-        candidate: c,
-        score: evaluateGenreDistanceScore(c.primaryGenreName, genre, summary)
-      }));
-      scoredCandidates.sort((a, b) => b.score - a.score);
-
-      const top = scoredCandidates[0];
-      const runnerUp = scoredCandidates[1];
-
-      // If top candidate has direct taxonomy match (>= 8) and runner-up is distant bridge (<= 4)
-      if (top.score >= 8 && runnerUp.score <= 4) {
-        const winner = top.candidate;
-        const { artwork, albums } = await fetchArtistCollections(winner.artistId);
+      if (strictMatches.length === 1) {
+        const winner = strictMatches[0];
+        const { artwork, albums } = await fetchArtistCollections(winner.artistId, storefront);
         if (artwork) {
           const reconciled = reconcileDiscographyWithITunes(discography || [], albums, cleanArtistName);
-          console.log(`[scrapeImageUrlBackend] [Tier 1 Genre-Distance Hit] "${cleanArtistName}" resolved among ${strictMatches.length} candidates via taxonomic distance (Score: ${top.score} vs ${runnerUp.score}). Winner iTunes ID: ${winner.artistId} ('${winner.primaryGenreName}')`);
+          console.log(`[scrapeImageUrlBackend] [Tier 1 Hit | ${storefrontLabel}] "${cleanArtistName}" verified via strict taxonomy overlap. (iTunes ID: ${winner.artistId}, Genre: '${winner.primaryGenreName}')`);
           return { imageUrl: artwork, reconciledDiscography: reconciled, itunesArtistId: Number(winner.artistId) || null };
         }
+      } else if (strictMatches.length > 1) {
+        // Tier 1 Genre-Distance Scoring (Rule 38)
+        const scoredCandidates = strictMatches.map(c => ({
+          candidate: c,
+          score: evaluateGenreDistanceScore(c.primaryGenreName, genre, summary)
+        }));
+        scoredCandidates.sort((a, b) => b.score - a.score);
+
+        const top = scoredCandidates[0];
+        const runnerUp = scoredCandidates[1];
+
+        // If top candidate has direct taxonomy match (>= 8) and runner-up is distant bridge (<= 4)
+        if (top.score >= 8 && runnerUp.score <= 4) {
+          const winner = top.candidate;
+          const { artwork, albums } = await fetchArtistCollections(winner.artistId, storefront);
+          if (artwork) {
+            const reconciled = reconcileDiscographyWithITunes(discography || [], albums, cleanArtistName);
+            console.log(`[scrapeImageUrlBackend] [Tier 1 Genre-Distance Hit | ${storefrontLabel}] "${cleanArtistName}" resolved among ${strictMatches.length} candidates via taxonomic distance (Score: ${top.score} vs ${runnerUp.score}). Winner iTunes ID: ${winner.artistId} ('${winner.primaryGenreName}')`);
+            return { imageUrl: artwork, reconciledDiscography: reconciled, itunesArtistId: Number(winner.artistId) || null };
+          }
+        }
+
+        console.warn(`[scrapeImageUrlBackend] [Tier 1 Ambiguity | ${storefrontLabel}] "${cleanArtistName}" has ${strictMatches.length} candidates matching taxonomy [${strictMatches.map(m => `'${m.primaryGenreName}'#${m.artistId}`).join(', ')}]. Escalating to Tier 3.`);
+      } else {
+        console.warn(`[scrapeImageUrlBackend] [Tier 1 Blocked | ${storefrontLabel}] "${cleanArtistName}" genre mismatch. Zcene: '${genre}', iTunes: [${baseExactMatches.map(m => `'${m.primaryGenreName}'#${m.artistId}`).join(', ')}]. Escalating to Tier 2/3.`);
       }
-
-      console.warn(`[scrapeImageUrlBackend] [Tier 1 Ambiguity] "${cleanArtistName}" has ${strictMatches.length} candidates matching taxonomy [${strictMatches.map(m => `'${m.primaryGenreName}'#${m.artistId}`).join(', ')}]. Escalating to Tier 3.`);
-    } else {
-      console.warn(`[scrapeImageUrlBackend] [Tier 1 Blocked] "${cleanArtistName}" genre mismatch. Zcene: '${genre}', iTunes: [${baseExactMatches.map(m => `'${m.primaryGenreName}'#${m.artistId}`).join(', ')}]. Escalating to Tier 2/3.`);
     }
-  }
 
-  // --- Tier 2: Geographic Fallback (e.g., "Darko US") ---
-  let geoExactMatches: any[] = [];
-  if (origin && origin.trim() !== '') {
-    let suffix = extractCountrySlug(origin).toUpperCase();
-    if (suffix === 'GB') suffix = 'UK';
+    // --- Tier 2: Geographic Fallback (e.g., "Darko US", "Klear TH") ---
+    let geoExactMatches: any[] = [];
+    const tier2Iso = resolvedIso || (origin ? normalizeIsoCode(extractCountrySlug(origin)) : null);
+    if (tier2Iso) {
+      let suffix = tier2Iso.toUpperCase();
+      if (suffix === 'GB') suffix = 'UK';
 
-    if (suffix !== 'GLOBAL') {
       const fallbackName = `${cleanArtistName} ${suffix}`;
       try {
-        const geoUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(fallbackName)}&entity=musicArtist&limit=20`;
+        const geoUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(fallbackName)}&entity=musicArtist&limit=20${countryParam}`;
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 4000);
         try {
@@ -2790,105 +2903,109 @@ export const scrapeImageUrlBackend = async (
           clearTimeout(timeoutId);
         }
       } catch (err: any) {
-        console.warn(`[scrapeImageUrlBackend] Geographic iTunes search failed for "${fallbackName}":`, err.message);
+        console.warn(`[scrapeImageUrlBackend] Geographic iTunes search failed for "${fallbackName}" (${storefrontLabel}):`, err.message);
       }
 
       if (geoExactMatches.length > 0) {
         const geoStrictMatches = geoExactMatches.filter(r => evaluateGenreMatch(r.primaryGenreName, genre, summary));
         if (geoStrictMatches.length === 1) {
           const winner = geoStrictMatches[0];
-          const { artwork, albums } = await fetchArtistCollections(winner.artistId);
+          const { artwork, albums } = await fetchArtistCollections(winner.artistId, storefront);
           if (artwork) {
             const reconciled = reconcileDiscographyWithITunes(discography || [], albums, cleanArtistName);
-            console.log(`[scrapeImageUrlBackend] [Tier 2 Hit] "${cleanArtistName}" verified via geographic fallback "${fallbackName}". (iTunes ID: ${winner.artistId}, Genre: '${winner.primaryGenreName}')`);
+            console.log(`[scrapeImageUrlBackend] [Tier 2 Hit | ${storefrontLabel}] "${cleanArtistName}" verified via geographic fallback "${fallbackName}". (iTunes ID: ${winner.artistId}, Genre: '${winner.primaryGenreName}')`);
             return { imageUrl: artwork, reconciledDiscography: reconciled, itunesArtistId: Number(winner.artistId) || null };
           }
         }
       } else {
-        console.log(`[scrapeImageUrlBackend] [Tier 2 Miss] Geographic query "${fallbackName}" returned 0 exact matches.`);
-      }
-    }
-  }
-
-  // --- Tier 3: Discography Tie-Breaker & Verification ---
-  const allCandidatesMap = new Map<string, any>();
-  for (const c of [...baseExactMatches, ...geoExactMatches]) {
-    allCandidatesMap.set(String(c.artistId), c);
-  }
-  const allCandidates = Array.from(allCandidatesMap.values());
-
-  if (allCandidates.length > 0 && discography && discography.length > 0) {
-    allCandidates.sort((a, b) => {
-      const aMatch = evaluateGenreMatch(a.primaryGenreName, genre, summary) ? 1 : 0;
-      const bMatch = evaluateGenreMatch(b.primaryGenreName, genre, summary) ? 1 : 0;
-      return bMatch - aMatch;
-    });
-
-    const cappedCandidates = allCandidates.slice(0, 5);
-    console.log(`[scrapeImageUrlBackend] [Tier 3 Escalation] "${cleanArtistName}": Evaluating ${cappedCandidates.length} candidate(s) against ${discography.length} known album(s).`);
-
-    const verificationResults = await Promise.allSettled(
-      cappedCandidates.map(cand => verifyCandidateDiscography(cand, cleanArtistName, discography))
-    );
-
-    const verifiedWinners: CandidateVerification[] = [];
-    for (const res of verificationResults) {
-      if (res.status === 'fulfilled' && isQualifyingMatch(res.value)) {
-        verifiedWinners.push(res.value);
+        console.log(`[scrapeImageUrlBackend] [Tier 2 Miss | ${storefrontLabel}] Geographic query "${fallbackName}" returned 0 exact matches.`);
       }
     }
 
-    let finalWinner: CandidateVerification | null = null;
+    // --- Tier 3: Discography Tie-Breaker & Verification ---
+    const allCandidatesMap = new Map<string, any>();
+    for (const c of [...baseExactMatches, ...geoExactMatches]) {
+      allCandidatesMap.set(String(c.artistId), c);
+    }
+    const allCandidates = Array.from(allCandidatesMap.values());
 
-    if (verifiedWinners.length === 1) {
-      finalWinner = verifiedWinners[0];
-    } else if (verifiedWinners.length > 1) {
-      const genreMatchedWinners = verifiedWinners.filter(w =>
-        evaluateGenreMatch(w.candidate.primaryGenreName, genre, summary)
+    if (allCandidates.length > 0 && discography && discography.length > 0) {
+      allCandidates.sort((a, b) => {
+        const aMatch = evaluateGenreMatch(a.primaryGenreName, genre, summary) ? 1 : 0;
+        const bMatch = evaluateGenreMatch(b.primaryGenreName, genre, summary) ? 1 : 0;
+        return bMatch - aMatch;
+      });
+
+      const cappedCandidates = allCandidates.slice(0, 5);
+      console.log(`[scrapeImageUrlBackend] [Tier 3 Escalation | ${storefrontLabel}] "${cleanArtistName}": Evaluating ${cappedCandidates.length} candidate(s) against ${discography.length} known album(s).`);
+
+      const verificationResults = await Promise.allSettled(
+        cappedCandidates.map(cand => verifyCandidateDiscography(cand, cleanArtistName, discography, storefront))
       );
 
-      if (genreMatchedWinners.length === 1) {
-        finalWinner = genreMatchedWinners[0];
-        console.log(`[scrapeImageUrlBackend] [Tier 3 Tie-Breaker Hit] "${cleanArtistName}" resolved among ${verifiedWinners.length} candidates via strict genre affinity. Winner iTunes ID: ${finalWinner.candidate.artistId} ('${finalWinner.candidate.primaryGenreName}')`);
-      } else if (genreMatchedWinners.length > 1) {
-        const scored = genreMatchedWinners.map(w => {
-          let score = w.matchCount * 10;
-          const itunesGenre = (w.candidate.primaryGenreName || '').toLowerCase().trim();
-          const targetGenre = (genre || '').toLowerCase().trim();
-          if (itunesGenre && targetGenre && (itunesGenre.includes(targetGenre) || targetGenre.includes(itunesGenre))) {
-            score += 5;
+      const verifiedWinners: CandidateVerification[] = [];
+      for (const res of verificationResults) {
+        if (res.status === 'fulfilled' && isQualifyingMatch(res.value)) {
+          verifiedWinners.push(res.value);
+        }
+      }
+
+      let finalWinner: CandidateVerification | null = null;
+
+      if (verifiedWinners.length === 1) {
+        finalWinner = verifiedWinners[0];
+      } else if (verifiedWinners.length > 1) {
+        const genreMatchedWinners = verifiedWinners.filter(w =>
+          evaluateGenreMatch(w.candidate.primaryGenreName, genre, summary)
+        );
+
+        if (genreMatchedWinners.length === 1) {
+          finalWinner = genreMatchedWinners[0];
+          console.log(`[scrapeImageUrlBackend] [Tier 3 Tie-Breaker Hit | ${storefrontLabel}] "${cleanArtistName}" resolved among ${verifiedWinners.length} candidates via strict genre affinity. Winner iTunes ID: ${finalWinner.candidate.artistId} ('${finalWinner.candidate.primaryGenreName}')`);
+        } else if (genreMatchedWinners.length > 1) {
+          const scored = genreMatchedWinners.map(w => {
+            let score = w.matchCount * 10;
+            const itunesGenre = (w.candidate.primaryGenreName || '').toLowerCase().trim();
+            const targetGenre = (genre || '').toLowerCase().trim();
+            if (itunesGenre && targetGenre && (itunesGenre.includes(targetGenre) || targetGenre.includes(itunesGenre))) {
+              score += 5;
+            }
+            return { winner: w, score };
+          });
+
+          scored.sort((a, b) => b.score - a.score);
+
+          if (scored[0].score > scored[1].score) {
+            finalWinner = scored[0].winner;
+            console.log(`[scrapeImageUrlBackend] [Tier 3 Score Winner | ${storefrontLabel}] "${cleanArtistName}" resolved with score ${scored[0].score} vs runner-up ${scored[1].score}. Winner iTunes ID: ${finalWinner.candidate.artistId}`);
+          } else {
+            console.warn(`[scrapeImageUrlBackend] [Tier 3 Ambiguity | ${storefrontLabel}] "${cleanArtistName}" has ${genreMatchedWinners.length} genre-matched candidates with tied score (${scored[0].score}). Aborting storefront to prevent homonym pollution.`);
           }
-          return { winner: w, score };
-        });
-
-        scored.sort((a, b) => b.score - a.score);
-
-        if (scored[0].score > scored[1].score) {
-          finalWinner = scored[0].winner;
-          console.log(`[scrapeImageUrlBackend] [Tier 3 Score Winner] "${cleanArtistName}" resolved with score ${scored[0].score} vs runner-up ${scored[1].score}. Winner iTunes ID: ${finalWinner.candidate.artistId}`);
         } else {
-          console.warn(`[scrapeImageUrlBackend] [Tier 3 Ambiguity] "${cleanArtistName}" has ${genreMatchedWinners.length} genre-matched candidates with tied score (${scored[0].score}). Aborting to prevent homonym pollution.`);
+          console.warn(`[scrapeImageUrlBackend] [Tier 3 Ambiguity | ${storefrontLabel}] "${cleanArtistName}" has ${verifiedWinners.length} candidates matching discography, but 0 matched genre taxonomy ('${genre}'). Aborting storefront to prevent homonym pollution.`);
         }
       } else {
-        console.warn(`[scrapeImageUrlBackend] [Tier 3 Ambiguity] "${cleanArtistName}" has ${verifiedWinners.length} candidates matching discography, but 0 matched genre taxonomy ('${genre}'). Aborting to prevent homonym pollution.`);
+        console.warn(`[scrapeImageUrlBackend] [Tier 3 Miss | ${storefrontLabel}] "${cleanArtistName}": 0 candidates matched discography.`);
       }
-    } else {
-      console.warn(`[scrapeImageUrlBackend] [Tier 3 Miss] "${cleanArtistName}": 0 candidates matched discography.`);
+
+      if (finalWinner) {
+        let artwork = finalWinner.bestArtwork;
+        let albums = finalWinner.albums || [];
+        if (!artwork || albums.length === 0) {
+          const fetched = await fetchArtistCollections(finalWinner.candidate.artistId, storefront);
+          if (!artwork) artwork = fetched.artwork;
+          if (albums.length === 0) albums = fetched.albums;
+        }
+        if (artwork) {
+          const reconciled = reconcileDiscographyWithITunes(discography || [], albums, cleanArtistName);
+          console.log(`[scrapeImageUrlBackend] [Tier 3 Hit | ${storefrontLabel}] "${cleanArtistName}" (iTunes ID: ${finalWinner.candidate.artistId}) verified via ${finalWinner.matchCount} album matches: [${finalWinner.matchedTitles.map(t => `"${t}"`).join(', ')}]`);
+          return { imageUrl: artwork, reconciledDiscography: reconciled, itunesArtistId: Number(finalWinner.candidate.artistId) || null };
+        }
+      }
     }
 
-    if (finalWinner) {
-      let artwork = finalWinner.bestArtwork;
-      let albums = finalWinner.albums || [];
-      if (!artwork || albums.length === 0) {
-        const fetched = await fetchArtistCollections(finalWinner.candidate.artistId);
-        if (!artwork) artwork = fetched.artwork;
-        if (albums.length === 0) albums = fetched.albums;
-      }
-      if (artwork) {
-        const reconciled = reconcileDiscographyWithITunes(discography || [], albums, cleanArtistName);
-        console.log(`[scrapeImageUrlBackend] [Tier 3 Hit] "${cleanArtistName}" (iTunes ID: ${finalWinner.candidate.artistId}) verified via ${finalWinner.matchCount} album matches: [${finalWinner.matchedTitles.map(t => `"${t}"`).join(', ')}]`);
-        return { imageUrl: artwork, reconciledDiscography: reconciled, itunesArtistId: Number(finalWinner.candidate.artistId) || null };
-      }
+    if (storefront) {
+      console.log(`[scrapeImageUrlBackend] Regional storefront '${storefront}' yielded 0 verified winners for "${cleanArtistName}". Falling back to default US storefront...`);
     }
   }
 
