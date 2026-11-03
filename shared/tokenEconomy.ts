@@ -61,6 +61,25 @@ export const TOP_UP_TIER_LIST: TokenTopUpTier[] = [
   TOP_UP_TIERS.gbp_15,
 ];
 
+export const TOKEN_UNIT_GBP = 0.10;
+export const GBP_TO_USD_RATE = 1.30;
+export const TOKEN_UNIT_USD = 0.13;
+
+export function tokensToGbp(tokens: number): number {
+  const safeTokens = Number.isFinite(tokens) ? tokens : 0;
+  return Number((safeTokens * TOKEN_UNIT_GBP).toFixed(4));
+}
+
+export function tokensToUsd(tokens: number): number {
+  const safeTokens = Number.isFinite(tokens) ? tokens : 0;
+  return Number((safeTokens * TOKEN_UNIT_USD).toFixed(4));
+}
+
+export function usdToGbp(usd: number): number {
+  const safeUsd = Number.isFinite(usd) ? usd : 0;
+  return Number((safeUsd / GBP_TO_USD_RATE).toFixed(4));
+}
+
 export function computeBaseProjectTokenCost(seedCount: number, hasActiveFilters: boolean): 5 | 10 {
   return (seedCount > 1 || hasActiveFilters) ? TOKEN_PRICING.COMPLEX_QUERY : TOKEN_PRICING.SINGLE_SEED;
 }

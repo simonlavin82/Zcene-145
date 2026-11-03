@@ -3,12 +3,26 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import fs from 'fs';
 import path from 'path';
-import { UsageAnalyticsPage, calculateTelemetryForUser, DiscoveryLedgerTable } from '../components/UsageAnalyticsPage';
+import {
+  UsageAnalyticsPage,
+  calculateTelemetryForUser,
+  DiscoveryLedgerTable,
+  computeAggregateMetrics,
+  buildUnifiedActivityRows,
+} from '../components/UsageAnalyticsPage';
 import Dashboard from '../components/Dashboard';
 import Header from '../components/Header';
 import { TrashPage } from '../components/TrashPage';
 import { Project } from '../types';
-import { ADMIN_EMAIL } from '../shared/tokenEconomy';
+import {
+  ADMIN_EMAIL,
+  TOKEN_UNIT_GBP,
+  GBP_TO_USD_RATE,
+  TOKEN_UNIT_USD,
+  tokensToGbp,
+  tokensToUsd,
+  usdToGbp,
+} from '../shared/tokenEconomy';
 
 const mockHttpsCallable = vi.fn();
 const mockGetDocs = vi.fn();
@@ -525,7 +539,8 @@ describe('Architecture V41: 2-Stage 30-Day Trash & Immutable Discovery Ledger', 
 
       // In admin view, wait for ledger to render
       expect(await screen.findByText('The Discovery Ledger')).toBeInTheDocument();
-      expect(screen.getByText('AI Discovery Cost')).toBeInTheDocument();
+      expect(screen.getByText('Actual AI API Cost')).toBeInTheDocument();
+      expect(screen.queryByText(/Sync Archives/i)).not.toBeInTheDocument();
     });
   });
 
@@ -572,6 +587,340 @@ describe('Architecture V41: 2-Stage 30-Day Trash & Immutable Discovery Ledger', 
       expect(truthContent).toContain('status: \'deleted\'');
       expect(engineContent).toContain('status: \'trashed\'');
       expect(engineContent).toContain('status: \'deleted\'');
+    });
+  });
+
+  describe('Part 6: V42.2 Discovery Ledger P&L, Unified Activity Table & Auto-Reconciliation', () => {
+    it('exports canonical unit economics constants and GBP/USD conversion helpers', () => {
+      expect(TOKEN_UNIT_GBP).toBe(0.10);
+      expect(GBP_TO_USD_RATE).toBe(1.30);
+      expect(TOKEN_UNIT_USD).toBe(0.13);
+      expect(tokensToGbp(65)).toBeCloseTo(6.50, 4);
+      expect(tokensToUsd(65)).toBeCloseTo(8.45, 4);
+      expect(tokensToGbp(100)).toBeCloseTo(10.00, 4);
+      expect(tokensToUsd(100)).toBeCloseTo(13.00, 4);
+      expect(usdToGbp(1.4776)).toBeCloseTo(1.1366, 3);
+    });
+
+    it('reconciles 1:1 Executive P&L KPIs summing Customer, Admin/Sandbox, and JIT Auto-Healing costs', () => {
+      const adminUser = {
+        uid: 'admin-uid',
+        email: ADMIN_EMAIL,
+        projectsCount: 2,
+        actionTriggers: { createCount: 2, updateCount: 79 },
+        artistSearches: { globalCount: 2, topSearches: [] },
+        cacheEfficiency: { liveQueries: 1, cacheHits: 78 },
+        deepCutsOpened: 29,
+        exactCost: 0.2931,
+        hasExactCost: true,
+        preflightLookups: { calls: 1, costUsd: 0.0015 },
+        tokenBalance: 0,
+        lifetimeTokensPurchased: 0,
+        lifetimeTokensSpent: 0,
+        projects: [
+          {
+            id: 'admin-turnstile',
+            seedArtist: 'Turnstile',
+            generationType: 'Direct Hit',
+            userFacingScope: 'Single-Seed Zcene',
+            tokensSpent: 0,
+            hasRecordedTokens: true,
+            cost: 0,
+            curationOnlyCost: 0,
+            isEstimate: false,
+            createdAt: 1762100000000,
+            status: 'active',
+          },
+          {
+            id: 'admin-spaced',
+            seedArtist: 'Spaced',
+            generationType: 'Root Generation',
+            userFacingScope: 'Single-Seed Zcene',
+            tokensSpent: 0,
+            hasRecordedTokens: true,
+            cost: 0.2916,
+            curationOnlyCost: 0.2916,
+            isEstimate: false,
+            createdAt: 1762000000000,
+            status: 'active',
+          },
+        ],
+      };
+
+      const customerUser = {
+        uid: 'customer-uid',
+        email: 'simon.lavin1@gmail.com',
+        projectsCount: 3,
+        actionTriggers: { createCount: 3, updateCount: 60 },
+        artistSearches: { globalCount: 3, topSearches: [] },
+        cacheEfficiency: { liveQueries: 1, cacheHits: 29 },
+        deepCutsOpened: 10,
+        exactCost: 1.1816,
+        hasExactCost: true,
+        tokenBalance: 35,
+        lifetimeTokensPurchased: 100,
+        lifetimeTokensSpent: 65,
+        projects: [
+          {
+            id: 'cust-klaar',
+            seedArtist: 'Klaar',
+            generationType: 'Root Generation',
+            userFacingScope: 'Single-Seed Zcene',
+            tokensSpent: 5,
+            hasRecordedTokens: true,
+            cost: 0.2910, // includes $0.0100 deepWebApiUsage
+            curationOnlyCost: 0.2810,
+            isEstimate: false,
+            createdAt: 1762150000000,
+            status: 'active',
+          },
+          {
+            id: 'cust-turnstile',
+            seedArtist: 'Turnstile',
+            generationType: 'Direct Hit',
+            userFacingScope: 'Single-Seed Zcene',
+            tokensSpent: 5,
+            hasRecordedTokens: true,
+            cost: 0,
+            curationOnlyCost: 0,
+            isEstimate: false,
+            createdAt: 1762120000000,
+            status: 'active',
+          },
+          {
+            id: 'cust-barry',
+            seedArtist: 'Barry White',
+            generationType: 'Direct Hit',
+            userFacingScope: 'Single-Seed Zcene',
+            tokensSpent: 5,
+            hasRecordedTokens: true,
+            cost: 0,
+            curationOnlyCost: 0,
+            isEstimate: false,
+            createdAt: 1762050000000,
+            status: 'archived',
+            isArchived: true,
+          },
+        ],
+      };
+
+      const jitHeals = [
+        {
+          id: 'heal-1',
+          entityId: 'paradox-thailand',
+          rawEntityId: 'paradox-thailand',
+          entityType: 'artist' as const,
+          displayName: 'Paradox',
+          callerUid: 'customer-uid',
+          callerEmail: 'simon.lavin1@gmail.com',
+          totalTokens: 18341,
+          promptTokens: 14000,
+          candidatesTokens: 4341,
+          costUsd: 0.00285,
+          timestamp: 1762160000000,
+        },
+      ];
+
+      const metrics = computeAggregateMetrics([adminUser, customerUser], jitHeals);
+
+      // Card 1: Earned Revenue vs Float
+      expect(metrics.customerTokensSpent).toBe(65);
+      expect(metrics.customerEarnedGbp).toBeCloseTo(6.50, 2);
+      expect(metrics.customerEarnedUsd).toBeCloseTo(8.45, 2);
+      expect(metrics.customerGrossPurchasedTokens).toBe(100);
+      expect(metrics.customerUnspentFloatTokens).toBe(35);
+
+      // Card 2: Total Platform AI Cost reconciles 1:1 with Customer ($1.1816) + Admin ($0.2931) + JIT ($0.0029) = $1.4776
+      expect(metrics.customerAiCostUsd).toBeCloseTo(1.1816, 4);
+      expect(metrics.adminAiCostUsd).toBeCloseTo(0.2931, 4);
+      expect(metrics.jitAiCostUsd).toBeCloseTo(0.00285, 5);
+      expect(metrics.totalPlatformAiCostUsd).toBeCloseTo(1.4776, 4);
+      expect(metrics.totalPlatformAiCostUsd.toFixed(4)).toBe('1.4776');
+
+      // Card 3: Net Gross Profit & Margin + pure curationOnlyCost cold average
+      expect(metrics.customerNetProfitUsd).toBeCloseTo(7.2684, 4);
+      expect(metrics.customerGrossMarginPct).toBeCloseTo(86.016, 1);
+      expect(metrics.platformNetProfitUsd).toBeCloseTo(8.45 - 1.4776, 4);
+      // Cold curations: Admin Spaced ($0.2916) + Customer Klaar ($0.2810, excluding $0.01 deepWeb) -> avg $0.2863
+      expect(metrics.coldCurationCount).toBe(2);
+      expect(metrics.avgColdCurationCostUsd).toBeCloseTo((0.2916 + 0.2810) / 2, 4);
+
+      // Card 4: Cache Hit Efficiency across curations
+      expect(metrics.totalCurations).toBe(5);
+      expect(metrics.directHitCurations).toBe(3);
+      expect(metrics.directHitRatePct).toBeCloseTo(60.0, 1);
+      expect(metrics.estimatedDirectHitSavingsUsd).toBeCloseTo(3 * ((0.2916 + 0.2810) / 2), 4);
+
+      // Verify Admin fallback rows for zcene.online@gmail.com when tokenTransactions is empty
+      const adminRows = buildUnifiedActivityRows(adminUser, []);
+      expect(adminRows).toHaveLength(3); // 2 sandbox curations + 1 preflight lookup summary
+      expect(adminRows.map((r) => r.title)).toContain('Turnstile');
+      expect(adminRows.map((r) => r.title)).toContain('Spaced');
+      expect(adminRows.some((r) => r.title.includes('Pre-Flight Artist Lookups'))).toBe(true);
+      const summedAdminRowCost = adminRows.reduce((sum, r) => sum + (r.aiCostUsd || 0), 0);
+      expect(summedAdminRowCost).toBeCloseTo(0.2931, 4);
+    });
+
+    it('normalizes split-debit [ARCHIVED] project tokensSpent (4T after 1T pre-flight -> 5T) and renders unified Admin & User activity views', async () => {
+      const telemetry = calculateTelemetryForUser(
+        'simon.lavin1@gmail.com',
+        { step1: true },
+        [],
+        0,
+        { tokenBalance: 95, lifetimeTokensPurchased: 100, lifetimeTokensSpent: 5 },
+        'u-1',
+        [
+          {
+            id: 'tx-barry-split',
+            data: () => ({
+              uid: 'u-1',
+              type: 'spend_live_synthesis',
+              delta: -4,
+              balanceAfter: 95,
+              description: 'Zcene Synthesis: Barry White (4T balance after 1T pre-flight)',
+              costUsd: 0.2800,
+              createdAt: { toMillis: () => 1762000000000 },
+            }),
+          },
+        ]
+      );
+
+      expect(telemetry.projects).toHaveLength(1);
+      expect(telemetry.projects[0].status).toBe('archived');
+      expect(telemetry.projects[0].tokensSpent).toBe(5);
+
+      // Verify DiscoveryLedgerTable expanded drawer removes Onboarding Progress & standalone Projects Ledger
+      const { unmount } = render(
+        <DiscoveryLedgerTable
+          isLoading={false}
+          filteredLedger={[telemetry]}
+          expandedRow="simon.lavin1@gmail.com"
+          toggleRow={vi.fn()}
+        />
+      );
+      expect(screen.getByText('Revenue (Spent)')).toBeInTheDocument();
+      expect(screen.getAllByText('Net Margin').length).toBeGreaterThanOrEqual(1);
+      expect(screen.queryByText('Onboarding Progress')).not.toBeInTheDocument();
+      expect(screen.queryByText('Projects Ledger')).not.toBeInTheDocument();
+      expect(screen.getByText('ARCHIVED')).toBeInTheDocument();
+      expect(screen.getAllByText('Barry White').length).toBeGreaterThanOrEqual(1);
+      unmount();
+
+      // Verify Standard User unified table filter pills (All | Curations | Deep Connections | Top-Ups & Refunds)
+      mockGetDoc.mockResolvedValue({
+        exists: () => true,
+        data: () => ({
+          email: 'simon.lavin1@gmail.com',
+          tokenBalance: 35,
+          lifetimeTokensPurchased: 100,
+          lifetimeTokensSpent: 65,
+        }),
+      });
+      mockGetDocs.mockImplementation(async (ref: any) => {
+        if (ref.path?.includes('projects')) {
+          return {
+            docs: [
+              {
+                id: 'proj-klaar',
+                data: () => ({
+                  name: 'Klaar (edit 2)',
+                  seedArtists: 'Klaar',
+                  status: 'trashed',
+                  generationType: 'Root Generation',
+                  tokensSpent: 5,
+                  createdAt: { toMillis: () => 1762200000000 },
+                }),
+              },
+            ],
+          };
+        }
+        if (ref.path?.includes('tokenTransactions')) {
+          return {
+            docs: [
+              {
+                id: 'tx-curation',
+                data: () => ({
+                  uid: 'u-1',
+                  type: 'spend_live_synthesis',
+                  projectId: 'proj-klaar',
+                  delta: -4,
+                  balanceAfter: 35,
+                  description: 'Zcene Synthesis: Klaar (4T balance after 1T pre-flight)',
+                  costUsd: 0.2899,
+                  createdAt: { toMillis: () => 1762200000000 },
+                }),
+              },
+              {
+                id: 'tx-deepweb',
+                data: () => ({
+                  uid: 'u-1',
+                  type: 'spend_deep_web',
+                  delta: -3,
+                  balanceAfter: 39,
+                  description: 'Deep Connections (3 Messages): One Step Closer',
+                  createdAt: { toMillis: () => 1762100000000 },
+                }),
+              },
+              {
+                id: 'tx-topup',
+                data: () => ({
+                  uid: 'u-1',
+                  type: 'topup_simulated',
+                  delta: 100,
+                  balanceAfter: 100,
+                  description: 'Stripe Checkout Simulation — £10 Top-Up (100 Tokens)',
+                  createdAt: { toMillis: () => 1762000000000 },
+                }),
+              },
+            ],
+          };
+        }
+        return { docs: [] };
+      });
+
+      render(
+        <UsageAnalyticsPage
+          onNavigate={vi.fn()}
+          isActive={true}
+          user={{ uid: 'u-1', email: 'simon.lavin1@gmail.com' }}
+          isAdmin={false}
+          profile={{ tokenBalance: 35, lifetimeTokensPurchased: 100, lifetimeTokensSpent: 65 }}
+          isProfileOpen={false}
+          setIsProfileOpen={vi.fn()}
+          isDeleteAccountModalOpen={false}
+          setIsDeleteAccountModalOpen={vi.fn()}
+          isMenuOpen={false}
+          setIsMenuOpen={vi.fn()}
+          isSmallScreen={false}
+          stackCount={0}
+          isStackNew={false}
+          onOpenStack={vi.fn()}
+          onLogoClick={vi.fn()}
+          onLogout={vi.fn()}
+          onDeleteAccount={vi.fn()}
+        />
+      );
+
+      expect(await screen.findByText('Klaar (edit 2)')).toBeInTheDocument();
+      expect(screen.getByText('TRASHED')).toBeInTheDocument();
+      expect(screen.queryByTestId('standard-projects-ledger')).not.toBeInTheDocument();
+      expect(screen.queryByText(/\$0\.2899/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Root Generation/)).not.toBeInTheDocument();
+
+      // Filter by Deep Connections
+      fireEvent.click(screen.getByTestId('activity-filter-deep_connections'));
+      expect(screen.getByText(/Deep Connections \(3 Messages\): One Step Closer/)).toBeInTheDocument();
+      expect(screen.queryByText('Klaar (edit 2)')).not.toBeInTheDocument();
+
+      // Filter by Top-Ups & Refunds
+      fireEvent.click(screen.getByTestId('activity-filter-topups_refunds'));
+      expect(screen.getByText(/Stripe Checkout Simulation/)).toBeInTheDocument();
+      expect(screen.queryByText(/Deep Connections \(3 Messages\): One Step Closer/)).not.toBeInTheDocument();
+
+      // Filter by Curations
+      fireEvent.click(screen.getByTestId('activity-filter-curations'));
+      expect(screen.getByText('Klaar (edit 2)')).toBeInTheDocument();
+      expect(screen.queryByText(/Stripe Checkout Simulation/)).not.toBeInTheDocument();
     });
   });
 });

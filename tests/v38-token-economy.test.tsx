@@ -304,17 +304,22 @@ describe('Architecture V38 — Token Economy & Split-Debit Contract', () => {
 
     expect(await screen.findByTestId('wallet-hero-card')).toBeInTheDocument();
     expect(screen.getByTestId('wallet-balance-value')).toHaveTextContent('45');
-    expect(await screen.findByText('5 Tokens')).toBeInTheDocument();
+    expect(await screen.findByText('-5 T')).toBeInTheDocument();
     expect(screen.getAllByText(/Single-Seed Zcene/i).length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByTestId('standard-projects-ledger')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Sync Archives/i)).not.toBeInTheDocument();
 
-    // Rule 43 Redaction Assertions: Standard user must NEVER see $0.0000, Cache Recall Rate, or Direct Hit
-    expect(screen.queryByText(/Cache Recall Rate/i)).not.toBeInTheDocument();
+    // Rule 43 Redaction Assertions: Standard user must NEVER see $0.0000, P&L KPIs, Token Economics Key, or Direct Hit
+    expect(screen.queryByTestId('token-economics-key-strip')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Actual AI API Cost/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Net Gross Profit & Margin/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Cache Hit Efficiency/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/\$0\.0000/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Direct Hit/i)).not.toBeInTheDocument();
 
     unmount();
 
-    // Admin View Assertions: Admin sees Cache Recall Rate and AI Discovery Cost
+    // Admin View Assertions: Admin sees Token Economics Key and V42.2 Executive P&L KPI cards
     render(
       <UsageAnalyticsPage
         {...baseProps}
@@ -323,8 +328,13 @@ describe('Architecture V38 — Token Economy & Split-Debit Contract', () => {
       />
     );
 
-    expect(await screen.findByText('Cache Recall Rate')).toBeInTheDocument();
-    expect(screen.getByText('AI Discovery Cost')).toBeInTheDocument();
+    expect(await screen.findByTestId('token-economics-key-strip')).toBeInTheDocument();
+    expect(screen.getByText('Token Revenue (Earned)')).toBeInTheDocument();
+    expect(screen.getByText('Actual AI API Cost')).toBeInTheDocument();
+    expect(screen.getByText('Net Gross Profit & Margin')).toBeInTheDocument();
+    expect(screen.getByText('Cache Hit Efficiency')).toBeInTheDocument();
+    expect(screen.queryByText(/\$0\.0015/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Sync Archives/i)).not.toBeInTheDocument();
   });
 
   it('filters unmapped Untitled Zcene draft shells from /analytics while preserving curating/completed Zcenes and accounting for pre-flight Flash USD in Admin telemetry only', async () => {

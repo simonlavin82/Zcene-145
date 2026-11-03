@@ -4656,18 +4656,36 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             <div className="space-y-6">
                                 <h3 className="text-xl font-medium text-zinc-200">Hover-Tooltip KPI Cards</h3>
                                 <p className="text-sm text-zinc-400 max-w-2xl leading-relaxed">
-                                    Overview summary cards illustrating aggregate telemetry metrics. Incorporates the hover-activated micro-explanation tooltips.
+                                    Executive P&amp;L summary cards illustrating earned token revenue, real Gemini API expenditure, gross margin, and cache hit efficiency with hover-activated micro-explanation tooltips.
                                 </p>
                                 <div className="space-y-6">
                                     <div className="p-8 bg-zinc-900/40 border border-zinc-850">
                                         <TelemetryOverviewCards
                                             aggregateMetrics={{
-                                                overallEfficiency: 73.3,
-                                                totalCacheHits: 88,
-                                                totalLiveQueries: 32,
-                                                totalProjects: 12,
-                                                totalCosts: 0.0480,
-                                                totalSavings: 0.1320
+                                                customerTokensSpent: 65,
+                                                customerEarnedGbp: 6.50,
+                                                customerEarnedUsd: 8.45,
+                                                customerGrossPurchasedTokens: 100,
+                                                customerGrossPurchasedGbp: 10.00,
+                                                customerGrossPurchasedUsd: 13.00,
+                                                customerUnspentFloatTokens: 35,
+                                                customerUnspentFloatGbp: 3.50,
+                                                customerUnspentFloatUsd: 4.55,
+                                                totalPlatformAiCostUsd: 1.4776,
+                                                totalPlatformAiCostGbp: 1.14,
+                                                customerAiCostUsd: 1.1816,
+                                                adminAiCostUsd: 0.2931,
+                                                jitAiCostUsd: 0.0029,
+                                                customerNetProfitUsd: 7.2684,
+                                                customerGrossMarginPct: 86.0,
+                                                platformNetProfitUsd: 6.9724,
+                                                platformNetMarginPct: 82.5,
+                                                avgColdCurationCostUsd: 0.29,
+                                                coldCurationCount: 5,
+                                                totalCurations: 13,
+                                                directHitCurations: 7,
+                                                directHitRatePct: 53.8,
+                                                estimatedDirectHitSavingsUsd: 2.03
                                             }}
                                             isNormalUserView={false}
                                         />
@@ -4685,7 +4703,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             <div className="space-y-6">
                                 <h3 className="text-xl font-medium text-zinc-200">Collapsible Ledger Table</h3>
                                 <p className="text-sm text-zinc-400 max-w-2xl leading-relaxed">
-                                    High-density tabular layout presenting author-centric metrics. Click rows to test the expanding drawer sub-grids containing curation metrics, onboarding steps, and top search frequencies.
+                                    High-density tabular layout presenting author-centric P&amp;L metrics. Click rows to test the expanding drawer sub-grids containing curation actions, top artist discoveries, unified token &amp; curation receipts, and Deep Connections logs.
                                 </p>
                                 <div className="space-y-6">
                                     <div className="p-4 bg-zinc-900/40 border border-zinc-800 rounded-xl">
@@ -4708,8 +4726,11 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                     cacheEfficiency: { liveQueries: 10, cacheHits: 22 },
                                                     deepCutsOpened: 15,
                                                     onboardingProgress: { step1: true, step2: true, step3: true, step4: true, step5: true },
-                                                    exactCost: 0.15,
+                                                    exactCost: 0.87,
                                                     hasExactCost: true,
+                                                    tokenBalance: 60,
+                                                    lifetimeTokensPurchased: 100,
+                                                    lifetimeTokensSpent: 40,
                                                     projects: []
                                                 },
                                                 {
@@ -4728,8 +4749,11 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                     cacheEfficiency: { liveQueries: 8, cacheHits: 8 },
                                                     deepCutsOpened: 5,
                                                     onboardingProgress: { step1: true, step2: true, step3: true, step4: false, step5: false },
-                                                    exactCost: 0.05,
+                                                    exactCost: 0.29,
                                                     hasExactCost: true,
+                                                    tokenBalance: 30,
+                                                    lifetimeTokensPurchased: 50,
+                                                    lifetimeTokensSpent: 20,
                                                     projects: []
                                                 }
                                             ]}

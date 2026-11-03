@@ -313,13 +313,13 @@ Seed nodes must ALWAYS be elevated to the highest priority in the topology.
 - **2-Stage 30-Day Trash Lifecycle:**
   - **Stage 1 (30-Day Trash):** Deleting an active workspace sets `status: 'trashed'`, `trashedAt: serverTimestamp()`, and `purgeAt: trashedAt + 30d`. All topology data (`graphData`, `detailsCache`, `canvasLayout`) remains intact. Users restore workspaces at `0 Tokens` via the Dashboard Trash tab.
   - **Stage 2 (Compacted Archival):** When `purgeAt <= Date.now()` or user triggers "Delete Forever", the document transitions to `status: 'deleted'`. Topology blobs are nullified while telemetry headers (`tokensSpent`, `apiUsage`, `anchorResolution`, `activeNodesCount`) are permanently retained. Hard `deleteDoc` is write-locked in `firestore.rules`.
-- **Immutable Discovery Ledger Dual-Write & Historical Reconciliation:**
-  - Cloud Functions dual-write `apiUsage`, `costUsd`, `seedArtist`, `generationType`, and `anchorResolution` directly to `users/{uid}/tokenTransactions/{txId}` upon curation completion.
-  - On `/analytics`, `Sync Archives` reconciles `tokenTransactions` against `projects`, automatically reconstituting deleted historical runs (e.g., Barry White, earlier Spaced) as `[ARCHIVED]` records.
-  - Platform KPI cards (`AI DISCOVERY COST`, `CURATION PROJECTS`, `CACHE RECALL RATE`, `PRESERVED BUDGET`) and user-facing `ZCENES CURATED` reflect 100% lifetime accounting accuracy across `[ACTIVE]`, `[TRASHED]`, and `[ARCHIVED]` curations.
+- **Immutable Discovery Ledger Dual-Write, Auto-Reconciliation & Executive P&L (V42.2):**
+  - Cloud Functions dual-write `apiUsage`, `costUsd`, `seedArtist`, `generationType`, and `anchorResolution` directly to `users/{uid}/tokenTransactions/{txId}` upon curation completion (`1T = £0.10 / ~$0.13 USD`).
+  - On `/analytics`, load-time archive reconciliation automatically pairs `tokenTransactions` (`limit(500)`) against `projects`, reconstituting deleted historical runs (e.g., Barry White, earlier Spaced) as `[ARCHIVED]` records without manual sync buttons and normalizing split-debit project totals (`4T` after `1T` pre-flight -> `5T`).
+  - Admin KPI cards (`TOKEN REVENUE (EARNED)`, `ACTUAL AI API COST` summing Customer + Admin/Sandbox + JIT Auto-Healing, `NET GROSS PROFIT & MARGIN`, and `CACHE HIT EFFICIENCY` valued at real average cold curation cost) alongside the `Token Economics Key` strip and unified `[ACTIVE]`/`[TRASHED]`/`[ARCHIVED]` activity & receipt tables reflect 100% lifetime accounting accuracy.
 - **Admin Author-Targeted Wallet Inspection:**
-  - Admin (`zcene.online@gmail.com`) retains raw USD telemetry, lifetime `[ACTIVE]`/`[TRASHED]`/`[ARCHIVED]` project ledgers, and author token transaction streams inside the expanded row.
-  - Clicking **"Inspect Wallet"** enables Admin Preview Mode targeted to that specific author's UID (rendering Simon's live 57T balance, Juice Bar, curated Zcenes, and receipts rather than the Admin's empty wallet).
+  - Admin (`zcene.online@gmail.com`) retains raw USD telemetry, per-row net margins, Admin `0T` sandbox curation fallbacks, and Deep Connections query streams inside the expanded author drawer while Standard Users receive a single unified `Token Activity & Top-Up Receipts` table with category filter pills (`All | Curations | Deep Connections | Top-Ups & Refunds`) and strict USD/cache masking.
+  - Clicking **"Inspect Wallet"** enables Admin Preview Mode targeted to that specific author's UID (rendering the author's live balance, Juice Bar, and unified receipts rather than the Admin's empty wallet).
 
 
 
