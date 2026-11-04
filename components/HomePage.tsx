@@ -509,7 +509,7 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                         <div className="text-xs text-zinc-400 space-y-2 bg-zinc-950/70 p-4 border border-zinc-800/80">
                             <p className="font-semibold text-zinc-300 uppercase tracking-wider text-[10px]">How to Order:</p>
                             <ol className="list-decimal list-inside space-y-1.5 text-zinc-400 leading-relaxed">
-                                <li>Contact us with your size (S–XXL), color (Black/White), and delivery location.</li>
+                                <li>Contact us with your size (S-XXL), color (Black/White), and delivery location.</li>
                                 <li>Once confirmed, settle payment via Buy Me a Coffee.</li>
                             </ol>
                         </div>

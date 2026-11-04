@@ -739,7 +739,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
                                     </div>
                                     <h4 className="text-xl font-medium text-white">Email Support</h4>
                                     <p className="text-sm text-zinc-400 leading-relaxed">
-                                        Official inquiries, billing assistance, manual token adjustments, and bug reports. Responses typically arrive within 24–48 business hours.
+                                        Official inquiries, billing assistance, manual token adjustments, and bug reports. Responses typically arrive within 24-48 business hours.
                                     </p>
                                     <p className="text-xs font-mono text-primary font-semibold">
                                         {ZCENE_SUPPORT_EMAIL}
